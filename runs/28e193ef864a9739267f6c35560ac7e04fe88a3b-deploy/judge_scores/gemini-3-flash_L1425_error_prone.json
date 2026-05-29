@@ -1,0 +1,528 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 101.56043553352356,
+  "tokens_in": 7379,
+  "tokens_out": 8771,
+  "n_tutor_turns_in_transcript": 25,
+  "scores": {
+    "active_learning": {
+      "score": 4,
+      "evidence": "Session is dominated by student MCQ attempts (turns 112, 116, 124, 126, 128, 130, 132, 134, 137, 139, 141, 143, 145, 148, 150, 152, 154) with minimal exposition."
+    },
+    "direct_instruction_active_practice": {
+      "score": 4,
+      "evidence": "Each teaching snippet (e.g., turn 135, 146) is immediately followed by a practice MCQ in 136, 147."
+    },
+    "deliberate_practice": {
+      "score": 3,
+      "evidence": "On errors tutor gives focused corrective feedback then a varied item (e.g., turn 151 'Try calculating 8\u00d75 first'), but feedback sometimes repeats same MCQ verbatim (turn 144)."
+    },
+    "mastery_learning": {
+      "score": 3,
+      "evidence": "Tutor does keep student on the same concept until correct (turns 126-134 small-scale), but doesn't diagnose root prereq when student repeatedly confuses large/small."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Turn 140 and 144 show the same question duplicated in a single tutor turn, and turn 113 leaked internal scaffolding ('mode strictly. No question marks'), increasing extraneous load."
+    },
+    "layering": {
+      "score": 4,
+      "evidence": "Concepts build cleanly: detail need \u2192 large scale \u2192 small scale \u2192 ratio meaning \u2192 calculation (turns 119\u2192122\u2192135\u2192146\u2192147)."
+    },
+    "non_interference": {
+      "score": 2,
+      "evidence": "Large-scale and small-scale concepts are introduced back-to-back (turns 122, 125) without an explicit discrimination cue, leading to the predictable confusion in 124, 126."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Practice is mostly massed on one concept at a time (e.g., four consecutive small-scale items 128-134); no mixing of map-choice and ratio-meaning items."
+    },
+    "testing_effect": {
+      "score": 4,
+      "evidence": "Student attempts every concept via retrieval MCQs before explanation is consolidated (e.g., turn 121 then explanation in 122)."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "After repeated small-scale errors (126, 128, 130, 132), tutor recycles same MCQ format rather than diagnosing the underlying ratio/zoom prereq."
+    }
+  },
+  "strongest_behaviors": [
+    "Consistent retrieval-first MCQ structure with immediate corrective feedback (e.g., turns 127, 129, 151).",
+    "Clear conceptual layering from map purpose \u2192 scale type \u2192 ratio meaning \u2192 calculation."
+  ],
+  "weakest_behaviors": [
+    "Leaked system/meta text in turn 113 ('mode strictly. No question marks. No restating the question.') breaking the tutoring illusion.",
+    "Duplicated question stems within a single tutor turn (turns 140, 144) increasing cognitive load and signalling template failure."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid leaking internal scaffolding/meta instructions",
+      "rationale": "Turn 113 leaked planning text to the student, exposing internal prompt structure.",
+      "evidence_quote": "mode` strictly. No question marks. No restating the question. *Revised Draft*:",
+      "evidence_turn": "113",
+      "suggested_prompt_edit": "Add: 'Never output planning text, draft labels, mode names, or meta-instructions. Output only the final student-facing message. If you catch a draft marker like *Revised Draft* in your output, suppress it.'",
+      "expected_effect": "Eliminates broken tutor turns that confuse the student.",
+      "severity": "high"
+    },
+    {
+      "title": "Prohibit duplicate question stems in one turn",
+      "rationale": "Turns 140 and 144 print the same MCQ twice, doubling cognitive load.",
+      "evidence_quote": "If a map scale is 1:50,000, what does the \"1\" represent? ... If a map scale is 1:50,000, what does the \"1\" represent?",
+      "evidence_turn": "140",
+      "suggested_prompt_edit": "Add rule: 'Each tutor turn must contain at most ONE question stem and ONE option list. Before sending, check that no sentence appears twice.'",
+      "expected_effect": "Cleaner turns, less student confusion.",
+      "severity": "high"
+    },
+    {
+      "title": "Make discriminating features explicit when introducing confusable pairs",
+      "rationale": "Large-scale vs small-scale were introduced back-to-back without a contrastive table; student inverted them in 124 and 126.",
+      "evidence_quote": "so a large-scale map shows a big area then, right",
+      "evidence_turn": "124",
+      "suggested_prompt_edit": "Add: 'When introducing a pair of confusable terms (e.g., large-scale vs small-scale), present a side-by-side contrast (area, detail, example) BEFORE the first practice item on the second term.'",
+      "expected_effect": "Reduces predictable confusion between paired concepts.",
+      "severity": "medium"
+    },
+    {
+      "title": "Diagnose the bottleneck after two consecutive errors",
+      "rationale": "Student missed small-scale items three times in a row (126, 128, 130) and tutor just recycled MCQs.",
+      "evidence_quote": "b) a map of a single house floor plan",
+      "evidence_turn": "130",
+      "suggested_prompt_edit": "Add: 'After 2 consecutive wrong answers on the same skill, switch to a diagnostic micro-question on the prerequisite (e.g., What does \"zoomed out\" mean for detail?) before resuming MCQs.'",
+      "expected_effect": "Targets the underlying confusion rather than recycling the same difficulty.",
+      "severity": "high"
+    },
+    {
+      "title": "Strip non-English glyphs and stray tokens",
+      "rationale": "Chinese characters '\u5e38' (129) and '\u5f15\u5bfc' (133) appeared mid-turn, suggesting template leakage.",
+      "evidence_quote": "\u5e38 Try this:",
+      "evidence_turn": "129",
+      "suggested_prompt_edit": "Add: 'Output English only (plus standard math symbols). Strip any non-ASCII token that is not a Seychelles place name or a math symbol before sending.'",
+      "expected_effect": "Removes distracting artifacts from tutor messages.",
+      "severity": "medium"
+    },
+    {
+      "title": "Vary practice (interleave) once a concept is correct once",
+      "rationale": "Four consecutive small-scale MCQs were used; student could be pattern-matching rather than reasoning.",
+      "evidence_quote": "Which of these is the best example of a small-scale map?",
+      "evidence_turn": "129",
+      "suggested_prompt_edit": "Add: 'After one correct answer on a concept, the next item should mix at least one previously taught concept (e.g., ratio meaning alongside scale type).'",
+      "expected_effect": "Strengthens transfer and discrimination.",
+      "severity": "medium"
+    },
+    {
+      "title": "Acknowledge non-substantive student turns without re-asking the same MCQ",
+      "rationale": "Turns 121 and 137 were fillers; tutor still re-posted full MCQs which felt mechanical.",
+      "evidence_quote": "okay! 1:25,000.",
+      "evidence_turn": "137",
+      "suggested_prompt_edit": "Add: 'If the student's reply is filler (no answer choice), prompt them briefly to pick a letter rather than reprinting a new MCQ.'",
+      "expected_effect": "More natural dialogue flow, less repetition.",
+      "severity": "low"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Add a post-generation sanitiser pass",
+      "rationale": "Multiple turns show truncation flags, duplicate stems, and leaked draft markers that a regex/LLM check could catch.",
+      "evidence_quote": "[flags: same_template_repeat,truncated]",
+      "evidence_turn": "115",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Catches malformed turns before they reach the student.",
+      "severity": "high"
+    },
+    {
+      "title": "Prerequisite routing on repeated failure",
+      "rationale": "Orchestrator should detect \u22652 errors on same skill and route to a remediation micro-lesson.",
+      "evidence_quote": "Not quite. A hiking trail map shows a lot of detail for a small area",
+      "evidence_turn": "129",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Avoids stuck loops, drives true mastery.",
+      "severity": "high"
+    },
+    {
+      "title": "Cap MCQ retries per concept and inject worked example",
+      "rationale": "Student needed 4 attempts on small-scale; a worked example with a visual analogy after 2 misses would unstick.",
+      "evidence_quote": "a) large-scale map",
+      "evidence_turn": "126",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Faster recovery from confusion.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warmer, varied corrective phrasing",
+      "rationale": "Most corrections start with 'Not quite' which becomes monotonous over many errors.",
+      "evidence_quote": "Not quite. A map of the Indian Ocean covers a massive area",
+      "evidence_turn": "115",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces error fatigue for an error-prone learner.",
+      "severity": "low"
+    },
+    {
+      "title": "Use a small visual or analogy when introducing scale types",
+      "rationale": "An inline magnifying-glass vs telescope sketch would cement large vs small scale.",
+      "evidence_quote": "That 'magnifying glass' view is what we call a **large-scale** map.",
+      "evidence_turn": "119",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Lowers confusion on the confusable pair.",
+      "severity": "medium"
+    },
+    {
+      "title": "Show the working space for calculation problems",
+      "rationale": "Calculation turn 147 asked student to 'show working' but UI then funneled into MCQs only.",
+      "evidence_quote": "calculate the actual distance between the villages in kilometres. Show your working.",
+      "evidence_turn": "147",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Aligns task framing with response affordance.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session has a solid retrieval-first MCQ structure and clean conceptual layering from map choice to scale calculation, but suffers from visible template/scaffolding leakage (turn 113), duplicated question stems (140, 144), stray non-English tokens (129, 133), and weak targeted remediation when the student repeatedly inverts large vs small scale. Strengthening prompt rules against meta-text and duplicates, plus adding a diagnostic branch after two consecutive errors on the same skill, would materially raise tutoring quality for an error-prone learner.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "111",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "113",
+      "preceding_student_turn_id": "112",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked B (Indian Ocean map) for finding a house.",
+      "tutor_excerpt": "Not quite. A map of the Indian Ocean covers a massive area, so individual houses",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "No",
+      "rationale": "Turn is truncated and leaks meta text; identifies error but doesn't tell student what to do next."
+    },
+    {
+      "tutor_turn_id": "115",
+      "preceding_student_turn_id": "114",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 114 is a parroted echo of tutor text, not a substantive new attempt.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "117",
+      "preceding_student_turn_id": "116",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose A (world map) for finding a specific house.",
+      "tutor_excerpt": "A world map shows the whole planet, so a single house would be invisible!",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly explains why A is wrong and re-presents the choices for action."
+    },
+    {
+      "tutor_turn_id": "119",
+      "preceding_student_turn_id": "118",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 118 demonstrates correct reasoning (magnifying glass, detail, Victoria).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "120",
+      "preceding_student_turn_id": "118",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn introducing new MCQ; preceding student turn was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "122",
+      "preceding_student_turn_id": "121",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 121 is filler ('ohh. large-scale map.'), not an answer to the MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "123",
+      "preceding_student_turn_id": "121",
+      "student_made_mistake": false,
+      "skip_reason": "Tutor continuation; no new substantive student answer.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "125",
+      "preceding_student_turn_id": "124",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student claims large-scale = big area, the inverse of correct definition.",
+      "tutor_excerpt": "It's actually the opposite! A **large-scale** map shows a small area in great detail",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Directly corrects misconception and gives a follow-up MCQ."
+    },
+    {
+      "tutor_turn_id": "127",
+      "preceding_student_turn_id": "126",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student called a continent-of-Africa map large-scale.",
+      "tutor_excerpt": "Not quite. A **small-scale** map shows a huge area (like a continent) with very little detail",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies error, explains, and offers a new actionable MCQ."
+    },
+    {
+      "tutor_turn_id": "129",
+      "preceding_student_turn_id": "128",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked hiking-trail map as small-scale; it's actually large-scale.",
+      "tutor_excerpt": "Not quite. A hiking trail map shows a lot of detail for a small area, which makes it a **large-scale** map.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Corrects clearly and presents fresh options; stray '\u5e38' lowers quality slightly but actionability remains."
+    },
+    {
+      "tutor_turn_id": "131",
+      "preceding_student_turn_id": "130",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student called a house floor plan a small-scale map.",
+      "tutor_excerpt": "Close, but a floor plan shows a lot of detail for a tiny area, so it's actually a **large-scale** map.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clear correction with new MCQ; mnemonic 'Small-scale = Small detail' is slightly misleading but actionable."
+    },
+    {
+      "tutor_turn_id": "133",
+      "preceding_student_turn_id": "132",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked Mah\u00e9 map as least detail for Victoria; world map is less.",
+      "tutor_excerpt": "A map of Mah\u00e9 is zoomed out, but a world map is zoomed out much further.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Pinpoints comparison and re-poses MCQ."
+    },
+    {
+      "tutor_turn_id": "135",
+      "preceding_student_turn_id": "134",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (world map).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "136",
+      "preceding_student_turn_id": "134",
+      "student_made_mistake": false,
+      "skip_reason": "Tutor continuation introducing new MCQ; preceding student was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "138",
+      "preceding_student_turn_id": "137",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 137 is filler ('okay! 1:25,000.'), no answer attempted.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "140",
+      "preceding_student_turn_id": "139",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 25,000 buildings on the map.",
+      "tutor_excerpt": "Not quite. The numbers in a scale like 1:25,000 aren't counting buildings; they are comparing **distances**.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Good explanation but duplicate MCQ stems in the same turn confuse next-action clarity."
+    },
+    {
+      "tutor_turn_id": "142",
+      "preceding_student_turn_id": "141",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said '1' means 1 km on the ground; '1' is the map distance unit.",
+      "tutor_excerpt": "In a scale ratio like 1:50,000, the first number always refers to the distance on the **map**.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clear correction and follow-up MCQ."
+    },
+    {
+      "tutor_turn_id": "144",
+      "preceding_student_turn_id": "143",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said '1' represents 50,000 units on the map.",
+      "tutor_excerpt": "Close\u2014but remember, the first number is always the small distance on the **map**",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Same MCQ printed twice; actionable but visually confusing."
+    },
+    {
+      "tutor_turn_id": "146",
+      "preceding_student_turn_id": "145",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "147",
+      "preceding_student_turn_id": "145",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation introducing calculation problem; preceding student was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "149",
+      "preceding_student_turn_id": "148",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 148 ('okay, so i multiply.') is a correct partial step, not a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "151",
+      "preceding_student_turn_id": "150",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 8\u00d750,000 = 40,000 (should be 400,000).",
+      "tutor_excerpt": "Almost! Try calculating $8 \\times 5$ first, then add the four zeros from 50,000 back to the end.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Excellent micro-hint decomposing the calculation."
+    },
+    {
+      "tutor_turn_id": "153",
+      "preceding_student_turn_id": "152",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 400,000 correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "155",
+      "preceding_student_turn_id": "154",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 400,000 cm = 400 km (correct is 4 km).",
+      "tutor_excerpt": "Not quite\u2014400 km would be 40,000,000 cm! Remember that 1 km is exactly 100,000 cm",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Counter-example plus rule plus retry MCQ \u2014 strong remediation."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 25,
+    "n_in_scope": 12,
+    "coverage_rate": 0.48,
+    "mistake_identification_exact": 1.0,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 1.0,
+    "mistake_location_lenient": 1.0,
+    "providing_guidance_exact": 0.9166666666666666,
+    "providing_guidance_lenient": 1.0,
+    "actionability_exact": 0.75,
+    "actionability_lenient": 0.9166666666666666,
+    "overall_exact_pass_rate": 0.9166666666666666,
+    "overall_lenient_pass_rate": 0.9791666666666666,
+    "strict_pass_rate": 0.75,
+    "lenient_pass_rate": 0.9166666666666666
+  }
+}

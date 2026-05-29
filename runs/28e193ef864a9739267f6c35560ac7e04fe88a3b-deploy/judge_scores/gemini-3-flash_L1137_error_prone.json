@@ -1,0 +1,510 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 97.75767159461975,
+  "tokens_in": 6100,
+  "tokens_out": 8748,
+  "n_tutor_turns_in_transcript": 25,
+  "scores": {
+    "active_learning": {
+      "score": 4,
+      "evidence": "Session is dominated by student attempts; tutor explanations are brief (e.g., turn 72, 75)."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Most instruction blocks are followed by a question, though turns 72-73 split instruction across two tutor turns."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On repeated errors (turns 85, 91, 93), tutor recycles similar arithmetic without diagnosing the misconception that 'sum so far' \u2260 'missing angle'."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Student repeatedly conflates partial sum with final answer (turns 74, 77, 79, 82, 88, 100); tutor advances anyway and never confirms mastery before moving to equal-angle division."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Turn 91 leaks raw JSON authoring scaffold to the student, increasing extraneous load; turn 103 shows two identical question blocks duplicated."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Tutor links to prior concept ('two straight lines = 360\u00b0', turn 70) and builds from sum-rule to division for equal angles (turn 99)."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Sum-around-point and straight-line-180\u00b0 introduced together (turn 70) but discriminating feature is made explicit."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Almost all problems are 'find the missing angle' with same procedure; only late shift to equal-angles division (turn 99)."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Student attempts each problem before feedback; however tutor often praises 'correctly added' (turn 75) when student actually gave wrong final answer."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "After repeated failures on 360-200, tutor drills 35\u00f75 and 10\u00f75 (turns 103-105) which is not the bottleneck (subtraction-from-360 confusion)."
+    }
+  },
+  "strongest_behaviors": [
+    "Brief explanations followed by immediate practice questions keep the student actively doing work.",
+    "Tutor explicitly links the 360\u00b0 rule to two straight lines of 180\u00b0 (turn 70), supporting layering."
+  ],
+  "weakest_behaviors": [
+    "Tutor repeatedly affirms the student's wrong final answer as 'correctly added' (turns 75, 79, 89), reinforcing the misconception that the sum is the answer.",
+    "Authoring JSON scaffolding leaked to the student (turn 91), and remediation targets the wrong prerequisite (arithmetic instead of the subtract-from-360 concept)."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid praising incorrect final answers",
+      "rationale": "Tutor repeatedly says 'You've correctly added...' when the student gave that sum AS the final answer, reinforcing the wrong procedure.",
+      "evidence_quote": "You've correctly added the two known angles to get 190! To find x, you just need to subtract that sum from the full 360\u00b0 circle.",
+      "evidence_turn": "75",
+      "suggested_prompt_edit": "When a student submits a partial computation as their final answer, do NOT praise the partial step. State clearly: 'That is not the final answer \u2014 it is only the sum of the known angles. The question asks for the missing angle.' Then prompt the next step.",
+      "expected_effect": "Student stops confusing intermediate sum with missing angle.",
+      "severity": "high"
+    },
+    {
+      "title": "Never emit raw JSON / authoring scaffolds to the student",
+      "rationale": "Turn 91 leaked a JSON object with 'correct_answer' and 'explanation' fields, breaking the lesson and revealing answers.",
+      "evidence_quote": "{ \"question\": \"What is 360 - 200?\", \"options\": {...}, \"correct_answer\": \"B\", \"explanation\": \"360 minus 200 equals 160.\" }",
+      "evidence_turn": "91",
+      "suggested_prompt_edit": "Never include JSON, internal tool payloads, 'correct_answer', or 'explanation' fields in the visible message. Question authoring must go through the tool call only; visible text contains only the rendered question and options.",
+      "expected_effect": "Eliminates answer leakage and confusing formatting.",
+      "severity": "high"
+    },
+    {
+      "title": "Diagnose the real bottleneck before remediating",
+      "rationale": "After student repeatedly gives the 'sum so far' as the answer, tutor drills basic division (35\u00f75, 10\u00f75) which is unrelated to the misconception.",
+      "evidence_quote": "What is 35 divided by 5? A) 5 B) 6 C) 7 D) 8",
+      "evidence_turn": "103",
+      "suggested_prompt_edit": "Before issuing remedial sub-questions, name the suspected misconception explicitly (e.g., 'student treats partial sum as final answer' vs 'arithmetic error') and target remediation to that misconception, not to arbitrary arithmetic.",
+      "expected_effect": "Remediation matches actual error, faster recovery.",
+      "severity": "high"
+    },
+    {
+      "title": "Vary problem types to prevent rote repetition",
+      "rationale": "Nearly every item is '3 or 4 angles around a point, find missing one'; student answers mechanically by adding given angles.",
+      "evidence_quote": "Three angles around a point are 80\u00b0, 110\u00b0, and x\u00b0. Find x.",
+      "evidence_turn": "76",
+      "suggested_prompt_edit": "Within each lesson, interleave at least three problem variants: missing-angle subtraction, equal-angle division, and a worked-example/identify-the-error item. Do not present more than two consecutive problems of the same variant.",
+      "expected_effect": "Forces transfer rather than pattern-matching.",
+      "severity": "medium"
+    },
+    {
+      "title": "Worked example before first attempt on new sub-skill",
+      "rationale": "Equal-angle division is introduced via assertion (turn 99) with no worked example; student immediately errs (turn 100, 102).",
+      "evidence_quote": "When angles around a point are equal, we simply divide 360\u00b0 by the number of angles to find the size of each one.",
+      "evidence_turn": "99",
+      "suggested_prompt_edit": "When introducing a new sub-skill, show one fully worked example (e.g., '4 equal angles: 360\u00f74 = 90\u00b0') before the student's first attempt on that sub-skill.",
+      "expected_effect": "Reduces first-try failure rate on new procedures.",
+      "severity": "medium"
+    },
+    {
+      "title": "Gate progression on mastery, not turn count",
+      "rationale": "Tutor advanced from missing-angle problems to equal-angle division despite the student never producing a correct missing-angle answer unaided.",
+      "evidence_quote": "Yes, 160 is right! When angles around a point are equal...",
+      "evidence_turn": "99",
+      "suggested_prompt_edit": "Require at least two consecutive correct unaided answers on the current sub-skill before introducing a new sub-skill. If not met, repeat with a varied problem at the same level.",
+      "expected_effect": "Prevents premature topic shifts and shaky foundations.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and block duplicate question rendering",
+      "rationale": "Turn 103 and 105 render the same question block twice in one tutor message.",
+      "evidence_quote": "What is 35 divided by 5? A)...D) 8\\n\\nWhat is 35 divided by 5? A)...D) 8",
+      "evidence_turn": "103",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Cleaner UI, less confusion.",
+      "severity": "medium"
+    },
+    {
+      "title": "Add a 'partial-sum-as-answer' misconception classifier",
+      "rationale": "The student exhibits the same misconception across many turns; engine should route to a dedicated remediation flow instead of continuing the same template.",
+      "evidence_quote": "my answer is 190. ... my answer is 170. ... my answer is 210.",
+      "evidence_turn": "74-79",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Triggers targeted remediation automatically.",
+      "severity": "high"
+    },
+    {
+      "title": "Cap consecutive failures before forcing a worked example",
+      "rationale": "After 3+ failures on 360-200, system still offered multiple-choice rather than walking through a worked example.",
+      "evidence_quote": "c) 200 ... a) 100 ... d) 260",
+      "evidence_turn": "92-96",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Breaks failure loops.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Honest feedback tone on partial answers",
+      "rationale": "Saying 'You've correctly added...' when the student gave a wrong final answer feels misleading; honest framing builds trust.",
+      "evidence_quote": "You've correctly added the known angles to get 210\u00b0.",
+      "evidence_turn": "80",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Student gets accurate signal about correctness.",
+      "severity": "medium"
+    },
+    {
+      "title": "Acknowledge student's self-generated problems",
+      "rationale": "The student keeps inventing their own problems (turns 77, 82, 88, 100); tutor ignores this engagement and substitutes its own.",
+      "evidence_quote": "two angles around a point are 130\u00b0 and 70\u00b0. what is the third angle? my answer is 170.",
+      "evidence_turn": "77",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Higher engagement and ownership.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The session keeps the student active and follows a reasonable layering arc from sum-rule to equal-angle division, but it is undermined by three serious failures: (1) the tutor repeatedly praises the student's partial sum as if it were correct, reinforcing the very misconception driving every error; (2) raw JSON authoring scaffolding (including the correct answer) leaks to the student; (3) remediation targets the wrong prerequisite \u2014 basic division drills instead of the 'subtract from 360' concept. Progression is not gated on mastery, and problem variety is low.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "66",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "68",
+      "preceding_student_turn_id": "67",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 180\u00b0 instead of 360\u00b0 for angles around a point.",
+      "tutor_excerpt": "180\u00b0 is the sum for a straight line, but a full rotation around a point covers a complete circle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly identifies error, contrasts with straight line, and asks student to retry."
+    },
+    {
+      "tutor_turn_id": "70",
+      "preceding_student_turn_id": "69",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 270\u00b0 instead of 360\u00b0.",
+      "tutor_excerpt": "Not quite. A full circle is like two straight lines (180\u00b0 each) put together.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies wrong answer and gives a concrete hint (180+180)."
+    },
+    {
+      "tutor_turn_id": "72",
+      "preceding_student_turn_id": "71",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 450\u00b0 after two wrong attempts.",
+      "tutor_excerpt": "Actually, the sum of angles around a point is always 360\u00b0.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Reveals the answer (acceptable after 3 attempts) and transitions to new question, but action on this item is just acknowledgement."
+    },
+    {
+      "tutor_turn_id": "73",
+      "preceding_student_turn_id": "71",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 72; no intervening student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "75",
+      "preceding_student_turn_id": "74",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student gave 190 (sum of 90+100) as the missing angle instead of 360-190=170.",
+      "tutor_excerpt": "You've correctly added the two known angles to get 190! To find x, you just need to subtract that sum from the full 360\u00b0 circle.",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Tutor reframes the wrong answer as a correct partial step rather than naming the error; guidance is technically right but praise is misleading and no retry is solicited before moving on."
+    },
+    {
+      "tutor_turn_id": "76",
+      "preceding_student_turn_id": "74",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 75.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "78",
+      "preceding_student_turn_id": "77",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again gave the sum (200) as the missing angle for 130+70; answer should be 160.",
+      "tutor_excerpt": "Two angles around a point are 100\u00b0 and 110\u00b0. The remaining angle is y\u00b0. Find y.",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor ignores the wrong answer and silently switches to a new problem \u2014 does not address the misconception at all."
+    },
+    {
+      "tutor_turn_id": "80",
+      "preceding_student_turn_id": "79",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student gave 210 (sum of 100+110) as the answer instead of 150.",
+      "tutor_excerpt": "You've correctly added the known angles to get 210\u00b0. To find y, you just need to subtract that sum from the total 360\u00b0.",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Same pattern \u2014 praises the partial sum and explains next step but doesn't insist on completing this item before moving on."
+    },
+    {
+      "tutor_turn_id": "81",
+      "preceding_student_turn_id": "79",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 80.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "83",
+      "preceding_student_turn_id": "82",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 80 (=70+80-70) \u2014 repeating the partial-sum misconception, with arithmetic error too; correct is 90.",
+      "tutor_excerpt": "Three angles around a point are 70\u00b0, 120\u00b0, and x\u00b0. Calculate x.",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor ignores the wrong answer and presents a different problem with no feedback."
+    },
+    {
+      "tutor_turn_id": "85",
+      "preceding_student_turn_id": "84",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 70 instead of 170 for 70+120+x=360.",
+      "tutor_excerpt": "Not quite\u201470 + 120 + 70 only adds up to 260\u00b0. We need the total to be 360\u00b0 for a full turn.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly identifies the shortfall, explains the rule, and offers a new MCQ to attempt."
+    },
+    {
+      "tutor_turn_id": "87",
+      "preceding_student_turn_id": "86",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 190\u00b0 (the sum 80+110) instead of 170\u00b0.",
+      "tutor_excerpt": "You've found the sum of the two known angles. Remember that all angles around a point must add up to 360\u00b0. Subtract 190\u00b0 from 360\u00b0 to find the value of x and try again.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Names the error (chose the sum), states the rule, and gives a concrete next step ('subtract 190 from 360 and try again')."
+    },
+    {
+      "tutor_turn_id": "89",
+      "preceding_student_turn_id": "88",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again gave the partial sum 200 (95+105) as the missing angle; correct is 160.",
+      "tutor_excerpt": "You've correctly added the two known angles to get 200! To find z, you just need to subtract that sum from the full 360\u00b0 circle.",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Praises the partial step but does follow up with a concrete sub-question about 360-200."
+    },
+    {
+      "tutor_turn_id": "91",
+      "preceding_student_turn_id": "90",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 200\u00b0 again instead of 160\u00b0.",
+      "tutor_excerpt": "Not quite\u2014200 is the sum of the angles we already have... {\"correct_answer\": \"B\", \"explanation\": \"360 minus 200 equals 160.\"}",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Although the verbal hint is okay, the message leaks the correct answer in raw JSON, which destroys the retrieval opportunity."
+    },
+    {
+      "tutor_turn_id": "93",
+      "preceding_student_turn_id": "92",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 200 again for 360-200.",
+      "tutor_excerpt": "Not quite\u2014200 is what we are starting with. ... 300 - 200 = 100, then add the extra 60. What do you get?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Decomposes the subtraction and asks the student to combine \u2014 clear next action."
+    },
+    {
+      "tutor_turn_id": "95",
+      "preceding_student_turn_id": "94",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 100 to 360-200 instead of 160.",
+      "tutor_excerpt": "Close! Let's try counting up instead. From 200 to 300 is 100, and from 300 to 360 is another 60.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Alternative scaffold (counting up) with explicit next step (100+60)."
+    },
+    {
+      "tutor_turn_id": "97",
+      "preceding_student_turn_id": "96",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 260 to 100+60 instead of 160.",
+      "tutor_excerpt": "What is 100 + 60? A) 100 B) 160 C) 200 D) 260",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Simply re-asks the same question with no feedback identifying the error."
+    },
+    {
+      "tutor_turn_id": "99",
+      "preceding_student_turn_id": "98",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (160).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "101",
+      "preceding_student_turn_id": "100",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 60\u00b0 for 5 equal angles around a point; correct is 72\u00b0.",
+      "tutor_excerpt": "Not quite\u201460 \u00d7 5 is 300, but we need to reach 360\u00b0 for a full turn. Try dividing 360 by 5 to find the exact size of each angle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Checks the student's answer by reversing, explains shortfall, suggests division, and gives MCQ."
+    },
+    {
+      "tutor_turn_id": "103",
+      "preceding_student_turn_id": "102",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 80\u00b0 (80\u00d75=400) instead of 72\u00b0.",
+      "tutor_excerpt": "That's a bit too high\u201480 \u00d7 5 = 400, but we need exactly 360\u00b0. Let's break the division down... What is 35 divided by 5?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Identifies error well, but the chosen scaffold (35\u00f75) is loosely connected to 360\u00f75 and the question is duplicated."
+    },
+    {
+      "tutor_turn_id": "105",
+      "preceding_student_turn_id": "104",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 6 to 35\u00f75; correct is 7.",
+      "tutor_excerpt": "Actually, 5 \u00d7 7 = 35, so 35 \u00f7 5 = 7. If we know 350 \u00f7 5 = 70, we just have 10 left over to reach 360. What is 10 \u00f7 5?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Corrects, connects to 350\u00f75=70, and asks the next sub-question."
+    },
+    {
+      "tutor_turn_id": "107",
+      "preceding_student_turn_id": "106",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered 10\u00f75=2 correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "108",
+      "preceding_student_turn_id": "106",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of turn 107.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "110",
+      "preceding_student_turn_id": "109",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 80\u00b0 for 4 equal angles around a point; correct is 90\u00b0.",
+      "tutor_excerpt": "If 4 equal angles make a full 360\u00b0 circle, what is the size of each angle? A) 80\u00b0 B) 90\u00b0 C) 100\u00b0 D) 120\u00b0",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor just re-poses the question as MCQ without acknowledging the wrong answer or providing any hint about 360\u00f74."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 25,
+    "n_in_scope": 18,
+    "coverage_rate": 0.72,
+    "mistake_identification_exact": 0.6111111111111112,
+    "mistake_identification_lenient": 0.7777777777777778,
+    "mistake_location_exact": 0.6111111111111112,
+    "mistake_location_lenient": 0.7777777777777778,
+    "providing_guidance_exact": 0.5555555555555556,
+    "providing_guidance_lenient": 0.7222222222222222,
+    "actionability_exact": 0.5555555555555556,
+    "actionability_lenient": 0.9444444444444444,
+    "overall_exact_pass_rate": 0.5833333333333334,
+    "overall_lenient_pass_rate": 0.8055555555555556,
+    "strict_pass_rate": 0.4444444444444444,
+    "lenient_pass_rate": 0.7222222222222222
+  }
+}

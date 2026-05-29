@@ -1,0 +1,289 @@
+{
+  "transcript": "sonnet-4_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 65.72341895103455,
+  "tokens_in": 4878,
+  "tokens_out": 5274,
+  "n_tutor_turns_in_transcript": 8,
+  "scores": {
+    "active_learning": {
+      "score": 2,
+      "evidence": "Most of the session is tutor explanation with only MCQ checks; the student only attempts one calculation problem at the very end."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Each instruction block is followed by a question, but they're mostly meta-recall MCQs about which operation, not actual practice."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "When student answered 'plus' (turn 4), the tutor offered corrective feedback but then asked essentially the same conceptual MCQ three times rather than giving a varied practice problem."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Tutor moved on after the student finally picked option A in turn 10, but this was a 4-option MCQ after process-of-elimination, not demonstrated mastery."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Worked example is presented with clear numbered steps before practice, though the figure reference ('Look at the diagram below') has no actual diagram (turn 11, 13)."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Explicitly links the new rule to the prior 360\u00b0 complete-turn idea ('which is why angles around a point sum to 360\u00b0', turn 3)."
+    },
+    "non_interference": {
+      "score": 4,
+      "evidence": "Single topic focus throughout; no confusable concepts introduced back-to-back."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "All items are the same type (missing angle around a point); no variation in problem structure."
+    },
+    "testing_effect": {
+      "score": 2,
+      "evidence": "Tutor reveals the answer (105\u00b0) inside the worked example before any retrieval, and the corrective MCQs essentially give away the answer in the options."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "After repeated confusion between addition/subtraction (turns 4, 6, 8), the tutor kept asking variations of the same MCQ rather than diagnosing the underlying arithmetic/operation-identification weakness."
+    }
+  },
+  "strongest_behaviors": [
+    "Clear worked-example structure with numbered steps (turn 3) that scaffolds the procedure.",
+    "Persistent, non-judgmental corrective feedback when the student selected wrong options ('Close, but look carefully...', turn 7)."
+  ],
+  "weakest_behaviors": [
+    "Referring to a diagram that does not exist ('Look at the diagram below showing four angles around a point', turns 11 and 13).",
+    "Orchestration breakdown at turn 12-14 where the student turn contains tutor-style content (a worked example and new question), and the tutor at turn 15 ignores the student's posed problem (90\u00b0, 120\u00b0, x) and substitutes a different one."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid references to non-existent diagrams",
+      "rationale": "Tutor repeatedly says 'Look at the diagram below' when no image is rendered, confusing the student.",
+      "evidence_quote": "Look at the diagram below showing four angles around a point.",
+      "evidence_turn": "11",
+      "suggested_prompt_edit": "Never reference a 'diagram', 'figure', or 'image below' unless an image tool has actually produced one in this turn. If no image is available, describe the configuration verbally instead (e.g., 'Imagine four angles meeting at one point...').",
+      "expected_effect": "Removes confusing dead references; forces verbal description suitable for text-only delivery.",
+      "severity": "high"
+    },
+    {
+      "title": "Vary problems after mastery rather than re-asking the same MCQ",
+      "rationale": "After the student confused addition/subtraction, the tutor asked three near-identical MCQs about operations instead of giving a fresh worked numeric example.",
+      "evidence_quote": "What two operations do we use to find a missing angle around a point?",
+      "evidence_turn": "9",
+      "suggested_prompt_edit": "If a student gets a conceptual MCQ wrong, do NOT re-ask the same MCQ with reshuffled options more than once. Instead, give a small worked numeric step (e.g., 'What is 360 - 200?') to isolate the bottleneck, then return to the original task.",
+      "expected_effect": "Reduces multiple-choice guessing and surfaces the actual arithmetic/concept gap.",
+      "severity": "high"
+    },
+    {
+      "title": "Withhold the answer inside worked examples until student attempts a step",
+      "rationale": "The worked example (turn 3) reveals x = 105\u00b0 before the student does anything, undermining retrieval practice.",
+      "evidence_quote": "x = 360\u00b0 - 255\u00b0 = 105\u00b0",
+      "evidence_turn": "3",
+      "suggested_prompt_edit": "In worked examples, pause before the final numerical answer and ask the student to compute the last step themselves (e.g., 'So x = 360 - 255 = ?'). Reveal the answer only after the student responds.",
+      "expected_effect": "Converts passive worked example into active practice.",
+      "severity": "medium"
+    },
+    {
+      "title": "Add interleaved variation in practice problems",
+      "rationale": "Every problem is the same template (find missing angle around a point given others); no variety.",
+      "evidence_quote": "Four angles around a point measure 60\u00b0, 75\u00b0, 80\u00b0, and x. Find the value of x.",
+      "evidence_turn": "15",
+      "suggested_prompt_edit": "Across the session, vary practice items: (a) 3 known angles + missing, (b) 5 angles including an algebraic expression like 2x, (c) reversed problem (given the missing angle, find one of the others), (d) check whether a set of angles can fit around a point.",
+      "expected_effect": "Prevents rote pattern-matching; deepens understanding of the 360\u00b0 rule.",
+      "severity": "medium"
+    },
+    {
+      "title": "Diagnose the specific error before re-explaining",
+      "rationale": "When student answered 'we used plus' (turn 4), tutor jumped straight to re-explaining rather than asking what symbol they saw.",
+      "evidence_quote": "we used plus",
+      "evidence_turn": "4",
+      "suggested_prompt_edit": "On a wrong answer, first ask a short diagnostic question ('Look at the equation x = 360\u00b0 - 255\u00b0. What symbol do you see between 360 and 255?') before re-explaining.",
+      "expected_effect": "Targets the misconception precisely; reduces repeated guessing.",
+      "severity": "medium"
+    },
+    {
+      "title": "Prevent role bleed-through / accept student-authored problems gracefully",
+      "rationale": "Turn 14 shows the student channel contained tutor-style content posing a new problem (90\u00b0, 120\u00b0, x); the tutor ignored it and posed a different problem.",
+      "evidence_quote": "Three angles around a point are 90\u00b0, 120\u00b0, and x\u00b0. What is the value of x?",
+      "evidence_turn": "14",
+      "suggested_prompt_edit": "If the student message contains a question the student appears to have posed (or accepted), honor that exact problem next rather than substituting a new one. Never ignore the student's stated numbers.",
+      "expected_effect": "Maintains conversational coherence and student agency.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Cap repeated-MCQ retries and route to remediation",
+      "rationale": "Student got the same conceptual MCQ wrong twice (turns 6, 8); the engine should have routed to a remedial micro-task, not a third reshuffle.",
+      "evidence_quote": "c) addition to find the sum, then multiplication to find the missing angle",
+      "evidence_turn": "8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents MCQ thrash; ensures genuine remediation triggers after 2 failed retries.",
+      "severity": "high"
+    },
+    {
+      "title": "Validate image availability before tutor references figures",
+      "rationale": "Turns 11 and 13 reference a 'diagram below' that does not exist; orchestration should detect missing media and either generate it or strip the reference.",
+      "evidence_quote": "Look at the diagram below showing four angles around a point.",
+      "evidence_turn": "13",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Eliminates broken figure references at the system level.",
+      "severity": "high"
+    },
+    {
+      "title": "Detect and recover from role/channel confusion",
+      "rationale": "Turn 12 and 14 contain tutor-like content authored under STUDENT role; the orchestration should detect this anomaly and re-prompt or correct routing.",
+      "evidence_quote": "Great! Let's put your understanding to the test.",
+      "evidence_turn": "12",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents incoherent two-tutor exchanges visible in turns 12-15.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Soften meta-questioning that feels like a quiz on vocabulary",
+      "rationale": "Three consecutive operation-naming MCQs may feel demoralizing to an error-prone learner.",
+      "evidence_quote": "What operation did we use to find x in the equation x = 360\u00b0 - 255\u00b0?",
+      "evidence_turn": "5",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Improves student confidence; reduces frustration loops.",
+      "severity": "medium"
+    },
+    {
+      "title": "Use verbal spatial descriptions in place of missing diagrams",
+      "rationale": "Student sees instructions to look at something that isn't there; offer a vivid verbal picture instead.",
+      "evidence_quote": "Look at the diagram below showing four angles around a point.",
+      "evidence_turn": "11",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Keeps the learner oriented and engaged in text-only sessions.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session teaches one rule (angles around a point sum to 360\u00b0) with a clear worked example, but it leans heavily on conceptual MCQs about operation names rather than actual numeric practice. When the student confused addition with subtraction, the tutor asked variants of the same MCQ three times instead of diagnosing or giving a fresh numeric task. Two serious orchestration issues \u2014 broken diagram references and apparent role confusion in turns 12\u201314 \u2014 undermine coherence. The session ends with the tutor finally posing a real practice problem but ignoring the problem the student had just posed.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "1",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "3",
+      "preceding_student_turn_id": "2",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (360\u00b0).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "5",
+      "preceding_student_turn_id": "4",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 'plus' but Step 3 used subtraction.",
+      "tutor_excerpt": "Not quite - let's look at Step 3 again. We had 255\u00b0 from adding the known angles, then we needed to find what was left to make 360\u00b0.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor clearly identifies the wrong operation, points to Step 3, re-explains the subtraction, and presents an MCQ as the next action."
+    },
+    {
+      "tutor_turn_id": "7",
+      "preceding_student_turn_id": "6",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked 'addition' again instead of subtraction.",
+      "tutor_excerpt": "Close, but look carefully at the equation: x = 360\u00b0 - 255\u00b0. The symbol between 360\u00b0 and 255\u00b0 is a minus sign (-), which means we're using subtraction, not addition.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor explicitly identifies the error, points to the minus sign, explains subtraction, and asks a follow-up question."
+    },
+    {
+      "tutor_turn_id": "9",
+      "preceding_student_turn_id": "8",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 'addition then multiplication' instead of 'addition then subtraction'.",
+      "tutor_excerpt": "Almost there! You're right that we use addition first... But look at the second part - we use subtraction (not multiplication) to find the missing angle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identification and location are clear, guidance is correct, but the next action is yet another near-identical MCQ which doesn't give the student a meaningfully different task."
+    },
+    {
+      "tutor_turn_id": "11",
+      "preceding_student_turn_id": "10",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered the MCQ correctly.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "13",
+      "preceding_student_turn_id": "12",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 12 contains tutor-style framing, not a substantive student response with a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "15",
+      "preceding_student_turn_id": "14",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 14 contains a correct worked solution and a new problem posed to the tutor; no student mistake to remediate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 8,
+    "n_in_scope": 3,
+    "coverage_rate": 0.375,
+    "mistake_identification_exact": 1.0,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 1.0,
+    "mistake_location_lenient": 1.0,
+    "providing_guidance_exact": 1.0,
+    "providing_guidance_lenient": 1.0,
+    "actionability_exact": 0.6666666666666666,
+    "actionability_lenient": 1.0,
+    "overall_exact_pass_rate": 0.9166666666666666,
+    "overall_lenient_pass_rate": 1.0,
+    "strict_pass_rate": 0.6666666666666666,
+    "lenient_pass_rate": 1.0
+  }
+}
