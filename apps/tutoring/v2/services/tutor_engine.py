@@ -30,6 +30,8 @@ from apps.tutoring.v2.contracts import (
     GradingRequest,
     GradingResult,
     ObjectiveProgress,
+    OpenQuestion,
+    QuestionSource,
     RouterDecision,
     SessionRuntimeState,
     TutoringContext,
@@ -141,6 +143,14 @@ class TutorEngine:
                 "method_evidence_present": (
                     _decision.method_evidence_present
                     if _decision is not None else None
+                ),
+                "open_question_present": (
+                    _decision.open_question_present
+                    if _decision is not None else None
+                ),
+                "open_question_text": (
+                    (_decision.open_question_text or "")[:200]
+                    if _decision is not None else ""
                 ),
             },
         }
@@ -281,13 +291,28 @@ class TutorEngine:
         )
 
         # 2. Grader — only when the router asked for a verdict.
+        #
+        # open_question authority redesign (memo §5): the question to grade
+        # against is the COMMITTED open_question when present; otherwise,
+        # when the router PERCEIVED a question from the transcript that was
+        # never committed (e.g. an EXPLAIN opener authored it in prose),
+        # resolve that perceived text back to a bank LessonStep (grader owns
+        # matching) and commit it so per-open-question counters, gate
+        # context, and resume all treat it uniformly. This closes the
+        # silent-pivot: a real answer to a perceived-but-uncommitted
+        # question is graded, not dropped.
         verdict: Optional[GradingResult] = None
-        if router_decision.verdict_needed and runtime_state.open_question is not None:
+        open_question_to_grade = self._open_question_for_grading(
+            runtime_state=runtime_state,
+            router_decision=router_decision,
+            context=context,
+        )
+        if router_decision.verdict_needed and open_question_to_grade is not None:
             try:
                 verdict = self.grader.grade_student_response(
                     context,
                     GradingRequest(
-                        open_question=runtime_state.open_question,
+                        open_question=open_question_to_grade,
                         student_input=student_input,
                         is_math=self._is_math_lesson(context),
                         kb_chunks=[],
@@ -607,6 +632,13 @@ class TutorEngine:
                 "named_their_reasoning": router_decision.named_their_reasoning,
                 "richness": router_decision.richness,
                 "rule_fired": router_decision.rule_fired,
+                # Open-question perception (open_question_authority_redesign.md
+                # §5) — the router's transcript-derived judgment that now
+                # drives grading. Surfaced for the observability dashboard.
+                "open_question_present": router_decision.open_question_present,
+                "open_question_text": (
+                    router_decision.open_question_text or ""
+                )[:200],
             },
         }
 
@@ -654,6 +686,76 @@ class TutorEngine:
         # non-answer-attempt branch.
         chosen = self._resolve_move(decision=decision, verdict=None)
         return chosen, decision.reason, decision
+
+    def _open_question_for_grading(
+        self,
+        *,
+        runtime_state: SessionRuntimeState,
+        router_decision: RouterDecision,
+        context: TutoringContext,
+    ) -> Optional[OpenQuestion]:
+        """Resolve the question to grade against (memo §5).
+
+        Priority:
+          1. The COMMITTED ``runtime_state.open_question`` (fast path —
+             a tool-posed bank question with a canonical already in
+             state).
+          2. Else, when the router PERCEIVED a question from the
+             transcript (``open_question_present`` + ``open_question_
+             text``) that was never committed, resolve that text back to
+             a bank ``LessonStep`` (grader owns matching) and COMMIT it
+             into ``runtime_state`` so the per-open-question counters,
+             gate context, and resume path all see it. On no bank match,
+             grade the perceived stem as authored (thin, uncommitted —
+             grounded adjudication).
+
+        Returns ``None`` when there is nothing to grade (no committed
+        question and the router perceived none) — preserving the legacy
+        "don't grade without an open question" behaviour and keeping
+        backward-compat with router decisions that predate the perceived
+        fields (``open_question_present is None``).
+        """
+        if runtime_state.open_question is not None:
+            return runtime_state.open_question
+        if not router_decision.open_question_present:
+            return None
+        text = (router_decision.open_question_text or "").strip()
+        if not text:
+            return None
+        try:
+            resolved = self.grader.resolve_open_question_from_text(
+                lesson_id=context.lesson_id, question_text=text,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[TutorEngine] perceived open-question resolution raised "
+                "%s — grading the perceived stem as authored",
+                type(exc).__name__,
+            )
+            resolved = None
+        if resolved is not None:
+            # Commit the perceived → bank-resolved question so the rest of
+            # the turn (counter updates, clear-on-correct, gate context,
+            # resume) treats it as the tracked open question.
+            runtime_state.open_question = resolved
+            runtime_state.attempts_on_open_question = 0
+            with emit_span(
+                "audit", "router.perceived_open_question_committed",
+                payload={
+                    "lesson_step_id": resolved.id,
+                    "answer_type": resolved.answer_type,
+                },
+            ):
+                pass
+            return resolved
+        # No confident bank match — grade the perceived stem grounded,
+        # uncommitted (the grader's grounded path; no canonical tracking).
+        return OpenQuestion(
+            source=QuestionSource.LESSON_STEP,
+            id=0,
+            canonical="",
+            rendered_stem=text,
+        )
 
     def _route(
         self,

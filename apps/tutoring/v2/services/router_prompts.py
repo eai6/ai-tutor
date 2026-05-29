@@ -142,11 +142,30 @@ relevant prior turns. Emit these judgments in your decision payload:
     rich: student named the mechanism / formula / chain of reasoning.
     bare: just the answer with no reasoning.
 
+(e) open_question_present + open_question_text  (perceived from the
+    transcript — the ground truth of what the student actually saw)
+    Read the transcript, especially the LAST tutor turn. A question is
+    "on the table" when the most recent tutor turn posed a question (or
+    an instruction the student must act on) that the student has NOT yet
+    answered in a later turn.
+      - open_question_present: true when such an unanswered question
+        exists right now; false otherwise.
+      - open_question_text: when present == true, the VERBATIM text of
+        that question — the exact stem the student is answering, copied
+        from the transcript (include any A/B/C/D options shown). Empty
+        string when present == false.
+    Determine this from the TRANSCRIPT. The numeric counters below stay
+    authoritative for COUNTS (how many attempts, how many correct); the
+    transcript is authoritative for WHETHER a question is open and WHAT
+    its text is. The rules below branch on the value YOU perceive here.
+
 ────────────────────────────────────────────────────────────────────
 ROUTING RULES — PRINCIPLE-CITED
 
-Apply in order. The FIRST matching rule wins. The named counter
-fields are authoritative — do not re-count from the transcript.
+Apply in order. The FIRST matching rule wins. ``open_question_present``
+is your judgment (e), read from the transcript. Every OTHER named
+counter is an authoritative numeric value — do not re-count those from
+the transcript.
 
 Rule 1 — Mastery Learning Ch.13 (lesson assessment complete)
   WHEN: assessable_slots_remaining == 0
@@ -301,6 +320,8 @@ forced_close, doing_rate_floor, opening_turn, post_step_pose):
   "method_evidence_present": <true | false>,
   "named_their_reasoning": <true | false | null>,
   "richness": <"rich" | "bare" | null>,
+  "open_question_present": <true | false>,
+  "open_question_text": "<verbatim stem if present, else empty>",
   "rule_fired": "Rule N (...)"
 }
 
@@ -318,6 +339,8 @@ For the ANSWER_ATTEMPT case:
   "method_evidence_present": <true | false>,
   "named_their_reasoning": <true | false | null>,
   "richness": <"rich" | "bare" | null>,
+  "open_question_present": true,
+  "open_question_text": "<verbatim stem of the question being answered>",
   "rule_fired": "Rule 7 (answer_attempt)"
 }
 
@@ -362,14 +385,17 @@ def render_router_user_prompt(request: RouterRequest) -> str:
         f"{open_q_block}\n\n"
         f"{counters_block}\n\n"
         f"=== Student profile summary ===\n{profile_block}\n\n"
-        f"=== Recent transcript (last {len(request.last_n_turns)} turns; "
-        f"for qualitative context only — do NOT count from this) ===\n"
+        f"=== Recent transcript (last {len(request.last_n_turns)} turns) ===\n"
+        f"Authoritative for open-question perception (judgment (e)): read it "
+        f"to decide open_question_present + open_question_text. NOT a source "
+        f"for the numeric counters above — use those as given.\n"
         f"{transcript_block}\n\n"
         f"=== CURRENT STUDENT TURN ===\n"
         f"{(request.student_input or '').strip() or '(no input — opening / transitional turn)'}\n\n"
         f"---\n"
-        f"Classify the turn (answer_attempt / help_request / "
-        f"opening_turn / forced_close) and return strict JSON per the "
+        f"Perceive open_question_present + open_question_text from the "
+        f"transcript, classify the turn (answer_attempt / help_request / "
+        f"opening_turn / forced_close), and return strict JSON per the "
         f"schema in the system prompt. No prose, no fences."
     )
 
@@ -464,7 +490,6 @@ def _render_counters_block(request: RouterRequest) -> str:
     )
     return (
         "=== Runtime counters (authoritative — do not re-derive) ===\n"
-        f"open_question_present: {request.open_question_has_pending}\n"
         f"wrong_attempts_on_open_question: {request.wrong_attempts_on_open_question}\n"
         f"partial_attempts_on_open_question: {request.partial_attempts_on_open_question}\n"
         f"consecutive_wrong_on_open_question: {request.consecutive_wrong_on_open_question}\n"
@@ -484,12 +509,26 @@ def _render_counters_block(request: RouterRequest) -> str:
 
 
 def _render_open_q_block(request: RouterRequest) -> str:
+    """Last engine-committed question — REFERENCE ONLY.
+
+    Open-question presence is perceived from the transcript (system-prompt
+    judgment (e)), not from this block. This surfaces the last committed
+    stem purely to help the router copy ``open_question_text`` verbatim
+    when the committed question IS the one on the table. It may be stale
+    (e.g. the question was just answered, or a later prose question
+    superseded it) — the transcript is authoritative.
+    """
     if not request.open_question_has_pending:
-        return "=== Open question ===\n(none — no question in flight)"
+        return (
+            "=== Last committed question (reference only) ===\n"
+            "(none on record — determine open_question_present from the "
+            "transcript)"
+        )
     stem = _clip(request.open_question_stem or "", 400)
     return (
-        "=== Open question ===\n"
-        f"In flight: {stem!r}"
+        "=== Last committed question (reference only; verify against the "
+        "transcript) ===\n"
+        f"{stem!r}"
     )
 
 

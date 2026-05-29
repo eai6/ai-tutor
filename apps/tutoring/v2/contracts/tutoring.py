@@ -367,6 +367,18 @@ class RouterDecision(BaseModel):
     richness: Optional[str] = None  # "rich" | "bare" | None
     rule_fired: Optional[str] = Field(default=None, max_length=80)
 
+    # ── Open-question perception (open_question_authority_redesign.md §5) ──
+    # The router now PERCEIVES whether a question is on the table from the
+    # transcript (ground truth of what the student saw), rather than the
+    # engine feeding a stored flag that can drift. ``open_question_present``
+    # is the perceived value the routing rules branch on;
+    # ``open_question_text`` is the verbatim stem the grader matches back to
+    # the bank (grader owns matching end-to-end). Optional + default so
+    # legacy decisions (and the fail-soft path) keep validating; the engine
+    # falls back to the stored flag when these are None/empty.
+    open_question_present: Optional[bool] = None
+    open_question_text: str = Field(default="", max_length=1000)
+
     @model_validator(mode="after")
     def _validate_case_shape(self) -> "RouterDecision":
         if self.verdict_needed:

@@ -225,6 +225,16 @@ class StudentGrader:
         affirming. The state_inconsistent reason_code preserves the
         observability signal.
         """
+        # open_question authority redesign (memo
+        # open_question_authority_redesign.md §5): the router now PERCEIVES
+        # the open question from the transcript and may hand the grader a
+        # "thin" OpenQuestion — verbatim ``rendered_stem`` text only, with
+        # no bank ``id`` / ``canonical`` (id <= 0). The grader owns bank-
+        # matching end-to-end: resolve the text back to a LessonStep so the
+        # deterministic + LLM paths get a real canonical. On no confident
+        # match the thin question is graded as-is (grounded adjudication).
+        request = self._resolve_thin_open_question(context, request)
+
         stem = (request.open_question.rendered_stem or "").strip()
         if not stem:
             return GradingResult(
@@ -296,6 +306,143 @@ class StudentGrader:
             )
             bank_match = None
         return bank_match
+
+    # ------------------------------------------------------------------
+    # Thin open-question resolution (open_question authority redesign)
+    # ------------------------------------------------------------------
+
+    def _resolve_thin_open_question(
+        self,
+        context: TutoringContext,
+        request: GradingRequest,
+    ) -> GradingRequest:
+        """Resolve a router-perceived ("thin") open question to a bank row.
+
+        The router perceives the open question from the transcript and
+        hands the grader an ``OpenQuestion`` carrying only the verbatim
+        ``rendered_stem`` text — ``id <= 0`` and an empty ``canonical``
+        (memo open_question_authority_redesign.md §5). The grader owns
+        bank-matching end-to-end: match that text to an undelivered-or-
+        delivered ``LessonStep`` in the lesson, and rebuild the request
+        with the bank ``id`` / ``canonical`` / ``answer_type`` / fully-
+        rendered stem so the deterministic + LLM grading paths run
+        unchanged.
+
+        No confident match → return the request untouched; the thin
+        stem is graded as authored (grounded adjudication). Fail-soft:
+        any ORM / import error returns the request untouched.
+        """
+        open_q = request.open_question
+        # Only thin questions need resolution. A committed open_question
+        # (real bank id + canonical) is the fast path — leave it alone.
+        if open_q is None:
+            return request
+        if open_q.id and open_q.id > 0:
+            return request
+        if (open_q.canonical or "").strip():
+            return request
+        stem_text = (open_q.rendered_stem or "").strip()
+        if not stem_text:
+            return request
+        try:
+            resolved = self._match_text_to_lesson_step(
+                lesson_id=context.lesson_id, question_text=stem_text,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[StudentGrader] thin open-question bank match raised "
+                "%s — grading the perceived stem as authored",
+                type(exc).__name__,
+            )
+            return request
+        if resolved is None:
+            return request
+        with emit_span(
+            "audit", "grader.thin_open_question_resolved",
+            payload={
+                "lesson_step_id": resolved.id,
+                "answer_type": resolved.answer_type,
+            },
+        ):
+            pass
+        return request.model_copy(update={"open_question": resolved})
+
+    def resolve_open_question_from_text(
+        self, *, lesson_id: int, question_text: str,
+    ) -> Optional[OpenQuestion]:
+        """Public: match perceived question text to a bank ``LessonStep``.
+
+        The grader owns text→bank matching end-to-end (memo
+        open_question_authority_redesign.md §9.3). The engine calls this
+        when the router perceives an open question the store never
+        committed, to resolve a real canonical before grading. Returns a
+        fully-populated ``OpenQuestion`` on a confident match, else None.
+        """
+        return self._match_text_to_lesson_step(
+            lesson_id=lesson_id, question_text=question_text,
+        )
+
+    @staticmethod
+    def _match_text_to_lesson_step(
+        *, lesson_id: int, question_text: str,
+    ) -> Optional[OpenQuestion]:
+        """Match perceived question text to a bank ``LessonStep``.
+
+        Returns a fully-populated ``OpenQuestion`` (bank id + canonical +
+        answer_type + rendered stem with answer-shape suffix) on a
+        confident match, else ``None``. Conservative by design (§9.3
+        sub-risk): mis-matching a *different* step is worse than no
+        match, so the threshold is high and ambiguity yields ``None``.
+
+        Match score (on the normalized question *core* — options /
+        T-F suffix stripped from both sides):
+          - exact normalized equality → 1.0
+          - one core is a substring of the other → 0.95
+          - else token Jaccard overlap
+        A step scores only if ≥ ``_THIN_MATCH_THRESHOLD``; the single
+        best-scoring step wins, and a near-tie between two different
+        steps (top two within 0.05) is treated as ambiguous → None.
+        """
+        from apps.curriculum.models import LessonStep
+        from apps.tutoring.v2.tools.pose_question import (
+            _render_bank_stem_with_options,
+        )
+
+        target = _normalize_question_core(question_text)
+        if not target:
+            return None
+        candidates = list(
+            LessonStep.objects
+            .filter(lesson_id=lesson_id)
+            .exclude(question__isnull=True)
+            .exclude(question__exact="")
+            .order_by("order_index")
+        )
+        scored: list[tuple[float, Any]] = []
+        for step in candidates:
+            core = _normalize_question_core(getattr(step, "question", "") or "")
+            if not core:
+                continue
+            scored.append((_question_core_similarity(target, core), step))
+        if not scored:
+            return None
+        scored.sort(key=lambda row: row[0], reverse=True)
+        best_score, best_step = scored[0]
+        if best_score < _THIN_MATCH_THRESHOLD:
+            return None
+        # Ambiguity guard — two different steps scoring within 0.05 of
+        # each other is not a confident match.
+        if len(scored) > 1 and (best_score - scored[1][0]) < 0.05:
+            return None
+        return OpenQuestion(
+            source=QuestionSource.LESSON_STEP,
+            id=int(best_step.id),
+            canonical=(getattr(best_step, "expected_answer", "") or "").strip(),
+            rendered_stem=_render_bank_stem_with_options(best_step),
+            answer_type=(
+                getattr(best_step, "answer_type", "") or ""
+            ).strip().lower(),
+        )
 
     # ------------------------------------------------------------------
     # Math path (Phase 2 §2.1 — math)
@@ -2489,6 +2636,63 @@ def _resolve_bank_question(open_q: OpenQuestion):
         except Exception:
             return None
     return None
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Thin open-question → bank matching (open_question authority redesign)
+# ──────────────────────────────────────────────────────────────────────
+
+# Minimum question-core similarity for a confident text→LessonStep match.
+# High by design: a wrong match grades against the wrong canonical (P1),
+# so we prefer "no match → grade as authored" over an uncertain link.
+_THIN_MATCH_THRESHOLD = 0.85
+
+_MATCH_WORD_RE = re.compile(r"[a-z0-9]+")
+_MCQ_OPTION_LINE_RE = re.compile(r"^\s*[a-eA-E]\s*[).:\-]")
+
+
+def _normalize_question_core(text: str) -> str:
+    """Reduce a question to its comparable core for text→bank matching.
+
+    Strips answer-shape scaffolding so a perceived stem and a bank stem
+    compare on the question itself, not on options the transcript may or
+    may not have echoed:
+      - drop MCQ option lines (``A) ...``, ``b. ...``)
+      - drop a trailing ``(True or False?)`` shape suffix
+      - collapse whitespace, lowercase, strip surrounding punctuation
+    """
+    if not text:
+        return ""
+    kept: list[str] = []
+    for line in text.splitlines():
+        ls = line.strip()
+        if not ls:
+            continue
+        if _MCQ_OPTION_LINE_RE.match(ls):
+            continue
+        low = ls.lower()
+        if low in ("(true or false?)", "true or false?", "(true or false)"):
+            continue
+        kept.append(ls)
+    joined = " ".join(" ".join(kept).split()).lower().strip()
+    return joined.strip(" .?!:;-")
+
+
+def _question_core_similarity(a: str, b: str) -> float:
+    """Similarity in [0,1] between two normalized question cores."""
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if a in b or b in a:
+        return 0.95
+    ta = set(_MATCH_WORD_RE.findall(a))
+    tb = set(_MATCH_WORD_RE.findall(b))
+    if not ta or not tb:
+        return 0.0
+    inter = len(ta & tb)
+    union = len(ta | tb)
+    return inter / union if union else 0.0
 
 
 def _redact_canonical_leak(

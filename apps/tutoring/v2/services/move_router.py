@@ -381,11 +381,19 @@ class MoveRouter:
         unjustified explain on a returning learner). Soft guidance from
         the prompt (e.g. preferred reason text) is left to the LLM.
         """
-        # I-1: lesson_complete sanity
+        # I-1: lesson_complete sanity. open_question presence is now the
+        # router's PERCEIVED value (open_question_authority_redesign.md §5);
+        # fall back to the engine-supplied flag for legacy decisions that
+        # predate the perceived field (open_question_present is None).
+        open_q_present = (
+            decision.open_question_present
+            if decision.open_question_present is not None
+            else request.open_question_has_pending
+        )
         if decision.case == "lesson_complete":
             if (
                 request.assessable_slots_remaining != 0
-                or request.open_question_has_pending
+                or open_q_present
             ):
                 return (
                     "Invariant I-1 violated: case='lesson_complete' "
@@ -393,8 +401,7 @@ class MoveRouter:
                     "open_question_present==false; got "
                     f"assessable_slots_remaining="
                     f"{request.assessable_slots_remaining}, "
-                    f"open_question_present="
-                    f"{request.open_question_has_pending}."
+                    f"open_question_present={open_q_present}."
                 )
 
         # I-3: opening_turn requires no prior explain + no delivered steps
