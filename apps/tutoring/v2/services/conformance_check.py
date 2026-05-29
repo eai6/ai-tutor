@@ -288,6 +288,85 @@ def find_non_reflective_prose_questions(text: str) -> list[str]:
     ]
 
 
+def find_prose_stem_duplicates(
+    prose: str,
+    tool_stem: str,
+    *,
+    min_chars: int = 40,
+) -> list[str]:
+    """Return verbatim chunks of ``tool_stem`` that also appear in ``prose``.
+
+    Used by the stem_duplication gate to catch the failure mode
+    surfaced on Map Scale L1425 session 123 T2 (2026-05-28): the LLM
+    authored the full bank stem as a STATEMENT in its prose AND also
+    called the ``pose_question`` tool, producing the stem text twice
+    in the rendered turn (LLM-copy then engine-appended).
+
+    Detection is verbatim-substring based:
+      - Whitespace is normalized so line-wrap differences between
+        the prose and the stored stem do not break the match.
+      - Trailing answer-shape suffixes added by
+        ``_render_bank_stem_with_options`` ("(True or False?)",
+        MCQ option lines) are stripped from ``tool_stem`` before
+        comparison — they have their own detection via the
+        curriculum_fidelity gate's question-pattern scan.
+      - Any contiguous substring of the normalized stem ≥
+        ``min_chars`` characters that appears in the normalized
+        prose is returned (verbatim from the prose side, so degrade
+        can strip it directly).
+
+    Returns an empty list when:
+      - ``tool_stem`` is empty or shorter than ``min_chars``
+      - No substring of the stem appears in the prose
+    """
+    if not prose or not tool_stem:
+        return []
+    # Strip the engine-appended answer-shape suffixes — those are
+    # the curriculum_fidelity gate's territory.
+    stem = (tool_stem or "").rstrip()
+    for suffix in ("\n\n(True or False?)", "(True or False?)"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)].rstrip()
+            break
+    # Strip MCQ option lines from the end (``A) ...``, ``B) ...`` etc).
+    while True:
+        lines = stem.rsplit("\n", 1)
+        if len(lines) != 2:
+            break
+        tail = lines[1].strip()
+        if re.match(r"^[A-D]\)\s+\S", tail):
+            stem = lines[0].rstrip()
+            continue
+        break
+    norm_stem = " ".join(stem.split())
+    if len(norm_stem) < min_chars:
+        return []
+    norm_prose = " ".join(prose.split())
+    if norm_stem in norm_prose:
+        # Whole stem appears verbatim. Return the prose-side substring
+        # so degrade can strip it.
+        idx = norm_prose.find(norm_stem)
+        return [norm_prose[idx : idx + len(norm_stem)]]
+    # Try progressively shorter windows from the stem's start, finding
+    # the longest contiguous substring of the stem that lives in the
+    # prose. This handles the case where the LLM paraphrased the
+    # leading or trailing edge of the stem but copied the middle.
+    best_match = ""
+    stem_len = len(norm_stem)
+    for window in range(stem_len, min_chars - 1, -1):
+        for start in range(0, stem_len - window + 1):
+            candidate = norm_stem[start : start + window]
+            if candidate in norm_prose:
+                if len(candidate) > len(best_match):
+                    best_match = candidate
+                # No need to check smaller windows at this start once
+                # we've found a hit at the longest possible window.
+                break
+        if best_match:
+            return [best_match]
+    return []
+
+
 def strip_trailing_tool_stem(response_text: str, tool_stem: str) -> str:
     """Return ``response_text`` with the appended tool stem removed.
 

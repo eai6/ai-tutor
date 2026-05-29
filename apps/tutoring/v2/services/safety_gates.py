@@ -38,6 +38,7 @@ from apps.tutoring.v2.contracts import GradingResult, Verdict
 from apps.tutoring.v2.services.conformance_check import (
     _last_question_sentence,
     find_non_reflective_prose_questions,
+    find_prose_stem_duplicates,
     find_verifiable_prose_questions,
     is_verifiable_prose_question,
     strip_trailing_tool_stem,
@@ -350,6 +351,84 @@ def run_curriculum_fidelity_check(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Stem duplication — LLM-authored prose copies the bank stem verbatim
+# ──────────────────────────────────────────────────────────────────────
+
+
+def run_stem_duplication_check(
+    response_text: str,
+    *,
+    selected_move: str,
+    posed_via_tool: bool,
+    pose_tool_stem: str,
+) -> GateResult:
+    """Detect prose that duplicates the tool-posed bank stem.
+
+    Failure mode surfaced on Map Scale L1425 session 123 T2
+    (2026-05-28): the LLM authored the full bank stem as a STATEMENT
+    in its prose AND also called the ``pose_question`` tool. The
+    engine then appended the tool stem again — the student saw the
+    stem twice (LLM-copy then engine-appended), with a degraded
+    artifact paren ``)`` between them when the curriculum_fidelity
+    gate's degrade pass had also trimmed a "(True or False?" tail
+    from the LLM-copy.
+
+    Detection lives in :func:`find_prose_stem_duplicates` — verbatim
+    contiguous substring match between the LLM-authored prose and
+    the tool-emitted stem text (with answer-shape suffixes like
+    "(True or False?)" and ``A) ... B) ...`` stripped from the stem
+    side first; those have their own detection via the
+    curriculum_fidelity gate's question-pattern scan).
+
+    Skip conditions:
+      - ``posed_via_tool == False`` — no stem to duplicate.
+      - ``pose_tool_stem`` is empty — same.
+      - Terminal move (``close_topic``) — no assessment authored.
+    """
+    move = (selected_move or "").strip()
+    with emit_span("audit", "gate.stem_duplication") as span:
+        if move == "close_topic":
+            return GateResult(
+                passed=True,
+                name="stem_duplication",
+                skipped=True,
+                reason="terminal_move",
+            )
+        if not posed_via_tool:
+            return GateResult(
+                passed=True,
+                name="stem_duplication",
+                skipped=True,
+                reason="no_tool_pose",
+            )
+        if not (pose_tool_stem or "").strip():
+            return GateResult(
+                passed=True,
+                name="stem_duplication",
+                skipped=True,
+                reason="empty_tool_stem",
+            )
+        prose_only = strip_trailing_tool_stem(
+            response_text, pose_tool_stem,
+        )
+        dups = find_prose_stem_duplicates(prose_only, pose_tool_stem)
+        if not dups:
+            return GateResult(passed=True, name="stem_duplication")
+        primary = dups[0]
+        return _fail(
+            "stem_duplication",
+            f"prose duplicates tool-posed stem "
+            f"({len(primary)} chars): {primary[:120]!r}",
+            span,
+            payload={
+                "duplicated_substrings": [d[:300] for d in dups],
+                "match_chars": len(primary),
+                "move": move,
+            },
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────
 # run_gates_with_recovery — per-gate one-retry-then-degrade loop
 # ──────────────────────────────────────────────────────────────────────
 
@@ -415,6 +494,13 @@ def _run_gate(gate_name: str, response_text: str, ctx: GateContext) -> GateResul
     """Run one named gate against the response."""
     if gate_name == "curriculum_fidelity":
         return run_curriculum_fidelity_check(
+            response_text,
+            selected_move=ctx.selected_move,
+            posed_via_tool=ctx.posed_via_tool,
+            pose_tool_stem=ctx.pose_tool_stem,
+        )
+    if gate_name == "stem_duplication":
+        return run_stem_duplication_check(
             response_text,
             selected_move=ctx.selected_move,
             posed_via_tool=ctx.posed_via_tool,
@@ -519,6 +605,29 @@ def _reminder_for(gate_name: str, gate_result: GateResult, ctx: GateContext) -> 
             "'have you seen this near you?'). Keep the same teaching "
             "move; only the trailing question changes."
         )
+    if gate_name == "stem_duplication":
+        payload = gate_result.payload or {}
+        dups = payload.get("duplicated_substrings") or []
+        primary = (dups[0] if dups else "")[:160].rstrip()
+        primary_clause = (
+            f' The duplicated substring was: "{primary}".'
+            if primary else ""
+        )
+        return (
+            "Your previous reply called the pose_question tool, but "
+            "the LLM-authored prose ALSO contained the bank stem "
+            "verbatim. The tool emits the stem to the student — "
+            "including it in your prose makes the stem appear twice. "
+            "This is the 'Tool-vs-prose dedup' rule in the shared "
+            "preamble: when you call the pose_question tool, your "
+            "prose must NOT include the stem text — neither as a "
+            "question nor as a statement."
+            + primary_clause +
+            " Rewrite the reply with the SAME tool call, but replace "
+            "the duplicated text with a brief lead-in: 'Try this:', "
+            "'Next:', 'Here's a quick check:'. The tool's emitted "
+            "stem IS your turn's prompt to the student."
+        )
     if gate_name == "safety":
         return (
             "Your previous reply was flagged by the safety check. "
@@ -622,6 +731,64 @@ def _degrade_for(
             return "Let's keep going — we'll work through the next step together."
         return stripped
 
+    if gate_name == "stem_duplication":
+        payload = gate_result.payload or {}
+        dups = payload.get("duplicated_substrings") or []
+        stripped = text
+        for dup in dups:
+            dup = (dup or "").strip()
+            if not dup:
+                continue
+            # Try exact match first.
+            if dup in stripped:
+                stripped = stripped.replace(dup, "", 1)
+                continue
+            # Whitespace-normalized fallback: walk through the response
+            # word-by-word and excise the run that matches the
+            # normalized substring. Handles line-wrap differences
+            # between detection-time (normalized) and degrade-time.
+            norm_dup = " ".join(dup.split())
+            if not norm_dup:
+                continue
+            words = stripped.split()
+            joined = " ".join(words)
+            if norm_dup in joined:
+                idx = joined.find(norm_dup)
+                # Map back into the original text by counting words
+                # in the prefix and using their original whitespace.
+                prefix_words = joined[:idx].split()
+                prefix_word_count = len(prefix_words)
+                dup_word_count = len(norm_dup.split())
+                # Find the slice in original text.
+                cur = 0
+                start_idx = 0
+                end_idx = len(stripped)
+                seen_words = 0
+                in_word = False
+                for i, ch in enumerate(stripped):
+                    if ch.isspace():
+                        if in_word:
+                            seen_words += 1
+                            in_word = False
+                            if seen_words == prefix_word_count:
+                                start_idx = i
+                            elif seen_words == prefix_word_count + dup_word_count:
+                                end_idx = i
+                                break
+                    else:
+                        in_word = True
+                if seen_words < prefix_word_count + dup_word_count and in_word:
+                    seen_words += 1
+                    if seen_words == prefix_word_count + dup_word_count:
+                        end_idx = len(stripped)
+                if start_idx < end_idx <= len(stripped):
+                    stripped = stripped[:start_idx] + stripped[end_idx:]
+        # Tidy: collapse extra blank lines + trim trailing whitespace.
+        stripped = re.sub(r"\n{3,}", "\n\n", stripped).strip()
+        if not stripped:
+            return "Let's keep going — try the next step."
+        return stripped
+
     if gate_name == "safety":
         sentences = _SENTENCE_SPLIT_RE.split(text)
         flagged_terms = []
@@ -676,6 +843,7 @@ def _degrade_for(
 
 _GATE_ORDER: tuple[str, ...] = (
     "curriculum_fidelity",
+    "stem_duplication",
     "safety",
     "figure_ref",
     "answer_leak",
