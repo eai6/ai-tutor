@@ -55,13 +55,13 @@ def _normalize(text: str) -> str:
     return " ".join(text.split())
 
 
-def test_scaffold_hint_consistent_with_worked_example_step_labels() -> None:
-    """SCAFFOLD_HINT references the worked-example's 'steps' (not 'subgoals')."""
-    body = _normalize(SCAFFOLD_HINT.body)
-    # SCAFFOLD_HINT line 597-ish: "one of the worked- example steps"
-    # collapses to "one of the worked-example steps" after normalization.
-    assert "worked-example steps" in body
-    assert "worked-example subgoals" not in body
+def test_scaffold_hint_uses_step_not_subgoal_terminology() -> None:
+    """SCAFFOLD_HINT uses 'step' terminology, never 'subgoal' (the relabel
+    invariant). Post-consolidation the move references decomposing into a
+    smaller 'step', not the old 'worked-example steps' cross-reference."""
+    body = SCAFFOLD_HINT.body.lower()
+    assert "subgoal" not in body
+    assert "step" in body
 
 
 def test_name_misconception_consistent_with_step_labels() -> None:

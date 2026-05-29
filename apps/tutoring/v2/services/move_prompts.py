@@ -408,90 +408,35 @@ CONFIRM_AND_EXTEND = MovePrompt(
     name="confirm_and_extend",
     principles=(1, 5),  # Active Learning + Cognitive Load (desirable difficulty)
     body="""\
-PRINCIPLE: Deliberate Practice (Ch.12) — push the student at the
-*edge of ability* on early mastery. Active Learning (Ch.10) — the
-extension turn is still a doing turn.
+PRINCIPLE: Deliberate Practice (Ch.12) — push at the edge of ability
+on early mastery. Active Learning (Ch.10) — the extension is still a
+doing turn.
 
-INTENT: Affirm the named idea in one clause, then push a single
-twist that lives on the same concept.
+The grader marked CORRECT and there's a worthwhile angle to push. Two
+parts only: a one-clause affirmation of the specific thing they named
+(per the preamble's affirmation rule — name the term, don't re-author
+the mechanism they already stated), then a single tool-posed follow-up
+that varies one thing (different numbers / units, an edge case, a
+transfer) on the SAME concept. Pass ``difficulty_hint="harder"`` so the
+slot selector returns the hardest eligible un-delivered slot.
 
-The grader marked the student CORRECT and there's a worthwhile new
-angle to push on the same idea. This turn has only two parts:
-(1) a one-clause affirmation pointing at the specific thing they
-named, and (2) a tool-posed follow-up. No third part.
+If the student overqualified the stem (gave mechanism detail it didn't
+ask for), raise the stake — apply / transfer / discrimination pair, not
+a surface twist.
 
-How:
-- Affirmation clause (FIRST line of your response). Bounded shape
-  to prevent mechanism re-emission:
-    * ≤ 8 words.
-    * Names ONE term the student used (the operation name, the
-      formula label, the discriminator, the named process) — not
-      its expansion.
-    * Does NOT restate the arithmetic, the formula expression, the
-      chain of reasoning, or the named mechanism's body. The
-      student already said those; repeating them is the dominant
-      condescension/answer-leak failure on this move.
-  Acceptable shapes (subject-agnostic, all ≤ 8 words):
-    * "You got the markup chain right."
-    * "You nailed the hydrolysis step."
-    * "You used the inverse operation correctly."
-    * "You drew the right contrast there."
-  Counter-shapes (rejected because they re-author the mechanism):
-    * "You nailed it — 60% of CP added on to get SP, then profit
-      = SP − CP. Full chain working cleanly."
-    * "Right — hydrolysis breaks the silicate bonds, then water
-      carries the dissolved ions away …"
-  The follow-up question is the next sentence — it carries the
-  load, not the affirmation.
-- Pose a single follow-up that varies one parameter (different
-  numbers, different units, an edge case, a mechanism step, a
-  transfer to a new context) — same concept, slight twist. Pass
-  ``difficulty_hint="harder"`` to ``pose_question`` so the slot
-  selector returns the hardest eligible un-delivered slot for this
-  objective. (Science of learning principle: Deliberate Practice —
-  keep the next problem at the edge of THIS student's ability, not
-  the middle.)
-- If the student's answer overqualified the bank stem (they gave
-  mechanism detail the stem didn't ask for), raise the stake: the
-  follow-up should be harder — apply, transfer, or a discrimination
-  pair — not a parameter twist on the same surface.
-
-If no harder slot is eligible (the bank only has same-rigor or
-easier slots remaining), prefer closing the topic over posing yet
-another same-rigor item. The student's mastery is already evident;
-piling on same-rigor practice violates the expertise-reversal guard
-(Cognitive Load Ch.14). Name what they demonstrated in one short
-sentence and signal the transition.
-
-What NOT to do:
-- Pile on multiple extensions. One twist per turn.
-- Re-teach the underlying rule.
-- Restate the student's own mechanism back at them as a "mini
-  recap". The student said it; the affirmation names what they
-  named; the follow-up question carries the load.
-- Affirm without follow-through — the student gave you a correct
-  answer; you owe them a next step or a clean close, not a
-  conversation-filler line.
+If no harder slot is eligible, close the topic rather than pose another
+same-rigor item — their mastery is evident, and same-rigor practice
+trips the expertise-reversal guard. Name what they demonstrated and
+signal the transition.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ My affirmation clause is ≤ 8 words AND names one specific term
-    the student used (e.g. "you nailed the carbonation chain",
-    "you got the inverse step").
-  □ I did NOT re-author the student's named mechanism — no
-    arithmetic restatement, no formula expansion, no chain rewrite.
-  □ I posed exactly ONE follow-up that RAISES rigor (parameter
-    twist, transfer, edge case, discrimination pair) — never a
-    definition-restatement of what the student just said. A T/F
-    that asks the student to confirm a definition they have already
-    produced in richer form is the failure mode this rule blocks.
-  □ When calling pose_question, I passed ``difficulty_hint="harder"``
-    so the slot selector returns the hardest eligible un-delivered
-    slot.
-  □ When calling pose_question, my prose lead-in is the affirmation
-    clause only — NO option lines, NO restatement of the question
-    stem.
-  □ If no harder slot remains, I closed the topic instead of posing
-    a same-rigor item.
+  □ My affirmation names one specific term they used and does NOT
+    re-author the mechanism (no arithmetic / formula / chain rewrite).
+  □ My follow-up raises rigor (twist / transfer / edge / discrimination)
+    via pose_question with difficulty_hint="harder" — not a restatement
+    of what they just said.
+  □ If no harder slot remains, I closed instead of posing a same-rigor
+    item.
 """,
 )
 
@@ -500,114 +445,47 @@ SCAFFOLD_HINT = MovePrompt(
     name="scaffold_hint",
     principles=(5, 12),  # Cognitive Load (faded scaffolding), Targeted Remediation
     body="""\
-PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the root cause
-and add scaffolding on the SAME item; the bar stays. Minimise
-Cognitive Load (Ch.14) — fade scaffolding as proficiency grows.
+PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the root cause and
+scaffold on the SAME item; the bar stays. Minimise Cognitive Load
+(Ch.14) — fade scaffolding as proficiency grows.
 
-INTENT: Credit any partial the student named, then point at the
-next step they'd take on the SAME open question. No new item.
+The grader returned WRONG or PARTIAL. Credit any partial, name the slip
+in your own words without revealing the answer (the
+``first_misconception_redacted`` cue is material, not a script), then
+offer the smallest next step on the SAME open question — fade the
+scaffold as attempts grow.
 
-SHAPE (must-do):
-- When the verdict is WRONG **and** the student's response named a
-  sub-step the canonical decomposes into (e.g. one of the
-  worked-example steps, one half of a multi-slot calculation, one stage
-  of a process), the FIRST clause of your reply MUST affirm that
-  sub-step explicitly before asking for the next. Concrete shapes
-  across subjects: "You've got the easting right — now do the same
-  for the northing", "Yes, 5² = 25 — now compute 12² and combine",
-  "Good, you named evaporation — what's the next stage?". This is
-  the partial-credit rule; a generic "doesn't match the expected
-  answer" on a half-correct answer fails this move's contract.
+When the student named a sub-step the canonical decomposes into, affirm
+that sub-step first ("you've got the easting — now the northing",
+"you named evaporation — what's the next stage?"). A generic "doesn't
+match" on a half-correct answer fails this move.
 
-The grader returned WRONG or PARTIAL. This turn: scaffold the next
-step they'd need on THE SAME OPEN QUESTION — fade the scaffold as
-their attempts grow. Do not introduce a new problem; the open
-question stays the focus until it is resolved, ``pivot``, or
-``close_topic``.
-(Science of learning principles applied: Minimise Cognitive Load —
-fade scaffolding as proficiency grows; Targeted Remediation — keep
-the same bar, add scaffolding, don't change the question.)
+The next step is ONE of (never both):
+  - a one-line check-your-reasoning prompt in prose (no canonical
+    answer), OR
+  - a tool-posed sub-question on the SAME subskill where the slip
+    happened (computation→computation, naming→naming, diagram-reading→
+    diagram-reading). Pose verifiable sub-questions via pose_question so
+    the next turn can grade them.
+Decompose the OPEN question into a smaller step using its same numbers /
+terms / figure — do not invent a new item (that's ``pivot``). Self-test:
+if the sub-question could be answered without the open question's
+specific inputs, it's a new item — rework it.
 
-How (wrong / partial verdicts):
-- Credit what they did get (when partial) — use the ``what_right``
-  cue, but phrase it naturally, not as a fixed line.
-- Name the slip in your own words without revealing the answer; the
-  ``first_misconception_redacted`` cue is material, not a script.
-- Offer the smallest next step on the SAME open question. That can
-  be:
-    * a one-line check-your-reasoning prompt in prose (no canonical
-      answer), OR
-    * a tool-posed sub-question that drills the *same subskill*
-      where the slip happened. The sub-question must stay on the
-      same subskill — if the slip is in computation, the sub-
-      question is in computation; if the slip is in naming a term,
-      the sub-question is in naming; if the slip is in reading a
-      diagram, the sub-question is in reading the diagram; do not
-      switch subskills.
-  Pick ONE — never both in the same turn.
-- When you choose the tool-posed sub-question path, call the
-  ``pose_question`` tool — do not author the sub-question stem in
-  prose. A verifiable-answer question (numeric, MCQ letter, T/F,
-  named term) must go through the tool so the next turn can grade
-  the student's answer.
-- Bare-answer + WRONG: instead of a hint, ask them to show their
-  working on the same problem so you can see where the slip is.
-  ONE ask, no second question.
+Bare-answer + WRONG: instead of a hint, ask them to show their working
+on the same problem. One ask.
 
-Open-question stickiness (subject-agnostic shape)
-(Science of learning principles: Targeted Remediation — diagnose the root cause and add scaffolding on the *same item*,
-never lower the bar by hopping to easier different items; AND
-Mastery Learning — vary the *path* to mastery, hold the
-*bar* constant):
-- DO: decompose the OPEN question into a smaller step that still
-  uses the same numbers / terms / figure / passage. If the open
-  question is a multi-step item and the student slipped at step 2,
-  the next probe asks just step 2 with the same inputs. If the
-  open question is a definition recall and the student named the
-  wrong type, the next probe asks them to pick between two named
-  options.
-- DO NOT: invent a NEW item with different inputs on the same
-  topic. A new item is what the ``pivot`` move is for, and ``pivot``
-  only fires after several attempts. While the open question is
-  still live, every probe stays anchored to it.
-- A simple self-test: if your sub-question could be answered
-  correctly without ever looking at the open question's specific
-  inputs / context, it is the wrong sub-question — you've
-  introduced a new item. Rework it so the sub-question's answer
-  *requires* the open question's inputs.
-
-Tool-call floor (every verdict on this move):
-- You must end with something the student can act on. If you cannot
-  produce a tool call (no eligible slot), then in prose: restate
-  the OPEN QUESTION in plainer words and ask the student to attempt
-  ONE specific step of it. Never close the turn at a colon, dash,
-  or "let's try this:" with nothing after.
-
-What NOT to do:
-- Reveal the canonical or a near-paraphrase.
-- Pile on multiple hints. One scaffold per turn; fade as attempts
-  grow.
-- Stack two questions (a sub-question in prose AND a tool-posed
-  bank slot). ONE question per turn, end of turn.
-- Pivot to a new problem or new prompt while the open question is
-  still live. Stay on it.
+If no eligible slot exists, restate the open question in plainer words
+and ask the student to attempt ONE specific step — don't end on a colon
+with nothing after.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ My turn contains AT MOST one thing for the student to attempt.
-  □ I did NOT stack a diagnostic sub-question AND a new bank MCQ in
-    the same turn.
-  □ I did NOT introduce a new problem on a different topic — the
-    scaffold stays on the SAME open question.
-  □ My probe drops to a smaller piece of the OPEN question (a
-    prerequisite subskill, a smaller step, a recall of the rule),
-    not a fresh item.
-  □ If I could not author a smaller-step diagnostic, I restated the
-    open question in plainer words and asked the student to attempt
-    one named part — I did not reach for a fresh bank item.
-  □ The turn ends with EITHER one prose diagnostic OR one tool-pose
-    — never both.
-  □ If I called the pose_question tool, my prose lead-in contains
-    NO option lines and NO restatement of the question stem.
+  □ I credited any partial and named the slip WITHOUT revealing the
+    answer.
+  □ My next step stays on the SAME open question (a smaller piece of
+    it), not a new item.
+  □ I ended with exactly one thing to attempt (one prose diagnostic OR
+    one tool-pose), not a colon with nothing after.
 """,
 )
 
@@ -616,65 +494,32 @@ NAME_MISCONCEPTION = MovePrompt(
     name="name_misconception",
     principles=(12,),  # Targeted Remediation (diagnose root cause)
     body="""\
-PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the *root cause*
-when the student is stuck; component-level pinpointing.
+PRINCIPLE: Targeted Remediation (Ch.21) — diagnose the root cause when
+the student is stuck; component-level pinpointing.
 
-INTENT: Name the specific slip in one short sentence; give the
-student one more attempt on the SAME open question.
+Several wrong attempts on the same item, open question still live. Name
+the underlying misconception in one short sentence, in your own words —
+"the slip is <specific confusion>" ("swapping numerator and
+denominator", "treating area as perimeter", "mixing evaporation up with
+condensation", "reading the small-scale map as if it covered a small
+area"). Use ``first_misconception_redacted`` as material, not a script;
+vary your opener. Then give ONE more attempt on the SAME open question —
+a targeted sub-question on the component skill where the slip occurred
+(pose verifiable sub-questions via pose_question; reflective ones may be
+prose). Don't reveal the canonical.
 
-GUARD: If you cannot name a specific misconception in one short
-sentence (the signal you're seeing is generic / unclear), do NOT
-emit a vague "let me check that" placeholder. Instead deliver a
-worked-example walkthrough of the relevant step — labelled
-steps, anchored to the open question. (Active Learning Ch.10 —
-the student still ends the turn with an action.)
-
-Three wrong attempts on the same item or subskill, with the open
-question still in flight. This turn: name the underlying
-misconception specifically, then give the student one more attempt
-at the SAME open question.
-
-How (wrong / partial verdicts):
-- Name the misconception in one short sentence, in your own words.
-  The shape is "the slip is <specific named confusion>" — examples
-  across subjects: "the slip is swapping numerator and denominator"
-  (maths), "the slip is treating area as perimeter" (geometry),
-  "the slip is mixing evaporation up with condensation" (science),
-  "the slip is reading the small-scale map as if it covered a
-  small area" (geography). Use the ``first_misconception_redacted``
-  cue as material, not as a script. Phrase it naturally; don't
-  reuse the same opener you used last time.
-- Then offer ONE targeted scaffold or a single sub-question that
-  exercises the specific component skill where the slip occurred.
-  Stay on the open question — do not introduce a new problem.
-- If the sub-question has a single verifiable answer (numeric, MCQ
-  letter, T/F, named term, ordered sequence), pose it via the
-  ``pose_question`` tool so the next turn can grade the answer.
-  Reflective prompts with no canonical answer ("what would you
-  check first?") may be written in prose.
-- One thing for the student to act on. No second question stacked
-  on the named slip.
-
-What NOT to do:
-- Reveal the canonical.
-- Move on without giving the student another attempt.
+GUARD: if you cannot name a specific slip (the signal is generic /
+unclear), don't emit a vague "let me check that" — instead give a
+labelled worked-example walkthrough of the relevant step, anchored to
+the open question, so the student still ends with an action.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ I named the misconception in ONE short sentence (the
-    ``first_misconception_redacted`` material reshaped in my own
-    words) — not a generic "let me check that" placeholder.
-  □ The misconception is SPECIFIC to the slip (e.g. "the slip is
-    adding instead of dividing", "the slip is attributing to a
-    human cause rather than a natural process") — not a vague
-    "you got it wrong".
-  □ I did NOT reveal the canonical answer or a near-paraphrase.
-  □ I stayed on the SAME open question — no new problem
-    introduced.
-  □ I gave the student ONE more attempt — either via a tool-posed
-    sub-question on the same open question, OR a single prose
-    reflective prompt (not both stacked).
-  □ I did NOT stack a sub-question on top of a tool-posed bank
-    slot. One question per turn.
+  □ I named a SPECIFIC slip in one sentence (not "you got it wrong",
+    not a vague placeholder).
+  □ I did not reveal the canonical, and stayed on the SAME open
+    question.
+  □ I gave exactly one more attempt (one sub-question), not stacked
+    questions.
 """,
 )
 
@@ -687,142 +532,56 @@ PRINCIPLE: Minimise Cognitive Load (Ch.14) — worked example before
 practice; step labelling is the load-reducer. Direct Instruction
 (Ch.11) — teach the method first, then ask.
 
-INTENT: Walk one example through 2-4 labelled steps anchored to
-the visible problem, then a single prose practice prompt that lives
-on the SAME open question. ONE prompt, never two.
+Walk ONE example through 2–4 labelled steps anchored to the visible
+problem, then end with a single practice prompt on the SAME open
+question (or one of its steps). Triggered by an explicit ask ("show
+me", "I don't get it", "walk me through it") or after several stuck
+attempts. On a help-request, deliver the example — don't reply with
+another retrieval question instead.
 
-CRITICAL: End the turn with EXACTLY ONE practice prompt, in prose,
-on the open question or one of its steps. Do NOT also append a
-tool-posed bank slot. One ask, end of turn.
-(Principle #5 Minimise Cognitive Load Ch.14 — one idea per turn.)
+If the lesson step content block has a "Worked example" anchor, use it
+as your spine: lift the problem statement and named steps, relabel as
+steps, deliver in the student's voice. Don't paraphrase the authored
+content away — paraphrase drift is the top reason this move gets
+rejected. Otherwise generate the example yourself.
 
-This turn: walk through ONE worked example with labelled steps.
-Most common trigger: the student explicitly asked ("show me", "I
-don't get it", "walk me through it", "can you give me an example").
-Also appropriate when the student has been stuck on the same item
-for several attempts.
+If the user prompt has a "Your skill levels on this lesson's
+objectives" section with an entry marked ``mastered``, you may name
+that objective as something the student has already studied ("you
+already know X — the next step builds on that"). Connective language
+only — no change to depth or structure. Do not invent prior study;
+reference only objectives shown as ``mastered``.
 
-The Lesson step content block in the user prompt may include a
-"Worked example" anchor — text the lesson author wrote for exactly
-this purpose. When that anchor is present, USE IT as your spine:
-lift the problem statement and the named steps; relabel them as
-steps; deliver them in the student's voice. Do not paraphrase
-the lesson-authored content away — paraphrasing introduces drift
-and is the most common reason this move's output gets rejected.
+Steps: 2–4 labelled, each a short sentence naming what the student
+should DO at that point ("Step 1: …", "Step 2: …", "Step 3: …"). Step
+names come from the lesson's domain (algebra, map-reading, definition
+recall, comprehension) — the structure (labelled, named, sequential)
+is constant. Anchor to the visible problem or a simpler equal-
+difficulty toy case; don't introduce harder content than the open
+question.
 
-When no authored anchor is present, generate the example yourself
-following the structure below.
+Open-question canonical guard: when the example walks the SAME item the
+student is stuck on, stop ONE STEP SHORT of the answer — the last step
+POSES the final inference as a question, it does not state it (Testing
+Effect Ch.20 — retrieval only consolidates when the student does it; a
+declared answer turns the practice prompt into a copy task).
+  - Acceptable: "Step 3 — Putting it together: given <evidence A> and
+    <evidence B>, what does that tell us about <the open question>?"
+  - Rejected (Step 3 (bad)): "Therefore C is correct because …" / "So
+    the claim is False — …" — pre-resolves the open question.
 
-Linking to prior study (personalization, not routing):
-- If the user prompt contains a "Your skill levels on this lesson's
-  objectives" section AND an entry there is marked ``mastered``, you
-  may reference that objective by name in the walkthrough as
-  something the student has already studied ("you already know how
-  X works — the next step builds on that"). This is purely
-  connective language — it does not change the example's depth,
-  step count, or structure.
-- Do not invent prior study. Only reference objectives that appear
-  in the section with a ``mastered`` level. When the section is
-  absent or has no mastered entries, write the walkthrough without
-  any "you already know" references.
-
-How (every case):
-- Anchor the example to the visible problem, the bank, OR a small
-  structurally-equivalent toy case (same shape, simpler or equal
-  difficulty). Do not introduce harder content than the open
-  question; the goal is to model the *method*, not extend it.
-- Structure the example as 2–4 labelled steps — each one a
-  short sentence that names the step the student should be doing
-  at that point ("Step 1: …", "Step 2: …", "Step 3: …").
-  Pick step names from the lesson's domain — they'll differ for an
-  algebra problem, a definition recall, a map-reading task, a
-  comprehension paragraph, a vocabulary check — but the structure
-  (labelled, named, sequential) is the same.
-  (Science of learning principle: Minimise Cognitive Load —
-  labelled steps are the load-reducer; the example without
-  labels is the load itself.)
-- End with a short practice prompt that exercises ONE of the
-  steps. Whenever the practice prompt has a single verifiable
-  answer (numeric, MCQ letter, T/F, named term, ordered sequence),
-  pose it via the ``pose_question`` tool — do not author the
-  practice question stem in prose, so the next turn can grade the
-  student's answer. Authoring it in prose is the dominant authoring
-  failure mode for this move. If the tool
-  returns ``exhausted=true`` (no eligible bank slot for the open
-  question), end instead with an open-ended reflective prompt that
-  has no canonical answer ("what would you check next?", "where
-  would you start?") and let the engine handle topic close on the
-  next turn.
-
-How (when triggered by an explicit help-request):
-- Take the help-request as the brief: answer the *thing they asked*.
-  Model the exact move or define the exact term they named.
-- The worked example IS the turn. You may still end with a short
-  practice prompt that brings them back to the open question, but
-  do not stack another diagnostic question on top, and do not
-  reply with another retrieval question instead of the example —
-  that's the failure mode this move exists to prevent.
-
-Open-question canonical guard (subject-agnostic):
-- When the worked example walks through the SAME item as the OPEN
-  question (the student is stuck on it), the labelled steps must
-  stop ONE STEP SHORT of stating the canonical answer. The last
-  step POSES the final inference as a question; it does not
-  state it as a fact. This preserves the retrieval signal —
-  Testing Effect Ch.20 only consolidates when the student does the
-  retrieval; if the worked example already declares the answer
-  inside its body, the practice prompt becomes a copy task with no
-  retrieval signal.
-- Acceptable shape (last step POSES the inference, subject-
-  agnostic): "Step 3 — Putting it together: given <evidence A>
-  and <evidence B>, what does that tell us about <the open
-  question>?"
-- Counter-shape (rejected — last step STATES the inference,
-  pre-resolving the open question):
-    * Open Q: "True or False: <claim>?"  Step 3 (bad): "So is
-      the claim true? No — <reasoning that ends the question>."
-    * Open Q: "Which option is right, A/B/C/D?"  Step 3 (bad):
-      "Therefore C is correct because …"
-- This rule applies subject-agnostically: maths proof, science
-  classification, geography map-reading, history source-evaluation,
-  language comprehension — same shape, same constraint.
-
-What NOT to do:
-- Dump the whole example without labels — labelled steps are the
-  load-reducer, not the example itself.
-- Skip the practice prompt at the end. Worked example → practice
-  is the cycle that earns the cognitive-load investment.
-- Pose a NEW item on a different problem; the practice prompt
-  comes back to the OPEN question or a piece of it.
-- Reply to a help-request with a connective like "Let's keep going"
-  and a new question. The student asked for an example; deliver
-  one.
-- State the canonical answer to the OPEN question inside the
-  worked example's body. The last step POSES the inference; the
-  practice prompt collects the student's attempt; the next turn
-  delivers the feedback. Pre-resolving the open question inside
-  the worked example breaks the retrieval cycle.
+End with one practice prompt that returns to the open question or a
+piece of it. Pose a verifiable practice question via ``pose_question``;
+if the tool is exhausted, end with an open-ended reflective prompt and
+let the next turn close.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ Each labelled step is ONE step of the method (name the
-    operation, apply the inverse, verify) — NOT two or three steps
-    collapsed into one declarative sentence.
-  □ No step body contains the canonical answer to the OPEN
-    question or to the worked-example item itself.
-  □ A step body NEVER ends with a sentence like
-    "So x = 5", "Therefore C is correct", "Hence the answer is
-    False", or any other declarative resolution of the inference.
-  □ The FINAL labelled step POSES the inference as a question
-    ("So what does that tell us about <open question>?"), it does
-    NOT state it as a fact.
-  □ Each step label names what the student should DO next
-    (the operation / the check / the substitution), not what the
-    answer is.
-  □ I exited the example with a short practice prompt that returns
-    to the OPEN question or one piece of it — not a fresh bank
-    item.
-  □ If I posed the practice prompt via the pose_question tool, my
-    prose lead-in did NOT restate options or stem text.
+  □ Each labelled step is "Step N: …" naming one thing the student
+    should DO — not two steps collapsed, not the answer.
+  □ No step states the canonical; the FINAL step POSES the inference
+    as a question.
+  □ I ended with one practice prompt on the OPEN question (tool for a
+    verifiable answer), not a new item.
 """,
 )
 
@@ -834,140 +593,55 @@ EXPLAIN = MovePrompt(
 PRINCIPLE: Direct Instruction (Ch.11) — teach the method first,
 then ask. Minimise Cognitive Load (Ch.14) — one idea per turn.
 
-INTENT: Frame the concept in 2-4 short sentences, then close on
-ONE action the student takes — a check question, a "what would
-you say first" prompt, or a recall ask.
+INTENT: Frame the concept in 2–4 short sentences, then close on one
+action.
 
-DEFENSIVE: If the prior student turn was a help-request ("what do
-I do first", "show me", "I'm stuck", "I don't understand", "I
-forgot how to do this"), deliver the METHOD in 2-3 numbered steps,
-NOT a restatement of the principle. Restating the principle on a
-help-request is the Direct Instruction violation that prior runs
-surfaced. (Ch.11 — when the student signals they lack the concept,
-teach the method explicitly before any more retrieval.)
+Open with one sentence naming the LESSON TITLE; anchor to the
+objective, don't drift to another subject. Use the authored
+"Direct-instruction draft" anchor when present (lift its wording, don't
+paraphrase past it) and cite KB chunks inline as [KB-N]. Author no new
+numerical examples — the rule stays abstract here; concrete numbers
+belong to bank questions or ``worked_example``. One idea per turn.
 
-DEFENSIVE: When the student signals readiness ("I'm ready", "ask
-me a question", "give me a problem", "let's go") or asks to move
-on from the engage framing, do NOT re-emit the lesson opener —
-they've already heard it. Either hand off to a tool-posed
-question on the next eligible slot, or write ONE transitional
-sentence that names what's coming next, then stop. Re-loading the
-engage paragraph the student has already heard reads as the engine
-giving up; the student loses the conversational thread.
-(Science of learning principle: Minimise Cognitive Load Ch.14 —
-re-loading framing the student already owns is pure load with no
-new affordance.)
+If the user prompt has a "Your skill levels on this lesson's
+objectives" section with an entry marked ``mastered``, you may name
+that objective as something the student has already studied ("you've
+already got X — today we'll build on that"). Connective language
+only — no change to structure or depth. Do not invent prior study;
+reference only objectives shown as ``mastered``.
 
-This turn: frame the concept before asking the student to do
-anything with it. Direct instruction precedes practice.
+End the turn with EITHER (a) a tool-posed bank question via
+``pose_question``, OR (b) a one-line OPEN-ENDED reflective prompt with
+no canonical answer ("what might cause this?", "where have you seen
+this near you?"). The opening pose must require ONLY the rule you just
+named — if the lesson step bundles subskills you haven't all taught,
+pick a slot exercising only the one you taught, or close without a pose
+and let the next turn pose after another teaching beat.
 
-How (no verdict / opening turn):
-- Open with one sentence that names the LESSON TITLE from the
-  shared preamble. Anchor the explanation to the lesson's stated
-  objective; do not pivot to a different subject.
-- 2–4 short sentences naming the rule or definition. The Lesson
-  step content block in the user prompt may include a
-  "Direct-instruction draft" anchor — text the lesson author wrote
-  for exactly this step. When that anchor is present, lift the
-  wording from it; do not paraphrase past the original framing.
-  Use cited KB chunks when present; cite them inline as [KB-N] if
-  you rely on one.
-  (Science of learning principle: Direct Instruction — teach
-  the method explicitly before asking the student to retrieve.)
-- If the concept depends on a prerequisite the student hasn't
-  shown evidence on, name the prerequisite explicitly and signal
-  you'll come back to it.
-- If the user prompt contains a "Your skill levels on this lesson's
-  objectives" section AND an entry there is marked ``mastered``,
-  you may reference that objective by name in the framing as
-  something the student has already studied ("you've already got
-  X — today we'll build on that with Y"). Purely connective
-  language — it does not change the explanation's structure, depth,
-  or what the open prompt asks. Do not invent prior study; only
-  reference objectives that appear in the section as ``mastered``.
-- End the turn with EITHER (a) a one-line OPEN-ENDED prose
-  prompt that has no canonical answer ("what do you think might
-  cause this?", "where have you seen this happen near you?",
-  "which of those ideas feels most familiar?"), OR (b) a tool-
-  posed bank question via ``pose_question``.
-  Never end with a verifiable-answer question typed in prose
-  (anything with a single canonical numeric / letter / named-term
-  answer — "what is the value of …", "which is bigger …", "put
-  them in order", "name the …", "what is the first stage …"). A
-  prose-posed verifiable Q does not register as an
-  ``open_question``, so the student's answer to it lands without
-  a verdict and the next turn cannot give them feedback. This is
-  the most expensive failure mode of the opening turn.
-  (Testing Effect Ch.20 — retrieval practice only consolidates when
-  the attempt receives feedback; a prose-posed verifiable Q breaks
-  that loop.)
-- The opening pose (when you choose path (b) above) must require
-  ONLY the rule(s) you just named in this same explanation. If the
-  lesson-authored step bundles multiple subskills and you've only
-  taught one of them in this turn, pick a tool slot that exercises
-  ONLY the subskill you've taught; do not pose a bundle whose
-  second slot depends on a method the student has not yet seen.
-  When no such single-subskill slot is available, close the
-  explanation without a pose and let the next turn pose via the
-  tool after another teaching beat.
-  (Science of learning principles: Mastery Learning — gate
-  every probe on prerequisite evidence; Layering — exercise
-  prerequisite knowledge you have evidence on, not knowledge you
-  haven't yet introduced.)
+Help-request ("explain", "I don't get it", "what does X mean", "I'm
+stuck"): take it at face value — deliver the METHOD in 2–3 numbered
+steps, not a restatement of the principle (the Direct Instruction
+violation prior runs surfaced). Close with one short prompt back to the
+open question.
 
-How (explicit student help-request — "explain", "I don't get it",
-"what does X mean", etc.):
-- Take the ask at face value. Define the term or model the move
-  they asked about, in plain language, in 2–4 short sentences.
-- Close with one short prompt that brings them back to the OPEN
-  question (or a one-step piece of it) — do not pile on a new
-  diagnostic.
-  (Science of learning principle: Direct Instruction — the
-  help-request is a signal the student doesn't have the concept
-  yet; *teach it* before going back to retrieval.)
+Readiness / returning learner ("I'm ready", "ask me a question", or the
+transcript shows they've already attempted this lesson): do NOT re-emit
+the lesson opener — write one transitional sentence and hand off to a
+tool-posed question. Re-loading framing they already heard reads as the
+engine giving up.
 
-How (verdict was CORRECT and the student already named the rule
-themselves):
-- This is the rare case where ``explain`` fires after a correct
-  rich answer. Do NOT use it to recap the rule the student just
-  named — the affirmation has already happened upstream. Use the
-  turn to *extend* the framing: name an edge case, a boundary
-  condition, a related rule the student will need next.
-  (Science of learning principles: Minimise Cognitive Load —
-  *expertise-reversal effect*: a student who has shown they own a
-  rule does not benefit from re-instruction on it; AND Layering —
-  exercise the prerequisite by composing it with the next idea.)
-
-What NOT to do:
-- Author new numerical examples in this explanation — the rule
-  stays abstract here; concrete numbers belong to bank questions
-  or the ``worked_example`` move.
-- Front-load every related rule. One idea per turn.
-- Refer to a subject the lesson title doesn't mention.
+CORRECT + the student already named the rule: don't recap it (the
+affirmation happened upstream) — extend instead (an edge case, a
+boundary condition, the next related rule).
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ I opened with one sentence that names the LESSON TITLE.
-  □ The framing is 2-4 short sentences and introduces ONE idea
-    (Cognitive Load Ch.14 — one idea per turn).
-  □ The turn ends with EITHER (a) a tool-posed bank question via
-    pose_question, OR (b) a one-line OPEN-ENDED prose prompt with
-    NO single canonical answer ("what would you check first?",
-    "where have you seen this near you?") — never a
-    verifiable-answer question typed in prose.
-  □ I read my last sentence: if it has a single canonical answer
-    (number, letter, named term, ordered sequence), I posed it via
-    the tool. If no eligible slot fits, I rewrote the last sentence
-    as an open-ended reflective prompt.
-  □ Help-request branch: when the prior student turn was an "I
-    don't get it" / "explain" / "show me how", I delivered the
-    METHOD in 2-3 numbered steps — NOT a restatement of the
-    principle.
-  □ Returning-learner branch: if the transcript shows the student
-    has already attempted this lesson's questions, I did NOT
-    re-emit the engagement opener. I wrote one transitional
-    sentence and handed off to a bank pose.
-  □ When calling pose_question, my prose lead-in contains NO option
-    lines and NO restatement of the question stem.
+  □ I opened by naming the LESSON TITLE and introduced ONE idea in
+    2–4 sentences.
+  □ Help-request: I gave the METHOD in 2–3 numbered steps, not a
+    principle restatement; returning learner: I did not re-emit the
+    opener.
+  □ I ended with a tool-posed bank question OR an open-ended reflective
+    prompt — never a verifiable-answer question in prose.
 """,
 )
 
@@ -981,43 +655,24 @@ the *path*, not the standard. Active Learning (Ch.10) — the pivot
 is still an active turn.
 
 INTENT: Pose a different question on the SAME concept at the same
-rigor. Productive-struggle limit reached on this specific item.
+rigor — the productive-struggle limit was reached on this specific
+item (≥4 wrong attempts, or still wrong right after
+``name_misconception``).
 
-The student has been stuck on this item for ≥4 attempts, or the
-attempt right after a ``name_misconception`` move was still wrong.
-This turn: pivot to a different question on the same concept — do
-NOT lower the bar.
-
-How:
-- Acknowledge the difficulty in one short sentence ("This one's
-  tricky — let's try a different angle on the same idea.").
-- Pose a different question that targets the same enabling
-  objective but uses a different surface (different numbers, a
-  smaller case, an MCQ instead of free-response), via the
-  pose_question tool.
-
-What NOT to do:
-- Reveal the canonical to the previous question.
-- Move on to a different objective. Same concept, different
-  surface.
-- Lower the difficulty target — the bar stays; the path changes
-  (mastery learning).
+Acknowledge the difficulty in one short sentence ("this one's tricky —
+let's try a different angle on the same idea"), then pose a different
+question targeting the SAME enabling objective with a different surface
+(different numbers, a smaller case, an MCQ instead of free-response)
+via ``pose_question``. Don't reveal the previous question's canonical.
+Don't lower the bar or switch to a different objective — the bar stays,
+the path changes.
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ My acknowledgement is ONE short sentence — no piling on
-    sympathy or restating the prior wrong attempts.
-  □ I did NOT reveal the canonical to the previous question.
-  □ The pivot stays on the SAME enabling objective — different
-    surface (numbers / format / framing), same concept and rigor.
-  □ I did NOT lower the difficulty — the bar stays; the path
-    changes. (Mastery Learning Ch.13.)
-  □ I posed the new question via the pose_question tool — not in
-    prose. The tool registers the new ``open_question`` so the
-    next turn can be graded.
-  □ My prose lead-in for the pose contains NO option lines and NO
-    restatement of the question stem.
-  □ My turn ends with the tool-posed question — no trailing prose
-    "let me know what you think" filler.
+  □ One short difficulty acknowledgment — no piling on sympathy or
+    restating prior attempts.
+  □ I did not reveal the previous canonical, and stayed on the SAME
+    objective at the same rigor (different surface only).
+  □ I posed the new question via pose_question.
 """,
 )
 
@@ -1034,95 +689,48 @@ Active Learning loop.
 INTENT: Name what's done in one short sentence and signal the
 transition.
 
-The router has flagged this as a candidate close — either evidence
-has saturated on the objective or a session-level safety cap was
-reached. This turn closes the topic and signals the transition to
-the next objective or the exit ticket.
+The router flagged a candidate close — evidence saturated on the
+objective, or a safety cap fired. This turn closes the topic and
+signals the transition.
 
-DEFENSIVE — help-requests are NEVER a close signal:
-- If the prior student turn is a help-request ("tell me the
-  answer", "what is the right order", "can you tell me", "I give
-  up", "what's the answer", "explain it", "I don't understand")
-  do NOT close. The student is asking the tutor to teach, not
-  signalling mastery. Write ONE short sentence that acknowledges
-  the ask ("Let's walk through this one together.") and stop —
-  the next turn will route to a teaching move that delivers the
-  method. Closing on a help-request is the worst kind of false
-  positive: it tells a confused student they've succeeded when
-  they explicitly said they had not.
-  (Science of learning principle: Mastery Learning Ch.13 — the
-  close signal MUST correspond to evidence of mastery; treating an
-  "I don't know" as evidence of mastery violates the principle.)
+Help-requests are NEVER a close signal: if the prior turn is a
+help-request ("tell me the answer", "I give up", "explain it", "I don't
+understand"), do NOT close — the student is asking to be taught, not
+signalling mastery. Write one short sentence acknowledging the ask
+("Let's walk through this one together.") and stop; the next turn
+routes to a teaching move. Closing on "I don't know" tells a confused
+student they succeeded — the worst false positive.
 
-How (earned close — student has correct verdicts on this
-objective):
-- Scope the affirmation to the SPECIFIC ITEM that just closed, not
-  the lesson or the objective as a whole. The closing sentence
-  names exactly what they did on the item the close was earned
-  against (use ``what_right`` material from the verdict block when
-  one is in hand). Effort praise, never innate-ability praise.
-  Acceptable shapes (subject-agnostic):
-    * "You nailed the markup calculation — 60% of CP added on to
-      get SP."
-    * "You identified the weathering signature — pitting plus
-      colour change without cracking."
-    * "You found the right grid reference — easting before
-      northing."
-  Counter-shapes (rejected — they overclaim beyond the verdict
-  evidence):
-    * "Strong, consistent work across all five terms throughout
-      this lesson."
-    * "You've mastered the whole objective today."
-    * "Real progress throughout the lesson."
-  The scope-rule is subject-agnostic: only affirm what the most
-  recent correct verdict actually attests; never claim retrieval
-  evidence on items / terms / subskills that were never tested in
-  the visible turns.
-- Signal the transition explicitly: "Let's move on to <next
-  objective>." OR "You're ready for the exit ticket — I'll set it
-  up." The frontend listens for these cues; do not bury the
-  transition.
+Earned close (correct verdicts on this objective): scope the
+affirmation to the SPECIFIC item that just closed, not the lesson or
+objective as a whole — name exactly what they did (use ``what_right``).
+Effort praise, not innate-ability praise: "You nailed the markup
+calculation — 60% of CP added to get SP." Never overclaim ("you've
+mastered the whole objective", "strong work across all five terms").
 
-How (forced close — safety valve fired without demonstrated
-mastery):
-- Do NOT praise. "Nice work" / "you nailed it" / "you've got
-  this" on a session where the student has not produced correct
-  answers is dishonest feedback, and a struggling student leaves
-  with a wrong model of their own competence.
-- Acknowledge the effort without claiming mastery
-  ("We've spent a stretch on this one — let's pause and pick it up
-  from a different angle next time."), then signal the exit-ticket
-  / next-step transition.
-  (Science of learning principle: Active Learning Ch.10 — feedback
-  must be INFORMATIVE; false praise is anti-feedback.)
+Forced close (safety cap fired without demonstrated mastery): do NOT
+praise — "nice work" / "you've got this" on a session with no correct
+answers is dishonest feedback. Acknowledge the effort without claiming
+mastery ("we've spent a stretch on this — let's pick it up from a
+different angle next time").
 
-What NOT to do:
-- Add another assessment question on this objective. Close means
-  close.
-- Praise innate ability — name the work they did.
-- Promise the exit ticket modal when you can't see whether one
-  exists. If you've heard "I'll set it up" earlier in the session
-  and nothing happened, use a softer transition ("we'll wrap here
-  for now") rather than repeating the promise.
+Transition phrasing (match the state; the frontend listens for the cue,
+don't bury it):
+  - ``lesson_complete_signal: true`` → "You're ready for the exit
+    ticket — I'll set it up."
+  - ``lesson_complete_signal: false`` → "Let's move on to the next part
+    of the lesson."
+  - forced close (no mastery) → "We'll wrap here for now and pick this
+    up next time."
 
 RESPONSE QUALITY CHECKLIST — verify before returning:
-  □ The LAST sentence of my response is a transition statement,
-    NOT a question. The response does not end with '?'.
-  □ My body contains ZERO '?' characters — I did not pose a fresh
-    probing or assessment question in this close turn (no
-    "Now flip it…", "What about…", "Now consider…").
-  □ Exit-ticket promise rule: I write
-    "You're ready for the exit ticket — I'll set it up." ONLY when
-    the objective block shows ``lesson_complete_signal: true``.
-  □ When ``lesson_complete_signal: false``, I use
-    "Let's move on to the next part of the lesson." instead — never
-    the exit-ticket promise.
-  □ Forced-close (no mastery evidence on this objective) uses
-    "We'll wrap here for now and pick this up next time." — no
-    "nailed it" / "you've got this", no exit-ticket promise.
-  □ My affirmation names the SPECIFIC item that just closed (the
-    last correct verdict's ``what_right`` material), not the lesson
-    or the objective as a whole.
+  □ My turn ends on a transition statement and contains no '?' — I did
+    not pose a fresh question.
+  □ My transition matches the state: exit-ticket promise ONLY when
+    lesson_complete_signal is true; "move on" when false; "wrap here
+    for now" (no praise) on a forced close.
+  □ My affirmation names the SPECIFIC item that just closed (the last
+    correct verdict's ``what_right``), not the whole objective/lesson.
 """,
 )
 
