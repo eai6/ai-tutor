@@ -1,0 +1,471 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 89.43264198303223,
+  "tokens_in": 5335,
+  "tokens_out": 7957,
+  "n_tutor_turns_in_transcript": 22,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly student MCQ attempts with brief tutor explanations, but many turns are empty or stalled (turns 85, 87, 89, 91)."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Tutor generally follows explanations with an MCQ (e.g., turn 72, 76), though some turns are empty (85, 87) breaking the flow."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On repeated errors at 360-190, tutor cycles through similar MCQs rather than a clean varied retry; some scaffolding (turn 76) is reasonable but turn 78 introduces a confusing 200-based decomposition."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Tutor moves on from 360-190 once student gets 170 (turn 80) but never re-checks the original 'third angle' question; also the 60\u00f75 sub-skill is being drilled without diagnosing place-value bottleneck."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Turn 78's '360-200=160, add 10 back' reasoning is awkward and high-load for an error-prone S3 student; figure references appear without an inline figure (turn 68)."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Tutor links new problem (5 equal angles) to the 360\u00b0 total, and breaks 360\u00f75 into 300\u00f75 + 60\u00f75, leveraging prerequisite division facts."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "180\u00b0 (straight line) vs 360\u00b0 (point) are explicitly contrasted in turn 68/70; no confusable topics back-to-back."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Problems stay narrowly on 360-sum subtraction/division; no genuine mixing of problem types."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor poses MCQs before explaining (turn 66, 72), giving genuine retrieval attempts, though hints sometimes come too eagerly (turn 76)."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "When student repeatedly fails 360-190 and 60\u00f75, tutor recycles the same MCQ (turns 74, 97, 99) rather than diagnosing the place-value or subtraction prerequisite."
+    }
+  },
+  "strongest_behaviors": [
+    "Explicit contrast between 180\u00b0 (straight line) and 360\u00b0 (point) when correcting the first error (turn 68/70).",
+    "Decomposing 360\u00f75 into 300\u00f75 + 60\u00f75 to scaffold division (turn 93)."
+  ],
+  "weakest_behaviors": [
+    "Multiple empty tutor turns (85, 87, 89, 91) that derail the session and force the student to self-tutor.",
+    "Recycling identical MCQs after wrong answers (turns 74, 97, 99) instead of remediating the prerequisite skill."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid empty tutor turns",
+      "rationale": "Several tutor turns are entirely empty, causing the student to take over the tutoring role.",
+      "evidence_quote": "--- TUTOR (id=85, tools=1)\\n\\n--- STUDENT (id=86)",
+      "evidence_turn": "85",
+      "suggested_prompt_edit": "Add: 'Every tutor turn MUST contain at least one sentence of feedback AND either a question or a clearly marked next step. Never emit an empty message.'",
+      "expected_effect": "Eliminates stalled turns and keeps tutor in control of the dialogue.",
+      "severity": "high"
+    },
+    {
+      "title": "Ban verbatim MCQ recycling on wrong answer",
+      "rationale": "After wrong answers the tutor often re-posts the identical MCQ with no new scaffold, which doesn't help an error-prone student.",
+      "evidence_quote": "If 30 divided by 5 is 6, what is 300 divided by 5? A) 50 B) 60 C) 70 D) 80",
+      "evidence_turn": "99",
+      "suggested_prompt_edit": "Add: 'If a student answers an MCQ incorrectly, do NOT repost the same options. Provide a new scaffold (worked sub-step, simpler analogous problem, or place-value breakdown) before re-asking.'",
+      "expected_effect": "Forces genuine remediation instead of guess-cycling.",
+      "severity": "high"
+    },
+    {
+      "title": "Diagnose prerequisite on repeated failure",
+      "rationale": "Student repeatedly fails simple subtraction/division; tutor should branch to a prerequisite check rather than persist.",
+      "evidence_quote": "c) 180\u00b0 ... a) 150\u00b0",
+      "evidence_turn": "75",
+      "suggested_prompt_edit": "Add: 'After two consecutive errors on the same micro-skill, switch to a prerequisite diagnostic (e.g., single-digit subtraction or 10x place-value) before returning to the target problem.'",
+      "expected_effect": "Targets the actual bottleneck instead of looping.",
+      "severity": "high"
+    },
+    {
+      "title": "Don't reference figures that aren't shown",
+      "rationale": "Tutor refers to 'the diagram' but no figure is rendered inline, increasing load.",
+      "evidence_quote": "Look at the diagram to see how many degrees make up",
+      "evidence_turn": "68",
+      "suggested_prompt_edit": "Add: 'Only reference a diagram if you are emitting one inline in the same turn. Otherwise describe the visual in words.'",
+      "expected_effect": "Removes dangling figure references that confuse the student.",
+      "severity": "medium"
+    },
+    {
+      "title": "Avoid convoluted decomposition strategies",
+      "rationale": "Turn 78's '360-200=160, then add 10 back' is more confusing than direct subtraction.",
+      "evidence_quote": "If you have 360 and take away 200, you have 160 left. Since 190 is 10 less than 200, we add that 10 back to 160.",
+      "evidence_turn": "78",
+      "suggested_prompt_edit": "Add: 'Prefer the simplest decomposition (e.g., 360-190 = 360-200+10 stated as a single step, or column subtraction). Avoid multi-step reasoning that itself requires the skill being remediated.'",
+      "expected_effect": "Lowers cognitive load for error-prone students.",
+      "severity": "medium"
+    },
+    {
+      "title": "Close the original question before moving on",
+      "rationale": "Student's original question 'what is the third angle?' was never explicitly answered as 170\u00b0; tutor pivoted to a new problem.",
+      "evidence_quote": "Spot on\u2014you'd have 170 sweets! That's exactly right, which means 360 - 190 = 170.",
+      "evidence_turn": "80",
+      "suggested_prompt_edit": "Add: 'After solving a sub-step, explicitly restate the answer to the original question before introducing a new problem.'",
+      "expected_effect": "Improves closure and mastery confirmation.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and retry empty model outputs",
+      "rationale": "Engine emitted multiple empty tutor turns; orchestration should retry or fall back.",
+      "evidence_quote": "--- TUTOR (id=87, tools=0)\\n\\n--- STUDENT (id=88)",
+      "evidence_turn": "87",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents student from having to drive the lesson.",
+      "severity": "high"
+    },
+    {
+      "title": "Cap consecutive wrong answers before prerequisite routing",
+      "rationale": "Student missed the same subtraction question 3+ times with no routing to a prereq lesson.",
+      "evidence_quote": "a) 150\u00b0 ... c) 180\u00b0 ... a) 150\u00b0",
+      "evidence_turn": "77",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Triggers prereq remediation automatically after N failures.",
+      "severity": "high"
+    },
+    {
+      "title": "Role-confusion guard",
+      "rationale": "Because tutor turns were empty, the student began producing tutor-style replies; engine should detect role inversion.",
+      "evidence_quote": "You're close! You divided 360 by 6, but there are five equal angles.",
+      "evidence_turn": "86",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Restores proper turn-taking.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Inline visual for angles around a point",
+      "rationale": "An error-prone S3 student would benefit from a labelled diagram showing 90\u00b0, 100\u00b0, and the unknown angle.",
+      "evidence_quote": "Look at the diagram to see how many degrees make up",
+      "evidence_turn": "68",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Concrete visual reduces abstraction load.",
+      "severity": "medium"
+    },
+    {
+      "title": "Warmer tone after repeated errors",
+      "rationale": "After 3+ wrong attempts, encouragement and a 'let's slow down' beat would help an error-prone learner.",
+      "evidence_quote": "c) 15",
+      "evidence_turn": "104",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces frustration and supports persistence.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The tutor opens reasonably with a clear contrast between 180\u00b0 and 360\u00b0, but the session deteriorates: multiple empty tutor turns force the student into the tutor role, and on repeated arithmetic errors the tutor recycles identical MCQs rather than diagnosing the prerequisite subtraction/division skills. Targeted remediation, mastery gating, and cognitive-load management are the weakest areas. Highest-priority fixes are forbidding empty turns, banning verbatim MCQ recycling, and routing to prereq diagnostics after consecutive failures.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "66",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "68",
+      "preceding_student_turn_id": "67",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 180\u00b0 instead of 360\u00b0 for angles around a point.",
+      "tutor_excerpt": "Not quite\u2014180\u00b0 is the sum for a straight line, but a full rotation around a point is a complete circle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Identifies the error and contrasts straight line vs full rotation, but the turn is truncated and references a diagram that isn't shown."
+    },
+    {
+      "tutor_turn_id": "70",
+      "preceding_student_turn_id": "69",
+      "student_made_mistake": false,
+      "skip_reason": "Student said 'ohh. okay' (acknowledgement) and then posed a new problem; no mistake to remediate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "72",
+      "preceding_student_turn_id": "71",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student gave 190\u00b0 as the third angle, having added the two known angles instead of subtracting from 360\u00b0.",
+      "tutor_excerpt": "You've correctly added 90\u00b0 and 100\u00b0 to get 190\u00b0. To find the missing third angle, we just need to subtract that sum from the full 360\u00b0 circle.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly names what student did right, what step is missing, and prompts the subtraction with an MCQ."
+    },
+    {
+      "tutor_turn_id": "74",
+      "preceding_student_turn_id": "73",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 150\u00b0 for 360-190.",
+      "tutor_excerpt": "What is 360\u00b0 - 190\u00b0? A) 150\u00b0 B) 170\u00b0 C) 180\u00b0 D) 200\u00b0",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Simply reposts the same MCQ with no feedback or scaffolding."
+    },
+    {
+      "tutor_turn_id": "76",
+      "preceding_student_turn_id": "75",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 180\u00b0 for 360-190.",
+      "tutor_excerpt": "Let's try breaking it down: 360 - 100 is 260. Now, what is 260 - 90?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "No",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Doesn't name the error explicitly but offers a useful decomposition and a clear next step."
+    },
+    {
+      "tutor_turn_id": "78",
+      "preceding_student_turn_id": "77",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again chose 150\u00b0.",
+      "tutor_excerpt": "If you have 360 and take away 200, you have 160 left. Since 190 is 10 less than 200, we add that 10 back to 160.",
+      "mistake_identification": "To some extent",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Provides a new strategy but it's more cognitively complex than the original problem and doesn't pinpoint the student's specific error."
+    },
+    {
+      "tutor_turn_id": "80",
+      "preceding_student_turn_id": "79",
+      "student_made_mistake": false,
+      "skip_reason": "Student's reply (160+10 sweets) is correct reasoning, not a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "82",
+      "preceding_student_turn_id": "81",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed a new question; no mistake yet.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "83",
+      "preceding_student_turn_id": "81",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn restating the problem; no intervening student mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "85",
+      "preceding_student_turn_id": "84",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 60\u00b0 for 360\u00f75 (actually 360\u00f76).",
+      "tutor_excerpt": "",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Empty tutor turn \u2014 no response at all to the student error."
+    },
+    {
+      "tutor_turn_id": "87",
+      "preceding_student_turn_id": "86",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn is actually tutor-style feedback (role inversion); not a student mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "89",
+      "preceding_student_turn_id": "88",
+      "student_made_mistake": false,
+      "skip_reason": "Student asked a question; no mistake present.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "91",
+      "preceding_student_turn_id": "90",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 70\u00b0 for 360\u00f75.",
+      "tutor_excerpt": "",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Empty tutor turn; no response to the wrong answer."
+    },
+    {
+      "tutor_turn_id": "93",
+      "preceding_student_turn_id": "92",
+      "student_made_mistake": false,
+      "skip_reason": "Preceding 'student' turn is actually tutor-style scaffolding (role inversion), not a student mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "95",
+      "preceding_student_turn_id": "94",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 65 (unclear what for); not a valid sub-answer.",
+      "tutor_excerpt": "You said 65. Show me how you calculated that, but first, if 30 \u00f7 5 = 6, what is 300 \u00f7 5?",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Acknowledges the answer, offers a useful analogy (30\u00f75=6) and asks a targeted MCQ."
+    },
+    {
+      "tutor_turn_id": "97",
+      "preceding_student_turn_id": "96",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 70 for 300\u00f75.",
+      "tutor_excerpt": "Not quite. If 30\u00f75 = 6, we can use that same 6 and just add a zero to the end for 300\u00f75.",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Explains the place-value pattern and re-asks; reasonable scaffold though it re-uses the same MCQ."
+    },
+    {
+      "tutor_turn_id": "99",
+      "preceding_student_turn_id": "98",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 50 for 300\u00f75.",
+      "tutor_excerpt": "If 30 divided by 5 is 6, what is 300 divided by 5? A) 50 B) 60 C) 70 D) 80",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Just reposts the question with no feedback after the second consecutive wrong answer."
+    },
+    {
+      "tutor_turn_id": "101",
+      "preceding_student_turn_id": "100",
+      "student_made_mistake": false,
+      "skip_reason": "Student finally chose 60 (correct); tutor moves to next sub-step.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "103",
+      "preceding_student_turn_id": "102",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 10 for 60\u00f75.",
+      "tutor_excerpt": "Close! If 50\u00f75 = 10, then 60\u00f75 must be a bit more since 60 is larger than 50. Think about how many 5s are in that extra 10.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Pinpoints the error, gives a clear hint, and re-asks."
+    },
+    {
+      "tutor_turn_id": "105",
+      "preceding_student_turn_id": "104",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 15 for 60\u00f75.",
+      "tutor_excerpt": "Almost! 15\u00d75 is 75, which is a bit too high. Let's count up by 5s from 50: 50, 55... what is the next number?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Uses multiplication check and skip-counting scaffold \u2014 strong targeted remediation."
+    },
+    {
+      "tutor_turn_id": "107",
+      "preceding_student_turn_id": "106",
+      "student_made_mistake": false,
+      "skip_reason": "Preceding 'student' turn is actually tutor-style scaffolding (role inversion).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 22,
+    "n_in_scope": 12,
+    "coverage_rate": 0.5454545454545454,
+    "mistake_identification_exact": 0.5,
+    "mistake_identification_lenient": 0.6666666666666666,
+    "mistake_location_exact": 0.3333333333333333,
+    "mistake_location_lenient": 0.5,
+    "providing_guidance_exact": 0.5,
+    "providing_guidance_lenient": 0.6666666666666666,
+    "actionability_exact": 0.5833333333333334,
+    "actionability_lenient": 0.8333333333333334,
+    "overall_exact_pass_rate": 0.4791666666666667,
+    "overall_lenient_pass_rate": 0.6666666666666666,
+    "strict_pass_rate": 0.25,
+    "lenient_pass_rate": 0.5
+  }
+}

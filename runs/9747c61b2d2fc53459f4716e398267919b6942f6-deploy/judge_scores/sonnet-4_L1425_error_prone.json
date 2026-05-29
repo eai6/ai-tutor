@@ -1,0 +1,584 @@
+{
+  "transcript": "sonnet-4_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 121.18128895759583,
+  "tokens_in": 8363,
+  "tokens_out": 10522,
+  "n_tutor_turns_in_transcript": 30,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly MCQ practice with student responses (turns 17, 19, 26, 33, 46), so student does most of the talking, but tutor sometimes over-explains (turns 29, 47)."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Most teaching segments are followed by an MCQ, but some tutor turns (e.g., 22\u219223) chain explanation then question; also tutor occasionally posted just a stub like turn 39 'Let's practice with a calculation:' with no action."
+    },
+    "deliberate_practice": {
+      "score": 3,
+      "evidence": "On the scale denominator error (turn 33\u219234), tutor gave focused corrective feedback then student succeeded; however on river-distance problem (turn 37), tutor abandoned it instead of giving a similar varied problem."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Progression seems step-based rather than mastery-gated; tutor moved on after single correct MCQ answers (e.g., turn 51 \u2192 new topic) without retrieval checks."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Generally one idea per turn with bolded key terms (turn 29 large-scale vs small-scale), but turn 29 packs definitions, analogy, and answer reveal at once."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Scale concept built on prior detail concept (turn 36 links 1:5,000 back to school-campus detail), but few explicit links across map-type topics."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Thematic vs topographic vs political maps appear close together (turns 45-49); tutor does explicitly contrast 'you're thinking about what a topographic map would show' (turn 47)."
+    },
+    "interleaving": {
+      "score": 2,
+      "evidence": "Problems mostly follow the same MCQ-on-scale template; numeric calculation question (turn 37) was skipped, so variety collapsed back to definition-recognition MCQs."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor asks retrieval MCQs first before explaining (turn 23, 30, 40), but hints arrive quickly after a single wrong answer (turn 27 reveals definition immediately)."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "After student role-confusion (student impersonating tutor in turns 24, 38, 53, 61), tutor never diagnosed the meta-problem nor routed to prereq practice; just posted next MCQ (turn 25, 39, 54, 62)."
+    }
+  },
+  "strongest_behaviors": [
+    "Clear, focused corrective feedback on the scale-denominator misconception with concrete numbers (turn 34) that led to student success in turn 35.",
+    "Consistent use of bolded key terms and contrasting definitions (turns 29, 47) that help distinguish confusable map types."
+  ],
+  "weakest_behaviors": [
+    "Tutor repeatedly failed to handle student turns that impersonated the tutor by posing their own questions (turns 24, 38, 53, 61); the tutor simply ignored or re-posted its own MCQ instead of correcting the role confusion.",
+    "Tutor abandoned the open-ended calculation problem in turn 37 after the student gave a confused answer (turn 41), instead of remediating the calculation skill \u2014 a clear missed deliberate-practice opportunity."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid abandoning open-response problems",
+      "rationale": "When student answered 'the river is 20 kilometres long' to a question they invented, tutor dropped the original calculation task (turn 37) and jumped to an unrelated MCQ.",
+      "evidence_quote": "I notice you calculated an answer for a different problem than the one I just posed! ... Let me pose the question I intended:",
+      "evidence_turn": "42",
+      "suggested_prompt_edit": "Rule: If you posed a calculation/open question and the student's answer is off-topic or wrong, re-anchor to YOUR original question and walk them through it with subgoals. Do NOT substitute a new question until the original is resolved or explicitly deferred.",
+      "expected_effect": "Preserves deliberate practice on the calculation skill instead of skipping it.",
+      "severity": "high"
+    },
+    {
+      "title": "Detect and correct student role-impersonation",
+      "rationale": "Student repeatedly produced tutor-style turns ('Okay, fantastic! ... Here's a problem for you:') and the tutor either silently posted a stub (turn 39, 54, 62) or moved on, never naming the issue.",
+      "evidence_quote": "Okay, fantastic! You're really getting the hang of map scales. Here's a problem for you: On a map with a scale of 1:25,000, a river measures 8 cm long...",
+      "evidence_turn": "38",
+      "suggested_prompt_edit": "Rule: If the student message looks like a tutor turn (praises you, poses a new MCQ, or invents a problem), gently call this out: 'I'm the tutor here \u2014 let's stay with my question.' Then re-post YOUR pending question.",
+      "expected_effect": "Stops the role-swap drift and keeps the lesson on track.",
+      "severity": "high"
+    },
+    {
+      "title": "Hold MCQ answer reveal until at least one more guided attempt",
+      "rationale": "On turn 29, tutor revealed the answer 'option B' after just one wrong guess, undermining retrieval practice.",
+      "evidence_quote": "So a world map that shows the entire globe would be a **small-scale** map - option B.",
+      "evidence_turn": "29",
+      "suggested_prompt_edit": "Rule: After a wrong MCQ answer, give ONE targeted hint and ask the student to choose again from the original options before revealing the correct letter.",
+      "expected_effect": "Stronger testing effect and reduced answer-leakage.",
+      "severity": "medium"
+    },
+    {
+      "title": "Avoid empty stub turns",
+      "rationale": "Turns 39, 54, and 62 consist of one-line stubs ('Let's practice with a calculation:', 'Let's check your understanding.', 'Let's try this one:') with no actual content \u2014 wasted turns.",
+      "evidence_quote": "Let's practice with a calculation:",
+      "evidence_turn": "39",
+      "suggested_prompt_edit": "Rule: Never emit a 'transition only' message. Every tutor turn must contain either a question, an explanation, or feedback. Combine the transition with the next question in a single turn.",
+      "expected_effect": "Cleaner pacing, fewer wasted exchanges.",
+      "severity": "medium"
+    },
+    {
+      "title": "Explicitly contrast confusable map types when introduced",
+      "rationale": "Student confused thematic with topographic (turn 46) and then with political (turn 48); discriminating features were only stated reactively.",
+      "evidence_quote": "Not quite - you're thinking about what a **topographic** map would show.",
+      "evidence_turn": "47",
+      "suggested_prompt_edit": "When introducing any map type, include a one-line contrast table with the other map types already covered (topographic vs thematic vs political vs street) before asking the practice question.",
+      "expected_effect": "Reduces back-to-back confusion and supports non-interference.",
+      "severity": "medium"
+    },
+    {
+      "title": "Add a brief retrieval check before changing topic",
+      "rationale": "After scale mastery in turn 36, tutor immediately jumped to a calculation (turn 37) without a quick retrieval check that locked in the rule.",
+      "evidence_quote": "Great understanding of how map scales work! Now let's put this knowledge into practice with a real calculation.",
+      "evidence_turn": "36",
+      "suggested_prompt_edit": "Before switching subtopics, ask one \u226420-word retrieval prompt that requires recalling the rule just learned, then proceed.",
+      "expected_effect": "Supports mastery-gated progression.",
+      "severity": "medium"
+    },
+    {
+      "title": "Vary problem types to prevent template repetition",
+      "rationale": "Several consecutive MCQs are 'identify the correct scale/map type' \u2014 student can pattern-match without deep processing.",
+      "evidence_quote": "Which of these map scales would show the most detail for a small area, like a school campus?",
+      "evidence_turn": "32",
+      "suggested_prompt_edit": "Rule: Interleave question formats \u2014 definition MCQ, numeric conversion, scenario justification, open short-answer \u2014 and avoid more than two consecutive items of the same format.",
+      "expected_effect": "Better interleaving, deeper learning.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect tutor-impersonation in student turns",
+      "rationale": "Engine should classify student messages and route 'tutor-style' ones to a corrective handler instead of letting the model post a stub.",
+      "evidence_quote": "Okay, that's excellent! You're doing great. Now, let's talk about some other important parts of a map...",
+      "evidence_turn": "53",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents role-swap drift programmatically.",
+      "severity": "high"
+    },
+    {
+      "title": "Block stub-only tutor outputs",
+      "rationale": "Turns 39, 54, 62 are content-free; an output validator could re-prompt the model to produce a full turn.",
+      "evidence_quote": "Let's check your understanding.",
+      "evidence_turn": "54",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Eliminates wasted turns.",
+      "severity": "medium"
+    },
+    {
+      "title": "Retry policy on open calculations",
+      "rationale": "When an open numeric problem is posed (turn 37) and student's response doesn't include working, the engine should force a hint-and-retry loop before allowing topic change.",
+      "evidence_quote": "If a map scale is 1:50,000 and the straight-line distance between two villages is 8 cm on the map, calculate the actual distance...",
+      "evidence_turn": "37",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Forces deliberate practice completion.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "More encouraging tone after multiple errors",
+      "rationale": "Error-prone student got 'Not quite' three times in a row early on (turns 18, 20, 27) which may feel discouraging.",
+      "evidence_quote": "Still not quite right. Think about what makes a navigation app useful for getting around Victoria specifically.",
+      "evidence_turn": "20",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Maintains motivation for error-prone learners.",
+      "severity": "low"
+    },
+    {
+      "title": "Inline a small visual or analogy for scale",
+      "rationale": "Scale terminology confused the student; a quick visual analogy (e.g., zoom-in/zoom-out icon) could anchor it.",
+      "evidence_quote": "The scale terminology can be confusing at first, but think of it this way...",
+      "evidence_turn": "29",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces cognitive load on a known-confusable concept.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The tutor delivers a structured MCQ-driven lesson on map types and scale with generally clear feedback and good use of bolded key terms. However, the session is repeatedly derailed by the student impersonating the tutor (inventing their own questions), which the tutor never addresses \u2014 instead emitting empty stub turns and skipping its own pending questions, including the only open numeric calculation. Progression is step-based rather than mastery-gated, with quick answer reveals after single errors and limited variety in problem formats. Strongest moments are the scale-denominator remediation (turns 34\u201336); weakest are the abandoned calculation (turn 37\u219242) and uncorrected role-swap behavior.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "16",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "18",
+      "preceding_student_turn_id": "17",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose B (entire Indian Ocean) when navigation apps require street-level detail (A).",
+      "tutor_excerpt": "Not quite - think about what you actually need when navigating around a city... Option B describes what you'd see on a world map.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor names the error, explains why B is wrong, and prompts re-selection."
+    },
+    {
+      "tutor_turn_id": "20",
+      "preceding_student_turn_id": "19",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose C (countries and continents) for navigation app content.",
+      "tutor_excerpt": "Still not quite right. Think about what makes a navigation app useful for getting around Victoria specifically... Try once more.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor identifies wrong choice, explains the purpose framing, and asks for another attempt."
+    },
+    {
+      "tutor_turn_id": "22",
+      "preceding_student_turn_id": "21",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 21 is a tutor-impersonation (paraphrasing/repeating the tutor's prompt), not a substantive content mistake by the student.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "23",
+      "preceding_student_turn_id": "21",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of prior tutor turn; preceding student message was tutor-impersonation, not a mistake to remediate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "25",
+      "preceding_student_turn_id": "24",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student impersonated tutor and posed their own question \u2014 a meta-mistake (role confusion) the tutor should address.",
+      "tutor_excerpt": "If you want to see the whole world on one map, what kind of map would that be? A) A large-scale map B) A small-scale map...",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor ignored the role-swap entirely and just re-posted the question; no recognition of the meta-mistake."
+    },
+    {
+      "tutor_turn_id": "27",
+      "preceding_student_turn_id": "26",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose A (large-scale map) for whole world; correct is B (small-scale).",
+      "tutor_excerpt": "Not quite - think about what 'large-scale' actually means... A large-scale map shows a small area with lots of detail... Which type of map would that be - one that shows a large area with less detail?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clear identification, accurate explanation of the confusion, and a clear next action."
+    },
+    {
+      "tutor_turn_id": "29",
+      "preceding_student_turn_id": "28",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student guessed topographic (C) confusing 'big area / less detail' with the topographic category.",
+      "tutor_excerpt": "Not quite! ... 'topographic' refers to a specific type of map that shows elevation... So a world map that shows the entire globe would be a small-scale map - option B.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies and locates the mistake well, but reveals the answer instead of prompting another attempt."
+    },
+    {
+      "tutor_turn_id": "30",
+      "preceding_student_turn_id": "28",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 29; same preceding student turn already evaluated.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "32",
+      "preceding_student_turn_id": "31",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again impersonated tutor \u2014 declared mastery and posed a new MCQ.",
+      "tutor_excerpt": "Which of these map scales would show the most detail for a small area, like a school campus? A) 1:100,000 B) 1:1,000,000 C) 1:5,000 D) 1:50,000,000",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "To some extent",
+      "rationale": "Tutor simply echoed the student's invented question rather than addressing the role-swap; no recognition or guidance."
+    },
+    {
+      "tutor_turn_id": "34",
+      "preceding_student_turn_id": "33",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 1:50,000,000 \u2014 confused that bigger denominator = more detail.",
+      "tutor_excerpt": "Not quite! Remember, large-scale maps show more detail, and large-scale means a smaller denominator... Which has the smallest denominator?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Excellent targeted feedback: names the rule, gives a numeric comparison, and asks the student to re-pick."
+    },
+    {
+      "tutor_turn_id": "36",
+      "preceding_student_turn_id": "35",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (C, 1:5,000).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "37",
+      "preceding_student_turn_id": "35",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation; preceding student turn was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "39",
+      "preceding_student_turn_id": "38",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student impersonated tutor again, posing a new river-scale problem instead of solving turn 37.",
+      "tutor_excerpt": "Let's practice with a calculation:",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Empty stub turn; no recognition of the role-swap and no guidance."
+    },
+    {
+      "tutor_turn_id": "40",
+      "preceding_student_turn_id": "38",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation; same preceding student turn already evaluated under turn 39.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "42",
+      "preceding_student_turn_id": "41",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered '20 km' to the wrong question (the river one they invented), not the MCQ about efficient calculation method.",
+      "tutor_excerpt": "I notice you calculated an answer for a different problem than the one I just posed! ... Let me pose the question I intended:",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Tutor names the off-topic answer but then substitutes a brand-new question (turn 43) rather than the original one; partial guidance and unclear next action on either problem."
+    },
+    {
+      "tutor_turn_id": "43",
+      "preceding_student_turn_id": "41",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 42.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "45",
+      "preceding_student_turn_id": "44",
+      "student_made_mistake": false,
+      "skip_reason": "Student apologized and said they were ready \u2014 non-substantive filler.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "47",
+      "preceding_student_turn_id": "46",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose A (mountainous areas) for the purpose of a thematic population-density map.",
+      "tutor_excerpt": "Not quite - you're thinking about what a topographic map would show... What would be the main purpose of showing this information with color shading across Seychelles?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies and explicitly contrasts thematic vs topographic, then asks for re-selection."
+    },
+    {
+      "tutor_turn_id": "49",
+      "preceding_student_turn_id": "48",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose C (political boundaries) instead of B (geographic variable distribution).",
+      "tutor_excerpt": "Not quite! ... political boundaries show borders between countries... The key word in option B is 'geographic variable'... Look at option B again.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "To some extent",
+      "rationale": "Heavy hint that essentially points at option B; identifies the mistake well but borders on leaking the answer."
+    },
+    {
+      "tutor_turn_id": "51",
+      "preceding_student_turn_id": "50",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (B).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "52",
+      "preceding_student_turn_id": "50",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation; preceding student turn was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "54",
+      "preceding_student_turn_id": "53",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again impersonated tutor, posing a legend MCQ instead of answering the elevation/hiking question (turn 52).",
+      "tutor_excerpt": "Let's check your understanding.",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Empty stub turn; tutor neither addresses the role-swap nor returns to the pending question."
+    },
+    {
+      "tutor_turn_id": "55",
+      "preceding_student_turn_id": "53",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 54.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "57",
+      "preceding_student_turn_id": "56",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 'scale bar' to a question about Victoria buildings and 1:100,000 scale \u2014 but the answer also doesn't map to the MCQ options the tutor posed in turn 55; student appears to be answering the legend question they themselves posed.",
+      "tutor_excerpt": "Not quite! You're thinking about a different map feature. The scale bar helps you measure distances, but it doesn't explain what the symbols and colors mean... Try again - which option explains what the different symbols and colors represent?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor responds as if to the legend question (student's invented one), giving correct guidance for THAT question but ignoring that the actual posed question (turn 55) is about Victoria buildings \u2014 partial mismatch."
+    },
+    {
+      "tutor_turn_id": "59",
+      "preceding_student_turn_id": "58",
+      "student_made_mistake": false,
+      "skip_reason": "Student arrived at correct answer (legend).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "60",
+      "preceding_student_turn_id": "58",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation; preceding student turn was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "62",
+      "preceding_student_turn_id": "61",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student impersonated tutor again, posing compass-rose MCQ instead of answering the cartographer-scale question (turn 60).",
+      "tutor_excerpt": "Let's try this one:",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Empty stub turn; no acknowledgement of the role-swap or return to the pending question."
+    },
+    {
+      "tutor_turn_id": "63",
+      "preceding_student_turn_id": "61",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of tutor turn 62.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "65",
+      "preceding_student_turn_id": "64",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 'a) the title' to the question about finding North \u2014 note the actual posed question in turn 63 was about enlarging via photocopy, but tutor again responds to the student's invented compass-rose question.",
+      "tutor_excerpt": "Not quite! The title tells you what area the map covers, but it doesn't show direction... That's the compass rose... Try again - which map feature shows you directions?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Guidance is correct for the compass-rose question but the tutor effectively reveals the answer ('That's the compass rose') while asking the student to try again \u2014 mixed signal, and the originally posed photocopy question is abandoned."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 30,
+    "n_in_scope": 15,
+    "coverage_rate": 0.5,
+    "mistake_identification_exact": 0.5333333333333333,
+    "mistake_identification_lenient": 0.6666666666666666,
+    "mistake_location_exact": 0.4666666666666667,
+    "mistake_location_lenient": 0.6666666666666666,
+    "providing_guidance_exact": 0.5333333333333333,
+    "providing_guidance_lenient": 0.6666666666666666,
+    "actionability_exact": 0.4,
+    "actionability_lenient": 0.8,
+    "overall_exact_pass_rate": 0.48333333333333334,
+    "overall_lenient_pass_rate": 0.7,
+    "strict_pass_rate": 0.3333333333333333,
+    "lenient_pass_rate": 0.6666666666666666
+  }
+}

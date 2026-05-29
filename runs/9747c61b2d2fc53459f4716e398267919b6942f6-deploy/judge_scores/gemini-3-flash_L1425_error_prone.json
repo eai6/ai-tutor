@@ -1,0 +1,610 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 116.07389807701111,
+  "tokens_in": 7812,
+  "tokens_out": 10458,
+  "n_tutor_turns_in_transcript": 32,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly MCQs and short calculations from the student, but the student frequently hijacks with their own questions (turns 114, 117, 120, etc.) which the tutor allows."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Each tutor explanation is generally followed by a practice question (e.g., turn 121\u2192122, 127\u2192128), though some practice items go unanswered before the next is posed."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "When the student gave 125 metres (turn 123) the tutor identified the unit conversion error but then jumped to a navigation MCQ (turn 125) instead of a similar varied problem."
+    },
+    "mastery_learning": {
+      "score": 1,
+      "evidence": "Tutor repeatedly moves on without confirming mastery: turn 130 ignores student's 1:25,000 answer entirely and pivots to a new MCQ; many student answers (e.g., 117, 141) never get evaluated."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Conversion problem (turn 153-159) is muddled \u2014 tutor says '100,000 cm is 1,000 metres' which is wrong (it's 1,000 m? actually 100,000/100=1,000 m, correct), but the prior calculation was inconsistent, adding load."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Scale problems build on prior large/small-scale concept (turn 142\u2192143), linking direction tools to distance application."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Topics (scale type, ratio interpretation, distance calculation, thematic vs topographic) are sequenced reasonably without confusable back-to-back items."
+    },
+    "interleaving": {
+      "score": 3,
+      "evidence": "Mix of map-type selection, scale interpretation, and distance calculation across the session (turns 119, 122, 131, 140)."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor poses MCQs requiring retrieval (e.g., turn 113, 119), though hints sometimes arrive too quickly without letting student attempt."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "Repeated failure on cm\u2192m\u2192km conversion (turns 123, 126, 152, 156, 158) is met with the same template MCQ rather than remedial practice on unit conversion prerequisite."
+    }
+  },
+  "strongest_behaviors": [
+    "Clear identification of conceptual errors with brief correction (e.g., turn 110 explaining why Africa map is too broad; turn 142 distinguishing scale bar from compass rose).",
+    "Use of contextually relevant Seychelles examples (Morne Seychellois, Mahe, Victoria) that anchor abstract scale concepts."
+  ],
+  "weakest_behaviors": [
+    "Tutor ignores or fails to evaluate many student answers and lets student hijack the lesson with self-generated questions (turns 114, 117, 120, 129, 141, 144, 147, 150).",
+    "Repeated cycling on the same unit-conversion error without diagnosing the prerequisite (cm\u2194m\u2194km) \u2014 turns 153\u2013159 show a confusing loop with an inconsistent intermediate statement."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid letting the student set the next question",
+      "rationale": "Student repeatedly poses their own MCQs and the tutor either answers them or pivots, losing control of the lesson arc.",
+      "evidence_quote": "okay, let's try another one. which type of map would you use if you wanted to see the entire country of seychelles at once",
+      "evidence_turn": "114",
+      "suggested_prompt_edit": "Add rule: 'You are the sole question-setter. If the student proposes a new question instead of answering yours, acknowledge briefly, then redirect: \"Good thinking \u2014 first finish the current question, then I'll set the next one.\"'",
+      "expected_effect": "Maintains tutor-led progression and ensures every posed item is resolved before advancing.",
+      "severity": "high"
+    },
+    {
+      "title": "Require explicit evaluation of every student answer before moving on",
+      "rationale": "Multiple student answers (e.g., 117, 141, 144) receive no acknowledgement; tutor pivots to a new MCQ.",
+      "evidence_quote": "Let's try this one about choosing the right map:",
+      "evidence_turn": "130",
+      "suggested_prompt_edit": "Add: 'Before posing any new question, you MUST explicitly mark the student's most recent answer as correct/incorrect and state why.'",
+      "expected_effect": "Closes feedback loop and supports mastery checking.",
+      "severity": "high"
+    },
+    {
+      "title": "Trigger prerequisite remediation on repeated unit-conversion failure",
+      "rationale": "Student fails cm\u2192m\u2192km three times; tutor recycles MCQs instead of teaching the conversion ladder.",
+      "evidence_quote": "i think it's a) 500 metres",
+      "evidence_turn": "156",
+      "suggested_prompt_edit": "Add: 'If the student errs twice on the same sub-skill, pause the main thread and run a 2-step prerequisite micro-drill (e.g., \"How many cm in 1 m? How many m in 1 km?\") before retrying the original problem.'",
+      "expected_effect": "Resolves the bottleneck rather than masking it.",
+      "severity": "high"
+    },
+    {
+      "title": "Eliminate self-contradictory arithmetic in feedback",
+      "rationale": "Turn 155 states '100,000 cm is 1,000 metres' which is correct, but earlier turn 124 said 125,000 cm conversion needed checking against '100 cm = 1 m' without computing \u2014 students are left to reconcile inconsistent guidance.",
+      "evidence_quote": "If 100,000 cm is 1,000 metres, and 1,000 metres equals 1 kilometre",
+      "evidence_turn": "155",
+      "suggested_prompt_edit": "Add: 'When correcting a numeric error, show ALL conversion steps explicitly: cm\u2192m (\u00f7100), m\u2192km (\u00f71000). Do not state intermediate equalities without the operation.'",
+      "expected_effect": "Reduces student confusion and cognitive load during remediation.",
+      "severity": "medium"
+    },
+    {
+      "title": "Use varied follow-up after errors, not identical-template MCQs",
+      "rationale": "Turn 155 reposes the same 1:50,000 / 2 cm MCQ template that just failed.",
+      "evidence_quote": "which is the correct distance for 2 cm on a 1:50,000 map?",
+      "evidence_turn": "155",
+      "suggested_prompt_edit": "Add: 'After an error, the follow-up problem must be similar but varied (different scale and/or distance). Never re-pose the identical numeric MCQ.'",
+      "expected_effect": "Promotes deliberate practice and prevents guess-cycling.",
+      "severity": "medium"
+    },
+    {
+      "title": "Constrain explanation length and require a student action after each",
+      "rationale": "Some tutor turns provide explanation then immediately follow with another tutor turn containing the question (e.g., 112\u2192113), which is fine, but a few stack explanation without action.",
+      "evidence_quote": "Let's see if you can interpret a specific scale ratio.",
+      "evidence_turn": "118",
+      "suggested_prompt_edit": "Add: 'Every tutor message must end with either a question for the student or an explicit instruction to act. Never two consecutive explanatory turns.'",
+      "expected_effect": "Tighter active-practice cadence.",
+      "severity": "low"
+    },
+    {
+      "title": "Gate progression on mastery checkpoint",
+      "rationale": "Tutor advances through topics (scale \u2192 thematic maps \u2192 enlargement) without confirming the student can reliably do scale conversions.",
+      "evidence_quote": "Now, let's see what happens to the scale if we change the physical size of the map.",
+      "evidence_turn": "145",
+      "suggested_prompt_edit": "Add: 'Do not introduce a new sub-topic until the student has answered TWO consecutive problems on the current sub-topic correctly without hints.'",
+      "expected_effect": "Aligns with mastery learning and prevents premature topic shifts.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect student-posed questions and route to redirect handler",
+      "rationale": "Engine should recognise when the student turn is a question rather than an answer and apply a redirect template.",
+      "evidence_quote": "a map has a scale of 1:25,000. if two points are 5 cm apart on the map, how far apart are they in real life?",
+      "evidence_turn": "123",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents lesson hijacking at the orchestration layer.",
+      "severity": "high"
+    },
+    {
+      "title": "Add a repeated-error counter with remedial routing",
+      "rationale": "After 2 errors on the same skill tag (e.g., unit-conversion), engine should swap in a prerequisite drill from a remediation bank.",
+      "evidence_quote": "i think it's d) 10 kilometres",
+      "evidence_turn": "158",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Operationalises targeted remediation rather than relying on the model.",
+      "severity": "high"
+    },
+    {
+      "title": "Suppress 'repeated_question' and 'same_template_repeat' flagged outputs",
+      "rationale": "Many turns are flagged repeated_question; engine should regenerate when flag triggers.",
+      "evidence_quote": "[flags: truncated,same_template_repeat,numeric_mutation]",
+      "evidence_turn": "155",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Eliminates duplicated and templated outputs the student already saw.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Acknowledge each answer warmly before correcting",
+      "rationale": "Error-prone student gets repeated corrections without affirmation, which may discourage persistence.",
+      "evidence_quote": "Not quite 10 km. If you have 100,000 cm, remember that 100 cm makes 1 metre",
+      "evidence_turn": "153",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Maintains motivation during repeated errors.",
+      "severity": "medium"
+    },
+    {
+      "title": "Slow pace when student shows confusion ('wait what')",
+      "rationale": "Student expresses surprise/confusion (turns 126, 152) and tutor responds with new MCQs rather than a slower walkthrough.",
+      "evidence_quote": "wait what? 80 kilometres? no, that's too much.",
+      "evidence_turn": "152",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Better match to error-prone persona; reduces frustration.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session covers map scale concepts with reasonable topical variety and Seychelles-anchored examples, but is undermined by two systemic issues: the tutor lets the student hijack the lesson with self-generated questions and often fails to evaluate prior answers, and it fails to remediate a persistent cm\u2192m\u2192km conversion bottleneck, instead recycling near-identical MCQs. Mastery gating and targeted remediation are the weakest dimensions; mistake identification and contextual framing are the strongest.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "108",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "110",
+      "preceding_student_turn_id": "109",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose B (Africa map) for finding a walking trail; should be C (local detailed map).",
+      "tutor_excerpt": "A map of Africa covers a massive area, so it won't show small details like individual hiking trails.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Clearly identifies and locates the error and explains, but the turn is truncated and doesn't explicitly tell the student to pick the correct option."
+    },
+    {
+      "tutor_turn_id": "112",
+      "preceding_student_turn_id": "111",
+      "student_made_mistake": false,
+      "skip_reason": "Student asked a clarifying question rather than making a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "113",
+      "preceding_student_turn_id": "111",
+      "student_made_mistake": false,
+      "skip_reason": "Tutor follow-up MCQ; no preceding student error.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "115",
+      "preceding_student_turn_id": "114",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed their own question rather than answering; not a mistake to remediate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "116",
+      "preceding_student_turn_id": "114",
+      "student_made_mistake": false,
+      "skip_reason": "Tutor follow-up MCQ; no preceding student error.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "118",
+      "preceding_student_turn_id": "117",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed their own question instead of answering tutor's earlier MCQs.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "119",
+      "preceding_student_turn_id": "117",
+      "student_made_mistake": false,
+      "skip_reason": "Tutor follow-up MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "121",
+      "preceding_student_turn_id": "120",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed their own question rather than making a mistake; tutor solved it.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "122",
+      "preceding_student_turn_id": "120",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "124",
+      "preceding_student_turn_id": "123",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student gave 125 metres for 5cm \u00d7 25,000; correct answer is 1,250 m. Unit conversion error.",
+      "tutor_excerpt": "Close! You correctly calculated $125,000$ cm, but check your conversion to metres (remember $100 \\text{ cm} = 1 \\text{ m}$).",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies and locates the conversion error and hints at the rule, but then pivots to an unrelated MCQ instead of asking the student to redo the conversion."
+    },
+    {
+      "tutor_turn_id": "125",
+      "preceding_student_turn_id": "123",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ on a different sub-topic.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "127",
+      "preceding_student_turn_id": "126",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 125,000 cm = 12.5 m; correct is 1,250 m.",
+      "tutor_excerpt": "Not quite\u2014since $100 \\text{ cm} = 1 \\text{ m}$, you divide $125,000$ by $100$ to get $1,250$ metres (just remove two zeros).",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Gives the answer directly with explanation, but then moves to a new topic rather than having the student practise another conversion."
+    },
+    {
+      "tutor_turn_id": "128",
+      "preceding_student_turn_id": "126",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up open question on a new sub-topic.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "130",
+      "preceding_student_turn_id": "129",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 1:25,000 for deep-sea navigation; correct is 1:250,000 (small scale, large area).",
+      "tutor_excerpt": "Let's try this one about choosing the right map:",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Tutor entirely ignores the student's wrong answer and pivots to an unrelated MCQ."
+    },
+    {
+      "tutor_turn_id": "131",
+      "preceding_student_turn_id": "129",
+      "student_made_mistake": false,
+      "skip_reason": "Continuation of pivot MCQ; no remediation addressed.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "133",
+      "preceding_student_turn_id": "132",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 132 is a hint-style explanation rather than an answer/mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "135",
+      "preceding_student_turn_id": "134",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose D (contour lines) for purpose of thematic population-density map; correct is B.",
+      "tutor_excerpt": "Contour lines show the height of the land, but population density is a specific \"theme\"... Try again by looking for the option that mentions a specific geographic variable.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies error, explains the distinction, and directs the student to retry by focusing on the correct option type."
+    },
+    {
+      "tutor_turn_id": "137",
+      "preceding_student_turn_id": "136",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student now chose C (political boundaries); still wrong, correct is B.",
+      "tutor_excerpt": "Political maps show boundaries, but this map is about **population density**. Look at option B\u2014how does it describe showing a specific variable across an area?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly identifies the error, points the student to option B, and asks a guiding question."
+    },
+    {
+      "tutor_turn_id": "139",
+      "preceding_student_turn_id": "138",
+      "student_made_mistake": false,
+      "skip_reason": "Student turn 138 echoes the tutor's hint; not a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "140",
+      "preceding_student_turn_id": "138",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "142",
+      "preceding_student_turn_id": "141",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student picked scale bar for finding cardinal directions; correct is compass rose.",
+      "tutor_excerpt": "The scale bar measures distance, not direction. To find North or South, you need the **compass rose**.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Identifies and corrects, but immediately reveals the answer and moves on without practice on the same skill."
+    },
+    {
+      "tutor_turn_id": "143",
+      "preceding_student_turn_id": "141",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ on distance.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "145",
+      "preceding_student_turn_id": "144",
+      "student_made_mistake": false,
+      "skip_reason": "Student answer 300 metres is correct; no mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "146",
+      "preceding_student_turn_id": "144",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ; previous student answer was correct.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "148",
+      "preceding_student_turn_id": "147",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 1:100,000 for doubled-size map; correct is 1:25,000 (denominator halves).",
+      "tutor_excerpt": "When you enlarge a map, features look bigger, so 1 cm on the paper represents a smaller real-world distance. This means the denominator actually gets smaller (like 1:25,000).",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Correct explanation but essentially reveals the answer rather than guiding the student to derive it."
+    },
+    {
+      "tutor_turn_id": "149",
+      "preceding_student_turn_id": "147",
+      "student_made_mistake": false,
+      "skip_reason": "Follow-up MCQ.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "151",
+      "preceding_student_turn_id": "150",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 80 km for a 4 cm \u00d7 200 m problem; correct is 0.8 km.",
+      "tutor_excerpt": "If a map scale is 1:50,000 and you measure 2 cm on the map, what is the actual distance in the real world?",
+      "mistake_identification": "No",
+      "mistake_location": "No",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Tutor ignores the wrong answer and the student's self-posed question, switching to an unrelated 1:50,000 MCQ."
+    },
+    {
+      "tutor_turn_id": "153",
+      "preceding_student_turn_id": "152",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 10 km for 2 cm on a 1:50,000 map; correct is 1 km.",
+      "tutor_excerpt": "Not quite 10 km. If you have 100,000 cm, remember that 100 cm makes 1 metre\u2014how many metres is that total?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Identifies error, gives a scaffolding hint, and asks a clear next question."
+    },
+    {
+      "tutor_turn_id": "155",
+      "preceding_student_turn_id": "154",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 10,000 metres; correct is 1,000 metres.",
+      "tutor_excerpt": "If 100,000 cm is 1,000 metres, and 1,000 metres equals 1 kilometre, which is the correct distance for 2 cm on a 1:50,000 map?",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Implicitly corrects by stating the right number (1,000 m) without explicitly flagging that the student's 10,000 was wrong; re-poses original MCQ."
+    },
+    {
+      "tutor_turn_id": "157",
+      "preceding_student_turn_id": "156",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 500 metres; correct is 1 km.",
+      "tutor_excerpt": "If $1 \\text{ cm}$ represents $50,000 \\text{ cm}$, then $2 \\text{ cm}$ represents $100,000 \\text{ cm}$. Since $100,000 \\text{ cm}$ is the same as $1,000 \\text{ metres}$, how many kilometres is that?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Walks through the calculation step-by-step with a hint and clear next action."
+    },
+    {
+      "tutor_turn_id": "159",
+      "preceding_student_turn_id": "158",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student still chose 10 km; correct is 1 km (C).",
+      "tutor_excerpt": "1,000 metres is exactly **1 kilometre**. Since our calculation gave us 1,000 metres, the correct answer is 1 km.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Reveals the answer after repeated failure (acceptable here), then offers a follow-up problem, but doesn't diagnose the underlying conversion bottleneck."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 32,
+    "n_in_scope": 13,
+    "coverage_rate": 0.40625,
+    "mistake_identification_exact": 0.7692307692307693,
+    "mistake_identification_lenient": 0.8461538461538461,
+    "mistake_location_exact": 0.7692307692307693,
+    "mistake_location_lenient": 0.8461538461538461,
+    "providing_guidance_exact": 0.8461538461538461,
+    "providing_guidance_lenient": 0.8461538461538461,
+    "actionability_exact": 0.38461538461538464,
+    "actionability_lenient": 0.8461538461538461,
+    "overall_exact_pass_rate": 0.6923076923076923,
+    "overall_lenient_pass_rate": 0.8461538461538461,
+    "strict_pass_rate": 0.3076923076923077,
+    "lenient_pass_rate": 0.8461538461538461
+  }
+}
