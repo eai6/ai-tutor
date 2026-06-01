@@ -1130,6 +1130,16 @@ def curriculum_upload(request):
         subject_name = request.POST.get('subject_name', '').strip()
         grade_levels = request.POST.getlist('grade_level')
         grade_level = ','.join(grade_levels) if grade_levels else ''
+        # M5-wire (2026-06-01): teacher picks the course's language at
+        # upload time. Drives content generation language + tutor
+        # response language for the resulting course. Default 'en-us'.
+        # See apps/curriculum/locale_prompts.py for what the LLM does
+        # with non-English locales.
+        from django.conf import settings as _settings
+        locale = request.POST.get('locale', 'en-us').strip() or 'en-us'
+        if locale not in dict(_settings.LANGUAGES):
+            messages.error(request, f"Invalid language: {locale!r}.")
+            return redirect('dashboard:curriculum_upload')
 
         if not uploaded_file:
             messages.error(request, "Please upload a curriculum file.")
@@ -1182,6 +1192,7 @@ def curriculum_upload(request):
             subject_code=subject_code,
             grade_level=grade_level,
             lesson_duration_minutes=lesson_duration,
+            locale=locale,
             status='pending'
         )
 
@@ -1242,12 +1253,16 @@ def curriculum_upload(request):
     # GET - show upload form
     from apps.dashboard.models import TeachingMaterialUpload
     from apps.curriculum.models import Course
+    from django.conf import settings as _settings
 
     context = {
         **request.staff_ctx,
         'grade_levels': PlatformConfig.get_grade_choices(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
         'subject_code_choices': Course.SubjectCode.choices,
+        # M5-wire: surface the platform's LANGUAGES tuple so the
+        # upload form can render a country-forward locale dropdown.
+        'locale_choices': _settings.LANGUAGES,
     }
 
     return render(request, 'dashboard/curriculum/upload.html', context)
@@ -1395,6 +1410,9 @@ def curriculum_approve(request, upload_id):
                 'description': f"{subject} curriculum for {grade_display}",
                 'grade_level': upload.grade_level,
                 'is_published': False,
+                # M5-wire: persist the locale the teacher picked at
+                # upload time. Drives content-gen + tutor language.
+                'locale': getattr(upload, 'locale', 'en-us') or 'en-us',
             }
         )
         
