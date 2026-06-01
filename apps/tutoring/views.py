@@ -600,6 +600,22 @@ def chat_tutor_interface(request, lesson_id):
         # Super admin — can access any published lesson
         lesson = get_object_or_404(Lesson, id=lesson_id, is_published=True)
 
+    # Per-course locale activation — "course wins in-session" branch
+    # of the resolution chain (see memory/multi_locale_architecture_research.md).
+    # The LocaleResolverMiddleware already activated a locale based on
+    # the student's preferred / institutional default, but inside a
+    # course session the COURSE's locale takes precedence so a
+    # Seychelles student opening a Portuguese course gets Portuguese
+    # UI, and vice versa. The middleware's process_response will
+    # deactivate everything before the next request, so no bleed.
+    from django.utils import translation
+    course_locale = (
+        getattr(lesson.unit.course, 'locale', None)
+        if lesson.unit and lesson.unit.course else None
+    )
+    if course_locale:
+        translation.activate(course_locale)
+
     # Baseline is now a SOFT recommendation, not a gate. Students can
     # start any lesson immediately so teachers can demo without forcing
     # the pilot through the summative first. The persistent
