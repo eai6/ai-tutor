@@ -1341,6 +1341,10 @@ body {
 
 {% block extra_js %}
 {% comment %}marked + DOMPurify are render-blocking — moved to defer so first paint isn't held up. The first message arrives several seconds after page load, so the script downloads have plenty of time to finish before they're called.{% endcomment %}
+<!-- Django JavaScript translation catalog. Loads gettext() into the
+     page so JS-side strings (phase labels, dynamic toast messages) get
+     the same pt-mz translations as the server-rendered HTML. -->
+<script src="{% url 'javascript-catalog' %}"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 {% comment %}Chart.js was used for the interactive plot_spec exit-ticket renderer. That feature was removed in favour of server-rendered SVG via figure_render.py.{% endcomment %}
@@ -1456,11 +1460,19 @@ function renderMath(el) {
     }
 }
 
-// Phase label mapping (5E model phases + session states)
+// Phase label mapping (5E model phases + session states).
+// Each label is wrapped in gettext() so the JS catalog at /jsi18n/
+// translates them per the active locale (matches the django.po
+// translations for the same strings).
 const phaseLabels = {
-    engage: 'Engage', explore: 'Explore', explain: 'Explain',
-    practice: 'Practice', evaluate: 'Evaluate',
-    exit_ticket: 'Exit Quiz', remediation: 'Review', completed: 'Completed',
+    engage: gettext('Engage'),
+    explore: gettext('Explore'),
+    explain: gettext('Explain'),
+    practice: gettext('Practice'),
+    evaluate: gettext('Evaluate'),
+    exit_ticket: gettext('Exit Quiz'),
+    remediation: gettext('Review'),
+    completed: gettext('Completed'),
 };
 function phaseLabel(phase) {
     return phaseLabels[phase] || phase.replace('_', ' ');

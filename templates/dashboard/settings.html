@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Settings{% endblock %}
-{% block page_title %}Settings{% endblock %}
+{% block title %}{% trans "Settings" %}{% endblock %}
+{% block page_title %}{% trans "Settings" %}{% endblock %}
 
 {% block content %}
 <div style="max-width: 700px;">
@@ -14,16 +15,16 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">School Settings</h3>
+                <h3 class="card-title">{% trans "School Settings" %}</h3>
             </div>
             <div class="card-body">
                 <div class="form-group">
-                    <label class="form-label" for="name">School Name</label>
+                    <label class="form-label" for="name">{% trans "School Name" %}</label>
                     <input type="text" class="form-control" id="name" name="name" value="{{ institution.name }}">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="timezone">Timezone</label>
+                    <label class="form-label" for="timezone">{% trans "Timezone" %}</label>
                     <select class="form-control" id="timezone" name="timezone">
                         {% for tz in all_timezones %}
                         <option value="{{ tz }}" {% if institution.timezone == tz %}selected{% endif %}>{{ tz }}</option>
@@ -33,12 +34,12 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save School Settings</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save School Settings" %}</button>
     </form>
     {% elif is_superadmin %}
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-body">
-            <p style="color:var(--gray-500);">Select a specific school from the dropdown above to edit its settings, or manage all schools below.</p>
+            <p style="color:var(--gray-500);">{% trans "Select a specific school from the dropdown above to edit its settings, or manage all schools below." %}</p>
         </div>
     </div>
     {% endif %}
@@ -50,25 +51,25 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Your Account</h3>
+                <h3 class="card-title">{% trans "Your Account" %}</h3>
             </div>
             <div class="card-body">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="first_name">First Name</label>
+                        <label class="form-label" for="first_name">{% trans "First Name" %}</label>
                         <input type="text" class="form-control" id="first_name" name="first_name" value="{{ user.first_name }}">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="last_name">Last Name</label>
+                        <label class="form-label" for="last_name">{% trans "Last Name" %}</label>
                         <input type="text" class="form-control" id="last_name" name="last_name" value="{{ user.last_name }}">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="email">Email</label>
+                        <label class="form-label" for="email">{% trans "Email" %}</label>
                         <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
                     </div>
                     {% if user_school_choices %}
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="school">School</label>
+                        <label class="form-label" for="school">{% trans "School" %}</label>
                         <select class="form-control" id="school" name="school">
                             {% for inst in user_school_choices %}
                             <option value="{{ inst.id }}" {% if membership and membership.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
@@ -77,29 +78,29 @@
                     </div>
                     {% endif %}
                     <div>
-                        <div style="font-size: 0.875rem; color: var(--gray-500);">Role</div>
-                        <div style="font-weight: 500; margin-top: 0.25rem;">{% if user.is_staff %}Super Admin{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
+                        <div style="font-size: 0.875rem; color: var(--gray-500);">{% trans "Role" %}</div>
+                        <div style="font-weight: 500; margin-top: 0.25rem;">{% if user.is_staff %}{% trans "Super Admin" %}{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
-                            Member since {% if membership %}{{ membership.joined_at|date:"M d, Y" }}{% else %}{{ user.date_joined|date:"M d, Y" }}{% endif %}
+                            {% if membership %}{% blocktrans with date=membership.joined_at|date:"M d, Y" %}Member since {{ date }}{% endblocktrans %}{% else %}{% blocktrans with date=user.date_joined|date:"M d, Y" %}Member since {{ date }}{% endblocktrans %}{% endif %}
                         </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
-                        <label class="form-label" for="preferred_locale">Language</label>
+                        <label class="form-label" for="preferred_locale">{% trans "Language" %}</label>
                         <select class="form-control" id="preferred_locale" name="preferred_locale">
-                            <option value="" {% if not current_preferred_locale %}selected{% endif %}>— Use my school's default —</option>
+                            <option value="" {% if not current_preferred_locale %}selected{% endif %}>{% trans "— Use my school's default —" %}</option>
                             {% for code, label in locale_choices %}
                             <option value="{{ code }}" {% if current_preferred_locale == code %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                            Sets the platform UI language for your account. Blank follows your school's default. Course chat sessions always render in the course's language.
+                            {% trans "Sets the platform UI language for your account. Blank follows your school's default. Course chat sessions always render in the course's language." %}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Profile</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save Profile" %}</button>
     </form>
 
     {# ── Change Password ── #}
@@ -109,48 +110,48 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Change Password</h3>
+                <h3 class="card-title">{% trans "Change Password" %}</h3>
             </div>
             <div class="card-body">
                 <div class="form-group">
-                    <label class="form-label" for="current_password">Current Password</label>
+                    <label class="form-label" for="current_password">{% trans "Current Password" %}</label>
                     <input type="password" class="form-control" id="current_password" name="current_password" required>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="new_password">New Password</label>
+                        <label class="form-label" for="new_password">{% trans "New Password" %}</label>
                         <input type="password" class="form-control" id="new_password" name="new_password" required>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="confirm_password">Confirm New Password</label>
+                        <label class="form-label" for="confirm_password">{% trans "Confirm New Password" %}</label>
                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
                     </div>
                 </div>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Change Password</button>
+        <button type="submit" class="btn btn-primary">{% trans "Change Password" %}</button>
     </form>
 
     {# ── Delete Account (danger zone) ── #}
     <div style="margin-top: 2rem;">
         <div class="card" style="border: 1px solid var(--danger); margin-bottom: 1.5rem;">
             <div class="card-header" style="background: rgba(220, 53, 69, 0.05);">
-                <h3 class="card-title" style="color: var(--danger);">Danger Zone</h3>
+                <h3 class="card-title" style="color: var(--danger);">{% trans "Danger Zone" %}</h3>
             </div>
             <div class="card-body">
                 {% if user.is_staff %}
                 <p style="color: var(--gray-500); font-size: 0.875rem;">
-                    Super Admin accounts cannot be deleted from this page. Contact another administrator to remove your account.
+                    {% trans "Super Admin accounts cannot be deleted from this page. Contact another administrator to remove your account." %}
                 </p>
                 {% else %}
                 <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 1rem;">
-                    Permanently delete your account and all associated data. This action cannot be undone.
+                    {% trans "Permanently delete your account and all associated data. This action cannot be undone." %}
                 </p>
-                <form method="post" onsubmit="return confirm('Are you sure you want to delete your account? This action is permanent and cannot be undone.');">
+                <form method="post" onsubmit="return confirm('{% trans "Are you sure you want to delete your account? This action is permanent and cannot be undone." %}');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="delete_account">
-                    <button type="submit" class="btn" style="background: var(--danger); color: #fff;">Delete My Account</button>
+                    <button type="submit" class="btn" style="background: var(--danger); color: #fff;">{% trans "Delete My Account" %}</button>
                 </form>
                 {% endif %}
             </div>
@@ -165,43 +166,43 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Appearance &amp; Branding</h3>
+                <h3 class="card-title">{% trans "Appearance & Branding" %}</h3>
             </div>
             <div class="card-body">
 
                 {# Platform Name #}
                 <div class="form-group">
-                    <label class="form-label" for="platform_name">Platform Name</label>
+                    <label class="form-label" for="platform_name">{% trans "Platform Name" %}</label>
                     <input type="text" class="form-control" id="platform_name" name="platform_name" value="{{ platform_config.platform_name|default:'AI Tutor' }}">
                 </div>
 
                 {# Logo #}
                 <div class="form-group">
-                    <label class="form-label">Logo</label>
+                    <label class="form-label">{% trans "Logo" %}</label>
                     {% if platform_config.logo %}
                     <div style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 1rem;">
-                        <img src="{{ platform_config.logo.url }}" alt="Current logo" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--gray-200);">
+                        <img src="{{ platform_config.logo.url }}" alt="{% trans 'Current logo' %}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--gray-200);">
                         <label style="font-size:0.875rem;cursor:pointer;">
-                            <input type="checkbox" name="clear_logo" value="1"> Remove logo
+                            <input type="checkbox" name="clear_logo" value="1"> {% trans "Remove logo" %}
                         </label>
                     </div>
                     {% endif %}
                     <input type="file" name="logo" accept="image/*" class="form-control">
-                    <small style="color:var(--gray-500);">Square image recommended (at least 128x128px).</small>
+                    <small style="color:var(--gray-500);">{% trans "Square image recommended (at least 128x128px)." %}</small>
                 </div>
 
                 {# Colors #}
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                     <div class="form-group">
-                        <label class="form-label" for="primary_color">Primary Color</label>
+                        <label class="form-label" for="primary_color">{% trans "Primary Color" %}</label>
                         <input type="color" class="form-control" id="primary_color" name="primary_color" value="{{ platform_config.primary_color|default:'#E8590C' }}" style="height:40px;padding:2px;">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="secondary_color">Secondary Color</label>
+                        <label class="form-label" for="secondary_color">{% trans "Secondary Color" %}</label>
                         <input type="color" class="form-control" id="secondary_color" name="secondary_color" value="{{ platform_config.secondary_color|default:'#4ECDC4' }}" style="height:40px;padding:2px;">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="accent_color">Accent Color</label>
+                        <label class="form-label" for="accent_color">{% trans "Accent Color" %}</label>
                         <input type="color" class="form-control" id="accent_color" name="accent_color" value="{{ platform_config.accent_color|default:'#FFE66D' }}" style="height:40px;padding:2px;">
                     </div>
                 </div>
@@ -209,7 +210,7 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Theme</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save Theme" %}</button>
     </form>
 
     {# ── Competency Thresholds (superadmin only) ── #}
@@ -219,71 +220,71 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Competency Categories &amp; Thresholds</h3>
+                <h3 class="card-title">{% trans "Competency Categories & Thresholds" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Configure how students are categorized based on fraction of enabling objectives achieved.
+                    {% trans "Configure how students are categorized based on fraction of enabling objectives achieved." %}
                 </p>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                     <div class="form-group">
-                        <label class="form-label">Below Expectation (BE) — below this %</label>
+                        <label class="form-label">{% trans "Below Expectation (BE) — below this %" %}</label>
                         <input type="number" class="form-control" name="threshold_be_max" value="{{ platform_config.threshold_be_max }}" min="10" max="100">
-                        <small style="color:var(--gray-500);">Students below this % are categorized as BE</small>
+                        <small style="color:var(--gray-500);">{% trans "Students below this % are categorized as BE" %}</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Approaching Expectation (AE) — below this %</label>
+                        <label class="form-label">{% trans "Approaching Expectation (AE) — below this %" %}</label>
                         <input type="number" class="form-control" name="threshold_ae_max" value="{{ platform_config.threshold_ae_max }}" min="20" max="100">
-                        <small style="color:var(--gray-500);">Students between BE and this % are AE</small>
+                        <small style="color:var(--gray-500);">{% trans "Students between BE and this % are AE" %}</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Meeting Expectation (ME) — at or above this %</label>
+                        <label class="form-label">{% trans "Meeting Expectation (ME) — at or above this %" %}</label>
                         <input type="number" class="form-control" name="threshold_me_min" value="{{ platform_config.threshold_me_min }}" min="50" max="100">
-                        <small style="color:var(--gray-500);">Students at or above this % are ME (should match AE max)</small>
+                        <small style="color:var(--gray-500);">{% trans "Students at or above this % are ME (should match AE max)" %}</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Exceeding Expectation (EE) — exit ticket time (minutes)</label>
+                        <label class="form-label">{% trans "Exceeding Expectation (EE) — exit ticket time (minutes)" %}</label>
                         <input type="number" class="form-control" name="threshold_ee_time" value="{{ platform_config.threshold_ee_time_minutes }}" min="1" max="30">
-                        <small style="color:var(--gray-500);">100% + exit ticket under this time = EE</small>
+                        <small style="color:var(--gray-500);">{% trans "100% + exit ticket under this time = EE" %}</small>
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-top:1rem;">
-                    <label class="form-label">Move-On Threshold — minimum % for ALL students</label>
+                    <label class="form-label">{% trans "Move-On Threshold — minimum % for ALL students" %}</label>
                     <input type="number" class="form-control" name="threshold_move_on" value="{{ platform_config.threshold_move_on }}" min="30" max="100" style="max-width:200px;">
-                    <small style="color:var(--gray-500);">Teacher is recommended to move on only when every student achieves at least this % of enabling objectives</small>
+                    <small style="color:var(--gray-500);">{% trans "Teacher is recommended to move on only when every student achieves at least this % of enabling objectives" %}</small>
                 </div>
 
                 <div class="form-group" style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
-                    <label class="form-label">Teacher Content Editing</label>
+                    <label class="form-label">{% trans "Teacher Content Editing" %}</label>
                     <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
                         <input type="checkbox" name="teachers_can_edit" value="1" {% if platform_config.teachers_can_edit_content %}checked{% endif %}>
-                        <span style="font-size:0.875rem;">Allow teachers to edit, publish, regenerate, and delete content</span>
+                        <span style="font-size:0.875rem;">{% trans "Allow teachers to edit, publish, regenerate, and delete content" %}</span>
                     </label>
-                    <small style="color:var(--gray-500);display:block;margin-top:0.25rem;">When off (default for pilot), teachers can only view lessons and access session/competency reports. Super admins always have full access.</small>
+                    <small style="color:var(--gray-500);display:block;margin-top:0.25rem;">{% trans "When off (default for pilot), teachers can only view lessons and access session/competency reports. Super admins always have full access." %}</small>
                 </div>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Thresholds</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save Thresholds" %}</button>
     </form>
 
     {# ── Manage Schools (superadmin only) ── #}
     <div style="margin-top: 2rem;">
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Manage Schools</h3>
+                <h3 class="card-title">{% trans "Manage Schools" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Each school is a separate institution. Students and staff belong to specific schools.
+                    {% trans "Each school is a separate institution. Students and staff belong to specific schools." %}
                 </p>
 
                 {% if all_schools %}
                 <table class="table" style="margin-bottom:1rem;">
                     <thead>
-                        <tr><th>Name</th><th>Slug</th><th>Timezone</th><th>Status</th><th style="width:100px;"></th></tr>
+                        <tr><th>{% trans "Name" %}</th><th>{% trans "Slug" %}</th><th>{% trans "Timezone" %}</th><th>{% trans "Status" %}</th><th style="width:100px;"></th></tr>
                     </thead>
                     <tbody>
                         {% for school in all_schools %}
@@ -293,9 +294,9 @@
                             <td>{{ school.timezone }}</td>
                             <td>
                                 {% if school.is_active %}
-                                <span class="badge badge-success">Active</span>
+                                <span class="badge badge-success">{% trans "Active" %}</span>
                                 {% else %}
-                                <span class="badge badge-danger">Inactive</span>
+                                <span class="badge badge-danger">{% trans "Inactive" %}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -304,7 +305,7 @@
                                     <input type="hidden" name="action" value="toggle_school">
                                     <input type="hidden" name="school_id" value="{{ school.id }}">
                                     <button type="submit" class="btn btn-sm btn-secondary">
-                                        {% if school.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        {% if school.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}
                                     </button>
                                 </form>
                             </td>
@@ -313,7 +314,7 @@
                     </tbody>
                 </table>
                 {% else %}
-                <p style="color:var(--gray-500);font-style:italic;">No schools yet.</p>
+                <p style="color:var(--gray-500);font-style:italic;">{% trans "No schools yet." %}</p>
                 {% endif %}
 
                 {# Add new school form #}
@@ -322,22 +323,22 @@
                     <input type="hidden" name="action" value="add_school">
                     <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:0.75rem;align-items:end;">
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">School Name</label>
-                            <input type="text" class="form-control" name="school_name" placeholder="e.g. Mont Fleuri Secondary" required>
+                            <label class="form-label">{% trans "School Name" %}</label>
+                            <input type="text" class="form-control" name="school_name" placeholder="{% trans 'e.g. Mont Fleuri Secondary' %}" required>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Slug</label>
-                            <input type="text" class="form-control" name="school_slug" placeholder="e.g. mont-fleuri" required>
+                            <label class="form-label">{% trans "Slug" %}</label>
+                            <input type="text" class="form-control" name="school_slug" placeholder="{% trans 'e.g. mont-fleuri' %}" required>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Timezone</label>
+                            <label class="form-label">{% trans "Timezone" %}</label>
                             <select class="form-control" name="school_timezone">
                                 {% for tz in all_timezones %}
                                 <option value="{{ tz }}" {% if tz == 'Indian/Mahe' %}selected{% endif %}>{{ tz }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-sm" style="height:38px;">Add School</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="height:38px;">{% trans "Add School" %}</button>
                     </div>
                 </form>
             </div>
@@ -348,11 +349,11 @@
     <div style="margin-top: 2rem;">
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Manage Users</h3>
+                <h3 class="card-title">{% trans "Manage Users" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Teachers and admins only. Staff are added via "Invite Staff".
+                    {% trans "Teachers and admins only. Staff are added via 'Invite Staff'." %}
                 </p>
 
                 {% if all_users %}
@@ -360,11 +361,11 @@
                 <table class="table" style="margin-bottom:0;">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>School</th>
-                            <th>Status</th>
+                            <th>{% trans "Name" %}</th>
+                            <th>{% trans "Email" %}</th>
+                            <th>{% trans "Role" %}</th>
+                            <th>{% trans "School" %}</th>
+                            <th>{% trans "Status" %}</th>
                             <th style="width:240px;"></th>
                         </tr>
                     </thead>
@@ -375,7 +376,7 @@
                             <td>{{ u.email }}</td>
                             <td>
                                 {% if u.is_staff %}
-                                    <span class="badge" style="background:var(--primary);color:#fff;">Super Admin</span>
+                                    <span class="badge" style="background:var(--primary);color:#fff;">{% trans "Super Admin" %}</span>
                                 {% else %}
                                     {% for m in u.memberships.all %}
                                         {{ m.get_role_display }}{% if not forloop.last %}, {% endif %}
@@ -386,7 +387,7 @@
                             </td>
                             <td>
                                 {% if u.is_staff %}
-                                    <span style="color:var(--gray-400);">All</span>
+                                    <span style="color:var(--gray-400);">{% trans "All" %}</span>
                                 {% else %}
                                     {% for m in u.memberships.all %}
                                         {{ m.institution.name }}{% if not forloop.last %}, {% endif %}
@@ -397,45 +398,45 @@
                             </td>
                             <td>
                                 {% if u.is_active %}
-                                <span class="badge badge-success">Active</span>
+                                <span class="badge badge-success">{% trans "Active" %}</span>
                                 {% elif not u.last_login %}
-                                <span class="badge" style="background:#F59E0B;color:#fff;">Pending</span>
+                                <span class="badge" style="background:#F59E0B;color:#fff;">{% trans "Pending" %}</span>
                                 {% else %}
-                                <span class="badge badge-danger">Inactive</span>
+                                <span class="badge badge-danger">{% trans "Inactive" %}</span>
                                 {% endif %}
                             </td>
                             <td style="white-space:nowrap;">
                                 {% if u.is_staff %}
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Remove Super Admin privileges from {{ u.get_full_name|default:u.email }}?');">
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=u.get_full_name|default:u.email %}Remove Super Admin privileges from {{ name }}?{% endblocktrans %}');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="toggle_admin">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
-                                        <button type="submit" class="btn btn-sm btn-secondary">Demote</button>
+                                        <button type="submit" class="btn btn-sm btn-secondary">{% trans "Demote" %}</button>
                                     </form>
                                 {% else %}
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Promote {{ u.get_full_name|default:u.email }} to Super Admin?');">
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=u.get_full_name|default:u.email %}Promote {{ name }} to Super Admin?{% endblocktrans %}');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="toggle_admin">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
-                                        <button type="submit" class="btn btn-sm btn-secondary">Promote</button>
+                                        <button type="submit" class="btn btn-sm btn-secondary">{% trans "Promote" %}</button>
                                     </form>
                                     <form method="post" style="display:inline;">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="toggle_user">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
                                         {% if not u.is_active and not u.last_login %}
-                                        <button type="submit" class="btn btn-sm" style="background:#10B981;color:#fff;">Approve</button>
+                                        <button type="submit" class="btn btn-sm" style="background:#10B981;color:#fff;">{% trans "Approve" %}</button>
                                         {% else %}
                                         <button type="submit" class="btn btn-sm btn-secondary">
-                                            {% if u.is_active %}Deactivate{% else %}Activate{% endif %}
+                                            {% if u.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}
                                         </button>
                                         {% endif %}
                                     </form>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Delete user {{ u.get_full_name|default:u.email }}? This cannot be undone.');">
+                                    <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=u.get_full_name|default:u.email %}Delete user {{ name }}? This cannot be undone.{% endblocktrans %}');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="delete_user">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
-                                        <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;">Delete</button>
+                                        <button type="submit" class="btn btn-sm" style="background:var(--danger);color:#fff;">{% trans "Delete" %}</button>
                                     </form>
                                 {% endif %}
                             </td>
@@ -445,33 +446,33 @@
                 </table>
                 </div>
                 {% else %}
-                <p style="color:var(--gray-500);font-style:italic;">No other users yet.</p>
+                <p style="color:var(--gray-500);font-style:italic;">{% trans "No other users yet." %}</p>
                 {% endif %}
 
                 {# Create new Super Admin #}
                 <form method="post" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="create_admin">
-                    <p style="font-weight:600;font-size:0.875rem;margin-bottom:0.75rem;">Create Super Admin</p>
+                    <p style="font-weight:600;font-size:0.875rem;margin-bottom:0.75rem;">{% trans "Create Super Admin" %}</p>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">First Name</label>
-                            <input type="text" class="form-control" name="admin_first_name" placeholder="First name">
+                            <label class="form-label">{% trans "First Name" %}</label>
+                            <input type="text" class="form-control" name="admin_first_name" placeholder="{% trans 'First name' %}">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Last Name</label>
-                            <input type="text" class="form-control" name="admin_last_name" placeholder="Last name">
+                            <label class="form-label">{% trans "Last Name" %}</label>
+                            <input type="text" class="form-control" name="admin_last_name" placeholder="{% trans 'Last name' %}">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Email</label>
+                            <label class="form-label">{% trans "Email" %}</label>
                             <input type="email" class="form-control" name="admin_email" placeholder="admin@example.com" required>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="admin_password" placeholder="Min 6 characters" required>
+                            <label class="form-label">{% trans "Password" %}</label>
+                            <input type="password" class="form-control" name="admin_password" placeholder="{% trans 'Min 6 characters' %}" required>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">Create Admin</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:0.75rem;">{% trans "Create Admin" %}</button>
                 </form>
             </div>
         </div>
@@ -485,23 +486,23 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('grades-body').style.display=document.getElementById('grades-body').style.display==='none'?'block':'none'">
-                <h3 class="card-title">Grade Levels <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+                <h3 class="card-title">{% trans "Grade Levels" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
             </div>
             <div class="card-body" id="grades-body" style="display:none;">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Configure grade levels available to students during registration. Leave empty to use built-in defaults.
+                    {% trans "Configure grade levels available to students during registration. Leave empty to use built-in defaults." %}
                 </p>
                 <table class="table" id="grades-table" style="margin-bottom:0.5rem;">
                     <thead>
-                        <tr><th>Code</th><th>Name</th><th style="width:60px;"></th></tr>
+                        <tr><th>{% trans "Code" %}</th><th>{% trans "Name" %}</th><th style="width:60px;"></th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="addRow('grades')">+ Add Grade</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addRow('grades')">{% trans "+ Add Grade" %}</button>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Grade Levels</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save Grade Levels" %}</button>
     </form>
 
     {# ── AI Model Configuration (superadmin only) — per-purpose ── #}
@@ -512,16 +513,16 @@
         {# Card 1: Student Tutoring #}
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Student Tutoring Model</h3>
+                <h3 class="card-title">{% trans "Student Tutoring Model" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    LLM used for live tutoring sessions, exit tickets, and skill extraction.
+                    {% trans "LLM used for live tutoring sessions, exit tickets, and skill extraction." %}
                 </p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="tutor_provider">Provider</label>
+                        <label class="form-label" for="tutor_provider">{% trans "Provider" %}</label>
                         <select class="form-control" id="tutor_provider" name="tutor_provider" onchange="onProviderChange('tutor')">
                             {% for code, label in provider_choices %}
                             <option value="{{ code }}" {% if code == tutor_provider %}selected{% endif %}>{{ label }}</option>
@@ -529,29 +530,29 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="tutor_model">Model Name</label>
+                        <label class="form-label" for="tutor_model">{% trans "Model Name" %}</label>
                         <input type="text" class="form-control" id="tutor_model" name="tutor_model" value="{{ tutor_model }}" placeholder="e.g. gemini-3.1-pro-preview">
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-top: 1rem;">
-                    <label class="form-label" for="tutor_api_key">API Key</label>
+                    <label class="form-label" for="tutor_api_key">{% trans "API Key" %}</label>
                     <input type="password" class="form-control" id="tutor_api_key" name="tutor_api_key"
-                           placeholder="{% if has_tutor_db_key %}Key stored in database (leave blank to keep){% elif has_tutor_env_key %}Using environment variable (leave blank to keep){% else %}Enter API key...{% endif %}">
-                    <small style="color:var(--gray-500);">Leave blank to keep the current key.</small>
+                           placeholder="{% if has_tutor_db_key %}{% trans 'Key stored in database (leave blank to keep)' %}{% elif has_tutor_env_key %}{% trans 'Using environment variable (leave blank to keep)' %}{% else %}{% trans 'Enter API key...' %}{% endif %}">
+                    <small style="color:var(--gray-500);">{% trans "Leave blank to keep the current key." %}</small>
                 </div>
 
                 <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
-                    <strong>Current:</strong>
-                    {{ tutor_provider|default:"not configured" }} / {{ tutor_model|default:"—" }}
+                    <strong>{% trans "Current:" %}</strong>
+                    {% if tutor_provider %}{{ tutor_provider }}{% else %}{% trans "not configured" %}{% endif %} / {{ tutor_model|default:"—" }}
                     &nbsp;&bull;&nbsp;
-                    <strong>Key:</strong>
+                    <strong>{% trans "Key:" %}</strong>
                     {% if has_tutor_db_key %}
-                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
                     {% elif has_tutor_env_key %}
-                        <span style="color: var(--success, #16a34a);">From env var</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -560,16 +561,16 @@
         {# Card 2: Content Generation #}
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Content Generation Model</h3>
+                <h3 class="card-title">{% trans "Content Generation Model" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    LLM used for curriculum generation, lesson content, and image generation prompts.
+                    {% trans "LLM used for curriculum generation, lesson content, and image generation prompts." %}
                 </p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="gen_provider">Provider</label>
+                        <label class="form-label" for="gen_provider">{% trans "Provider" %}</label>
                         <select class="form-control" id="gen_provider" name="gen_provider" onchange="onProviderChange('gen')">
                             {% for code, label in provider_choices %}
                             <option value="{{ code }}" {% if code == gen_provider %}selected{% endif %}>{{ label }}</option>
@@ -577,29 +578,29 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="gen_model">Model Name</label>
+                        <label class="form-label" for="gen_model">{% trans "Model Name" %}</label>
                         <input type="text" class="form-control" id="gen_model" name="gen_model" value="{{ gen_model }}" placeholder="e.g. gemini-3.1-pro-preview">
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-top: 1rem;">
-                    <label class="form-label" for="gen_api_key">API Key</label>
+                    <label class="form-label" for="gen_api_key">{% trans "API Key" %}</label>
                     <input type="password" class="form-control" id="gen_api_key" name="gen_api_key"
-                           placeholder="{% if has_gen_db_key %}Key stored in database (leave blank to keep){% elif has_gen_env_key %}Using environment variable (leave blank to keep){% else %}Enter API key...{% endif %}">
-                    <small style="color:var(--gray-500);">Leave blank to keep the current key.</small>
+                           placeholder="{% if has_gen_db_key %}{% trans 'Key stored in database (leave blank to keep)' %}{% elif has_gen_env_key %}{% trans 'Using environment variable (leave blank to keep)' %}{% else %}{% trans 'Enter API key...' %}{% endif %}">
+                    <small style="color:var(--gray-500);">{% trans "Leave blank to keep the current key." %}</small>
                 </div>
 
                 <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
-                    <strong>Current:</strong>
-                    {{ gen_provider|default:"not configured" }} / {{ gen_model|default:"—" }}
+                    <strong>{% trans "Current:" %}</strong>
+                    {% if gen_provider %}{{ gen_provider }}{% else %}{% trans "not configured" %}{% endif %} / {{ gen_model|default:"—" }}
                     &nbsp;&bull;&nbsp;
-                    <strong>Key:</strong>
+                    <strong>{% trans "Key:" %}</strong>
                     {% if has_gen_db_key %}
-                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
                     {% elif has_gen_env_key %}
-                        <span style="color: var(--success, #16a34a);">From env var</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -608,16 +609,16 @@
         {# Card 3: Image Generation #}
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
-                <h3 class="card-title">Image Generation Model</h3>
+                <h3 class="card-title">{% trans "Image Generation Model" %}</h3>
             </div>
             <div class="card-body">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Used for AI-generated diagrams, maps, charts, and illustrations. Must be a Gemini image model.
+                    {% trans "Used for AI-generated diagrams, maps, charts, and illustrations. Must be a Gemini image model." %}
                 </p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="img_provider">Provider</label>
+                        <label class="form-label" for="img_provider">{% trans "Provider" %}</label>
                         <select class="form-control" id="img_provider" name="img_provider" onchange="onImgProviderChange()">
                             {% for code, label in provider_choices %}
                             <option value="{{ code }}" {% if code == img_provider %}selected{% endif %}>{{ label }}</option>
@@ -625,55 +626,55 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="img_model">Model Name</label>
+                        <label class="form-label" for="img_model">{% trans "Model Name" %}</label>
                         <input type="text" class="form-control" id="img_model" name="img_model" value="{{ img_model }}" placeholder="e.g. gemini-3.1-flash-image-preview">
                     </div>
                 </div>
 
                 <div class="form-group" style="margin-top: 1rem;">
-                    <label class="form-label" for="img_api_key">API Key</label>
+                    <label class="form-label" for="img_api_key">{% trans "API Key" %}</label>
                     <input type="password" class="form-control" id="img_api_key" name="img_api_key"
-                           placeholder="{% if has_img_db_key %}Key stored in database (leave blank to keep){% elif has_img_env_key %}Using environment variable (leave blank to keep){% else %}Leave blank to use the same key as above{% endif %}">
-                    <small style="color:var(--gray-500);">Leave blank to reuse the Google key from Tutoring or Generation config.</small>
+                           placeholder="{% if has_img_db_key %}{% trans 'Key stored in database (leave blank to keep)' %}{% elif has_img_env_key %}{% trans 'Using environment variable (leave blank to keep)' %}{% else %}{% trans 'Leave blank to use the same key as above' %}{% endif %}">
+                    <small style="color:var(--gray-500);">{% trans "Leave blank to reuse the Google key from Tutoring or Generation config." %}</small>
                 </div>
 
                 <div style="margin-top: 1rem; padding: 0.75rem; background: var(--gray-50); border-radius: 8px; font-size: 0.8125rem; color: var(--gray-600);">
-                    <strong>Current:</strong>
-                    {{ img_provider|default:"not configured" }} / {{ img_model|default:"—" }}
+                    <strong>{% trans "Current:" %}</strong>
+                    {% if img_provider %}{{ img_provider }}{% else %}{% trans "not configured" %}{% endif %} / {{ img_model|default:"—" }}
                     &nbsp;&bull;&nbsp;
-                    <strong>Key:</strong>
+                    <strong>{% trans "Key:" %}</strong>
                     {% if has_img_db_key %}
-                        <span style="color: var(--success, #16a34a);">Stored in DB</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
                     {% elif has_img_env_key %}
-                        <span style="color: var(--success, #16a34a);">From env var</span>
+                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">Not configured</span>
+                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save AI Models</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save AI Models" %}</button>
     </form>
 
     {# ── Tutor Personalities (superadmin only) ── #}
     <div class="card" style="margin-top: 2rem; margin-bottom: 1.5rem;">
         <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('personalities-body').style.display=document.getElementById('personalities-body').style.display==='none'?'block':'none'">
-            <h3 class="card-title">Tutor Personalities <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+            <h3 class="card-title">{% trans "Tutor Personalities" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
         </div>
         <div class="card-body" id="personalities-body" style="display:none;">
             <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                Configure personality options that students can choose from. Each personality modifies the tutor's tone.
+                {% trans "Configure personality options that students can choose from. Each personality modifies the tutor's tone." %}
             </p>
             {% if personalities %}
             <table class="table" style="width:100%;margin-bottom:1.5rem;">
                 <thead>
                     <tr>
-                        <th>Emoji</th>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{% trans "Emoji" %}</th>
+                        <th>{% trans "Name" %}</th>
+                        <th>{% trans "Description" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th>{% trans "Actions" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -688,16 +689,16 @@
                                 <input type="hidden" name="action" value="toggle_personality">
                                 <input type="hidden" name="personality_id" value="{{ p.id }}">
                                 <button type="submit" class="btn btn-sm {% if p.is_active %}btn-success{% else %}btn-secondary{% endif %}" style="font-size:0.75rem;padding:0.2rem 0.5rem;">
-                                    {% if p.is_active %}Active{% else %}Inactive{% endif %}
+                                    {% if p.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}
                                 </button>
                             </form>
                         </td>
                         <td>
-                            <form method="post" style="display:inline;" onsubmit="return confirm('Delete personality \'{{ p.name }}\'?');">
+                            <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=p.name %}Delete personality '{{ name }}'?{% endblocktrans %}');">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="delete_personality">
                                 <input type="hidden" name="personality_id" value="{{ p.id }}">
-                                <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.2rem 0.5rem;">Delete</button>
+                                <button type="submit" class="btn btn-sm btn-danger" style="font-size:0.75rem;padding:0.2rem 0.5rem;">{% trans "Delete" %}</button>
                             </form>
                         </td>
                     </tr>
@@ -705,20 +706,20 @@
                 </tbody>
             </table>
             {% else %}
-            <p style="color:var(--gray-400);font-style:italic;margin-bottom:1rem;">No personalities configured. Add one below or run <code>python manage.py seed_gamification</code>.</p>
+            <p style="color:var(--gray-400);font-style:italic;margin-bottom:1rem;">{% trans "No personalities configured. Add one below or run" %} <code>python manage.py seed_gamification</code>.</p>
             {% endif %}
 
-            <h4 style="font-size:0.95rem;margin-bottom:0.75rem;">Add New Personality</h4>
+            <h4 style="font-size:0.95rem;margin-bottom:0.75rem;">{% trans "Add New Personality" %}</h4>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add_personality">
                 <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem;margin-bottom:0.5rem;">
                     <input type="text" name="personality_emoji" placeholder="😊" maxlength="10" style="text-align:center;font-size:1.5rem;padding:0.3rem;">
-                    <input type="text" name="personality_name" placeholder="Name (e.g. Friendly)" required maxlength="50">
+                    <input type="text" name="personality_name" placeholder="{% trans 'Name (e.g. Friendly)' %}" required maxlength="50">
                 </div>
-                <input type="text" name="personality_description" placeholder="Short description shown to students" maxlength="200" style="width:100%;margin-bottom:0.5rem;">
-                <textarea name="personality_prompt" placeholder="System prompt modifier (injected into the tutor's system prompt)" required rows="3" style="width:100%;margin-bottom:0.75rem;"></textarea>
-                <button type="submit" class="btn btn-primary btn-sm">Add Personality</button>
+                <input type="text" name="personality_description" placeholder="{% trans 'Short description shown to students' %}" maxlength="200" style="width:100%;margin-bottom:0.5rem;">
+                <textarea name="personality_prompt" placeholder="{% trans 'System prompt modifier (injected into the tutor system prompt)' %}" required rows="3" style="width:100%;margin-bottom:0.75rem;"></textarea>
+                <button type="submit" class="btn btn-primary btn-sm">{% trans "Add Personality" %}</button>
             </form>
         </div>
     </div>
@@ -730,11 +731,11 @@
 
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('prompts-body').style.display=document.getElementById('prompts-body').style.display==='none'?'block':'none'">
-                <h3 class="card-title">AI System Prompts <small style="font-weight:normal;color:var(--gray-500);">(click to expand)</small></h3>
+                <h3 class="card-title">{% trans "AI System Prompts" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
             </div>
             <div class="card-body" id="prompts-body" style="display:none;">
                 <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
-                    Edit the prompts below. They are pre-populated with the built-in defaults.
+                    {% trans "Edit the prompts below. They are pre-populated with the built-in defaults." %}
                 </p>
 
                 {% for pf in prompt_fields %}
@@ -748,7 +749,7 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save AI Prompts</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save AI Prompts" %}</button>
     </form>
     {% endif %}
 

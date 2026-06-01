@@ -1,38 +1,39 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Dashboard{% endblock %}
-{% block page_title %}Dashboard Overview{% endblock %}
+{% block title %}{% trans "Dashboard" %}{% endblock %}
+{% block page_title %}{% trans "Dashboard Overview" %}{% endblock %}
 
 {% block content %}
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-label">Total Students</div>
+        <div class="stat-label">{% trans "Total Students" %}</div>
         <div class="stat-value">{{ total_students }}</div>
-        <div class="stat-change positive">{{ active_students }} active this week</div>
+        <div class="stat-change positive">{% blocktrans with count=active_students %}{{ count }} active this week{% endblocktrans %}</div>
     </div>
-    
+
     <div class="stat-card">
-        <div class="stat-label">Sessions (30 days)</div>
+        <div class="stat-label">{% trans "Sessions (30 days)" %}</div>
         <div class="stat-value">{{ total_sessions }}</div>
-        <div class="stat-change">{{ completed_sessions }} completed</div>
+        <div class="stat-change">{% blocktrans with count=completed_sessions %}{{ count }} completed{% endblocktrans %}</div>
     </div>
-    
+
     <div class="stat-card">
-        <div class="stat-label">Avg Lesson Competency</div>
+        <div class="stat-label">{% trans "Avg Lesson Competency" %}</div>
         <div class="stat-value">{{ avg_competency }}%</div>
         <div class="progress-bar" style="margin-top: 0.5rem;">
             <div class="progress-fill success" style="width: {{ avg_competency }}%;"></div>
         </div>
-        <div class="stat-change" title="Of students who have attempted any lesson, the % who have mastered at least one.">{{ avg_mastery }}% of active students mastered ≥1 lesson</div>
+        <div class="stat-change" title="{% trans 'Of students who have attempted any lesson, the % who have mastered at least one.' %}">{% blocktrans with pct=avg_mastery %}{{ pct }}% of active students mastered ≥1 lesson{% endblocktrans %}</div>
     </div>
-    
+
     <div class="stat-card">
-        <div class="stat-label">Students At Risk</div>
+        <div class="stat-label">{% trans "Students At Risk" %}</div>
         <div class="stat-value" style="color: {% if at_risk_count > 0 %}var(--danger){% else %}var(--success){% endif %};">
             {{ at_risk_count }}
         </div>
-        <div class="stat-change">No activity in 7+ days</div>
+        <div class="stat-change">{% trans "No activity in 7+ days" %}</div>
     </div>
 </div>
 
@@ -40,7 +41,7 @@
     <!-- Sessions chart -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">Sessions (Last 14 Days)</h2>
+            <h2 class="card-title">{% trans "Sessions (Last 14 Days)" %}</h2>
         </div>
         <div class="card-body">
             <div id="activity-chart-wrap" style="display:flex; gap:0.4rem; height:240px;">
@@ -65,7 +66,7 @@
     <!-- Recent Activity -->
     <div class="card">
         <div class="card-header">
-            <h2 class="card-title">Recent Activity</h2>
+            <h2 class="card-title">{% trans "Recent Activity" %}</h2>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if recent_sessions %}
@@ -84,7 +85,7 @@
                         </div>
                         {% if session.is_group %}
                         <div style="font-size: 0.75rem; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.15rem;">
-                            with {% for u in session.active_participant_users %}{% if u.id != session.student_id %}{{ u.username }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
+                            {% trans "with" %} {% for u in session.active_participant_users %}{% if u.id != session.student_id %}{{ u.username }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
                         </div>
                         {% endif %}
                     </div>
@@ -101,7 +102,7 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <p>No recent activity</p>
+                    <p>{% trans "No recent activity" %}</p>
                 </div>
             {% endif %}
         </div>

@@ -2,12 +2,41 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor-js\n"
 "Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-01 22:10+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-# Skeleton file for Mozambique Portuguese (JavaScript catalog).
-# Populated by `python manage.py makemessages -l pt_MZ -d djangojs` in M2.
-# Translated by the translate_po management command in M3.
+#: templates/tutoring/chat_tutor.html:1468
+msgid "Engage"
+msgstr "Envolver"
+
+#: templates/tutoring/chat_tutor.html:1469
+msgid "Explore"
+msgstr "Explorar"
+
+#: templates/tutoring/chat_tutor.html:1470
+msgid "Explain"
+msgstr "Explicar"
+
+#: templates/tutoring/chat_tutor.html:1471
+msgid "Practice"
+msgstr "Praticar"
+
+#: templates/tutoring/chat_tutor.html:1472
+msgid "Evaluate"
+msgstr "Avaliar"
+
+#: templates/tutoring/chat_tutor.html:1473
+msgid "Exit Quiz"
+msgstr "Avaliação Final"
+
+#: templates/tutoring/chat_tutor.html:1474
+msgid "Review"
+msgstr "Revisão"
+
+#: templates/tutoring/chat_tutor.html:1475
+msgid "Completed"
+msgstr "Concluído"
