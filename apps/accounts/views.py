@@ -746,6 +746,20 @@ def settings(request):
                     student_profile.grade_level = grade
                     student_profile.save()
 
+            # Preferred locale — any user (student or staff). Drives
+            # the LocaleResolverMiddleware's per-user override. Blank
+            # → no override, fall back to institution.default_locale.
+            # Get-or-create the profile for staff users so they can
+            # set a preference too.
+            from django.conf import settings as _settings
+            preferred_locale = (request.POST.get('preferred_locale') or '').strip()
+            valid_codes = set(dict(_settings.LANGUAGES).keys())
+            if preferred_locale == '' or preferred_locale in valid_codes:
+                if not student_profile:
+                    student_profile, _created = StudentProfile.objects.get_or_create(user=user)
+                student_profile.preferred_locale = preferred_locale or None
+                student_profile.save(update_fields=['preferred_locale'])
+
             messages.success(request, _('Profile updated.'))
             return redirect('accounts:settings')
 
@@ -764,6 +778,7 @@ def settings(request):
     )
     grade_choices = ['S1', 'S2', 'S3', 'S4', 'S5']
 
+    from django.conf import settings as _settings
     return render(request, 'accounts/settings.html', {
         'user_obj': user,
         'student_profile': student_profile,
@@ -772,6 +787,13 @@ def settings(request):
         'is_staff_user': is_staff_user,
         'school_choices': school_choices,
         'grade_choices': grade_choices,
+        # M5-wire follow-up: settings page exposes per-user locale
+        # preference. Drives LocaleResolverMiddleware. Falls back to
+        # institution.default_locale → settings.LANGUAGE_CODE when blank.
+        'locale_choices': _settings.LANGUAGES,
+        'current_preferred_locale': (
+            student_profile.preferred_locale if student_profile else ''
+        ) or '',
     })
 
 
