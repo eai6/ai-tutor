@@ -7,6 +7,7 @@ drives the tutoring sessions. Steps control the flow.
 Hierarchy: Course > Unit > Lesson > LessonStep
 """
 
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from apps.accounts.models import Institution
@@ -40,6 +41,29 @@ class Course(models.Model):
         help_text="e.g., 'Grade 3', 'High School', 'Adult'"
     )
     is_published = models.BooleanField(default=False)
+
+    # Locale of this course's curriculum content. Drives the tutor's
+    # response language (via the per-turn locale block in the system
+    # prompt) and the UI rendering inside chat sessions (via the
+    # LocaleResolverMiddleware "course wins in-session" branch). Use
+    # hyphenated lowercase to match Django's LANGUAGE_CODE convention
+    # — e.g. 'en-us', 'pt-mz'. New non-English curricula land by setting
+    # this field on the imported Course; the rest of the platform is
+    # locale-agnostic. See memory/multi_locale_architecture_research.md.
+    #
+    # `choices` is wired to settings.LANGUAGES so the admin + any form
+    # rendering this field shows country-forward labels (see auto-
+    # memory/feedback_locale_picker_country_forward.md).
+    locale = models.CharField(
+        max_length=10,
+        default='en-us',
+        choices=settings.LANGUAGES,
+        help_text=(
+            "Course curriculum language. Hyphenated lowercase per Django "
+            "LANGUAGE_CODE (e.g. 'en-us', 'pt-mz'). Drives tutor response "
+            "language + UI activation during chat sessions."
+        ),
+    )
 
     # Subject classification (M8 / memory/math_tutor_fix_plan.md). Replaces
     # the fragile MATH_KEYWORDS title heuristic. is_math now prefers this

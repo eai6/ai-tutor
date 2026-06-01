@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import Http404
+from django.utils.translation import gettext as _
 from apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 
 
@@ -58,7 +59,7 @@ def student_login(request):
 
         if user is not None:
             login(request, user)
-            messages.success(request, f"Welcome back, {user.first_name or user.username}!")
+            messages.success(request, _("Welcome back, %(name)s!") % {"name": user.first_name or user.username})
             # Route through terms-acceptance interstitial if a newer
             # version was published since this user last agreed.
             if _terms_acceptance_pending(user):
@@ -199,7 +200,7 @@ def student_register(request):
                 f"Welcome, {first_name}! 🎉 We sent a verification link to {email} — check your inbox.",
             )
         else:
-            messages.success(request, f"Welcome, {first_name}! 🎉 Let's start learning!")
+            messages.success(request, _("Welcome, %(name)s! 🎉 Let's start learning!") % {"name": first_name})
         return redirect('tutoring:catalog')
     
     return render(request, 'accounts/student_register.html', {
@@ -234,7 +235,7 @@ def staff_login(request):
 
             if has_access:
                 login(request, user)
-                messages.success(request, f"Welcome, {user.first_name or user.username}!")
+                messages.success(request, _("Welcome, %(name)s!") % {"name": user.first_name or user.username})
                 if _terms_acceptance_pending(user):
                     return redirect(f"/terms/accept/?next=/dashboard/")
                 return redirect('dashboard:home')
@@ -600,7 +601,7 @@ def login_view(request):
 def logout_view(request):
     """Logout and redirect to landing."""
     logout(request)
-    messages.info(request, "You've been logged out.")
+    messages.info(request, _("You've been logged out."))
     return redirect('accounts:landing')
 
 
@@ -745,7 +746,7 @@ def settings(request):
                     student_profile.grade_level = grade
                     student_profile.save()
 
-            messages.success(request, 'Profile updated.')
+            messages.success(request, _('Profile updated.'))
             return redirect('accounts:settings')
 
         if action == 'password':
@@ -753,7 +754,7 @@ def settings(request):
             if password_form.is_valid():
                 password_form.save()
                 update_session_auth_hash(request, password_form.user)
-                messages.success(request, 'Password changed.')
+                messages.success(request, _('Password changed.'))
                 return redirect('accounts:settings')
             # else: fall through to render with form errors
 

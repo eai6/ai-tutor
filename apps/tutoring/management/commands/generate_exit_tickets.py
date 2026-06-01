@@ -361,31 +361,28 @@ P6. SLOT NAMES vs ANSWER LABELS. The `{{answer}}` slot in
 ═══════════════════════════════════════════════════════════════════════
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════
-1. Generate up to 35 questions, ALL templated. Bank floor is 25.
+1. Generate EXACTLY 35 question_type: "mcq" entries, ALL templated.
+   Updated 2026-06-01: math exit tickets are MCQ-only — fill_in_blank,
+   matching, and short_numeric formats are DISABLED. Pick MCQ
+   templates that combine the formula system (parameters +
+   answer_formula + distractor_formulas) with 4 student-visible
+   options A/B/C/D.
 
-   Format mix is MANDATORY (NOT a suggestion):
-     - 15 MCQ              (question_type: "mcq")
-     - 7  fill_in_blank    (question_type: "fill_in_blank")
-     - 6  matching         (question_type: "matching")
-     - 7  short_numeric    (question_type: "short_numeric")
+   Use the MCQ worked example pattern: declare `parameters`,
+   `template_text`, `answer_formula`, four `distractor_formulas`
+   (each a pure arithmetic expression in the same parameters),
+   and the `correct` letter A/B/C/D. The backend samples
+   parameters, computes the correct answer + three distractors,
+   shuffles them into A/B/C/D, and records which slot ends up
+   correct.
 
-   A bank with 35 short_numeric and zero of the other types is a
-   format-mix violation. Pick MCQ/fill/matching templates from the
-   worked examples (sections 6, 7, 8 above) and adapt them to the
-   lesson topic — they're computable just like short_numeric, just
-   with one extra field (correct_formula + distractor_formulas, or
-   blank_formulas, or pair_count + left/right_formula).
-
-   Generate IN ORDER: questions 1-7 short_numeric, 8-22 MCQ,
-   23-29 fill_in_blank, 30-35 matching. This forces format
-   diversity from the start instead of all short_numeric first.
 2. Each question MUST have BOTH:
    - concept_tag: broad learning objective (the lesson's main objective)
    - enabling_objective: EXACT TEXT of one ENABLING OBJECTIVE from below
      (the specific sub-skill — copy verbatim). This is the field
      remediation uses to target the failing sub-skill.
 3. EVERY enabling objective must be assessed by at least 1 question
-4. Use Seychelles context in word problems (SCR prices, fish catches, island areas)
+4. Use context appropriate to the student's setting. Vary phrasing.
 5. Vary difficulty: easy calculations → harder numbers → word problems → multi-step
 6. NO data_interpretation. NO figures (text-only).
 7. Diversify the templates — don't emit 35 sum-to-360 questions.
@@ -394,90 +391,149 @@ REQUIREMENTS
    integrity (see CONCEPTUAL INTEGRITY above). A template without
    guard constraints WILL be rejected.
 
+<distribution>
+The correct-answer letter must spread roughly evenly across A, B, C,
+and D over the 35 templated MCQs. Target: 8-9 correct per letter.
+Hard cap: no letter exceeds 11 correct answers (~31% of the bank).
+Audits found ~60% of correct answers landing on B in prior generations
+because format examples used B as a placeholder — do NOT let that
+placeholder bias the actual `correct` values you emit. After drafting,
+tally the `correct` field across all 35 and re-letter overflowing
+questions (swap which slot is correct; the underlying formula stays
+the same). The post-gen verifier
+(apps/curriculum/mcq_distribution.py) also runs and logs a warning
+if any letter exceeds 35%.
+</distribution>
+
 DIFFICULTY DISTRIBUTION (out of 35):
 - Questions 1-12: easy (single-step formula, small integers)
-- Questions 13-25: medium (multi-step formula, Seychelles context)
+- Questions 13-25: medium (multi-step formula, applied context)
 - Questions 26-35: hard (compound formulas, reverse/inverse, sqrt/percent)
 
-Generate the question bank now (JSON array of templated questions):"""
+Generate the question bank now (JSON array of 35 templated MCQs):"""
 
-EXIT_TICKET_PROMPT = """Generate a mixed-format question bank (35 questions) for a summative assessment (exit ticket) on this lesson.
+# ──────────────────────────────────────────────────────────────────────
+# EXIT_TICKET_PROMPT_V2 (2026-06-01) — MCQ-ONLY exit tickets.
+#
+# Major rewrite per Edward's directive: "exit tickets from now on
+# should only be mcq questions … make sure the proportions are not
+# biased to one letter like b". Three changes vs the prior format:
+#
+#   1. MCQ-only output. Drops fill_in_blank, matching, short_answer.
+#      Why: the tutoring engine grades MCQs deterministically (letter
+#      match — Tier 1 grader, perfect agreement with intent); the
+#      other formats need the embedding-gate / verifier-LLM tier
+#      which surfaces partial-verdict edge cases. For pilot scale we
+#      want the cleaner signal.
+#   2. XML-structured system prompt (per claude-prompting-expert
+#      conventions): <role>, <rules>, <distribution>,
+#      <output_format>, <enabling_objectives_block>. Mirrors the
+#      shape of apps/tutoring/simple_tutor/prompts.py for parity.
+#   3. Stronger A/B/C/D balance rule with explicit two-pass approach:
+#      (i) write the bank caring only about pedagogical correctness;
+#      (ii) self-audit by tallying letter counts; (iii) re-letter
+#      any block of options exceeding a threshold by permuting which
+#      option ends up at A/B/C/D. The post-gen verifier in
+#      apps/curriculum/mcq_distribution.py also runs and logs a
+#      warning if any letter still exceeds 35% of the bank.
+#
+# The locale block (apps/curriculum/locale_prompts.py) gets appended
+# to the SYSTEM portion at the caller — not baked in here — so the
+# template stays locale-agnostic.
+# ──────────────────────────────────────────────────────────────────────
 
+EXIT_TICKET_PROMPT = """Generate a 35-question MCQ-only question bank for a summative assessment (exit ticket) on this lesson.
+
+<lesson>
 LESSON: {lesson_title}
 OBJECTIVE: {lesson_objective}
 SUBJECT: {subject}
 {exam_context}{seychelles_context}
-QUESTION FORMAT MIX — generate in THIS EXACT ORDER:
-Questions 1-5: FILL_IN_BLANK (sentence with blanks to complete)
-Questions 6-9: MATCHING (match terms to definitions)
-Questions 10-13: SHORT_ANSWER (1-3 sentence written response)
-Questions 14-35: MCQ (multiple choice, 4 options each)
+</lesson>
 
-YOU MUST generate ALL 4 types. DO NOT generate any data_interpretation
-questions — that type is disabled platform-wide. The first 13 questions
-MUST NOT be MCQ.
+<rules>
+- Generate EXACTLY 35 multiple-choice questions. No other formats —
+  no fill_in_blank, no matching, no short_answer, no
+  data_interpretation, no short_numeric (those types are disabled
+  platform-wide for exit tickets as of 2026-06-01).
+- Each MCQ has FOUR options labelled A, B, C, D — exactly four, never
+  three, never five.
+- Each MCQ has EXACTLY ONE correct answer. The other three options
+  are PLAUSIBLE distractors (common misconceptions or near-misses),
+  not obvious filler.
+- Each question MUST carry both:
+    - concept_tag: the BROAD learning objective. Use the exact text
+      of the lesson's main learning objective.
+    - enabling_objective: the SPECIFIC sub-skill. MUST be the EXACT
+      TEXT of one of the ENABLING OBJECTIVES listed below — copy
+      verbatim, including capitalisation and punctuation. This is
+      what the remediation flow uses to target the failing
+      sub-skill, so getting it right matters.
+- concept_tag and enabling_objective are DIFFERENT fields. concept_tag
+  is the broad grouping; enabling_objective is the narrow sub-skill.
+  Do not put the same value in both.
+- EVERY enabling objective must be assessed by at least 1 question
+  — distribute coverage across all of them.
+- Use context appropriate to the student's setting. Vary question
+  phrasing — avoid repetitive stems.
+- NO FIGURES — questions are TEXT-ONLY. Do NOT emit `figure_spec`,
+  `figure`, `plot_spec`, `figure_svg`, `figure_url`, or any inline
+  <svg>. Teachers attach a generated image after the fact via the
+  question editor when needed.
+</rules>
 
-REQUIREMENTS:
-1. Generate EXACTLY 35 questions in the format mix above
-2. Each question MUST have:
-   - concept_tag: the BROAD learning objective the question is grouped
-     under. Use the exact text of the lesson's main learning objective.
-   - enabling_objective: the SPECIFIC enabling objective (sub-objective)
-     this question tests. MUST be the EXACT TEXT of one of the ENABLING
-     OBJECTIVES listed below — copy verbatim, including capitalisation
-     and punctuation. This is the field remediation uses to target the
-     failing sub-skill, so getting it right matters.
-   - terminal_objective: the terminal objective this question assesses
-     (from the lesson objectives, optional).
-3. EVERY enabling objective must be assessed by at least 1 question
-   — distribute coverage across all of them.
-4. enabling_objective and concept_tag are DIFFERENT fields:
-     - concept_tag is the BROAD grouping (the learning objective)
-     - enabling_objective is the NARROW sub-objective (one of EO1..EON)
-   Do not put the same value in both.
-4. Use context relevant to Seychelles secondary school students
-5. Vary question phrasing — avoid repetitive stems
-6. MCQ correct-answer distribution: spread the correct letter ROUGHLY
-   EVENLY across A, B, C, and D over the 22 MCQs. Target: 5-6 of each
-   letter, no single letter more than 7 times. Audits of prior
-   generations showed 60%+ of correct answers landed on B because the
-   format example below uses "B" as a placeholder — do NOT let that
-   placeholder bias the actual answers you write. After drafting,
-   tally the distribution and re-balance if any letter exceeds 7.
+<distribution>
+The correct-answer letter MUST be spread roughly evenly across A, B, C,
+and D over the 35 questions. Target: 8-9 correct answers per letter.
+Hard cap: no letter exceeds 11 correct answers (≈ 31% of the bank).
 
-OUTPUT FORMAT (JSON array — each question has a "question_type" field):
+This is non-negotiable. Audits of prior generations found ~60% of
+correct answers landed on B because format examples used B as a
+placeholder. To prevent that bias:
 
-MCQ format (correct value here is just an illustrative placeholder —
-USE the answer that is genuinely correct for the question you write,
-and spread across A/B/C/D per requirement 6 above):
-{{"question_type": "mcq", "question": "What is...?", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "correct": "<A|B|C|D>", "explanation": "...", "difficulty": "easy", "concept_tag": "Understand development indicators", "enabling_objective": "Define the terms Development, Globalization, MEDC, NIC, LEDC"}}
-
-FILL_IN_BLANK format:
-{{"question_type": "fill_in_blank", "question": "Complete the sentence:", "answer_data": {{"text_template": "The ___ of a country is measured using ___ per capita figures.", "blanks": ["GNP", "US dollar"], "accept_alternatives": [["gross national product", "Gross National Product"], ["USD", "American dollar"]]}}, "explanation": "...", "difficulty": "easy", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
-
-MATCHING format:
-{{"question_type": "matching", "question": "Match each term to its definition:", "answer_data": {{"pairs": [{{"left": "GNP", "right": "Total value of goods and services"}}, {{"left": "HDI", "right": "Measure combining health, education, income"}}], "distractor_rights": ["Population growth rate"]}}, "explanation": "...", "difficulty": "medium", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
-
-SHORT_ANSWER format:
-{{"question_type": "short_answer", "question": "Explain why HDI is considered a better measure of development than GNP.", "answer_data": {{"model_answer": "HDI is better because it measures health, education and income, not just economic output.", "keywords": ["health", "education", "income", "not just economic"], "min_keywords": 2}}, "explanation": "...", "difficulty": "hard", "concept_tag": "broad learning objective text", "enabling_objective": "EXACT TEXT OF ONE EO FROM THE LIST ABOVE"}}
-
-DATA_INTERPRETATION is DISABLED. Do not generate questions of that type.
-
-NO FIGURES — questions are TEXT-ONLY. Do NOT emit `figure_spec`,
-`figure`, `plot_spec`, `figure_svg`, `figure_url`, or any inline
-<svg>. The teacher can attach a generated image (gpt-image-2)
-to any question after the fact via the question editor.
-
-`data_description` content (when used for non-figure tabular
-reference data) uses inline styles only — no external CSS, no
-scripts. All HTML renders in a sandboxed iframe.
+  1. First draft: write each question caring ONLY about pedagogical
+     correctness — pick the answer the student should know,
+     regardless of which letter it ends up on.
+  2. After drafting all 35: TALLY how many correct answers landed
+     at A, B, C, D respectively.
+  3. If any letter has more than 11 correct answers, RE-LETTER the
+     overflowing questions by swapping the correct option with one
+     of the distractors. The correct CONTENT stays the same — only
+     which letter (A/B/C/D) it sits at changes. Re-tally and repeat
+     until every letter has at most 11.
 
 DIFFICULTY DISTRIBUTION (out of 35):
-- Questions 1-12: easy (recall facts)
-- Questions 13-25: medium (apply concepts)
-- Questions 26-35: hard (analyze/evaluate)
+- Questions 1-12: easy (recall facts, definitions, simple
+  identification)
+- Questions 13-25: medium (apply concepts, interpret examples)
+- Questions 26-35: hard (analyze, evaluate, multi-step reasoning)
+</distribution>
 
-Generate the 35 questions now:"""
+<output_format>
+Return a JSON array of 35 objects. Each object has exactly these
+fields:
+
+  {{
+    "question_type": "mcq",
+    "question": "<the stem>",
+    "option_a": "<text>",
+    "option_b": "<text>",
+    "option_c": "<text>",
+    "option_d": "<text>",
+    "correct": "<A|B|C|D>",
+    "explanation": "<one-sentence why-the-correct-is-correct>",
+    "difficulty": "<easy|medium|hard>",
+    "concept_tag": "<broad learning objective>",
+    "enabling_objective": "<EXACT verbatim sub-skill from list>"
+  }}
+
+NOTE on `"correct"`: the literal letter you write here determines
+the answer key. Do NOT default to "B" — pick the letter that holds
+the correct answer for THIS question after you've applied the
+distribution discipline in <distribution> above.
+</output_format>
+
+Generate the 35 MCQs now:"""
 
 
 class Command(BaseCommand):

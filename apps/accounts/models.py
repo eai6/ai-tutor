@@ -5,6 +5,7 @@ Multi-tenancy pattern: Every record in the system is tied to an Institution.
 Users can belong to multiple institutions with different roles.
 """
 
+from django.conf import settings as django_settings
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -22,6 +23,20 @@ class Institution(models.Model):
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
     timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
+    # Default UI language for students/staff at this school. The
+    # LocaleResolverMiddleware uses this when an authenticated user
+    # has no `StudentProfile.preferred_locale` override AND is not
+    # currently in a Course-scoped view (in which case `Course.locale`
+    # wins). See memory/multi_locale_architecture_research.md.
+    default_locale = models.CharField(
+        max_length=10,
+        default='en-us',
+        choices=django_settings.LANGUAGES,
+        help_text=(
+            "Default UI language for users of this institution. "
+            "Falls back to settings.LANGUAGE_CODE when unset."
+        ),
+    )
     session_mode = models.CharField(
         max_length=20,
         choices=SessionMode.choices,
@@ -255,6 +270,25 @@ class StudentProfile(models.Model):
     tutor_personality = models.ForeignKey(
         'TutorPersonality', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='students',
+    )
+    # Optional per-student UI language override. When set, takes
+    # precedence over Institution.default_locale for all non-course
+    # views (catalog, dashboard, accounts pages). Inside a Course
+    # chat session, the course's locale still wins regardless.
+    # Nullable + blank because most students never set it — Django
+    # admin renders a blank "select language" entry that means
+    # "use my school's default".
+    preferred_locale = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        choices=django_settings.LANGUAGES,
+        help_text=(
+            "Student's preferred UI language. Blank = follow the "
+            "school's default. Course-scoped views (chat tutor) "
+            "always render in the course's locale, regardless of "
+            "this preference."
+        ),
     )
 
     # Safety suspension — student locked out of tutor until teacher reviews

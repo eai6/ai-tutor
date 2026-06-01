@@ -1,10 +1,33 @@
 # Mozambique Pilot — Portuguese localization plan
 
-**Status**: planning — no code written. Ready to pick up at M1.
+**Status (2026-06-01 EOD)**: M1, M2, M3, M4, M5-prep, M6d SHIPPED on `feature/i18n-bootstrap` (12 commits, all pushed). Demo-ready locally — pt-mz student logged in via chrome-devtools-mcp gets Portuguese UI end-to-end + simple_tutor responds in pt-mz. **Remaining**: M5 (Edward uploads PT curriculum via dashboard), M6 deploy to staging, M7 audio (opt). M5 reshaped — see § "M5 — Edward uploads via dashboard" below.
 **Trigger**: Paschal's Mozambique visit, week of 2026-06-01. Government has shared Grade 8 materials (sitting locally under `mozambique/Grade 8 Materials/`, currently gitignored).
-**Branch reserved for the i18n work**: `feature/i18n-bootstrap` (created 2026-05-31, no commits yet; tracks `origin/dev`).
+**Branch in flight**: `feature/i18n-bootstrap` (12 commits, all on origin).
 **Plan author**: Claude Opus 4.7 session 2026-05-29 → 2026-06-01 (Edward driving).
 **Architecture reference**: `memory/multi_locale_architecture_research.md` — the locked decisions table at the top of that doc drives this plan.
+
+---
+
+## Shipped on `feature/i18n-bootstrap` (chronological)
+
+| Commit | Milestone | Summary |
+|---|---|---|
+| `ed01689` | M1 | i18n bootstrap — `LANGUAGES`, `LOCALE_PATHS`, Django `LocaleMiddleware`, `/jsi18n/`, `/health/` surfaces locale |
+| `523f616` | M4 | `Course.locale` + `StudentProfile.preferred_locale` + `Institution.default_locale` + `LocaleResolverMiddleware` + tutor engine reads `session.course.locale` + 35 tests |
+| `14b7f54` | M2a | `base.html` + accounts auth templates wrapped in `{% trans %}` |
+| `b7f7e68` | M2b | `chat_tutor` + `catalog` templates wrapped |
+| `d7e55c3` | M2c | Python student-facing flash messages wrapped |
+| `2eea90c` | M2d | audit script + coverage tests + 142 msgids in `pt_MZ` catalog |
+| `4a40cbf` | M3 | `translate_po` command + 141/141 pt-mz translations populated via Claude Opus 4.7 |
+| `a092662` | M5-prep | content gen locale-aware + **MCQ-ONLY** exit tickets + A/B/C/D rebalance (mcq_distribution.py) |
+| `051cb4e` | M4 follow-up | chat_tutor view activates `course.locale` for in-session UI |
+| `b8b4586` | M6d | drop `SIMPLE_TUTOR_ENGINE` env-var dispatch — simple_tutor is the only respond engine. Legacy `ConversationalTutor.respond()` removed from the dispatch path; 5 unported call sites (start/resume/review/difficulty/bank) still on legacy, tracked as Phase 2 follow-up |
+
+**Verified live in chrome (en-us → pt-mz → en-us flip cycle on local dev)**:
+- Landing page + login + register + settings + catalog: all render Portuguese with `tu` informal form.
+- Chat tutor UI shell renders Portuguese.
+- Fresh simple-tutor turn (Claude Opus 4.7) responds in Portuguese with proper Mozambique register ("vais aprender", "pensa nisto", "és um operador").
+- No regression: revert to `en-us` → all pages back to English.
 
 ---
 
@@ -297,58 +320,47 @@ The architecture milestone. Adds all three locale fields, the resolver middlewar
 
 ---
 
-### M5 — Mozambique Grade 8 Biology curriculum import
+### M5 — Edward uploads Mozambique Grade 8 Biology via the dashboard
 
-**Effort**: 2 days. **Blocks**: M6. **Depends on**: M4 (needs `Course.locale` field).
+**Effort**: ~30 min of teacher time on the upload UI, plus the platform's normal content-generation cycle. **Blocks**: M6 verification. **Depends on**: M5-prep (shipped).
 
-Path A only (government Portuguese materials). No translation step.
+**Reshaped 2026-06-01**: this milestone was originally a custom importer command. Dropped in favour of using the existing teacher-dashboard curriculum upload flow. Rationale:
 
-**Phase 1 — Inspect the materials BEFORE writing the importer:**
+- The platform already has a battle-tested upload path (`TeachingMaterialUpload` model → `content_generator.py` parses + generates `LessonStep`s + MCQs via LLM). Same path that built every Seychelles course. Writing a custom Mozambique importer would have duplicated all that logic with new failure modes to debug.
+- M5-prep (commit `a092662`) made `content_generator.py` + the exit-ticket generator locale-aware. They now read `course.locale` and inject a `<locale>` instruction into the LLM system prompt. Uploading a PT curriculum + selecting `locale='pt-mz'` on the course → generated lessons + MCQs come back in Portuguese.
+- The course-creation form on the dashboard exposes `locale` as a dropdown (`choices=settings.LANGUAGES` from M4) — labels render as "🇸🇨 Seychelles — English" / "🇲🇿 Moçambique — Português".
 
-The next Claude MUST first explore `mozambique/Grade 8 Materials/` and answer:
+**What Edward does** (teacher-driven, no engineering work):
 
-- File format? PDFs, DOCX, structured XML, plaintext?
-- Curriculum hierarchy? Likely Subject → Module/Unit → Topic/Lesson → Activity, but exact terms come from the source files.
-- Is Biology a standalone subject or bundled under "Ciências"? If bundled, scope to the Biology units only.
-- Are MCQs pre-built or do we need to generate them?
-- How many lessons total? — bounds the import effort.
+1. Visit the teacher dashboard → "Create a course".
+2. Pick **🇲🇿 Moçambique — Português** in the language dropdown.
+3. Set subject = Biology, grade = 8, title = "Biologia - 8ª Classe", institution = the Mozambique pilot institution (create one with `default_locale='pt-mz'` if not exists).
+4. Upload the Grade 8 Biology materials from `mozambique/Grade 8 Materials/` (PDF / DOCX whatever Edward has).
+5. Wait for content generation to finish (background job; takes ~5-10 min depending on lesson count).
+6. Optional: run `python manage.py generate_exit_tickets --course <id>` if exit tickets didn't auto-generate. The MCQ-only prompt with A/B/C/D rebalance (M5-prep) fires automatically.
 
-Run `ls -la "mozambique/Grade 8 Materials/" && file mozambique/Grade\ 8\ Materials/* | head -20` first. Read 2–3 representative files end-to-end second. Write the importer third.
+**What the platform does end-to-end** (verified by M5-prep changes):
 
-**Phase 2 — Importer:**
+- Parses the upload via the existing `content_generator.py` pipeline.
+- For each generated lesson/step/MCQ: sends a system prompt that includes the M5-prep `<locale>` block → LLM emits all content in pt-mz with `tu` informal addressing + post-1990 Acordo Ortográfico spelling.
+- For exit tickets: the new MCQ-only prompt (35 questions, no fill_in_blank / matching / short_answer) generates a 35-MCQ bank.
+- Post-generation: `apps/curriculum/mcq_distribution.py::audit_distribution` tallies the correct-letter spread. If any letter > 35% of the bank, `rebalance_distribution()` deterministically permutes which option holds the correct answer so the bank is uniform. Educationally identical; just labels shuffled.
 
-- New management command `apps/curriculum/management/commands/import_mozambique_biology.py`:
-  - Creates `Institution(slug='mozambique-pilot', name='Mozambique Pilot Schools', default_locale='pt-mz')` if not exists.
-  - Creates `Course(institution=mozambique_inst, locale='pt-mz', subject='Biology', grade=8, title='Biologia - 8ª Classe')`.
-  - Maps source-file structure to `Unit → Lesson → LessonStep → ExitTicketQuestion`.
-  - Idempotent: safe to re-run via `external_id` matching.
-- If MCQs aren't pre-supplied: generate via existing `generate_exit_tickets` command — the engine reads `course.locale` (M4 wiring) so generation runs in Portuguese.
+**Reviewer checklist** (Edward does this from the dashboard):
 
-**Tests:**
+- [ ] Course shows `locale='pt-mz'` (visible as "🇲🇿 Moçambique — Português" badge / dropdown).
+- [ ] All generated lessons read in Portuguese. Spot-check 5 lessons end-to-end.
+- [ ] Generated MCQs are in Portuguese (stems + options + explanations).
+- [ ] Exit ticket bank size = 35 MCQs (no other types).
+- [ ] Spot-check 3 MCQs: A/B/C/D distribution looks uniform — no obvious B-bias.
+- [ ] Logging confirms M5-prep firing: grep staging logs for `[mcq distribution]` after running `generate_exit_tickets` against the new course.
 
-1. New test `apps/curriculum/tests/test_mozambique_biology_import.py`:
-   - Imports a tiny fixture (1 unit, 2 lessons, 5 MCQs) shaped like the real Grade 8 Biology materials.
-   - Verifies `Institution(slug='mozambique-pilot', default_locale='pt-mz')` is created.
-   - Verifies `Course.locale == 'pt-mz'` and `Course.subject == 'Biology'`.
-   - Verifies relationships (Course → Unit → Lesson → LessonStep → ExitTicketQuestion).
-   - Verifies all rows are scoped to `mozambique-pilot`.
-2. Re-import idempotency: run twice, no duplicate rows.
-3. Cross-pollination check: `Course.objects.filter(locale='pt-mz').exclude(institution__slug='mozambique-pilot').count() == 0`, and the inverse.
-4. Curriculum audit: `python manage.py audit_kb_coverage --institution=mozambique-pilot` reports ≥ 1 question per lesson.
+**Risks**:
 
-**Risks:**
+- The locale block prompt was tuned for pt-mz specifically. Other languages would need their own branch in `apps/curriculum/locale_prompts.py::locale_instruction_block`. Right now only en-us and pt-mz are supported; unknown locales fall back to a generic instruction with a WARNING log.
+- If the source materials are in English (vs Portuguese), the parser will store English text in the DB and the locale block won't fix that — the LLM only handles new generation, not transcription. Sanity-check the first lesson's `teacher_script` is actually in Portuguese.
 
-- Source-file structure may not map cleanly to Course → Unit → Lesson → LessonStep. May need a file → intermediate JSON → DB translator.
-- Source files likely include figures/images. The platform's `MediaAsset` model supports them but bulk-import isn't wired — may need a one-off script to upload images to Azure storage and FK them in.
-
-**Reviewer checklist:**
-
-- [ ] All curriculum rows have `Course.locale == 'pt-mz'`.
-- [ ] All curriculum rows scoped to `mozambique-pilot` institution.
-- [ ] `Institution.default_locale == 'pt-mz'`.
-- [ ] No cross-pollination with Seychelles institutions.
-- [ ] If MCQs generated: A/B/C/D distribution roughly uniform (~25% each).
-- [ ] Source files documented in the commit message (which file → which Lesson).
+**Old custom-importer plan**: the deleted contents of this section are preserved in commit history (pre-`a092662`). If the dashboard upload path proves insufficient, look there.
 
 ---
 

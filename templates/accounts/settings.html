@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Settings — AI Tutor{% endblock %}
+{% block title %}{% trans "Settings" %} — AI Tutor{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -126,9 +127,9 @@
 <div class="settings-page">
     <a href="{% url 'tutoring:catalog' %}"
        class="back-link"
-       onclick="if (document.referrer && document.referrer !== window.location.href) { history.back(); return false; }">← Back</a>
-    <h1>Settings</h1>
-    <p class="lead">Manage your account.</p>
+       onclick="if (document.referrer && document.referrer !== window.location.href) { history.back(); return false; }">← {% trans "Back" %}</a>
+    <h1>{% trans "Settings" %}</h1>
+    <p class="lead">{% trans "Manage your account." %}</p>
 
     {% if messages %}
     <div class="messages-area">
@@ -140,16 +141,16 @@
 
     {# ── Account info (read + edit) ───────────────────────────────── #}
     <section class="panel">
-        <h2>Account</h2>
-        <p class="panel-sub">Update the name and email we use for you.</p>
+        <h2>{% trans "Account" %}</h2>
+        <p class="panel-sub">{% trans "Update the name and email we use for you." %}</p>
 
         <div class="read-only-row">
-            <span class="ro-label">Username</span>
+            <span class="ro-label">{% trans "Username" %}</span>
             <span class="ro-value">{{ user_obj.username }}</span>
         </div>
         {% if membership %}
         <div class="read-only-row">
-            <span class="ro-label">Role</span>
+            <span class="ro-label">{% trans "Role" %}</span>
             <span class="ro-value" style="text-transform: capitalize;">{{ membership.role }}</span>
         </div>
         {% endif %}
@@ -159,22 +160,22 @@
             <input type="hidden" name="action" value="profile">
             <div class="field-row">
                 <div class="field">
-                    <label for="first_name">First name</label>
+                    <label for="first_name">{% trans "First name" %}</label>
                     <input type="text" id="first_name" name="first_name" value="{{ user_obj.first_name }}" autocomplete="given-name">
                 </div>
                 <div class="field">
-                    <label for="last_name">Last name</label>
+                    <label for="last_name">{% trans "Last name" %}</label>
                     <input type="text" id="last_name" name="last_name" value="{{ user_obj.last_name }}" autocomplete="family-name">
                 </div>
             </div>
             <div class="field">
-                <label for="email">Email</label>
+                <label for="email">{% trans "Email" %}</label>
                 <input type="email" id="email" name="email" value="{{ user_obj.email }}" autocomplete="email" placeholder="you@example.com">
-                <p class="helptext">Used for password reset.</p>
+                <p class="helptext">{% trans "Used for password reset." %}</p>
             </div>
             {% if school_choices %}
             <div class="field">
-                <label for="school">School</label>
+                <label for="school">{% trans "School" %}</label>
                 <select id="school" name="school">
                     {% for inst in school_choices %}
                     <option value="{{ inst.id }}" {% if membership and membership.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
@@ -184,7 +185,7 @@
             {% endif %}
             {% if student_profile and not is_staff_user %}
             <div class="field">
-                <label for="grade_level">Grade level</label>
+                <label for="grade_level">{% trans "Grade level" %}</label>
                 <select id="grade_level" name="grade_level">
                     <option value="" {% if not student_profile.grade_level %}selected{% endif %}>—</option>
                     {% for g in grade_choices %}
@@ -193,55 +194,55 @@
                 </select>
             </div>
             {% endif %}
-            <button type="submit" class="btn btn-primary">Save profile</button>
+            <button type="submit" class="btn btn-primary">{% trans "Save profile" %}</button>
         </form>
     </section>
 
     {# ── Password change ──────────────────────────────────────────── #}
     <section class="panel">
-        <h2>Password</h2>
-        <p class="panel-sub">Use a strong password you don't reuse elsewhere.</p>
+        <h2>{% trans "Password" %}</h2>
+        <p class="panel-sub">{% trans "Use a strong password you don't reuse elsewhere." %}</p>
 
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="password">
             <div class="field">
-                <label for="id_old_password">Current password</label>
+                <label for="id_old_password">{% trans "Current password" %}</label>
                 <input type="password" name="old_password" id="id_old_password" autocomplete="current-password" required>
                 {% if password_form.old_password.errors %}
                 <ul class="errorlist">{% for e in password_form.old_password.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
             <div class="field">
-                <label for="id_new_password1">New password</label>
+                <label for="id_new_password1">{% trans "New password" %}</label>
                 <input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" required>
                 {% if password_form.new_password1.errors %}
                 <ul class="errorlist">{% for e in password_form.new_password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
             <div class="field">
-                <label for="id_new_password2">Confirm new password</label>
+                <label for="id_new_password2">{% trans "Confirm new password" %}</label>
                 <input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" required>
                 {% if password_form.new_password2.errors %}
                 <ul class="errorlist">{% for e in password_form.new_password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
-            <button type="submit" class="btn btn-primary">Change password</button>
+            <button type="submit" class="btn btn-primary">{% trans "Change password" %}</button>
         </form>
     </section>
 
     {# ── Sign out ──────────────────────────────────────────────── #}
     <section class="panel">
-        <h2>Session</h2>
-        <p class="panel-sub">Sign out on this device.</p>
-        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary">Logout</a>
+        <h2>{% trans "Session" %}</h2>
+        <p class="panel-sub">{% trans "Sign out on this device." %}</p>
+        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary">{% trans "Logout" %}</a>
     </section>
 
     {# ── Delete account (kept clearly separate) ───────────────── #}
     <section class="panel danger-zone">
-        <h2>Delete account</h2>
-        <p class="panel-sub">Permanently remove your account and all data we hold for you. This cannot be undone.</p>
-        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger">Delete my account</a>
+        <h2>{% trans "Delete account" %}</h2>
+        <p class="panel-sub">{% trans "Permanently remove your account and all data we hold for you. This cannot be undone." %}</p>
+        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger">{% trans "Delete my account" %}</a>
     </section>
 </div>
 {% endblock %}

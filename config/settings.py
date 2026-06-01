@@ -68,9 +68,26 @@ MIDDLEWARE = [
     # not stripped of CORS headers. See django-cors-headers docs.
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # LocaleMiddleware sits between SessionMiddleware and
+    # CommonMiddleware per Django docs. Our custom LocaleResolverMiddleware
+    # (below, after AuthenticationMiddleware) overrides the default
+    # cookie/header resolution chain with our per-course / per-student /
+    # per-institution chain — see apps/accounts/locale_middleware.py and
+    # memory/multi_locale_architecture_research.md.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # LocaleResolverMiddleware runs after AuthenticationMiddleware
+    # (needs request.user) and overrides the language activated by
+    # Django's LocaleMiddleware above. Resolution chain:
+    #   course.locale (in-session, applied by the view itself)
+    #     > StudentProfile.preferred_locale
+    #       > Institution.default_locale
+    #         > settings.LANGUAGE_CODE
+    # See apps/accounts/locale_middleware.py and
+    # memory/multi_locale_architecture_research.md.
+    'apps.accounts.locale_middleware.LocaleResolverMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.safety.SafetyMiddleware',
@@ -135,6 +152,28 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
+# Supported locales for the unified multi-locale platform. Per-course
+# locale is the primary signal at runtime (see memory/multi_locale_
+# architecture_research.md). The .po directories live under locale/ as
+# `<lang>_<COUNTRY>` per gettext convention (e.g. pt_MZ); the language
+# tag used in settings + Course.locale is hyphenated-lowercase
+# (e.g. 'pt-mz').
+#
+# Labels are country-forward ("🇸🇨 Seychelles — English") because
+# raw BCP 47 codes mean nothing to teachers and students. The same
+# tuples are used as `choices=settings.LANGUAGES` on the three locale
+# fields (Course.locale, Institution.default_locale,
+# StudentProfile.preferred_locale) so picker dropdowns auto-render
+# with these labels. See auto-memory/feedback_locale_picker_country_forward.md.
+#
+# Storage stays `en-us` for Seychelles (technically inaccurate vs
+# `en-sc`; Edward chose to defer the rename to avoid churn — flag if
+# revisiting).
+LANGUAGES = [
+    ('en-us', '🇸🇨 Seychelles — English'),
+    ('pt-mz', '🇲🇿 Moçambique — Português'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+{% load i18n %}
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -239,38 +240,38 @@
     
     <main class="main">
         <div class="hero">
-            <h1>Welcome to {{ theme_institution_name|default:"AI Tutor" }}</h1>
-            <p>Personalized learning powered by AI. Choose how you'd like to continue.</p>
+            <h1>{% blocktrans with institution=theme_institution_name|default:"AI Tutor" %}Welcome to {{ institution }}{% endblocktrans %}</h1>
+            <p>{% trans "Personalized learning powered by AI. Choose how you'd like to continue." %}</p>
         </div>
-        
+
         <div class="roles-container">
             <!-- Student -->
             <div class="role-card student">
                 <div class="role-icon">🎓</div>
-                <h2 class="role-title">I'm a Student</h2>
-                <p class="role-description">Learn at your own pace with AI-powered tutoring</p>
+                <h2 class="role-title">{% trans "I'm a Student" %}</h2>
+                <p class="role-description">{% trans "Learn at your own pace with AI-powered tutoring" %}</p>
                 <div class="role-actions">
-                    <a href="{% url 'accounts:student_login' %}" class="btn btn-primary">Sign In</a>
-                    <a href="{% url 'accounts:student_register' %}" class="btn btn-secondary">Create Account</a>
+                    <a href="{% url 'accounts:student_login' %}" class="btn btn-primary">{% trans "Sign In" %}</a>
+                    <a href="{% url 'accounts:student_register' %}" class="btn btn-secondary">{% trans "Create Account" %}</a>
                 </div>
             </div>
-            
+
             <!-- Staff -->
             <div class="role-card staff">
                 <div class="role-icon">👩‍🏫</div>
-                <h2 class="role-title">I'm a Teacher</h2>
-                <p class="role-description">Manage curriculum and track student progress</p>
+                <h2 class="role-title">{% trans "I'm a Teacher" %}</h2>
+                <p class="role-description">{% trans "Manage curriculum and track student progress" %}</p>
                 <div class="role-actions">
-                    <a href="{% url 'accounts:staff_login' %}" class="btn btn-primary">Staff Sign In</a>
-                    <a href="{% url 'accounts:staff_self_register' %}" class="btn btn-secondary">Create Account</a>
+                    <a href="{% url 'accounts:staff_login' %}" class="btn btn-primary">{% trans "Staff Sign In" %}</a>
+                    <a href="{% url 'accounts:staff_self_register' %}" class="btn btn-secondary">{% trans "Create Account" %}</a>
                 </div>
             </div>
         </div>
     </main>
-    
+
     <footer class="footer">
         <p>
-            <a href="{% url 'dashboard:help_index' %}">Help &amp; FAQ</a>
+            <a href="{% url 'dashboard:help_index' %}">{% trans "Help & FAQ" %}</a>
             &nbsp;·&nbsp;
             © 2026 The World Bank Group
         </p>
