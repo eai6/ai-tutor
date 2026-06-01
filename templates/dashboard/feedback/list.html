@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Feedback & Bug Reports{% endblock %}
-{% block page_title %}Feedback &amp; Bug Reports{% endblock %}
+{% block title %}{% trans "Feedback & Bug Reports" %}{% endblock %}
+{% block page_title %}{% trans "Feedback & Bug Reports" %}{% endblock %}
 
 {% block content %}
 <style>
@@ -45,13 +46,13 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
     <p style="color:var(--gray-600);margin:0;font-size:0.9rem;">
-        Reports submitted from the floating <strong>Help / Feedback</strong> button.
-        {% if open_count %}<strong style="color:#92400e;">{{ open_count }} open</strong>{% else %}All caught up.{% endif %}
+        {% trans "Reports submitted from the floating" %} <strong>{% trans "Help / Feedback" %}</strong> {% trans "button." %}
+        {% if open_count %}<strong style="color:#92400e;">{% blocktrans with n=open_count %}{{ n }} open{% endblocktrans %}</strong>{% else %}{% trans "All caught up." %}{% endif %}
     </p>
     <div class="fb-tabs">
-        <a href="?show=open" class="fb-tab {% if show == 'open' %}active{% endif %}">Open</a>
-        <a href="?show=resolved" class="fb-tab {% if show == 'resolved' %}active{% endif %}">Resolved</a>
-        <a href="?show=all" class="fb-tab {% if show == 'all' %}active{% endif %}">All</a>
+        <a href="?show=open" class="fb-tab {% if show == 'open' %}active{% endif %}">{% trans "Open" %}</a>
+        <a href="?show=resolved" class="fb-tab {% if show == 'resolved' %}active{% endif %}">{% trans "Resolved" %}</a>
+        <a href="?show=all" class="fb-tab {% if show == 'all' %}active{% endif %}">{% trans "All" %}</a>
     </div>
 </div>
 
@@ -61,44 +62,44 @@
         <div style="flex:1;min-width:240px;">
             <span class="fb-tag {{ r.kind }}">{{ r.get_kind_display }}</span>
             <span class="fb-tag {{ r.severity }}">{{ r.get_severity_display }}</span>
-            {% if r.is_resolved %}<span class="fb-tag" style="background:#dcfce7;color:#166534;">Resolved</span>{% endif %}
+            {% if r.is_resolved %}<span class="fb-tag" style="background:#dcfce7;color:#166534;">{% trans "Resolved" %}</span>{% endif %}
             <div class="fb-msg" style="margin-top:0.4rem;">{{ r.message }}</div>
             {% if r.screenshot %}
-            <a href="{{ r.screenshot.url }}" target="_blank" rel="noopener" title="Open full-size in a new tab" style="display:inline-block;margin-top:0.5rem;">
-                <img src="{{ r.screenshot.url }}" alt="Screenshot from user" style="max-width:240px;max-height:160px;border-radius:6px;border:1px solid #e5e7eb;background:#f9fafb;display:block;">
-                <span style="font-size:0.7rem;color:#6b7280;">📷 Screenshot — click to enlarge</span>
+            <a href="{{ r.screenshot.url }}" target="_blank" rel="noopener" title="{% trans 'Open full-size in a new tab' %}" style="display:inline-block;margin-top:0.5rem;">
+                <img src="{{ r.screenshot.url }}" alt="{% trans 'Screenshot from user' %}" style="max-width:240px;max-height:160px;border-radius:6px;border:1px solid #e5e7eb;background:#f9fafb;display:block;">
+                <span style="font-size:0.7rem;color:#6b7280;">{% trans "📷 Screenshot — click to enlarge" %}</span>
             </a>
             {% endif %}
             <div class="fb-meta">
-                {% if r.user %}{{ r.user.first_name }} {{ r.user.last_name }} (@{{ r.user.username }}){% else %}(anonymous){% endif %}
+                {% if r.user %}{{ r.user.first_name }} {{ r.user.last_name }} (@{{ r.user.username }}){% else %}{% trans "(anonymous)" %}{% endif %}
                 {% if r.institution %} · {{ r.institution.name }}{% endif %}
                 · {{ r.created_at|date:"M j, Y H:i" }}
                 {% if r.page_url %} · <a href="{{ r.page_url }}" style="color:var(--gray-500);" target="_blank">{{ r.page_url|truncatechars:60 }}</a>{% endif %}
             </div>
-            {% if r.resolution_notes %}<div class="fb-meta" style="margin-top:0.25rem;">Resolution: {{ r.resolution_notes }}</div>{% endif %}
+            {% if r.resolution_notes %}<div class="fb-meta" style="margin-top:0.25rem;">{% trans "Resolution:" %} {{ r.resolution_notes }}</div>{% endif %}
         </div>
         <form method="post" action="{% url 'dashboard:feedback_resolve' r.id %}" style="display:flex;gap:0.35rem;align-items:flex-start;">
             {% csrf_token %}
             {% if not r.is_resolved %}
-            <input type="text" name="notes" placeholder="Resolution note (optional)" style="padding:0.35rem 0.6rem;border:1px solid var(--gray-200);border-radius:6px;font-size:0.8rem;width:200px;">
-            <button type="submit" class="btn btn-sm btn-primary">Mark resolved</button>
+            <input type="text" name="notes" placeholder="{% trans 'Resolution note (optional)' %}" style="padding:0.35rem 0.6rem;border:1px solid var(--gray-200);border-radius:6px;font-size:0.8rem;width:200px;">
+            <button type="submit" class="btn btn-sm btn-primary">{% trans "Mark resolved" %}</button>
             {% else %}
-            <button type="submit" class="btn btn-sm btn-secondary">Reopen</button>
+            <button type="submit" class="btn btn-sm btn-secondary">{% trans "Reopen" %}</button>
             {% endif %}
         </form>
     </div>
 </div>
 {% empty %}
 <div style="background:#fff;border:1px solid var(--gray-200);border-radius:8px;padding:2rem;text-align:center;color:var(--gray-500);">
-    No reports yet.
+    {% trans "No reports yet." %}
 </div>
 {% endfor %}
 
 {% if reports.has_other_pages %}
 <div style="display:flex;justify-content:center;gap:0.4rem;margin-top:1rem;">
-    {% if reports.has_previous %}<a class="btn btn-sm btn-secondary" href="?show={{ show }}&page={{ reports.previous_page_number }}">Prev</a>{% endif %}
-    <span style="padding:0.4rem 0.8rem;color:var(--gray-600);font-size:0.85rem;">Page {{ reports.number }} of {{ reports.paginator.num_pages }}</span>
-    {% if reports.has_next %}<a class="btn btn-sm btn-secondary" href="?show={{ show }}&page={{ reports.next_page_number }}">Next</a>{% endif %}
+    {% if reports.has_previous %}<a class="btn btn-sm btn-secondary" href="?show={{ show }}&page={{ reports.previous_page_number }}">{% trans "Prev" %}</a>{% endif %}
+    <span style="padding:0.4rem 0.8rem;color:var(--gray-600);font-size:0.85rem;">{% blocktrans with current=reports.number total=reports.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    {% if reports.has_next %}<a class="btn btn-sm btn-secondary" href="?show={{ show }}&page={{ reports.next_page_number }}">{% trans "Next" %}</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

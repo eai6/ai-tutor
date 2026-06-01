@@ -44,6 +44,9 @@ TARGETS = [
     BASE_DIR / 'templates' / 'accounts' / 'student_register.html',
     BASE_DIR / 'templates' / 'accounts' / 'settings.html',
 ]
+# M2-ext (2026-06-01): Also scan every template under templates/dashboard/ now
+# that the teacher dashboard has been wrapped for Mozambique pilot.
+TARGETS.extend(sorted((BASE_DIR / 'templates' / 'dashboard').rglob('*.html')))
 
 # Heuristic patterns for visible text. We catch:
 #   - Text content between > and < that starts with an uppercase letter

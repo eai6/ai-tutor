@@ -1,20 +1,21 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}{{ grade }} class{% endblock %}
-{% block page_title %}{{ grade }} class{% endblock %}
+{% block title %}{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}{% endblock %}
+{% block page_title %}{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <a href="{% url 'dashboard:class_list' %}" style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--gray-500); text-decoration:none; margin-bottom:1rem;">
-    ← All classes
+    ← {% trans "All classes" %}
 </a>
 
 <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem; gap:1rem; flex-wrap:wrap;">
     <div>
-        <h1 style="margin:0; font-size:1.6rem;">{{ grade }} class</h1>
+        <h1 style="margin:0; font-size:1.6rem;">{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}</h1>
         <p style="color:var(--gray-500); margin:0.25rem 0 0;">
-            {{ student_count }} student{{ student_count|pluralize }}
+            {% blocktrans count count=student_count %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %}
             ·
-            {{ course_stats|length }} course{{ course_stats|length|pluralize }} for this grade
+            {% blocktrans count count=course_stats|length %}{{ count }} course for this grade{% plural %}{{ count }} courses for this grade{% endblocktrans %}
         </p>
     </div>
 </div>
@@ -22,7 +23,7 @@
 <!-- Courses for this class -->
 <div class="card" style="margin-bottom:1.5rem;">
     <div class="card-header">
-        <h2 class="card-title">Courses for {{ grade }}</h2>
+        <h2 class="card-title">{% blocktrans with g=grade %}Courses for {{ g }}{% endblocktrans %}</h2>
     </div>
     <div class="card-body" style="padding:1rem 1.25rem;">
         {% if course_stats %}
@@ -32,20 +33,20 @@
                 <div>
                     <div style="font-weight:600; color:var(--gray-900); font-size:0.95rem;">{{ cs.course.title }}</div>
                     <div style="font-size:0.78rem; color:var(--gray-500); margin-top:0.2rem;">
-                        {{ cs.lesson_count }} lesson{{ cs.lesson_count|pluralize }}
-                        {% if cs.students_with_attempts %} · {{ cs.students_with_attempts }} student{{ cs.students_with_attempts|pluralize }} attempted{% endif %}
+                        {% blocktrans count count=cs.lesson_count %}{{ count }} lesson{% plural %}{{ count }} lessons{% endblocktrans %}
+                        {% if cs.students_with_attempts %} · {% blocktrans count count=cs.students_with_attempts %}{{ count }} student attempted{% plural %}{{ count }} students attempted{% endblocktrans %}{% endif %}
                     </div>
                 </div>
 
                 <div style="display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap;">
-                    <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm" style="font-size:0.78rem;">Lessons</a>
-                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm" style="background:#0891b2; color:#fff; border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">Competency map</a>
+                    <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm" style="font-size:0.78rem;">{% trans "Lessons" %}</a>
+                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm" style="background:#0891b2; color:#fff; border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">{% trans "Competency map" %}</a>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p style="color:var(--gray-500); margin:0;">No courses generated for {{ grade }} yet.</p>
+        <p style="color:var(--gray-500); margin:0;">{% blocktrans with g=grade %}No courses generated for {{ g }} yet.{% endblocktrans %}</p>
         {% endif %}
     </div>
 </div>
@@ -54,18 +55,18 @@
 <!-- Recent activity — what's the class working on this week -->
 <div class="card" style="margin-bottom:1.5rem;">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <h2 class="card-title">📅 Recent activity (last 7 days)</h2>
-        <span style="font-size:0.78rem;color:var(--gray-500);">most recent first · quick links to monitor + report</span>
+        <h2 class="card-title">{% trans "📅 Recent activity (last 7 days)" %}</h2>
+        <span style="font-size:0.78rem;color:var(--gray-500);">{% trans "most recent first · quick links to monitor + report" %}</span>
     </div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
             <thead style="background:#f9fafb;">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.55rem 1rem;">Lesson</th>
-                    <th style="padding:0.55rem 1rem;">Course</th>
-                    <th style="padding:0.55rem 1rem;">Students</th>
-                    <th style="padding:0.55rem 1rem;">Sessions</th>
-                    <th style="padding:0.55rem 1rem;">Last started</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Lesson" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Course" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Students" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Sessions" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Last started" %}</th>
                     <th style="padding:0.55rem 1rem;"></th>
                 </tr>
             </thead>
@@ -77,17 +78,17 @@
                     </td>
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">{{ r.course.title }}</td>
                     <td style="padding:0.55rem 1rem;">
-                        {{ r.unique_students }} student{{ r.unique_students|pluralize }}
-                        {% if r.completed_count %}<div style="font-size:0.72rem;color:#059669;">{{ r.completed_count }} completed</div>{% endif %}
+                        {% blocktrans count count=r.unique_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %}
+                        {% if r.completed_count %}<div style="font-size:0.72rem;color:#059669;">{% blocktrans with c=r.completed_count %}{{ c }} completed{% endblocktrans %}</div>{% endif %}
                     </td>
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);">{{ r.session_count }}</td>
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">
-                        {{ r.most_recent|timesince }} ago
+                        {% blocktrans with ts=r.most_recent|timesince %}{{ ts }} ago{% endblocktrans %}
                     </td>
                     <td style="padding:0.55rem 1rem;">
                         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">Monitor</a>
-                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">Report</a>
+                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Monitor" %}</a>
+                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Report" %}</a>
                         </div>
                     </td>
                 </tr>
@@ -102,9 +103,9 @@
 <div class="card">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
         <div>
-            <h2 class="card-title">Students</h2>
+            <h2 class="card-title">{% trans "Students" %}</h2>
             <p style="font-size:0.875rem; color:var(--gray-500); margin-top:0.25rem;">
-                {{ student_count }} student{{ student_count|pluralize }} in {{ grade }}
+                {% blocktrans count count=student_count with g=grade %}{{ count }} student in {{ g }}{% plural %}{{ count }} students in {{ g }}{% endblocktrans %}
             </p>
         </div>
         <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
@@ -126,11 +127,11 @@
         <div style="padding:0.75rem 1rem; background:#eff6ff; border-bottom:1px solid #dbeafe; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <label style="font-size:0.875rem; font-weight:500; color:#1e40af;">
                 <input type="checkbox" id="select-all" onchange="toggleAllStudents(this)" style="margin-right:0.25rem;">
-                Select all
+                {% trans "Select all" %}
             </label>
-            <span id="selected-count" style="font-size:0.78rem; color:#1e40af;">0 selected</span>
-            <button type="submit" class="btn btn-primary btn-sm" id="confirm-btn">Confirm</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="closePromoteForm()">Cancel</button>
+            <span id="selected-count" style="font-size:0.78rem; color:#1e40af;">{% trans "0 selected" %}</span>
+            <button type="submit" class="btn btn-primary btn-sm" id="confirm-btn">{% trans "Confirm" %}</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closePromoteForm()">{% trans "Cancel" %}</button>
         </div>
     </form>
     {% endif %}
@@ -141,8 +142,8 @@
             <thead>
                 <tr>
                     <th style="width:40px;" class="promote-col" hidden></th>
-                    <th>Student</th>
-                    <th>Email</th>
+                    <th>{% trans "Student" %}</th>
+                    <th>{% trans "Email" %}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -162,7 +163,7 @@
                     </td>
                     <td style="color:var(--gray-500);">{{ student.email }}</td>
                     <td>
-                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm">View</a>
+                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm">{% trans "View" %}</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -170,8 +171,8 @@
         </table>
         {% else %}
         <div class="empty-state">
-            <h3>No students in {{ grade }}</h3>
-            <p>Students will appear here once their profile grade is set to {{ grade }}.</p>
+            <h3>{% blocktrans with g=grade %}No students in {{ g }}{% endblocktrans %}</h3>
+            <p>{% blocktrans with g=grade %}Students will appear here once their profile grade is set to {{ g }}.{% endblocktrans %}</p>
         </div>
         {% endif %}
     </div>

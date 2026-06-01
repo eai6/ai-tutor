@@ -1,15 +1,16 @@
 {% extends 'dashboard/base.html' %}
+{% load i18n %}
 
-{% block title %}Staff{% endblock %}
+{% block title %}{% trans "Staff" %}{% endblock %}
 
 {% block content %}
 <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
     <div>
-        <h1>Staff Accounts</h1>
-        <p class="muted">Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail.</p>
+        <h1>{% trans "Staff Accounts" %}</h1>
+        <p class="muted">{% trans "Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail." %}</p>
     </div>
     <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary" style="white-space:nowrap;">
-        + Invite Staff
+        + {% trans "Invite Staff" %}
     </a>
 </div>
 
@@ -18,24 +19,24 @@
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.75rem 1rem;">Username</th>
-                    <th style="padding:0.75rem 1rem;">Name</th>
-                    <th style="padding:0.75rem 1rem;">Email</th>
-                    <th style="padding:0.75rem 1rem;">Institution</th>
-                    <th style="padding:0.75rem 1rem;">Status</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Username" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Name" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Email" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Institution" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Status" %}</th>
                     <th style="padding:0.75rem 1rem;text-align:right;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in staff_rows %}
                 <tr style="border-top:1px solid var(--gray-100);">
-                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">(you)</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">{% trans "(you)" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;">{{ row.user.first_name }} {{ row.user.last_name }}</td>
                     <td style="padding:0.75rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
                     <td style="padding:0.75rem 1rem;">{{ row.institution.name|default:"—" }}</td>
                     <td style="padding:0.75rem 1rem;">
-                        {% if row.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
-                        {% if row.user.is_staff %}<span class="badge" style="background:#ede9fe;color:#5b21b6;margin-left:0.25rem;">Admin</span>{% endif %}
+                        {% if row.is_active %}<span class="badge badge-success">{% trans "Active" %}</span>{% else %}<span class="badge">{% trans "Inactive" %}</span>{% endif %}
+                        {% if row.user.is_staff %}<span class="badge" style="background:#ede9fe;color:#5b21b6;margin-left:0.25rem;">{% trans "Admin" %}</span>{% endif %}
                     </td>
                     <td style="padding:0.75rem 1rem;text-align:right;">
                         {% if not row.is_self %}
@@ -45,17 +46,17 @@
                                 data-username="{{ row.user.username }}"
                                 data-email="{{ row.user.email }}"
                                 style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-right:0.4rem;">
-                            Reset password
+                            {% trans "Reset password" %}
                         </button>
-                        <form method="post" action="{% url 'dashboard:delete_staff' row.user.id %}" style="display:inline;" onsubmit="return confirm('Permanently delete staff account &quot;{{ row.user.username }}&quot;? This cascades through their data and cannot be undone.');">
+                        <form method="post" action="{% url 'dashboard:delete_staff' row.user.id %}" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=row.user.username %}Permanently delete staff account &quot;{{ name }}&quot;? This cascades through their data and cannot be undone.{% endblocktrans %}');">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-danger btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
+                            <button type="submit" class="btn btn-danger btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Delete" %}</button>
                         </form>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">No staff accounts found.</td></tr>
+                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">{% trans "No staff accounts found." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -66,37 +67,37 @@
 <div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:8px;width:min(440px,92vw);box-shadow:0 8px 30px rgba(0,0,0,0.2);overflow:hidden;">
         <div style="padding:1rem 1.25rem;border-bottom:1px solid #e4e4e7;">
-            <h3 id="reset-modal-title" style="margin:0;font-size:1.05rem;color:#111;">Reset password</h3>
+            <h3 id="reset-modal-title" style="margin:0;font-size:1.05rem;color:#111;">{% trans "Reset password" %}</h3>
             <p id="reset-modal-subtitle" style="margin:0.3rem 0 0;font-size:0.85rem;color:#6b7280;"></p>
         </div>
         <div id="reset-modal-body" style="padding:1.1rem 1.25rem;font-size:0.9rem;color:#1f2937;">
             <div id="reset-step-choose">
-                <p style="margin:0 0 0.75rem;color:#374151;">Pick how to deliver the new password:</p>
+                <p style="margin:0 0 0.75rem;color:#374151;">{% trans "Pick how to deliver the new password:" %}</p>
                 <button type="button" id="reset-choice-email" style="display:block;width:100%;text-align:left;padding:0.7rem 0.85rem;border:1px solid #d4d4d8;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:0.5rem;">
-                    <strong style="color:#111;">Email a reset link</strong>
+                    <strong style="color:#111;">{% trans "Email a reset link" %}</strong>
                     <span id="reset-email-recipient" style="display:block;font-size:0.78rem;color:#6b7280;margin-top:2px;"></span>
                 </button>
                 <button type="button" id="reset-choice-show" style="display:block;width:100%;text-align:left;padding:0.7rem 0.85rem;border:1px solid #d4d4d8;border-radius:6px;background:#fff;cursor:pointer;">
-                    <strong style="color:#111;">Show a temporary password</strong>
-                    <span style="display:block;font-size:0.78rem;color:#6b7280;margin-top:2px;">Copy it and share with the user. They'll be forced to change it on next login.</span>
+                    <strong style="color:#111;">{% trans "Show a temporary password" %}</strong>
+                    <span style="display:block;font-size:0.78rem;color:#6b7280;margin-top:2px;">{% trans "Copy it and share with the user. They will be forced to change it on next login." %}</span>
                 </button>
             </div>
-            <div id="reset-step-working" style="display:none;color:#374151;">Working…</div>
+            <div id="reset-step-working" style="display:none;color:#374151;">{% trans "Working…" %}</div>
             <div id="reset-step-result-show" style="display:none;">
-                <p style="margin:0 0 0.5rem;color:#374151;">Temporary password for <strong id="reset-result-username"></strong>:</p>
+                <p style="margin:0 0 0.5rem;color:#374151;">{% trans "Temporary password for" %} <strong id="reset-result-username"></strong>:</p>
                 <div style="display:flex;gap:0.4rem;">
                     <code id="reset-result-password" style="flex:1;font-family:ui-monospace,monospace;font-size:1.05rem;background:#f5f3ff;color:#5b21b6;padding:0.55rem 0.7rem;border-radius:6px;letter-spacing:1px;border:1px solid #ddd6fe;"></code>
-                    <button type="button" id="reset-copy-btn" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:0 0.85rem;cursor:pointer;font-size:0.85rem;">Copy</button>
+                    <button type="button" id="reset-copy-btn" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:0 0.85rem;cursor:pointer;font-size:0.85rem;">{% trans "Copy" %}</button>
                 </div>
-                <p style="margin:0.6rem 0 0;font-size:0.78rem;color:#6b7280;">⚠️ Won't be shown again. The user will be required to change it on next login.</p>
+                <p style="margin:0.6rem 0 0;font-size:0.78rem;color:#6b7280;">{% trans "⚠️ Will not be shown again. The user will be required to change it on next login." %}</p>
             </div>
             <div id="reset-step-result-email" style="display:none;color:#065f46;">
-                <p style="margin:0;">✅ Reset link emailed to <strong id="reset-result-email-addr"></strong>. The link expires shortly.</p>
+                <p style="margin:0;">{% trans "✅ Reset link emailed to" %} <strong id="reset-result-email-addr"></strong>. {% trans "The link expires shortly." %}</p>
             </div>
             <div id="reset-step-error" style="display:none;color:#991b1b;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.6rem 0.75rem;margin-top:0.6rem;"></div>
         </div>
         <div style="padding:0.75rem 1.25rem;border-top:1px solid #e4e4e7;background:#fafafa;text-align:right;">
-            <button type="button" id="reset-modal-close" style="background:#fff;color:#374151;border:1px solid #d4d4d8;border-radius:6px;padding:0.4rem 0.85rem;cursor:pointer;font-size:0.85rem;">Close</button>
+            <button type="button" id="reset-modal-close" style="background:#fff;color:#374151;border:1px solid #d4d4d8;border-radius:6px;padding:0.4rem 0.85rem;cursor:pointer;font-size:0.85rem;">{% trans "Close" %}</button>
         </div>
     </div>
 </div>

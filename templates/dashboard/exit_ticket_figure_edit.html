@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Edit figure — Exit ticket question{% endblock %}
-{% block page_title %}Edit figure{% endblock %}
+{% block title %}{% trans "Edit figure — Exit ticket question" %}{% endblock %}
+{% block page_title %}{% trans "Edit figure" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -33,12 +34,12 @@
 <div style="margin-bottom: 1rem;">
     <a href="{% url 'dashboard:lesson_detail' question.exit_ticket.lesson.id %}"
        style="font-size: 0.85rem; color: #64748b; text-decoration: none;">
-        ← Back to lesson
+        ← {% trans "Back to lesson" %}
     </a>
 </div>
 
 <div class="question-text">
-    <strong>Q{{ question.order_index|add:1 }}.</strong>
+    <strong>{% blocktrans with n=question.order_index|add:1 %}Q{{ n }}.{% endblocktrans %}</strong>
     {{ question.question_text }}
 </div>
 
@@ -48,47 +49,42 @@
 <div class="figure-edit-grid">
 
     <div class="panel">
-        <h3>Preview</h3>
+        <h3>{% trans "Preview" %}</h3>
         <div class="preview-frame">
             {% if figure_url %}
-                <img src="{{ figure_url }}" alt="Question figure">
+                <img src="{{ figure_url }}" alt="{% trans 'Question figure' %}">
             {% elif figure_svg %}
                 {{ figure_svg|safe }}
             {% else %}
-                <div class="preview-empty">No figure attached. Type a prompt to generate one.</div>
+                <div class="preview-empty">{% trans "No figure attached. Type a prompt to generate one." %}</div>
             {% endif %}
         </div>
         {% if figure_model %}
-        <div class="meta">Last generated with <strong>{{ figure_model }}</strong>.</div>
+        <div class="meta">{% blocktrans with name=figure_model %}Last generated with <strong>{{ name }}</strong>.{% endblocktrans %}</div>
         {% endif %}
     </div>
 
     <div class="panel">
-        <h3>Image prompt</h3>
+        <h3>{% trans "Image prompt" %}</h3>
         <form method="post">
             {% csrf_token %}
             <textarea name="figure_prompt" class="prompt-area" spellcheck="true"
-                      placeholder='Describe the image you want generated. Be specific:
-labels, colours, shapes, what should NOT be in the image.
-
-Example: "Schematic diagram of a triangle with interior angles labelled
-48° and 67°. Third angle is unlabelled. Clean white background, black
-outlines, no shading."'>{{ figure_prompt }}</textarea>
+                      placeholder="{% trans 'Describe the image you want generated. Be specific: labels, colours, shapes, what should NOT be in the image.' %}">{{ figure_prompt }}</textarea>
             <div class="actions">
-                <label style="font-size:0.78rem; color:#475569;">Model:</label>
-                <select name="model_choice" class="model-pick" title="Image model">
-                    <option value="">Default (config)</option>
+                <label style="font-size:0.78rem; color:#475569;">{% trans "Model:" %}</label>
+                <select name="model_choice" class="model-pick" title="{% trans 'Image model' %}">
+                    <option value="">{% trans "Default (config)" %}</option>
                     <option value="openai">OpenAI gpt-image-2</option>
                     <option value="gemini">Gemini</option>
                 </select>
-                <button type="submit" class="btn btn-primary">Generate &amp; save</button>
+                <button type="submit" class="btn btn-primary">{% trans "Generate & save" %}</button>
                 {% if figure_url or figure_svg %}
                 <button type="submit" name="action" value="remove" class="btn btn-danger"
-                        onclick="return confirm('Remove this figure from the question?');">Remove figure</button>
+                        onclick="return confirm('{% trans "Remove this figure from the question?" %}');">{% trans "Remove figure" %}</button>
                 {% endif %}
             </div>
             <div class="meta">
-                gpt-image-2 takes ~50 seconds. The page will reload when the image is ready.
+                {% trans "gpt-image-2 takes ~50 seconds. The page will reload when the image is ready." %}
             </div>
         </form>
     </div>

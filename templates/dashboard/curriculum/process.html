@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Processing Curriculum{% endblock %}
-{% block page_title %}Processing Curriculum{% endblock %}
+{% block title %}{% trans "Processing Curriculum" %}{% endblock %}
+{% block page_title %}{% trans "Processing Curriculum" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -209,43 +210,43 @@
     <!-- Upload Header -->
     <div class="upload-header">
         <div>
-            <h2 style="margin: 0; font-size: 1.25rem;">{{ upload.subject_name }} Curriculum</h2>
+            <h2 style="margin: 0; font-size: 1.25rem;">{% blocktrans with subj=upload.subject_name %}{{ subj }} Curriculum{% endblocktrans %}</h2>
             <p style="margin: 0.25rem 0 0; color: var(--gray-500); font-size: 0.875rem;">{{ upload.original_filename }}</p>
         </div>
         <div class="upload-meta">
             <div class="upload-meta-item">
-                <div class="upload-meta-label">Grade</div>
+                <div class="upload-meta-label">{% trans "Grade" %}</div>
                 <div class="upload-meta-value">{{ upload.grade_level|default:"S1" }}</div>
             </div>
             <div class="upload-meta-item">
-                <div class="upload-meta-label">Uploaded</div>
+                <div class="upload-meta-label">{% trans "Uploaded" %}</div>
                 <div class="upload-meta-value">{{ upload.created_at|date:"M d, H:i" }}</div>
             </div>
         </div>
     </div>
-    
+
     <!-- Steps Timeline -->
     <div class="steps-timeline">
         {% with step=upload.current_step|default:0 %}
         <div class="timeline-step {% if step >= 1 %}completed{% else %}pending{% endif %}">
             <div class="timeline-icon">{% if step >= 1 %}✓{% else %}📄{% endif %}</div>
-            <div class="timeline-label">Extract<br>Text</div>
+            <div class="timeline-label">{% trans "Extract Text" %}</div>
         </div>
         <div class="timeline-step {% if upload.status == 'review' %}review{% elif step >= 2 %}completed{% else %}pending{% endif %}">
             <div class="timeline-icon">{% if step > 2 %}✓{% elif upload.status == 'review' %}👁{% else %}📚{% endif %}</div>
-            <div class="timeline-label">Review<br>Structure</div>
+            <div class="timeline-label">{% trans "Review Structure" %}</div>
         </div>
         <div class="timeline-step {% if step >= 3 %}{% if step == 3 and upload.status == 'processing' %}active{% else %}completed{% endif %}{% else %}pending{% endif %}">
             <div class="timeline-icon">{% if step > 3 %}✓{% else %}💾{% endif %}</div>
-            <div class="timeline-label">Create<br>Records</div>
+            <div class="timeline-label">{% trans "Create Records" %}</div>
         </div>
         <div class="timeline-step {% if step >= 4 %}{% if upload.status == 'processing' %}active{% else %}completed{% endif %}{% else %}pending{% endif %}">
             <div class="timeline-icon">{% if upload.status == 'completed' %}✓{% else %}📝{% endif %}</div>
-            <div class="timeline-label">Generate<br>Content</div>
+            <div class="timeline-label">{% trans "Generate Content" %}</div>
         </div>
         <div class="timeline-step {% if upload.status == 'completed' %}completed{% else %}pending{% endif %}">
             <div class="timeline-icon">{% if upload.status == 'completed' %}🎉{% else %}✅{% endif %}</div>
-            <div class="timeline-label">Complete</div>
+            <div class="timeline-label">{% trans "Complete" %}</div>
         </div>
         {% endwith %}
     </div>
@@ -254,54 +255,54 @@
     <!-- Complete State -->
     <div class="complete-banner">
         <div class="complete-icon">🎉</div>
-        <div class="complete-title">Curriculum Processing Complete!</div>
-        <p style="color: #065F46; margin: 0;">Your curriculum has been processed and lesson content generated.</p>
-        
+        <div class="complete-title">{% trans "Curriculum Processing Complete!" %}</div>
+        <p style="color: #065F46; margin: 0;">{% trans "Your curriculum has been processed and lesson content generated." %}</p>
+
         <div class="complete-stats">
             <div class="complete-stat">
                 <div class="complete-stat-value">{{ upload.units_created|default:0 }}</div>
-                <div class="complete-stat-label">Units</div>
+                <div class="complete-stat-label">{% trans "Units" %}</div>
             </div>
             <div class="complete-stat">
                 <div class="complete-stat-value">{{ upload.lessons_created|default:0 }}</div>
-                <div class="complete-stat-label">Lessons</div>
+                <div class="complete-stat-label">{% trans "Lessons" %}</div>
             </div>
             <div class="complete-stat">
                 <div class="complete-stat-value">{{ upload.steps_created|default:0 }}</div>
-                <div class="complete-stat-label">Steps</div>
+                <div class="complete-stat-label">{% trans "Steps" %}</div>
             </div>
         </div>
-        
+
         <div style="display: flex; gap: 1rem; justify-content: center;">
             {% if upload.created_course %}
-            <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-success" style="font-size: 1rem; padding: 0.75rem 2rem;">📖 View Course</a>
+            <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-success" style="font-size: 1rem; padding: 0.75rem 2rem;">📖 {% trans "View Course" %}</a>
             {% endif %}
-            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Curriculum</a>
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">{% trans "Back to Curriculum" %}</a>
         </div>
     </div>
-    
+
     {% elif upload.status == 'pending' %}
     <!-- Pending: Ready to Start -->
     <div class="step-card">
         <div class="step-header">
-            <div class="step-title"><span class="step-number">1</span> Extract & Parse Curriculum</div>
+            <div class="step-title"><span class="step-number">1</span> {% trans "Extract & Parse Curriculum" %}</div>
         </div>
         <div class="step-body">
-            <p style="color: var(--gray-600); margin-bottom: 1rem;">We'll extract text from your document and identify units and lessons using AI.</p>
+            <p style="color: var(--gray-600); margin-bottom: 1rem;">{% trans "We will extract text from your document and identify units and lessons using AI." %}</p>
             <div class="results-grid" style="max-width: 400px;">
                 <div class="result-card">
-                    <h4>📄 Document</h4>
+                    <h4>📄 {% trans "Document" %}</h4>
                     <div style="font-size: 0.875rem; font-weight: 500;">{{ upload.subject_name }}</div>
                     <div style="font-size: 0.75rem; color: var(--gray-500);">{{ upload.grade_level|default:"S1" }}</div>
                 </div>
                 <div class="result-card">
-                    <h4>📋 Status</h4>
-                    <div style="font-size: 0.875rem; color: #D97706; font-weight: 500;">Ready</div>
+                    <h4>📋 {% trans "Status" %}</h4>
+                    <div style="font-size: 0.875rem; color: #D97706; font-weight: 500;">{% trans "Ready" %}</div>
                 </div>
             </div>
             <div class="step-actions">
-                <button id="start-btn" class="btn btn-primary" onclick="startProcessing()">🚀 Start Processing</button>
-                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Cancel</a>
+                <button id="start-btn" class="btn btn-primary" onclick="startProcessing()">🚀 {% trans "Start Processing" %}</button>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             </div>
         </div>
     </div>

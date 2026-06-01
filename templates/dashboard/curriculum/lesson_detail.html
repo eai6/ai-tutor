@@ -1,5 +1,6 @@
 {% extends "dashboard/base.html" %}
 {% load dashboard_extras %}
+{% load i18n %}
 
 {% block title %}{{ lesson.title }}{% endblock %}
 {% block page_title %}{{ lesson.title }}{% endblock %}
@@ -163,7 +164,7 @@
 
 {% block content %}
 <a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← Back to {{ course.title }}
+    ← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <div id="lesson-live-region" data-is-generating="{% if is_generating %}1{% else %}0{% endif %}">
@@ -229,13 +230,12 @@
                     <span class="lesson-meta-item">📚 {{ unit.title }}</span>
                     <span class="lesson-meta-item">⏱️ {{ lesson.estimated_minutes|default:20 }} min</span>
                     {% if lesson.is_published %}
-                        <span class="lesson-meta-item" style="color: var(--success);">✓ Published</span>
+                        <span class="lesson-meta-item" style="color: var(--success);">{% trans "✓ Published" %}</span>
                     {% else %}
-                        <span class="lesson-meta-item" style="color: var(--warning);">Draft</span>
+                        <span class="lesson-meta-item" style="color: var(--warning);">{% trans "Draft" %}</span>
                     {% endif %}
-                    <!-- Tier badge removed — tier is at course level based on materials -->
                     {% if lesson.teacher_approved %}
-                        <span class="lesson-meta-item" style="color: var(--success);">✓ Approved</span>
+                        <span class="lesson-meta-item" style="color: var(--success);">{% trans "✓ Approved" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -246,20 +246,20 @@
                     <form method="post" action="{% url 'dashboard:lesson_approve' lesson.id %}" style="display: inline;">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm" style="background: #f59e0b; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
-                            Approve Content
+                            {% trans "Approve Content" %}
                         </button>
                     </form>
                     {% endif %}
                 <form method="post" action="{% url 'dashboard:lesson_publish' lesson.id %}" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="publish">
-                    <button type="submit" class="btn btn-success btn-sm">Publish</button>
+                    <button type="submit" class="btn btn-success btn-sm">{% trans "Publish" %}</button>
                 </form>
                 {% else %}
                 <form method="post" action="{% url 'dashboard:lesson_publish' lesson.id %}" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="unpublish">
-                    <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
+                    <button type="submit" class="btn btn-secondary btn-sm">{% trans "Unpublish" %}</button>
                 </form>
                 {% endif %}
                 {% if is_generating and can_regenerate_courses %}

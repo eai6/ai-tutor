@@ -1,34 +1,35 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Add Unit{% endblock %}
-{% block page_title %}Add Unit to {{ course.title }}{% endblock %}
+{% block title %}{% trans "Add Unit" %}{% endblock %}
+{% block page_title %}{% blocktrans with title=course.title %}Add Unit to {{ title }}{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← Back to Course
+    ← {% trans "Back to Course" %}
 </a>
 
 <div class="card" style="max-width: 600px;">
     <div class="card-header">
-        <h3 class="card-title">New Unit</h3>
+        <h3 class="card-title">{% trans "New Unit" %}</h3>
     </div>
     <div class="card-body">
         <form method="post">
             {% csrf_token %}
-            
+
             <div class="form-group">
-                <label for="title">Unit Title *</label>
-                <input type="text" id="title" name="title" class="form-control" placeholder="e.g., Earth's Structure and Plate Tectonics" required>
+                <label for="title">{% trans "Unit Title *" %}</label>
+                <input type="text" id="title" name="title" class="form-control" placeholder="{% trans 'e.g., Earth Structure and Plate Tectonics' %}" required>
             </div>
-            
+
             <div class="form-group">
-                <label for="description">Description (optional)</label>
-                <textarea id="description" name="description" class="form-control" rows="3" placeholder="Brief description of what this unit covers"></textarea>
+                <label for="description">{% trans "Description (optional)" %}</label>
+                <textarea id="description" name="description" class="form-control" rows="3" placeholder="{% trans 'Brief description of what this unit covers' %}"></textarea>
             </div>
-            
+
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button type="submit" class="btn btn-primary">Create Unit</button>
-                <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">{% trans "Create Unit" %}</button>
+                <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             </div>
         </form>
     </div>

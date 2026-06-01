@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}{{ course.title }} — Summative Exam{% endblock %}
-{% block page_title %}{{ course.title }} — Summative Exam{% endblock %}
+{% block title %}{% blocktrans with title=course.title %}{{ title }} — Summative Exam{% endblocktrans %}{% endblock %}
+{% block page_title %}{% blocktrans with title=course.title %}{{ title }} — Summative Exam{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <style>
@@ -23,23 +24,23 @@
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--gray-500);font-size:0.85rem;text-decoration:none;">← Back to {{ course.title }}</a>
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--gray-500);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
     <div style="display:flex;gap:0.4rem;">
         {% if summative %}
         <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Regenerate the summative? Existing questions will be replaced.');">↻ Regenerate</button>
+            <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('{% trans "Regenerate the summative? Existing questions will be replaced." %}');">↻ {% trans "Regenerate" %}</button>
         </form>
         <form method="post" action="{% url 'dashboard:summative_publish' course.id %}" style="display:inline;">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm" style="{% if summative.is_published %}background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;{% else %}background:#5b21b6;color:#fff;border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
-                {% if summative.is_published %}Unpublish{% else %}Publish{% endif %}
+                {% if summative.is_published %}{% trans "Unpublish" %}{% else %}{% trans "Publish" %}{% endif %}
             </button>
         </form>
         {% else %}
         <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">⚡ Generate Summative</button>
+            <button type="submit" class="btn btn-primary">⚡ {% trans "Generate Summative" %}</button>
         </form>
         {% endif %}
     </div>
@@ -47,36 +48,33 @@
 
 {% if not summative %}
 <div class="card" style="text-align:center;padding:2.5rem 1.5rem;">
-    <h3 style="margin:0 0 0.5rem;color:var(--gray-700);">No summative exam yet</h3>
+    <h3 style="margin:0 0 0.5rem;color:var(--gray-700);">{% trans "No summative exam yet" %}</h3>
     <p style="color:var(--gray-500);margin:0 0 1.25rem;font-size:0.92rem;">
-        Generate a 90-question summative covering every teaching objective in
-        <strong>{{ course.title }}</strong>. Each student attempt sees 30 questions
-        stratified across all objectives.
+        {% blocktrans with title=course.title %}Generate a 90-question summative covering every teaching objective in <strong>{{ title }}</strong>. Each student attempt sees 30 questions stratified across all objectives.{% endblocktrans %}
     </p>
     <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary">⚡ Generate Summative</button>
+        <button type="submit" class="btn btn-primary">⚡ {% trans "Generate Summative" %}</button>
     </form>
     <p style="color:var(--gray-400);font-size:0.78rem;margin-top:1rem;">
-        Generation queries the knowledge base for any uploaded question banks /
-        past exam papers and mirrors their format. Takes ~1–2 minutes.
+        {% trans "Generation queries the knowledge base for any uploaded question banks / past exam papers and mirrors their format. Takes ~1–2 minutes." %}
     </p>
 </div>
 {% else %}
 <div class="card" style="margin-bottom:1rem;">
     <div class="card-header">
-        <h2 class="card-title">Bank summary</h2>
+        <h2 class="card-title">{% trans "Bank summary" %}</h2>
         <span style="font-size:0.8rem;color:var(--gray-500);">
-            {% if summative.is_published %}<span style="color:#166534;font-weight:600;">● Published</span>{% else %}<span style="color:#92400e;font-weight:600;">● Draft</span>{% endif %}
-            · created {{ summative.created_at|date:"M j, H:i" }}
+            {% if summative.is_published %}<span style="color:#166534;font-weight:600;">● {% trans "Published" %}</span>{% else %}<span style="color:#92400e;font-weight:600;">● {% trans "Draft" %}</span>{% endif %}
+            · {% blocktrans with date=summative.created_at|date:"M j, H:i" %}created {{ date }}{% endblocktrans %}
         </span>
     </div>
     <div class="card-body">
         <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:#111;margin-bottom:0.75rem;">
-            <div><strong>{{ coverage.total }}</strong> / {{ coverage.target_count }} questions in bank</div>
-            <div><strong>{{ coverage.unique_tags }}</strong> teaching objectives covered</div>
-            <div><strong>{{ summative.questions_per_attempt }}</strong> served per student attempt</div>
-            <div>Pass: {{ summative.passing_score }} of {{ summative.questions_per_attempt }} ({{ summative.passing_score|floatformat:0 }} of {{ summative.questions_per_attempt|floatformat:0 }})</div>
+            <div>{% blocktrans with current=coverage.total target=coverage.target_count %}<strong>{{ current }}</strong> / {{ target }} questions in bank{% endblocktrans %}</div>
+            <div>{% blocktrans with n=coverage.unique_tags %}<strong>{{ n }}</strong> teaching objectives covered{% endblocktrans %}</div>
+            <div>{% blocktrans with n=summative.questions_per_attempt %}<strong>{{ n }}</strong> served per student attempt{% endblocktrans %}</div>
+            <div>{% blocktrans with pass=summative.passing_score total=summative.questions_per_attempt %}Pass: {{ pass }} of {{ total }}{% endblocktrans %}</div>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
             {% for diff, n in coverage.by_difficulty.items %}
@@ -88,8 +86,8 @@
 
 <div class="card" style="margin-bottom:1rem;">
     <div class="card-header">
-        <h2 class="card-title">Coverage by teaching objective</h2>
-        <span style="font-size:0.78rem;color:var(--gray-500);">objectives with &lt;2 questions are flagged</span>
+        <h2 class="card-title">{% trans "Coverage by teaching objective" %}</h2>
+        <span style="font-size:0.78rem;color:var(--gray-500);">{% trans "objectives with <2 questions are flagged" %}</span>
     </div>
     <div class="card-body">
         <div class="coverage-grid">
@@ -107,12 +105,12 @@
 {% if summative %}
 <div class="card" style="margin-bottom:1rem;">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <h2 class="card-title">Student scores</h2>
+        <h2 class="card-title">{% trans "Student scores" %}</h2>
         <div style="font-size:0.78rem;color:var(--gray-500);">
-            {{ score_stats.attempted }} of {{ score_stats.total_students }} attempted
-            {% if score_stats.passed %}· <strong style="color:#059669;">{{ score_stats.passed }} passed</strong>{% endif %}
-            {% if score_stats.avg_best_pct is not None %}· avg best <strong>{{ score_stats.avg_best_pct }}%</strong>{% endif %}
-            · pass {{ score_stats.passing_pct }}%
+            {% blocktrans with attempted=score_stats.attempted total=score_stats.total_students %}{{ attempted }} of {{ total }} attempted{% endblocktrans %}
+            {% if score_stats.passed %}· <strong style="color:#059669;">{% blocktrans with n=score_stats.passed %}{{ n }} passed{% endblocktrans %}</strong>{% endif %}
+            {% if score_stats.avg_best_pct is not None %}· {% blocktrans with pct=score_stats.avg_best_pct %}avg best <strong>{{ pct }}%</strong>{% endblocktrans %}{% endif %}
+            · {% blocktrans with pct=score_stats.passing_pct %}pass {{ pct }}%{% endblocktrans %}
         </div>
     </div>
     <div class="card-body" style="padding:0;">
@@ -120,12 +118,12 @@
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
             <thead style="background:#f9fafb;">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.55rem 1rem;">Student</th>
-                    <th style="padding:0.55rem 1rem;">Best</th>
-                    <th style="padding:0.55rem 1rem;">Latest</th>
-                    <th style="padding:0.55rem 1rem;">Attempts</th>
-                    <th style="padding:0.55rem 1rem;">Last attempted</th>
-                    <th style="padding:0.55rem 1rem;">Status</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Student" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Best" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Latest" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Attempts" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Last attempted" %}</th>
+                    <th style="padding:0.55rem 1rem;">{% trans "Status" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -156,15 +154,15 @@
                         {% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--gray-500);">
-                        {% if r.last_at %}{{ r.last_at|timesince }} ago{% else %}—{% endif %}
+                        {% if r.last_at %}{% blocktrans with ts=r.last_at|timesince %}{{ ts }} ago{% endblocktrans %}{% else %}—{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if not r.has_attempt %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:0.72rem;font-weight:600;">Not taken</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:0.72rem;font-weight:600;">{% trans "Not taken" %}</span>
                         {% elif r.passed %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:0.72rem;font-weight:700;">Passed</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:0.72rem;font-weight:700;">{% trans "Passed" %}</span>
                         {% else %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:0.72rem;font-weight:600;">Below pass</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:0.72rem;font-weight:600;">{% trans "Below pass" %}</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -173,7 +171,7 @@
         </table>
         {% else %}
         <div style="padding:2rem;text-align:center;color:var(--gray-500);">
-            No students enrolled in this course yet.
+            {% trans "No students enrolled in this course yet." %}
         </div>
         {% endif %}
     </div>
@@ -182,7 +180,7 @@
 
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">All {{ questions|length }} questions</h2>
+        <h2 class="card-title">{% blocktrans with count=questions|length %}All {{ count }} questions{% endblocktrans %}</h2>
     </div>
     <div class="card-body" style="padding:0.75rem 1rem;">
         {% for q in questions %}
@@ -211,11 +209,11 @@
                         {% if q.answer_data.figure_svg %}
                         <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|safe }}</div>
                         {% endif %}
-                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>Answer:</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
+                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
                         {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
                         <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
-                            <button type="button" onclick="editSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Edit</button>
-                            <button type="button" onclick="deleteSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;color:var(--danger);">Delete</button>
+                            <button type="button" onclick="editSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Edit" %}</button>
+                            <button type="button" onclick="deleteSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;color:var(--danger);">{% trans "Delete" %}</button>
                         </div>
                     </div>
                     <div style="font-size:0.7rem;color:var(--gray-400);">#{{ q.order_index|add:1 }}</div>
@@ -282,13 +280,13 @@
                     <textarea class="eq-explanation" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.explanation }}</textarea>
                 </div>
                 <div style="display:flex;gap:0.4rem;">
-                    <button type="button" onclick="saveSumQ(this)" class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Save</button>
-                    <button type="button" onclick="cancelSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">Cancel</button>
+                    <button type="button" onclick="saveSumQ(this)" class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Save" %}</button>
+                    <button type="button" onclick="cancelSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Cancel" %}</button>
                 </div>
             </div>
         </div>
         {% empty %}
-        <p style="color:var(--gray-500);padding:1rem;">No questions yet — generation may still be running. Refresh in a minute.</p>
+        <p style="color:var(--gray-500);padding:1rem;">{% trans "No questions yet — generation may still be running. Refresh in a minute." %}</p>
         {% endfor %}
     </div>
 </div>

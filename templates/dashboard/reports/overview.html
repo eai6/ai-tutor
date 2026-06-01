@@ -1,16 +1,17 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Reports{% endblock %}
-{% block page_title %}Reports{% endblock %}
+{% block title %}{% trans "Reports" %}{% endblock %}
+{% block page_title %}{% trans "Reports" %}{% endblock %}
 
 {% block content %}
 <!-- Date Range Filter -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <p style="color: var(--gray-500);">Analytics and insights</p>
+    <p style="color: var(--gray-500);">{% trans "Analytics and insights" %}</p>
     <div style="display: flex; gap: 0.5rem;">
-        <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">7 days</a>
-        <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">30 days</a>
-        <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">90 days</a>
+        <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "7 days" %}</a>
+        <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "30 days" %}</a>
+        <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "90 days" %}</a>
     </div>
 </div>
 
@@ -18,7 +19,7 @@
     <!-- Sessions Over Time -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Sessions Over Time</h3>
+            <h3 class="card-title">{% trans "Sessions Over Time" %}</h3>
         </div>
         <div class="card-body">
             {% if sessions_by_day %}
@@ -26,7 +27,7 @@
                 {% for day in sessions_by_day %}
                 <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
                     <div style="width: 100%; background: var(--primary); border-radius: 2px; min-height: 4px;"
-                         title="{{ day.date }}: {{ day.count }} sessions"
+                         title="{% blocktrans with date=day.date count=day.count %}{{ date }}: {{ count }} sessions{% endblocktrans %}"
                          data-count="{{ day.count }}" data-max="{% if sessions_by_day %}{{ sessions_by_day|length }}{% else %}1{% endif %}">
                     </div>
                 </div>
@@ -42,24 +43,24 @@
             </script>
             {% else %}
             <div class="empty-state">
-                <p>No session data for this period</p>
+                <p>{% trans "No session data for this period" %}</p>
             </div>
             {% endif %}
         </div>
     </div>
-    
+
     <!-- Top Students -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Top Performing Students</h3>
+            <h3 class="card-title">{% trans "Top Performing Students" %}</h3>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if top_students %}
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Student</th>
-                        <th style="text-align: right;">Lessons Mastered</th>
+                        <th>{% trans "Student" %}</th>
+                        <th style="text-align: right;">{% trans "Lessons Mastered" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,7 +80,7 @@
             </table>
             {% else %}
             <div class="empty-state">
-                <p>No mastery data yet</p>
+                <p>{% trans "No mastery data yet" %}</p>
             </div>
             {% endif %}
         </div>
@@ -89,7 +90,7 @@
 <!-- Competency Reports -->
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Competency Reports</h3>
+        <h3 class="card-title">{% trans "Competency Reports" %}</h3>
     </div>
     <div class="card-body">
         {% if courses_with_eo %}
@@ -98,17 +99,17 @@
             <div style="border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 1rem;">
                 <div style="font-weight: 700; margin-bottom: 0.25rem;">{{ item.course.title }}</div>
                 <div style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
-                    {{ item.eo_count }} enabling objectives &middot; {{ item.session_count }} sessions
+                    {% blocktrans with eo=item.eo_count s=item.session_count %}{{ eo }} enabling objectives · {{ s }} sessions{% endblocktrans %}
                 </div>
                 <a href="{% url 'dashboard:class_competency' item.course.id %}" class="btn btn-sm btn-primary" style="font-size: 0.8125rem;">
-                    Class Competency &amp; Readiness
+                    {% trans "Class Competency & Readiness" %}
                 </a>
             </div>
             {% endfor %}
         </div>
         {% else %}
         <div class="empty-state">
-            <p>No courses with competency data yet. Upload a curriculum and generate content to see competency reports.</p>
+            <p>{% trans "No courses with competency data yet. Upload a curriculum and generate content to see competency reports." %}</p>
         </div>
         {% endif %}
     </div>
@@ -118,16 +119,16 @@
 {% if recent_lessons %}
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Recent Lesson Sessions</h3>
+        <h3 class="card-title">{% trans "Recent Lesson Sessions" %}</h3>
     </div>
     <div class="card-body" style="padding: 0;">
         <table class="table">
             <thead>
                 <tr>
-                    <th>Lesson</th>
-                    <th>Course</th>
-                    <th style="text-align: center;">Sessions</th>
-                    <th style="text-align: center;">Completed</th>
+                    <th>{% trans "Lesson" %}</th>
+                    <th>{% trans "Course" %}</th>
+                    <th style="text-align: center;">{% trans "Sessions" %}</th>
+                    <th style="text-align: center;">{% trans "Completed" %}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -140,7 +141,7 @@
                     <td style="text-align: center;">{{ lesson.recent_completions }}</td>
                     <td style="text-align: right;">
                         <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
-                            Session Report
+                            {% trans "Session Report" %}
                         </a>
                     </td>
                 </tr>
@@ -154,18 +155,18 @@
 <!-- Lesson Performance -->
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
-        <h3 class="card-title">Lesson Performance</h3>
+        <h3 class="card-title">{% trans "Lesson Performance" %}</h3>
     </div>
     <div class="card-body" style="padding: 0;">
         {% if lessons %}
         <table class="table">
             <thead>
                 <tr>
-                    <th>Lesson</th>
-                    <th>Course</th>
-                    <th style="text-align: center;">Attempts</th>
-                    <th style="text-align: center;">Completions</th>
-                    <th style="width: 150px;">Success Rate</th>
+                    <th>{% trans "Lesson" %}</th>
+                    <th>{% trans "Course" %}</th>
+                    <th style="text-align: center;">{% trans "Attempts" %}</th>
+                    <th style="text-align: center;">{% trans "Completions" %}</th>
+                    <th style="width: 150px;">{% trans "Success Rate" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -194,7 +195,7 @@
         </table>
         {% else %}
         <div class="empty-state">
-            <p>No lesson data yet</p>
+            <p>{% trans "No lesson data yet" %}</p>
         </div>
         {% endif %}
     </div>

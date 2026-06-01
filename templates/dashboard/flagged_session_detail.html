@@ -1,11 +1,12 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Flagged Session - {{ session.student.first_name }} {{ session.student.last_name }}{% endblock %}
-{% block page_title %}Flagged Session{% endblock %}
+{% block title %}{% blocktrans with first=session.student.first_name last=session.student.last_name %}Flagged Session - {{ first }} {{ last }}{% endblocktrans %}{% endblock %}
+{% block page_title %}{% trans "Flagged Session" %}{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'dashboard:flagged_sessions' %}" class="btn btn-secondary btn-sm">&larr; Back to Flagged Chats</a>
+    <a href="{% url 'dashboard:flagged_sessions' %}" class="btn btn-secondary btn-sm">&larr; {% trans "Back to Flagged Chats" %}</a>
 </div>
 
 <!-- Session Info Card -->
@@ -18,12 +19,12 @@
                 <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
                     <span class="badge badge-danger" style="font-size: 0.8125rem;">{{ session.flag_reason }}</span>
                     {% if session.flagged_at %}
-                    <span style="font-size: 0.8125rem; color: var(--gray-500);">Flagged {{ session.flagged_at|timesince }} ago</span>
+                    <span style="font-size: 0.8125rem; color: var(--gray-500);">{% blocktrans with ts=session.flagged_at|timesince %}Flagged {{ ts }} ago{% endblocktrans %}</span>
                     {% endif %}
                     {% if session.flag_reviewed %}
-                        <span class="badge badge-success">Reviewed by {{ session.reviewed_by.first_name }} {{ session.reviewed_by.last_name }}</span>
+                        <span class="badge badge-success">{% blocktrans with first=session.reviewed_by.first_name last=session.reviewed_by.last_name %}Reviewed by {{ first }} {{ last }}{% endblocktrans %}</span>
                     {% else %}
-                        <span class="badge badge-warning">Unreviewed</span>
+                        <span class="badge badge-warning">{% trans "Unreviewed" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -32,11 +33,11 @@
                 {% csrf_token %}
                 {% if session.student.student_profile.is_tutor_suspended %}
                 <div style="background:#fee2e2;border:1px solid #fca5a5;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:0.75rem;font-size:0.875rem;color:#991b1b;">
-                    <strong>Student suspended from tutor.</strong> Reviewing this flag will restore their access.
+                    <strong>{% trans "Student suspended from tutor." %}</strong> {% trans "Reviewing this flag will restore their access." %}
                 </div>
-                <button type="submit" class="btn btn-primary">Review &amp; Restore Access</button>
+                <button type="submit" class="btn btn-primary">{% trans "Review & Restore Access" %}</button>
                 {% else %}
-                <button type="submit" class="btn btn-primary">Mark as Reviewed</button>
+                <button type="submit" class="btn btn-primary">{% trans "Mark as Reviewed" %}</button>
                 {% endif %}
             </form>
             {% endif %}
@@ -47,8 +48,8 @@
 <!-- Transcript -->
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">Transcript</h2>
-        <span style="font-size: 0.8125rem; color: var(--gray-500);">{{ turns|length }} messages</span>
+        <h2 class="card-title">{% trans "Transcript" %}</h2>
+        <span style="font-size: 0.8125rem; color: var(--gray-500);">{% blocktrans count count=turns|length %}{{ count }} message{% plural %}{{ count }} messages{% endblocktrans %}</span>
     </div>
     <div class="card-body" style="padding: 0;">
         {% for turn in turns %}

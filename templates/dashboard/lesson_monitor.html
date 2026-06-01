@@ -1,6 +1,7 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Live Monitor — {{ lesson.title }}{% endblock %}
-{% block page_title %}Live Monitor{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with title=lesson.title %}Live Monitor — {{ title }}{% endblocktrans %}{% endblock %}
+{% block page_title %}{% trans "Live Monitor" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -211,38 +212,38 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="back-link">&larr; Back to Lesson</a>
+<a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="back-link">&larr; {% trans "Back to Lesson" %}</a>
 
 <div class="monitor-header">
     <div>
         <h2>{{ lesson.title }}</h2>
-        <div class="monitor-meta">{{ course.name }} &mdash; Live Session Monitor</div>
+        <div class="monitor-meta">{{ course.name }} &mdash; {% trans "Live Session Monitor" %}</div>
     </div>
     <div>
-        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:#6366f1;">Session Report</a>
+        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:#6366f1;">{% trans "Session Report" %}</a>
     </div>
 </div>
 
 <div class="summary-cards">
     <div class="summary-card">
         <div class="number blue">{{ active_count }}</div>
-        <div class="label">Active</div>
+        <div class="label">{% trans "Active" %}</div>
     </div>
     <div class="summary-card">
         <div class="number gray">{{ idle_count }}</div>
-        <div class="label">Idle</div>
+        <div class="label">{% trans "Idle" %}</div>
     </div>
     <div class="summary-card">
         <div class="number green">{{ completed_count }}</div>
-        <div class="label">Completed</div>
+        <div class="label">{% trans "Completed" %}</div>
     </div>
     <div class="summary-card">
         <div class="number red">{{ struggling_count }}</div>
-        <div class="label">Struggling</div>
+        <div class="label">{% trans "Struggling" %}</div>
     </div>
     <div class="summary-card">
         <div class="number gray">{{ sessions|length }}</div>
-        <div class="label">Total</div>
+        <div class="label">{% trans "Total" %}</div>
     </div>
 </div>
 
@@ -250,14 +251,14 @@
 <table class="session-table">
     <thead>
         <tr>
-            <th>Student</th>
-            <th>Status</th>
-            <th>Phase</th>
-            <th>Step</th>
-            <th>Exchanges</th>
-            <th>Duration</th>
-            <th>Exit Score</th>
-            <th>Actions</th>
+            <th>{% trans "Student" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Phase" %}</th>
+            <th>{% trans "Step" %}</th>
+            <th>{% trans "Exchanges" %}</th>
+            <th>{% trans "Duration" %}</th>
+            <th>{% trans "Exit Score" %}</th>
+            <th>{% trans "Actions" %}</th>
         </tr>
     </thead>
     <tbody>
@@ -266,34 +267,34 @@
             <td class="cell-student" style="font-weight:600;">
                 {{ s.student_name }}
                 {% if s.is_group %}
-                <span title="Group session — {{ s.participant_names|join:', ' }}"
+                <span title="{% blocktrans with names=s.participant_names|join:', ' %}Group session — {{ names }}{% endblocktrans %}"
                       style="display:inline-block;margin-left:0.35rem;padding:0.05rem 0.4rem;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:0.65rem;font-weight:700;cursor:help;">👥 +{{ s.participant_count|add:'-1' }}</span>
                 {% endif %}
             </td>
-            <td data-label="Status">
+            <td data-label="{% trans 'Status' %}">
                 <span>
                     <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
-                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="No activity for {{ s.idle_minutes }} min">Idle {{ s.idle_minutes }}m</span>{% endif %}
-                    {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">Remediation</span>{% endif %}
+                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="{% blocktrans with mins=s.idle_minutes %}No activity for {{ mins }} min{% endblocktrans %}">{% blocktrans with mins=s.idle_minutes %}Idle {{ mins }}m{% endblocktrans %}</span>{% endif %}
+                    {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">{% trans "Remediation" %}</span>{% endif %}
                 </span>
             </td>
-            <td data-label="Phase">{{ s.display_phase|default:"--" }}</td>
-            <td data-label="Step">{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
-            <td data-label="Exchanges">{{ s.exchange_count }}</td>
-            <td data-label="Duration">{% if s.duration_minutes is not None %}{{ s.duration_minutes }} min{% else %}--{% endif %}</td>
-            <td data-label="Exit Score">
+            <td data-label="{% trans 'Phase' %}">{{ s.display_phase|default:"--" }}</td>
+            <td data-label="{% trans 'Step' %}">{% if s.is_remediation %}<span style="color:#71717a;">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
+            <td data-label="{% trans 'Exchanges' %}">{{ s.exchange_count }}</td>
+            <td data-label="{% trans 'Duration' %}">{% if s.duration_minutes is not None %}{% blocktrans with mins=s.duration_minutes %}{{ mins }} min{% endblocktrans %}{% else %}--{% endif %}</td>
+            <td data-label="{% trans 'Exit Score' %}">
                 {% if s.exit_score is not None %}
                     <span>
                         <span style="font-weight:600;{% if s.exit_passed %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
-                        {% if s.exit_passed %}<span style="font-size:0.7rem;color:#16a34a;">PASS</span>{% else %}<span style="font-size:0.7rem;color:#dc2626;">FAIL</span>{% endif %}
+                        {% if s.exit_passed %}<span style="font-size:0.7rem;color:#16a34a;">{% trans "PASS" %}</span>{% else %}<span style="font-size:0.7rem;color:#dc2626;">{% trans "FAIL" %}</span>{% endif %}
                     </span>
                 {% else %}
                     --
                 {% endif %}
             </td>
             <td class="cell-actions">
-                <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">View Chat</a>
-                {% if s.has_exit_review %}<a href="{% url 'dashboard:session_exit_review' s.session.id %}" class="btn-view" style="margin-left:4px;">Review</a>{% endif %}
+                <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">{% trans "View Chat" %}</a>
+                {% if s.has_exit_review %}<a href="{% url 'dashboard:session_exit_review' s.session.id %}" class="btn-view" style="margin-left:4px;">{% trans "Review" %}</a>{% endif %}
             </td>
         </tr>
         {% endfor %}
@@ -301,7 +302,7 @@
 </table>
 {% else %}
 <div style="text-align:center;padding:3rem;color:#a1a1aa;">
-    No sessions found for this lesson yet.
+    {% trans "No sessions found for this lesson yet." %}
 </div>
 {% endif %}
 
@@ -312,7 +313,7 @@ underlying cognitive_load tracking still runs in the engine but
 isn't surfaced.
 {% endcomment %}
 
-<div class="refresh-note">Auto-refreshes every 10 seconds for active sessions.</div>
+<div class="refresh-note">{% trans "Auto-refreshes every 10 seconds for active sessions." %}</div>
 {% endblock %}
 
 {% block extra_js %}

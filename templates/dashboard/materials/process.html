@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
 {% block title %}{{ upload.title }}{% endblock %}
 {% block page_title %}{{ upload.title }}{% endblock %}
@@ -18,15 +19,15 @@
                 </div>
                 <div>
                     {% if upload.status == 'completed' %}
-                        <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">Completed</span>
+                        <span class="badge badge-success" style="font-size: 1rem; padding: 0.5rem 1rem;">{% trans "Completed" %}</span>
                     {% elif upload.status == 'processing' %}
-                        <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">Processing...</span>
+                        <span class="badge badge-warning" style="font-size: 1rem; padding: 0.5rem 1rem;">{% trans "Processing..." %}</span>
                     {% elif upload.status == 'failed' %}
-                        <span class="badge badge-danger" style="font-size: 1rem; padding: 0.5rem 1rem;">Failed</span>
+                        <span class="badge badge-danger" style="font-size: 1rem; padding: 0.5rem 1rem;">{% trans "Failed" %}</span>
                     {% elif upload.status == 'pending_confirmation' %}
-                        <span class="badge badge-info" style="font-size: 1rem; padding: 0.5rem 1rem;">Awaiting confirmation</span>
+                        <span class="badge badge-info" style="font-size: 1rem; padding: 0.5rem 1rem;">{% trans "Awaiting confirmation" %}</span>
                     {% else %}
-                        <span class="badge badge-secondary" style="font-size: 1rem; padding: 0.5rem 1rem;">Pending</span>
+                        <span class="badge badge-secondary" style="font-size: 1rem; padding: 0.5rem 1rem;">{% trans "Pending" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -35,15 +36,15 @@
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
                 <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
                     <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.extracted_text_length|floatformat:0 }}</div>
-                    <div style="color: var(--gray-500); font-size: 0.875rem;">Characters extracted</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">{% trans "Characters extracted" %}</div>
                 </div>
                 <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
                     <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.chunks_created }}</div>
-                    <div style="color: var(--gray-500); font-size: 0.875rem;">Knowledge chunks</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">{% trans "Knowledge chunks" %}</div>
                 </div>
                 <div style="text-align: center; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
                     <div style="font-size: 1.5rem; font-weight: 600;">{{ upload.completed_at|date:"M d" }}</div>
-                    <div style="color: var(--gray-500); font-size: 0.875rem;">Completed</div>
+                    <div style="color: var(--gray-500); font-size: 0.875rem;">{% trans "Completed" %}</div>
                 </div>
             </div>
             {% endif %}
@@ -52,29 +53,27 @@
             {% if cost_verdict_label == 'red' %}
                 {% with bgcolor='#FEE2E2' textcolor='#991B1B' bordercolor='#F87171' %}
                 <div style="background:{{ bgcolor }};border:1px solid {{ bordercolor }};border-radius:8px;padding:1.25rem;margin-top:1rem;color:{{ textcolor }};">
-                    <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;">⛔ Cost over hard-block threshold</div>
+                    <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;">{% trans "⛔ Cost over hard-block threshold" %}</div>
                     <div style="font-size:0.9rem;margin-bottom:0.75rem;">
-                        Processing this {{ cost_estimate.pages }}-page material would cost an estimated
-                        <strong>${{ cost_estimate.estimated_cost_usd }}</strong>
-                        — above the $50 hard-block. Only a super-admin can force-confirm.
+                        {% blocktrans with pages=cost_estimate.pages cost=cost_estimate.estimated_cost_usd %}Processing this {{ pages }}-page material would cost an estimated <strong>${{ cost }}</strong> — above the $50 hard-block. Only a super-admin can force-confirm.{% endblocktrans %}
                     </div>
                     {% if is_super_admin %}
                     <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="rich">
                         <input type="hidden" name="force" value="1">
-                        <button type="submit" class="btn btn-sm" style="background:#DC2626;color:white;border:none;" onclick="return confirm('Force-start a ${{ cost_estimate.estimated_cost_usd }} processing job?');">Force-start (Rich)</button>
+                        <button type="submit" class="btn btn-sm" style="background:#DC2626;color:white;border:none;" onclick="return confirm('{% blocktrans with cost=cost_estimate.estimated_cost_usd %}Force-start a ${{ cost }} processing job?{% endblocktrans %}');">{% trans "Force-start (Rich)" %}</button>
                     </form>
                     <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;margin-left:0.5rem;">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="fast">
-                        <button type="submit" class="btn btn-sm btn-secondary">Fast (free, text-only)</button>
+                        <button type="submit" class="btn btn-sm btn-secondary">{% trans "Fast (free, text-only)" %}</button>
                     </form>
                     {% else %}
                     <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;">
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="fast">
-                        <button type="submit" class="btn btn-sm btn-secondary">Fast (free, text-only)</button>
+                        <button type="submit" class="btn btn-sm btn-secondary">{% trans "Fast (free, text-only)" %}</button>
                     </form>
                     {% endif %}
                 </div>
@@ -91,7 +90,7 @@
             {% if upload.status == 'processing' and upload.pages_total > 0 %}
             <div style="margin-top: 1rem;">
                 <div style="display:flex;justify-content:space-between;font-size:0.875rem;color:var(--gray-600);margin-bottom:0.4rem;">
-                    <span>Pages processed: {{ upload.pages_processed }} of {{ upload.pages_total }}</span>
+                    <span>{% blocktrans with done=upload.pages_processed total=upload.pages_total %}Pages processed: {{ done }} of {{ total }}{% endblocktrans %}</span>
                     {% if upload.phase %}<span style="color:var(--gray-500);font-size:0.75rem;">{{ upload.phase }}</span>{% endif %}
                 </div>
                 <div style="height:8px;background:var(--gray-200);border-radius:4px;overflow:hidden;">
@@ -103,12 +102,12 @@
             {% if upload.error_message %}
             {% if error_detail %}
             <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
-                <strong>Failed:</strong> {{ error_detail.reason }}<br>
+                <strong>{% trans "Failed:" %}</strong> {{ error_detail.reason }}<br>
                 <span style="font-size:0.875rem;color:#7F1D1D;">{{ error_detail.detail|default:error_detail.message }}</span>
             </div>
             {% else %}
             <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
-                <strong>Error:</strong> {{ upload.error_message }}
+                <strong>{% trans "Error:" %}</strong> {{ upload.error_message }}
             </div>
             {% endif %}
             {% endif %}
@@ -118,7 +117,7 @@
     <!-- Edit Material Details -->
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-header">
-            <h3 class="card-title" style="margin: 0;">Edit Details</h3>
+            <h3 class="card-title" style="margin: 0;">{% trans "Edit Details" %}</h3>
         </div>
         <div class="card-body">
             <form method="post">
@@ -126,11 +125,11 @@
                 <input type="hidden" name="action" value="update">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Title</label>
+                        <label class="form-label">{% trans "Title" %}</label>
                         <input type="text" name="title" value="{{ upload.title }}" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Material Type</label>
+                        <label class="form-label">{% trans "Material Type" %}</label>
                         <select name="material_type" class="form-control">
                             {% for code, name in material_types %}
                             <option value="{{ code }}" {% if upload.material_type == code %}selected{% endif %}>{{ name }}</option>
@@ -138,9 +137,9 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Grade Level</label>
+                        <label class="form-label">{% trans "Grade Level" %}</label>
                         <select name="grade_level" class="form-control">
-                            <option value="" {% if not upload.grade_level %}selected{% endif %}>All Levels</option>
+                            <option value="" {% if not upload.grade_level %}selected{% endif %}>{% trans "All Levels" %}</option>
                             <option value="S1" {% if upload.grade_level == 'S1' %}selected{% endif %}>S1</option>
                             <option value="S2" {% if upload.grade_level == 'S2' %}selected{% endif %}>S2</option>
                             <option value="S3" {% if upload.grade_level == 'S3' %}selected{% endif %}>S3</option>
@@ -149,12 +148,12 @@
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Description <span style="color:var(--gray-400);font-weight:normal;">(optional)</span></label>
-                        <textarea name="description" class="form-control" rows="2" placeholder="Brief description of this material...">{{ upload.description }}</textarea>
+                        <label class="form-label">{% trans "Description" %} <span style="color:var(--gray-400);font-weight:normal;">{% trans "(optional)" %}</span></label>
+                        <textarea name="description" class="form-control" rows="2" placeholder="{% trans 'Brief description of this material...' %}">{{ upload.description }}</textarea>
                     </div>
                 </div>
                 <div style="margin-top: 1rem;">
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
                 </div>
             </form>
         </div>
@@ -163,15 +162,15 @@
     <!-- File Info -->
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-header">
-            <h3 class="card-title" style="margin: 0;">File Info</h3>
+            <h3 class="card-title" style="margin: 0;">{% trans "File Info" %}</h3>
         </div>
         <div class="card-body">
             <div style="font-size: 0.875rem; color: var(--gray-600); display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem;">
-                <strong>Original filename:</strong> <span>{{ upload.original_filename }}</span>
-                <strong>Subject:</strong> <span>{{ upload.subject_name }}</span>
-                <strong>Uploaded:</strong> <span>{{ upload.created_at|date:"M d, Y H:i" }}</span>
+                <strong>{% trans "Original filename:" %}</strong> <span>{{ upload.original_filename }}</span>
+                <strong>{% trans "Subject:" %}</strong> <span>{{ upload.subject_name }}</span>
+                <strong>{% trans "Uploaded:" %}</strong> <span>{{ upload.created_at|date:"M d, Y H:i" }}</span>
                 {% if upload.course %}
-                <strong>Linked to course:</strong> <span>{{ upload.course.title }}</span>
+                <strong>{% trans "Linked to course:" %}</strong> <span>{{ upload.course.title }}</span>
                 {% endif %}
             </div>
         </div>
@@ -181,7 +180,7 @@
     {% if upload.processing_log %}
     <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-header">
-            <h3 class="card-title" style="margin: 0;">Processing Log</h3>
+            <h3 class="card-title" style="margin: 0;">{% trans "Processing Log" %}</h3>
         </div>
         <div class="card-body">
             <pre style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
@@ -191,12 +190,12 @@
 
     <div style="display: flex; gap: 0.75rem;">
         {% if upload.course %}
-        <a href="{% url 'dashboard:course_detail' upload.course.id %}" class="btn btn-secondary">Back to Course</a>
+        <a href="{% url 'dashboard:course_detail' upload.course.id %}" class="btn btn-secondary">{% trans "Back to Course" %}</a>
         {% else %}
-        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Back to Curriculum</a>
+        <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">{% trans "Back to Curriculum" %}</a>
         {% endif %}
         {% if upload.status == 'processing' %}
-        <button class="btn btn-primary" onclick="location.reload()">Refresh Status</button>
+        <button class="btn btn-primary" onclick="location.reload()">{% trans "Refresh Status" %}</button>
         {% endif %}
     </div>
 </div>

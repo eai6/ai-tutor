@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Content Generation Progress{% endblock %}
-{% block page_title %}Content Generation{% endblock %}
+{% block title %}{% trans "Content Generation Progress" %}{% endblock %}
+{% block page_title %}{% trans "Content Generation" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -71,7 +72,7 @@
 {% block content %}
 {% if course %}
 <a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← Back to {{ course.title }}
+    ← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 {% endif %}
 
@@ -79,63 +80,63 @@
     <div class="progress-header">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h2 style="margin: 0; font-size: 1.25rem;">📝 Content Generation</h2>
+                <h2 style="margin: 0; font-size: 1.25rem;">📝 {% trans "Content Generation" %}</h2>
                 <p style="margin: 0.5rem 0 0 0; color: var(--gray-500);">{{ course.title|default:upload.subject_name }}</p>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 {% if upload.status == 'processing' %}
                 <span class="status-badge processing">
                     <span class="spinner"></span>
-                    Processing...
+                    {% trans "Processing..." %}
                 </span>
                 <form method="post" action="{% url 'dashboard:cancel_generation' upload.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
-                        ⛔ Stop Generation
+                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating content? Lessons already completed will be kept." %}');">
+                        ⛔ {% trans "Stop Generation" %}
                     </button>
                 </form>
                 {% elif upload.status == 'completed' %}
                 <span class="status-badge completed">
-                    ✓ Complete
+                    ✓ {% trans "Complete" %}
                 </span>
                 {% elif upload.status == 'failed' %}
                 <span class="status-badge failed">
-                    ✗ Failed
+                    ✗ {% trans "Failed" %}
                 </span>
                 {% endif %}
             </div>
         </div>
     </div>
-    
+
     <div class="progress-body">
         {% if upload.status == 'processing' %}
         <div style="text-align: center; padding: 1rem 0 1.5rem;">
             <div class="spinner" style="width: 40px; height: 40px; border-width: 3px; margin: 0 auto 1rem;"></div>
-            <p style="color: var(--gray-600); margin: 0;">Generating tutoring content for each lesson...</p>
-            <p style="color: var(--gray-400); font-size: 0.875rem; margin: 0.5rem 0 0;">This page auto-refreshes every 5 seconds</p>
+            <p style="color: var(--gray-600); margin: 0;">{% trans "Generating tutoring content for each lesson..." %}</p>
+            <p style="color: var(--gray-400); font-size: 0.875rem; margin: 0.5rem 0 0;">{% trans "This page auto-refreshes every 5 seconds" %}</p>
         </div>
         {% endif %}
-        
-        <h4 style="margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--gray-600);">📋 Progress Log</h4>
+
+        <h4 style="margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--gray-600);">📋 {% trans "Progress Log" %}</h4>
         <div class="log-container" id="log-container">{{ upload.processing_log }}</div>
-        
+
         {% if upload.status == 'completed' %}
         <div style="margin-top: 1.5rem; text-align: center;">
             {% if course %}
             <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-primary">
-                ← Back to Course
+                ← {% trans "Back to Course" %}
             </a>
             {% else %}
             <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-primary">
-                ← Back to Curriculum
+                ← {% trans "Back to Curriculum" %}
             </a>
             {% endif %}
         </div>
         {% endif %}
-        
+
         {% if upload.status == 'failed' and upload.error_message %}
         <div style="margin-top: 1rem; padding: 1rem; background: #fee2e2; border-radius: 8px; color: #991b1b;">
-            <strong>Error:</strong> {{ upload.error_message }}
+            <strong>{% trans "Error:" %}</strong> {{ upload.error_message }}
         </div>
         {% endif %}
     </div>
