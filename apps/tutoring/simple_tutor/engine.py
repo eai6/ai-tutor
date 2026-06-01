@@ -108,6 +108,20 @@ def start_remediation(session: 'TutorSession') -> dict[str, Any]:
     return payload
 
 
+def _course_locale(session) -> str:
+    """Return the locale of the session's course, defaulting to 'en-us'.
+
+    Path is ``session.lesson.unit.course.locale``. Any missing link in
+    that chain (legacy session without a lesson, lesson without a unit,
+    etc.) falls back to the global default — never raises.
+    """
+    try:
+        course = session.lesson.unit.course
+        return (getattr(course, 'locale', '') or 'en-us').lower()
+    except Exception:  # noqa: BLE001 — defensive, never break the tutor
+        return 'en-us'
+
+
 def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = False) -> dict[str, Any]:
     """Process one student turn and return the tutor's response.
 
@@ -159,9 +173,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # answering". A deterministic pre-call labels the student's input
     # so the LLM can route conversationally on clarification / pushback
     # / off-topic / non-engagement instead of forcing record_answer.
+    #
+    # M4 (2026-06-01) made the patterns locale-aware so "não sei"
+    # routes the same way in a pt-mz course as "i don't know" does
+    # in an en-us course.
     from apps.tutoring.simple_tutor.intent import classify_student_message
     student_intent = classify_student_message(
-        user_input, has_inflight_question=in_flight is not None,
+        user_input,
+        has_inflight_question=in_flight is not None,
+        locale=_course_locale(session),
     )
 
     if exit_ticket_review is not None:
@@ -175,6 +195,13 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     )
 
     # ─── 2. Build system prompt + tool schemas ────────────────────
+    # Locale drives both the per-turn instruction in the system prompt
+    # (e.g. "respond in pt-mz") and the locale-aware intent classifier.
+    # Sourced from the course rather than settings.LANGUAGE_CODE so the
+    # same deployment can serve EN Seychelles and PT Mozambique
+    # courses simultaneously. See memory/multi_locale_architecture_research.md.
+    course_locale = _course_locale(session)
+
     from apps.tutoring.simple_tutor.prompts import build_system_prompt
     system_blocks, tools = build_system_prompt(
         session=session,
@@ -188,6 +215,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         step_summaries=step_summaries,
         exit_ticket_review=exit_ticket_review,
         student_intent=student_intent,
+        locale=course_locale,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────

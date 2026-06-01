@@ -297,7 +297,7 @@ the student your in-flight question and options through the UI, and \
 grades the student's answer against the reference you provided when \
 you posed it.
 </role>
-
+{LOCALE_RULE}
 <rules>
 - **Mode-switching via in-flight slot + message intent.** Every \
 turn you are in one of two modes:
@@ -562,6 +562,7 @@ def build_system_prompt(
     step_summaries: list[str] | None = None,
     exit_ticket_review: dict | None = None,
     student_intent: str | None = None,
+    locale: str = 'en-us',
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -612,7 +613,12 @@ def build_system_prompt(
             "images, or visuals. Describe concepts in prose. The request_figure "
             "tool is unavailable on this lesson."
         )
-    block_0_text = _BLOCK_0_TEMPLATE.replace('{FIGURE_RULE}', figure_rule)
+    locale_rule = _build_locale_rule(locale)
+    block_0_text = (
+        _BLOCK_0_TEMPLATE
+        .replace('{FIGURE_RULE}', figure_rule)
+        .replace('{LOCALE_RULE}', locale_rule)
+    )
     blocks.append({
         "type": "text",
         "text": block_0_text,
@@ -702,6 +708,53 @@ def build_system_prompt(
     _ = copy  # imported above for the helper
 
     return blocks, tools_for_llm
+
+
+def _build_locale_rule(locale: str) -> str:
+    """Return the `<locale>` block injected into Block 0 of the system
+    prompt, or empty string for the default English course.
+
+    The block is XML-tagged per ``claude-prompting-expert`` conventions
+    (Claude trained heavily on XML delimiters). It sits between
+    ``</role>`` and ``<rules>`` so the language constraint is read
+    before the behavioural rules. The two-call loop re-sends Block 0
+    every turn, so the locale rule reaches the model on every
+    generation — addresses the "alignment drift" finding from the
+    CEFR LLM-tutoring paper (arXiv 2505.08351), which observed that
+    system-prompt-only locale constraints decay over long sessions.
+
+    Returns "" for en-us so the en-us cache key matches today's
+    behaviour byte-for-byte — no cache churn for existing Seychelles
+    sessions.
+    """
+    code = (locale or 'en-us').lower()
+    if code in ('en-us', 'en'):
+        return ''
+    if code == 'pt-mz':
+        return (
+            "\n<locale>\n"
+            "Respond to the student in Mozambique Portuguese "
+            "(pt-mz register). Use 'tu' informal addressing throughout. "
+            "Use post-1990 Acordo Ortográfico spelling. Keep technical "
+            "terms in their standard Portuguese form (e.g. \"ângulo\", "
+            "\"escala\", \"fotossíntese\", \"ecossistema\"). Do not "
+            "switch to English mid-reply — section labels, affirmations, "
+            "and rephrasings all stay in Portuguese.\n"
+            "</locale>\n"
+        )
+    # Defensive: an unknown locale gets a generic instruction in the
+    # native code rather than a hard error. New supported locales add
+    # an explicit branch above so the prompt is tailored.
+    logger.warning(
+        "build_system_prompt: unknown locale '%s' — falling back to generic instruction",
+        code,
+    )
+    return (
+        f"\n<locale>\n"
+        f"Respond to the student in the language identified by the "
+        f"locale tag '{code}'. Do not switch to English mid-reply.\n"
+        f"</locale>\n"
+    )
 
 
 def _narrow_pose_question_types(tool_schema: dict, allowed: tuple[str, ...]) -> dict:
