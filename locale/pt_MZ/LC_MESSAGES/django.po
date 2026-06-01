@@ -489,7 +489,7 @@ msgstr "Todas as escolas"
 #: templates/dashboard/base.html:757 templates/dashboard/settings.html:82
 #: templates/dashboard/settings.html:379
 msgid "Super Admin"
-msgstr "Super Admin"
+msgstr "Super Administrador"
 
 #: templates/dashboard/class_readiness.html:3
 #, python-format
@@ -2086,7 +2086,7 @@ msgstr "Demasiados alunos estão abaixo do limiar de %(pct)s%%. Dedica a tua pr�
 #: templates/dashboard/lesson_session_report.html:348
 #, python-format
 msgid "Next Lesson: %(t)s"
-msgstr "Nova Lição em \"%(title)s\""
+msgstr "Próxima lição: %(t)s"
 
 #: templates/dashboard/lesson_session_report.html:351
 msgid "Review This Lesson"
