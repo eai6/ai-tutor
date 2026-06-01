@@ -1,58 +1,59 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Student Sign In - AI Tutor{% endblock %}
+{% block title %}{% trans "Student Sign In" %} - AI Tutor{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
             <div class="auth-icon">🎓</div>
-            <h1>Student Sign In</h1>
-            <p class="text-muted">Welcome back! Let's continue learning.</p>
+            <h1>{% trans "Student Sign In" %}</h1>
+            <p class="text-muted">{% trans "Welcome back! Let's continue learning." %}</p>
         </div>
-        
+
         {% if error %}
         <div class="alert alert-error">
             {{ error }}
         </div>
         {% endif %}
-        
+
         <form method="post" class="auth-form">
             {% csrf_token %}
-            
+
             <div class="form-group">
-                <label for="username">Username</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
+                <label for="username">{% trans "Username" %}</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
                     value="{{ username|default:'' }}"
-                    placeholder="Enter your username"
+                    placeholder="{% trans 'Enter your username' %}"
                     required
                     autofocus
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="password">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="Enter your password"
+                <label for="password">{% trans "Password" %}</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="{% trans 'Enter your password' %}"
                     required
                 >
             </div>
-            
+
             <button type="submit" class="btn btn-primary btn-full">
-                Sign In →
+                {% trans "Sign In" %} →
             </button>
         </form>
-        
+
         <div class="auth-footer">
-            <p><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></p>
-            <p>Don't have an account? <a href="{% url 'accounts:student_register' %}">Register as Student</a></p>
-            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
+            <p><a href="{% url 'accounts:password_reset' %}">{% trans "Forgot your password?" %}</a></p>
+            <p>{% trans "Don't have an account?" %} <a href="{% url 'accounts:student_register' %}">{% trans "Register as Student" %}</a></p>
+            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← {% trans "Back to home" %}</a></p>
         </div>
     </div>
 </div>

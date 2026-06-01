@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Student Registration - AI Tutor{% endblock %}
+{% block title %}{% trans "Student Registration" %} - AI Tutor{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
             <div class="auth-icon">🎓</div>
-            <h1>Create Student Account</h1>
-            <p class="text-muted">Join AI Tutor and start learning today!</p>
+            <h1>{% trans "Create Student Account" %}</h1>
+            <p class="text-muted">{% trans "Join AI Tutor and start learning today!" %}</p>
         </div>
-        
+
         {% if errors %}
         <div class="alert alert-error">
             <ul style="margin: 0; padding-left: 1.25rem;">
@@ -20,74 +21,74 @@
             </ul>
         </div>
         {% endif %}
-        
+
         <form method="post" class="auth-form">
             {% csrf_token %}
-            
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="first_name">First Name</label>
-                    <input 
-                        type="text" 
-                        id="first_name" 
-                        name="first_name" 
+                    <label for="first_name">{% trans "First Name" %}</label>
+                    <input
+                        type="text"
+                        id="first_name"
+                        name="first_name"
                         value="{{ first_name|default:'' }}"
-                        placeholder="Your first name"
+                        placeholder="{% trans 'Your first name' %}"
                         required
                         autofocus
                     >
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="last_name">Last Name</label>
-                    <input 
-                        type="text" 
-                        id="last_name" 
-                        name="last_name" 
+                    <label for="last_name">{% trans "Last Name" %}</label>
+                    <input
+                        type="text"
+                        id="last_name"
+                        name="last_name"
                         value="{{ last_name|default:'' }}"
-                        placeholder="Your last name"
+                        placeholder="{% trans 'Your last name' %}"
                     >
                 </div>
             </div>
-            
+
             <div class="form-group">
-                <label for="username">Username</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
+                <label for="username">{% trans "Username" %}</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
                     value="{{ username|default:'' }}"
-                    placeholder="Choose a username"
+                    placeholder="{% trans 'Choose a username' %}"
                     required
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="email">Email (Optional)</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
+                <label for="email">{% trans "Email (Optional)" %}</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
                     value="{{ email|default:'' }}"
                     placeholder="your.email@example.com"
                 >
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group">
-                    <label for="school">School</label>
+                    <label for="school">{% trans "School" %}</label>
                     <select id="school" name="school" required>
-                        <option value="">Select your school</option>
+                        <option value="">{% trans "Select your school" %}</option>
                         {% for code, name in school_choices %}
                         <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="grade_level">Grade Level</label>
+                    <label for="grade_level">{% trans "Grade Level" %}</label>
                     <select id="grade_level" name="grade_level" required>
-                        <option value="">Select grade</option>
+                        <option value="">{% trans "Select grade" %}</option>
                         {% for code, name in grade_choices %}
                         <option value="{{ code }}" {% if grade_level == code %}selected{% endif %}>{{ name }}</option>
                         {% endfor %}
@@ -96,29 +97,29 @@
             </div>
 
             <div class="form-group">
-                <label for="student_id">Student ID (optional)</label>
-                <input type="text" id="student_id" name="student_id" value="{{ student_id|default:'' }}" placeholder="e.g., STU-2024-001">
-                <div style="font-size: 0.75rem; color: #71717a; margin-top: 0.25rem;">Your school ID number, if you have one</div>
+                <label for="student_id">{% trans "Student ID (optional)" %}</label>
+                <input type="text" id="student_id" name="student_id" value="{{ student_id|default:'' }}" placeholder="{% trans 'e.g., STU-2024-001' %}">
+                <div style="font-size: 0.75rem; color: #71717a; margin-top: 0.25rem;">{% trans "Your school ID number, if you have one" %}</div>
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="At least 6 characters"
+                <label for="password">{% trans "Password" %}</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="{% trans 'At least 6 characters' %}"
                     required
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="password_confirm">Confirm Password</label>
+                <label for="password_confirm">{% trans "Confirm Password" %}</label>
                 <input
                     type="password"
                     id="password_confirm"
                     name="password_confirm"
-                    placeholder="Re-enter your password"
+                    placeholder="{% trans 'Re-enter your password' %}"
                     required
                 >
             </div>
@@ -128,7 +129,8 @@
                 <label style="display:flex;gap:0.55rem;align-items:flex-start;font-weight:500;color:#111;cursor:pointer;">
                     <input type="checkbox" name="accept_terms" required style="margin-top:0.25rem;transform:scale(1.15);accent-color:#5b21b6;">
                     <span style="line-height:1.5;font-size:0.9rem;">
-                        I agree to the <a href="{% url 'accounts:terms' %}" target="_blank" style="color:#5b21b6;font-weight:600;">AI Tutor terms</a>.
+                        {% trans "I agree to the" %}
+                        <a href="{% url 'accounts:terms' %}" target="_blank" style="color:#5b21b6;font-weight:600;">{% trans "AI Tutor terms" %}</a>.
                         {% if active_terms.summary %}<br><span style="color:#6b7280;font-weight:400;font-size:0.82rem;">{{ active_terms.summary }}</span>{% endif %}
                     </span>
                 </label>
@@ -136,13 +138,13 @@
             {% endif %}
 
             <button type="submit" class="btn btn-primary btn-full">
-                Create Account →
+                {% trans "Create Account" %} →
             </button>
         </form>
-        
+
         <div class="auth-footer">
-            <p>Already have an account? <a href="{% url 'accounts:student_login' %}">Sign in</a></p>
-            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
+            <p>{% trans "Already have an account?" %} <a href="{% url 'accounts:student_login' %}">{% trans "Sign in" %}</a></p>
+            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← {% trans "Back to home" %}</a></p>
         </div>
     </div>
 </div>
