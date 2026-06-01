@@ -269,16 +269,16 @@ def submit_exit_ticket(session, answers: list) -> dict:
         len(batch_items),
     )
 
+    from django.utils.translation import gettext
     if passed:
-        message = (
-            f"🎉 You scored {correct_count}/{total} — that's a pass. "
-            "Well done!"
-        )
+        message = gettext("🎉 You scored %(score)d/%(total)d — that's a pass. Well done!") % {
+            'score': correct_count, 'total': total,
+        }
     else:
-        message = (
-            f"📋 **Exit ticket review**\n\nYou scored {correct_count} "
-            f"out of {total}. Let's revisit the concepts you missed."
-        )
+        message = gettext(
+            "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. "
+            "Let's revisit the concepts you missed."
+        ) % {'score': correct_count, 'total': total}
 
     return {
         'message': message,
