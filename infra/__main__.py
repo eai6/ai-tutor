@@ -54,6 +54,15 @@ primary_custom_domain = custom_domains[0] if custom_domains else None
 email_domain = config.get("email-domain") or (
     f"mail.{primary_custom_domain}" if primary_custom_domain else None
 )
+# Email auto-provisioning kill switch (added 2026-06-01 for staging).
+# When False, the ACS EmailService + Domain + CommunicationService
+# resources are skipped — the Container App falls back to the console
+# email backend. Useful on stages like `staging` where transactional
+# mail isn't needed but we still want a TLS-bound custom domain.
+# Default: True (matches prod's existing behaviour).
+email_enabled = config.get_bool("email-enabled")
+if email_enabled is None:
+    email_enabled = True
 # Sender address (the From: of outgoing transactional mail).
 email_sender_username = config.get("email-sender-username") or "noreply"
 email_from_display_name = config.get("email-from-display-name") or "AI Tutor"
@@ -324,7 +333,7 @@ acs_connection_string = None  # filled in if ACS is configured
 acs_sender_address = None     # filled in if email_domain is set
 email_dns_outputs = {}        # surfaced to the user via pulumi stack output
 
-if email_domain:
+if email_domain and email_enabled:
     email_service = communication.EmailService(
         f"aitutor-{stack}-email",
         email_service_name=f"aitutor-{stack}-email",
