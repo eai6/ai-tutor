@@ -1184,92 +1184,31 @@ def chat_respond(request, session_id):
     logger = logging.getLogger('apps')
     logger.info(f"[respond] Starting for session {session_id}, message: {message[:50]}")
 
-    # ── Engine dispatch ──────────────────────────────────────────
-    # The simple-tutor engine (apps/tutoring/simple_tutor/) is selected
-    # via the SIMPLE_TUTOR_ENGINE env var. Default OFF → legacy v1.
-    # The student NEVER picks the engine — it's a deploy-level config
-    # set in the Container App env. See
-    # auto-memory/feedback_server_owns_question_state.md.
-    from apps.tutoring import simple_tutor
-    if simple_tutor.is_enabled():
-        from apps.tutoring.simple_tutor.engine import respond_for_view
-        try:
-            t0 = time.time()
-            payload = respond_for_view(session, message)
-            elapsed = time.time() - t0
-            logger.info(
-                f"[respond:simple] Completed in {elapsed:.1f}s "
-                f"step={payload.get('step_number')}/{payload.get('total_steps')}"
-            )
-            return JsonResponse(payload)
-        except Exception as e:
-            logger.error(f"[respond:simple] Failed: {e}", exc_info=True)
-            return JsonResponse(
-                {"error": "Something went wrong. Please try again."},
-                status=500,
-            )
-
-    tutor = ConversationalTutor(session)
-
+    # ── Main turn loop — simple_tutor is the only engine ──────────
+    # 2026-06-01: the SIMPLE_TUTOR_ENGINE env-var dispatch was removed.
+    # The simple_tutor engine (apps/tutoring/simple_tutor/) handles
+    # every chat turn; the legacy ConversationalTutor.respond() path
+    # is gone from this endpoint. The 5 other call sites in this file
+    # (start / resume / start_review / difficulty-button /
+    # bank-question-grade) still call ConversationalTutor methods that
+    # haven't been ported to simple_tutor yet — tracked as a follow-up
+    # PR per the v0.1.0+ legacy-engine teardown plan.
+    from apps.tutoring.simple_tutor.engine import respond_for_view
     try:
         t0 = time.time()
-        result = tutor.respond(message)
+        payload = respond_for_view(session, message)
         elapsed = time.time() - t0
-        logger.info(f"[respond] Completed in {elapsed:.1f}s, phase={result.phase}")
-
-        # NOTE: post-response AI safety is now handled INSIDE
-        # ConversationalTutor.respond() via the safety judge in
-        # run_all_judges. When the judge flags a response, the
-        # validator raises ISSUE_TUTOR_UNSAFE → triggers the regen
-        # ensemble → the unsafe text is rewritten before reaching
-        # the student. Per Edward (2026-05-07): we don't need to
-        # flag tutor output for teacher review since unsafe text
-        # never reaches the student; only student input is flagged
-        # for /dashboard/flagged/.
-
-        # 2026-05-17 (task #182): optional follow-up TutorMessage —
-        # emitted as a second tutor bubble when the move-on flow splits
-        # acknowledgement from new-question pose. Frontend renders
-        # follow_up_message after the main content.
-        _follow_up = getattr(result, 'follow_up', None)
-        _follow_up_payload = None
-        if _follow_up is not None:
-            _follow_up_payload = {
-                "message": _follow_up.content,
-                "media": _follow_up.media,
-                "pending_question": getattr(_follow_up, 'pending_question', None),
-                "is_correct": _follow_up.is_correct,
-            }
-
-        return JsonResponse({
-            "message": result.content,
-            "phase": result.phase,
-            "media": result.media,
-            "show_exit_ticket": result.show_exit_ticket,
-            "exit_ticket": result.exit_ticket_data,
-            "is_complete": result.is_complete,
-            "step_number": result.step_number,
-            "total_steps": result.total_steps,
-            # In-conversation gamification
-            "is_correct": result.is_correct,
-            "streak_count": result.streak_count,
-            "practice_score": result.practice_score,
-            "milestone": result.milestone,
-            # Rich HTML artifact (rendered in sandboxed iframe)
-            "artifact_html": getattr(result, 'artifact_html', None),
-            # Easy-mode interactive probe (MCQ / fill-in-blank widget).
-            "probe": getattr(result, 'probe', None),
-            # R2 (2026-05-15): bank question awaiting answer — the
-            # frontend artifact panel (R3) renders this as a question
-            # widget instead of relying on inline prose. None when no
-            # question is in flight.
-            "pending_question": getattr(result, 'pending_question', None),
-            # 2026-05-17 (task #182): second bubble for move-on split.
-            "follow_up_message": _follow_up_payload,
-        })
+        logger.info(
+            f"[respond:simple] Completed in {elapsed:.1f}s "
+            f"step={payload.get('step_number')}/{payload.get('total_steps')}"
+        )
+        return JsonResponse(payload)
     except Exception as e:
-        logger.error(f"[respond] Failed: {e}", exc_info=True)
-        return JsonResponse({"error": "Something went wrong. Please try again."}, status=500)
+        logger.error(f"[respond:simple] Failed: {e}", exc_info=True)
+        return JsonResponse(
+            {"error": "Something went wrong. Please try again."},
+            status=500,
+        )
 
 
 @login_required
