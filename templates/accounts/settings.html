@@ -194,6 +194,16 @@
                 </select>
             </div>
             {% endif %}
+            <div class="field">
+                <label for="preferred_locale">{% trans "Language" %}</label>
+                <select id="preferred_locale" name="preferred_locale">
+                    <option value="" {% if not current_preferred_locale %}selected{% endif %}>{% trans "— Use my school's default —" %}</option>
+                    {% for code, label in locale_choices %}
+                    <option value="{{ code }}" {% if current_preferred_locale == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="helptext">{% trans "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless." %}</p>
+            </div>
             <button type="submit" class="btn btn-primary">{% trans "Save profile" %}</button>
         </form>
     </section>

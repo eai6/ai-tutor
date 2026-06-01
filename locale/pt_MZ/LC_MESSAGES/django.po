@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-01 15:06+0000\n"
+"POT-Creation-Date: 2026-06-01 19:54+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -29,11 +29,11 @@ msgstr "Olá, %(name)s!"
 msgid "You've been logged out."
 msgstr "Sessão terminada."
 
-#: apps/accounts/views.py:749
+#: apps/accounts/views.py:763
 msgid "Profile updated."
 msgstr "Perfil atualizado."
 
-#: apps/accounts/views.py:757
+#: apps/accounts/views.py:771
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
@@ -99,7 +99,7 @@ msgstr "Nome de utilizador"
 msgid "Enter your username"
 msgstr "Introduz o teu nome de utilizador"
 
-#: templates/accounts/login.html:38 templates/accounts/settings.html:203
+#: templates/accounts/login.html:38 templates/accounts/settings.html:213
 #: templates/accounts/student_login.html:38
 #: templates/accounts/student_register.html:106
 msgid "Password"
@@ -166,51 +166,63 @@ msgstr "Escola"
 msgid "Grade level"
 msgstr "Classe"
 
-#: templates/accounts/settings.html:197
+#: templates/accounts/settings.html:198
+msgid "Language"
+msgstr "Idioma"
+
+#: templates/accounts/settings.html:200
+msgid "— Use my school's default —"
+msgstr "— Usar a predefinição da minha escola —"
+
+#: templates/accounts/settings.html:205
+msgid "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless."
+msgstr "Define o idioma em que a interface da plataforma é exibida. Em branco significa seguir a predefinição da tua escola. As sessões de chat dos cursos são sempre apresentadas no idioma do curso, independentemente disso."
+
+#: templates/accounts/settings.html:207
 msgid "Save profile"
 msgstr "Guardar perfil"
 
-#: templates/accounts/settings.html:204
+#: templates/accounts/settings.html:214
 msgid "Use a strong password you don't reuse elsewhere."
 msgstr "Usa uma palavra-passe forte que não reutilizes noutros sítios."
 
-#: templates/accounts/settings.html:210
+#: templates/accounts/settings.html:220
 msgid "Current password"
 msgstr "Palavra-passe atual"
 
-#: templates/accounts/settings.html:217
+#: templates/accounts/settings.html:227
 msgid "New password"
 msgstr "Nova palavra-passe"
 
-#: templates/accounts/settings.html:224
+#: templates/accounts/settings.html:234
 msgid "Confirm new password"
 msgstr "Confirma a nova palavra-passe"
 
-#: templates/accounts/settings.html:230
+#: templates/accounts/settings.html:240
 msgid "Change password"
 msgstr "Alterar palavra-passe"
 
-#: templates/accounts/settings.html:236
+#: templates/accounts/settings.html:246
 msgid "Session"
 msgstr "Sessão"
 
-#: templates/accounts/settings.html:237
+#: templates/accounts/settings.html:247
 msgid "Sign out on this device."
 msgstr "Termina a sessão neste dispositivo."
 
-#: templates/accounts/settings.html:238 templates/base.html:328
+#: templates/accounts/settings.html:248 templates/base.html:328
 msgid "Logout"
 msgstr "Sair"
 
-#: templates/accounts/settings.html:243
+#: templates/accounts/settings.html:253
 msgid "Delete account"
 msgstr "Eliminar conta"
 
-#: templates/accounts/settings.html:244
+#: templates/accounts/settings.html:254
 msgid "Permanently remove your account and all data we hold for you. This cannot be undone."
 msgstr "Remove permanentemente a tua conta e todos os dados que temos sobre ti. Isto não pode ser desfeito."
 
-#: templates/accounts/settings.html:245
+#: templates/accounts/settings.html:255
 msgid "Delete my account"
 msgstr "Eliminar a minha conta"
 
