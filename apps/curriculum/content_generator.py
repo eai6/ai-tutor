@@ -2391,6 +2391,7 @@ CONTENT GUIDELINES:
 
         from apps.llm.prompts import get_prompt_or_default
         from apps.curriculum.dok_framework import dok_guidance_for
+        from apps.curriculum.locale_prompts import locale_instruction_block
         system_prompt = get_prompt_or_default(
             self.institution_id, 'content_generation_prompt',
             "You are an expert curriculum designer creating engaging tutoring content for Seychelles secondary students.",
@@ -2398,6 +2399,15 @@ CONTENT GUIDELINES:
         # Webb's DOK rubric — anchors the cognitive demand of each
         # teaching step. See apps/curriculum/dok_framework.py.
         system_prompt = system_prompt + "\n\n" + dok_guidance_for("content")
+
+        # Per-course locale injection — emits lesson text + steps in
+        # the course's language. See apps/curriculum/locale_prompts.py
+        # and memory/multi_locale_architecture_research.md.
+        course_locale = (
+            getattr(lesson.unit.course, 'locale', 'en-us')
+            if lesson.unit and lesson.unit.course else 'en-us'
+        )
+        system_prompt = system_prompt + locale_instruction_block(course_locale)
 
         print(f"[ContentGen] [{lesson.title}] Calling instructor ({self._model_config.provider}/{self._model_config.model_name})...", flush=True)
 
@@ -3171,6 +3181,7 @@ RULES:
 
     from apps.llm.prompts import get_prompt_or_default
     from apps.curriculum.dok_framework import dok_guidance_for
+    from apps.curriculum.locale_prompts import locale_instruction_block
     exit_sys_prompt = get_prompt_or_default(
         institution_id, 'exit_ticket_prompt',
         "You are an expert educational assessment designer.",
@@ -3179,6 +3190,18 @@ RULES:
     # Webb's DOK rubric — every question targets a stated cognitive level.
     # See apps/curriculum/dok_framework.py.
     exit_sys_prompt = exit_sys_prompt + "\n\n" + dok_guidance_for("assessment")
+
+    # Per-course locale injection. Appends an XML <locale> block to the
+    # system prompt when the course is non-English so the LLM emits
+    # MCQ stems / options / explanations in the target language.
+    # Returns '' for en-us so the existing Seychelles cache key is
+    # byte-identical — no cache churn for the prod baseline. See
+    # memory/multi_locale_architecture_research.md.
+    course_locale = (
+        getattr(lesson.unit.course, 'locale', 'en-us')
+        if lesson.unit and lesson.unit.course else 'en-us'
+    )
+    exit_sys_prompt = exit_sys_prompt + locale_instruction_block(course_locale)
 
     try:
         print(
@@ -3227,6 +3250,23 @@ RULES:
         )
 
         questions = questions[:35]
+
+        # MCQ distribution audit + rebalance — belt-and-braces for the
+        # B-bias that historically skewed correct-answer letters. The
+        # prompt now asks the LLM to self-balance; this verifier
+        # tallies the realized distribution and, if any letter exceeds
+        # 35% of the bank, deterministically permutes which option
+        # ends up at each letter. Educationally identical content;
+        # just shuffled labels. See apps/curriculum/mcq_distribution.py.
+        from apps.curriculum.mcq_distribution import (
+            audit_distribution, rebalance_distribution,
+        )
+        bank_label = f"exit-ticket lesson={lesson.id}"
+        counts = audit_distribution(questions, label=bank_label)
+        total_mcq = sum(counts.values())
+        if total_mcq and max(counts.values()) / total_mcq > 0.35:
+            rebalance_distribution(questions, label=bank_label)
+            audit_distribution(questions, label=f"{bank_label} post-rebalance")
 
         # Layer 4 — render any parametric templates the LLM emitted.
         # Templated questions get their prose fields filled in by
