@@ -109,7 +109,7 @@ msgstr "Entra para continuar a aprender"
 #: templates/accounts/student_register.html:55
 #: templates/dashboard/staff_list.html:22
 msgid "Username"
-msgstr "Nome de utilizador"
+msgstr "Utilizador"
 
 #: templates/accounts/login.html:31 templates/accounts/student_login.html:31
 msgid "Enter your username"
@@ -203,7 +203,7 @@ msgstr "— Usar a predefinição da minha escola —"
 
 #: templates/accounts/settings.html:205
 msgid "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless."
-msgstr "Define o idioma em que a interface da plataforma é exibida. Em branco significa seguir a predefinição da tua escola. As sessões de chat dos cursos são sempre apresentadas no idioma do curso, independentemente disso."
+msgstr "Define o idioma em que a interface da plataforma é apresentada. Em branco significa seguir o padrão da tua escola. As sessões de chat dos cursos aparecem sempre no idioma do curso, independentemente disso."
 
 #: templates/accounts/settings.html:207
 msgid "Save profile"
@@ -278,11 +278,11 @@ msgstr "Voltar ao início"
 
 #: templates/accounts/student_register.html:4
 msgid "Student Registration"
-msgstr "Registo de aluno"
+msgstr "Registo de Estudante"
 
 #: templates/accounts/student_register.html:11
 msgid "Create Student Account"
-msgstr "Criar conta de aluno"
+msgstr "Criar Conta de Estudante"
 
 #: templates/accounts/student_register.html:12
 msgid "Join AI Tutor and start learning today!"
@@ -326,11 +326,11 @@ msgstr "Classe"
 
 #: templates/accounts/student_register.html:91
 msgid "Select grade"
-msgstr "Seleciona a classe"
+msgstr "Selecciona a classe"
 
 #: templates/accounts/student_register.html:100
 msgid "Student ID (optional)"
-msgstr "Número de aluno (opcional)"
+msgstr "Nº de estudante (opcional)"
 
 #: templates/accounts/student_register.html:101
 msgid "e.g., STU-2024-001"
@@ -392,7 +392,7 @@ msgstr "Sair"
 #, fuzzy
 #| msgid "Dashboard"
 msgid "Teacher Dashboard"
-msgstr "Painel"
+msgstr "Painel do professor"
 
 #: templates/dashboard/base.html:585 templates/dashboard/base.html:739
 #: templates/dashboard/home.html:4
@@ -410,13 +410,13 @@ msgstr "Painel"
 #, fuzzy
 #| msgid "I'm a Student"
 msgid "Students"
-msgstr "Sou Estudante"
+msgstr "Alunos"
 
 #: templates/dashboard/base.html:595
 #, fuzzy
 #| msgid "I'm a Student"
 msgid "All Students"
-msgstr "Sou Estudante"
+msgstr "Todos os alunos"
 
 #: templates/dashboard/base.html:601 templates/dashboard/classes/list.html:4
 #: templates/dashboard/classes/list.html:5
@@ -442,7 +442,7 @@ msgstr "Currículo"
 #, fuzzy
 #| msgid "Hours:"
 msgid "Courses"
-msgstr "Horas:"
+msgstr "Cursos"
 
 #: templates/dashboard/base.html:630
 msgid "Reports & Safety"
@@ -478,7 +478,7 @@ msgstr "Qualidade do Conteúdo"
 #, fuzzy
 #| msgid "Achievements"
 msgid "Edit events"
-msgstr "Conquistas"
+msgstr "Editar eventos"
 
 #: templates/dashboard/base.html:694 templates/dashboard/staff_list.html:4
 msgid "Staff"
@@ -488,7 +488,7 @@ msgstr "Equipa"
 #, fuzzy
 #| msgid "Back to home"
 msgid "Back to Tutor"
-msgstr "Voltar ao início"
+msgstr "Voltar ao Tutor"
 
 #: templates/dashboard/base.html:729
 msgid "Open navigation"
@@ -519,7 +519,7 @@ msgstr "Preparação da Turma — %(title)s"
 #, fuzzy, python-format
 #| msgid "Back to Lessons"
 msgid "Back to %(title)s"
-msgstr "Voltar às lições"
+msgstr "Voltar a %(title)s"
 
 #: templates/dashboard/class_readiness.html:137
 msgid "Class Readiness Report"
@@ -596,7 +596,7 @@ msgstr "Turma %(g)s"
 #, fuzzy
 #| msgid "All Schools"
 msgid "All classes"
-msgstr "Todas as escolas"
+msgstr "Todas as turmas"
 
 #: templates/dashboard/classes/detail.html:18
 #, fuzzy, python-format
@@ -627,7 +627,7 @@ msgstr "%(count)s aluno tentou"
 #, fuzzy
 #| msgid "Lessons:"
 msgid "Lessons"
-msgstr "Lições:"
+msgstr "Lições"
 
 #: templates/dashboard/classes/detail.html:43
 msgid "Competency map"
@@ -655,7 +655,7 @@ msgstr "mais recente primeiro · ligações rápidas para monitorizar + relatar"
 #, fuzzy
 #| msgid "Lessons:"
 msgid "Lesson"
-msgstr "Lições:"
+msgstr "Lição"
 
 #: templates/dashboard/classes/detail.html:66
 #: templates/dashboard/curriculum/list.html:29
@@ -664,25 +664,25 @@ msgstr "Lições:"
 #, fuzzy
 #| msgid "Hours:"
 msgid "Course"
-msgstr "Horas:"
+msgstr "Curso"
 
 #: templates/dashboard/classes/detail.html:68
 #: templates/dashboard/reports/overview.html:130
 #, fuzzy
 #| msgid "Session"
 msgid "Sessions"
-msgstr "Sessão"
+msgstr "Sessões"
 
 #: templates/dashboard/classes/detail.html:69
 #, fuzzy
 #| msgid "Get Started"
 msgid "Last started"
-msgstr "Começar"
+msgstr "Última iniciada"
 
 #: templates/dashboard/classes/detail.html:82
 #, python-format
 msgid "%(c)s completed"
-msgstr "%(c)s concluído"
+msgstr "%(c)s concluídas"
 
 #: templates/dashboard/classes/detail.html:86
 #: templates/dashboard/flagged_sessions.html:56
@@ -710,7 +710,7 @@ msgstr "%(count)s aluno em %(g)s"
 #, fuzzy
 #| msgid "Select grade"
 msgid "Select all"
-msgstr "Seleciona a classe"
+msgstr "Seleccionar tudo"
 
 #: templates/dashboard/classes/detail.html:132
 msgid "0 selected"
@@ -720,7 +720,7 @@ msgstr "0 selecionados"
 #, fuzzy
 #| msgid "Confirm Password"
 msgid "Confirm"
-msgstr "Confirmar palavra-passe"
+msgstr "Confirmar"
 
 #: templates/dashboard/classes/detail.html:134
 #: templates/dashboard/curriculum/lesson_create.html:33
@@ -743,7 +743,7 @@ msgstr "Cancelar"
 #, fuzzy
 #| msgid "I'm a Student"
 msgid "Student"
-msgstr "Sou Estudante"
+msgstr "Aluno"
 
 #: templates/dashboard/classes/detail.html:166
 #: templates/dashboard/curriculum/list.html:68
@@ -783,7 +783,7 @@ msgstr "aluno sem classe definida no perfil"
 #, fuzzy
 #| msgid "No subjects available yet"
 msgid "No students yet"
-msgstr "Ainda não há disciplinas disponíveis"
+msgstr "Ainda sem alunos"
 
 #: templates/dashboard/classes/list.html:65
 msgid "Students will appear here once they join and complete their profiles."
@@ -911,7 +911,7 @@ msgstr "Dominado (último ≥ 70%%)"
 #, fuzzy
 #| msgid "Start baseline"
 msgid "Has baseline"
-msgstr "Iniciar diagnóstico"
+msgstr "Tem avaliação inicial"
 
 #: templates/dashboard/competency/student.html:56
 msgid "Has final"
@@ -969,7 +969,7 @@ msgstr "Progresso da Geração de Conteúdo"
 #, fuzzy
 #| msgid "Student Registration"
 msgid "Content Generation"
-msgstr "Registo de aluno"
+msgstr "Geração de Conteúdo"
 
 #: templates/dashboard/curriculum/content_progress.html:90
 #: templates/dashboard/curriculum/media_progress.html:88
@@ -985,7 +985,7 @@ msgstr "Parar a geração de conteúdo? As lições já concluídas serão manti
 #, fuzzy
 #| msgid "Student Registration"
 msgid "Stop Generation"
-msgstr "Registo de aluno"
+msgstr "Parar Geração"
 
 #: templates/dashboard/curriculum/content_progress.html:100
 #: templates/dashboard/curriculum/media_progress.html:92
@@ -993,7 +993,7 @@ msgstr "Registo de aluno"
 #, fuzzy
 #| msgid "Lesson Complete!"
 msgid "Complete"
-msgstr "Lição concluída!"
+msgstr "Concluído"
 
 #: templates/dashboard/curriculum/content_progress.html:104
 #: templates/dashboard/curriculum/list.html:106
@@ -1024,7 +1024,7 @@ msgstr "Registo de Progresso"
 #, fuzzy
 #| msgid "Back to home"
 msgid "Back to Course"
-msgstr "Voltar ao início"
+msgstr "Voltar ao Curso"
 
 #: templates/dashboard/curriculum/content_progress.html:131
 #: templates/dashboard/curriculum/course_detail.html:160
@@ -1033,7 +1033,7 @@ msgstr "Voltar ao início"
 #, fuzzy
 #| msgid "Back to home"
 msgid "Back to Curriculum"
-msgstr "Voltar ao início"
+msgstr "Voltar ao Currículo"
 
 #: templates/dashboard/curriculum/content_progress.html:139
 #: templates/dashboard/curriculum/media_progress.html:125
@@ -1059,7 +1059,7 @@ msgstr "Rascunho"
 #, fuzzy
 #| msgid "No summative exam yet"
 msgid "Summative Exam"
-msgstr "Ainda sem exame sumativo"
+msgstr "Exame Sumativo"
 
 #: templates/dashboard/curriculum/course_detail.html:198
 #: templates/dashboard/reports/overview.html:105
@@ -1070,7 +1070,7 @@ msgstr "Competência e Prontidão da Turma"
 #, fuzzy
 #| msgid "Hours:"
 msgid "Edit Course"
-msgstr "Horas:"
+msgstr "Editar Curso"
 
 #: templates/dashboard/curriculum/course_detail.html:204
 msgid "Publish all lessons in this course?"
@@ -1080,7 +1080,7 @@ msgstr "Publicar todas as lições deste curso?"
 #, fuzzy
 #| msgid "Publish"
 msgid "Publish All"
-msgstr "Publicar"
+msgstr "Publicar Tudo"
 
 #: templates/dashboard/curriculum/course_detail.html:208
 msgid "Unpublish all lessons in this course?"
@@ -1090,7 +1090,7 @@ msgstr "Despublicar todas as lições deste curso?"
 #, fuzzy
 #| msgid "Unpublish"
 msgid "Unpublish All"
-msgstr "Despublicar"
+msgstr "Despublicar Tudo"
 
 #: templates/dashboard/curriculum/course_detail.html:212
 #, fuzzy
@@ -1098,7 +1098,7 @@ msgstr "Despublicar"
 #| "Are you sure you want to delete your account? This action is permanent "
 #| "and cannot be undone."
 msgid "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone."
-msgstr "Tens a certeza de que queres eliminar a tua conta? Esta ação é permanente e não pode ser desfeita."
+msgstr "Tens a certeza de que queres eliminar este curso e TODAS as suas unidades, lições e conteúdos? Esta ação não pode ser desfeita."
 
 #: templates/dashboard/curriculum/course_detail.html:212
 #: templates/dashboard/curriculum/step_edit.html:161
@@ -1108,19 +1108,19 @@ msgstr "Tens a certeza de que queres eliminar a tua conta? Esta ação é perman
 #, fuzzy
 #| msgid "Delete account"
 msgid "Delete"
-msgstr "Eliminar conta"
+msgstr "Eliminar"
 
 #: templates/dashboard/curriculum/course_detail.html:340
 #, fuzzy
 #| msgid "Session"
 msgid "Total Lessons"
-msgstr "Sessão"
+msgstr "Total de Lições"
 
 #: templates/dashboard/curriculum/course_detail.html:344
 #, fuzzy
 #| msgid "Generate Summative"
 msgid "With Content"
-msgstr "Gerar Sumativo"
+msgstr "Com Conteúdo"
 
 #: templates/dashboard/curriculum/course_detail.html:348
 msgid "Media Assets"
@@ -1130,25 +1130,25 @@ msgstr "Recursos Multimédia"
 #, fuzzy
 #| msgid "Pending"
 msgid "Media Pending"
-msgstr "Pendente"
+msgstr "Multimédia Pendente"
 
 #: templates/dashboard/curriculum/course_detail.html:356
 #, fuzzy
 #| msgid "Student Progress"
 msgid "Content Progress"
-msgstr "Progresso do aluno"
+msgstr "Progresso do Conteúdo"
 
 #: templates/dashboard/curriculum/course_detail.html:366
 #, fuzzy, python-format
 #| msgid "%(c)s completed"
 msgid "%(pct)s%% complete"
-msgstr "%(c)s concluído"
+msgstr "%(pct)s%% concluído"
 
 #: templates/dashboard/curriculum/lesson_create.html:4
 #, fuzzy
 #| msgid "Lessons:"
 msgid "Add Lesson"
-msgstr "Lições:"
+msgstr "Adicionar Lição"
 
 #: templates/dashboard/curriculum/lesson_create.html:5
 #, python-format
@@ -1164,7 +1164,7 @@ msgstr "Nova Lição em \"%(title)s\""
 #, fuzzy
 #| msgid "Lesson Complete!"
 msgid "Lesson Title *"
-msgstr "Lição concluída!"
+msgstr "Título da Lição *"
 
 #: templates/dashboard/curriculum/lesson_create.html:22
 msgid "e.g., Earth Internal Layers"
@@ -1186,25 +1186,25 @@ msgstr "O que devem os alunos ser capazes de fazer após concluir esta lição?"
 #, fuzzy
 #| msgid "Create one"
 msgid "Create Lesson"
-msgstr "Cria uma"
+msgstr "Criar Lição"
 
 #: templates/dashboard/curriculum/lesson_detail.html:233
 #, fuzzy
 #| msgid "Published"
 msgid "✓ Published"
-msgstr "Publicado"
+msgstr "✓ Publicado"
 
 #: templates/dashboard/curriculum/lesson_detail.html:238
 #, fuzzy
 #| msgid "Approve"
 msgid "✓ Approved"
-msgstr "Aprovar"
+msgstr "✓ Aprovado"
 
 #: templates/dashboard/curriculum/lesson_detail.html:249
 #, fuzzy
 #| msgid "Generate Summative"
 msgid "Approve Content"
-msgstr "Gerar Sumativo"
+msgstr "Aprovar Conteúdo"
 
 #: templates/dashboard/curriculum/lesson_detail.html:256
 #: templates/dashboard/summative/review.html:37
@@ -1220,7 +1220,7 @@ msgstr "Despublicar"
 #, fuzzy
 #| msgid "Manage your account."
 msgid "Manage your courses and lessons"
-msgstr "Gere a tua conta."
+msgstr "Gere os teus cursos e lições"
 
 #: templates/dashboard/curriculum/list.html:15
 #: templates/dashboard/curriculum/list.html:143
@@ -1280,7 +1280,7 @@ msgstr "Blocos"
 #, fuzzy
 #| msgid "Lesson Complete!"
 msgid "Completed"
-msgstr "Lição concluída!"
+msgstr "Concluído"
 
 #: templates/dashboard/curriculum/list.html:104
 msgid "Processing"
@@ -1329,13 +1329,13 @@ msgstr "A gerar imagens para cada passo da lição..."
 #, fuzzy
 #| msgid "Curriculum"
 msgid "Processing Curriculum"
-msgstr "Currículo"
+msgstr "A processar currículo"
 
 #: templates/dashboard/curriculum/process.html:213
 #, fuzzy, python-format
 #| msgid "Curriculum"
 msgid "%(subj)s Curriculum"
-msgstr "Currículo"
+msgstr "Currículo de %(subj)s"
 
 #: templates/dashboard/curriculum/process.html:222
 #: templates/dashboard/curriculum/step_edit.html:132
@@ -1354,13 +1354,13 @@ msgstr "Rever estrutura"
 #, fuzzy
 #| msgid "Create one"
 msgid "Create Records"
-msgstr "Cria uma"
+msgstr "Criar registos"
 
 #: templates/dashboard/curriculum/process.html:245
 #, fuzzy
 #| msgid "Generate Summative"
 msgid "Generate Content"
-msgstr "Gerar Sumativo"
+msgstr "Gerar conteúdo"
 
 #: templates/dashboard/curriculum/process.html:258
 msgid "Curriculum Processing Complete!"
@@ -1374,19 +1374,19 @@ msgstr "O teu currículo foi processado e o conteúdo das lições foi gerado."
 #, fuzzy
 #| msgid "Step"
 msgid "Steps"
-msgstr "Passo"
+msgstr "Passos"
 
 #: templates/dashboard/curriculum/process.html:278
 #, fuzzy
 #| msgid "Hours:"
 msgid "View Course"
-msgstr "Horas:"
+msgstr "Ver curso"
 
 #: templates/dashboard/curriculum/process.html:288
 #, fuzzy
 #| msgid "Back to home"
 msgid "Extract & Parse Curriculum"
-msgstr "Voltar ao início"
+msgstr "Extrair e analisar currículo"
 
 #: templates/dashboard/curriculum/process.html:291
 msgid "We will extract text from your document and identify units and lessons using AI."
@@ -1404,7 +1404,7 @@ msgstr "Pronto"
 #, fuzzy
 #| msgid "Processing"
 msgid "Start Processing"
-msgstr "A processar"
+msgstr "Iniciar processamento"
 
 #: templates/dashboard/curriculum/step_edit.html:4
 msgid "Edit Step"
@@ -1467,7 +1467,7 @@ msgstr "O que o AI Tutor diz para explicar conceitos."
 #, fuzzy
 #| msgid "Student ID (optional)"
 msgid "Question (optional)"
-msgstr "Número de aluno (opcional)"
+msgstr "Pergunta (opcional)"
 
 #: templates/dashboard/curriculum/step_edit.html:95
 msgid "Expected Answer"
@@ -1535,7 +1535,7 @@ msgstr "Substituir"
 #, fuzzy, python-format
 #| msgid "Last name"
 msgid "last: %(name)s"
-msgstr "Apelido"
+msgstr "último: %(name)s"
 
 #: templates/dashboard/curriculum/step_edit.html:170
 msgid "No media attached to this step."
@@ -1545,7 +1545,7 @@ msgstr "Nenhum ficheiro anexado a este passo."
 #, fuzzy
 #| msgid "Image"
 msgid "Add Image"
-msgstr "Imagem"
+msgstr "Adicionar imagem"
 
 #: templates/dashboard/curriculum/step_edit.html:178
 msgid "Upload a custom image for this step"
@@ -1581,7 +1581,7 @@ msgstr "ex.: Estrutura da Terra e Tectónica de Placas"
 #, fuzzy
 #| msgid "Student ID (optional)"
 msgid "Description (optional)"
-msgstr "Número de aluno (opcional)"
+msgstr "Descrição (opcional)"
 
 #: templates/dashboard/curriculum/unit_create.html:27
 msgid "Brief description of what this unit covers"
@@ -1591,13 +1591,13 @@ msgstr "Breve descrição do que esta unidade aborda"
 #, fuzzy
 #| msgid "Create one"
 msgid "Create Unit"
-msgstr "Cria uma"
+msgstr "Criar unidade"
 
 #: templates/dashboard/curriculum/upload.html:238
 #, fuzzy
 #| msgid "Last Name"
 msgid "Platform-wide upload"
-msgstr "Apelido"
+msgstr "Carregamento para toda a plataforma"
 
 #: templates/dashboard/curriculum/upload.html:238
 msgid "This curriculum will be shared across all schools (read-only for staff). To upload for a specific school, select it from the dropdown above."
@@ -1607,7 +1607,7 @@ msgstr "Este currículo será partilhado por todas as escolas (apenas leitura pa
 #, fuzzy
 #| msgid "Curriculum"
 msgid "Curriculum Document"
-msgstr "Currículo"
+msgstr "Documento do currículo"
 
 #: templates/dashboard/curriculum/upload.html:256
 msgid "Drop your file here"
@@ -1621,7 +1621,7 @@ msgstr "ou clica para procurar (PDF, DOCX, TXT)"
 #, fuzzy
 #| msgid "My Subjects"
 msgid "Subject"
-msgstr "As minhas disciplinas"
+msgstr "Disciplina"
 
 #: templates/dashboard/curriculum/upload.html:280
 msgid "— Select subject —"
@@ -1639,14 +1639,14 @@ msgstr "Define a língua em que o AI Tutor responde neste curso, bem como a lín
 #, fuzzy
 #| msgid "First name"
 msgid "Display name"
-msgstr "Nome"
+msgstr "Nome a mostrar"
 
 #: templates/dashboard/curriculum/upload.html:305
 #: templates/dashboard/materials/process.html:151
 #, fuzzy
 #| msgid "Email (Optional)"
 msgid "(optional)"
-msgstr "E-mail (opcional)"
+msgstr "(opcional)"
 
 #: templates/dashboard/curriculum/upload.html:307
 msgid "auto-derived from subject above (e.g. Geography)"
@@ -1660,7 +1660,7 @@ msgstr "Deixa em branco para usar o nome da disciplina. O título do curso fica 
 #, fuzzy
 #| msgid "Grade Level"
 msgid "Grade Levels to Process"
-msgstr "Classe"
+msgstr "Classes a processar"
 
 #: templates/dashboard/curriculum/upload.html:324
 msgid "Select which grade levels to extract. The document will be analyzed once and separate courses created per level."
@@ -1739,7 +1739,7 @@ msgstr "Serão gerados bilhetes de saída e conteúdos"
 #, fuzzy
 #| msgid "Ready to process"
 msgid "Upload & Process"
-msgstr "Pronto para processar"
+msgstr "Carregar e processar"
 
 #: templates/dashboard/exit_ticket_figure_edit.html:4
 msgid "Edit figure — Exit ticket question"
@@ -1753,7 +1753,7 @@ msgstr "Editar figura"
 #, fuzzy
 #| msgid "Back to Lessons"
 msgid "Back to lesson"
-msgstr "Voltar às lições"
+msgstr "Voltar à lição"
 
 #: templates/dashboard/exit_ticket_figure_edit.html:42
 #, python-format
@@ -1793,7 +1793,7 @@ msgstr "Modelo:"
 #, fuzzy
 #| msgid "Image"
 msgid "Image model"
-msgstr "Imagem"
+msgstr "Modelo de imagem"
 
 #: templates/dashboard/exit_ticket_figure_edit.html:80
 msgid "Generate & save"
@@ -1921,7 +1921,7 @@ msgstr "Sessão Sinalizada - %(first)s %(last)s"
 #, fuzzy
 #| msgid "Session"
 msgid "Flagged Session"
-msgstr "Sessão"
+msgstr "Sessão sinalizada"
 
 #: templates/dashboard/flagged_session_detail.html:9
 msgid "Back to Flagged Chats"
@@ -1983,7 +1983,7 @@ msgstr "Estado:"
 #, fuzzy
 #| msgid "Review Lesson"
 msgid "Reviewed"
-msgstr "Rever lição"
+msgstr "Revisto"
 
 #: templates/dashboard/flagged_sessions.html:38
 msgid "Flag Reason"
@@ -2015,13 +2015,13 @@ msgstr "Não foram encontradas sessões de conversa sinalizadas para este filtro
 #, fuzzy
 #| msgid "Dashboard"
 msgid "Dashboard Overview"
-msgstr "Painel"
+msgstr "Visão Geral"
 
 #: templates/dashboard/home.html:11
 #, fuzzy
 #| msgid "I'm a Student"
 msgid "Total Students"
-msgstr "Sou Estudante"
+msgstr "Total de Alunos"
 
 #: templates/dashboard/home.html:13
 #, python-format
@@ -2041,7 +2041,7 @@ msgstr "%(count)s concluídas"
 #, fuzzy
 #| msgid "Lesson Complete!"
 msgid "Avg Lesson Competency"
-msgstr "Lição concluída!"
+msgstr "Competência Média da Aula"
 
 #: templates/dashboard/home.html:28
 #, python-format
@@ -2057,7 +2057,7 @@ msgstr "%(pct)s%% dos alunos ativos dominaram ≥1 lição"
 #, fuzzy
 #| msgid "Student Registration"
 msgid "Students At Risk"
-msgstr "Registo de aluno"
+msgstr "Alunos em Risco"
 
 #: templates/dashboard/home.html:36
 msgid "No activity in 7+ days"
@@ -2093,7 +2093,7 @@ msgstr "Monitor ao Vivo"
 #, fuzzy
 #| msgid "Back to Lessons"
 msgid "Back to Lesson"
-msgstr "Voltar às lições"
+msgstr "Voltar à Aula"
 
 #: templates/dashboard/lesson_monitor.html:220
 msgid "Live Session Monitor"
@@ -2104,7 +2104,7 @@ msgstr "Monitor de Sessões ao Vivo"
 #, fuzzy
 #| msgid "Session"
 msgid "Session Report"
-msgstr "Sessão"
+msgstr "Relatório da Sessão"
 
 #: templates/dashboard/lesson_monitor.html:230
 #: templates/dashboard/settings.html:297 templates/dashboard/settings.html:401
@@ -2114,7 +2114,7 @@ msgstr "Ativa"
 
 #: templates/dashboard/lesson_monitor.html:234
 msgid "Idle"
-msgstr "Inativa"
+msgstr "Inativo"
 
 #: templates/dashboard/lesson_monitor.html:246
 msgid "Total"
@@ -2183,13 +2183,13 @@ msgstr "REPROVADO"
 #, fuzzy
 #| msgid "Viewing as:"
 msgid "View Chat"
-msgstr "A ver como:"
+msgstr "Ver Conversa"
 
 #: templates/dashboard/lesson_monitor.html:297
 #, fuzzy
 #| msgid "Review Lesson"
 msgid "Review"
-msgstr "Rever lição"
+msgstr "Rever"
 
 #: templates/dashboard/lesson_monitor.html:305
 msgid "No sessions found for this lesson yet."
@@ -2203,25 +2203,25 @@ msgstr "Atualiza automaticamente a cada 10 segundos para sessões ativas."
 #, fuzzy, python-format
 #| msgid "Live Monitor — %(title)s"
 msgid "Session Report — %(title)s"
-msgstr "Monitor ao Vivo — %(title)s"
+msgstr "Relatório da Sessão — %(title)s"
 
 #: templates/dashboard/lesson_session_report.html:278
 #, fuzzy, python-format
 #| msgid "Session"
 msgid "Session Report: %(title)s"
-msgstr "Sessão"
+msgstr "Relatório da Sessão: %(title)s"
 
 #: templates/dashboard/lesson_session_report.html:290
 #, fuzzy
 #| msgid "Exit Ticket"
 msgid "Took Exit Ticket"
-msgstr "Bilhete de Saída"
+msgstr "Fez o Bilhete de Saída"
 
 #: templates/dashboard/lesson_session_report.html:294
 #, fuzzy
 #| msgid "Competency"
 msgid "Avg Competency"
-msgstr "Competência"
+msgstr "Competência Média"
 
 #: templates/dashboard/lesson_session_report.html:294
 msgid "(assessed only)"
@@ -2231,13 +2231,13 @@ msgstr "(apenas avaliados)"
 #, fuzzy, python-format
 #| msgid "pass %(pct)s%%"
 msgid "Below %(pct)s%%"
-msgstr "aprovação %(pct)s%%"
+msgstr "Abaixo de %(pct)s%%"
 
 #: templates/dashboard/lesson_session_report.html:302
 #, fuzzy
 #| msgid "not assessed"
 msgid "Unassessed"
-msgstr "não avaliado"
+msgstr "Não avaliado"
 
 #: templates/dashboard/lesson_session_report.html:339
 #, python-format
@@ -2263,7 +2263,7 @@ msgstr "Nova Lição em \"%(title)s\""
 #, fuzzy
 #| msgid "Review Lesson"
 msgid "Review This Lesson"
-msgstr "Rever lição"
+msgstr "Rever Esta Aula"
 
 #: templates/dashboard/lesson_session_report.html:365
 msgid "Students by Competency Category"
@@ -2273,13 +2273,13 @@ msgstr "Alunos por Categoria de Competência"
 #, fuzzy
 #| msgid "Institution"
 msgid "Instruction:"
-msgstr "Instituição"
+msgstr "Instrução:"
 
 #: templates/dashboard/lesson_session_report.html:399
 #, fuzzy, python-format
 #| msgid "Exit Ticket Review — %(name)s"
 msgid "Exit ticket: %(score)s · %(time)s"
-msgstr "Revisão do Bilhete de Saída — %(name)s"
+msgstr "Bilhete de saída: %(score)s · %(time)s"
 
 #: templates/dashboard/lesson_session_report.html:402
 #: templates/dashboard/summative/review.html:161
@@ -2290,20 +2290,20 @@ msgstr "Não realizada"
 #, fuzzy
 #| msgid "No subjects available yet"
 msgid "No student session data available yet."
-msgstr "Ainda não há disciplinas disponíveis"
+msgstr "Ainda não há dados de sessões dos alunos."
 
 #: templates/dashboard/lesson_session_report.html:426
 #, fuzzy, python-format
 #| msgid "All Groups (%(count)s)"
 msgid "👥 Group Sessions (%(count)s)"
-msgstr "Todos os Grupos (%(count)s)"
+msgstr "👥 Sessões em Grupo (%(count)s)"
 
 #: templates/dashboard/lesson_session_report.html:431
 #: templates/dashboard/lesson_session_report.html:440
 #, fuzzy
 #| msgid "Start"
 msgid "Started"
-msgstr "Começar"
+msgstr "Iniciado"
 
 #: templates/dashboard/lesson_session_report.html:432
 #: templates/dashboard/lesson_session_report.html:441
@@ -2314,19 +2314,19 @@ msgstr "Participantes"
 #, fuzzy
 #| msgid "Lesson Complete!"
 msgid "✓ completed"
-msgstr "Lição concluída!"
+msgstr "✓ concluído"
 
 #: templates/dashboard/lesson_session_report.html:448
 #, fuzzy
 #| msgid "In Progress"
 msgid "in progress"
-msgstr "Em curso"
+msgstr "em curso"
 
 #: templates/dashboard/lesson_session_report.html:452
 #, fuzzy
 #| msgid "Viewing as:"
 msgid "View chat"
-msgstr "A ver como:"
+msgstr "Ver conversa"
 
 #: templates/dashboard/materials/_confirm_card.html:12
 msgid "⚠️ Above warn threshold"
@@ -2352,7 +2352,7 @@ msgstr "Duração est."
 #, fuzzy
 #| msgid "15 min"
 msgid "min"
-msgstr "15 min"
+msgstr "min"
 
 #: templates/dashboard/materials/_confirm_card.html:29
 #, python-format
@@ -2440,7 +2440,7 @@ msgstr "Nome original do ficheiro:"
 #, fuzzy
 #| msgid "My Subjects"
 msgid "Subject:"
-msgstr "As minhas disciplinas"
+msgstr "Disciplina:"
 
 #: templates/dashboard/materials/process.html:171
 msgid "Uploaded:"
@@ -2492,7 +2492,7 @@ msgstr "Etiqueta:"
 #, fuzzy
 #| msgid "Lessons:"
 msgid "Lesson ID:"
-msgstr "Lições:"
+msgstr "ID da lição:"
 
 #: templates/dashboard/quality/content_edit_dashboard.html:48
 #: templates/dashboard/quality/content_edit_events_list.html:49
@@ -2548,7 +2548,7 @@ msgstr "Suporte"
 #, fuzzy
 #| msgid "Session"
 msgid "Precision"
-msgstr "Sessão"
+msgstr "Precisão"
 
 #: templates/dashboard/quality/content_edit_dashboard.html:149
 msgid "Recall"
@@ -2572,7 +2572,7 @@ msgstr "Evento de Edição de Conteúdo #%(id)s"
 #, fuzzy
 #| msgid "Back to Lessons"
 msgid "Back to all events"
-msgstr "Voltar às lições"
+msgstr "Voltar a todos os eventos"
 
 #: templates/dashboard/quality/content_edit_event_detail.html:12
 #, python-format
@@ -2587,7 +2587,7 @@ msgstr "em"
 #, fuzzy, python-format
 #| msgid "Welcome, %(name)s!"
 msgid "by %(name)s"
-msgstr "Olá, %(name)s!"
+msgstr "por %(name)s"
 
 #: templates/dashboard/quality/content_edit_event_detail.html:24
 msgid "Before"
@@ -2614,7 +2614,7 @@ msgstr "Sugerido automaticamente:"
 #, fuzzy
 #| msgid "Student ID (optional)"
 msgid "Notes (optional)"
-msgstr "Número de aluno (opcional)"
+msgstr "Notas (opcional)"
 
 #: templates/dashboard/quality/content_edit_event_detail.html:67
 msgid "Save tags + notes"
@@ -2742,7 +2742,7 @@ msgstr "Desempenho na Lição"
 #, fuzzy
 #| msgid "More options"
 msgid "Completions"
-msgstr "Mais opções"
+msgstr "Conclusões"
 
 #: templates/dashboard/reports/overview.html:169
 msgid "Success Rate"
@@ -2765,13 +2765,13 @@ msgstr "Histórico de Conversas"
 #, fuzzy
 #| msgid "Back to home"
 msgid "Back to Monitor"
-msgstr "Voltar ao início"
+msgstr "Voltar ao Monitor"
 
 #: templates/dashboard/session_chat_history.html:193
 #, fuzzy, python-format
 #| msgid "due Sunday %(date)s"
 msgid "Started %(date)s"
-msgstr "até domingo %(date)s"
+msgstr "Iniciado em %(date)s"
 
 #: templates/dashboard/session_chat_history.html:206
 msgid "Active Duration"
@@ -2779,14 +2779,14 @@ msgstr "Duração Ativa"
 
 #: templates/dashboard/session_chat_history.html:224
 msgid "Exit Ticket"
-msgstr "Bilhete de Saída"
+msgstr "Ficha de Saída"
 
 #: templates/dashboard/session_chat_history.html:229
 #: templates/dashboard/summative/review.html:163
 #, fuzzy
 #| msgid "Password"
 msgid "Passed"
-msgstr "Palavra-passe"
+msgstr "Aprovado"
 
 #: templates/dashboard/session_chat_history.html:229
 msgid "Did not pass"
@@ -2803,7 +2803,7 @@ msgstr "Sem mensagens nesta sessão."
 #: templates/dashboard/session_exit_review.html:3
 #, python-format
 msgid "Exit Ticket Review — %(name)s"
-msgstr "Revisão do Bilhete de Saída — %(name)s"
+msgstr "Revisão da Ficha de Saída — %(name)s"
 
 #: templates/dashboard/session_exit_review.html:4
 msgid "Exit Ticket Review"
@@ -2813,7 +2813,7 @@ msgstr "Revisão do Bilhete de Saída"
 #, fuzzy
 #| msgid "Back to Lessons"
 msgid "Back to Live Monitor"
-msgstr "Voltar às lições"
+msgstr "Voltar ao Monitor ao Vivo"
 
 #: templates/dashboard/session_exit_review.html:177
 #, python-format
@@ -2828,7 +2828,7 @@ msgstr "(mais recente mostrado)"
 #, fuzzy, python-format
 #| msgid "due Sunday %(date)s"
 msgid "Submitted %(date)s"
-msgstr "até domingo %(date)s"
+msgstr "Submetido em %(date)s"
 
 #: templates/dashboard/session_exit_review.html:181
 msgid "View Chat Transcript"
@@ -2858,7 +2858,7 @@ msgstr "✗ Incorreto"
 #, fuzzy
 #| msgid "Student Sign In"
 msgid "Student picked"
-msgstr "Entrada do Estudante"
+msgstr "O aluno escolheu"
 
 #: templates/dashboard/session_exit_review.html:216
 msgid "Correct"
@@ -2908,7 +2908,7 @@ msgstr "Dados mostrados ao aluno"
 #, fuzzy
 #| msgid "Student Sign In"
 msgid "Student answer"
-msgstr "Entrada do Estudante"
+msgstr "Resposta do aluno"
 
 #: templates/dashboard/session_exit_review.html:264
 msgid "Expected answer"
@@ -2938,13 +2938,13 @@ msgstr "Não há dados de perguntas disponíveis para esta tentativa."
 #, fuzzy
 #| msgid "Settings"
 msgid "School Settings"
-msgstr "Definições"
+msgstr "Definições da Escola"
 
 #: templates/dashboard/settings.html:22 templates/dashboard/settings.html:326
 #, fuzzy
 #| msgid "School"
 msgid "School Name"
-msgstr "Escola"
+msgstr "Nome da Escola"
 
 #: templates/dashboard/settings.html:27 templates/dashboard/settings.html:287
 #: templates/dashboard/settings.html:334
@@ -2963,13 +2963,13 @@ msgstr "Seleciona uma escola específica na lista acima para editar as suas defi
 #, fuzzy
 #| msgid "Account"
 msgid "Your Account"
-msgstr "Conta"
+msgstr "A Tua Conta"
 
 #: templates/dashboard/settings.html:84
 #, fuzzy, python-format
 #| msgid "due Sunday %(date)s"
 msgid "Member since %(date)s"
-msgstr "até domingo %(date)s"
+msgstr "Membro desde %(date)s"
 
 #: templates/dashboard/settings.html:96
 #, fuzzy
@@ -2978,37 +2978,37 @@ msgstr "até domingo %(date)s"
 #| "school's default. Course chat sessions always render in the course's "
 #| "language regardless."
 msgid "Sets the platform UI language for your account. Blank follows your school's default. Course chat sessions always render in the course's language."
-msgstr "Define o idioma em que a interface da plataforma é exibida. Em branco significa seguir a predefinição da tua escola. As sessões de chat dos cursos são sempre apresentadas no idioma do curso, independentemente disso."
+msgstr "Define o idioma da interface da plataforma para a tua conta. Em branco segue o padrão da tua escola. As sessões de chat do curso são sempre apresentadas no idioma do curso."
 
 #: templates/dashboard/settings.html:103
 #, fuzzy
 #| msgid "Save profile"
 msgid "Save Profile"
-msgstr "Guardar perfil"
+msgstr "Guardar Perfil"
 
 #: templates/dashboard/settings.html:113 templates/dashboard/settings.html:133
 #, fuzzy
 #| msgid "Change password"
 msgid "Change Password"
-msgstr "Alterar palavra-passe"
+msgstr "Alterar Palavra-passe"
 
 #: templates/dashboard/settings.html:117
 #, fuzzy
 #| msgid "Current password"
 msgid "Current Password"
-msgstr "Palavra-passe atual"
+msgstr "Palavra-passe Atual"
 
 #: templates/dashboard/settings.html:122
 #, fuzzy
 #| msgid "New password"
 msgid "New Password"
-msgstr "Nova palavra-passe"
+msgstr "Nova Palavra-passe"
 
 #: templates/dashboard/settings.html:126
 #, fuzzy
 #| msgid "Confirm new password"
 msgid "Confirm New Password"
-msgstr "Confirma a nova palavra-passe"
+msgstr "Confirmar Nova Palavra-passe"
 
 #: templates/dashboard/settings.html:140
 msgid "Danger Zone"
@@ -3024,7 +3024,7 @@ msgstr "As contas de Super Admin não podem ser eliminadas a partir desta págin
 #| "Permanently remove your account and all data we hold for you. This cannot "
 #| "be undone."
 msgid "Permanently delete your account and all associated data. This action cannot be undone."
-msgstr "Remove permanentemente a tua conta e todos os dados que temos sobre ti. Isto não pode ser desfeito."
+msgstr "Elimina permanentemente a tua conta e todos os dados associados. Esta ação não pode ser desfeita."
 
 #: templates/dashboard/settings.html:151
 msgid "Are you sure you want to delete your account? This action is permanent and cannot be undone."
@@ -3034,7 +3034,7 @@ msgstr "Tens a certeza de que queres eliminar a tua conta? Esta ação é perman
 #, fuzzy
 #| msgid "Delete my account"
 msgid "Delete My Account"
-msgstr "Eliminar a minha conta"
+msgstr "Eliminar a Minha Conta"
 
 #: templates/dashboard/settings.html:169
 msgid "Appearance & Branding"
@@ -3044,19 +3044,19 @@ msgstr "Aparência e Identidade"
 #, fuzzy
 #| msgid "Last Name"
 msgid "Platform Name"
-msgstr "Apelido"
+msgstr "Nome da Plataforma"
 
 #: templates/dashboard/settings.html:181
 #, fuzzy
 #| msgid "Logout"
 msgid "Logo"
-msgstr "Sair"
+msgstr "Logótipo"
 
 #: templates/dashboard/settings.html:184
 #, fuzzy
 #| msgid "Current password"
 msgid "Current logo"
-msgstr "Palavra-passe atual"
+msgstr "Logótipo atual"
 
 #: templates/dashboard/settings.html:186
 msgid "Remove logo"
@@ -3159,7 +3159,7 @@ msgstr "Guardar Limiares"
 #, fuzzy
 #| msgid "All Schools"
 msgid "Manage Schools"
-msgstr "Todas as escolas"
+msgstr "Gerir Escolas"
 
 #: templates/dashboard/settings.html:281
 msgid "Each school is a separate institution. Students and staff belong to specific schools."
@@ -3171,7 +3171,7 @@ msgstr "Cada escola é uma instituição separada. Alunos e funcionários perten
 #, fuzzy
 #| msgid "Last Name"
 msgid "Name"
-msgstr "Apelido"
+msgstr "Nome"
 
 #: templates/dashboard/settings.html:287 templates/dashboard/settings.html:330
 msgid "Slug"
@@ -3180,7 +3180,7 @@ msgstr "Slug"
 #: templates/dashboard/settings.html:299 templates/dashboard/settings.html:405
 #: templates/dashboard/settings.html:692 templates/dashboard/staff_list.html:38
 msgid "Inactive"
-msgstr "Inativa"
+msgstr "Inativo"
 
 #: templates/dashboard/settings.html:308 templates/dashboard/settings.html:431
 msgid "Deactivate"
@@ -3206,7 +3206,7 @@ msgstr "ex. mont-fleuri"
 #, fuzzy
 #| msgid "All Schools"
 msgid "Add School"
-msgstr "Todas as escolas"
+msgstr "Adicionar Escola"
 
 #: templates/dashboard/settings.html:352
 msgid "Manage Users"
@@ -3251,25 +3251,25 @@ msgstr "Ainda não há outros utilizadores."
 #, fuzzy
 #| msgid "Create Student Account"
 msgid "Create Super Admin"
-msgstr "Criar conta de aluno"
+msgstr "Criar Super Admin"
 
 #: templates/dashboard/settings.html:472
 #, fuzzy
 #| msgid "At least 6 characters"
 msgid "Min 6 characters"
-msgstr "Pelo menos 6 caracteres"
+msgstr "Mín. 6 caracteres"
 
 #: templates/dashboard/settings.html:475
 #, fuzzy
 #| msgid "Create one"
 msgid "Create Admin"
-msgstr "Cria uma"
+msgstr "Criar Admin"
 
 #: templates/dashboard/settings.html:489
 #, fuzzy
 #| msgid "Grade Level"
 msgid "Grade Levels"
-msgstr "Classe"
+msgstr "Níveis de Ensino"
 
 #: templates/dashboard/settings.html:489 templates/dashboard/settings.html:663
 #: templates/dashboard/settings.html:734
@@ -3292,7 +3292,7 @@ msgstr "+ Adicionar Nível"
 #, fuzzy
 #| msgid "Grade Level"
 msgid "Save Grade Levels"
-msgstr "Classe"
+msgstr "Guardar Níveis"
 
 #: templates/dashboard/settings.html:516
 msgid "Student Tutoring Model"
@@ -3451,7 +3451,7 @@ msgstr "Guardar Prompts da AI"
 #, fuzzy
 #| msgid "Account"
 msgid "Staff Accounts"
-msgstr "Conta"
+msgstr "Contas de Pessoal"
 
 #: templates/dashboard/staff_list.html:10
 msgid "Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail."
@@ -3478,7 +3478,7 @@ msgstr "Administrador"
 #, fuzzy
 #| msgid "New password"
 msgid "Reset password"
-msgstr "Nova palavra-passe"
+msgstr "Repor palavra-passe"
 
 #: templates/dashboard/staff_list.html:51
 #, python-format
@@ -3501,7 +3501,7 @@ msgstr "Enviar link de redefinição por e-mail"
 #, fuzzy
 #| msgid "Change password"
 msgid "Show a temporary password"
-msgstr "Alterar palavra-passe"
+msgstr "Mostrar palavra-passe temporária"
 
 #: templates/dashboard/staff_list.html:82
 msgid "Copy it and share with the user. They will be forced to change it on next login."
@@ -3515,7 +3515,7 @@ msgstr "A processar…"
 #, fuzzy
 #| msgid "Used for password reset."
 msgid "Temporary password for"
-msgstr "Usado para repor a palavra-passe."
+msgstr "Palavra-passe temporária para"
 
 #: templates/dashboard/staff_list.html:90
 msgid "Copy"
@@ -3571,7 +3571,7 @@ msgstr "esconde o botão de adicionar aluno — cada aluno tem aulas sozinho no 
 #, fuzzy
 #| msgid "Save profile"
 msgid "Save mode"
-msgstr "Guardar perfil"
+msgstr "Modo de gravação"
 
 #: templates/dashboard/student_groups/list.html:83
 msgid "Pick a specific school in the school picker to configure session mode."
@@ -3589,7 +3589,7 @@ msgstr "Escolhe qualquer número de alunos. Um aluno que esteja num grupo ativo 
 #, fuzzy
 #| msgid "First name"
 msgid "Group name"
-msgstr "Nome"
+msgstr "Nome do grupo"
 
 #: templates/dashboard/student_groups/list.html:101
 msgid "e.g., Pair A, Group 3, Maths Pair S2-1"
@@ -3608,7 +3608,7 @@ msgstr "Ainda não há alunos nesta escola."
 #, fuzzy
 #| msgid "Create one"
 msgid "Create Group"
-msgstr "Cria uma"
+msgstr "Criar Grupo"
 
 #: templates/dashboard/student_groups/list.html:129
 #, python-format
@@ -3648,7 +3648,7 @@ msgstr "Ainda não há alunos — clica em Editar para adicionar."
 #, fuzzy
 #| msgid "Username"
 msgid "Rename"
-msgstr "Nome de utilizador"
+msgstr "Renomear"
 
 #: templates/dashboard/student_groups/list.html:166
 msgid "Members (overwrites existing)"
@@ -3664,13 +3664,13 @@ msgstr "Ainda não há grupos. Usa o formulário acima para criar um."
 
 #: templates/dashboard/students/detail.html:5
 msgid "Student Progress"
-msgstr "Progresso do aluno"
+msgstr "Progresso do Aluno"
 
 #: templates/dashboard/students/detail.html:13
 #, fuzzy
 #| msgid "Back to Lessons"
 msgid "Back to Students"
-msgstr "Voltar às lições"
+msgstr "Voltar aos Alunos"
 
 #: templates/dashboard/students/detail.html:35
 #: templates/dashboard/students/detail.html:45
@@ -3687,18 +3687,18 @@ msgstr "Eliminar permanentemente a conta do aluno &quot;%(name)s&quot;? Isto rem
 #, fuzzy
 #| msgid "Delete account"
 msgid "Delete student"
-msgstr "Eliminar conta"
+msgstr "Eliminar aluno"
 
 #: templates/dashboard/students/detail.html:72
 #, fuzzy
 #| msgid "Session"
 msgid "Total Sessions"
-msgstr "Sessão"
+msgstr "Total de Sessões"
 
 #: templates/dashboard/students/detail.html:80
 #: templates/dashboard/students/detail.html:182
 msgid "In Progress"
-msgstr "Em curso"
+msgstr "Em Curso"
 
 #: templates/dashboard/students/detail.html:89
 msgid "Course Progress"
@@ -3732,7 +3732,7 @@ msgstr "Ainda sem progresso no curso"
 #, fuzzy
 #| msgid "Session"
 msgid "Recent Sessions"
-msgstr "Sessão"
+msgstr "Sessões Recentes"
 
 #: templates/dashboard/students/detail.html:170
 msgid "Joined as a group participant"
@@ -3754,7 +3754,7 @@ msgstr "Ainda sem sessões"
 #, fuzzy, python-format
 #| msgid "Create Student Account"
 msgid "All Students (%(count)s)"
-msgstr "Criar conta de aluno"
+msgstr "Todos os Alunos (%(count)s)"
 
 #: templates/dashboard/students/list.html:12
 msgid "Search students..."
@@ -3768,7 +3768,7 @@ msgstr "Progresso"
 #, fuzzy
 #| msgid "Last name"
 msgid "Last Active"
-msgstr "Apelido"
+msgstr "Última atividade"
 
 #: templates/dashboard/students/list.html:70
 msgid "Never"
@@ -3795,7 +3795,7 @@ msgstr "Regenerar o sumativo? As perguntas existentes serão substituídas."
 #: templates/dashboard/summative/review.html:43
 #: templates/dashboard/summative/review.html:57
 msgid "Generate Summative"
-msgstr "Gerar Sumativo"
+msgstr "Gerar Sumativa"
 
 #: templates/dashboard/summative/review.html:51
 msgid "No summative exam yet"
@@ -3818,7 +3818,7 @@ msgstr "Resumo do banco"
 #, fuzzy, python-format
 #| msgid "due Sunday %(date)s"
 msgid "created %(date)s"
-msgstr "até domingo %(date)s"
+msgstr "criado a %(date)s"
 
 #: templates/dashboard/summative/review.html:74
 #, python-format
@@ -3870,7 +3870,7 @@ msgstr "média melhor <strong>%(pct)s%%</strong>"
 #: templates/dashboard/summative/review.html:113
 #, python-format
 msgid "pass %(pct)s%%"
-msgstr "aprovação %(pct)s%%"
+msgstr "passagem %(pct)s%%"
 
 #: templates/dashboard/summative/review.html:123
 msgid "Latest"
@@ -3880,13 +3880,13 @@ msgstr "Mais recente"
 #, fuzzy
 #| msgid "Last name"
 msgid "Last attempted"
-msgstr "Apelido"
+msgstr "Última tentativa"
 
 #: templates/dashboard/summative/review.html:165
 #, fuzzy
 #| msgid "New password"
 msgid "Below pass"
-msgstr "Nova palavra-passe"
+msgstr "Abaixo da média"
 
 #: templates/dashboard/summative/review.html:174
 msgid "No students enrolled in this course yet."
@@ -3896,7 +3896,7 @@ msgstr "Ainda não há alunos inscritos neste curso."
 #, fuzzy, python-format
 #| msgid "Account settings"
 msgid "All %(count)s questions"
-msgstr "Definições da conta"
+msgstr "Todas as %(count)s perguntas"
 
 #: templates/dashboard/summative/review.html:212
 msgid "Answer:"
@@ -3912,7 +3912,7 @@ msgstr "Ainda não há perguntas — a geração pode ainda estar a decorrer. At
 
 #: templates/tutoring/catalog.html:4
 msgid "My Subjects"
-msgstr "As minhas disciplinas"
+msgstr "As Minhas Disciplinas"
 
 #: templates/tutoring/catalog.html:13
 msgid "Welcome to AI Tutor"
@@ -4003,7 +4003,7 @@ msgstr "Lições desta semana"
 #: templates/tutoring/catalog.html:123
 #, python-format
 msgid "due Sunday %(date)s"
-msgstr "até domingo %(date)s"
+msgstr "entrega domingo %(date)s"
 
 #: templates/tutoring/catalog.html:147
 msgid "Continue where you left off"
@@ -4039,7 +4039,7 @@ msgstr "Verificação rápida"
 
 #: templates/tutoring/chat_tutor.html:11
 msgid "Back to Lessons"
-msgstr "Voltar às lições"
+msgstr "Voltar às Lições"
 
 #: templates/tutoring/chat_tutor.html:24
 msgid "Starting..."
@@ -4138,11 +4138,11 @@ msgstr "Repor"
 
 #: templates/tutoring/chat_tutor.html:224
 msgid "Lesson Complete!"
-msgstr "Lição concluída!"
+msgstr "Lição Concluída!"
 
 #: templates/tutoring/chat_tutor.html:233
 msgid "Review Lesson"
-msgstr "Rever lição"
+msgstr "Rever Lição"
 
 #: templates/tutoring/chat_tutor.html:234
 msgid "Continue Learning"
