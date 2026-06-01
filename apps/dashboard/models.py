@@ -53,6 +53,22 @@ class CurriculumUpload(models.Model):
         ),
     )
 
+    # M5-wire (2026-06-01): course language picked at upload time.
+    # Drives content_generator + exit-ticket-prompt locale (so the LLM
+    # emits Portuguese / etc lessons + MCQs) AND propagates to
+    # Course.locale via the curriculum_upload view's
+    # update_or_create(defaults={'locale': ...}) call. Default 'en-us'
+    # so existing uploads keep their Seychelles behaviour.
+    locale = models.CharField(
+        max_length=10,
+        default='en-us',
+        help_text=(
+            "Course language picked at upload time (e.g. 'en-us', "
+            "'pt-mz'). Drives tutor response language + generated "
+            "content language for the resulting Course."
+        ),
+    )
+
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
