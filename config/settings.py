@@ -68,6 +68,12 @@ MIDDLEWARE = [
     # not stripped of CORS headers. See django-cors-headers docs.
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # LocaleMiddleware sits between SessionMiddleware (needs the session
+    # for the URL-prefix/cookie/session resolution chain) and
+    # CommonMiddleware (which uses the active locale when redirecting
+    # for APPEND_SLASH). The full per-course/student/institution
+    # resolution layer lands in M4 of memory/portuguese_mozambique_pilot_plan.md.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -135,6 +141,17 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LANGUAGE_CODE = 'en-us'
+# Supported locales for the unified multi-locale platform. Per-course
+# locale is the primary signal at runtime (see memory/multi_locale_
+# architecture_research.md). The .po directories live under locale/ as
+# `<lang>_<COUNTRY>` per gettext convention (e.g. pt_MZ); the language
+# tag used in settings + Course.locale is hyphenated-lowercase
+# (e.g. 'pt-mz').
+LANGUAGES = [
+    ('en-us', 'English'),
+    ('pt-mz', 'Português (Moçambique)'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True

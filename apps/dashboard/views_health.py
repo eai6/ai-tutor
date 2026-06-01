@@ -32,7 +32,14 @@ _VERSION = _read_version()
 
 
 def health_check(request):
-    payload = {"status": "ok", "version": _VERSION}
+    payload = {
+        "status": "ok",
+        "version": _VERSION,
+        # Surface the active language for the request. After M4 ships
+        # the LocaleResolverMiddleware this reflects per-request
+        # resolution; today it's the global LANGUAGE_CODE.
+        "language": settings.LANGUAGE_CODE,
+    }
     try:
         connection.ensure_connection()
         return JsonResponse(payload)

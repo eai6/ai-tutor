@@ -21,6 +21,7 @@ from django.conf.urls.static import static
 from django.views.static import serve
 from django.shortcuts import redirect
 from django.http import FileResponse
+from django.views.i18n import JavaScriptCatalog
 
 from apps.dashboard.views_health import health_check
 
@@ -40,6 +41,10 @@ urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
     path('api/v1/', include('apps.api.urls', namespace='api')),
+    # i18n JS catalog so client-side gettext() calls can resolve the
+    # same translations the templates use. Empty until M2/M3 ship
+    # actual translations.
+    path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
     # PWA service worker — must live at the site root so it can
     # control all paths under /. The actual file is in static/pwa/.
     path('sw.js', service_worker, name='service_worker'),
