@@ -116,6 +116,7 @@ def run_step_regen(
     lesson_objective: str = "",
     step_objective: str = "",
     step_concept_tag: str = "",
+    locale: str = '',
     max_cycles: int = DEFAULT_MAX_CYCLES,
     temperature_start: float = DEFAULT_TEMPERATURE_START,
     temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
@@ -162,6 +163,19 @@ def run_step_regen(
             judge_results = {}
     started = time.monotonic()
     result = RegenResult(text=step_text or '', cycles_run=0)
+
+    # Locale — explicit kw OR derive from lesson.unit.course.locale.
+    # Threaded into the regen prompt builder so rewrites stay in the
+    # source language. Closes the PT→EN drift bug Edward caught
+    # 2026-06-01.
+    _effective_locale = (locale or '').strip()
+    if not _effective_locale:
+        try:
+            _effective_locale = (
+                getattr(lesson.unit.course, 'locale', 'en-us') or 'en-us'
+            ).lower()
+        except Exception:
+            _effective_locale = 'en-us'
 
     if not (step_text or '').strip():
         result.text = ''
@@ -357,6 +371,7 @@ def run_step_regen(
             lesson_objective=lesson_objective,
             step_objective=step_objective,
             step_concept_tag=step_concept_tag,
+            locale=_effective_locale,
         )
 
         # Generate via the multi-provider gen chain — first
@@ -906,6 +921,7 @@ def run_exit_question_regen(
     lesson_objective: str = "",
     step_concept_tag: str = "",
     enabling_objective: str = "",
+    locale: str = '',
     max_cycles: int = DEFAULT_MAX_CYCLES,
     temperature_start: float = DEFAULT_TEMPERATURE_START,
     temperature_decay: float = DEFAULT_TEMPERATURE_DECAY,
@@ -943,6 +959,18 @@ def run_exit_question_regen(
         correct_answer=original_question.get('correct_answer') or '',
         explanation=original_question.get('explanation') or '',
     )
+
+    # Locale — explicit kw OR derive from lesson.unit.course.locale.
+    # Threaded into the exit-question rewrite prompt so PT MCQs don't
+    # get rewritten to English by the regen pipeline.
+    _effective_locale = (locale or '').strip()
+    if not _effective_locale:
+        try:
+            _effective_locale = (
+                getattr(lesson.unit.course, 'locale', 'en-us') or 'en-us'
+            ).lower()
+        except Exception:
+            _effective_locale = 'en-us'
 
     try:
         from apps.llm.models import ModelConfig
@@ -1071,6 +1099,7 @@ def run_exit_question_regen(
             lesson_objective=lesson_objective,
             step_concept_tag=step_concept_tag,
             enabling_objective=enabling_objective,
+            locale=_effective_locale,
         )
 
         # Multi-provider chain + 90s per-provider timeout so a

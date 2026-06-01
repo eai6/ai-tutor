@@ -29,6 +29,22 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from apps.curriculum.locale_prompts import locale_instruction_block
+
+
+def _with_locale(system_text: str, locale: str) -> str:
+    """Append the course's locale instruction block to a regen system
+    prompt so the rewrite stays in the source language.
+
+    Closes the bug Edward caught 2026-06-01: M5-prep made the
+    *generator* locale-aware via apps/curriculum/locale_prompts.py,
+    but the *regen* pipeline had its own prompts and was rewriting
+    PT teacher_scripts back to English when a factual judge flagged
+    them. Now every regen builder calls this helper before returning,
+    threading lesson.unit.course.locale through the orchestrator.
+    """
+    return system_text + locale_instruction_block(locale or 'en-us')
+
 
 _REGEN_SYSTEM = """\
 Rewrite one lesson step's narrative text so the named factual issues \
@@ -63,6 +79,7 @@ def build_step_regen_prompt(
     lesson_objective: str = "",
     step_objective: str = "",
     step_concept_tag: str = "",
+    locale: str = 'en-us',
 ) -> Dict[str, str]:
     """Compose the regen prompt.
 
@@ -107,7 +124,7 @@ def build_step_regen_prompt(
     )
 
     return {
-        "system": _REGEN_SYSTEM,
+        "system": _with_locale(_REGEN_SYSTEM, locale),
         "user": user,
     }
 
@@ -314,6 +331,7 @@ def build_step_multi_judge_regen_prompt(
     lesson_objective: str = "",
     step_objective: str = "",
     step_concept_tag: str = "",
+    locale: str = 'en-us',
 ) -> Dict[str, str]:
     """Compose a step-regen prompt that addresses violations from
     multiple judges in one rewrite.
@@ -379,7 +397,7 @@ def build_step_multi_judge_regen_prompt(
     )
 
     return {
-        "system": _MULTI_JUDGE_REGEN_SYSTEM,
+        "system": _with_locale(_MULTI_JUDGE_REGEN_SYSTEM, locale),
         "user": user,
     }
 
@@ -432,6 +450,7 @@ def build_exit_q_auto_regen_prompt(
     lesson_objective: str = "",
     step_concept_tag: str = "",
     enabling_objective: str = "",
+    locale: str = 'en-us',
 ) -> Dict[str, str]:
     """Compose a judge-driven (not teacher-driven) regen prompt for
     one MCQ.
@@ -478,7 +497,7 @@ def build_exit_q_auto_regen_prompt(
     )
 
     return {
-        "system": _EXIT_Q_AUTO_REGEN_SYSTEM,
+        "system": _with_locale(_EXIT_Q_AUTO_REGEN_SYSTEM, locale),
         "user": user,
     }
 
