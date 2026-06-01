@@ -154,8 +154,40 @@ class Command(BaseCommand):
             except Exception as e:  # noqa: BLE001
                 self.stderr.write(self.style.ERROR(f"Batch failed: {e}"))
                 continue
-            # Validate each translation preserves placeholders.
-            for msgid, msgstr in pairs.items():
+
+            # ── Strict key validation ────────────────────────────────
+            # The 2026-06-01 cross-wire incident: Claude's response keys
+            # did not match the request msgids 1:1, and the previous
+            # "find by msgid" loop silently assigned wrong msgstrs.
+            # Fix: drive assignment by the REQUEST batch (in-order),
+            # asserting the response has every requested msgid as an
+            # exact-string key, no extras. Anything off → skip the
+            # entire batch and shout. Better to leave entries empty for
+            # a re-run than to land cross-wired translations.
+            requested = {e["msgid"] for e in batch}
+            returned = set(pairs.keys())
+            missing = requested - returned
+            extras = returned - requested
+            if missing or extras:
+                self.stderr.write(self.style.ERROR(
+                    f"  ✗ key-set mismatch — batch dropped. "
+                    f"missing={len(missing)} extras={len(extras)}."
+                ))
+                if missing:
+                    for m in sorted(missing)[:3]:
+                        self.stderr.write(f"      missing: {m!r}")
+                if extras:
+                    for x in sorted(extras)[:3]:
+                        self.stderr.write(f"      extra:   {x!r}")
+                continue
+
+            # Now safe to assign: iterate the BATCH (not pairs.items()),
+            # pulling each msgstr by exact-msgid key. Cross-wiring is
+            # structurally impossible — we look up by the same string
+            # we asked Claude to translate.
+            for entry in batch:
+                msgid = entry["msgid"]
+                msgstr = pairs[msgid]
                 source_phs = set(_PLACEHOLDER_RE.findall(msgid))
                 target_phs = set(_PLACEHOLDER_RE.findall(msgstr))
                 if source_phs != target_phs:
@@ -163,12 +195,10 @@ class Command(BaseCommand):
                         f"  ⚠️  placeholder mismatch on {msgid!r} — skipping"
                     ))
                     continue
-                # Find the entry and update.
-                for entry in entries:
-                    if entry["msgid"] == msgid and not entry["msgstr"]:
-                        entry["msgstr"] = msgstr
-                        translated_count += 1
-                        break
+                if entry["msgstr"]:
+                    continue  # already filled in (parallel re-run safety)
+                entry["msgstr"] = msgstr
+                translated_count += 1
 
         _write_po(po_path, entries)
         self.stdout.write(self.style.SUCCESS(
