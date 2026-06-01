@@ -164,7 +164,7 @@
                     </span>
                     <span class="session-time">{{ session.started_at|timesince }} ago</span>
                 </div>
-                <div class="session-cta">Resume →</div>
+                <div class="session-cta">{% trans "Resume" %} →</div>
             </a>
             {% endfor %}
         </div>
@@ -205,11 +205,11 @@
             <p style="margin:0 0 1rem;color:rgba(255,255,255,0.92);font-size:0.92rem;line-height:1.55;">
                 Lessons unlock after a quick baseline. It's not a test — we use it to figure out exactly what to teach you next, so you don't waste time on stuff you already know.
             </p>
-            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:#fff;color:#5b21b6;font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">Start baseline →</a>
+            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:#fff;color:#5b21b6;font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">{% trans "Start baseline" %} →</a>
         </div>
         {% elif selected_subject.summative_published and selected_subject.summative_attempts_count > 0 %}
         <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:#5b21b6;background:#ede9fe;border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="Retake the course summative — useful for tracking growth over time.">
+            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:#5b21b6;background:#ede9fe;border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="{% trans 'Retake the course summative — useful for tracking growth over time.' %}">
                 📝 Retake course exam ({{ selected_subject.summative_attempts_count }} attempt{{ selected_subject.summative_attempts_count|pluralize }})
             </a>
         </div>
@@ -220,7 +220,7 @@
                 <div style="font-weight:700;color:#92400e;font-size:0.95rem;">⭐ Recommended next</div>
                 <div style="color:#78350f;font-size:0.85rem;margin-top:0.2rem;">{{ selected_subject.recommended_reason }}</div>
             </div>
-            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:#92400e;color:#fff;padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">Start →</a>
+            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:#92400e;color:#fff;padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">{% trans "Start" %} →</a>
         </div>
         {% endif %}
 
@@ -245,7 +245,7 @@
                     </div>
                     <div class="lesson-info">
                         <h4>{{ forloop.counter }}. {{ lesson.title }}</h4>
-                        <p class="locked-hint">Complete prerequisites to unlock</p>
+                        <p class="locked-hint">{% trans "Complete prerequisites to unlock" %}</p>
                     </div>
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
@@ -291,7 +291,7 @@
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
                         {% if lesson.status != 'completed' %}
-                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="Take a 10-question pre-test instead — pass and the lesson is marked complete.">🎯 Quick check</a>
+                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
                         {% endif %}
                         <span class="arrow">{% if lesson.status == 'completed' %}Review &rarr;{% else %}&rarr;{% endif %}</span>
                     </div>

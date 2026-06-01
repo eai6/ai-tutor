@@ -2,12 +2,601 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-01 15:06+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-# Skeleton file for Mozambique Portuguese.
-# Populated by `python manage.py makemessages -l pt_MZ` in M2.
-# Translated by the translate_po management command in M3.
+#: apps/accounts/views.py:62
+#, python-format
+msgid "Welcome back, %(name)s!"
+msgstr ""
+
+#: apps/accounts/views.py:203
+#, python-format
+msgid "Welcome, %(name)s! 🎉 Let's start learning!"
+msgstr ""
+
+#: apps/accounts/views.py:238
+#, python-format
+msgid "Welcome, %(name)s!"
+msgstr ""
+
+#: apps/accounts/views.py:604
+msgid "You've been logged out."
+msgstr ""
+
+#: apps/accounts/views.py:749
+msgid "Profile updated."
+msgstr ""
+
+#: apps/accounts/views.py:757
+msgid "Password changed."
+msgstr ""
+
+#: templates/accounts/landing.html:243
+#, python-format
+msgid "Welcome to %(institution)s"
+msgstr ""
+
+#: templates/accounts/landing.html:244
+msgid "Personalized learning powered by AI. Choose how you'd like to continue."
+msgstr ""
+
+#: templates/accounts/landing.html:251
+msgid "I'm a Student"
+msgstr ""
+
+#: templates/accounts/landing.html:252
+msgid "Learn at your own pace with AI-powered tutoring"
+msgstr ""
+
+#: templates/accounts/landing.html:254 templates/accounts/login.html:4
+#: templates/accounts/login.html:49 templates/accounts/student_login.html:49
+#: templates/base.html:332 templates/tutoring/catalog.html:17
+msgid "Sign In"
+msgstr ""
+
+#: templates/accounts/landing.html:255 templates/accounts/landing.html:266
+#: templates/accounts/student_register.html:141
+msgid "Create Account"
+msgstr ""
+
+#: templates/accounts/landing.html:262
+msgid "I'm a Teacher"
+msgstr ""
+
+#: templates/accounts/landing.html:263
+msgid "Manage curriculum and track student progress"
+msgstr ""
+
+#: templates/accounts/landing.html:265
+msgid "Staff Sign In"
+msgstr ""
+
+#: templates/accounts/landing.html:274 templates/base.html:305
+msgid "Help & FAQ"
+msgstr ""
+
+#: templates/accounts/login.html:11
+msgid "Welcome back!"
+msgstr ""
+
+#: templates/accounts/login.html:12
+msgid "Sign in to continue learning"
+msgstr ""
+
+#: templates/accounts/login.html:25 templates/accounts/settings.html:148
+#: templates/accounts/student_login.html:25
+#: templates/accounts/student_register.html:55
+msgid "Username"
+msgstr ""
+
+#: templates/accounts/login.html:31 templates/accounts/student_login.html:31
+msgid "Enter your username"
+msgstr ""
+
+#: templates/accounts/login.html:38 templates/accounts/settings.html:203
+#: templates/accounts/student_login.html:38
+#: templates/accounts/student_register.html:106
+msgid "Password"
+msgstr ""
+
+#: templates/accounts/login.html:43 templates/accounts/student_login.html:43
+msgid "Enter your password"
+msgstr ""
+
+#: templates/accounts/login.html:54 templates/accounts/student_login.html:55
+msgid "Don't have an account?"
+msgstr ""
+
+#: templates/accounts/login.html:54
+msgid "Create one"
+msgstr ""
+
+#: templates/accounts/settings.html:4 templates/accounts/settings.html:131
+msgid "Settings"
+msgstr ""
+
+#: templates/accounts/settings.html:130
+msgid "Back"
+msgstr ""
+
+#: templates/accounts/settings.html:132
+msgid "Manage your account."
+msgstr ""
+
+#: templates/accounts/settings.html:144
+msgid "Account"
+msgstr ""
+
+#: templates/accounts/settings.html:145
+msgid "Update the name and email we use for you."
+msgstr ""
+
+#: templates/accounts/settings.html:153
+msgid "Role"
+msgstr ""
+
+#: templates/accounts/settings.html:163
+msgid "First name"
+msgstr ""
+
+#: templates/accounts/settings.html:167
+msgid "Last name"
+msgstr ""
+
+#: templates/accounts/settings.html:172
+msgid "Email"
+msgstr ""
+
+#: templates/accounts/settings.html:174
+msgid "Used for password reset."
+msgstr ""
+
+#: templates/accounts/settings.html:178
+#: templates/accounts/student_register.html:79
+msgid "School"
+msgstr ""
+
+#: templates/accounts/settings.html:188
+msgid "Grade level"
+msgstr ""
+
+#: templates/accounts/settings.html:197
+msgid "Save profile"
+msgstr ""
+
+#: templates/accounts/settings.html:204
+msgid "Use a strong password you don't reuse elsewhere."
+msgstr ""
+
+#: templates/accounts/settings.html:210
+msgid "Current password"
+msgstr ""
+
+#: templates/accounts/settings.html:217
+msgid "New password"
+msgstr ""
+
+#: templates/accounts/settings.html:224
+msgid "Confirm new password"
+msgstr ""
+
+#: templates/accounts/settings.html:230
+msgid "Change password"
+msgstr ""
+
+#: templates/accounts/settings.html:236
+msgid "Session"
+msgstr ""
+
+#: templates/accounts/settings.html:237
+msgid "Sign out on this device."
+msgstr ""
+
+#: templates/accounts/settings.html:238 templates/base.html:328
+msgid "Logout"
+msgstr ""
+
+#: templates/accounts/settings.html:243
+msgid "Delete account"
+msgstr ""
+
+#: templates/accounts/settings.html:244
+msgid ""
+"Permanently remove your account and all data we hold for you. This cannot be "
+"undone."
+msgstr ""
+
+#: templates/accounts/settings.html:245
+msgid "Delete my account"
+msgstr ""
+
+#: templates/accounts/student_login.html:4
+#: templates/accounts/student_login.html:11
+msgid "Student Sign In"
+msgstr ""
+
+#: templates/accounts/student_login.html:12
+msgid "Welcome back! Let's continue learning."
+msgstr ""
+
+#: templates/accounts/student_login.html:54
+msgid "Forgot your password?"
+msgstr ""
+
+#: templates/accounts/student_login.html:55
+msgid "Register as Student"
+msgstr ""
+
+#: templates/accounts/student_login.html:56
+#: templates/accounts/student_register.html:147
+msgid "Back to home"
+msgstr ""
+
+#: templates/accounts/student_register.html:4
+msgid "Student Registration"
+msgstr ""
+
+#: templates/accounts/student_register.html:11
+msgid "Create Student Account"
+msgstr ""
+
+#: templates/accounts/student_register.html:12
+msgid "Join AI Tutor and start learning today!"
+msgstr ""
+
+#: templates/accounts/student_register.html:30
+msgid "First Name"
+msgstr ""
+
+#: templates/accounts/student_register.html:36
+msgid "Your first name"
+msgstr ""
+
+#: templates/accounts/student_register.html:43
+msgid "Last Name"
+msgstr ""
+
+#: templates/accounts/student_register.html:49
+msgid "Your last name"
+msgstr ""
+
+#: templates/accounts/student_register.html:61
+msgid "Choose a username"
+msgstr ""
+
+#: templates/accounts/student_register.html:67
+msgid "Email (Optional)"
+msgstr ""
+
+#: templates/accounts/student_register.html:81
+msgid "Select your school"
+msgstr ""
+
+#: templates/accounts/student_register.html:89
+msgid "Grade Level"
+msgstr ""
+
+#: templates/accounts/student_register.html:91
+msgid "Select grade"
+msgstr ""
+
+#: templates/accounts/student_register.html:100
+msgid "Student ID (optional)"
+msgstr ""
+
+#: templates/accounts/student_register.html:101
+msgid "e.g., STU-2024-001"
+msgstr ""
+
+#: templates/accounts/student_register.html:102
+msgid "Your school ID number, if you have one"
+msgstr ""
+
+#: templates/accounts/student_register.html:111
+msgid "At least 6 characters"
+msgstr ""
+
+#: templates/accounts/student_register.html:117
+msgid "Confirm Password"
+msgstr ""
+
+#: templates/accounts/student_register.html:122
+msgid "Re-enter your password"
+msgstr ""
+
+#: templates/accounts/student_register.html:132
+msgid "I agree to the"
+msgstr ""
+
+#: templates/accounts/student_register.html:133
+msgid "AI Tutor terms"
+msgstr ""
+
+#: templates/accounts/student_register.html:146
+msgid "Already have an account?"
+msgstr ""
+
+#: templates/accounts/student_register.html:146
+msgid "Sign in"
+msgstr ""
+
+#: templates/base.html:290
+msgid "You're offline — messages will send when you reconnect."
+msgstr ""
+
+#: templates/base.html:311
+msgid "Help"
+msgstr ""
+
+#: templates/base.html:313
+msgid "Terms"
+msgstr ""
+
+#: templates/base.html:314
+msgid "Account settings"
+msgstr ""
+
+#: templates/base.html:321
+msgid "Log out"
+msgstr ""
+
+#: templates/tutoring/catalog.html:4
+msgid "My Subjects"
+msgstr ""
+
+#: templates/tutoring/catalog.html:13
+msgid "Welcome to AI Tutor"
+msgstr ""
+
+#: templates/tutoring/catalog.html:14
+msgid "Your personal learning companion for Seychelles secondary students"
+msgstr ""
+
+#: templates/tutoring/catalog.html:16
+msgid "Get Started"
+msgstr ""
+
+#: templates/tutoring/catalog.html:27
+msgid "No subjects available yet"
+msgstr ""
+
+#: templates/tutoring/catalog.html:30
+#, python-format
+msgid ""
+"No published courses found for %(school_name)s. Publish courses from the "
+"Dashboard."
+msgstr ""
+
+#: templates/tutoring/catalog.html:32
+msgid "No published courses found. Publish courses from the Dashboard."
+msgstr ""
+
+#: templates/tutoring/catalog.html:35
+msgid "Your courses are being set up. Check back soon!"
+msgstr ""
+
+#: templates/tutoring/catalog.html:43
+#, python-format
+msgid "Hello, %(first_name)s!"
+msgstr ""
+
+#: templates/tutoring/catalog.html:44
+msgid "Choose a subject to continue learning"
+msgstr ""
+
+#: templates/tutoring/catalog.html:49 templates/tutoring/chat_tutor.html:17
+msgid "Return to teacher dashboard"
+msgstr ""
+
+#: templates/tutoring/catalog.html:50 templates/tutoring/chat_tutor.html:18
+msgid "Dashboard"
+msgstr ""
+
+#: templates/tutoring/catalog.html:53
+msgid "Viewing as:"
+msgstr ""
+
+#: templates/tutoring/catalog.html:55
+msgid "All Schools"
+msgstr ""
+
+#: templates/tutoring/catalog.html:76
+msgid "Trophies"
+msgstr ""
+
+#: templates/tutoring/catalog.html:77
+msgid "Select Tutor Style"
+msgstr ""
+
+#: templates/tutoring/catalog.html:78 templates/tutoring/catalog.html:109
+msgid "Leaderboard"
+msgstr ""
+
+#: templates/tutoring/catalog.html:81
+msgid "Lessons:"
+msgstr ""
+
+#: templates/tutoring/catalog.html:82
+msgid "Hours:"
+msgstr ""
+
+#: templates/tutoring/catalog.html:83
+msgid "Accuracy:"
+msgstr ""
+
+#: templates/tutoring/catalog.html:90
+msgid "Achievements"
+msgstr ""
+
+#: templates/tutoring/catalog.html:99
+msgid "Choose Your Tutor Style"
+msgstr ""
+
+#: templates/tutoring/catalog.html:100
+msgid "Pick a personality that makes learning fun for you!"
+msgstr ""
+
+#: templates/tutoring/catalog.html:102 templates/tutoring/catalog.html:111
+#: templates/tutoring/chat_tutor.html:207
+msgid "Close"
+msgstr ""
+
+#: templates/tutoring/catalog.html:120
+msgid "This week's lessons"
+msgstr ""
+
+#: templates/tutoring/catalog.html:123
+#, python-format
+msgid "due Sunday %(date)s"
+msgstr ""
+
+#: templates/tutoring/catalog.html:147
+msgid "Continue where you left off"
+msgstr ""
+
+#: templates/tutoring/catalog.html:167
+msgid "Resume"
+msgstr ""
+
+#: templates/tutoring/catalog.html:208
+msgid "Start baseline"
+msgstr ""
+
+#: templates/tutoring/catalog.html:212
+msgid "Retake the course summative — useful for tracking growth over time."
+msgstr ""
+
+#: templates/tutoring/catalog.html:223
+msgid "Start"
+msgstr ""
+
+#: templates/tutoring/catalog.html:248
+msgid "Complete prerequisites to unlock"
+msgstr ""
+
+#: templates/tutoring/catalog.html:294
+msgid ""
+"Take a 10-question pre-test instead — pass and the lesson is marked complete."
+msgstr ""
+
+#: templates/tutoring/catalog.html:294
+msgid "Quick check"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:11
+msgid "Back to Lessons"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:24
+msgid "Starting..."
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:29
+msgid "Toggle audio mode"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:47 templates/tutoring/chat_tutor.html:48
+#: templates/tutoring/chat_tutor.html:82
+msgid "Help / report an issue"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:64
+msgid "More options"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:76
+msgid "Toggle audio"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:79
+msgid "Restart lesson"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:96
+msgid "How long do you have today?"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:98
+msgid ""
+"The tutor adapts the lesson depth to fit your time. You can answer the same "
+"number of questions either way — fewer steps just means less reinforcement."
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:101
+msgid "15 min"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:102
+msgid "20 min"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:103
+msgid "25 min"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:104
+msgid "Use the lesson default"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:146
+msgid "Type your answer..."
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:151
+msgid "Record audio"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:158
+msgid "Send message"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:168
+msgid "Image"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:170
+#: templates/tutoring/chat_tutor.html:198
+msgid "Zoom in"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:173
+#: templates/tutoring/chat_tutor.html:201
+msgid "Zoom out"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:176
+msgid "Reset zoom"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:179
+msgid "Expand panel"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:183
+msgid "Close panel"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:189
+msgid "Images will appear here"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:204
+msgid "Reset"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:224
+msgid "Lesson Complete!"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:233
+msgid "Review Lesson"
+msgstr ""
+
+#: templates/tutoring/chat_tutor.html:234
+msgid "Continue Learning"
+msgstr ""
