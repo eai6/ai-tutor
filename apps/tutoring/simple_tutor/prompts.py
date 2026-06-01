@@ -132,7 +132,17 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "letter A/B/C/D. For short_numeric: the numeric "
                         "value (e.g. '4' or '180'). For short_answer: "
                         "one canonical phrasing. The grader will compare "
-                        "the student's answer to this."
+                        "the student's answer to this.\n\n"
+                        "MCQ correct-letter balance: the correct option "
+                        "must rotate evenly across A, B, C, and D over a "
+                        "session. Do NOT default to B (a well-documented "
+                        "LLM bias — see auto-memory/feedback_mcq_b_bias.md). "
+                        "When deciding which letter holds the correct "
+                        "answer for a given question, shuffle independently "
+                        "of position-feel and don't just write the right "
+                        "answer second. If the last 2 MCQs in "
+                        "<recent_turns> had correct=B, deliberately use A, "
+                        "C, or D for this one."
                     ),
                 },
                 "source": {
@@ -333,15 +343,39 @@ options A/B/C/D for MCQ) verbatim in your text reply so the student \
 can read it in the chat — the slot is the platform's grading \
 anchor, but the student-visible question must appear in the chat \
 text. Pose exactly one question per turn.
-    * **POSE / TEACH mode** — no ``<in_flight_question>`` block is \
-present. Decide whether to teach (explanation, worked example, \
-warmup) or pose a question. When you decide to pose, call \
-pose_question with the question_text, question_type, options (for \
-MCQ), and reference_answer. Also include the question stem (and \
-options A/B/C/D for MCQ) verbatim in your text reply so the student \
-can read it in the chat — the slot is the platform's grading \
-anchor, but the student-visible question must appear in the chat \
-text. Pose exactly one question per turn.
+
+- **One clearly-marked question per turn — no rhetorical questions.** \
+When you pose an MCQ, the student must be able to tell at a glance \
+which sentence is THE question. Do NOT pepper your lead-up with \
+rhetorical questions ("Doesn't that mean X?", "What do you think \
+happens?", "Right?") because the student then has to guess which \
+question to answer. If you want to walk through reasoning, write it \
+as STATEMENTS ("The law applies regardless of how many people \
+break it.") not Socratic self-questions ("Does the law apply? Of \
+course not."). The actual question — the one matching pose_question's \
+question_text — should be the ONLY question mark in your reply before \
+the A/B/C/D list. Bad turn: "Does X count? No. Does Y count? Yes. \
+Now, which option is correct: A/B/C/D?" (three questions — confusing). \
+Good turn: "X and Y both count. Z does not. Which option captures \
+this: A/B/C/D?" (one question — clear).
+
+- **MCQ correct-letter balance — rotate evenly across A / B / C / D.** \
+Documented LLM behaviour: when authoring MCQs, models default to B \
+for the correct option (the "middle, safe" letter). On this platform \
+we explicitly REJECT that bias. Every MCQ you pose should be one of \
+four random equal-probability options. Concrete discipline:\n\
+  * Before writing the four options, decide the CORRECT TEXT (the \
+fact-of-the-matter answer). Independently roll a fair four-way pick \
+of which LETTER (A/B/C/D) that text will sit at.\n\
+  * Check ``<recent_turns>`` — if your last 2 MCQs had correct=B, \
+this one MUST NOT be B. Pick A, C, or D.\n\
+  * Across any 8-MCQ window your correct letters should be roughly \
+{A: 2, B: 2, C: 2, D: 2} ± 1. If you find yourself writing "correct: \
+'B'" reflexively, STOP and pick again.\n\
+  * The three distractors must be plausible (a common student \
+misconception, a near-miss numeric value, an option that's correct \
+in a different context). Distractors aren't filler; they're the \
+diagnostic signal of WHY a student got it wrong.
 
 - **Adapt to the 5E phase** shown in <current_step>:
     * Engage     — hook the student with a curiosity-piquing question \

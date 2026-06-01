@@ -1341,6 +1341,10 @@ body {
 
 {% block extra_js %}
 {% comment %}marked + DOMPurify are render-blocking — moved to defer so first paint isn't held up. The first message arrives several seconds after page load, so the script downloads have plenty of time to finish before they're called.{% endcomment %}
+<!-- Django JavaScript translation catalog. Loads gettext() into the
+     page so JS-side strings (phase labels, dynamic toast messages) get
+     the same pt-mz translations as the server-rendered HTML. -->
+<script src="{% url 'javascript-catalog' %}"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 {% comment %}Chart.js was used for the interactive plot_spec exit-ticket renderer. That feature was removed in favour of server-rendered SVG via figure_render.py.{% endcomment %}
@@ -1456,11 +1460,19 @@ function renderMath(el) {
     }
 }
 
-// Phase label mapping (5E model phases + session states)
+// Phase label mapping (5E model phases + session states).
+// Each label is wrapped in gettext() so the JS catalog at /jsi18n/
+// translates them per the active locale (matches the django.po
+// translations for the same strings).
 const phaseLabels = {
-    engage: 'Engage', explore: 'Explore', explain: 'Explain',
-    practice: 'Practice', evaluate: 'Evaluate',
-    exit_ticket: 'Exit Quiz', remediation: 'Review', completed: 'Completed',
+    engage: gettext('Engage'),
+    explore: gettext('Explore'),
+    explain: gettext('Explain'),
+    practice: gettext('Practice'),
+    evaluate: gettext('Evaluate'),
+    exit_ticket: gettext('Exit Quiz'),
+    remediation: gettext('Review'),
+    completed: gettext('Completed'),
 };
 function phaseLabel(phase) {
     return phaseLabels[phase] || phase.replace('_', ' ');
@@ -1588,7 +1600,7 @@ function renderPendingQuestionInArtifact(pq) {
         body += '</label>';
         body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:#52525b;">';
         body += '<span style="font-weight:500;">Show your working <span style="color:#a1a1aa;font-weight:400;">(optional)</span></span>';
-        body += '<textarea class="bank-q-working" rows="3" placeholder="Show how you got there — formulas, steps, reasoning…" style="padding:0.5rem 0.625rem;border:1px solid #e4e4e7;border-radius:0.5rem;font-size:0.875rem;font-family:inherit;resize:vertical;background:#fff;"></textarea>';
+        body += '<textarea class="bank-q-working" rows="3" placeholder="' + gettext('Show how you got there — formulas, steps, reasoning…') + '" style="padding:0.5rem 0.625rem;border:1px solid #e4e4e7;border-radius:0.5rem;font-size:0.875rem;font-family:inherit;resize:vertical;background:#fff;"></textarea>';
         body += '</label>';
         body += '</div>';
     } else if (pq.question_type === 'fill_in_blank') {
@@ -1636,10 +1648,10 @@ function renderPendingQuestionInArtifact(pq) {
         // ships in R6; for now render a textarea so students can at
         // least answer in free text and the legacy text grader picks
         // it up.
-        body += '<textarea class="bank-q-text" placeholder="Your answer…" rows="3" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;resize:vertical;"></textarea>';
+        body += '<textarea class="bank-q-text" placeholder="' + gettext('Your answer…') + '" rows="3" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;resize:vertical;"></textarea>';
     }
 
-    body += '<button class="bank-q-submit" type="button" style="align-self:flex-start;padding:0.5rem 1.25rem;background:#7c3aed;color:#fff;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;font-size:0.9375rem;">Submit answer</button>';
+    body += '<button class="bank-q-submit" type="button" style="align-self:flex-start;padding:0.5rem 1.25rem;background:#7c3aed;color:#fff;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;font-size:0.9375rem;">' + gettext('Submit answer') + '</button>';
     body += '<div class="bank-q-status" style="font-size:0.8125rem;color:#71717a;min-height:1.2em;"></div>';
     body += '</div>';
 
@@ -1680,7 +1692,7 @@ function bindBankQuestionHandlers(pq) {
         if (pq.question_type === 'mcq') {
             const picked = card.querySelector('input[type=radio]:checked');
             if (!picked) {
-                statusEl.textContent = 'Pick an option first.';
+                statusEl.textContent = gettext('Pick an option first.');
                 return;
             }
             answer = picked.value;  // 'A' / 'B' / 'C' / 'D'
@@ -1691,7 +1703,7 @@ function bindBankQuestionHandlers(pq) {
                 .sort((a, b) => Number(a.dataset.blankIndex) - Number(b.dataset.blankIndex))
                 .map(i => (i.value || '').trim());
             if (blanks.every(b => !b)) {
-                statusEl.textContent = 'Fill in at least one blank.';
+                statusEl.textContent = gettext('Fill in at least one blank.');
                 return;
             }
             answer = blanks;
@@ -1699,7 +1711,7 @@ function bindBankQuestionHandlers(pq) {
             const input = card.querySelector('.bank-q-text');
             answer = (input && input.value || '').trim();
             if (!answer) {
-                statusEl.textContent = 'Type a final answer first.';
+                statusEl.textContent = gettext('Type a final answer first.');
                 return;
             }
         }
@@ -1794,7 +1806,7 @@ function showResumePendingBanner() {
         + 'max-width:36rem;display:flex;align-items:center;'
         + 'justify-content:center;gap:0.5rem;'
         + 'transition:opacity 0.5s;';
-    div.innerHTML = '<span>↩</span><span>Welcome back — your previous question is still waiting in the panel on the right.</span>';
+    div.innerHTML = '<span>↩</span><span>' + gettext('Welcome back — your previous question is still waiting in the panel on the right.') + '</span>';
     chatMessages.insertBefore(div, typing);
     scrollToBottom();
     setTimeout(() => { div.style.opacity = '0'; }, 6000);
@@ -1886,7 +1898,7 @@ function renderHistory(history) {
     // Add a visual separator between history and new messages
     const sep = document.createElement('div');
     sep.className = 'history-separator';
-    sep.innerHTML = '<span>earlier messages</span>';
+    sep.innerHTML = '<span>' + gettext('earlier messages') + '</span>';
     chatMessages.insertBefore(sep, typing);
     scrollToBottom();
 }
@@ -1941,7 +1953,7 @@ async function refreshParticipants() {
             && !data.host_group_name) {
             // Host has no group → tell them why they can't add.
             const note = document.createElement('span');
-            note.textContent = 'Ask your teacher to add you to a group to share this lesson.';
+            note.textContent = gettext('Ask your teacher to add you to a group to share this lesson.');
             note.style.cssText = 'color:var(--muted);font-size:0.75rem;font-style:italic;';
             bar.appendChild(note);
         }
@@ -2006,18 +2018,18 @@ async function addParticipantById(userId, displayName) {
                 'already_primary': 'You\'re already the host of this session.',
                 'group_mode_disabled': 'Group sessions are disabled for this lesson.',
             };
-            alert('Could not add ' + (displayName || 'student') + ': ' + (messages[data.error] || data.error || 'unknown'));
+            alert(interpolate(gettext('Could not add %s: %s'), [(displayName || gettext('student')), (messages[data.error] || data.error || gettext('unknown'))]));
             return;
         }
         refreshParticipants();
     } catch (e) {
         console.error('Add participant failed', e);
-        alert('Network error adding student.');
+        alert(gettext('Network error adding student.'));
     }
 }
 
 async function removeParticipant(userId) {
-    if (!confirm('Remove this student from the group session?')) return;
+    if (!confirm(gettext('Remove this student from the group session?'))) return;
     try {
         const r = await fetch(`/tutor/api/chat/${sessionId}/participants/${userId}/`, {
             method: 'POST',
@@ -2170,7 +2182,7 @@ function addMessage(role, content, media = [], artifactHtml = null, probe = null
     let artifactBlock = '';
     if (artifactHtml) {
         if (isDesktop()) {
-            artifactTitle.textContent = 'Interactive Content';
+            artifactTitle.textContent = gettext('Interactive Content');
             artifactBody.innerHTML = renderArtifactIframe(artifactHtml);
             artifactPanel.classList.add('open');
         } else {
@@ -2356,7 +2368,7 @@ function renderProbeWidget(probe) {
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'probe-fill-input';
-        input.placeholder = 'Type your answer…';
+        input.placeholder = gettext('Type your answer…');
         input.autocomplete = 'off';
         input.addEventListener('input', () => { selected = input.value; });
         input.addEventListener('keydown', (e) => {
@@ -2398,7 +2410,7 @@ function renderProbeWidget(probe) {
     const submit = document.createElement('button');
     submit.type = 'button';
     submit.className = 'probe-submit';
-    submit.textContent = 'Check answer';
+    submit.textContent = gettext('Check answer');
     submit.addEventListener('click', () => {
         if (locked) return;
         if (probe.type === 'mcq') {
@@ -2465,7 +2477,7 @@ function markBubbleQueued(bubble, id) {
     if (!bubble.querySelector('.queued-badge')) {
         const badge = document.createElement('div');
         badge.className = 'queued-badge';
-        badge.innerHTML = '⏳ Will send when online';
+        badge.innerHTML = '⏳ ' + gettext('Will send when online');
         bubble.appendChild(badge);
     }
 }
@@ -2682,7 +2694,7 @@ async function restartLesson() {
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
         });
         if (!response.ok) {
-            alert('Could not restart the lesson. Please try again.');
+            alert(gettext('Could not restart the lesson. Please try again.'));
             return;
         }
         // Reload the page — chat_start_session will create a fresh
