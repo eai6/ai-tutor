@@ -3125,6 +3125,7 @@ def material_delete(request, material_id):
 @teacher_required
 def settings_page(request):
     """Institution settings — general for all staff, theme + prompts for superadmins."""
+    from django.conf import settings as django_settings
     institution = request.staff_ctx['institution']
     membership = request.staff_ctx['membership']
     is_superadmin = request.user.is_staff
@@ -3164,6 +3165,18 @@ def settings_page(request):
                     if new_inst and new_inst.id != membership.institution_id:
                         membership.institution = new_inst
                         membership.save(update_fields=['institution'])
+
+                # Preferred locale — drives LocaleResolverMiddleware's
+                # per-user branch. Blank → fall back to institution
+                # default. get-or-create StudentProfile for staff users
+                # so they can set a preference too.
+                from django.conf import settings as _settings
+                preferred_locale = (request.POST.get('preferred_locale') or '').strip()
+                if preferred_locale == '' or preferred_locale in dict(_settings.LANGUAGES):
+                    from apps.accounts.models import StudentProfile as _StudentProfile
+                    profile, _created = _StudentProfile.objects.get_or_create(user=request.user)
+                    profile.preferred_locale = preferred_locale or None
+                    profile.save(update_fields=['preferred_locale'])
 
                 messages.success(request, "Profile updated.")
 
@@ -3585,6 +3598,12 @@ def settings_page(request):
         'all_schools': all_schools,
         'user_school_choices': user_school_choices,
         'all_users': all_users,
+        # Locale picker for the admin's own account section. Drives
+        # LocaleResolverMiddleware via StudentProfile.preferred_locale.
+        'locale_choices': django_settings.LANGUAGES,
+        'current_preferred_locale': (
+            getattr(getattr(request.user, 'student_profile', None), 'preferred_locale', None) or ''
+        ),
         'tutor_provider': tutor_provider,
         'tutor_model': tutor_model,
         'has_tutor_db_key': has_tutor_db_key,
