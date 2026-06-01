@@ -1,6 +1,7 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Exit Ticket Review — {{ student_name }}{% endblock %}
-{% block page_title %}Exit Ticket Review{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with name=student_name %}Exit Ticket Review — {{ name }}{% endblocktrans %}{% endblock %}
+{% block page_title %}{% trans "Exit Ticket Review" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -166,26 +167,26 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">← Back to Live Monitor</a>
+<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">← {% trans "Back to Live Monitor" %}</a>
 
 <div class="review-header" style="margin-top: 0.75rem;">
     <div>
         <h2>{{ student_name }}</h2>
         <div class="review-meta">
             {{ lesson.title }}
-            &middot; Attempt {{ all_attempts|length }}{% if all_attempts|length > 1 %} (most recent shown){% endif %}
-            {% if attempt.completed_at %} &middot; Submitted {{ attempt.completed_at|date:"M j, H:i" }}{% endif %}
+            &middot; {% blocktrans with n=all_attempts|length %}Attempt {{ n }}{% endblocktrans %}{% if all_attempts|length > 1 %} {% trans "(most recent shown)" %}{% endif %}
+            {% if attempt.completed_at %} &middot; {% blocktrans with date=attempt.completed_at|date:"M j, H:i" %}Submitted {{ date }}{% endblocktrans %}{% endif %}
         </div>
     </div>
-    <a href="{% url 'dashboard:session_chat_history' session.id %}" class="btn-view">View Chat Transcript</a>
+    <a href="{% url 'dashboard:session_chat_history' session.id %}" class="btn-view">{% trans "View Chat Transcript" %}</a>
 </div>
 
 <div class="score-banner {% if passed %}pass{% else %}fail{% endif %}" id="score-banner">
     <div class="score-big" id="score-display">{{ score }}/{{ total }}</div>
     <div>
-        <span id="pass-label">{% if passed %}PASSED{% else %}DID NOT PASS{% endif %}</span>
+        <span id="pass-label">{% if passed %}{% trans "PASSED" %}{% else %}{% trans "DID NOT PASS" %}{% endif %}</span>
         <div style="font-weight:400;font-size:0.8rem;margin-top:0.125rem;">
-            Passing threshold is 8/10. Score updates automatically when you override a question below.
+            {% trans "Passing threshold is 8/10. Score updates automatically when you override a question below." %}
         </div>
     </div>
 </div>
@@ -200,7 +201,7 @@
             {% if item.concept_tag %}<span class="q-tag">· {{ item.concept_tag }}</span>{% endif %}
         </div>
         <span class="q-badge {% if item.is_correct %}correct{% else %}incorrect{% endif %}" data-badge>
-            {% if item.is_correct %}✓ Correct{% else %}✗ Incorrect{% endif %}
+            {% if item.is_correct %}{% trans "✓ Correct" %}{% else %}{% trans "✗ Incorrect" %}{% endif %}
         </span>
     </div>
 
@@ -212,21 +213,21 @@
         <li class="{% if opt.is_selected %}selected {% if item.is_correct %}correct{% else %}incorrect{% endif %}{% endif %}{% if opt.is_correct_option and not opt.is_selected %} correct-answer{% endif %}">
             <span class="marker">{{ opt.letter }}.</span>
             <span>{{ opt.text }}</span>
-            {% if opt.is_selected %}<span class="note">Student picked</span>{% elif opt.is_correct_option %}<span class="note">Correct</span>{% endif %}
+            {% if opt.is_selected %}<span class="note">{% trans "Student picked" %}</span>{% elif opt.is_correct_option %}<span class="note">{% trans "Correct" %}</span>{% endif %}
         </li>
         {% endfor %}
     </ul>
 
     {% elif item.question_type == 'fill_in_blank' %}
     {% if item.fill_template %}
-    <div class="label">Sentence</div>
+    <div class="label">{% trans "Sentence" %}</div>
     <div class="fill-template">{{ item.fill_template }}</div>
     {% endif %}
-    <div class="label">Student's blank{{ item.fill_student_blanks|length|pluralize }}</div>
+    <div class="label">{% blocktrans count count=item.fill_student_blanks|length %}Student blank{% plural %}Student blanks{% endblocktrans %}</div>
     <div class="free-answer">
-        {% for b in item.fill_student_blanks %}<span class="fill-blank-pill {% if item.is_correct %}correct{% else %}incorrect{% endif %}">{{ b|default:"(blank)" }}</span>{% empty %}{{ item.selected_text|default:"(no answer)" }}{% endfor %}
+        {% for b in item.fill_student_blanks %}<span class="fill-blank-pill {% if item.is_correct %}correct{% else %}incorrect{% endif %}">{% if b %}{{ b }}{% else %}{% trans "(blank)" %}{% endif %}</span>{% empty %}{% if item.selected_text %}{{ item.selected_text }}{% else %}{% trans "(no answer)" %}{% endif %}{% endfor %}
     </div>
-    <div class="label">Expected</div>
+    <div class="label">{% trans "Expected" %}</div>
     <div class="free-answer expected">
         {% for b in item.fill_blanks_correct %}<span class="fill-blank-pill correct">{{ b }}</span>{% empty %}{{ item.correct_answer_display|default:"—" }}{% endfor %}
     </div>
@@ -235,16 +236,16 @@
     <table class="matching-table">
         <thead>
             <tr>
-                <th>Item</th>
-                <th>Student matched</th>
-                <th>Correct match</th>
+                <th>{% trans "Item" %}</th>
+                <th>{% trans "Student matched" %}</th>
+                <th>{% trans "Correct match" %}</th>
             </tr>
         </thead>
         <tbody>
             {% for row in item.matching_rows %}
             <tr>
                 <td>{{ row.left }}</td>
-                <td class="{% if row.is_match %}match-correct{% else %}match-incorrect{% endif %}">{{ row.student_right|default:"(blank)" }}</td>
+                <td class="{% if row.is_match %}match-correct{% else %}match-incorrect{% endif %}">{% if row.student_right %}{{ row.student_right }}{% else %}{% trans "(blank)" %}{% endif %}</td>
                 <td>{{ row.correct_right }}</td>
             </tr>
             {% endfor %}
@@ -254,34 +255,34 @@
     {% else %}
     {# short_answer / data_interpretation / fallback #}
     {% if item.data_description %}
-    <div class="label">Data shown to student</div>
+    <div class="label">{% trans "Data shown to student" %}</div>
     <div class="data-desc">{{ item.data_description|safe }}</div>
     {% endif %}
-    <div class="label">Student's answer</div>
-    <div class="free-answer">{{ item.selected_text|default:"(no answer)" }}</div>
+    <div class="label">{% trans "Student answer" %}</div>
+    <div class="free-answer">{% if item.selected_text %}{{ item.selected_text }}{% else %}{% trans "(no answer)" %}{% endif %}</div>
     {% if item.correct_answer_display %}
-    <div class="label">Expected answer</div>
+    <div class="label">{% trans "Expected answer" %}</div>
     <div class="free-answer expected">{{ item.correct_answer_display }}</div>
     {% endif %}
     {% endif %}
 
     {% if item.explanation %}
-    <div class="explanation"><strong>Explanation:</strong> {{ item.explanation }}</div>
+    <div class="explanation"><strong>{% trans "Explanation:" %}</strong> {{ item.explanation }}</div>
     {% endif %}
 
     <div class="override-bar">
-        <span>Teacher override:</span>
+        <span>{% trans "Teacher override:" %}</span>
         <button type="button" class="override-btn correct {% if item.is_correct %}active{% endif %}"
-                data-mark="correct" data-index="{{ forloop.counter0 }}">✓ Mark Correct</button>
+                data-mark="correct" data-index="{{ forloop.counter0 }}">{% trans "✓ Mark Correct" %}</button>
         <button type="button" class="override-btn incorrect {% if not item.is_correct %}active{% endif %}"
-                data-mark="incorrect" data-index="{{ forloop.counter0 }}">✗ Mark Incorrect</button>
+                data-mark="incorrect" data-index="{{ forloop.counter0 }}">{% trans "✗ Mark Incorrect" %}</button>
         <span class="override-spinner" data-spinner></span>
     </div>
 </div>
 {% endfor %}
 {% else %}
 <div style="text-align:center;padding:3rem;color:#a1a1aa;">
-    No question data available for this attempt.
+    {% trans "No question data available for this attempt." %}
 </div>
 {% endif %}
 

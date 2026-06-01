@@ -1,16 +1,13 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Classes{% endblock %}
-{% block page_title %}Classes{% endblock %}
+{% block title %}{% trans "Classes" %}{% endblock %}
+{% block page_title %}{% trans "Classes" %}{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1.5rem;">
     <p style="color: var(--gray-500); margin: 0;">
-        {{ total_students }} student{{ total_students|pluralize }} grouped into
-        {{ classes|length }} class{{ classes|length|pluralize:"es" }}.
-        Open a class to see its courses, mastery averages, and roster.
-        Promotion lives on the class page — pick the students you want to
-        move and confirm there.
+        {% blocktrans with students=total_students classes_count=classes|length %}{{ students }} students grouped into {{ classes_count }} classes. Open a class to see its courses, mastery averages, and roster. Promotion lives on the class page — pick the students you want to move and confirm there.{% endblocktrans %}
     </p>
 </div>
 
@@ -31,7 +28,7 @@
             {{ cls.count }}
         </div>
         <div style="font-size:0.82rem; color:var(--gray-500);">
-            student{{ cls.count|pluralize }}
+            {% blocktrans count count=cls.count %}student{% plural %}students{% endblocktrans %}
         </div>
     </a>
     {% else %}
@@ -44,7 +41,7 @@
             {{ cls.count }}
         </div>
         <div style="font-size:0.78rem; color:var(--gray-500);">
-            student{{ cls.count|pluralize }} without a grade set on their profile
+            {% blocktrans count count=cls.count %}student without a grade set on their profile{% plural %}students without a grade set on their profile{% endblocktrans %}
         </div>
     </div>
     {% endif %}
@@ -64,8 +61,8 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
-        <h3>No students yet</h3>
-        <p>Students will appear here once they join and complete their profiles.</p>
+        <h3>{% trans "No students yet" %}</h3>
+        <p>{% trans "Students will appear here once they join and complete their profiles." %}</p>
     </div>
 </div>
 {% endif %}

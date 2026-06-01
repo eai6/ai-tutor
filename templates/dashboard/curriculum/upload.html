@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Upload Curriculum{% endblock %}
-{% block page_title %}Upload Curriculum{% endblock %}
+{% block title %}{% trans "Upload Curriculum" %}{% endblock %}
+{% block page_title %}{% trans "Upload Curriculum" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -224,7 +225,7 @@
 {% block content %}
 <div style="max-width: 700px;">
     <p style="color: var(--gray-500); margin-bottom: 2rem;">
-        Upload a curriculum document to automatically generate courses and lessons.
+        {% trans "Upload a curriculum document to automatically generate courses and lessons." %}
     </p>
 
     {% if is_superadmin and not institution %}
@@ -234,8 +235,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <div style="font-size: 0.875rem; color: #1E40AF;">
-                <strong>Platform-wide upload</strong> &mdash; This curriculum will be shared across all schools (read-only for staff).
-                To upload for a specific school, select it from the dropdown above.
+                <strong>{% trans "Platform-wide upload" %}</strong> &mdash; {% trans "This curriculum will be shared across all schools (read-only for staff). To upload for a specific school, select it from the dropdown above." %}
             </div>
         </div>
     </div>
@@ -248,13 +248,13 @@
             <div class="card-body">
                 <!-- File Upload -->
                 <div class="form-group">
-                    <label class="form-label">Curriculum Document</label>
+                    <label class="form-label">{% trans "Curriculum Document" %}</label>
                     <div class="upload-zone" id="upload-zone">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                         </svg>
-                        <h3>Drop your file here</h3>
-                        <p>or click to browse (PDF, DOCX, TXT)</p>
+                        <h3>{% trans "Drop your file here" %}</h3>
+                        <p>{% trans "or click to browse (PDF, DOCX, TXT)" %}</p>
                         <input type="file" name="curriculum_file" id="file-input" accept=".pdf,.docx,.doc,.txt" style="display: none;">
                     </div>
                     <div id="file-selected" class="file-selected" style="display: none;">
@@ -275,44 +275,44 @@
 
                 <!-- Subject (canonical dropdown — drives material inheritance match) -->
                 <div class="form-group">
-                    <label class="form-label" for="subject_code">Subject <span style="color:var(--danger);">*</span></label>
+                    <label class="form-label" for="subject_code">{% trans "Subject" %} <span style="color:var(--danger);">*</span></label>
                     <select class="form-control" id="subject_code" name="subject_code" required>
-                        <option value="">— Select subject —</option>
+                        <option value="">{% trans "— Select subject —" %}</option>
                         {% for code, label in subject_code_choices %}
                         <option value="{{ code }}">{{ label }}</option>
                         {% endfor %}
                     </select>
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Canonical subject — used to match this course with platform-wide teaching materials for the same subject + grade.
+                        {% trans "Canonical subject — used to match this course with platform-wide teaching materials for the same subject + grade." %}
                     </div>
                 </div>
 
                 <!-- Language / locale (M5-wire 2026-06-01) -->
                 <div class="form-group">
-                    <label class="form-label" for="locale">Language <span style="color:var(--danger);">*</span></label>
+                    <label class="form-label" for="locale">{% trans "Language" %} <span style="color:var(--danger);">*</span></label>
                     <select class="form-control" id="locale" name="locale" required>
                         {% for code, label in locale_choices %}
                         <option value="{{ code }}" {% if code == 'en-us' %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Drives the language the AI tutor responds in for this course, plus the language of all generated lessons + MCQs.
+                        {% trans "Drives the language the AI tutor responds in for this course, plus the language of all generated lessons + MCQs." %}
                     </div>
                 </div>
 
                 <!-- Optional display-name override -->
                 <div class="form-group">
-                    <label class="form-label" for="subject_name">Display name <span style="color:var(--gray-400);font-weight:normal;">(optional)</span></label>
+                    <label class="form-label" for="subject_name">{% trans "Display name" %} <span style="color:var(--gray-400);font-weight:normal;">{% trans "(optional)" %}</span></label>
                     <input type="text" class="form-control" id="subject_name" name="subject_name"
-                           placeholder="auto-derived from subject above (e.g. 'Geography')">
+                           placeholder="{% trans 'auto-derived from subject above (e.g. Geography)' %}">
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Leave blank to use the subject label. Course title becomes "<i>Display name</i> <i>Grade</i>" (e.g. "Geography S3").
+                        {% trans "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Geography S3')." %}
                     </div>
                 </div>
 
                 <!-- Grade Level — multi-select checkboxes -->
                 <div class="form-group">
-                    <label class="form-label">Grade Levels to Process</label>
+                    <label class="form-label">{% trans "Grade Levels to Process" %}</label>
                     <div style="display:flex;flex-wrap:wrap;gap:0.5rem;" id="grade-pills">
                         {% for code, name in grade_levels %}
                         <label style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:999px;cursor:pointer;font-size:0.875rem;transition:all 0.15s;">
@@ -321,26 +321,26 @@
                         {% endfor %}
                     </div>
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Select which grade levels to extract. The document will be analyzed once and separate courses created per level.
+                        {% trans "Select which grade levels to extract. The document will be analyzed once and separate courses created per level." %}
                     </div>
                 </div>
 
                 <!-- Lesson Duration -->
                 <div class="form-group">
-                    <label class="form-label">Target Lesson Duration</label>
+                    <label class="form-label">{% trans "Target Lesson Duration" %}</label>
                     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
                         <label style="display:flex;align-items:center;gap:0.375rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:8px;cursor:pointer;font-size:0.875rem;">
-                            <input type="radio" name="lesson_duration" value="15" style="accent-color:var(--primary);"> 15 min · 3 steps
+                            <input type="radio" name="lesson_duration" value="15" style="accent-color:var(--primary);"> {% trans "15 min · 3 steps" %}
                         </label>
                         <label style="display:flex;align-items:center;gap:0.375rem;padding:0.5rem 1rem;border:2px solid var(--primary);border-radius:8px;cursor:pointer;font-size:0.875rem;background:var(--primary-light);">
-                            <input type="radio" name="lesson_duration" value="20" checked style="accent-color:var(--primary);"> 20 min · 4 steps (default)
+                            <input type="radio" name="lesson_duration" value="20" checked style="accent-color:var(--primary);"> {% trans "20 min · 4 steps (default)" %}
                         </label>
                         <label style="display:flex;align-items:center;gap:0.375rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:8px;cursor:pointer;font-size:0.875rem;">
-                            <input type="radio" name="lesson_duration" value="25" style="accent-color:var(--primary);"> 25 min · 5 steps (full)
+                            <input type="radio" name="lesson_duration" value="25" style="accent-color:var(--primary);"> {% trans "25 min · 5 steps (full)" %}
                         </label>
                     </div>
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime selector picks the subset matching the student's chosen duration. Shorter sessions skip the enrichment practice.
+                        {% trans "Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime selector picks the subset matching the student's chosen duration. Shorter sessions skip the enrichment practice." %}
                     </div>
                 </div>
 
@@ -348,10 +348,10 @@
                 <div class="material-section" id="material-section">
                     <label class="material-checkbox-label">
                         <input type="checkbox" id="attach-material" name="attach_material" value="1">
-                        Attach teaching materials
+                        {% trans "Attach teaching materials" %}
                     </label>
                     <div style="font-size: 0.8125rem; color: var(--gray-500); margin-top: 0.25rem; margin-left: 1.5rem;">
-                        Upload worksheets, past exam papers, textbook chapters, teacher notes — each file gets its own type. These are indexed into the knowledge base for AI tutoring and assessment.
+                        {% trans "Upload worksheets, past exam papers, textbook chapters, teacher notes — each file gets its own type. These are indexed into the knowledge base for AI tutoring and assessment." %}
                     </div>
 
                     <div id="material-fields" class="material-fields" style="display: none;">
@@ -360,15 +360,15 @@
                             <div class="material-entry" data-entry-index="0" style="border:1px solid var(--gray-200);border-radius:0.5rem;padding:1rem;margin-bottom:0.75rem;">
                                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
                                     <div class="form-group" style="grid-column:1/-1;">
-                                        <label class="form-label">Files</label>
+                                        <label class="form-label">{% trans "Files" %}</label>
                                         <input type="file" name="material_files_0" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple>
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label">Title</label>
-                                        <input type="text" name="material_titles" class="form-control" placeholder="e.g., Geography Worksheet Unit 5">
+                                        <label class="form-label">{% trans "Title" %}</label>
+                                        <input type="text" name="material_titles" class="form-control" placeholder="{% trans 'e.g., Geography Worksheet Unit 5' %}">
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label">Type</label>
+                                        <label class="form-label">{% trans "Type" %}</label>
                                         <select name="material_types" class="form-control">
                                             {% for code, name in material_types %}
                                             <option value="{{ code }}" {% if code == 'worksheet' %}selected{% endif %}>{{ name }}</option>
@@ -376,9 +376,9 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label class="form-label">Grade Level</label>
+                                        <label class="form-label">{% trans "Grade Level" %}</label>
                                         <select name="material_grades" class="form-control">
-                                            <option value="">All Levels</option>
+                                            <option value="">{% trans "All Levels" %}</option>
                                             <option value="S1">S1</option>
                                             <option value="S2">S2</option>
                                             <option value="S3">S3</option>
@@ -391,7 +391,7 @@
                         </div>
 
                         <button type="button" class="btn btn-secondary btn-sm" onclick="addMaterialEntry()" style="margin-bottom:0.75rem;">
-                            + Add another material
+                            + {% trans "Add another material" %}
                         </button>
 
                         <div style="background: #EFF6FF; border-radius: 8px; padding: 0.75rem;">
@@ -399,7 +399,7 @@
                                 <svg width="16" height="16" fill="none" stroke="#3B82F6" viewBox="0 0 24 24" style="flex-shrink: 0; margin-top: 0.125rem;">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                Materials are saved now but processed AFTER the curriculum is parsed and courses are created. You can process them from the course page.
+                                {% trans "Materials are saved now but processed AFTER the curriculum is parsed and courses are created. You can process them from the course page." %}
                             </div>
                         </div>
                     </div>
@@ -412,12 +412,12 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                         <div style="font-size: 0.875rem; color: #1E40AF;">
-                            <strong>What happens next?</strong>
+                            <strong>{% trans "What happens next?" %}</strong>
                             <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
-                                <li>AI will analyze your curriculum document</li>
-                                <li>Units and lessons will be extracted automatically</li>
-                                <li>You can review and edit before publishing</li>
-                                <li>Exit tickets and content will be generated</li>
+                                <li>{% trans "AI will analyze your curriculum document" %}</li>
+                                <li>{% trans "Units and lessons will be extracted automatically" %}</li>
+                                <li>{% trans "You can review and edit before publishing" %}</li>
+                                <li>{% trans "Exit tickets and content will be generated" %}</li>
                             </ul>
                         </div>
                     </div>
@@ -430,9 +430,9 @@
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                 </svg>
-                Upload & Process
+                {% trans "Upload & Process" %}
             </button>
-            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">Cancel</a>
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
         </div>
     </form>
 </div>

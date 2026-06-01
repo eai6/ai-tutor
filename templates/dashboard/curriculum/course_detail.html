@@ -1,5 +1,6 @@
 {% extends "dashboard/base.html" %}
 {% load dashboard_extras %}
+{% load i18n %}
 
 {% block title %}{{ course.title }}{% endblock %}
 {% block page_title %}{{ course.title }}{% endblock %}
@@ -156,7 +157,7 @@
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
     </svg>
-    Back to Curriculum
+    {% trans "Back to Curriculum" %}
 </a>
 
 <!-- Course Header -->
@@ -167,9 +168,9 @@
                 <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
                     <h2 style="font-size: 1.5rem; margin: 0;">{{ course.title }}</h2>
                     {% if course.is_published %}
-                        <span class="badge badge-success">Published</span>
+                        <span class="badge badge-success">{% trans "Published" %}</span>
                     {% else %}
-                        <span class="badge badge-warning">Draft</span>
+                        <span class="badge badge-warning">{% trans "Draft" %}</span>
                     {% endif %}
                     <span style="padding:3px 10px;border-radius:999px;font-size:0.6875rem;font-weight:700;background:{{ course_tier_bg }};color:{{ course_tier_color }};">{{ course_tier_label }}</span>
                 </div>
@@ -193,22 +194,22 @@
                 </form>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <a href="{% url 'dashboard:summative_review' course.id %}" class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📝 Summative Exam</a>
-                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm" style="background:#0891b2;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 Class Competency &amp; Readiness</a>
+                <a href="{% url 'dashboard:summative_review' course.id %}" class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📝 {% trans "Summative Exam" %}</a>
+                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm" style="background:#0891b2;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 {% trans "Class Competency & Readiness" %}</a>
                 {% if can_edit_content %}
-                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">Edit Course</button>{% endif %}
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">{% trans "Edit Course" %}</button>{% endif %}
                 {% if can_edit_content %}
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Publish all lessons in this course?');">Publish All</button>
+                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('{% trans "Publish all lessons in this course?" %}');">{% trans "Publish All" %}</button>
                 </form>
                 <form method="post" action="{% url 'dashboard:course_unpublish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Unpublish all lessons in this course?');">Unpublish All</button>
+                    <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('{% trans "Unpublish all lessons in this course?" %}');">{% trans "Unpublish All" %}</button>
                 </form>
                 <form method="post" action="{% url 'dashboard:course_delete' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone.');">Delete</button>
+                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone." %}');">{% trans "Delete" %}</button>
                 </form>
                 {% endif %}
             </div>
@@ -336,23 +337,23 @@
 <div class="stats-bar">
     <div class="stat-item">
         <div class="stat-value">{{ total_lessons }}</div>
-        <div class="stat-label">Total Lessons</div>
+        <div class="stat-label">{% trans "Total Lessons" %}</div>
     </div>
     <div class="stat-item">
         <div class="stat-value" style="color: var(--success);">{{ lessons_with_content }}</div>
-        <div class="stat-label">With Content</div>
+        <div class="stat-label">{% trans "With Content" %}</div>
     </div>
     <div class="stat-item">
         <div class="stat-value" style="color: var(--info);">{{ total_media }}</div>
-        <div class="stat-label">Media Assets</div>
+        <div class="stat-label">{% trans "Media Assets" %}</div>
     </div>
     <div class="stat-item">
         <div class="stat-value" style="color: var(--warning);">{{ total_media_pending }}</div>
-        <div class="stat-label">Media Pending</div>
+        <div class="stat-label">{% trans "Media Pending" %}</div>
     </div>
     <div style="flex: 1;"></div>
     <div class="stat-item" style="min-width: 150px;">
-        <div style="margin-bottom: 0.25rem; font-size: 0.75rem; color: var(--gray-500);">Content Progress</div>
+        <div style="margin-bottom: 0.25rem; font-size: 0.75rem; color: var(--gray-500);">{% trans "Content Progress" %}</div>
         <div class="progress-bar">
             {% if total_lessons > 0 %}
                 {% widthratio lessons_with_content total_lessons 100 as progress %}
@@ -362,7 +363,7 @@
             <div class="progress-bar-fill" style="width: {{ progress|default:0 }}%;"></div>
         </div>
         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
-            {{ progress|default:0 }}% complete
+            {% blocktrans with pct=progress|default:0 %}{{ pct }}% complete{% endblocktrans %}
         </div>
     </div>
 </div>

@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}{{ student.username }} — Competency Map{% endblock %}
-{% block page_title %}{{ student.first_name }} {{ student.last_name }} — {{ course.title }} competency map{% endblock %}
+{% block title %}{% blocktrans with name=student.username %}{{ name }} — Competency Map{% endblocktrans %}{% endblock %}
+{% block page_title %}{% blocktrans with first=student.first_name last=student.last_name title=course.title %}{{ first }} {{ last }} — {{ title }} competency map{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <style>
@@ -35,24 +36,24 @@
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← Class competency map</a>
+    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← {% trans "Class competency map" %}</a>
 </div>
 
 <div class="summary-row">
     <div class="summary-card">
-        <div class="label">Total objectives</div>
+        <div class="label">{% trans "Total objectives" %}</div>
         <div class="value">{{ total_objectives }}</div>
     </div>
     <div class="summary-card">
-        <div class="label">Mastered (latest ≥ 70%)</div>
+        <div class="label">{% trans "Mastered (latest ≥ 70%)" %}</div>
         <div class="value">{{ mastered_latest }}</div>
     </div>
     <div class="summary-card">
-        <div class="label">Has baseline</div>
+        <div class="label">{% trans "Has baseline" %}</div>
         <div class="value">{{ has_baseline }}</div>
     </div>
     <div class="summary-card">
-        <div class="label">Has final</div>
+        <div class="label">{% trans "Has final" %}</div>
         <div class="value">{{ has_final }}</div>
     </div>
 </div>
@@ -61,10 +62,10 @@
     <table>
         <thead>
             <tr>
-                <th style="width:60%;">Teaching objective</th>
-                <th>Status</th>
-                <th>Competency</th>
-                <th>Attempts</th>
+                <th style="width:60%;">{% trans "Teaching objective" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Competency" %}</th>
+                <th>{% trans "Attempts" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -72,10 +73,10 @@
             <tr>
                 <td class="obj">{{ r.tag }}</td>
                 <td>
-                    {% if r.latest_pct is None %}<span class="pill none">not assessed</span>
-                    {% elif r.latest_pct >= 70 %}<span class="pill mastered">mastered</span>
-                    {% elif r.latest_pct >= 40 %}<span class="pill med">developing</span>
-                    {% else %}<span class="pill weak">weak</span>{% endif %}
+                    {% if r.latest_pct is None %}<span class="pill none">{% trans "not assessed" %}</span>
+                    {% elif r.latest_pct >= 70 %}<span class="pill mastered">{% trans "mastered" %}</span>
+                    {% elif r.latest_pct >= 40 %}<span class="pill med">{% trans "developing" %}</span>
+                    {% else %}<span class="pill weak">{% trans "weak" %}</span>{% endif %}
                 </td>
                 <td>{% if r.latest_pct is not None %}<span class="pct">{{ r.latest_pct|floatformat:0 }}%</span>{% else %}<span class="pct-faint">—</span>{% endif %}</td>
                 <td><span class="pct-faint">{{ r.attempts }}</span></td>

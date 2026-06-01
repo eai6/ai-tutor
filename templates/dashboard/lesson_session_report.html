@@ -1,5 +1,6 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Session Report — {{ lesson.title }}{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with title=lesson.title %}Session Report — {{ title }}{% endblocktrans %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -268,17 +269,17 @@
 
 {% block content %}
 <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
-    &larr; Back to {{ lesson.title }}
+    &larr; {% blocktrans with title=lesson.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <!-- Header -->
 <div class="report-header">
     <div>
-        <h2>Session Report: {{ lesson.title }}</h2>
+        <h2>{% blocktrans with title=lesson.title %}Session Report: {{ title }}{% endblocktrans %}</h2>
         <div class="report-meta">{{ unit.title }} &mdash; {{ course.title }}</div>
     </div>
     <div>
-        <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:0.8125rem;font-weight:600;text-decoration:none;background:#8b5cf6;color:#fff;">Live Monitor</a>
+        <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" style="display:inline-block;padding:6px 14px;border-radius:6px;font-size:0.8125rem;font-weight:600;text-decoration:none;background:#8b5cf6;color:#fff;">{% trans "Live Monitor" %}</a>
     </div>
 </div>
 
@@ -286,19 +287,19 @@
 <div class="summary-cards">
     <div class="summary-card">
         <div class="number">{{ assessed_count }}/{{ total_students }}</div>
-        <div class="label">Took Exit Ticket</div>
+        <div class="label">{% trans "Took Exit Ticket" %}</div>
     </div>
     <div class="summary-card">
         <div class="number {% if assessed_count == 0 %}gray{% elif students_below_count == 0 %}green{% elif students_below_count <= 3 %}yellow{% else %}red{% endif %}">{% if assessed_count %}{{ avg_pct }}%{% else %}—{% endif %}</div>
-        <div class="label">Avg Competency{% if unassessed_count %}<span style="font-weight:400;color:#a1a1aa;display:block;font-size:0.625rem;text-transform:none;letter-spacing:0;">(assessed only)</span>{% endif %}</div>
+        <div class="label">{% trans "Avg Competency" %}{% if unassessed_count %}<span style="font-weight:400;color:#a1a1aa;display:block;font-size:0.625rem;text-transform:none;letter-spacing:0;">{% trans "(assessed only)" %}</span>{% endif %}</div>
     </div>
     <div class="summary-card">
         <div class="number {% if students_below_count == 0 %}green{% else %}red{% endif %}">{{ students_below_count }}</div>
-        <div class="label">Below {{ move_on_threshold }}%</div>
+        <div class="label">{% blocktrans with pct=move_on_threshold %}Below {{ pct }}%{% endblocktrans %}</div>
     </div>
     <div class="summary-card">
         <div class="number {% if unassessed_count == 0 %}green{% else %}gray{% endif %}">{{ unassessed_count }}</div>
-        <div class="label">Unassessed</div>
+        <div class="label">{% trans "Unassessed" %}</div>
     </div>
 </div>
 
@@ -335,19 +336,19 @@
         <div class="recommendation-text">
             {{ recommendation }}
             {% if recommendation_action == 'proceed' %}
-                <div class="sub">Every student has achieved at least {{ move_on_threshold }}% of enabling objectives. The class is ready for the next lesson.</div>
+                <div class="sub">{% blocktrans with pct=move_on_threshold %}Every student has achieved at least {{ pct }}% of enabling objectives. The class is ready for the next lesson.{% endblocktrans %}</div>
             {% elif recommendation_action == 'proceed_with_review' %}
-                <div class="sub">A small number of students need targeted support. You can proceed while the tutor provides remediation to those students.</div>
+                <div class="sub">{% trans "A small number of students need targeted support. You can proceed while the tutor provides remediation to those students." %}</div>
             {% else %}
-                <div class="sub">Too many students are below the {{ move_on_threshold }}% threshold. Dedicate your next teacher session to the weak objectives listed above.</div>
+                <div class="sub">{% blocktrans with pct=move_on_threshold %}Too many students are below the {{ pct }}% threshold. Dedicate your next teacher session to the weak objectives listed above.{% endblocktrans %}</div>
             {% endif %}
         </div>
         <div class="recommendation-action">
             {% if next_lesson and recommendation_action != 'revisit' %}
-                <a href="{% url 'dashboard:lesson_detail' next_lesson.id %}" class="btn-proceed">Next Lesson: {{ next_lesson.title|truncatewords:5 }}</a>
+                <a href="{% url 'dashboard:lesson_detail' next_lesson.id %}" class="btn-proceed">{% blocktrans with t=next_lesson.title|truncatewords:5 %}Next Lesson: {{ t }}{% endblocktrans %}</a>
             {% endif %}
             {% if recommendation_action == 'revisit' %}
-                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn-revisit">Review This Lesson</a>
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn-revisit">{% trans "Review This Lesson" %}</a>
             {% endif %}
         </div>
     </div>
@@ -361,7 +362,7 @@ competency.
 {% endcomment %}
 
 <!-- Students by Competency Category -->
-<div class="section-title">Students by Competency Category</div>
+<div class="section-title">{% trans "Students by Competency Category" %}</div>
 
 {% if category_groups %}
 {% for group in category_groups %}
@@ -371,24 +372,21 @@ competency.
         <div>
             <span style="font-weight:800;font-size:1rem;color:{{ group.color }};">{{ group.code }}</span>
             <span style="font-weight:600;font-size:0.875rem;color:{{ group.color }};margin-left:0.5rem;">{{ group.label }}</span>
-            <span style="font-size:0.8125rem;color:{{ group.color }}99;margin-left:0.5rem;">({{ group.count }} student{{ group.count|pluralize }})</span>
+            <span style="font-size:0.8125rem;color:{{ group.color }}99;margin-left:0.5rem;">({% blocktrans count count=group.count %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %})</span>
         </div>
     </div>
 
     <!-- Targeted Instruction Recommendation -->
     <div style="padding:0.75rem 1rem;background:{{ group.bg }}88;border-bottom:1px solid {{ group.border }};font-size:0.8125rem;color:#374151;">
-        <strong>Instruction:</strong> {{ group.instruction }}
+        <strong>{% trans "Instruction:" %}</strong> {{ group.instruction }}
     </div>
 
-    <!-- Student List — Exit Quiz column dropped since the competency
-         % is derived from the exit-ticket score anyway (Edward,
-         2026-05-07). Time-on-quiz is a useful detail though, so
-         we keep it inline as small text under the student name. -->
+    <!-- Student List -->
     <table class="obj-table" style="box-shadow:none;border-radius:0;margin-bottom:0;">
         <thead>
             <tr>
-                <th>Student</th>
-                <th>Competency</th>
+                <th>{% trans "Student" %}</th>
+                <th>{% trans "Competency" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -398,13 +396,13 @@ competency.
                     <span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span>
                     {% if s.exit_passed != None %}
                         <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">
-                            Exit ticket: {{ s.exit_score }} · {{ s.exit_time }}
+                            {% blocktrans with score=s.exit_score time=s.exit_time %}Exit ticket: {{ score }} · {{ time }}{% endblocktrans %}
                         </div>
                     {% else %}
-                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">Not taken</div>
+                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">{% trans "Not taken" %}</div>
                     {% endif %}
                 </td>
-                <td data-label="Competency">
+                <td data-label="{% trans 'Competency' %}">
                     {% if s.has_exit_attempt %}
                         <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">{{ s.pct }}%</span>
                     {% else %}
@@ -419,39 +417,39 @@ competency.
 {% endfor %}
 {% else %}
 <div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
-    No student session data available yet.
+    {% trans "No student session data available yet." %}
 </div>
 {% endif %}
 
 {# Group sessions section (G6) — sessions where >1 student worked together #}
 {% if group_sessions %}
-<div class="section-title" style="margin-top:2rem;">👥 Group Sessions ({{ group_sessions|length }})</div>
+<div class="section-title" style="margin-top:2rem;">{% blocktrans with count=group_sessions|length %}👥 Group Sessions ({{ count }}){% endblocktrans %}</div>
 <div style="background:#fff;border-radius:0.75rem;overflow:hidden;border:1px solid var(--gray-200);">
     <table class="responsive-cards" style="width:100%;border-collapse:collapse;">
         <thead style="background:var(--gray-50);">
             <tr style="text-align:left;font-size:0.78rem;color:var(--gray-500);text-transform:uppercase;">
-                <th style="padding:0.75rem 1rem;">Started</th>
-                <th style="padding:0.75rem 1rem;">Participants</th>
-                <th style="padding:0.75rem 1rem;">Status</th>
+                <th style="padding:0.75rem 1rem;">{% trans "Started" %}</th>
+                <th style="padding:0.75rem 1rem;">{% trans "Participants" %}</th>
+                <th style="padding:0.75rem 1rem;">{% trans "Status" %}</th>
                 <th style="padding:0.75rem 1rem;"></th>
             </tr>
         </thead>
         <tbody>
             {% for gs in group_sessions %}
             <tr style="border-top:1px solid var(--gray-100);">
-                <td data-label="Started" style="padding:0.75rem 1rem;font-size:0.85rem;">{{ gs.session.started_at|date:"M j, H:i" }}</td>
-                <td data-label="Participants" style="padding:0.75rem 1rem;">
+                <td data-label="{% trans 'Started' %}" style="padding:0.75rem 1rem;font-size:0.85rem;">{{ gs.session.started_at|date:"M j, H:i" }}</td>
+                <td data-label="{% trans 'Participants' %}" style="padding:0.75rem 1rem;">
                     <span>
                         {% for s in gs.participants %}<span class="badge" style="background:var(--gray-100);color:var(--gray-700);font-size:0.75rem;margin-right:0.25rem;">{{ s.username }}</span>{% endfor %}
                     </span>
                 </td>
-                <td data-label="Status" style="padding:0.75rem 1rem;font-size:0.85rem;">
+                <td data-label="{% trans 'Status' %}" style="padding:0.75rem 1rem;font-size:0.85rem;">
                     <span>
-                        {% if gs.is_completed %}<span style="color:#059669;">✓ completed</span>{% else %}<span style="color:#d97706;">in progress</span>{% endif %}
+                        {% if gs.is_completed %}<span style="color:#059669;">{% trans "✓ completed" %}</span>{% else %}<span style="color:#d97706;">{% trans "in progress" %}</span>{% endif %}
                     </span>
                 </td>
                 <td style="padding:0.75rem 1rem;text-align:right;">
-                    <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">View chat</a>
+                    <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">{% trans "View chat" %}</a>
                 </td>
             </tr>
             {% endfor %}

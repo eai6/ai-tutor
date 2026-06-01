@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Edit Step{% endblock %}
-{% block page_title %}Edit Step {{ step.order_index|add:1 }}{% endblock %}
+{% block title %}{% trans "Edit Step" %}{% endblock %}
+{% block page_title %}{% blocktrans with n=step.order_index|add:1 %}Edit Step {{ n }}{% endblocktrans %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -31,34 +32,34 @@
 
 {% block content %}
 <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← Back to {{ lesson.title }}
+    ← {% blocktrans with title=lesson.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <div class="card" style="max-width: 800px;">
     <div class="card-header">
-        <h3 class="card-title">Edit Step {{ step.order_index|add:1 }}</h3>
+        <h3 class="card-title">{% blocktrans with n=step.order_index|add:1 %}Edit Step {{ n }}{% endblocktrans %}</h3>
     </div>
     <div class="card-body">
         <div class="step-meta">
             <div class="step-meta-item">
-                <span class="step-meta-label">Lesson</span>
+                <span class="step-meta-label">{% trans "Lesson" %}</span>
                 <span class="step-meta-value">{{ lesson.title }}</span>
             </div>
             <div class="step-meta-item">
-                <span class="step-meta-label">Unit</span>
+                <span class="step-meta-label">{% trans "Unit" %}</span>
                 <span class="step-meta-value">{{ lesson.unit.title }}</span>
             </div>
             <div class="step-meta-item">
-                <span class="step-meta-label">Step</span>
-                <span class="step-meta-value">{{ step.order_index|add:1 }} of {{ total_steps }}</span>
+                <span class="step-meta-label">{% trans "Step" %}</span>
+                <span class="step-meta-value">{% blocktrans with n=step.order_index|add:1 total=total_steps %}{{ n }} of {{ total }}{% endblocktrans %}</span>
             </div>
         </div>
-        
+
         <form method="post">
             {% csrf_token %}
-            
+
             <div class="form-group">
-                <label>Phase (5E Model)</label>
+                <label>{% trans "Phase (5E Model)" %}</label>
                 <div class="phase-select">
                     {% for phase_val, phase_label in phases %}
                     <label class="phase-option {% if step.phase == phase_val %}selected{% endif %}">
@@ -68,57 +69,57 @@
                     {% endfor %}
                 </div>
             </div>
-            
+
             <div class="form-group">
-                <label for="step_type">Step Type</label>
+                <label for="step_type">{% trans "Step Type" %}</label>
                 <select name="step_type" id="step_type" class="form-control">
-                    <option value="teach" {% if step.step_type == 'teach' %}selected{% endif %}>Teach - Direct instruction</option>
-                    <option value="worked_example" {% if step.step_type == 'worked_example' %}selected{% endif %}>Worked Example</option>
-                    <option value="practice" {% if step.step_type == 'practice' %}selected{% endif %}>Practice - Student attempts</option>
-                    <option value="quiz" {% if step.step_type == 'quiz' %}selected{% endif %}>Quiz - Assessment</option>
+                    <option value="teach" {% if step.step_type == 'teach' %}selected{% endif %}>{% trans "Teach - Direct instruction" %}</option>
+                    <option value="worked_example" {% if step.step_type == 'worked_example' %}selected{% endif %}>{% trans "Worked Example" %}</option>
+                    <option value="practice" {% if step.step_type == 'practice' %}selected{% endif %}>{% trans "Practice - Student attempts" %}</option>
+                    <option value="quiz" {% if step.step_type == 'quiz' %}selected{% endif %}>{% trans "Quiz - Assessment" %}</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
-                <label for="teacher_script">Tutor Script</label>
+                <label for="teacher_script">{% trans "Tutor Script" %}</label>
                 <textarea name="teacher_script" id="teacher_script" class="form-control" rows="6">{{ step.teacher_script }}</textarea>
-                <small>What the AI tutor says to explain concepts.</small>
+                <small>{% trans "What the AI tutor says to explain concepts." %}</small>
             </div>
-            
+
             <div class="form-group">
-                <label for="question">Question (optional)</label>
+                <label for="question">{% trans "Question (optional)" %}</label>
                 <textarea name="question" id="question" class="form-control" rows="3">{{ step.question }}</textarea>
             </div>
-            
+
             <div class="form-group">
-                <label for="expected_answer">Expected Answer</label>
+                <label for="expected_answer">{% trans "Expected Answer" %}</label>
                 <input type="text" name="expected_answer" id="expected_answer" class="form-control" value="{{ step.expected_answer|default:'' }}">
             </div>
-            
+
             <div class="form-group">
-                <label for="answer_type">Answer Type</label>
+                <label for="answer_type">{% trans "Answer Type" %}</label>
                 <select name="answer_type" id="answer_type" class="form-control">
-                    <option value="none" {% if step.answer_type == 'none' %}selected{% endif %}>None</option>
-                    <option value="free_text" {% if step.answer_type == 'free_text' %}selected{% endif %}>Free Text</option>
-                    <option value="multiple_choice" {% if step.answer_type == 'multiple_choice' %}selected{% endif %}>Multiple Choice</option>
-                    <option value="numeric" {% if step.answer_type == 'numeric' %}selected{% endif %}>Numeric</option>
+                    <option value="none" {% if step.answer_type == 'none' %}selected{% endif %}>{% trans "None" %}</option>
+                    <option value="free_text" {% if step.answer_type == 'free_text' %}selected{% endif %}>{% trans "Free Text" %}</option>
+                    <option value="multiple_choice" {% if step.answer_type == 'multiple_choice' %}selected{% endif %}>{% trans "Multiple Choice" %}</option>
+                    <option value="numeric" {% if step.answer_type == 'numeric' %}selected{% endif %}>{% trans "Numeric" %}</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
-                <label for="choices">Choices (one per line)</label>
+                <label for="choices">{% trans "Choices (one per line)" %}</label>
                 <textarea name="choices" id="choices" class="form-control" rows="4">{% if step.choices %}{% for choice in step.choices %}{{ choice }}{% if not forloop.last %}
 {% endif %}{% endfor %}{% endif %}</textarea>
             </div>
-            
+
             <div class="form-group">
-                <label for="hints">Hints (one per line)</label>
+                <label for="hints">{% trans "Hints (one per line)" %}</label>
                 <textarea name="hints" id="hints" class="form-control" rows="3">{% if step.hints %}{% for hint in step.hints %}{{ hint }}{% if not forloop.last %}
 {% endif %}{% endfor %}{% endif %}</textarea>
             </div>
-            
+
             <div class="form-group">
-                <label>Media</label>
+                <label>{% trans "Media" %}</label>
                 <div class="media-editor">
                     {% if step.media and step.media.images %}
                         {% for img in step.media.images %}
@@ -128,60 +129,60 @@
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <strong>{{ img.type|default:"Image" }}</strong>
                                 {% if img.source == 'uploaded' %}
-                                <span style="color: var(--primary);">Uploaded</span>
+                                <span style="color: var(--primary);">{% trans "Uploaded" %}</span>
                                 {% else %}
-                                <span style="color: var(--success);">Generated</span>
+                                <span style="color: var(--success);">{% trans "Generated" %}</span>
                                 {% endif %}
                             </div>
                             {% else %}
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <strong>{{ img.type|default:"Image" }}</strong>
-                                <span style="color: var(--warning);">Pending</span>
+                                <span style="color: var(--warning);">{% trans "Pending" %}</span>
                             </div>
                             {% endif %}
                             <div style="margin-top: 0.5rem;">
-                                <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">Image Prompt</label>
+                                <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">{% trans "Image Prompt" %}</label>
                                 <textarea name="image_description_{{ forloop.counter0 }}" class="form-control" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
                             </div>
                             <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <select id="model-choice-{{ forloop.counter0 }}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="Image model for regeneration">
-                                    <option value="">Default (config)</option>
+                                <select id="model-choice-{{ forloop.counter0 }}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="{% trans 'Image model for regeneration' %}">
+                                    <option value="">{% trans "Default (config)" %}</option>
                                     <option value="openai">OpenAI gpt-image-2</option>
                                     <option value="gemini">Gemini</option>
                                 </select>
                                 <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm">
-                                    Regenerate
+                                    {% trans "Regenerate" %}
                                 </button>
                                 <label class="btn btn-secondary btn-sm" style="margin: 0; cursor: pointer;">
-                                    Replace
+                                    {% trans "Replace" %}
                                     <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'replace_image', {{ forloop.counter0 }})">
                                 </label>
                                 <button type="button" class="btn btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteImage({{ forloop.counter0 }})">
-                                    Delete
+                                    {% trans "Delete" %}
                                 </button>
                                 {% if img.model %}
-                                <span style="font-size: 0.7rem; color: var(--gray-500);">last: {{ img.model }}</span>
+                                <span style="font-size: 0.7rem; color: var(--gray-500);">{% blocktrans with name=img.model %}last: {{ name }}{% endblocktrans %}</span>
                                 {% endif %}
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p style="color: var(--gray-500); margin: 0;">No media attached to this step.</p>
+                        <p style="color: var(--gray-500); margin: 0;">{% trans "No media attached to this step." %}</p>
                     {% endif %}
 
                     <div style="margin-top: 0.75rem; padding-top: 0.75rem; {% if step.media and step.media.images %}border-top: 1px solid var(--gray-200);{% endif %}">
                         <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
-                            + Add Image
+                            + {% trans "Add Image" %}
                             <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'upload_image')">
                         </label>
-                        <span style="font-size: 0.75rem; color: var(--gray-500); margin-left: 0.5rem;">Upload a custom image for this step</span>
+                        <span style="font-size: 0.75rem; color: var(--gray-500); margin-left: 0.5rem;">{% trans "Upload a custom image for this step" %}</span>
                     </div>
                 </div>
             </div>
-            
+
             <div style="display: flex; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             </div>
         </form>
     </div>

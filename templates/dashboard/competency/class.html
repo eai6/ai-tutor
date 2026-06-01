@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}{{ course.title }} — Competency Map{% endblock %}
-{% block page_title %}{{ course.title }} — Competency Map{% endblock %}
+{% block title %}{% blocktrans with title=course.title %}{{ title }} — Competency Map{% endblocktrans %}{% endblock %}
+{% block page_title %}{% blocktrans with title=course.title %}{{ title }} — Competency Map{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <style>
@@ -44,27 +45,27 @@
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← Back to {{ course.title }}</a>
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
 </div>
 
 <div class="summary-row">
     <div class="summary-card" style="background:linear-gradient(135deg,#5b21b6 0%,#8b5cf6 100%);color:#fff;border:none;">
-        <div class="label" style="color:rgba(255,255,255,0.8);">Class readiness</div>
+        <div class="label" style="color:rgba(255,255,255,0.8);">{% trans "Class readiness" %}</div>
         <div class="value" style="color:#fff;">{{ readiness }}%</div>
-        <div style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:0.2rem;">average of class competency across all lessons</div>
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:0.2rem;">{% trans "average of class competency across all lessons" %}</div>
     </div>
     <div class="summary-card">
-        <div class="label">Teaching objectives</div>
+        <div class="label">{% trans "Teaching objectives" %}</div>
         <div class="value">{{ matrix.objectives|length }}</div>
-        {% if struggling_count %}<div style="font-size:0.72rem;color:#b91c1c;margin-top:0.2rem;">{{ struggling_count }} below 50%</div>{% endif %}
-        {% if untouched_count %}<div style="font-size:0.72rem;color:#6b7280;margin-top:0.2rem;">{{ untouched_count }} not yet assessed</div>{% endif %}
+        {% if struggling_count %}<div style="font-size:0.72rem;color:#b91c1c;margin-top:0.2rem;">{% blocktrans with n=struggling_count %}{{ n }} below 50%{% endblocktrans %}</div>{% endif %}
+        {% if untouched_count %}<div style="font-size:0.72rem;color:#6b7280;margin-top:0.2rem;">{% blocktrans with n=untouched_count %}{{ n }} not yet assessed{% endblocktrans %}</div>{% endif %}
     </div>
     <div class="summary-card">
-        <div class="label">Roster</div>
+        <div class="label">{% trans "Roster" %}</div>
         <div class="value">{{ matrix.total_students }}</div>
     </div>
     <div class="summary-card">
-        <div class="label">Students attempted</div>
+        <div class="label">{% trans "Students attempted" %}</div>
         <div class="value">{{ matrix.students_attempted }}</div>
     </div>
 </div>
@@ -84,11 +85,11 @@
     <table>
         <thead>
             <tr>
-                <th style="width:50%;">Teaching objective</th>
-                <th>Students</th>
-                <th>Average competency</th>
-                <th>Mastered ≥70%</th>
-                <th title="Attempts taken in a group session vs solo">Group attempts</th>
+                <th style="width:50%;">{% trans "Teaching objective" %}</th>
+                <th>{% trans "Students" %}</th>
+                <th>{% trans "Average competency" %}</th>
+                <th>{% trans "Mastered ≥70%" %}</th>
+                <th title="{% trans 'Attempts taken in a group session vs solo' %}">{% trans "Group attempts" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -109,10 +110,10 @@
                 <td>
                     {% if r.total_attempts %}
                         {% if r.group_attempts %}
-                            <span class="pct" title="{{ r.group_attempts }} group attempt{{ r.group_attempts|pluralize }} from {{ r.students_with_group_attempt }} student{{ r.students_with_group_attempt|pluralize }}">👥 {{ r.group_attempts }}</span>
+                            <span class="pct" title="{% blocktrans with g=r.group_attempts s=r.students_with_group_attempt %}{{ g }} group attempts from {{ s }} students{% endblocktrans %}">👥 {{ r.group_attempts }}</span>
                             <span class="pct-faint"> / {{ r.total_attempts }}</span>
                         {% else %}
-                            <span class="pct-faint" title="All {{ r.total_attempts }} attempt{{ r.total_attempts|pluralize }} solo">— / {{ r.total_attempts }}</span>
+                            <span class="pct-faint" title="{% blocktrans with n=r.total_attempts %}All {{ n }} attempts solo{% endblocktrans %}">— / {{ r.total_attempts }}</span>
                         {% endif %}
                     {% else %}
                         <span class="pct-faint">—</span>
@@ -126,25 +127,25 @@
 {% else %}
 <div class="empty-state">
     <div style="font-size:2.5rem;">📊</div>
-    <h3>No teaching objectives yet</h3>
-    <p>This course has no extracted teaching objectives. Re-parse the curriculum to populate them.</p>
+    <h3>{% trans "No teaching objectives yet" %}</h3>
+    <p>{% trans "This course has no extracted teaching objectives. Re-parse the curriculum to populate them." %}</p>
 </div>
 {% endif %}
 
 {% if student_gaps %}
 <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">Students with the most gaps</h3>
-    <p style="margin:0 0 0.75rem;color:#6b7280;font-size:0.82rem;">Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown.</p>
+    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">{% trans "Students with the most gaps" %}</h3>
+    <p style="margin:0 0 0.75rem;color:#6b7280;font-size:0.82rem;">{% trans "Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown." %}</p>
     <div style="display:flex;flex-direction:column;gap:0.4rem;">
         {% for gap in student_gaps %}
         <a href="{% url 'dashboard:student_competency' course.id gap.student.id %}" style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-decoration:none;color:inherit;">
             <div style="flex:1;min-width:0;">
                 <div style="font-weight:600;color:#111;font-size:0.9rem;">{{ gap.student.first_name }} {{ gap.student.last_name }} <span style="color:#9ca3af;font-weight:400;">@{{ gap.student.username }}</span></div>
                 <div style="font-size:0.78rem;color:#6b7280;margin-top:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                    Weak on: {{ gap.weak_objectives|join:" · "|truncatechars:140 }}
+                    {% trans "Weak on:" %} {{ gap.weak_objectives|join:" · "|truncatechars:140 }}
                 </div>
             </div>
-            <span style="background:#fee2e2;color:#991b1b;font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{{ gap.weak_count }} gap{{ gap.weak_count|pluralize }}</span>
+            <span style="background:#fee2e2;color:#991b1b;font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{% blocktrans count count=gap.weak_count %}{{ count }} gap{% plural %}{{ count }} gaps{% endblocktrans %}</span>
         </a>
         {% endfor %}
     </div>

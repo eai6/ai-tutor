@@ -1,17 +1,18 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Flagged Chats{% endblock %}
-{% block page_title %}Flagged Chats{% endblock %}
+{% block title %}{% trans "Flagged Chats" %}{% endblock %}
+{% block page_title %}{% trans "Flagged Chats" %}{% endblock %}
 
 {% block content %}
 <!-- Stats — safety-only (validator flags removed, 2026-05-07) -->
 <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 420px;">
     <div class="stat-card">
-        <div class="stat-label">Safety Flags</div>
+        <div class="stat-label">{% trans "Safety Flags" %}</div>
         <div class="stat-value">{{ total_flagged }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Unreviewed</div>
+        <div class="stat-label">{% trans "Unreviewed" %}</div>
         <div class="stat-value" style="color: {% if unreviewed_count %}var(--danger){% else %}var(--success){% endif %}">{{ unreviewed_count }}</div>
     </div>
 </div>
@@ -19,10 +20,10 @@
 <!-- Filters: status only -->
 <div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
     <div style="display:flex;gap:0.4rem;">
-        <span style="font-size:0.75rem;color:var(--gray-500);align-self:center;text-transform:uppercase;">Status:</span>
-        <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All</a>
-        <a href="?status=unreviewed" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Unreviewed</a>
-        <a href="?status=reviewed" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Reviewed</a>
+        <span style="font-size:0.75rem;color:var(--gray-500);align-self:center;text-transform:uppercase;">{% trans "Status:" %}</span>
+        <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "All" %}</a>
+        <a href="?status=unreviewed" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Unreviewed" %}</a>
+        <a href="?status=reviewed" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Reviewed" %}</a>
     </div>
 </div>
 
@@ -32,11 +33,11 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Student</th>
-                    <th>Lesson</th>
-                    <th>Flag Reason</th>
-                    <th>Flagged At</th>
-                    <th>Status</th>
+                    <th>{% trans "Student" %}</th>
+                    <th>{% trans "Lesson" %}</th>
+                    <th>{% trans "Flag Reason" %}</th>
+                    <th>{% trans "Flagged At" %}</th>
+                    <th>{% trans "Status" %}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -49,16 +50,16 @@
                     </td>
                     <td>{{ s.lesson.title }}</td>
                     <td style="max-width: 240px;">
-                        <div style="font-size: 0.78rem;color:#991b1b;">⚠ Safety: {{ s.flag_reason|truncatewords:10 }}</div>
+                        <div style="font-size: 0.78rem;color:#991b1b;">{% blocktrans with reason=s.flag_reason|truncatewords:10 %}⚠ Safety: {{ reason }}{% endblocktrans %}</div>
                     </td>
                     <td style="font-size: 0.875rem;">
-                        {% if s.flagged_at %}{{ s.flagged_at|timesince }} ago{% else %}&mdash;{% endif %}
+                        {% if s.flagged_at %}{% blocktrans with ts=s.flagged_at|timesince %}{{ ts }} ago{% endblocktrans %}{% else %}&mdash;{% endif %}
                     </td>
                     <td>
-                        {% if s.flag_reviewed %}<span class="badge badge-success">Reviewed</span>{% else %}<span class="badge badge-danger">Unreviewed</span>{% endif %}
+                        {% if s.flag_reviewed %}<span class="badge badge-success">{% trans "Reviewed" %}</span>{% else %}<span class="badge badge-danger">{% trans "Unreviewed" %}</span>{% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">View</a>
+                        <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">{% trans "View" %}</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -69,13 +70,13 @@
         {% if sessions.has_other_pages %}
         <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
             {% if sessions.has_previous %}
-                <a href="?status={{ status_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; Previous</a>
+                <a href="?status={{ status_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; {% trans "Previous" %}</a>
             {% endif %}
             <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
-                Page {{ sessions.number }} of {{ sessions.paginator.num_pages }}
+                {% blocktrans with current=sessions.number total=sessions.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
             </span>
             {% if sessions.has_next %}
-                <a href="?status={{ status_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">Next &rarr;</a>
+                <a href="?status={{ status_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">{% trans "Next" %} &rarr;</a>
             {% endif %}
         </div>
         {% endif %}
@@ -85,8 +86,8 @@
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <h3>No Flagged Sessions</h3>
-            <p>No flagged chat sessions found for this filter.</p>
+            <h3>{% trans "No Flagged Sessions" %}</h3>
+            <p>{% trans "No flagged chat sessions found for this filter." %}</p>
         </div>
         {% endif %}
     </div>

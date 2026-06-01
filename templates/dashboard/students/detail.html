@@ -1,7 +1,8 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
 {% block title %}{{ student.first_name }} {{ student.last_name }}{% endblock %}
-{% block page_title %}Student Progress{% endblock %}
+{% block page_title %}{% trans "Student Progress" %}{% endblock %}
 
 {% block content %}
 <!-- Back link -->
@@ -9,7 +10,7 @@
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
     </svg>
-    Back to Students
+    {% trans "Back to Students" %}
 </a>
 
 <!-- Student Header -->
@@ -31,7 +32,7 @@
             </div>
             <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:flex-start;">
                 {% if promote_label %}
-                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{{ promote_label }} for {{ student.first_name }} {{ student.last_name }}?');">
+                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{% blocktrans with label=promote_label first=student.first_name last=student.last_name %}{{ label }} for {{ first }} {{ last }}?{% endblocktrans %}');">
                     {% csrf_token %}
                     <input type="hidden" name="student_ids" value="{{ student.id }}">
                     <input type="hidden" name="from_grade" value="{{ current_grade }}">
@@ -41,7 +42,7 @@
                 </form>
                 {% endif %}
                 {% if demote_label %}
-                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{{ demote_label }} for {{ student.first_name }} {{ student.last_name }}?');">
+                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{% blocktrans with label=demote_label first=student.first_name last=student.last_name %}{{ label }} for {{ first }} {{ last }}?{% endblocktrans %}');">
                     {% csrf_token %}
                     <input type="hidden" name="student_ids" value="{{ student.id }}">
                     <input type="hidden" name="from_grade" value="{{ current_grade }}">
@@ -50,9 +51,9 @@
                     <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">{{ demote_label }}</button>
                 </form>
                 {% endif %}
-                <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('Permanently delete student account &quot;{{ student.username }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.');">
+                <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('{% blocktrans with name=student.username %}Permanently delete student account &quot;{{ name }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">Delete student</button>
+                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
                 </form>
             </div>
         </div>
@@ -68,15 +69,15 @@
      the meaningful story without the misleading divergence. -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-label">Total Sessions</div>
+        <div class="stat-label">{% trans "Total Sessions" %}</div>
         <div class="stat-value">{{ stats.total_sessions }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Lessons Mastered</div>
+        <div class="stat-label">{% trans "Lessons Mastered" %}</div>
         <div class="stat-value" style="color: var(--success);">{{ stats.mastered_lessons }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">In Progress</div>
+        <div class="stat-label">{% trans "In Progress" %}</div>
         <div class="stat-value" style="color: var(--warning);">{{ stats.in_progress_lessons }}</div>
     </div>
 </div>
@@ -85,7 +86,7 @@
     <!-- Course Progress -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Course Progress</h3>
+            <h3 class="card-title">{% trans "Course Progress" %}</h3>
         </div>
         <div class="card-body">
             {% if courses_progress %}
@@ -93,7 +94,7 @@
                 <div style="margin-bottom: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span style="font-weight: 600;">{{ cp.course.title }}</span>
-                        <span style="color: var(--gray-500);">{{ cp.mastered }}/{{ cp.total }} lessons</span>
+                        <span style="color: var(--gray-500);">{% blocktrans with mastered=cp.mastered total=cp.total %}{{ mastered }}/{{ total }} lessons{% endblocktrans %}</span>
                     </div>
                     <div class="progress-bar" style="margin-bottom: 0.75rem;">
                         {% widthratio cp.mastered cp.total 100 as pct %}
@@ -120,14 +121,14 @@
                                 </span>
                                 {% if lesson.best_score_pct is not None %}
                                 <span style="font-size:0.78rem;color:var(--gray-500);">
-                                    Best <strong>{{ lesson.best_score_pct }}%</strong>
-                                    · {{ lesson.attempts_count|default:0 }} attempt{{ lesson.attempts_count|pluralize }}
+                                    {% trans "Best" %} <strong>{{ lesson.best_score_pct }}%</strong>
+                                    · {% blocktrans count count=lesson.attempts_count|default:0 %}{{ count }} attempt{% plural %}{{ count }} attempts{% endblocktrans %}
                                 </span>
                                 {% endif %}
                             </div>
                             {% if lesson.weak_concepts %}
                             <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
-                                Weak: {% for c in lesson.weak_concepts %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
                             </div>
                             {% endif %}
                         </div>
@@ -137,7 +138,7 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <p>No course progress yet</p>
+                    <p>{% trans "No course progress yet" %}</p>
                 </div>
             {% endif %}
         </div>
@@ -155,7 +156,7 @@
     <!-- Recent Sessions -->
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Recent Sessions</h3>
+            <h3 class="card-title">{% trans "Recent Sessions" %}</h3>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if sessions %}
@@ -165,7 +166,7 @@
                         <div>
                             <div style="font-weight: 500;">
                                 {{ session.lesson.title }}
-                                {% if session.is_group_for_student %}<span class="badge" title="Joined as a group participant" style="background:#ede9fe;color:#5b21b6;font-size:0.65rem;margin-left:0.3rem;">👥 joined</span>{% elif session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">👥 group</span>{% endif %}
+                                {% if session.is_group_for_student %}<span class="badge" title="{% trans 'Joined as a group participant' %}" style="background:#ede9fe;color:#5b21b6;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
                             </div>
                             <div style="font-size: 0.8125rem; color: var(--gray-500);">
                                 {{ session.started_at|date:"M d, Y H:i" }}
@@ -173,11 +174,11 @@
                         </div>
                         <div>
                             {% if session.mastery_achieved %}
-                                <span class="badge badge-success">Mastered</span>
+                                <span class="badge badge-success">{% trans "Mastered" %}</span>
                             {% elif session.status == 'completed' %}
-                                <span class="badge badge-warning">Completed</span>
+                                <span class="badge badge-warning">{% trans "Completed" %}</span>
                             {% elif session.status == 'active' %}
-                                <span class="badge badge-info">In Progress</span>
+                                <span class="badge badge-info">{% trans "In Progress" %}</span>
                             {% else %}
                                 <span class="badge">{{ session.status }}</span>
                             {% endif %}
@@ -187,7 +188,7 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <p>No sessions yet</p>
+                    <p>{% trans "No sessions yet" %}</p>
                 </div>
             {% endif %}
         </div>

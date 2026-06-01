@@ -1,5 +1,6 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Class Readiness — {{ course.title }}{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with title=course.title %}Class Readiness — {{ title }}{% endblocktrans %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -129,12 +130,12 @@
 
 {% block content %}
 <a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
-    &larr; Back to {{ course.title }}
+    &larr; {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <div class="readiness-header">
-    <h2 style="margin:0 0 0.25rem;">Class Readiness Report</h2>
-    <p style="color:#71717a;margin:0;">{{ course.title }} &mdash; {{ total_students }} student{{ total_students|pluralize }} &mdash; {{ total_objectives }} enabling objective{{ total_objectives|pluralize }}</p>
+    <h2 style="margin:0 0 0.25rem;">{% trans "Class Readiness Report" %}</h2>
+    <p style="color:#71717a;margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>
 </div>
 
 <!-- Class Readiness Score -->
@@ -143,8 +144,8 @@
         {{ class_readiness }}%
     </div>
     <div class="score-details">
-        <h3>Class Readiness</h3>
-        <p>Percentage of students who have mastered each enabling objective (average across all objectives).</p>
+        <h3>{% trans "Class Readiness" %}</h3>
+        <p>{% trans "Percentage of students who have mastered each enabling objective (average across all objectives)." %}</p>
     </div>
 </div>
 
@@ -158,11 +159,11 @@
 <table class="objectives-table">
     <thead>
         <tr>
-            <th style="width:40%">Enabling Objective</th>
-            <th style="width:10%">Bloom</th>
-            <th style="width:20%">Class Mastery</th>
-            <th style="width:10%">Mastered</th>
-            <th style="width:10%">Struggling</th>
+            <th style="width:40%">{% trans "Enabling Objective" %}</th>
+            <th style="width:10%">{% trans "Bloom" %}</th>
+            <th style="width:20%">{% trans "Class Mastery" %}</th>
+            <th style="width:10%">{% trans "Mastered" %}</th>
+            <th style="width:10%">{% trans "Struggling" %}</th>
         </tr>
     </thead>
     <tbody>
@@ -194,21 +195,21 @@
 </table>
 {% else %}
 <div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
-    No enabling objectives found for this course. Upload a curriculum with enabling objectives to see the readiness report.
+    {% trans "No enabling objectives found for this course. Upload a curriculum with enabling objectives to see the readiness report." %}
 </div>
 {% endif %}
 
 <!-- Student Gaps -->
 {% if student_gaps %}
 <div class="student-gaps">
-    <h3>Students Needing Follow-Up</h3>
+    <h3>{% trans "Students Needing Follow-Up" %}</h3>
     {% for gap in student_gaps %}
     <div class="gap-item">
         <div>
             <div class="gap-name">{{ gap.student.get_full_name|default:gap.student.username }}</div>
             <div class="gap-objectives">{{ gap.weak_objectives|join:", " }}</div>
         </div>
-        <div class="gap-count">{{ gap.weak_count }} weak objective{{ gap.weak_count|pluralize }}</div>
+        <div class="gap-count">{% blocktrans count count=gap.weak_count %}{{ count }} weak objective{% plural %}{{ count }} weak objectives{% endblocktrans %}</div>
     </div>
     {% endfor %}
 </div>

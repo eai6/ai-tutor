@@ -1,35 +1,36 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Add Lesson{% endblock %}
-{% block page_title %}Add Lesson to {{ unit.title }}{% endblock %}
+{% block title %}{% trans "Add Lesson" %}{% endblock %}
+{% block page_title %}{% blocktrans with title=unit.title %}Add Lesson to {{ title }}{% endblocktrans %}{% endblock %}
 
 {% block content %}
 <a href="{% url 'dashboard:course_detail' course.id %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1rem;">
-    ← Back to Course
+    ← {% trans "Back to Course" %}
 </a>
 
 <div class="card" style="max-width: 600px;">
     <div class="card-header">
-        <h3 class="card-title">New Lesson in "{{ unit.title }}"</h3>
+        <h3 class="card-title">{% blocktrans with title=unit.title %}New Lesson in "{{ title }}"{% endblocktrans %}</h3>
     </div>
     <div class="card-body">
         <form method="post">
             {% csrf_token %}
-            
+
             <div class="form-group">
-                <label for="title">Lesson Title *</label>
-                <input type="text" id="title" name="title" class="form-control" placeholder="e.g., Earth's Internal Layers" required>
+                <label for="title">{% trans "Lesson Title *" %}</label>
+                <input type="text" id="title" name="title" class="form-control" placeholder="{% trans 'e.g., Earth Internal Layers' %}" required>
             </div>
-            
+
             <div class="form-group">
-                <label for="objective">Learning Objective</label>
-                <textarea id="objective" name="objective" class="form-control" rows="3" placeholder="Students will be able to..."></textarea>
-                <small style="color: var(--gray-500);">What should students be able to do after completing this lesson?</small>
+                <label for="objective">{% trans "Learning Objective" %}</label>
+                <textarea id="objective" name="objective" class="form-control" rows="3" placeholder="{% trans 'Students will be able to...' %}"></textarea>
+                <small style="color: var(--gray-500);">{% trans "What should students be able to do after completing this lesson?" %}</small>
             </div>
-            
+
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                <button type="submit" class="btn btn-primary">Create Lesson</button>
-                <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">{% trans "Create Lesson" %}</button>
+                <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             </div>
         </form>
     </div>

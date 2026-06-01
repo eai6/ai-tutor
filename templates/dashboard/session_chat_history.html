@@ -1,6 +1,7 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Chat History — {{ student_name }}{% endblock %}
-{% block page_title %}Chat History{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with name=student_name %}Chat History — {{ name }}{% endblocktrans %}{% endblock %}
+{% block page_title %}{% trans "Chat History" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -184,12 +185,12 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">&larr; Back to Monitor</a>
+<a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="back-link">&larr; {% trans "Back to Monitor" %}</a>
 
 <div class="chat-header">
     <div>
         <h2>{{ student_name }}</h2>
-        <div class="chat-meta">{{ lesson.title }} &mdash; Started {{ session.started_at|date:"M d, Y H:i" }}</div>
+        <div class="chat-meta">{{ lesson.title }} &mdash; {% blocktrans with date=session.started_at|date:"M d, Y H:i" %}Started {{ date }}{% endblocktrans %}</div>
     </div>
     <div>
         <span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.6875rem;font-weight:700;text-transform:uppercase;
@@ -202,12 +203,12 @@
 <div class="info-cards">
     {% if duration_minutes is not None %}
     <div class="info-card">
-        <div class="info-label">Active Duration</div>
-        <div class="info-value">{{ duration_minutes }} min</div>
+        <div class="info-label">{% trans "Active Duration" %}</div>
+        <div class="info-value">{% blocktrans with mins=duration_minutes %}{{ mins }} min{% endblocktrans %}</div>
     </div>
     {% endif %}
     <div class="info-card">
-        <div class="info-label">Exchanges</div>
+        <div class="info-label">{% trans "Exchanges" %}</div>
         <div class="info-value">{{ exchange_count }}</div>
     </div>
 </div>
@@ -220,12 +221,12 @@ memory/pilot_session_plan.md).
 
 {% if exit_score is not None %}
 <div class="exit-result">
-    <h3>Exit Ticket</h3>
+    <h3>{% trans "Exit Ticket" %}</h3>
     <span class="exit-score-big {% if exit_score >= 8 %}exit-pass{% else %}exit-fail{% endif %}">
         {{ exit_score }}/{{ exit_total|default:"10" }}
     </span>
     <span style="margin-left:0.5rem;font-size:0.875rem;color:#71717a;">
-        {% if exit_score >= 8 %}Passed{% else %}Did not pass{% endif %}
+        {% if exit_score >= 8 %}{% trans "Passed" %}{% else %}{% trans "Did not pass" %}{% endif %}
     </span>
 </div>
 {% endif %}
@@ -244,7 +245,7 @@ memory/pilot_session_plan.md).
         </div>
         {% else %}
         <div class="bubble-wrapper left">
-            <div class="bubble-role">Tutor</div>
+            <div class="bubble-role">{% trans "Tutor" %}</div>
             <div class="chat-bubble bubble-tutor">{{ turn.content }}</div>
             {% comment %}
             A.4 (2026-05-08): show attached figures inline so
@@ -273,7 +274,7 @@ memory/pilot_session_plan.md).
         </div>
         {% endif %}
     {% empty %}
-        <div style="text-align:center;color:#a1a1aa;padding:2rem;">No messages in this session.</div>
+        <div style="text-align:center;color:#a1a1aa;padding:2rem;">{% trans "No messages in this session." %}</div>
     {% endfor %}
 </div>
 {% endblock %}

@@ -1,14 +1,15 @@
 {% extends "dashboard/base.html" %}
+{% load i18n %}
 
-{% block title %}Students{% endblock %}
-{% block page_title %}Students{% endblock %}
+{% block title %}{% trans "Students" %}{% endblock %}
+{% block page_title %}{% trans "Students" %}{% endblock %}
 
 {% block content %}
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">All Students ({{ total_count }})</h2>
+        <h2 class="card-title">{% blocktrans with count=total_count %}All Students ({{ count }}){% endblocktrans %}</h2>
         <div style="display: flex; gap: 0.5rem;">
-            <input type="text" class="form-control" placeholder="Search students..." style="width: 250px;" id="search-input">
+            <input type="text" class="form-control" placeholder="{% trans 'Search students...' %}" style="width: 250px;" id="search-input">
         </div>
     </div>
     <div class="card-body" style="padding: 0;">
@@ -16,11 +17,11 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Student</th>
-                    <th>Grade</th>
-                    <th>School</th>
-                    <th>Progress</th>
-                    <th>Last Active</th>
+                    <th>{% trans "Student" %}</th>
+                    <th>{% trans "Grade" %}</th>
+                    <th>{% trans "School" %}</th>
+                    <th>{% trans "Progress" %}</th>
+                    <th>{% trans "Last Active" %}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -64,43 +65,43 @@
                     </td>
                     <td>
                         {% if s.last_active %}
-                            <span style="font-size: 0.875rem;">{{ s.last_active|timesince }} ago</span>
+                            <span style="font-size: 0.875rem;">{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}</span>
                         {% else %}
-                            <span style="color: var(--gray-400);">Never</span>
+                            <span style="color: var(--gray-400);">{% trans "Never" %}</span>
                         {% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn-secondary btn-sm">View</a>
+                        <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn-secondary btn-sm">{% trans "View" %}</a>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        
+
         <!-- Pagination -->
         {% if students.has_other_pages %}
         <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
             {% if students.has_previous %}
-                <a href="?page={{ students.previous_page_number }}" class="btn btn-secondary btn-sm">← Previous</a>
+                <a href="?page={{ students.previous_page_number }}" class="btn btn-secondary btn-sm">← {% trans "Previous" %}</a>
             {% endif %}
-            
+
             <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
-                Page {{ students.number }} of {{ students.paginator.num_pages }}
+                {% blocktrans with current=students.number total=students.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
             </span>
-            
+
             {% if students.has_next %}
-                <a href="?page={{ students.next_page_number }}" class="btn btn-secondary btn-sm">Next →</a>
+                <a href="?page={{ students.next_page_number }}" class="btn btn-secondary btn-sm">{% trans "Next" %} →</a>
             {% endif %}
         </div>
         {% endif %}
-        
+
         {% else %}
         <div class="empty-state">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
-            <h3>No Students Yet</h3>
-            <p>Students will appear here once they join your institution.</p>
+            <h3>{% trans "No Students Yet" %}</h3>
+            <p>{% trans "Students will appear here once they join your institution." %}</p>
         </div>
         {% endif %}
     </div>
