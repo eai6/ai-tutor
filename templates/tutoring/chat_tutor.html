@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
 {% block title %}{{ lesson.title }} - AI Tutor{% endblock %}
 
@@ -7,25 +8,25 @@
     <!-- Sticky top bar with lesson info + phase -->
     <header class="chat-header">
         <div class="chat-header-inner">
-            <a href="{% url 'tutoring:catalog' %}" class="back-link" title="Back to Lessons">
+            <a href="{% url 'tutoring:catalog' %}" class="back-link" title="{% trans 'Back to Lessons' %}">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
             {% if is_staff_user %}
             <a href="{% url 'dashboard:home' %}"
                style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.3rem 0.7rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.78rem; margin-right:0.4rem;"
-               title="Return to teacher dashboard">
-                ← Dashboard
+               title="{% trans 'Return to teacher dashboard' %}">
+                ← {% trans "Dashboard" %}
             </a>
             {% endif %}
             <div class="header-center">
                 <div class="header-title-row">
                     <h1 class="lesson-name">{{ lesson.title }}</h1>
-                    <span class="phase-badge" id="phase-badge">Starting...</span>
+                    <span class="phase-badge" id="phase-badge">{% trans "Starting..." %}</span>
                     <span class="step-progress" id="step-progress"></span>
                 </div>
                 <div class="participants-bar" id="participants-bar" style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;font-size:0.8rem;"></div>
             </div>
-            <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="Toggle audio mode">
+            <button class="audio-toggle" id="audio-toggle" onclick="toggleAudioMode()" title="{% trans 'Toggle audio mode' %}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <path class="audio-on-icon" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -42,8 +43,8 @@
             <button type="button"
                     class="help-toggle fb-trigger"
                     id="help-toggle"
-                    title="Help / report an issue"
-                    aria-label="Help / report an issue">
+                    title="{% trans 'Help / report an issue' %}"
+                    aria-label="{% trans 'Help / report an issue' %}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"/>
                     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
@@ -58,7 +59,7 @@
             <button type="button"
                     class="header-kebab"
                     id="header-kebab"
-                    aria-label="More options"
+                    aria-label="{% trans 'More options' %}"
                     aria-haspopup="menu"
                     aria-expanded="false"
                     onclick="toggleHeaderMenu(event)">
@@ -70,13 +71,13 @@
             </button>
             <div class="header-menu" id="header-menu" role="menu" hidden>
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); toggleAudioMode();">
-                    <span class="hm-emoji" aria-hidden="true">🔊</span> Toggle audio
+                    <span class="hm-emoji" aria-hidden="true">🔊</span> {% trans "Toggle audio" %}
                 </button>
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); restartLesson();">
-                    <span class="hm-emoji" aria-hidden="true">🔄</span> Restart lesson
+                    <span class="hm-emoji" aria-hidden="true">🔄</span> {% trans "Restart lesson" %}
                 </button>
                 <button type="button" role="menuitem" class="fb-trigger" onclick="closeHeaderMenu();">
-                    <span class="hm-emoji" aria-hidden="true">💬</span> Help / report an issue
+                    <span class="hm-emoji" aria-hidden="true">💬</span> {% trans "Help / report an issue" %}
                 </button>
             </div>
         </div>
@@ -90,15 +91,15 @@
                  Hidden when Course.allow_student_duration_override is False. -->
             <div id="duration-picker"
                  style="margin: 1rem; padding: 1rem 1.2rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; box-shadow: 0 4px 12px rgba(91,33,182,0.08);">
-                <div style="font-weight: 600; color: #5b21b6; margin-bottom: 0.4rem;">⏱️ How long do you have today?</div>
+                <div style="font-weight: 600; color: #5b21b6; margin-bottom: 0.4rem;">⏱️ {% trans "How long do you have today?" %}</div>
                 <div style="font-size: 0.85rem; color: #6d28d9; margin-bottom: 0.7rem;">
-                    The tutor adapts the lesson depth to fit your time. You can answer the same number of questions either way — fewer steps just means less reinforcement.
+                    {% trans "The tutor adapts the lesson depth to fit your time. You can answer the same number of questions either way — fewer steps just means less reinforcement." %}
                 </div>
                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                    <button type="button" data-duration="15" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">15 min</button>
-                    <button type="button" data-duration="20" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">20 min</button>
-                    <button type="button" data-duration="25" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">25 min</button>
-                    <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: #6d28d9; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">Use the lesson default</button>
+                    <button type="button" data-duration="15" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}15 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="20" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}20 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="25" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}25 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: #6d28d9; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">{% trans "Use the lesson default" %}</button>
                 </div>
             </div>
             {% endif %}
@@ -140,19 +141,19 @@
                 <div class="input-wrapper">
                     <textarea
                         id="user-input"
-                        placeholder="Type your answer..."
+                        placeholder="{% trans 'Type your answer...' %}"
                         autocomplete="off"
                         autofocus
                         rows="1"
                     ></textarea>
-                    <button id="mic-btn" class="mic-btn" onclick="toggleRecording()" aria-label="Record audio" style="display:none">
+                    <button id="mic-btn" class="mic-btn" onclick="toggleRecording()" aria-label="{% trans 'Record audio' %}" style="display:none">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                             <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
                         </svg>
                     </button>
-                    <button id="send-btn" onclick="sendMessage()" aria-label="Send message">
+                    <button id="send-btn" onclick="sendMessage()" aria-label="{% trans 'Send message' %}">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M18 2L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 2L12 18L9 11L2 8L18 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
                 </div>
@@ -162,28 +163,28 @@
         <!-- Artifact Panel (desktop only) -->
         <aside class="artifact-panel" id="artifact-panel">
             <div class="artifact-header">
-                <span class="artifact-title" id="artifact-title">Image</span>
+                <span class="artifact-title" id="artifact-title">{% trans "Image" %}</span>
                 <div class="artifact-header-actions">
-                    <button class="artifact-zoom-btn" onclick="artifactZoom(0.25)" title="Zoom in" aria-label="Zoom in">
+                    <button class="artifact-zoom-btn" onclick="artifactZoom(0.25)" title="{% trans 'Zoom in' %}" aria-label="{% trans 'Zoom in' %}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                     </button>
-                    <button class="artifact-zoom-btn" onclick="artifactZoom(-0.25)" title="Zoom out" aria-label="Zoom out">
+                    <button class="artifact-zoom-btn" onclick="artifactZoom(-0.25)" title="{% trans 'Zoom out' %}" aria-label="{% trans 'Zoom out' %}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                     </button>
-                    <button class="artifact-zoom-btn" onclick="artifactZoomReset()" title="Reset zoom" aria-label="Reset zoom">
+                    <button class="artifact-zoom-btn" onclick="artifactZoomReset()" title="{% trans 'Reset zoom' %}" aria-label="{% trans 'Reset zoom' %}">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                     </button>
-                    <button class="artifact-expand-btn" id="artifact-expand" onclick="toggleArtifactExpand()" title="Expand panel" aria-label="Expand panel">
+                    <button class="artifact-expand-btn" id="artifact-expand" onclick="toggleArtifactExpand()" title="{% trans 'Expand panel' %}" aria-label="{% trans 'Expand panel' %}">
                         <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                         <svg class="collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                     </button>
-                    <button class="artifact-close" onclick="closeArtifactPanel()" aria-label="Close panel">
+                    <button class="artifact-close" onclick="closeArtifactPanel()" aria-label="{% trans 'Close panel' %}">
                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                     </button>
                 </div>
             </div>
             <div class="artifact-body" id="artifact-body">
-                <div class="artifact-placeholder">Images will appear here</div>
+                <div class="artifact-placeholder">{% trans "Images will appear here" %}</div>
             </div>
             <div class="artifact-thumbnails" id="artifact-thumbnails"></div>
         </aside>
@@ -192,16 +193,16 @@
     <!-- Fullscreen Image Lightbox (mobile + desktop double-click) -->
     <div class="lightbox" id="lightbox" style="display:none" onclick="closeLightbox(event)">
         <div class="lightbox-controls">
-            <button class="lightbox-btn" onclick="lightboxZoom(0.25)" aria-label="Zoom in">
+            <button class="lightbox-btn" onclick="lightboxZoom(0.25)" aria-label="{% trans 'Zoom in' %}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
-            <button class="lightbox-btn" onclick="lightboxZoom(-0.25)" aria-label="Zoom out">
+            <button class="lightbox-btn" onclick="lightboxZoom(-0.25)" aria-label="{% trans 'Zoom out' %}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </button>
-            <button class="lightbox-btn" onclick="lightboxZoomReset()" aria-label="Reset">
+            <button class="lightbox-btn" onclick="lightboxZoomReset()" aria-label="{% trans 'Reset' %}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             </button>
-            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="Close">
+            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="{% trans 'Close' %}">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
@@ -218,7 +219,7 @@
     <div class="modal" id="complete-modal" style="display: none;">
         <div class="modal-content completion">
             <div class="completion-icon" id="completion-icon">🎉</div>
-            <h2 id="completion-title">Lesson Complete!</h2>
+            <h2 id="completion-title">{% trans "Lesson Complete!" %}</h2>
             <p id="completion-message"></p>
             <!-- Gamification XP display -->
             <div id="completion-xp" style="display:none; margin:1rem 0;">
@@ -227,8 +228,8 @@
                 <div id="completion-badges" style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:0.75rem;"></div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; margin-top: 1rem;">
-                <button class="cta-btn" onclick="startReview()" style="border: none; cursor: pointer;">Review Lesson</button>
-                <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: #fff; color: #18181b; border: 2px solid #e4e4e7;">Continue Learning</a>
+                <button class="cta-btn" onclick="startReview()" style="border: none; cursor: pointer;">{% trans "Review Lesson" %}</button>
+                <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: #fff; color: #18181b; border: 2px solid #e4e4e7;">{% trans "Continue Learning" %}</a>
             </div>
         </div>
     </div>

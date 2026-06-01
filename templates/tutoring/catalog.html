@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}My Subjects - AI Tutor{% endblock %}
+{% block title %}{% trans "My Subjects" %} - AI Tutor{% endblock %}
 
 {% block content %}
 <div class="catalog-container">
@@ -9,45 +10,49 @@
     <div class="welcome-section animate-in">
         <div class="welcome-card card">
             <div class="welcome-icon">🎓</div>
-            <h1>Welcome to AI Tutor</h1>
-            <p class="text-muted">Your personal learning companion for Seychelles secondary students</p>
+            <h1>{% trans "Welcome to AI Tutor" %}</h1>
+            <p class="text-muted">{% trans "Your personal learning companion for Seychelles secondary students" %}</p>
             <div class="welcome-actions">
-                <a href="{% url 'accounts:register' %}" class="btn btn-primary">Get Started →</a>
-                <a href="{% url 'accounts:login' %}" class="btn btn-secondary">Sign In</a>
+                <a href="{% url 'accounts:register' %}" class="btn btn-primary">{% trans "Get Started" %} →</a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-secondary">{% trans "Sign In" %}</a>
             </div>
         </div>
     </div>
-    
+
     {% elif not subjects %}
     <!-- No subjects available -->
     <div class="empty-section animate-in">
         <div class="empty-card card text-center">
             <div class="empty-icon">📚</div>
-            <h2>No subjects available yet</h2>
+            <h2>{% trans "No subjects available yet" %}</h2>
             {% if is_staff_viewer %}
-            <p class="text-muted">No published courses found{% if selected_school %} for {{ selected_school.name }}{% endif %}. Publish courses from the <a href="{% url 'dashboard:home' %}">Dashboard</a>.</p>
+            {% if selected_school %}
+            <p class="text-muted">{% blocktrans with school_name=selected_school.name %}No published courses found for {{ school_name }}. Publish courses from the Dashboard.{% endblocktrans %}</p>
             {% else %}
-            <p class="text-muted">Your courses are being set up. Check back soon!</p>
+            <p class="text-muted">{% trans "No published courses found. Publish courses from the Dashboard." %}</p>
+            {% endif %}
+            {% else %}
+            <p class="text-muted">{% trans "Your courses are being set up. Check back soon!" %}</p>
             {% endif %}
         </div>
     </div>
-    
+
     {% else %}
     <!-- Subject Selection -->
     <div class="catalog-header animate-in">
-        <h1>Hello, {{ user.first_name|default:user.username }}!</h1>
-        <p class="text-muted">Choose a subject to continue learning{% if student_grade %} &mdash; {{ student_grade }}{% endif %}</p>
+        <h1>{% blocktrans with first_name=user.first_name|default:user.username %}Hello, {{ first_name }}!{% endblocktrans %}</h1>
+        <p class="text-muted">{% trans "Choose a subject to continue learning" %}{% if student_grade %} &mdash; {{ student_grade }}{% endif %}</p>
         {% if is_staff_user %}
         <div class="school-switcher" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <a href="{% url 'dashboard:home' %}"
                style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
-               title="Return to teacher dashboard">
-                ← Dashboard
+               title="{% trans 'Return to teacher dashboard' %}">
+                ← {% trans "Dashboard" %}
             </a>
             {% if is_staff_viewer %}
-            <label for="school-select">Viewing as:</label>
+            <label for="school-select">{% trans "Viewing as:" %}</label>
             <select id="school-select" onchange="switchSchool(this.value)">
-                <option value="all" {% if not selected_school %}selected{% endif %}>All Schools</option>
+                <option value="all" {% if not selected_school %}selected{% endif %}>{% trans "All Schools" %}</option>
                 {% for school in all_schools %}
                 <option value="{{ school.id }}" {% if selected_school.id == school.id %}selected{% endif %}>{{ school.name }}</option>
                 {% endfor %}
@@ -68,21 +73,21 @@
             <span class="gbar-streak" id="gbar-streak" style="display:none"></span>
         </div>
         <div class="gbar-right">
-            <button class="gbar-btn" id="trophies-btn" onclick="toggleTrophyCase()">Trophies</button>
-            <button class="gbar-btn" id="personality-btn" onclick="openPersonalityModal()">Select Tutor Style</button>
-            <button class="gbar-btn" onclick="openLeaderboardModal()">Leaderboard</button>
+            <button class="gbar-btn" id="trophies-btn" onclick="toggleTrophyCase()">{% trans "Trophies" %}</button>
+            <button class="gbar-btn" id="personality-btn" onclick="openPersonalityModal()">{% trans "Select Tutor Style" %}</button>
+            <button class="gbar-btn" onclick="openLeaderboardModal()">{% trans "Leaderboard" %}</button>
         </div>
         <div class="gbar-stats" id="gbar-stats" style="display:none">
-            <span class="gbar-stat" id="gbar-lessons">Lessons: 0</span>
-            <span class="gbar-stat" id="gbar-hours">Hours: 0</span>
-            <span class="gbar-stat" id="gbar-accuracy" style="display:none">Accuracy: —</span>
+            <span class="gbar-stat" id="gbar-lessons">{% trans "Lessons:" %} 0</span>
+            <span class="gbar-stat" id="gbar-hours">{% trans "Hours:" %} 0</span>
+            <span class="gbar-stat" id="gbar-accuracy" style="display:none">{% trans "Accuracy:" %} —</span>
         </div>
     </div>
 
     <!-- Trophy Case (collapsible) -->
     <div class="trophy-case card animate-in" id="trophy-case" style="display:none; animation-delay:0.04s">
         <div class="trophy-header">
-            <h3 id="trophy-header-text">Achievements</h3>
+            <h3 id="trophy-header-text">{% trans "Achievements" %}</h3>
             <button class="trophy-close" onclick="toggleTrophyCase()">&times;</button>
         </div>
         <div class="trophy-grid" id="trophy-grid"></div>
@@ -91,19 +96,19 @@
     <!-- Personality Picker Modal -->
     <div class="modal-overlay" id="personality-overlay" style="display:none" onclick="if(event.target===this)closePersonalityModal()">
         <div class="modal-box">
-            <h3>Choose Your Tutor Style</h3>
-            <p class="text-muted" style="margin-bottom:1rem;">Pick a personality that makes learning fun for you!</p>
+            <h3>{% trans "Choose Your Tutor Style" %}</h3>
+            <p class="text-muted" style="margin-bottom:1rem;">{% trans "Pick a personality that makes learning fun for you!" %}</p>
             <div class="personality-grid" id="personality-grid"></div>
-            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closePersonalityModal()">Close</button>
+            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closePersonalityModal()">{% trans "Close" %}</button>
         </div>
     </div>
 
     <!-- Leaderboard Modal -->
     <div class="modal-overlay" id="leaderboard-overlay" style="display:none" onclick="if(event.target===this)closeLeaderboardModal()">
         <div class="modal-box">
-            <h3>Leaderboard</h3>
+            <h3>{% trans "Leaderboard" %}</h3>
             <div id="leaderboard-body" style="margin-top:1rem;max-height:400px;overflow-y:auto;"></div>
-            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closeLeaderboardModal()">Close</button>
+            <button class="btn btn-secondary" style="margin-top:1rem;width:100%" onclick="closeLeaderboardModal()">{% trans "Close" %}</button>
         </div>
     </div>
 
@@ -112,10 +117,10 @@
 
     {% if weekly_assignments %}
     <div class="continue-section animate-in" style="animation-delay: 0.03s; background:#fef9c3; border:1px solid #fde047; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-        <h2 style="font-size:1.05rem; margin:0 0 0.5rem; color:#78350f;">📅 This week's lessons</h2>
+        <h2 style="font-size:1.05rem; margin:0 0 0.5rem; color:#78350f;">📅 {% trans "This week's lessons" %}</h2>
         {% for wa in weekly_assignments %}
         <div style="margin-top:0.6rem;">
-            <div style="font-size:0.85rem; color:#92400e; font-weight:600;">{{ wa.course.title }} · due Sunday {{ wa.week_end|date:"M j" }}</div>
+            <div style="font-size:0.85rem; color:#92400e; font-weight:600;">{{ wa.course.title }} · {% blocktrans with date=wa.week_end|date:"M j" %}due Sunday {{ date }}{% endblocktrans %}</div>
             {% if wa.notes %}
             <div style="font-size:0.82rem; color:#78350f; font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
             {% endif %}
@@ -139,7 +144,7 @@
     {% if active_sessions %}
     <!-- Continue Learning Section -->
     <div class="continue-section animate-in" style="animation-delay: 0.05s">
-        <h2 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-dark);">⏳ Continue where you left off</h2>
+        <h2 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-dark);">⏳ {% trans "Continue where you left off" %}</h2>
         <div class="active-sessions-grid">
             {% for session in active_sessions %}
             <a href="{% url 'tutoring:tutor_interface' session.lesson_id %}" class="active-session-card card">
