@@ -968,7 +968,8 @@ def respond_for_view(session, user_input: str) -> dict:
                 # persisted tutor turn so resume doesn't surface the
                 # dangling question on reload.
                 from apps.tutoring.models import SessionTurn
-                transition_msg = (
+                from django.utils.translation import gettext
+                transition_msg = gettext(
                     "Great — you've worked through the lesson! Now "
                     "let's check what you've locked in with a short "
                     "quiz. Take your time on each question, then submit."
