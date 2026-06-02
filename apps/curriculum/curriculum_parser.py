@@ -64,7 +64,8 @@ from apps.curriculum.curriculum_parser_archive import (  # noqa: F401
     _classify_llm_error,
     _render_page_within_b64_limit,
     _strip_nul,
-    # legacy structure layer (re-exported until M5)
+    # legacy structure layer (re-exported as dormant helpers — no
+    # runtime path reaches them after M5; kept until archive deletion)
     ParsedCurriculum,
     FigureDescription,
     FigureExtractionResult,
@@ -78,8 +79,10 @@ from apps.curriculum.curriculum_parser_archive import (  # noqa: F401
     create_lesson_title,
     create_enabling_objectives,
     create_curriculum_from_structure,
-    process_curriculum_upload,
-    complete_curriculum_upload,
+    # process_curriculum_upload + complete_curriculum_upload INTENTIONALLY
+    # NOT re-exported — replaced by the v2 versions defined further down
+    # in this module. Callers that `from apps.curriculum.curriculum_parser
+    # import process_curriculum_upload` now hit the v2 version.
 )
 
 
@@ -1070,3 +1073,347 @@ def parse_curriculum(
         units=units,
         detection_disagreed_with_hint=detection['hint_disagreement'],
     )
+
+
+# ============================================================================
+# v2 — UPLOAD ORCHESTRATOR (M5)
+# ----------------------------------------------------------------------------
+# Overrides the archive's process_curriculum_upload + complete_curriculum_upload.
+# Same call signature so apps/dashboard views + tasks keep working unchanged.
+# Wires parse_curriculum() into the upload flow; surfaces ParseFailure as a
+# clean upload.status='failed' with a structured reason slug rather than a
+# stack trace. No regex fallback is reachable from this path.
+# ============================================================================
+
+
+def _v2_to_review_shape(parsed: ParsedCurriculumV2, target_grade: Optional[str] = None) -> dict:
+    """Convert a ``ParsedCurriculumV2`` to the dict shape the upload
+    review UI (templates/dashboard/curriculum/process.html) + the
+    archive's ``create_curriculum_from_structure`` both expect.
+
+    If ``target_grade`` is given, returns ONLY the units for that
+    grade. Otherwise returns all units mixed (used at the review-UI
+    step where teachers see the whole parse before the grade fanout
+    happens on Approve).
+    """
+    units_for_payload = []
+    for i, u in enumerate(parsed.units):
+        if target_grade and u.grade_level != target_grade:
+            continue
+        # Collect unit-level terminal objectives from the lesson
+        # objectives (the review UI expects them at unit level; v2
+        # doesn't track them separately but lesson objectives are a
+        # reasonable seed teachers can edit).
+        terminal_objectives = [l.objective for l in u.lessons if l.objective]
+        # Unit-level enabling objectives: dedupe across lessons.
+        all_eos = []
+        seen = set()
+        for l in u.lessons:
+            for eo in l.enabling_objectives:
+                if eo and eo.lower() not in seen:
+                    seen.add(eo.lower())
+                    all_eos.append(eo)
+
+        units_for_payload.append({
+            'title': u.title,
+            'grade_level': u.grade_level,
+            'number': i + 1,
+            'introduction': u.description,
+            'description': u.description,
+            'terminal_objectives': terminal_objectives[:10],
+            'enabling_objectives': all_eos,
+            'source_evidence': u.source_evidence,
+            'lessons': [
+                {
+                    'title': l.title,
+                    'objective': l.objective,
+                    'enabling_objectives': l.enabling_objectives,
+                    'teaching_strategies': [],
+                    'resources': [],
+                    'assessment_methods': [],
+                    'estimated_minutes': 20,
+                    'order': l.order,
+                }
+                for l in u.lessons
+            ],
+        })
+
+    return {
+        'subject': parsed.subject,
+        'locale': parsed.locale,
+        'grade_level': target_grade or '',  # for legacy single-grade callers
+        'grade_levels': parsed.grade_levels,
+        'description': parsed.description,
+        'detection_disagreed_with_hint': parsed.detection_disagreed_with_hint,
+        'units': units_for_payload,
+        'parser_version': 'v2',
+    }
+
+
+def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict:
+    """v2 orchestrator. Replaces the archive's regex-fallback chain
+    with the LLM-first ``parse_curriculum()``. Same call signature so
+    apps/dashboard call sites keep working unchanged.
+
+    Status transitions:
+      pending → processing → review (or → failed)
+      review  → (teacher approves via complete_curriculum_upload) → completed
+    """
+    from apps.dashboard.models import CurriculumUpload
+
+    upload = CurriculumUpload.objects.get(id=upload_id)
+
+    def _bump(phase: str, data: dict):
+        """Forward parser_v2 progress events to the upload log so the
+        review UI's live-progress widget stays informative.
+
+        Signature matches the `progress_cb(phase, data_dict)` contract
+        in parse_curriculum._emit — note `data` is a dict, not kwargs.
+        """
+        data = data or {}
+        if phase == 'extract':
+            upload.add_log(f"📄 Step 1/4: Extracting text from {upload.file_path}…")
+        elif phase == 'detect':
+            upload.add_log(
+                f"   ✓ Extracted {data.get('extracted_chars', 0):,} characters."
+            )
+            upload.add_log("🔍 Step 2/4: Classifying subject, locale, and grade…")
+        elif phase == 'outline':
+            upload.add_log(
+                f"   ✓ Detected: subject={data.get('subject')!r}, "
+                f"locale={data.get('locale')!r}"
+            )
+            upload.add_log("📚 Step 3/4: Extracting unit-level structure…")
+        elif phase == 'lessons':
+            upload.add_log(
+                f"   ✓ Found {data.get('unit_count', 0)} units."
+            )
+            upload.add_log(
+                f"📖 Step 4/4: Extracting lessons (parallel fan-out, "
+                f"max {LESSONS_FANOUT_MAX_WORKERS} concurrent)…"
+            )
+        elif phase == 'lesson_unit_done':
+            done, total = data.get('done', 0), data.get('total', 0)
+            if done % 3 == 0 or done == total:
+                upload.add_log(f"   • {done}/{total} units processed")
+        elif phase == 'done':
+            pass  # final summary logged below
+        upload.save(update_fields=['processing_log'])
+
+    try:
+        upload.status = 'processing'
+        upload.current_step = 1
+        upload.processing_log = ""
+        upload.add_log("🚀 Starting curriculum parsing (v2 — locale-aware LLM)…")
+        upload.add_log(f"   File: {upload.file_path}")
+        upload.add_log(f"   Teacher hints: subject={upload.subject_name!r}, "
+                       f"grade={upload.grade_level!r}, locale={getattr(upload, 'locale', None)!r}")
+        upload.save()
+
+        parsed = parse_curriculum(
+            upload.file_path,
+            subject_hint=upload.subject_name or '',
+            grade_hint=upload.grade_level or '',
+            locale=getattr(upload, 'locale', None) or DEFAULT_LOCALE,
+            institution_id=upload.institution_id,
+            progress_cb=_bump,
+        )
+
+        # Convert to review-UI shape (one payload, all units, all grades).
+        structure = _v2_to_review_shape(parsed)
+        upload.parsed_data = structure
+        upload.extracted_text_length = sum(
+            len(l.objective) + len(l.title) for u in parsed.units for l in u.lessons
+        )  # rough proxy — original was extract_text_from_file len; not load-bearing
+
+        unit_count = len(parsed.units)
+        lesson_count = sum(len(u.lessons) for u in parsed.units)
+        upload.add_log(
+            f"✅ Parse complete: {unit_count} units, {lesson_count} lessons "
+            f"across {len(parsed.grade_levels)} grade(s) "
+            f"({', '.join(parsed.grade_levels)})."
+        )
+        if parsed.detection_disagreed_with_hint:
+            upload.add_log(
+                "   ⚠ Subject/locale detection disagreed with your hints — "
+                "the document's content was trusted. See parsed_data.detection_*."
+            )
+        if len(parsed.grade_levels) > 1:
+            upload.add_log(
+                f"   ℹ️ Multi-grade document — on Approve, one Course will be "
+                f"created per grade ({len(parsed.grade_levels)} Courses total)."
+            )
+
+        if skip_review:
+            upload.save()
+            return complete_curriculum_upload(upload_id)
+
+        upload.status = 'review'
+        upload.add_log("⏸️ Ready for teacher review — confirm and Approve to "
+                       "generate the Course / Unit / Lesson rows.")
+        upload.save()
+
+        return {
+            'success': True,
+            'status': 'review',
+            'units_count': unit_count,
+            'lessons_count': lesson_count,
+            'grades': parsed.grade_levels,
+            'parser_version': 'v2',
+        }
+
+    except ParseFailure as e:
+        logger.warning(
+            "[parser_v2] process_curriculum_upload: ParseFailure(%s): %s",
+            e.reason, e.detail,
+        )
+        upload.status = 'failed'
+        upload.error_message = f"{e.reason}: {e.detail}"
+        upload.add_log(f"❌ Parse failed — reason: {e.reason}")
+        if e.detail:
+            upload.add_log(f"   Detail: {e.detail[:300]}")
+        # Reason-specific actionable next steps for the teacher.
+        if e.reason == 'no_text':
+            upload.add_log(
+                "   This usually means the PDF is a scanned image. Try "
+                "uploading a text-PDF version, or wait — vision OCR is "
+                "active and may have just failed on this specific page set."
+            )
+        elif e.reason == 'subject_unclassified':
+            upload.add_log(
+                "   The LLM couldn't identify the subject from the first "
+                "page. Pre-fill the Subject field on the upload form and "
+                "try again."
+            )
+        elif e.reason in ('llm_unavailable', 'llm_error'):
+            upload.add_log(
+                "   The AI parser is unavailable right now. Check ModelConfig "
+                "for purpose='generation' in the admin, or retry shortly."
+            )
+        upload.save()
+        return {
+            'success': False,
+            'status': 'failed',
+            'reason': e.reason,
+            'detail': e.detail,
+        }
+    except Exception as e:
+        logger.exception("[parser_v2] process_curriculum_upload: unexpected error")
+        upload.status = 'failed'
+        upload.error_message = str(e)
+        upload.add_log(f"❌ Unexpected error: {type(e).__name__}: {e}")
+        upload.save()
+        raise
+
+
+def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
+    """v2 completion — fans out by grade. One Course row per grade
+    detected in the document; each unit lands under its grade's Course.
+
+    For single-grade docs this is equivalent to the archive's one-
+    Course-per-upload behaviour. For multi-grade docs (e.g. Mozambique
+    Biology 10ª/11ª/12ª) it creates 3 Course rows. The data model
+    already supports this (Course.grade_level is a single string);
+    we just needed to actually fan out instead of jamming everything
+    under one Course.
+
+    Args:
+        upload_id: CurriculumUpload row id.
+        feedback: optional teacher feedback string (not currently used
+            in v2 — review-time edits are written directly to
+            upload.parsed_data by the review form).
+
+    Returns:
+        dict with course_ids, total units_created, lessons_created.
+    """
+    from apps.dashboard.models import CurriculumUpload
+    from apps.accounts.models import Institution
+
+    upload = CurriculumUpload.objects.get(id=upload_id)
+    structure = upload.parsed_data or {}
+    if not structure or not structure.get('units'):
+        upload.add_log("❌ complete_curriculum_upload: no parsed_data — nothing to commit.")
+        upload.status = 'failed'
+        upload.error_message = 'empty parsed_data'
+        upload.save()
+        return {'success': False, 'reason': 'empty_parsed_data'}
+
+    # Multi-grade fanout: group units by their grade_level. If units
+    # don't carry a grade_level (older data / teacher-edited structures
+    # that stripped it), fall back to upload.grade_level or the
+    # structure's first detected grade.
+    fallback_grade = (
+        upload.grade_level
+        or (structure.get('grade_levels') or [None])[0]
+        or ''
+    )
+    units_by_grade: dict[str, list] = {}
+    for unit in structure['units']:
+        g = (unit.get('grade_level') or fallback_grade or '').strip()
+        units_by_grade.setdefault(g, []).append(unit)
+
+    upload.add_log(
+        f"📦 Creating Course rows for {len(units_by_grade)} grade(s): "
+        f"{', '.join(sorted(units_by_grade.keys()))}"
+    )
+
+    inst = Institution.objects.filter(id=upload.institution_id).first() if upload.institution_id else None
+    course_ids = []
+    total_units = 0
+    total_lessons = 0
+
+    # Detected locale to stamp on each Course row. The archive's
+    # create_curriculum_from_structure doesn't read or set locale —
+    # we patch it on after the row is created so downstream content
+    # generation picks the right register.
+    detected_locale = structure.get('locale') or 'en-us'
+
+    from apps.curriculum.models import Course as _Course
+
+    for grade, units in sorted(units_by_grade.items()):
+        # Build a structure dict for this grade and hand off to the
+        # archive's create_curriculum_from_structure (it still works
+        # fine; we just feed it a single-grade slice). After M5 this
+        # is the only place the archive's structure-creation code runs
+        # from the runtime path.
+        per_grade_struct = {
+            'subject': structure.get('subject', 'General'),
+            'grade_level': grade,
+            'description': structure.get('description', ''),
+            'units': units,
+        }
+        result = create_curriculum_from_structure(per_grade_struct, inst, upload=upload)
+        cid = result.get('course_id')
+        course_ids.append(cid)
+        total_units += result.get('units_created', 0)
+        total_lessons += result.get('lessons_created', 0)
+
+        # Stamp the detected locale on the Course so content
+        # generation runs in the correct register. The archive's
+        # create_curriculum_from_structure ignores locale.
+        if cid:
+            _Course.objects.filter(id=cid).update(locale=detected_locale)
+
+        upload.add_log(
+            f"   ✓ {grade or '(no grade)'}: Course #{cid} "
+            f"({result.get('units_created', 0)} units, "
+            f"{result.get('lessons_created', 0)} lessons, "
+            f"locale={detected_locale!r})"
+        )
+
+    upload.status = 'completed'
+    upload.lessons_created = total_lessons
+    # Pick the first course as the primary "created_course" link the UI uses.
+    if course_ids:
+        from apps.curriculum.models import Course
+        upload.created_course = Course.objects.filter(id=course_ids[0]).first()
+    upload.add_log(f"🎉 Done — {len(course_ids)} course(s), {total_units} units, {total_lessons} lessons.")
+    upload.save()
+
+    return {
+        'success': True,
+        'course_ids': course_ids,
+        'units_created': total_units,
+        'lessons_created': total_lessons,
+        'parser_version': 'v2',
+    }
