@@ -30,7 +30,6 @@ Architecture refs:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -163,15 +162,59 @@ class ParsedCurriculumV2(BaseModel):
     )
 
 
+# --- LLM response_model schemas (constrained decoding via instructor) ---
+# These are what we PASS to instructor.chat.completions.create(...,
+# response_model=...). Distinct from the public Pydantic types above
+# because the LLM-side schemas include source_evidence, hint_disagreement,
+# rationale fields the LLM produces but we don't surface to callers.
+
+
+class _DetectionResult(BaseModel):
+    """Schema for detect_subject_and_locale LLM response."""
+    subject: str = Field(description="Academic subject — Mathematics, Biology, Geography, etc. Avoid 'General'.")
+    locale: str = Field(description="BCP-47 lowercase. e.g. 'en-us', 'pt-mz'.")
+    grade_levels: list[str] = Field(description="Distinct grade labels EXACTLY AS THEY APPEAR in the doc — e.g. '10ª Classe', 'S3', 'Form 4'. Do NOT coerce between systems.")
+    hint_disagreement: bool = Field(default=False, description="True iff your detection differs meaningfully from teacher_hints.")
+    rationale: str = Field(default="", description="One short sentence explaining the call.")
+
+
+class _OutlineUnit(BaseModel):
+    """One unit-outline entry within an _OutlineResult."""
+    title: str = Field(description="Unit name as it appears in the source.")
+    grade_level: str = Field(description="Grade label EXACTLY as in the source. Do not translate or coerce.")
+    description: str = Field(default="", description="One-line summary of what the unit covers.")
+    source_evidence: str = Field(default="", description="30-100 char verbatim snippet from the document anchoring this unit (heading line). Anti-hallucination.")
+
+
+class _OutlineResult(BaseModel):
+    """Schema for outline_pass LLM response."""
+    units: list[_OutlineUnit] = Field(default_factory=list)
+
+
+class _LessonRaw(BaseModel):
+    """One lesson entry within a _LessonsResult."""
+    title: str = Field(description="Short, student-friendly concept name. Not 'Students will learn X' — 'X'.")
+    objective: str = Field(description="Terminal objective in 1 sentence — what the student will be able to do.")
+    enabling_objectives: list[str] = Field(default_factory=list, description="3-6 granular sub-skills (action-verb statements).")
+    order: int = Field(default=0, description="1-indexed position within the unit.")
+    source_evidence: str = Field(default="", description="30-100 char verbatim snippet from the excerpt anchoring this lesson.")
+
+
+class _LessonsResult(BaseModel):
+    """Schema for lessons_pass LLM response."""
+    lessons: list[_LessonRaw] = Field(default_factory=list)
+
+
 # ============================================================================
 # v2 — LLM CLIENT WRAPPER
 # ============================================================================
 
 
 def _get_llm_client():
-    """Return (client, model_name) for the 'generation' purpose, or raise
-    ParseFailure('llm_unavailable'). Centralised so every v2 LLM call
-    surfaces the same structured error when ModelConfig isn't configured.
+    """Return (BaseLLMClient, ModelConfig) for purpose='generation', or
+    raise ParseFailure('llm_unavailable'). Centralised so every v2 LLM
+    call surfaces the same structured error when ModelConfig isn't
+    configured.
     """
     from apps.llm.models import ModelConfig
     from apps.llm.client import get_llm_client
@@ -182,114 +225,65 @@ def _get_llm_client():
             'llm_unavailable',
             "No ModelConfig found for purpose='generation'. Configure one in the LLM admin.",
         )
-    return get_llm_client(cfg), getattr(cfg, 'model_name', 'unknown')
+    return get_llm_client(cfg), cfg
 
 
 def _call_llm_structured(
     *,
+    response_model: type,
     system_prompt: str,
     user_prompt: str,
     max_tokens: int = 4096,
-    temperature: float = 0.1,
-) -> dict:
-    """Call the generation LLM and parse a JSON object out of the
-    response. Mirrors the robust JSON extraction in
-    ``content_generator._try_fix_json`` — tolerates markdown fences,
-    leading prose, and single-quoted-dict outputs from some providers.
+):
+    """Call the generation LLM and return a typed Pydantic instance of
+    ``response_model``. Uses ``instructor.from_provider`` for
+    constrained decoding so the response shape is GUARANTEED by the
+    provider — no more json.loads + regex repair.
 
-    Raises ParseFailure('llm_error') on JSON parse failure after one
-    retry. Raises ParseFailure('llm_unavailable') if no client.
+    Mirrors the pattern used by tutor judges
+    (``apps/tutoring/judges/_instructor_helper.py``) and content
+    generation. See auto-memory feedback_use_instructor_for_structured_output.
+
+    Raises:
+        ParseFailure('llm_unavailable') when no ModelConfig exists.
+        ParseFailure('llm_error') on provider call failure.
     """
-    client, model_name = _get_llm_client()
-    logger.info("[parser_v2] LLM call: model=%s max_tokens=%d", model_name, max_tokens)
+    from apps.tutoring.judges._instructor_helper import (
+        get_instructor_from_client, structured_completion,
+    )
 
+    client, cfg = _get_llm_client()
+    model_name = getattr(cfg, 'model_name', 'unknown')
+    provider = getattr(cfg, 'provider', '') or ''
+    logger.info(
+        "[parser_v2] LLM call: model=%s schema=%s max_tokens=%d",
+        model_name, response_model.__name__, max_tokens,
+    )
+
+    instructor_client = get_instructor_from_client(client)
+    if instructor_client is None:
+        raise ParseFailure(
+            'llm_error',
+            f"instructor.from_provider failed to wrap {model_name} — "
+            "check that the 'instructor' package is installed and the "
+            "provider is one of (anthropic, openai, google, ollama).",
+        )
     try:
-        response = client.generate(
-            messages=[{"role": "user", "content": user_prompt}],
+        return structured_completion(
+            instructor_client,
+            response_model,
             system_prompt=system_prompt,
+            user_prompt=user_prompt,
             max_tokens=max_tokens,
-            temperature=temperature,
+            max_retries=2,
+            provider=str(provider).lower(),
         )
     except Exception as e:
-        raise ParseFailure('llm_error', f"provider call failed: {type(e).__name__}: {e}")
-
-    text = (getattr(response, 'content', None) or '').strip()
-    if not text:
-        raise ParseFailure('llm_error', f"empty response from {model_name}")
-
-    parsed = _extract_json_object(text)
-    if parsed is None:
-        # One retry with a sharper "JSON only, no prose, no markdown" reminder.
-        logger.warning(
-            "[parser_v2] First-pass JSON parse failed (response was %d chars). Retrying.",
-            len(text),
+        raise ParseFailure(
+            'llm_error',
+            f"structured call failed for {response_model.__name__} on "
+            f"{model_name}: {type(e).__name__}: {e}",
         )
-        retry_user = (
-            user_prompt
-            + "\n\n<output_format>Return ONLY a single JSON object. No prose, "
-            "no markdown fences, no explanation. The first character of your "
-            "response must be `{`.</output_format>"
-        )
-        try:
-            response = client.generate(
-                messages=[{"role": "user", "content": retry_user}],
-                system_prompt=system_prompt,
-                max_tokens=max_tokens,
-                temperature=0.0,  # tighter on retry
-            )
-        except Exception as e:
-            raise ParseFailure('llm_error', f"retry call failed: {type(e).__name__}: {e}")
-        text = (getattr(response, 'content', None) or '').strip()
-        parsed = _extract_json_object(text)
-        if parsed is None:
-            raise ParseFailure(
-                'llm_error',
-                f"could not parse JSON from response after retry. preview: {text[:300]!r}",
-            )
-    return parsed
-
-
-def _extract_json_object(text: str) -> Optional[dict]:
-    """Best-effort JSON-object extraction. Returns None on hard failure
-    rather than raising, so the caller can decide retry vs. surface.
-    Handles:
-      - bare JSON
-      - ```json ... ``` fenced
-      - prose before/after the object
-      - single-quoted Python-dict-style output (a known Gemini failure)
-    """
-    if not text:
-        return None
-    s = text.strip()
-    # Strip markdown fences if present.
-    if s.startswith('```'):
-        lines = s.splitlines()
-        if lines and lines[0].startswith('```'):
-            lines = lines[1:]
-        if lines and lines[-1].startswith('```'):
-            lines = lines[:-1]
-        s = '\n'.join(lines).strip()
-    # Find the outermost {...}
-    start = s.find('{')
-    end = s.rfind('}')
-    if start == -1 or end == -1 or end < start:
-        return None
-    candidate = s[start:end + 1]
-    # Try strict JSON.
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        pass
-    # Try fixing single-quoted dicts → double quotes. Same trick as
-    # content_generator handles for Gemini outputs.
-    try:
-        fixed = re.sub(r"'", '"', candidate)
-        # Restore apostrophes inside words: "don't" was wrecked above —
-        # but for parser-level metadata this is rare; accept the risk
-        # since the field values are mostly programmatic.
-        return json.loads(fixed)
-    except json.JSONDecodeError:
-        return None
 
 
 # ============================================================================
@@ -364,41 +358,36 @@ def detect_subject_and_locale(
         f"<document_sample>\n{sample}\n</document_sample>\n"
         f"{hints_block}\n"
         f"<task>\n"
-        f"Classify this document. Return JSON with this exact shape:\n"
-        f"{{\n"
-        f'  "subject": "Biology",          // one of: Mathematics, Geography, '
-        f'Biology, Physics, Chemistry, History, Science, English, '
-        f'Portuguese, French, Other (use specific names from the doc, not '
-        f'"General")\n'
-        f'  "locale": "pt-mz",             // BCP-47 lowercase. Supported: '
-        f'{list(SUPPORTED_LOCALES)}. If the doc is in a language we don\'t '
-        f'list, pick the closest supported locale.\n'
-        f'  "grade_levels": ["10ª Classe", "11ª Classe", "12ª Classe"],  '
-        f'// distinct grade labels EXACTLY AS THEY APPEAR in the doc. Do not '
-        f'coerce "10ª Classe" to "S3" or vice versa.\n'
-        f'  "hint_disagreement": false,    // true iff your detection differs '
-        f'meaningfully from the teacher_hints\n'
-        f'  "rationale": "Title page reads `Programa de Ensino da Disciplina '
-        f'de Biologia ... 2º Ciclo`, with grade-overview table covering 10ª, '
-        f'11ª and 12ª Classe. Document is in Portuguese."  // 1-2 sentences.\n'
-        f"}}\n"
+        f"Classify this document.\n\n"
+        f"Constraints:\n"
+        f"- subject: use a specific name from the doc (Mathematics, "
+        f"Biology, Geography, Physics, Chemistry, etc.), NOT 'General'.\n"
+        f"- locale: BCP-47 lowercase. Supported: {list(SUPPORTED_LOCALES)}. "
+        f"If the doc is in a language we don't list, pick the closest "
+        f"supported locale.\n"
+        f"- grade_levels: list the distinct grade labels EXACTLY as they "
+        f"appear in the doc (e.g. ['10ª Classe', '11ª Classe', "
+        f"'12ª Classe'], or ['S3'], or ['Form 4', 'Form 5']). Do not "
+        f"coerce between national systems.\n"
+        f"- hint_disagreement: true iff your detection differs meaningfully "
+        f"from the teacher's hints (above).\n"
+        f"- rationale: one short sentence — what in the doc made you pick "
+        f"that subject/locale/grade.\n"
         f"</task>"
     )
 
     parsed = _call_llm_structured(
+        response_model=_DetectionResult,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         max_tokens=512,
     )
 
-    subject = (parsed.get('subject') or '').strip()
-    locale_raw = (parsed.get('locale') or '').strip().lower()
-    grade_levels = parsed.get('grade_levels') or []
-    if not isinstance(grade_levels, list):
-        grade_levels = [str(grade_levels)]
-    grade_levels = [str(g).strip() for g in grade_levels if str(g).strip()]
-    hint_disagreement = bool(parsed.get('hint_disagreement'))
-    rationale = (parsed.get('rationale') or '').strip()
+    subject = parsed.subject.strip()
+    locale_raw = parsed.locale.strip().lower()
+    grade_levels = [str(g).strip() for g in (parsed.grade_levels or []) if str(g).strip()]
+    hint_disagreement = bool(parsed.hint_disagreement)
+    rationale = (parsed.rationale or '').strip()
 
     if not subject:
         raise ParseFailure(
@@ -521,19 +510,23 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"Do NOT invent units, do NOT merge units the document treats "
         f"as separate.\n"
         f"2. DO NOT split a single unit into sub-units just because the "
-        f"source has multiple tables for it. Sub-tables like 'Reino "
-        f"Monera (continuação)' / 'Reino Protista (continuação)' / "
-        f"'(continuação)' are CONTINUATIONS of one parent unit "
-        f"(e.g. 'Sistemática dos Seres Vivos') — emit ONE outline entry "
-        f"for the parent, not one per continuation table. The fine-"
-        f"grained kingdom/phylum-level structure shows up later as "
-        f"LESSONS within that unit.\n"
+        f"source has multiple tables for it. Sub-tables literally marked "
+        f"as 'continuação' / '(continuação)' / '(continued)' are "
+        f"CONTINUATIONS of one parent unit — emit ONE outline entry for "
+        f"the parent, not one per continuation table. (Example: "
+        f"\"Sistemática dos Seres Vivos\" with 5 continuation tables for "
+        f"5 kingdoms is ONE unit; the kingdom-level structure becomes "
+        f"LESSONS within that unit.) BUT: two units that happen to share "
+        f"a code or strand prefix (e.g. 'GM9 - Area & Volume' on one "
+        f"page and 'GM9 - Angles' on a later page covering different "
+        f"topics with different time slots) are SEPARATE units — emit "
+        f"both.\n"
         f"3. If a unit recurs across multiple grades (e.g. 'Citologia' "
         f"in both 10ª Classe and 12ª Classe), emit ONE outline entry "
         f"per (unit, grade) pair — they will become separate Course "
         f"rows in our system, since each Course has a single grade.\n"
         f"4. Use grade labels EXACTLY as they appear (10ª Classe / S3 / "
-        f"Form 4 / etc.). Do not translate or coerce.\n"
+        f"Form 4 / Secondary 3 / etc.). Do not translate or coerce.\n"
         f"5. SKIP non-structural content: title pages, copyright pages "
         f"('Ficha Técnica'), introductions, methodological notes, "
         f"glossaries, bibliographies. These are NOT units.\n"
@@ -542,62 +535,47 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"from the document where that unit is FIRST introduced "
         f"(typically the FIRST heading line — not a continuation). "
         f"This anchors the extraction.\n"
-        f"8. Expected unit counts: a typical 3-grade secondary school "
-        f"curriculum has 5-10 top-level units per grade. If you find "
-        f"yourself emitting 20+ units, you are likely splitting too "
-        f"finely — re-read guideline 2.\n"
-        f"\nReturn JSON with this exact shape:\n"
-        f"{{\n"
-        f'  "units": [\n'
-        f'    {{\n'
-        f'      "title": "Unit name as in source",\n'
-        f'      "grade_level": "Grade label as in source",\n'
-        f'      "description": "One-line summary of what the unit covers",\n'
-        f'      "source_evidence": "Verbatim heading text from the doc"\n'
-        f'    }},\n'
-        f'    ...\n'
-        f'  ]\n'
-        f"}}\n"
+        f"8. BE EXHAUSTIVE. Scan the WHOLE document for unit headings — "
+        f"don't stop after the first few. Curriculum docs commonly "
+        f"have 5-15+ units per grade, sometimes spread across multiple "
+        f"terms / trimestres / cycles. If the document has a table of "
+        f"contents or overview table, use it as your unit-count target. "
+        f"Missing a unit on a later page is a BIGGER problem than "
+        f"splitting too finely.\n"
         f"</task>"
     )
 
     parsed = _call_llm_structured(
+        response_model=_OutlineResult,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         max_tokens=4096,
     )
 
-    raw_units = parsed.get('units') or []
-    if not isinstance(raw_units, list):
-        raise ParseFailure(
-            'no_units_found',
-            f"outline_pass: response.units was {type(raw_units).__name__}, expected list",
-        )
+    raw_units = parsed.units
 
     # Validate + anti-hallucination check.
-    text_lower = text.lower()
     outlines: list[UnitOutlineV2] = []
     skipped_no_evidence = 0
     for raw in raw_units:
-        if not isinstance(raw, dict):
-            continue
-        title = (raw.get('title') or '').strip()
-        grade = (raw.get('grade_level') or '').strip()
+        # raw is an _OutlineUnit pydantic instance (instructor-typed).
+        title = (raw.title or '').strip()
+        grade = (raw.grade_level or '').strip()
         if not title or not grade:
             continue
-        description = (raw.get('description') or '').strip()
-        evidence = (raw.get('source_evidence') or '').strip()
+        description = (raw.description or '').strip()
+        evidence = (raw.source_evidence or '').strip()
 
         # Anti-hallucination: the verbatim snippet should appear in the
-        # source text (modulo whitespace + casing). If it doesn't,
-        # the LLM probably invented this unit — drop it.
+        # source text. Use the same whitespace-tolerant regex search
+        # as _find_unit_body — pdftotext often line-breaks headings
+        # mid-word ("Geometry-\nshapes\nand\nSpaces\n(GM9)"), which a
+        # strict substring check rejects even though the heading IS
+        # in the document.
         if evidence:
-            # Be lenient: collapse whitespace, lowercase, and look for
-            # the first 30 chars of the evidence somewhere in the doc.
-            ev_norm = ' '.join(evidence.split()).lower()
-            ev_probe = ev_norm[:30] if len(ev_norm) > 30 else ev_norm
-            text_norm = ' '.join(text.split()).lower()
-            if ev_probe and ev_probe not in text_norm:
+            if _find_unit_body(text, evidence) == -1 and \
+               _find_unit_body(text, evidence[:50]) == -1 and \
+               _find_unit_body(text, title) == -1:
                 logger.warning(
                     "[parser_v2] outline_pass dropping unit %r — source_evidence "
                     "%r not found in document (likely hallucinated).",
@@ -653,8 +631,18 @@ def _find_unit_body(full_text: str, anchor: str) -> int:
     document than the unit body it points to.)
 
     Tolerates whitespace differences between the LLM-supplied anchor
-    and the actual document text — pdftotext leaves wonky spacing
-    around colons and line breaks that the LLM may normalise.
+    and the actual document text. pdftotext leaves wonky spacing
+    (column-wrap, page breaks, soft hyphens) so we layer four
+    progressively-looser searches:
+      1. exact rfind
+      2. whitespace-tolerant regex of the full anchor
+      3. whitespace-tolerant regex of the first 5-6 word tokens
+         (handles the case where the LLM produced a longer
+         evidence string than what's contiguous in the source —
+         e.g. "Number (N9) CORE (SET 3+) EXTENDED (SETS 1 &2)
+         Fractions Weeks 3 & 4" where pdftotext put intermediate
+         words like ASSESSMENT in between)
+      4. first 40 chars as bare substring
 
     Returns the character index, or -1 if not found.
     """
@@ -664,26 +652,49 @@ def _find_unit_body(full_text: str, anchor: str) -> int:
     idx = full_text.rfind(anchor)
     if idx != -1:
         return idx
-    # 2. Whitespace-tolerant search: build a regex where each run of
-    # whitespace in the anchor matches one-or-more whitespace chars in
-    # the text. This handles "II:  Genética" (LLM) vs "II: Genética"
-    # (doc body), or vice versa.
-    probe = anchor.strip()
+    # Normalise "soft hyphen" line breaks — pdftotext extracts a
+    # hyphenated word split across lines as "Geometry-\nshapes" which
+    # becomes "Geometry- shapes" after whitespace collapse. The LLM
+    # likely re-joins it as "Geometry-shapes" (no space). Collapsing
+    # "-\s+" → "-" in BOTH sides reconciles them.
+    text_norm = re.sub(r'-\s+', '-', full_text)
+    probe = re.sub(r'-\s+', '-', anchor).strip()
+    # 2. Exact rfind on the soft-hyphen-normalised text.
     if probe:
-        pattern = re.compile(
-            r'\s+'.join(re.escape(p) for p in probe.split()),
-            re.IGNORECASE,
-        )
-        matches = list(pattern.finditer(full_text))
-        if matches:
-            return matches[-1].start()  # last occurrence = body, not TOC
-    # 3. Last resort: first 40 chars of probe.
-    short = probe[:40] if probe else ''
-    if short:
-        idx = full_text.rfind(short)
+        idx = text_norm.rfind(probe)
         if idx != -1:
             return idx
-        idx = full_text.lower().rfind(short.lower())
+    # 3. Whitespace-tolerant search for the FULL anchor.
+    if probe:
+        tokens = probe.split()
+        if tokens:
+            pattern = re.compile(
+                r'\s+'.join(re.escape(p) for p in tokens),
+                re.IGNORECASE,
+            )
+            matches = list(pattern.finditer(text_norm))
+            if matches:
+                return matches[-1].start()
+            # 4. Try just the first 5-6 word tokens. The LLM may have
+            # produced a longer evidence string than what's contiguous
+            # in the PDF (pdftotext interleaves columns; words can
+            # appear between the "logical" parts of the heading).
+            if len(tokens) >= 5:
+                short_tokens = tokens[:5]
+                pattern = re.compile(
+                    r'\s+'.join(re.escape(p) for p in short_tokens),
+                    re.IGNORECASE,
+                )
+                matches = list(pattern.finditer(text_norm))
+                if matches:
+                    return matches[-1].start()
+    # 5. Last resort: first 40 chars of probe as plain substring.
+    short = probe[:40] if probe else ''
+    if short:
+        idx = text_norm.rfind(short)
+        if idx != -1:
+            return idx
+        idx = text_norm.lower().rfind(short.lower())
         if idx != -1:
             return idx
     return -1
@@ -804,69 +815,48 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
         f"7. For source_evidence: a 30-100 char verbatim snippet from "
         f"the excerpt that anchors this lesson (typically the "
         f"sub-heading or first content line). Anti-hallucination check.\n"
-        f"\nReturn JSON with this exact shape:\n"
-        f"{{\n"
-        f'  "lessons": [\n'
-        f'    {{\n'
-        f'      "title": "Short concept name",\n'
-        f'      "objective": "Terminal objective in 1 sentence",\n'
-        f'      "enabling_objectives": ["Sub-skill 1", "Sub-skill 2", ...],\n'
-        f'      "order": 1,\n'
-        f'      "source_evidence": "Verbatim snippet from the excerpt"\n'
-        f'    }},\n'
-        f'    ...\n'
-        f'  ]\n'
-        f"}}\n"
         f"</task>"
     )
 
     parsed = _call_llm_structured(
+        response_model=_LessonsResult,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         max_tokens=4096,
     )
 
-    raw_lessons = parsed.get('lessons') or []
-    if not isinstance(raw_lessons, list):
-        raise ParseFailure(
-            'llm_error',
-            f"lessons_pass for {unit.title!r}: response.lessons was "
-            f"{type(raw_lessons).__name__}, expected list",
-        )
+    raw_lessons = parsed.lessons
 
     # Anti-hallucination filter — each lesson's evidence must appear in
-    # the excerpt (case + whitespace insensitive, 30-char probe).
-    excerpt_norm = ' '.join(excerpt.split()).lower()
+    # the excerpt. Use the same whitespace-tolerant search as
+    # _find_unit_body so pdftotext line-break artefacts don't drop
+    # genuine lessons.
     lessons: list[LessonV2] = []
     skipped_no_evidence = 0
     for i, raw in enumerate(raw_lessons, start=1):
-        if not isinstance(raw, dict):
-            continue
-        title = (raw.get('title') or '').strip()
-        objective = (raw.get('objective') or '').strip()
+        # raw is a _LessonRaw pydantic instance.
+        title = (raw.title or '').strip()
+        objective = (raw.objective or '').strip()
         if not title or not objective:
             continue
-        evidence = (raw.get('source_evidence') or '').strip()
+        evidence = (raw.source_evidence or '').strip()
         if evidence:
-            ev_norm = ' '.join(evidence.split()).lower()
-            ev_probe = ev_norm[:30] if len(ev_norm) > 30 else ev_norm
-            if ev_probe and ev_probe not in excerpt_norm:
+            if _find_unit_body(excerpt, evidence) == -1 and \
+               _find_unit_body(excerpt, evidence[:50]) == -1 and \
+               _find_unit_body(excerpt, title) == -1:
                 logger.warning(
                     "[parser_v2] lessons_pass dropping lesson %r for unit %r "
                     "— evidence not in excerpt.", title, unit.title,
                 )
                 skipped_no_evidence += 1
                 continue
-        eos = raw.get('enabling_objectives') or []
-        if not isinstance(eos, list):
-            eos = [str(eos)]
-        eos = [str(e).strip() for e in eos if str(e).strip()]
+        eos = [str(e).strip() for e in (raw.enabling_objectives or []) if str(e).strip()]
         try:
             lessons.append(LessonV2(
                 title=title,
                 objective=objective,
                 enabling_objectives=eos,
-                order=int(raw.get('order') or i),
+                order=int(raw.order or i),
             ))
         except Exception:
             logger.warning(
