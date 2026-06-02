@@ -545,11 +545,15 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"</task>"
     )
 
+    # 8192 max_tokens: typical doc has 5-15 units, each ~400-600 chars
+    # of JSON (title + grade + description + 30-100 char source_evidence
+    # + structure overhead). 4096 truncated at ~8 units on a 12-unit
+    # Seychelles Geography doc; 8192 leaves headroom for 15-20 units.
     parsed = _call_llm_structured(
         response_model=_OutlineResult,
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        max_tokens=4096,
+        max_tokens=8192,
     )
 
     raw_units = parsed.units
