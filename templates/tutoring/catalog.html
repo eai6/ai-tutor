@@ -960,10 +960,10 @@ function showPrereqModal(el) {
     overlay.className = 'prereq-overlay';
     overlay.innerHTML = `
         <div class="prereq-modal">
-            <h3>🔒 Lesson Locked</h3>
-            <p style="color:#6B7280;">Complete these lessons first:</p>
+            <h3>🔒 ${gettext('Lesson Locked')}</h3>
+            <p style="color:#6B7280;">${gettext('Complete these lessons first:')}</p>
             <ul>${list}</ul>
-            <button class="btn btn-primary" onclick="this.closest('.prereq-overlay').remove()">Got it</button>
+            <button class="btn btn-primary" onclick="this.closest('.prereq-overlay').remove()">${gettext('Got it')}</button>
         </div>
     `;
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
@@ -1011,7 +1011,10 @@ function renderGamBar() {
     const streakEl = document.getElementById('gbar-streak');
     if (gamData.streak_days > 0) {
         streakEl.style.display = '';
-        streakEl.textContent = '🔥 ' + gamData.streak_days + ' day streak';
+        streakEl.textContent = '🔥 ' + interpolate(
+            ngettext('%s day streak', '%s day streak', gamData.streak_days),
+            [gamData.streak_days]
+        );
     }
 
     // Personality button
@@ -1023,18 +1026,21 @@ function renderGamBar() {
     // Trophies button with count
     const allAch = gamData.all_achievements || [];
     const earnedCount = allAch.filter(a => a.earned).length;
-    document.getElementById('trophies-btn').textContent = 'Trophies (' + earnedCount + '/' + allAch.length + ')';
+    document.getElementById('trophies-btn').textContent = interpolate(
+        gettext('Trophies (%(earned)s/%(total)s)'),
+        {earned: earnedCount, total: allAch.length}, true
+    );
 
     // Analytics stats row
     const statsEl = document.getElementById('gbar-stats');
     const lessons = gamData.mastered_lessons_count || 0;
     const mins = gamData.total_practice_minutes || 0;
     const hours = (mins / 60).toFixed(1);
-    document.getElementById('gbar-lessons').textContent = 'Lessons: ' + lessons;
-    document.getElementById('gbar-hours').textContent = 'Hours: ' + hours;
+    document.getElementById('gbar-lessons').textContent = gettext('Lessons:') + ' ' + lessons;
+    document.getElementById('gbar-hours').textContent = gettext('Hours:') + ' ' + hours;
     const accEl = document.getElementById('gbar-accuracy');
     if (gamData.quiz_accuracy !== null && gamData.quiz_accuracy !== undefined) {
-        accEl.textContent = 'Accuracy: ' + gamData.quiz_accuracy + '%';
+        accEl.textContent = gettext('Accuracy:') + ' ' + gamData.quiz_accuracy + '%';
         accEl.style.display = '';
     }
     statsEl.style.display = '';
@@ -1120,25 +1126,26 @@ async function selectPersonality(pid) {
 async function openLeaderboardModal() {
     document.getElementById('leaderboard-overlay').style.display = 'flex';
     const body = document.getElementById('leaderboard-body');
-    body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">Loading...</p>';
+    body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + gettext('Loading...') + '</p>';
     try {
         const res = await fetch('/tutor/api/leaderboard/');
         const data = await res.json();
         if (!data.leaderboard || data.leaderboard.length === 0) {
-            body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">No data yet. Complete lessons to appear!</p>';
+            body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + gettext('No data yet. Complete lessons to appear!') + '</p>';
             return;
         }
+        const youSuffix = gettext(' (You)');
         body.innerHTML = data.leaderboard.map(e =>
             `<div class="lb-row ${e.is_you ? 'is-you' : ''}">
                 <span class="lb-rank">${e.rank <= 3 ? ['🥇','🥈','🥉'][e.rank-1] : '#'+e.rank}</span>
                 <span class="lb-level">Lv ${e.level || 1}</span>
-                <span class="lb-name">${e.name}${e.is_you ? ' (You)' : ''}</span>
+                <span class="lb-name">${e.name}${e.is_you ? youSuffix : ''}</span>
                 ${e.streak ? '<span class="lb-streak">🔥' + e.streak + 'd</span>' : ''}
                 <span class="lb-xp">${e.xp.toLocaleString()} XP</span>
             </div>`
         ).join('');
     } catch(e) {
-        body.innerHTML = '<p style="text-align:center;color:#ef4444;">Failed to load leaderboard.</p>';
+        body.innerHTML = '<p style="text-align:center;color:#ef4444;">' + gettext('Failed to load leaderboard.') + '</p>';
     }
 }
 
@@ -1157,7 +1164,7 @@ function showAchievementToasts(achievements) {
             toast.innerHTML = `
                 <span class="at-emoji">${a.emoji || '🏆'}</span>
                 <div class="at-body">
-                    <div class="at-label">Achievement Unlocked!</div>
+                    <div class="at-label">${gettext('Achievement Unlocked!')}</div>
                     <div class="at-name">${a.name}</div>
                     <div class="at-desc">${a.description}</div>
                 </div>

@@ -100,6 +100,13 @@ class Command(BaseCommand):
             help="The .po language dir (default: pt_MZ).",
         )
         parser.add_argument(
+            "--domain", default="django",
+            choices=["django", "djangojs"],
+            help="Which catalog to translate (default: django). djangojs covers "
+                 "inline <script> gettext() / ngettext() calls extracted with "
+                 "`makemessages -d djangojs -e js,html`.",
+        )
+        parser.add_argument(
             "--batch-size", type=int, default=30,
             help="msgids per Claude call (default: 30).",
         )
@@ -116,9 +123,13 @@ class Command(BaseCommand):
         locale_dir = (
             Path(settings.BASE_DIR) / "locale" / options["locale"] / "LC_MESSAGES"
         )
-        po_path = locale_dir / "django.po"
+        po_path = locale_dir / f"{options['domain']}.po"
         if not po_path.exists():
-            raise CommandError(f"No catalog at {po_path}. Run `makemessages -l {options['locale']}` first.")
+            raise CommandError(
+                f"No catalog at {po_path}. Run `makemessages -l {options['locale']}"
+                + (" -d djangojs -e js,html`" if options['domain'] == 'djangojs' else "`")
+                + " first."
+            )
 
         entries = _parse_po(po_path)
         untranslated = [e for e in entries if not e["msgstr"]]

@@ -2,12 +2,131 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor-js\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-01 22:22+0000\n"
+"POT-Creation-Date: 2026-06-02 00:05+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+
+#: templates/_includes/feedback_button.html:343
+msgid "Proposed action:"
+msgstr "Ação proposta:"
+
+#: templates/_includes/feedback_button.html:352
+msgid "Confirm"
+msgstr "Confirmar"
+
+#: templates/_includes/feedback_button.html:356
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: templates/_includes/feedback_button.html:375
+msgid "Take me there →"
+msgstr "Levar-me lá →"
+
+#: templates/_includes/feedback_button.html:385
+msgid "Send this to support →"
+msgstr "Enviar isto ao suporte →"
+
+#: templates/_includes/feedback_button.html:408
+msgid "Could not start chat."
+msgstr "Não foi possível iniciar o chat."
+
+#: templates/_includes/feedback_button.html:424
+msgid "Assistant failed."
+msgstr "O assistente falhou."
+
+#: templates/_includes/feedback_button.html:453
+msgid "Could not run that action."
+msgstr "Não foi possível executar essa ação."
+
+#: templates/_includes/feedback_button.html:463
+msgid "Cancelled."
+msgstr "Cancelado."
+
+#: templates/_includes/feedback_button.html:466
+msgid "Done."
+msgstr "Concluído."
+
+#: templates/_includes/feedback_button.html:569
+msgid "Please describe what happened."
+msgstr "Descreve o que aconteceu."
+
+#: templates/_includes/feedback_button.html:575
+msgid "Pick a window…"
+msgstr "Escolhe uma janela…"
+
+#: templates/_includes/feedback_button.html:575
+#: templates/_includes/feedback_button.html:598
+msgid "Sending…"
+msgstr "A enviar…"
+
+#: templates/_includes/feedback_button.html:617
+msgid "Submission failed. Please try again."
+msgstr "Não foi possível reiniciar a lição. Tenta novamente."
+
+#: templates/_includes/feedback_button.html:625
+msgid "Network error. Try again in a moment."
+msgstr "Erro de rede ao adicionar aluno."
+
+#: templates/_includes/feedback_button.html:629
+msgid "Send"
+msgstr "Enviar"
+
+#: templates/tutoring/catalog.html:963
+msgid "Lesson Locked"
+msgstr "Lição Bloqueada"
+
+#: templates/tutoring/catalog.html:964
+msgid "Complete these lessons first:"
+msgstr "Conclui primeiro estas lições:"
+
+#: templates/tutoring/catalog.html:966
+msgid "Got it"
+msgstr "Entendido"
+
+#: templates/tutoring/catalog.html:1015
+#, javascript-format
+msgid "%s day streak"
+msgstr "Sequência de %s dias"
+
+#: templates/tutoring/catalog.html:1030
+msgid "Trophies (%(earned)s/%(total)s)"
+msgstr "Troféus (%(earned)s/%(total)s)"
+
+#: templates/tutoring/catalog.html:1039
+msgid "Lessons:"
+msgstr "Lições:"
+
+#: templates/tutoring/catalog.html:1040
+msgid "Hours:"
+msgstr "Horas:"
+
+#: templates/tutoring/catalog.html:1043
+msgid "Accuracy:"
+msgstr "Precisão:"
+
+#: templates/tutoring/catalog.html:1129
+msgid "Loading..."
+msgstr "A carregar..."
+
+#: templates/tutoring/catalog.html:1134
+msgid "No data yet. Complete lessons to appear!"
+msgstr "Ainda sem dados. Completa lições para apareceres!"
+
+#: templates/tutoring/catalog.html:1137
+msgid " (You)"
+msgstr " (Tu)"
+
+#: templates/tutoring/catalog.html:1148
+msgid "Failed to load leaderboard."
+msgstr "Falha ao carregar a classificação."
+
+#: templates/tutoring/catalog.html:1167
+msgid "Achievement Unlocked!"
+msgstr "Conquista Desbloqueada!"
 
 #: templates/tutoring/chat_tutor.html:1468
 msgid "Engage"
@@ -66,10 +185,8 @@ msgid "Type a final answer first."
 msgstr "Escreve primeiro uma resposta final."
 
 #: templates/tutoring/chat_tutor.html:1809
-msgid ""
-"Welcome back — your previous question is still waiting in the panel on the "
-"right."
-msgstr ""
+msgid "Welcome back — your previous question is still waiting in the panel on the right."
+msgstr "Bem-vindo de volta — a tua pergunta anterior continua à espera no painel à direita."
 
 #: templates/tutoring/chat_tutor.html:1901
 msgid "earlier messages"

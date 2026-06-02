@@ -15,6 +15,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 
@@ -70,9 +71,9 @@ def chat_start(request):
         'conversation_id': conv.id,
         'audience': audience,
         'greeting': (
-            "Hi 👋 — I'm your AI help assistant. I can answer questions about how the platform works "
-            + ("or help you navigate the dashboard. " if audience in ('teacher', 'super_admin') else "and help you find the right lesson. ")
-            + "What's up?"
+            _("Hi 👋 — I'm your AI help assistant. I can answer questions about how the platform works ")
+            + (_("or help you navigate the dashboard. ") if audience in ('teacher', 'super_admin') else _("and help you find the right lesson. "))
+            + _("What's up?")
         ),
     })
 

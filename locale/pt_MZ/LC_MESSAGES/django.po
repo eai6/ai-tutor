@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-01 22:41+0000\n"
+"POT-Creation-Date: 2026-06-02 00:04+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -37,6 +37,22 @@ msgstr "Perfil atualizado."
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
+#: apps/support/views.py:74
+msgid "Hi 👋 — I'm your AI help assistant. I can answer questions about how the platform works "
+msgstr "Olá 👋 — sou o teu assistente AI. Posso responder a perguntas sobre como a plataforma funciona "
+
+#: apps/support/views.py:75
+msgid "or help you navigate the dashboard. "
+msgstr "ou ajudar-te a navegar no painel. "
+
+#: apps/support/views.py:75
+msgid "and help you find the right lesson. "
+msgstr "e ajudar-te a encontrar a lição certa. "
+
+#: apps/support/views.py:76
+msgid "What's up?"
+msgstr "Tudo bem?"
+
 #: apps/tutoring/simple_tutor/engine.py:973
 msgid "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit."
 msgstr "Boa — terminaste a lição! Agora vamos ver o que fixaste com um pequeno questionário. Pensa bem em cada pergunta e depois submete."
@@ -50,6 +66,92 @@ msgstr "🎉 Tiveste %(score)d/%(total)d — passaste. Parabéns!"
 #, python-format
 msgid "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. Let's revisit the concepts you missed."
 msgstr "📋 **Revisão do bilhete de saída**\n\nTiveste %(score)d em %(total)d. Vamos rever os conceitos que falhaste."
+
+#: templates/_includes/feedback_button.html:122
+msgid "Report a bug or send feedback"
+msgstr "Reportar um erro ou enviar comentários"
+
+#: templates/_includes/feedback_button.html:126
+#: templates/dashboard/feedback/list.html:49
+msgid "Help / Feedback"
+msgstr "Ajuda / Comentários"
+
+#: templates/_includes/feedback_button.html:131
+msgid "Help & Support"
+msgstr "Ajuda e Suporte"
+
+#: templates/_includes/feedback_button.html:135
+msgid "Ask the AI"
+msgstr "Pergunta ao AI"
+
+#: templates/_includes/feedback_button.html:136
+msgid "Send to support"
+msgstr "Enviar para suporte"
+
+#: templates/_includes/feedback_button.html:143
+msgid "Ask anything about the platform — how do I…, where is…"
+msgstr "Pergunta qualquer coisa sobre a plataforma — como faço…, onde está…"
+
+#: templates/_includes/feedback_button.html:144
+#: templates/_includes/feedback_button.html:175
+msgid "Send"
+msgstr "Enviar"
+
+#: templates/_includes/feedback_button.html:151
+msgid "Tell us what happened or what would help. We read every one."
+msgstr "Conta-nos o que aconteceu ou o que ajudaria. Lemos todas as mensagens."
+
+#: templates/_includes/feedback_button.html:152
+msgid "Thanks — your message was sent. We'll review it soon."
+msgstr "Obrigado — a tua mensagem foi enviada. Vamos analisá-la em breve."
+
+#: templates/_includes/feedback_button.html:156
+msgid "Bug"
+msgstr "Erro"
+
+#: templates/_includes/feedback_button.html:157
+msgid "Feedback"
+msgstr "Comentários e Erros"
+
+#: templates/_includes/feedback_button.html:158
+msgid "Idea"
+msgstr "Ideia"
+
+#: templates/_includes/feedback_button.html:161
+msgid "Low"
+msgstr "Baixa"
+
+#: templates/_includes/feedback_button.html:162
+msgid "Medium"
+msgstr "Multimédia"
+
+#: templates/_includes/feedback_button.html:163
+msgid "High — pilot blocker"
+msgstr "Alta — bloqueia o piloto"
+
+#: templates/_includes/feedback_button.html:166
+msgid "Describe what happened, what you expected, or any feedback…"
+msgstr "Descreve o que aconteceu, o que esperavas, ou qualquer comentário…"
+
+#: templates/_includes/feedback_button.html:170
+msgid "Include a screenshot of my current screen"
+msgstr "Incluir uma captura do meu ecrã atual"
+
+#: templates/_includes/feedback_button.html:170
+msgid "(your browser will ask which screen / window to share)"
+msgstr "(o teu navegador vai perguntar qual ecrã / janela partilhar)"
+
+#: templates/_includes/feedback_button.html:174
+#: templates/dashboard/classes/detail.html:134
+#: templates/dashboard/curriculum/lesson_create.html:33
+#: templates/dashboard/curriculum/process.html:305
+#: templates/dashboard/curriculum/step_edit.html:185
+#: templates/dashboard/curriculum/unit_create.html:32
+#: templates/dashboard/curriculum/upload.html:435
+#: templates/dashboard/student_groups/list.html:178
+#: templates/dashboard/summative/review.html:284
+msgid "Cancel"
+msgstr "Cancelar"
 
 #: templates/accounts/landing.html:243
 #, python-format
@@ -524,7 +626,7 @@ msgstr "%(count)s aluno"
 #: templates/dashboard/class_readiness.html:138
 #, python-format
 msgid "%(count)s enabling objective"
-msgstr "%(count)s objetivo facilitador"
+msgstr "%(count)s objetivo habilitador"
 
 #: templates/dashboard/class_readiness.html:147
 msgid "Class Readiness"
@@ -583,7 +685,7 @@ msgstr "Todas as turmas"
 #: templates/dashboard/classes/detail.html:18
 #, python-format
 msgid "%(count)s course for this grade"
-msgstr "%(count)s curso para esta classe"
+msgstr "%(count)s disciplina para esta classe"
 
 #: templates/dashboard/classes/detail.html:26
 #, python-format
@@ -685,17 +787,6 @@ msgstr "0 selecionados"
 #: templates/dashboard/classes/detail.html:133
 msgid "Confirm"
 msgstr "Confirmar"
-
-#: templates/dashboard/classes/detail.html:134
-#: templates/dashboard/curriculum/lesson_create.html:33
-#: templates/dashboard/curriculum/process.html:305
-#: templates/dashboard/curriculum/step_edit.html:185
-#: templates/dashboard/curriculum/unit_create.html:32
-#: templates/dashboard/curriculum/upload.html:435
-#: templates/dashboard/student_groups/list.html:178
-#: templates/dashboard/summative/review.html:284
-msgid "Cancel"
-msgstr "Cancelar"
 
 #: templates/dashboard/classes/detail.html:145
 #: templates/dashboard/flagged_sessions.html:36
@@ -1679,10 +1770,6 @@ msgstr "Comentários e relatórios de erros"
 #: templates/dashboard/feedback/list.html:49
 msgid "Reports submitted from the floating"
 msgstr "Relatórios enviados a partir do botão flutuante"
-
-#: templates/dashboard/feedback/list.html:49
-msgid "Help / Feedback"
-msgstr "Ajuda / Comentários"
 
 #: templates/dashboard/feedback/list.html:49
 msgid "button."
