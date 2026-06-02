@@ -1,0 +1,47 @@
+{
+  "schema_version": "1",
+  "captured_at": "2026-06-02T16:55:12.267822Z",
+  "parser_state": "pre-M1 (LLM call SILENTLY CRASHES with prompt= kwarg; orchestrator falls through to regex)",
+  "notes": "Captured on feature/curriculum-parser-v2 right after the M0 rename (commit f0fb2d0). The shim is in place, archive holds the original parser unchanged. parse_curriculum_with_llm crashes with TypeError on BaseLLMClient.generate(prompt=...) but catches the exception and silently returns parse_generic_curriculum output — every result below is the regex fallback. IMPORTANT: 'llm_parse' shows what parse_curriculum_with_llm RETURNED (regex output on TRUNCATED text — line 1946 of the archive truncates 111K chars to 30K before the LLM call, then falls back to regex on the truncated text). 'regex_parse' shows parse_generic_curriculum on the FULL extracted text — what process_curriculum_upload's except-branch would have produced. The difference (3 vs 37 units) is a separate artifact of input truncation. Seychelles regression slices deferred to M6 — we will pull CurriculumUpload.parsed_data from staging at that time.",
+  "docs": [
+    {
+      "slug": "mozambique_biology_2_ciclo",
+      "path": "mozambique/selected_materials/ANEXO_IX_PROGRAMA_BIOLOGIA_ES_2ºCICLO_11-02-26_GM_assinado.pdf",
+      "expected_subject": "Biology",
+      "expected_locale": "pt-mz",
+      "expected_units_range": [
+        5,
+        8
+      ],
+      "ground_truth_note": "INDE/MEC programa for 2º Ciclo. Real structure: 6 Unidades Temáticas across 3 grades (10ª/11ª/12ª Classe). 3-column tables: Objectivos Específicos | Conteúdos | Resultados de Aprendizagem.",
+      "extracted_chars": 111479,
+      "file_type": "pdf",
+      "detected_subject": "General",
+      "llm_parse": {
+        "crashed": false,
+        "subject": "General",
+        "units": 3,
+        "lessons": 44
+      },
+      "regex_parse": {
+        "subject": "General",
+        "units_count": 37,
+        "lessons_count": 159,
+        "first_5_unit_titles": [
+          "Impressão",
+          "O aluno",
+          "• Conceitos básicos",
+          "O aluno",
+          "• Sistema Rh"
+        ],
+        "first_5_lessons_unit_1": [
+          "Os Cromossomas e Genes",
+          "Base molecular da hereditariedade",
+          "Ciclo celular",
+          "Gametogénese",
+          "Fecundação e fertilidade"
+        ]
+      }
+    }
+  ]
+}
