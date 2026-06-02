@@ -306,7 +306,8 @@
                     <input type="text" class="form-control" id="subject_name" name="subject_name"
                            placeholder="{% trans 'auto-derived from subject above (e.g. Geography)' %}">
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
-                        {% trans "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Geography S3')." %}
+                        <span class="display-name-hint" data-locale="en-us">{% trans "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Geography S3')." %}</span>
+                        <span class="display-name-hint" data-locale="pt-mz" style="display:none;">{% trans "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Biologia 10ª Classe')." %}</span>
                     </div>
                 </div>
 
@@ -462,6 +463,10 @@
                         cb.checked = false;
                     });
                 }
+            });
+            // Swap the display-name hint to the matching example.
+            document.querySelectorAll('.display-name-hint').forEach(h => {
+                h.style.display = h.dataset.locale === sel ? 'inline' : 'none';
             });
         }
         localeSelect.addEventListener('change', syncGradeOptions);
