@@ -184,7 +184,7 @@
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: {{ subject.progress_percent }}%"></div>
                     </div>
-                    <span class="progress-text">{{ subject.completed_lessons }}/{{ subject.total_lessons }} completed</span>
+                    <span class="progress-text">{% blocktrans with done=subject.completed_lessons total=subject.total_lessons %}{{ done }}/{{ total }} completed{% endblocktrans %}</span>
                 </div>
             </div>
         </a>
@@ -229,9 +229,9 @@
             <div class="unit-header" onclick="toggleUnit(this)">
                 <div class="unit-header-left">
                     <span class="unit-toggle-icon">▼</span>
-                    <h3>Unit {{ forloop.counter }}: {{ unit.title }}</h3>
+                    <h3>{% blocktrans with n=forloop.counter title=unit.title %}Unit {{ n }}: {{ title }}{% endblocktrans %}</h3>
                 </div>
-                <span class="lesson-count">{{ unit.lessons|length }} lessons</span>
+                <span class="lesson-count">{% blocktrans count count=unit.lessons|length %}{{ count }} lesson{% plural %}{{ count }} lessons{% endblocktrans %}</span>
             </div>
             {% if unit.description %}
             <p class="unit-description">{{ unit.description }}</p>
@@ -265,7 +265,7 @@
                         {% endif %}
                     </div>
                     <div class="lesson-info">
-                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:#92400e;color:#fff;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">recommended</span>{% endif %}</h4>
+                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:#92400e;color:#fff;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">{% trans "recommended" %}</span>{% endif %}</h4>
                         <p>{{ lesson.objective }}</p>
                         {% if lesson.competency_pct is not None %}
                         <div class="competency-bar" style="margin-top:0.4rem;">
@@ -278,9 +278,9 @@
                                     {% else %}
                                         <span style="color:var(--danger);">●</span>
                                     {% endif %}
-                                    {{ lesson.competency_pct }}% competency
+                                    {% blocktrans with pct=lesson.competency_pct %}{{ pct }}% competency{% endblocktrans %}
                                 </span>
-                                <span>{{ lesson.attempts_count }} attempt{{ lesson.attempts_count|pluralize }}</span>
+                                <span>{% blocktrans count count=lesson.attempts_count %}{{ count }} attempt{% plural %}{{ count }} attempts{% endblocktrans %}</span>
                             </div>
                             <div class="progress-bar" style="height:4px; background:var(--border); border-radius:2px; margin-top:0.2rem;">
                                 <div style="width:{{ lesson.competency_pct }}%; height:100%; background:{% if lesson.competency_pct >= 80 %}var(--success){% elif lesson.competency_pct >= 50 %}var(--warning){% else %}var(--danger){% endif %}; border-radius:2px;"></div>
@@ -293,7 +293,7 @@
                         {% if lesson.status != 'completed' %}
                         <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
                         {% endif %}
-                        <span class="arrow">{% if lesson.status == 'completed' %}Review &rarr;{% else %}&rarr;{% endif %}</span>
+                        <span class="arrow">{% if lesson.status == 'completed' %}{% trans "Review" %} &rarr;{% else %}&rarr;{% endif %}</span>
                     </div>
                 </a>
                 {% endif %}

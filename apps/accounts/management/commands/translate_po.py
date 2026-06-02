@@ -132,10 +132,22 @@ class Command(BaseCommand):
             )
 
         entries = _parse_po(po_path)
-        untranslated = [e for e in entries if not e["msgstr"]]
+        # Plural entries (msgid_plural / msgstr[0]/msgstr[1]) are
+        # round-tripped verbatim — translate_po doesn't yet handle the
+        # 2-form LLM call. They must be translated by hand. Skipping
+        # them here prevents the round-trip from CORRUPTING them (the
+        # 2026-06-01 bug where translate_po stripped msgid_plural +
+        # msgstr[1] and left only a singular form).
+        plural_count = sum(1 for e in entries if e.get("is_plural"))
+        untranslated = [
+            e for e in entries if not e["msgstr"] and not e.get("is_plural")
+        ]
         self.stdout.write(
             f"Found {len(entries)} msgids in {po_path.relative_to(settings.BASE_DIR)}; "
-            f"{len(untranslated)} untranslated."
+            f"{len(untranslated)} untranslated"
+            + (f" ({plural_count} plural entries skipped — translate by hand)"
+               if plural_count else "")
+            + "."
         )
 
         if not untranslated:
@@ -266,18 +278,37 @@ def _parse_po(path: Path) -> list[dict]:
 
         if line.startswith('msgid "'):
             if current is None:
-                current = {"msgid": "", "msgstr": "", "header_lines": flag_buffer[:]}
+                current = {"msgid": "", "msgstr": "", "header_lines": flag_buffer[:],
+                           "is_plural": False, "raw_tail": []}
                 flag_buffer = []
             current["msgid"] = _unquote(line[len("msgid "):])
             state = "msgid"
+        elif line.startswith('msgid_plural "'):
+            # Plural entry — translate_po can't safely round-trip these
+            # (msgstr[0]/msgstr[1]/etc.). Mark it and capture all
+            # following lines RAW so _write_po can emit them verbatim
+            # and the entry is excluded from LLM translation.
+            if current is not None:
+                current["is_plural"] = True
+                current["raw_tail"].append(line)
+                state = "raw_tail"
         elif line.startswith('msgstr "'):
             if current is None:
-                current = {"msgid": "", "msgstr": "", "header_lines": []}
+                current = {"msgid": "", "msgstr": "", "header_lines": [],
+                           "is_plural": False, "raw_tail": []}
             current["msgstr"] = _unquote(line[len("msgstr "):])
             state = "msgstr"
+        elif line.startswith('msgstr[') and current is not None:
+            # msgstr[N] only appears in plural entries.
+            current["is_plural"] = True
+            current["raw_tail"].append(line)
+            state = "raw_tail"
         elif line.startswith('"') and current is not None and state:
-            # Continuation line for the previous msgid/msgstr.
-            current[state] += _unquote(line)
+            if state == "raw_tail":
+                current["raw_tail"].append(line)
+            else:
+                # Continuation line for msgid / msgstr.
+                current[state] += _unquote(line)
 
     if current is not None and not is_first_block:
         entries.append(current)
@@ -314,7 +345,14 @@ def _write_po(path: Path, entries: list[dict]) -> None:
         for ref_line in entry.get("header_lines", []):
             out_lines.append(ref_line)
         out_lines.append(f"msgid {_quote(entry['msgid'])}")
-        out_lines.append(f"msgstr {_quote(entry['msgstr'])}")
+        if entry.get("is_plural"):
+            # Plural entries — emit msgid_plural + msgstr[0]/[1]/...
+            # exactly as captured. translate_po does NOT translate
+            # plurals (msgstr[N] needs special LLM handling), so the
+            # raw block is the single source of truth here.
+            out_lines.extend(entry.get("raw_tail", []))
+        else:
+            out_lines.append(f"msgstr {_quote(entry['msgstr'])}")
         out_lines.append("")
 
     path.write_text("\n".join(out_lines).rstrip() + "\n")
