@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 01:04+0000\n"
+"POT-Creation-Date: 2026-06-02 01:29+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -646,7 +646,7 @@ msgstr "%(count)s aluno"
 #: templates/dashboard/class_readiness.html:138
 #, python-format
 msgid "%(count)s enabling objective"
-msgstr "%(count)s objetivo habilitador"
+msgstr "%(count)s objetivo facilitador"
 
 #: templates/dashboard/class_readiness.html:147
 msgid "Class Readiness"
@@ -713,9 +713,13 @@ msgid "Courses for %(g)s"
 msgstr "Cursos para %(g)s"
 
 #: templates/dashboard/classes/detail.html:36
+#: templates/tutoring/catalog.html:234
+#, python-format
 #, python-format
 msgid "%(count)s lesson"
-msgstr "%(count)s lição"
+msgid_plural "%(count)s lessons"
+msgstr[0] "%(count)s lição"
+msgstr[1] "%(count)s lições"
 
 #: templates/dashboard/classes/detail.html:37
 #, python-format
@@ -1222,6 +1226,7 @@ msgstr "Com Conteúdo"
 
 #: templates/dashboard/curriculum/course_detail.html:971
 #: templates/dashboard/lesson_monitor.html:297
+#: templates/tutoring/catalog.html:296
 msgid "Review"
 msgstr "Rever"
 
@@ -3586,9 +3591,13 @@ msgid "Best"
 msgstr "Melhor"
 
 #: templates/dashboard/students/detail.html:125
+#: templates/tutoring/catalog.html:283
+#, python-format
 #, python-format
 msgid "%(count)s attempt"
-msgstr "%(count)s tentativa"
+msgid_plural "%(count)s attempts"
+msgstr[0] "%(count)s tentativa"
+msgstr[1] "%(count)s tentativas"
 
 #: templates/dashboard/students/detail.html:131
 msgid "Weak:"
@@ -3902,6 +3911,11 @@ msgstr "há %(t)s"
 msgid "Resume"
 msgstr "Retomar"
 
+#: templates/tutoring/catalog.html:187
+#, python-format
+msgid "%(done)s/%(total)s completed"
+msgstr "%(done)s/%(total)s concluídas"
+
 #: templates/tutoring/catalog.html:208
 msgid "Start baseline"
 msgstr "Iniciar diagnóstico"
@@ -3914,9 +3928,23 @@ msgstr "Refaz a avaliação sumativa do curso — útil para acompanhar o teu pr
 msgid "Start"
 msgstr "Começar"
 
+#: templates/tutoring/catalog.html:232
+#, python-format
+msgid "Unit %(n)s: %(title)s"
+msgstr "Unidade %(n)s: %(title)s"
+
 #: templates/tutoring/catalog.html:248
 msgid "Complete prerequisites to unlock"
 msgstr "Completa os pré-requisitos para desbloquear"
+
+#: templates/tutoring/catalog.html:268
+msgid "recommended"
+msgstr "recomendado"
+
+#: templates/tutoring/catalog.html:281
+#, python-format
+msgid "%(pct)s%% competency"
+msgstr "%(pct)s%% de competência"
 
 #: templates/tutoring/catalog.html:294
 msgid "Take a 10-question pre-test instead — pass and the lesson is marked complete."
