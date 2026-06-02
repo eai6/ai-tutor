@@ -273,6 +273,26 @@
         <p>
             <a href="{% url 'dashboard:help_index' %}">{% trans "Help & FAQ" %}</a>
             &nbsp;·&nbsp;
+            <span style="display:inline-flex;gap:0.4rem;align-items:center;">
+                {% get_current_language as CURRENT_LANG %}
+                {% for code, label in LANGUAGES %}
+                    {% if forloop.counter > 1 %}<span style="color:var(--gray-200);">|</span>{% endif %}
+                    {% if code|lower == CURRENT_LANG|lower %}
+                        <span style="font-weight:600;color:var(--gray-700);">{{ label }}</span>
+                    {% else %}
+                        <form action="{% url 'set_language' %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" name="language" value="{{ code }}"
+                                    style="background:none;border:none;color:var(--primary);cursor:pointer;
+                                           font:inherit;padding:0;text-decoration:underline;">
+                                {{ label }}
+                            </button>
+                        </form>
+                    {% endif %}
+                {% endfor %}
+            </span>
+            &nbsp;·&nbsp;
             © 2026 The World Bank Group
         </p>
     </footer>

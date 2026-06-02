@@ -44,6 +44,21 @@ def _resolve_locale(request) -> str:
     the request. Fall through to ``settings.LANGUAGE_CODE`` on any
     error.
     """
+    # 0. Explicit toggle via Django's `set_language` view (cookie or
+    # session). This is the only signal an anonymous visitor on the
+    # landing page can use to choose pt-mz before signing in, so it
+    # MUST override the LANGUAGE_CODE fallback below. We also let it
+    # win for authenticated users so a one-click EN/PT footer flip
+    # works without needing to update the StudentProfile.
+    lang_cookie = getattr(settings, 'LANGUAGE_COOKIE_NAME', 'django_language')
+    cookie_val = request.COOKIES.get(lang_cookie)
+    if cookie_val:
+        return cookie_val
+    if hasattr(request, 'session'):
+        sess_val = request.session.get('_language')
+        if sess_val:
+            return sess_val
+
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated:
         return settings.LANGUAGE_CODE

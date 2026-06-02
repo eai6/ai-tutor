@@ -45,6 +45,11 @@ urlpatterns = [
     # same translations the templates use. Empty until M2/M3 ship
     # actual translations.
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
+    # Standard Django language picker — accepts POST with `language=<code>`
+    # and sets the LANGUAGE_SESSION_KEY cookie. The landing page footer
+    # uses this so anonymous visitors can pick pt-mz before logging in
+    # (they have no StudentProfile.preferred_locale yet).
+    path('i18n/', include('django.conf.urls.i18n')),
     # PWA service worker — must live at the site root so it can
     # control all paths under /. The actual file is in static/pwa/.
     path('sw.js', service_worker, name='service_worker'),
