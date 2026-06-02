@@ -295,6 +295,46 @@ SUPPORTED_LOCALES = ('en-us', 'pt-mz')  # extend as pilots land
 DEFAULT_LOCALE = 'en-us'
 
 
+def _output_language_block(locale: str) -> str:
+    """Return a strong "respond in this language" instruction for the
+    LLM output. Without this, our English-default prompts cause the
+    LLM to translate PT source content into English when emitting
+    titles / objectives / enabling_objectives — which is exactly NOT
+    what we want for a Mozambique curriculum where students will read
+    these labels.
+
+    Returns "" for en-us so the EN cache key stays byte-stable.
+    """
+    code = (locale or 'en-us').lower()
+    if code in ('en-us', 'en'):
+        return ""
+    if code == 'pt-mz':
+        return (
+            "\n\n<output_language>\n"
+            "CRITICAL: Generate ALL output fields (title, objective, "
+            "description, enabling_objectives, every string) in "
+            "MOZAMBIQUE PORTUGUESE. Do NOT translate the document's "
+            "Portuguese content into English. The downstream UI shows "
+            "these strings verbatim to Mozambican students and teachers; "
+            "English leakage will be visible in production.\n"
+            "Use 'tu' informal addressing for student-facing strings, "
+            "post-1990 Acordo Ortográfico spelling, and keep technical "
+            "vocabulary in standard Portuguese (e.g. 'célula', 'núcleo', "
+            "'cromossomas', 'ADN', 'ARN').\n"
+            "source_evidence stays a VERBATIM snippet from the document "
+            "(do not translate it).\n"
+            "</output_language>\n"
+        )
+    # Fallback for unrecognised locales.
+    return (
+        f"\n\n<output_language>\n"
+        f"Generate ALL output fields in the language identified by "
+        f"locale '{code}'. Do not switch to English unless the document "
+        f"is itself in English.\n"
+        f"</output_language>\n"
+    )
+
+
 def detect_subject_and_locale(
     text: str,
     *,
@@ -480,6 +520,7 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         )
 
     locale_hints = locale_parser_hints(locale)
+    output_lang = _output_language_block(locale)
 
     system_prompt = (
         "You are a curriculum-document structure extractor. Given a "
@@ -491,6 +532,7 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         "not coerce them into another country's notation. Anchor every "
         "unit to a verbatim snippet from the document so we can verify "
         "the extraction. Respond with a single JSON object."
+        + output_lang
     )
 
     user_prompt = (
@@ -781,6 +823,7 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
     all_outlines = all_outlines or [unit]
     excerpt = _excerpt_for_unit(full_text, unit, all_outlines)
     locale_hints = locale_parser_hints(locale)
+    output_lang = _output_language_block(locale)
 
     system_prompt = (
         "You are a curriculum-document lesson extractor. Given a single "
@@ -790,6 +833,7 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
         "numbered topic in the unit's content list. Return ONLY lessons "
         "you can ANCHOR to a verbatim snippet from the provided text. "
         "Respond with a single JSON object."
+        + output_lang
     )
 
     user_prompt = (
