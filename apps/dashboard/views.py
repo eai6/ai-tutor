@@ -21,6 +21,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Avg, Q, F, Max
 from django.db.models.functions import TruncDate
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 
@@ -778,14 +779,14 @@ def student_detail(request, student_id):
     if current_grade in GRADE_ORDER:
         idx = GRADE_ORDER.index(current_grade)
         if idx < len(GRADE_ORDER) - 1:
-            promote_label = f'Promote to {GRADE_ORDER[idx + 1]}'
+            promote_label = _('Promote to %(grade)s') % {'grade': GRADE_ORDER[idx + 1]}
         else:
-            promote_label = 'Graduate'
+            promote_label = _('Graduate')
         if idx > 0:
-            demote_label = f'Demote to {GRADE_ORDER[idx - 1]}'
+            demote_label = _('Demote to %(grade)s') % {'grade': GRADE_ORDER[idx - 1]}
     elif current_grade == '':
         # Graduated — can be reactivated to S5.
-        demote_label = 'Reactivate at S5'
+        demote_label = _('Reactivate at S5')
 
     context = {
         **request.staff_ctx,
@@ -1897,17 +1898,17 @@ def class_detail(request, grade):
     GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
     if grade in GRADE_ORDER and GRADE_ORDER.index(grade) < len(GRADE_ORDER) - 1:
         next_grade = GRADE_ORDER[GRADE_ORDER.index(grade) + 1]
-        next_action = f'Promote to {next_grade}'
+        next_action = _('Promote to %(grade)s') % {'grade': next_grade}
     elif grade == 'S5':
-        next_grade = 'Graduate'
-        next_action = 'Graduate'
+        next_grade = _('Graduate')
+        next_action = _('Graduate')
     else:
         next_grade = ''
         next_action = ''
 
     if grade in GRADE_ORDER and GRADE_ORDER.index(grade) > 0:
         prev_grade = GRADE_ORDER[GRADE_ORDER.index(grade) - 1]
-        prev_action = f'Demote to {prev_grade}'
+        prev_action = _('Demote to %(grade)s') % {'grade': prev_grade}
     else:
         prev_grade = ''
         prev_action = ''

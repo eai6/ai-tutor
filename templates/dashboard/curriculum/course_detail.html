@@ -856,10 +856,10 @@ lessons even when curriculum editing is locked down.
             <!-- Header Row -->
             <div class="lesson-row" style="background: var(--gray-50); font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">
                 <div>#</div>
-                <div>Lesson</div>
-                <div>Content</div>
-                <div>Students</div>
-                <div>Status</div>
+                <div>{% trans "Lesson" %}</div>
+                <div>{% trans "Content" %}</div>
+                <div>{% trans "Students" %}</div>
+                <div>{% trans "Status" %}</div>
                 <div></div>
             </div>
 
@@ -880,22 +880,22 @@ lessons even when curriculum editing is locked down.
                     {% with lstats=lesson_stats|get_item:lesson.id %}
                         {% if lstats %}
                             {% if lstats.has_content %}
-                                <span class="content-badge steps">{{ lstats.steps_count }} steps</span>
+                                <span class="content-badge steps">{% blocktrans count count=lstats.steps_count %}{{ count }} step{% plural %}{{ count }} steps{% endblocktrans %}</span>
                             {% else %}
-                                <span class="content-badge none">No content</span>
+                                <span class="content-badge none">{% trans "No content" %}</span>
                             {% endif %}
 
                             {% if lstats.media_count > 0 %}
                                 <span class="content-badge media">{{ lstats.media_count }} 📷</span>
                             {% elif lstats.media_pending > 0 %}
-                                <span class="content-badge none" title="{{ lstats.media_pending }} media pending">⏳ {{ lstats.media_pending }}</span>
+                                <span class="content-badge none" title="{% blocktrans count count=lstats.media_pending %}{{ count }} media pending{% plural %}{{ count }} media pending{% endblocktrans %}">⏳ {{ lstats.media_pending }}</span>
                             {% endif %}
 
                             {% if lstats.has_exit_ticket %}
-                                <span class="content-badge exit">✓ Exit</span>
+                                <span class="content-badge exit">✓ {% trans "Exit" %}</span>
                             {% endif %}
                         {% else %}
-                            <span class="content-badge none">No content</span>
+                            <span class="content-badge none">{% trans "No content" %}</span>
                         {% endif %}
                     {% endwith %}
                 </div>
@@ -913,22 +913,22 @@ lessons even when curriculum editing is locked down.
 
                 <div>
                     {% if lesson.is_published %}
-                        <span class="status-indicator ready">✓ Published</span>
+                        <span class="status-indicator ready">✓ {% trans "Published" %}</span>
                     {% else %}
 
                         {% with lstats=lesson_stats|get_item:lesson.id %}
                             {% if lstats.content_status == 'generating' %}
-                                <span class="status-indicator generating"><span class="spinner-icon">⏳</span> Generating</span>
+                                <span class="status-indicator generating"><span class="spinner-icon">⏳</span> {% trans "Generating" %}</span>
                             {% elif lstats.content_status == 'failed' %}
-                                <span class="status-indicator failed">✗ Failed</span>
+                                <span class="status-indicator failed">✗ {% trans "Failed" %}</span>
                             {% elif lstats.content_status == 'ready' %}
                                 {% if lstats.has_exit_ticket %}
-                                    <span class="status-indicator ready">Ready</span>
+                                    <span class="status-indicator ready">{% trans "Ready" %}</span>
                                 {% else %}
-                                    <span class="status-indicator pending">Has Content</span>
+                                    <span class="status-indicator pending">{% trans "Has Content" %}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="status-indicator missing">No Content</span>
+                                <span class="status-indicator missing">{% trans "No Content" %}</span>
                             {% endif %}
                         {% endwith %}
                     {% endif %}
@@ -963,15 +963,15 @@ lessons even when curriculum editing is locked down.
                             </form>
                         {% endif %}
                     {% endwith %}
-                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">Review</a>
-                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="Competency report for this lesson">Report</a>
+                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Review" %}</a>
+                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
                 </div>
             </div>
             {% endfor %}
 
             {% else %}
             <div class="empty-state" style="padding: 2rem;">
-                <p style="margin: 0;">No lessons in this unit yet</p>
+                <p style="margin: 0;">{% trans "No lessons in this unit yet" %}</p>
             </div>
             {% endif %}
         </div>
