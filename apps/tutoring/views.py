@@ -208,10 +208,18 @@ def lesson_catalog(request):
             except (Institution.DoesNotExist, ValueError):
                 pass
 
-    # Get active sessions (incomplete) for resume
+    # Get active sessions (incomplete) for resume.
+    # Filter on lesson.is_published — a draft / unpublished lesson
+    # should not appear in the student's "Continue where you left off"
+    # row even if a session was started against it (e.g. by a teacher
+    # previewing pre-publication content). Edward caught this on the
+    # Mozambique Biology pilot — drafts were leaking into the resume
+    # row, which let students pick up lessons that hadn't been
+    # cleared for them yet.
     active_sessions_qs = TutorSession.objects.filter(
         student=request.user,
-        status=TutorSession.Status.ACTIVE
+        status=TutorSession.Status.ACTIVE,
+        lesson__is_published=True,
     )
     if viewing_institution:
         active_sessions_qs = active_sessions_qs.filter(institution=viewing_institution)
