@@ -24,24 +24,21 @@ logger = logging.getLogger(__name__)
 def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict:
     """
     Main entry point for processing uploaded curriculum.
-    
-    This delegates to the curriculum pipeline which:
-    1. Extracts text from PDF/DOCX
-    2. Vectorizes into knowledge base
-    3. Generates lesson structure with AI
-    4. Creates database records
-    
-    Args:
-        upload_id: CurriculumUpload record ID
-        skip_review: Whether to skip the teacher review step
-    
-    Returns:
-        dict with processing results
+
+    Wired to the v2 parser (memory/curriculum_parser_v2_plan.md):
+    locale-aware, LLM-first structure extraction; no regex fallback;
+    per-grade Course fanout on Approve. Replaces the older
+    apps.curriculum.pipeline.process_curriculum_upload chain which
+    did extract → vectorize-into-KB → AI-generate-lessons → create-rows.
+
+    The KB-vectorize step from the old pipeline (which hung locally
+    during M7 E2E on dev SQLite) is intentionally NOT part of v2 —
+    that's a separate concern handled by the curriculum_knowledge_base
+    indexing job, decoupled from the parse path.
     """
-    # Use the new pipeline
-    from apps.curriculum.pipeline import process_curriculum_upload as run_pipeline
-    
-    return run_pipeline(upload_id, skip_review=skip_review)
+    from apps.curriculum.curriculum_parser import process_curriculum_upload as run_v2
+
+    return run_v2(upload_id, skip_review=skip_review)
 
 
 def generate_content_for_course(course_id: int) -> dict:
