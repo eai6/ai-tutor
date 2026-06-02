@@ -1,8 +1,8 @@
 {
-  "schema_version": "1",
-  "captured_at": "2026-06-02T16:55:12.267822Z",
-  "parser_state": "pre-M1 (LLM call SILENTLY CRASHES with prompt= kwarg; orchestrator falls through to regex)",
-  "notes": "Captured on feature/curriculum-parser-v2 right after the M0 rename (commit f0fb2d0). The shim is in place, archive holds the original parser unchanged. parse_curriculum_with_llm crashes with TypeError on BaseLLMClient.generate(prompt=...) but catches the exception and silently returns parse_generic_curriculum output — every result below is the regex fallback. IMPORTANT: 'llm_parse' shows what parse_curriculum_with_llm RETURNED (regex output on TRUNCATED text — line 1946 of the archive truncates 111K chars to 30K before the LLM call, then falls back to regex on the truncated text). 'regex_parse' shows parse_generic_curriculum on the FULL extracted text — what process_curriculum_upload's except-branch would have produced. The difference (3 vs 37 units) is a separate artifact of input truncation. Seychelles regression slices deferred to M6 — we will pull CurriculumUpload.parsed_data from staging at that time.",
+  "schema_version": "2",
+  "captured_at": "2026-06-02T17:33:29.943357Z",
+  "parser_state": "post-M1 (BaseLLMClient.generate signature fixed; LLM path now actually runs end-to-end). v2 still pending.",
+  "notes": "Captured on feature/curriculum-parser-v2 after the M1 LLM-client signature fix landed in the archive. parse_curriculum_with_llm now successfully calls Claude and returns its structured output (no longer silently swallowing TypeError → regex fallback). Schema v2 supersedes the v1 snapshot from commit 2ee1182 (which captured the broken state). The Seychelles regression slices are still deferred to M6 — those PDFs aren't in the local repo; we'll pull CurriculumUpload.parsed_data from staging at that time. GAPS still visible vs ground truth: (a) subject = 'General' because detect_subject keyword list is English-only — pt-mz matches zero keywords; (b) grade_level = 'S1/S2/S3' because the LLM prompt hardcodes 'This is a Seychelles secondary school curriculum' — v2 prompt is locale-aware; (c) 10 units vs ground-truth 6 because the LLM split cross-grade units (Citologia 10ª + Citologia 11ª become separate units) — actually the correct shape for the downstream Course→Unit→Lesson model where a Course has a single grade.",
   "docs": [
     {
       "slug": "mozambique_biology_2_ciclo",
@@ -19,11 +19,74 @@
       "detected_subject": "General",
       "llm_parse": {
         "crashed": false,
+        "elapsed_seconds": 63.4,
         "subject": "General",
-        "units": 3,
-        "lessons": 44
+        "grade_level": "",
+        "units_count": 10,
+        "lessons_count": 53,
+        "first_10_unit_titles": [
+          "Citologia",
+          "Genética",
+          "Evolução",
+          "Ecologia e Ambiente",
+          "Taxonomia dos Seres Vivos",
+          "Sistemática dos Seres Vivos",
+          "Citologia Avançada",
+          "Fisiologia Vegetal",
+          "Fisiologia Animal",
+          "Saúde"
+        ],
+        "unit_grade_assignments": [
+          [
+            "Citologia",
+            "S1"
+          ],
+          [
+            "Genética",
+            "S1"
+          ],
+          [
+            "Evolução",
+            "S1"
+          ],
+          [
+            "Ecologia e Ambiente",
+            "S1"
+          ],
+          [
+            "Taxonomia dos Seres Vivos",
+            "S2"
+          ],
+          [
+            "Sistemática dos Seres Vivos",
+            "S2"
+          ],
+          [
+            "Citologia Avançada",
+            "S3"
+          ],
+          [
+            "Fisiologia Vegetal",
+            "S3"
+          ],
+          [
+            "Fisiologia Animal",
+            "S3"
+          ],
+          [
+            "Saúde",
+            "S3"
+          ]
+        ],
+        "first_5_lessons_unit_1": [
+          "A Célula e Teoria Celular",
+          "O Núcleo Celular",
+          "Cromossomas e Genes",
+          "Ácidos Nucleicos: ADN e ARN",
+          "Replicação do ADN"
+        ]
       },
-      "regex_parse": {
+      "regex_parse_full_text": {
         "subject": "General",
         "units_count": 37,
         "lessons_count": 159,
@@ -33,13 +96,6 @@
           "• Conceitos básicos",
           "O aluno",
           "• Sistema Rh"
-        ],
-        "first_5_lessons_unit_1": [
-          "Os Cromossomas e Genes",
-          "Base molecular da hereditariedade",
-          "Ciclo celular",
-          "Gametogénese",
-          "Fecundação e fertilidade"
         ]
       }
     }

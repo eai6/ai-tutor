@@ -1998,15 +1998,26 @@ GUIDELINES:
 Return ONLY valid JSON, no explanation or markdown."""
 
     try:
+        # M1 (2026-06-02): BaseLLMClient.generate signature changed from
+        # (prompt=...) to (messages=[{"role":"user","content":...}], ...).
+        # The old call raised TypeError on every invocation; the function
+        # silently caught it and returned parse_generic_curriculum output,
+        # so every curriculum upload — Seychelles included — has been
+        # regex-only for however long since the refactor. v2 will replace
+        # this whole function (see memory/curriculum_parser_v2_plan.md);
+        # this patch just unblocks the LLM path so the M0 baseline diff
+        # is meaningful at M6.
         response = llm_client.generate(
-            prompt=prompt,
+            messages=[{"role": "user", "content": prompt}],
             system_prompt="You are a curriculum parsing assistant. Extract structured curriculum data from documents. Return only valid JSON.",
             max_tokens=8000,
             temperature=0.1,
         )
-        
-        # Parse the JSON response
-        content = response.get('content', '').strip()
+
+        # `response` is an LLMResponse dataclass with `.content` (not a
+        # dict). Previously this read returned '' on every successful
+        # call because the dict-style .get() doesn't exist.
+        content = (response.content or '').strip()
         
         # Clean up common issues
         if content.startswith('```'):
