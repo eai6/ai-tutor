@@ -1333,12 +1333,16 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
         return {'success': False, 'reason': 'empty_parsed_data'}
 
     # Multi-grade fanout: group units by their grade_level. If units
-    # don't carry a grade_level (older data / teacher-edited structures
-    # that stripped it), fall back to upload.grade_level or the
-    # structure's first detected grade.
+    # don't carry a grade_level (older data, or — observed during M7
+    # E2E — review form POST that scraped units without preserving the
+    # per-unit grade_level field), fall back to the LLM-detected
+    # grade_levels from parsed_data FIRST, then upload.grade_level as
+    # a last resort. The detected grade is the authoritative one;
+    # upload.grade_level is the teacher's hint which the parser
+    # already explicitly overrode at detect time.
     fallback_grade = (
-        upload.grade_level
-        or (structure.get('grade_levels') or [None])[0]
+        (structure.get('grade_levels') or [None])[0]
+        or upload.grade_level
         or ''
     )
     units_by_grade: dict[str, list] = {}

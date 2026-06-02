@@ -1413,9 +1413,29 @@ def curriculum_approve(request, upload_id):
 
         # Capture teacher edits to the review form. If supplied, persist
         # them back to upload.parsed_data so v2_complete picks them up.
+        # MERGE rather than replace — the review-form JS only scrapes
+        # visible fields (title, terminal_objectives, enabling_objectives,
+        # lessons), so a naive replace strips grade_level + source_evidence
+        # from each unit. We preserve those from the original parsed_data
+        # by matching units by title (the stable key).
         edited_units = data.get('units')
         if edited_units:
             current = upload.parsed_data or {}
+            original_units = current.get('units', []) or []
+            grade_by_title = {
+                (u.get('title') or '').strip(): u.get('grade_level')
+                for u in original_units if u.get('title')
+            }
+            evidence_by_title = {
+                (u.get('title') or '').strip(): u.get('source_evidence', '')
+                for u in original_units if u.get('title')
+            }
+            for u in edited_units:
+                title = (u.get('title') or '').strip()
+                if not u.get('grade_level') and title in grade_by_title:
+                    u['grade_level'] = grade_by_title[title]
+                if not u.get('source_evidence') and title in evidence_by_title:
+                    u['source_evidence'] = evidence_by_title[title]
             current['units'] = edited_units
             upload.parsed_data = current
             upload.save(update_fields=['parsed_data'])
