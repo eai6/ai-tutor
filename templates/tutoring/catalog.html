@@ -152,17 +152,17 @@
                 <div class="session-lesson">{{ session.lesson_title }}</div>
                 <div class="session-meta">
                     <span class="session-phase">
-                        {% if session.phase == 'engage' %}💡 Engage
-                        {% elif session.phase == 'explore' %}🔍 Explore
-                        {% elif session.phase == 'explain' %}📖 Explain
-                        {% elif session.phase == 'practice' %}✏️ Practice
-                        {% elif session.phase == 'evaluate' %}🎯 Evaluate
-                        {% elif session.phase == 'exit_ticket' %}🎯 Quiz ({{ session.questions_correct }}/10)
-                        {% elif session.phase == 'completed' %}✅ Completed
-                        {% else %}📝 In Progress
+                        {% if session.phase == 'engage' %}💡 {% trans "Engage" %}
+                        {% elif session.phase == 'explore' %}🔍 {% trans "Explore" %}
+                        {% elif session.phase == 'explain' %}📖 {% trans "Explain" %}
+                        {% elif session.phase == 'practice' %}✏️ {% trans "Practice" %}
+                        {% elif session.phase == 'evaluate' %}🎯 {% trans "Evaluate" %}
+                        {% elif session.phase == 'exit_ticket' %}🎯 {% blocktrans with c=session.questions_correct %}Quiz ({{ c }}/10){% endblocktrans %}
+                        {% elif session.phase == 'completed' %}✅ {% trans "Completed" %}
+                        {% else %}📝 {% trans "In Progress" %}
                         {% endif %}
                     </span>
-                    <span class="session-time">{{ session.started_at|timesince }} ago</span>
+                    <span class="session-time">{% blocktrans with t=session.started_at|timesince %}{{ t }} ago{% endblocktrans %}</span>
                 </div>
                 <div class="session-cta">{% trans "Resume" %} →</div>
             </a>
