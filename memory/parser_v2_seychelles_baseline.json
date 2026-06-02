@@ -1,0 +1,262 @@
+{
+  "schema_version": "1",
+  "courses": [
+    {
+      "id": 17,
+      "title": "Belonie Geography S3",
+      "grade_level": "S3",
+      "locale": "en-us",
+      "is_math": false,
+      "unit_count": 3,
+      "lesson_count": 38,
+      "units": [
+        {
+          "order": 0,
+          "title": "S3: Map Skills and Ordnance Survey Interpretation",
+          "lesson_count": 13,
+          "sample_lessons": [
+            "Map Scale and Map Types",
+            "Compass Directions and Bearings",
+            "Four-Figure Grid References",
+            "Six-Figure Grid References",
+            "Measuring Straight-Line Distances"
+          ]
+        },
+        {
+          "order": 1,
+          "title": "S3: Weathering and Mass Movement",
+          "lesson_count": 13,
+          "sample_lessons": [
+            "Define and Classify Weathering",
+            "Agents of Weathering",
+            "Rock Properties Influencing Weathering",
+            "Climate and Weathering Influence",
+            "Time Factor in Weathering"
+          ]
+        },
+        {
+          "order": 2,
+          "title": "S3: Hydrology and River Systems",
+          "lesson_count": 12,
+          "sample_lessons": [
+            "The Hydrological Cycle Overview",
+            "Evaporation and Transpiration",
+            "Condensation and Precipitation",
+            "Infiltration and Percolation",
+            "Interception and Surface Runoff"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Geography S1-S5",
+      "grade_level": "S1,S2,S3,S4,S5",
+      "locale": "en-us",
+      "is_math": false,
+      "unit_count": 8,
+      "lesson_count": 101,
+      "units": [
+        {
+          "order": 0,
+          "title": "Unit 1: Introduction to Geography and Map Skills",
+          "lesson_count": 8,
+          "sample_lessons": [
+            "What is Geography?",
+            "Three Branches of Geography",
+            "Core Geographical Concepts",
+            "Understanding Maps",
+            "Political and Physical Maps"
+          ]
+        },
+        {
+          "order": 1,
+          "title": "Unit 2: Earth's Structure and Plate Tectonics",
+          "lesson_count": 9,
+          "sample_lessons": [
+            "Layers of the Earth",
+            "Comparing Earth's Layers",
+            "Earth's Crust and Plates",
+            "Oceanic vs Continental Crust",
+            "Locating Major Plates"
+          ]
+        },
+        {
+          "order": 2,
+          "title": "Unit 3: Volcanic and Seismic Activity",
+          "lesson_count": 11,
+          "sample_lessons": [
+            "Understanding Volcanoes",
+            "Types of Volcanic Eruptions",
+            "Seismic Activity Explained",
+            "Measuring Earthquakes",
+            "Global Distribution of Volcanoes"
+          ]
+        },
+        {
+          "order": 3,
+          "title": "Unit 4: Earth's Position and Celestial Systems",
+          "lesson_count": 13,
+          "sample_lessons": [
+            "Shape and Structure of Earth",
+            "Rotation and Revolution",
+            "Effects of Rotation",
+            "Effects of Revolution",
+            "The Solar System"
+          ]
+        },
+        {
+          "order": 4,
+          "title": "Unit 5: Rocks, Weathering, and Mass Movement",
+          "lesson_count": 12,
+          "sample_lessons": [
+            "Three Types of Rocks",
+            "Igneous Rock Formation",
+            "Sedimentary Rock Formation",
+            "Metamorphic Rock Formation",
+            "The Rock Cycle"
+          ]
+        },
+        {
+          "order": 5,
+          "title": "Unit 6: Water Systems - Rivers and Coasts",
+          "lesson_count": 13,
+          "sample_lessons": [
+            "River Systems Overview",
+            "River Erosion Processes",
+            "River Transportation",
+            "River Deposition",
+            "River Landforms"
+          ]
+        },
+        {
+          "order": 6,
+          "title": "Unit 7: Human Geography - Settlement, Land Use, and Development",
+          "lesson_count": 20,
+          "sample_lessons": [
+            "Settlement Patterns",
+            "Settlement Factors",
+            "Urban Settlement",
+            "Rural Settlement",
+            "Land Use Types"
+          ]
+        },
+        {
+          "order": 7,
+          "title": "Unit 8: Regional and Applied Geography",
+          "lesson_count": 15,
+          "sample_lessons": [
+            "Climate Systems",
+            "Weather vs Climate",
+            "Climate and Human Activity",
+            "Islands of Seychelles",
+            "Seychelles Geography"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Mathematics S3",
+      "grade_level": "S3",
+      "locale": "en-us",
+      "is_math": true,
+      "unit_count": 9,
+      "lesson_count": 56,
+      "units": [
+        {
+          "order": 0,
+          "title": "Geometry-shapes and Spaces (GM9) - Angles",
+          "lesson_count": 5,
+          "sample_lessons": [
+            "Use geometrical properties for unknown",
+            "Angles around a point",
+            "Angles at a point on a straight line and intersecting lines",
+            "Angles formed within parallel lines (simple diagrams)",
+            "Angles formed within parallel lines (in complex diagrams)"
+          ]
+        },
+        {
+          "order": 1,
+          "title": "Handling Data (HD6) - Probability",
+          "lesson_count": 4,
+          "sample_lessons": [
+            "And use the fact P (event happening) + P (event not happe...",
+            "That probability of event is written/described using frac...",
+            "Calculate the probability of single events",
+            "Calculate expected outcome when the total numbers and the..."
+          ]
+        },
+        {
+          "order": 2,
+          "title": "Algebra (A6) - Linear equations",
+          "lesson_count": 9,
+          "sample_lessons": [
+            "Solve numerical equations involving diagrams",
+            "Solve worded equations",
+            "Find output/input using function machine",
+            "Solve one step equations (unknown on one side) positive i...",
+            "Solve two steps equations (unknown on one side) positive ..."
+          ]
+        },
+        {
+          "order": 3,
+          "title": "Algebra (A6) - Subject of formulae",
+          "lesson_count": 3,
+          "sample_lessons": [
+            "Rearrange subject of formulae [simple frmulae]",
+            "Rearrange subject of formulae (all types of formulae in t...",
+            "Use information (from word problem) to construct formulae..."
+          ]
+        },
+        {
+          "order": 4,
+          "title": "Geometry (GM8) - 2D and 3D shapes",
+          "lesson_count": 9,
+          "sample_lessons": [
+            "And define the parts of a circle",
+            "Understanding the term π through practical activities",
+            "Formulae for circumference and area of circle",
+            "Solve simple word problems",
+            "Derive and use formulae for area of parallelogram"
+          ]
+        },
+        {
+          "order": 5,
+          "title": "Numbers (I2) - Percentages",
+          "lesson_count": 10,
+          "sample_lessons": [
+            "And use the terms selling price, cost price, discount, pr...",
+            "Analyse and solve problems involving cost and selling price",
+            "Solve problems to calculate profit, loss and discount",
+            "Percentages, profit, loss and discount (rate as whole val...",
+            "Percentage and VAT/GST and simple interest (use whole val..."
+          ]
+        },
+        {
+          "order": 6,
+          "title": "Geometry-Shape & Space (GM 10) - Pythagoras theorem",
+          "lesson_count": 4,
+          "sample_lessons": [
+            "Identify and explain the term hypotenuse in a right-angle...",
+            "Use Pythagoras theorem to prove whether a triangle is a r...",
+            "Pythagoras theorem to calculate missing length in a right...",
+            "Pythagoras theorem to solve simple and complex problems"
+          ]
+        },
+        {
+          "order": 7,
+          "title": "Algebra (A7) Expressions & factorization - Expressions involving brackets",
+          "lesson_count": 12,
+          "sample_lessons": [
+            "Expand and simplify number expressions",
+            "Expand simple expressions +a (b ± c) eg 3(x – 5)   x(x + 2)",
+            "Expand and simplify expressions +a(b ± c) +a(b ± c) eg 3(...",
+            "Review HCF of two numbers",
+            "Factorise expressions with positive HCF (one pair of brac..."
+          ]
+        }
+      ]
+    }
+  ]
+}
