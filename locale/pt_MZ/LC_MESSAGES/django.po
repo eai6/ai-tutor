@@ -2,12 +2,13 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 00:36+0000\n"
+"POT-Creation-Date: 2026-06-02 01:04+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 
 #: apps/accounts/views.py:62
 #, python-format
@@ -56,12 +57,8 @@ msgid "Reactivate at S5"
 msgstr "Reativar em S5"
 
 #: apps/support/views.py:74
-msgid ""
-"Hi 👋 — I'm your AI help assistant. I can answer questions about how the "
-"platform works "
-msgstr ""
-"Olá 👋 — sou o teu assistente AI. Posso responder a perguntas sobre como a "
-"plataforma funciona "
+msgid "Hi 👋 — I'm your AI help assistant. I can answer questions about how the platform works "
+msgstr "Olá 👋 — sou o teu assistente AI. Posso responder a perguntas sobre como a plataforma funciona "
 
 #: apps/support/views.py:75
 msgid "or help you navigate the dashboard. "
@@ -76,12 +73,8 @@ msgid "What's up?"
 msgstr "Tudo bem?"
 
 #: apps/tutoring/simple_tutor/engine.py:973
-msgid ""
-"Great — you've worked through the lesson! Now let's check what you've locked "
-"in with a short quiz. Take your time on each question, then submit."
-msgstr ""
-"Boa — terminaste a lição! Agora vamos ver o que fixaste com um pequeno "
-"questionário. Pensa bem em cada pergunta e depois submete."
+msgid "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit."
+msgstr "Boa — terminaste a lição! Agora vamos ver o que fixaste com um pequeno questionário. Pensa bem em cada pergunta e depois submete."
 
 #: apps/tutoring/simple_tutor/exit_ticket.py:274
 #, python-format
@@ -90,14 +83,8 @@ msgstr "🎉 Tiveste %(score)d/%(total)d — passaste. Parabéns!"
 
 #: apps/tutoring/simple_tutor/exit_ticket.py:279
 #, python-format
-msgid ""
-"📋 **Exit ticket review**\n"
-"\n"
-"You scored %(score)d out of %(total)d. Let's revisit the concepts you missed."
-msgstr ""
-"📋 **Revisão do bilhete de saída**\n"
-"\n"
-"Tiveste %(score)d em %(total)d. Vamos rever os conceitos que falhaste."
+msgid "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. Let's revisit the concepts you missed."
+msgstr "📋 **Revisão do bilhete de saída**\n\nTiveste %(score)d em %(total)d. Vamos rever os conceitos que falhaste."
 
 #: templates/_includes/feedback_button.html:122
 msgid "Report a bug or send feedback"
@@ -336,14 +323,8 @@ msgid "— Use my school's default —"
 msgstr "— Usar a predefinição da minha escola —"
 
 #: templates/accounts/settings.html:205
-msgid ""
-"Sets the language the platform UI displays in. Blank means follow your "
-"school's default. Course chat sessions always render in the course's "
-"language regardless."
-msgstr ""
-"Define o idioma em que a interface da plataforma é apresentada. Em branco "
-"significa seguir o padrão da tua escola. As sessões de chat dos cursos "
-"aparecem sempre no idioma do curso, independentemente disso."
+msgid "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless."
+msgstr "Define o idioma em que a interface da plataforma é apresentada. Em branco significa seguir o padrão da tua escola. As sessões de chat dos cursos aparecem sempre no idioma do curso, independentemente disso."
 
 #: templates/accounts/settings.html:207
 msgid "Save profile"
@@ -387,12 +368,8 @@ msgid "Delete account"
 msgstr "Eliminar conta"
 
 #: templates/accounts/settings.html:254
-msgid ""
-"Permanently remove your account and all data we hold for you. This cannot be "
-"undone."
-msgstr ""
-"Remove permanentemente a tua conta e todos os dados que temos sobre ti. Isto "
-"não pode ser desfeito."
+msgid "Permanently remove your account and all data we hold for you. This cannot be undone."
+msgstr "Remove permanentemente a tua conta e todos os dados que temos sobre ti. Isto não pode ser desfeito."
 
 #: templates/accounts/settings.html:255
 msgid "Delete my account"
@@ -514,8 +491,7 @@ msgstr "Entrar"
 
 #: templates/base.html:290
 msgid "You're offline — messages will send when you reconnect."
-msgstr ""
-"Estás offline — as mensagens serão enviadas quando voltares a ligar-te."
+msgstr "Estás offline — as mensagens serão enviadas quando voltares a ligar-te."
 
 #: templates/base.html:311
 msgid "Help"
@@ -663,32 +639,22 @@ msgstr "Relatório de Preparação da Turma"
 #: templates/dashboard/classes/detail.html:81
 #: templates/dashboard/lesson_session_report.html:375
 #: templates/dashboard/student_groups/list.html:138
-#, fuzzy, python-format
-#| msgid "%(count)s student"
+#, python-format
 msgid "%(count)s student"
-msgid_plural "%(count)s students"
-msgstr[0] "%(count)s aluno"
-msgstr[1] "%(count)s aluno"
+msgstr "%(count)s aluno"
 
 #: templates/dashboard/class_readiness.html:138
-#, fuzzy, python-format
-#| msgid "%(count)s enabling objective"
+#, python-format
 msgid "%(count)s enabling objective"
-msgid_plural "%(count)s enabling objectives"
-msgstr[0] "%(count)s objetivo habilitador"
-msgstr[1] "%(count)s objetivo habilitador"
+msgstr "%(count)s objetivo habilitador"
 
 #: templates/dashboard/class_readiness.html:147
 msgid "Class Readiness"
 msgstr "Preparação da Turma"
 
 #: templates/dashboard/class_readiness.html:148
-msgid ""
-"Percentage of students who have mastered each enabling objective (average "
-"across all objectives)."
-msgstr ""
-"Percentagem de alunos que dominaram cada objetivo habilitador (média de "
-"todos os objetivos)."
+msgid "Percentage of students who have mastered each enabling objective (average across all objectives)."
+msgstr "Percentagem de alunos que dominaram cada objetivo habilitador (média de todos os objetivos)."
 
 #: templates/dashboard/class_readiness.html:162
 msgid "Enabling Objective"
@@ -713,24 +679,17 @@ msgid "Struggling"
 msgstr "Com Dificuldades"
 
 #: templates/dashboard/class_readiness.html:198
-msgid ""
-"No enabling objectives found for this course. Upload a curriculum with "
-"enabling objectives to see the readiness report."
-msgstr ""
-"Não foram encontrados objetivos habilitadores para este curso. Carrega um "
-"currículo com objetivos habilitadores para veres o relatório de preparação."
+msgid "No enabling objectives found for this course. Upload a curriculum with enabling objectives to see the readiness report."
+msgstr "Não foram encontrados objetivos habilitadores para este curso. Carrega um currículo com objetivos habilitadores para veres o relatório de preparação."
 
 #: templates/dashboard/class_readiness.html:205
 msgid "Students Needing Follow-Up"
 msgstr "Alunos que Precisam de Acompanhamento"
 
 #: templates/dashboard/class_readiness.html:212
-#, fuzzy, python-format
-#| msgid "%(count)s weak objective"
+#, python-format
 msgid "%(count)s weak objective"
-msgid_plural "%(count)s weak objectives"
-msgstr[0] "%(count)s objetivo fraco"
-msgstr[1] "%(count)s objetivo fraco"
+msgstr "%(count)s objetivo fraco"
 
 #: templates/dashboard/classes/detail.html:4
 #: templates/dashboard/classes/detail.html:5
@@ -744,12 +703,9 @@ msgid "All classes"
 msgstr "Todas as turmas"
 
 #: templates/dashboard/classes/detail.html:18
-#, fuzzy, python-format
-#| msgid "%(count)s course for this grade"
+#, python-format
 msgid "%(count)s course for this grade"
-msgid_plural "%(count)s courses for this grade"
-msgstr[0] "%(count)s curso para esta classe"
-msgstr[1] "%(count)s curso para esta classe"
+msgstr "%(count)s curso para esta classe"
 
 #: templates/dashboard/classes/detail.html:26
 #, python-format
@@ -757,20 +713,14 @@ msgid "Courses for %(g)s"
 msgstr "Cursos para %(g)s"
 
 #: templates/dashboard/classes/detail.html:36
-#, fuzzy, python-format
-#| msgid "%(count)s lesson"
+#, python-format
 msgid "%(count)s lesson"
-msgid_plural "%(count)s lessons"
-msgstr[0] "%(count)s lição"
-msgstr[1] "%(count)s lição"
+msgstr "%(count)s lição"
 
 #: templates/dashboard/classes/detail.html:37
-#, fuzzy, python-format
-#| msgid "%(count)s student attempted"
+#, python-format
 msgid "%(count)s student attempted"
-msgid_plural "%(count)s students attempted"
-msgstr[0] "%(count)s aluno tentou"
-msgstr[1] "%(count)s aluno tentou"
+msgstr "%(count)s aluno tentou"
 
 #: templates/dashboard/classes/detail.html:42
 #: templates/dashboard/curriculum/list.html:32
@@ -844,12 +794,9 @@ msgid "Report"
 msgstr "Relatório"
 
 #: templates/dashboard/classes/detail.html:108
-#, fuzzy, python-format
-#| msgid "%(count)s student in %(g)s"
+#, python-format
 msgid "%(count)s student in %(g)s"
-msgid_plural "%(count)s students in %(g)s"
-msgstr[0] "%(count)s aluno na %(g)s"
-msgstr[1] "%(count)s aluno na %(g)s"
+msgstr "%(count)s aluno em %(g)s"
 
 #: templates/dashboard/classes/detail.html:130
 msgid "Select all"
@@ -888,36 +835,20 @@ msgstr "Nenhum aluno na %(g)s"
 #: templates/dashboard/classes/detail.html:175
 #, python-format
 msgid "Students will appear here once their profile grade is set to %(g)s."
-msgstr ""
-"Os alunos aparecerão aqui assim que a classe no perfil deles for definida "
-"para %(g)s."
+msgstr "Os alunos aparecerão aqui assim que a classe no perfil deles for definida para %(g)s."
 
 #: templates/dashboard/classes/list.html:10
 #, python-format
-msgid ""
-"%(students)s students grouped into %(classes_count)s classes. Open a class "
-"to see its courses, mastery averages, and roster. Promotion lives on the "
-"class page — pick the students you want to move and confirm there."
-msgstr ""
-"%(students)s alunos agrupados em %(classes_count)s turmas. Abre uma turma "
-"para veres as disciplinas, médias de domínio e lista de alunos. A promoção "
-"fica na página da turma — escolhe os alunos que queres mover e confirma aí."
+msgid "%(students)s students grouped into %(classes_count)s classes. Open a class to see its courses, mastery averages, and roster. Promotion lives on the class page — pick the students you want to move and confirm there."
+msgstr "%(students)s alunos agrupados em %(classes_count)s turmas. Abre uma turma para veres as disciplinas, médias de domínio e lista de alunos. A promoção fica na página da turma — escolhe os alunos que queres mover e confirma aí."
 
 #: templates/dashboard/classes/list.html:31
-#, fuzzy
-#| msgid "student"
 msgid "student"
-msgid_plural "students"
-msgstr[0] "aluno"
-msgstr[1] "aluno"
+msgstr "aluno"
 
 #: templates/dashboard/classes/list.html:44
-#, fuzzy
-#| msgid "student without a grade set on their profile"
 msgid "student without a grade set on their profile"
-msgid_plural "students without a grade set on their profile"
-msgstr[0] "aluno sem classe definida no perfil"
-msgstr[1] "aluno sem classe definida no perfil"
+msgstr "aluno sem classe definida no perfil"
 
 #: templates/dashboard/classes/list.html:64
 msgid "No students yet"
@@ -925,8 +856,7 @@ msgstr "Ainda sem alunos"
 
 #: templates/dashboard/classes/list.html:65
 msgid "Students will appear here once they join and complete their profiles."
-msgstr ""
-"Os alunos aparecerão aqui assim que se inscreverem e completarem os perfis."
+msgstr "Os alunos aparecerão aqui assim que se inscreverem e completarem os perfis."
 
 #: templates/dashboard/competency/class.html:4
 #: templates/dashboard/competency/class.html:5
@@ -1001,12 +931,8 @@ msgid "No teaching objectives yet"
 msgstr "Ainda não há objetivos de ensino"
 
 #: templates/dashboard/competency/class.html:131
-msgid ""
-"This course has no extracted teaching objectives. Re-parse the curriculum to "
-"populate them."
-msgstr ""
-"Esta disciplina não tem objetivos de ensino extraídos. Volta a processar o "
-"currículo para os preencher."
+msgid "This course has no extracted teaching objectives. Re-parse the curriculum to populate them."
+msgstr "Esta disciplina não tem objetivos de ensino extraídos. Volta a processar o currículo para os preencher."
 
 #: templates/dashboard/competency/class.html:137
 msgid "Students with the most gaps"
@@ -1014,24 +940,17 @@ msgstr "Estudantes com mais lacunas"
 
 #: templates/dashboard/competency/class.html:138
 #, python-format
-msgid ""
-"Students whose latest score is below 50%% on at least one objective. Click a "
-"student to see their per-objective breakdown."
-msgstr ""
-"Estudantes cuja nota mais recente está abaixo de 50%% em pelo menos um "
-"objetivo. Clica num estudante para veres o detalhe por objetivo."
+msgid "Students whose latest score is below 50%% on at least one objective. Click a student to see their per-objective breakdown."
+msgstr "Estudantes cuja nota mais recente está abaixo de 50%% em pelo menos um objetivo. Clica num estudante para veres o detalhe por objetivo."
 
 #: templates/dashboard/competency/class.html:145
 msgid "Weak on:"
 msgstr "Fraco em:"
 
 #: templates/dashboard/competency/class.html:148
-#, fuzzy, python-format
-#| msgid "%(count)s gap"
+#, python-format
 msgid "%(count)s gap"
-msgid_plural "%(count)s gaps"
-msgstr[0] "%(count)s lacuna"
-msgstr[1] "%(count)s lacuna"
+msgstr "%(count)s lacuna"
 
 #: templates/dashboard/competency/student.html:4
 #, python-format
@@ -1225,12 +1144,8 @@ msgid "Unpublish All"
 msgstr "Despublicar Tudo"
 
 #: templates/dashboard/curriculum/course_detail.html:212
-msgid ""
-"Are you sure you want to delete this course and ALL its units, lessons, and "
-"content? This cannot be undone."
-msgstr ""
-"Tens a certeza de que queres eliminar este curso e TODAS as suas unidades, "
-"lições e conteúdos? Esta ação não pode ser desfeita."
+msgid "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone."
+msgstr "Tens a certeza de que queres eliminar este curso e TODAS as suas unidades, lições e conteúdos? Esta ação não pode ser desfeita."
 
 #: templates/dashboard/curriculum/course_detail.html:212
 #: templates/dashboard/curriculum/step_edit.html:161
@@ -1272,9 +1187,7 @@ msgstr "Conteúdo"
 #: templates/dashboard/curriculum/course_detail.html:887
 #, python-format
 msgid "%(count)s step"
-msgid_plural "%(count)s steps"
-msgstr[0] "%(count)s passo"
-msgstr[1] "%(count)s passos"
+msgstr "%(count)s passo"
 
 #: templates/dashboard/curriculum/course_detail.html:889
 #: templates/dashboard/curriculum/course_detail.html:902
@@ -1284,9 +1197,7 @@ msgstr "Sem conteúdo"
 #: templates/dashboard/curriculum/course_detail.html:895
 #, python-format
 msgid "%(count)s media pending"
-msgid_plural "%(count)s media pending"
-msgstr[0] "%(count)s figura pendente"
-msgstr[1] "%(count)s figuras pendentes"
+msgstr "%(count)s média pendente"
 
 #: templates/dashboard/curriculum/course_detail.html:899
 msgid "Exit"
@@ -1439,6 +1350,7 @@ msgstr "Blocos"
 #: templates/dashboard/materials/process.html:47
 #: templates/dashboard/reports/overview.html:131
 #: templates/dashboard/students/detail.html:180
+#: templates/tutoring/catalog.html:161
 msgid "Completed"
 msgstr "Concluído"
 
@@ -1468,10 +1380,8 @@ msgstr "Ainda Sem Cursos"
 
 #: templates/dashboard/curriculum/list.html:141
 #: templates/dashboard/curriculum/upload.html:228
-msgid ""
-"Upload a curriculum document to automatically generate courses and lessons."
-msgstr ""
-"Carrega um documento curricular para gerar automaticamente cursos e lições."
+msgid "Upload a curriculum document to automatically generate courses and lessons."
+msgstr "Carrega um documento curricular para gerar automaticamente cursos e lições."
 
 #: templates/dashboard/curriculum/media_progress.html:4
 msgid "Media Generation Progress"
@@ -1538,12 +1448,8 @@ msgid "Extract & Parse Curriculum"
 msgstr "Extrair e analisar currículo"
 
 #: templates/dashboard/curriculum/process.html:291
-msgid ""
-"We will extract text from your document and identify units and lessons using "
-"AI."
-msgstr ""
-"Vamos extrair o texto do teu documento e identificar unidades e lições "
-"usando IA."
+msgid "We will extract text from your document and identify units and lessons using AI."
+msgstr "Vamos extrair o texto do teu documento e identificar unidades e lições usando IA."
 
 #: templates/dashboard/curriculum/process.html:294
 msgid "Document"
@@ -1736,13 +1642,8 @@ msgid "Platform-wide upload"
 msgstr "Carregamento para toda a plataforma"
 
 #: templates/dashboard/curriculum/upload.html:238
-msgid ""
-"This curriculum will be shared across all schools (read-only for staff). To "
-"upload for a specific school, select it from the dropdown above."
-msgstr ""
-"Este currículo será partilhado por todas as escolas (apenas leitura para o "
-"pessoal). Para carregar para uma escola específica, seleciona-a na lista "
-"acima."
+msgid "This curriculum will be shared across all schools (read-only for staff). To upload for a specific school, select it from the dropdown above."
+msgstr "Este currículo será partilhado por todas as escolas (apenas leitura para o pessoal). Para carregar para uma escola específica, seleciona-a na lista acima."
 
 #: templates/dashboard/curriculum/upload.html:251
 msgid "Curriculum Document"
@@ -1765,20 +1666,12 @@ msgid "— Select subject —"
 msgstr "— Seleciona a disciplina —"
 
 #: templates/dashboard/curriculum/upload.html:286
-msgid ""
-"Canonical subject — used to match this course with platform-wide teaching "
-"materials for the same subject + grade."
-msgstr ""
-"Disciplina canónica — usada para associar este curso a materiais didáticos "
-"da plataforma para a mesma disciplina + classe."
+msgid "Canonical subject — used to match this course with platform-wide teaching materials for the same subject + grade."
+msgstr "Disciplina canónica — usada para associar este curso a materiais didáticos da plataforma para a mesma disciplina + classe."
 
 #: templates/dashboard/curriculum/upload.html:299
-msgid ""
-"Drives the language the AI tutor responds in for this course, plus the "
-"language of all generated lessons + MCQs."
-msgstr ""
-"Define a língua em que o AI Tutor responde neste curso, bem como a língua de "
-"todas as lições e perguntas de escolha múltipla geradas."
+msgid "Drives the language the AI tutor responds in for this course, plus the language of all generated lessons + MCQs."
+msgstr "Define a língua em que o AI Tutor responde neste curso, bem como a língua de todas as lições e perguntas de escolha múltipla geradas."
 
 #: templates/dashboard/curriculum/upload.html:305
 msgid "Display name"
@@ -1794,24 +1687,16 @@ msgid "auto-derived from subject above (e.g. Geography)"
 msgstr "derivado automaticamente da disciplina acima (p. ex. Geografia)"
 
 #: templates/dashboard/curriculum/upload.html:309
-msgid ""
-"Leave blank to use the subject label. Course title becomes 'Display name "
-"Grade' (e.g. 'Geography S3')."
-msgstr ""
-"Deixa em branco para usar o nome da disciplina. O título do curso fica 'Nome "
-"Classe' (p. ex. 'Geografia S3')."
+msgid "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Geography S3')."
+msgstr "Deixa em branco para usar o nome da disciplina. O título do curso fica 'Nome Classe' (p. ex. 'Geografia S3')."
 
 #: templates/dashboard/curriculum/upload.html:315
 msgid "Grade Levels to Process"
 msgstr "Classes a processar"
 
 #: templates/dashboard/curriculum/upload.html:324
-msgid ""
-"Select which grade levels to extract. The document will be analyzed once and "
-"separate courses created per level."
-msgstr ""
-"Seleciona quais classes extrair. O documento será analisado uma vez e serão "
-"criados cursos separados por classe."
+msgid "Select which grade levels to extract. The document will be analyzed once and separate courses created per level."
+msgstr "Seleciona quais classes extrair. O documento será analisado uma vez e serão criados cursos separados por classe."
 
 #: templates/dashboard/curriculum/upload.html:330
 msgid "Target Lesson Duration"
@@ -1830,28 +1715,16 @@ msgid "25 min · 5 steps (full)"
 msgstr "25 min · 5 passos (completo)"
 
 #: templates/dashboard/curriculum/upload.html:343
-msgid ""
-"Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime "
-"selector picks the subset matching the student's chosen duration. Shorter "
-"sessions skip the enrichment practice."
-msgstr ""
-"Cada lição gera 5 passos (3 de ensino/exploração + 2 de prática). O seletor "
-"em tempo de execução escolhe o subconjunto que corresponde à duração "
-"escolhida pelo aluno. Sessões mais curtas saltam a prática de enriquecimento."
+msgid "Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime selector picks the subset matching the student's chosen duration. Shorter sessions skip the enrichment practice."
+msgstr "Cada lição gera 5 passos (3 de ensino/exploração + 2 de prática). O seletor em tempo de execução escolhe o subconjunto que corresponde à duração escolhida pelo aluno. Sessões mais curtas saltam a prática de enriquecimento."
 
 #: templates/dashboard/curriculum/upload.html:351
 msgid "Attach teaching materials"
 msgstr "Anexar materiais didáticos"
 
 #: templates/dashboard/curriculum/upload.html:354
-msgid ""
-"Upload worksheets, past exam papers, textbook chapters, teacher notes — each "
-"file gets its own type. These are indexed into the knowledge base for AI "
-"tutoring and assessment."
-msgstr ""
-"Carrega fichas de trabalho, exames anteriores, capítulos de manuais, notas "
-"do professor — cada ficheiro tem o seu tipo. São indexados na base de "
-"conhecimento para tutoria e avaliação com AI."
+msgid "Upload worksheets, past exam papers, textbook chapters, teacher notes — each file gets its own type. These are indexed into the knowledge base for AI tutoring and assessment."
+msgstr "Carrega fichas de trabalho, exames anteriores, capítulos de manuais, notas do professor — cada ficheiro tem o seu tipo. São indexados na base de conhecimento para tutoria e avaliação com AI."
 
 #: templates/dashboard/curriculum/upload.html:363
 msgid "Files"
@@ -1871,13 +1744,8 @@ msgid "Add another material"
 msgstr "Adicionar outro material"
 
 #: templates/dashboard/curriculum/upload.html:402
-msgid ""
-"Materials are saved now but processed AFTER the curriculum is parsed and "
-"courses are created. You can process them from the course page."
-msgstr ""
-"Os materiais são guardados agora mas processados DEPOIS de o currículo ser "
-"analisado e os cursos criados. Podes processá-los a partir da página do "
-"curso."
+msgid "Materials are saved now but processed AFTER the curriculum is parsed and courses are created. You can process them from the course page."
+msgstr "Os materiais são guardados agora mas processados DEPOIS de o currículo ser analisado e os cursos criados. Podes processá-los a partir da página do curso."
 
 #: templates/dashboard/curriculum/upload.html:415
 msgid "What happens next?"
@@ -1942,12 +1810,8 @@ msgid "Image prompt"
 msgstr "Pedido de imagem"
 
 #: templates/dashboard/exit_ticket_figure_edit.html:72
-msgid ""
-"Describe the image you want generated. Be specific: labels, colours, shapes, "
-"what should NOT be in the image."
-msgstr ""
-"Descreve a imagem que queres gerar. Sê específico: rótulos, cores, formas, o "
-"que NÃO deve aparecer na imagem."
+msgid "Describe the image you want generated. Be specific: labels, colours, shapes, what should NOT be in the image."
+msgstr "Descreve a imagem que queres gerar. Sê específico: rótulos, cores, formas, o que NÃO deve aparecer na imagem."
 
 #: templates/dashboard/exit_ticket_figure_edit.html:74
 msgid "Model:"
@@ -1970,11 +1834,8 @@ msgid "Remove figure"
 msgstr "Remover figura"
 
 #: templates/dashboard/exit_ticket_figure_edit.html:87
-msgid ""
-"gpt-image-2 takes ~50 seconds. The page will reload when the image is ready."
-msgstr ""
-"O gpt-image-2 demora ~50 segundos. A página vai recarregar quando a imagem "
-"estiver pronta."
+msgid "gpt-image-2 takes ~50 seconds. The page will reload when the image is ready."
+msgstr "O gpt-image-2 demora ~50 segundos. A página vai recarregar quando a imagem estiver pronta."
 
 #: templates/dashboard/feedback/list.html:4
 #: templates/dashboard/feedback/list.html:5
@@ -2124,12 +1985,9 @@ msgid "Transcript"
 msgstr "Transcrição"
 
 #: templates/dashboard/flagged_session_detail.html:52
-#, fuzzy, python-format
-#| msgid "%(count)s message"
+#, python-format
 msgid "%(count)s message"
-msgid_plural "%(count)s messages"
-msgstr[0] "%(count)s mensagem"
-msgstr[1] "%(count)s mensagem"
+msgstr "%(count)s mensagem"
 
 #: templates/dashboard/flagged_sessions.html:11
 msgid "Safety Flags"
@@ -2168,8 +2026,7 @@ msgstr "Sem Sessões Sinalizadas"
 
 #: templates/dashboard/flagged_sessions.html:90
 msgid "No flagged chat sessions found for this filter."
-msgstr ""
-"Não foram encontradas sessões de conversa sinalizadas para este filtro."
+msgstr "Não foram encontradas sessões de conversa sinalizadas para este filtro."
 
 #: templates/dashboard/home.html:5
 msgid "Dashboard Overview"
@@ -2199,9 +2056,7 @@ msgstr "Competência Média da Aula"
 
 #: templates/dashboard/home.html:28
 #, python-format
-msgid ""
-"Of students who have attempted any lesson, the %% who have mastered at least "
-"one."
+msgid "Of students who have attempted any lesson, the %% who have mastered at least one."
 msgstr "Dos alunos que tentaram alguma lição, a %% que dominou pelo menos uma."
 
 #: templates/dashboard/home.html:28
@@ -2374,29 +2229,17 @@ msgstr "Não avaliado"
 
 #: templates/dashboard/lesson_session_report.html:339
 #, python-format
-msgid ""
-"Every student has achieved at least %(pct)s%% of enabling objectives. The "
-"class is ready for the next lesson."
-msgstr ""
-"Todos os alunos atingiram pelo menos %(pct)s%% dos objetivos habilitadores. "
-"A turma está pronta para a próxima aula."
+msgid "Every student has achieved at least %(pct)s%% of enabling objectives. The class is ready for the next lesson."
+msgstr "Todos os alunos atingiram pelo menos %(pct)s%% dos objetivos habilitadores. A turma está pronta para a próxima aula."
 
 #: templates/dashboard/lesson_session_report.html:341
-msgid ""
-"A small number of students need targeted support. You can proceed while the "
-"tutor provides remediation to those students."
-msgstr ""
-"Um pequeno número de alunos precisa de apoio direcionado. Podes avançar "
-"enquanto o tutor faz a recuperação desses alunos."
+msgid "A small number of students need targeted support. You can proceed while the tutor provides remediation to those students."
+msgstr "Um pequeno número de alunos precisa de apoio direcionado. Podes avançar enquanto o tutor faz a recuperação desses alunos."
 
 #: templates/dashboard/lesson_session_report.html:343
 #, python-format
-msgid ""
-"Too many students are below the %(pct)s%% threshold. Dedicate your next "
-"teacher session to the weak objectives listed above."
-msgstr ""
-"Demasiados alunos estão abaixo do limiar de %(pct)s%%. Dedica a tua próxima "
-"sessão de professor aos objetivos fracos listados acima."
+msgid "Too many students are below the %(pct)s%% threshold. Dedicate your next teacher session to the weak objectives listed above."
+msgstr "Demasiados alunos estão abaixo do limiar de %(pct)s%%. Dedica a tua próxima sessão de professor aos objetivos fracos listados acima."
 
 #: templates/dashboard/lesson_session_report.html:348
 #, python-format
@@ -2483,8 +2326,7 @@ msgstr "min"
 #: templates/dashboard/materials/_confirm_card.html:29
 #, python-format
 msgid "Model: %(name)s ($%(price_in)s in / $%(price_out)s out per 1M tokens)"
-msgstr ""
-"Modelo: %(name)s ($%(price_in)s entrada / $%(price_out)s saída por 1M tokens)"
+msgstr "Modelo: %(name)s ($%(price_in)s entrada / $%(price_out)s saída por 1M tokens)"
 
 #: templates/dashboard/materials/_confirm_card.html:34
 msgid "Confirm and start (Rich)"
@@ -2512,14 +2354,8 @@ msgstr "⛔ Custo acima do limite de bloqueio"
 
 #: templates/dashboard/materials/process.html:58
 #, python-format
-msgid ""
-"Processing this %(pages)s-page material would cost an estimated <strong>$"
-"%(cost)s</strong> — above the $50 hard-block. Only a super-admin can force-"
-"confirm."
-msgstr ""
-"Processar este material de %(pages)s páginas custaria cerca de <strong>$"
-"%(cost)s</strong> — acima do bloqueio de $50. Só um super-admin pode forçar "
-"a confirmação."
+msgid "Processing this %(pages)s-page material would cost an estimated <strong>$%(cost)s</strong> — above the $50 hard-block. Only a super-admin can force-confirm."
+msgstr "Processar este material de %(pages)s páginas custaria cerca de <strong>$%(cost)s</strong> — acima do bloqueio de $50. Só um super-admin pode forçar a confirmação."
 
 #: templates/dashboard/materials/process.html:65
 #, python-format
@@ -2600,15 +2436,8 @@ msgid "All events (%(count)s)"
 msgstr "Todos os eventos (%(count)s)"
 
 #: templates/dashboard/quality/content_edit_dashboard.html:16
-msgid ""
-"Aggregate metrics over teacher edits. Per-judge precision compares the AI "
-"judge's verdict at edit time against the teacher's confirmed tags — useful "
-"for spotting which judges are pulling their weight."
-msgstr ""
-"Métricas agregadas sobre as edições do professor. A precisão por avaliador "
-"compara o veredito do avaliador de IA no momento da edição com as etiquetas "
-"confirmadas pelo professor — útil para identificar quais avaliadores estão a "
-"cumprir o seu papel."
+msgid "Aggregate metrics over teacher edits. Per-judge precision compares the AI judge's verdict at edit time against the teacher's confirmed tags — useful for spotting which judges are pulling their weight."
+msgstr "Métricas agregadas sobre as edições do professor. A precisão por avaliador compara o veredito do avaliador de IA no momento da edição com as etiquetas confirmadas pelo professor — útil para identificar quais avaliadores estão a cumprir o seu papel."
 
 #: templates/dashboard/quality/content_edit_dashboard.html:21
 #: templates/dashboard/quality/content_edit_events_list.html:22
@@ -2641,13 +2470,8 @@ msgid "clear"
 msgstr "limpar"
 
 #: templates/dashboard/quality/content_edit_dashboard.html:56
-msgid ""
-"No edit events match these filters yet. Edit a step or exit-ticket question "
-"to start populating the benchmark."
-msgstr ""
-"Ainda não há eventos de edição que correspondam a estes filtros. Edita um "
-"passo ou uma questão do bilhete de saída para começar a preencher o "
-"referencial."
+msgid "No edit events match these filters yet. Edit a step or exit-ticket question to start populating the benchmark."
+msgstr "Ainda não há eventos de edição que correspondam a estes filtros. Edita um passo ou uma questão do bilhete de saída para começar a preencher o referencial."
 
 #: templates/dashboard/quality/content_edit_dashboard.html:63
 msgid "Total events"
@@ -2674,21 +2498,8 @@ msgid "Per-judge precision"
 msgstr "Precisão por avaliador"
 
 #: templates/dashboard/quality/content_edit_dashboard.html:138
-msgid ""
-"TP = judge flagged a violation that mapped to a teacher-confirmed tag. FP = "
-"judge flagged a violation the teacher did not confirm. FN = teacher "
-"confirmed a tag the judge did not predict. Bias warning: when teachers "
-"haven't manually reviewed events, error_tags default to suggested_tags "
-"(derived from these same judges) → precision metric is biased high until "
-"manual review accumulates."
-msgstr ""
-"TP = o avaliador sinalizou uma violação que corresponde a uma etiqueta "
-"confirmada pelo professor. FP = o avaliador sinalizou uma violação que o "
-"professor não confirmou. FN = o professor confirmou uma etiqueta que o "
-"avaliador não previu. Aviso de viés: quando os professores ainda não reviram "
-"manualmente os eventos, os error_tags assumem por defeito os suggested_tags "
-"(derivados dos mesmos avaliadores) → a métrica de precisão fica enviesada "
-"para cima até que a revisão manual se acumule."
+msgid "TP = judge flagged a violation that mapped to a teacher-confirmed tag. FP = judge flagged a violation the teacher did not confirm. FN = teacher confirmed a tag the judge did not predict. Bias warning: when teachers haven't manually reviewed events, error_tags default to suggested_tags (derived from these same judges) → precision metric is biased high until manual review accumulates."
+msgstr "TP = o avaliador sinalizou uma violação que corresponde a uma etiqueta confirmada pelo professor. FP = o avaliador sinalizou uma violação que o professor não confirmou. FN = o professor confirmou uma etiqueta que o avaliador não previu. Aviso de viés: quando os professores ainda não reviram manualmente os eventos, os error_tags assumem por defeito os suggested_tags (derivados dos mesmos avaliadores) → a métrica de precisão fica enviesada para cima até que a revisão manual se acumule."
 
 #: templates/dashboard/quality/content_edit_dashboard.html:143
 msgid "Judge"
@@ -2773,15 +2584,8 @@ msgid "Content Edit Events"
 msgstr "Eventos de Edição de Conteúdo"
 
 #: templates/dashboard/quality/content_edit_events_list.html:18
-msgid ""
-"Every teacher edit to a generated lesson step, exit-ticket question, or "
-"image. Tags are auto-suggested from the diff + AI-judge verdicts at edit "
-"time; click an event to confirm/edit."
-msgstr ""
-"Cada edição feita por um professor a um passo de aula gerado, pergunta do "
-"exit-ticket ou imagem. As etiquetas são sugeridas automaticamente a partir "
-"do diff + veredictos do AI-judge no momento da edição; clica num evento para "
-"confirmar/editar."
+msgid "Every teacher edit to a generated lesson step, exit-ticket question, or image. Tags are auto-suggested from the diff + AI-judge verdicts at edit time; click an event to confirm/edit."
+msgstr "Cada edição feita por um professor a um passo de aula gerado, pergunta do exit-ticket ou imagem. As etiquetas são sugeridas automaticamente a partir do diff + veredictos do AI-judge no momento da edição; clica num evento para confirmar/editar."
 
 #: templates/dashboard/quality/content_edit_events_list.html:56
 msgid "Tag frequency:"
@@ -2881,12 +2685,8 @@ msgid "%(eo)s enabling objectives · %(s)s sessions"
 msgstr "%(eo)s objetivos habilitadores · %(s)s sessões"
 
 #: templates/dashboard/reports/overview.html:112
-msgid ""
-"No courses with competency data yet. Upload a curriculum and generate "
-"content to see competency reports."
-msgstr ""
-"Ainda não há disciplinas com dados de competência. Carrega um currículo e "
-"gera conteúdos para veres os relatórios de competências."
+msgid "No courses with competency data yet. Upload a curriculum and generate content to see competency reports."
+msgstr "Ainda não há disciplinas com dados de competência. Carrega um currículo e gera conteúdos para veres os relatórios de competências."
 
 #: templates/dashboard/reports/overview.html:122
 msgid "Recent Lesson Sessions"
@@ -2991,12 +2791,8 @@ msgid "DID NOT PASS"
 msgstr "NÃO APROVADO"
 
 #: templates/dashboard/session_exit_review.html:189
-msgid ""
-"Passing threshold is 8/10. Score updates automatically when you override a "
-"question below."
-msgstr ""
-"O limite de aprovação é 8/10. A pontuação atualiza-se automaticamente quando "
-"alteras uma pergunta abaixo."
+msgid "Passing threshold is 8/10. Score updates automatically when you override a question below."
+msgstr "O limite de aprovação é 8/10. A pontuação atualiza-se automaticamente quando alteras uma pergunta abaixo."
 
 #: templates/dashboard/session_exit_review.html:204
 msgid "✓ Correct"
@@ -3019,12 +2815,8 @@ msgid "Sentence"
 msgstr "Frase"
 
 #: templates/dashboard/session_exit_review.html:226
-#, fuzzy
-#| msgid "Student blank"
 msgid "Student blank"
-msgid_plural "Student blanks"
-msgstr[0] "Aluno em branco"
-msgstr[1] "Aluno em branco"
+msgstr "Aluno em branco"
 
 #: templates/dashboard/session_exit_review.html:228
 #: templates/dashboard/session_exit_review.html:248
@@ -3102,12 +2894,8 @@ msgid "Save School Settings"
 msgstr "Guardar Definições da Escola"
 
 #: templates/dashboard/settings.html:42
-msgid ""
-"Select a specific school from the dropdown above to edit its settings, or "
-"manage all schools below."
-msgstr ""
-"Seleciona uma escola específica na lista acima para editar as suas "
-"definições, ou gere todas as escolas abaixo."
+msgid "Select a specific school from the dropdown above to edit its settings, or manage all schools below."
+msgstr "Seleciona uma escola específica na lista acima para editar as suas definições, ou gere todas as escolas abaixo."
 
 #: templates/dashboard/settings.html:54
 msgid "Your Account"
@@ -3119,13 +2907,8 @@ msgid "Member since %(date)s"
 msgstr "Membro desde %(date)s"
 
 #: templates/dashboard/settings.html:96
-msgid ""
-"Sets the platform UI language for your account. Blank follows your school's "
-"default. Course chat sessions always render in the course's language."
-msgstr ""
-"Define o idioma da interface da plataforma para a tua conta. Em branco segue "
-"o padrão da tua escola. As sessões de chat do curso são sempre apresentadas "
-"no idioma do curso."
+msgid "Sets the platform UI language for your account. Blank follows your school's default. Course chat sessions always render in the course's language."
+msgstr "Define o idioma da interface da plataforma para a tua conta. Em branco segue o padrão da tua escola. As sessões de chat do curso são sempre apresentadas no idioma do curso."
 
 #: templates/dashboard/settings.html:103
 msgid "Save Profile"
@@ -3152,28 +2935,16 @@ msgid "Danger Zone"
 msgstr "Zona de Perigo"
 
 #: templates/dashboard/settings.html:145
-msgid ""
-"Super Admin accounts cannot be deleted from this page. Contact another "
-"administrator to remove your account."
-msgstr ""
-"As contas de Super Admin não podem ser eliminadas a partir desta página. "
-"Contacta outro administrador para remover a tua conta."
+msgid "Super Admin accounts cannot be deleted from this page. Contact another administrator to remove your account."
+msgstr "As contas de Super Admin não podem ser eliminadas a partir desta página. Contacta outro administrador para remover a tua conta."
 
 #: templates/dashboard/settings.html:149
-msgid ""
-"Permanently delete your account and all associated data. This action cannot "
-"be undone."
-msgstr ""
-"Elimina permanentemente a tua conta e todos os dados associados. Esta ação "
-"não pode ser desfeita."
+msgid "Permanently delete your account and all associated data. This action cannot be undone."
+msgstr "Elimina permanentemente a tua conta e todos os dados associados. Esta ação não pode ser desfeita."
 
 #: templates/dashboard/settings.html:151
-msgid ""
-"Are you sure you want to delete your account? This action is permanent and "
-"cannot be undone."
-msgstr ""
-"Tens a certeza de que queres eliminar a tua conta? Esta ação é permanente e "
-"não pode ser desfeita."
+msgid "Are you sure you want to delete your account? This action is permanent and cannot be undone."
+msgstr "Tens a certeza de que queres eliminar a tua conta? Esta ação é permanente e não pode ser desfeita."
 
 #: templates/dashboard/settings.html:154
 msgid "Delete My Account"
@@ -3224,12 +2995,8 @@ msgid "Competency Categories & Thresholds"
 msgstr "Categorias e Limiares de Competência"
 
 #: templates/dashboard/settings.html:227
-msgid ""
-"Configure how students are categorized based on fraction of enabling "
-"objectives achieved."
-msgstr ""
-"Configura como os alunos são categorizados com base na fração de objetivos "
-"habilitadores alcançados."
+msgid "Configure how students are categorized based on fraction of enabling objectives achieved."
+msgstr "Configura como os alunos são categorizados com base na fração de objetivos habilitadores alcançados."
 
 #: templates/dashboard/settings.html:232
 #, python-format
@@ -3277,12 +3044,8 @@ msgstr "Limiar de Avanço — %% mínimo para TODOS os alunos"
 
 #: templates/dashboard/settings.html:256
 #, python-format
-msgid ""
-"Teacher is recommended to move on only when every student achieves at least "
-"this %% of enabling objectives"
-msgstr ""
-"Recomenda-se ao professor avançar apenas quando cada aluno atingir pelo "
-"menos este %% dos objetivos habilitadores"
+msgid "Teacher is recommended to move on only when every student achieves at least this %% of enabling objectives"
+msgstr "Recomenda-se ao professor avançar apenas quando cada aluno atingir pelo menos este %% dos objetivos habilitadores"
 
 #: templates/dashboard/settings.html:260
 msgid "Teacher Content Editing"
@@ -3290,17 +3053,11 @@ msgstr "Edição de Conteúdo pelo Professor"
 
 #: templates/dashboard/settings.html:263
 msgid "Allow teachers to edit, publish, regenerate, and delete content"
-msgstr ""
-"Permitir que os professores editem, publiquem, regenerem e eliminem conteúdo"
+msgstr "Permitir que os professores editem, publiquem, regenerem e eliminem conteúdo"
 
 #: templates/dashboard/settings.html:265
-msgid ""
-"When off (default for pilot), teachers can only view lessons and access "
-"session/competency reports. Super admins always have full access."
-msgstr ""
-"Quando desativado (padrão no piloto), os professores só podem ver lições e "
-"aceder a relatórios de sessão/competência. Os super administradores têm "
-"sempre acesso total."
+msgid "When off (default for pilot), teachers can only view lessons and access session/competency reports. Super admins always have full access."
+msgstr "Quando desativado (padrão no piloto), os professores só podem ver lições e aceder a relatórios de sessão/competência. Os super administradores têm sempre acesso total."
 
 #: templates/dashboard/settings.html:270
 msgid "Save Thresholds"
@@ -3311,12 +3068,8 @@ msgid "Manage Schools"
 msgstr "Gerir Escolas"
 
 #: templates/dashboard/settings.html:281
-msgid ""
-"Each school is a separate institution. Students and staff belong to specific "
-"schools."
-msgstr ""
-"Cada escola é uma instituição separada. Alunos e funcionários pertencem a "
-"escolas específicas."
+msgid "Each school is a separate institution. Students and staff belong to specific schools."
+msgstr "Cada escola é uma instituição separada. Alunos e funcionários pertencem a escolas específicas."
 
 #: templates/dashboard/settings.html:287 templates/dashboard/settings.html:364
 #: templates/dashboard/settings.html:497 templates/dashboard/settings.html:674
@@ -3363,9 +3116,7 @@ msgstr "Gerir Utilizadores"
 
 #: templates/dashboard/settings.html:356
 msgid "Teachers and admins only. Staff are added via 'Invite Staff'."
-msgstr ""
-"Apenas professores e administradores. O pessoal é adicionado através de "
-"'Convidar Pessoal'."
+msgstr "Apenas professores e administradores. O pessoal é adicionado através de 'Convidar Pessoal'."
 
 #: templates/dashboard/settings.html:410
 #, python-format
@@ -3420,12 +3171,8 @@ msgid "(click to expand)"
 msgstr "(clica para expandir)"
 
 #: templates/dashboard/settings.html:493
-msgid ""
-"Configure grade levels available to students during registration. Leave "
-"empty to use built-in defaults."
-msgstr ""
-"Configura os níveis de escolaridade disponíveis para os estudantes durante o "
-"registo. Deixa vazio para usar os valores predefinidos."
+msgid "Configure grade levels available to students during registration. Leave empty to use built-in defaults."
+msgstr "Configura os níveis de escolaridade disponíveis para os estudantes durante o registo. Deixa vazio para usar os valores predefinidos."
 
 #: templates/dashboard/settings.html:497
 msgid "Code"
@@ -3444,11 +3191,8 @@ msgid "Student Tutoring Model"
 msgstr "Modelo de Tutoria de Estudantes"
 
 #: templates/dashboard/settings.html:520
-msgid ""
-"LLM used for live tutoring sessions, exit tickets, and skill extraction."
-msgstr ""
-"LLM usado para sessões de tutoria ao vivo, exit tickets e extração de "
-"competências."
+msgid "LLM used for live tutoring sessions, exit tickets, and skill extraction."
+msgstr "LLM usado para sessões de tutoria ao vivo, exit tickets e extração de competências."
 
 #: templates/dashboard/settings.html:525 templates/dashboard/settings.html:573
 #: templates/dashboard/settings.html:621
@@ -3519,24 +3263,16 @@ msgid "Content Generation Model"
 msgstr "Modelo de Geração de Conteúdo"
 
 #: templates/dashboard/settings.html:568
-msgid ""
-"LLM used for curriculum generation, lesson content, and image generation "
-"prompts."
-msgstr ""
-"LLM usado para gerar o currículo, conteúdo das lições e prompts para geração "
-"de imagens."
+msgid "LLM used for curriculum generation, lesson content, and image generation prompts."
+msgstr "LLM usado para gerar o currículo, conteúdo das lições e prompts para geração de imagens."
 
 #: templates/dashboard/settings.html:612
 msgid "Image Generation Model"
 msgstr "Modelo de Geração de Imagens"
 
 #: templates/dashboard/settings.html:616
-msgid ""
-"Used for AI-generated diagrams, maps, charts, and illustrations. Must be a "
-"Gemini image model."
-msgstr ""
-"Usado para diagramas, mapas, gráficos e ilustrações gerados por IA. Tem de "
-"ser um modelo Gemini de imagens."
+msgid "Used for AI-generated diagrams, maps, charts, and illustrations. Must be a Gemini image model."
+msgstr "Usado para diagramas, mapas, gráficos e ilustrações gerados por IA. Tem de ser um modelo Gemini de imagens."
 
 #: templates/dashboard/settings.html:637
 msgid "Leave blank to use the same key as above"
@@ -3544,9 +3280,7 @@ msgstr "Deixa em branco para usar a mesma chave acima"
 
 #: templates/dashboard/settings.html:638
 msgid "Leave blank to reuse the Google key from Tutoring or Generation config."
-msgstr ""
-"Deixa em branco para reutilizar a chave Google da configuração de Tutoria ou "
-"Geração."
+msgstr "Deixa em branco para reutilizar a chave Google da configuração de Tutoria ou Geração."
 
 #: templates/dashboard/settings.html:657
 msgid "Save AI Models"
@@ -3557,12 +3291,8 @@ msgid "Tutor Personalities"
 msgstr "Personalidades do Tutor"
 
 #: templates/dashboard/settings.html:667
-msgid ""
-"Configure personality options that students can choose from. Each "
-"personality modifies the tutor's tone."
-msgstr ""
-"Configura as opções de personalidade que os alunos podem escolher. Cada "
-"personalidade altera o tom do tutor."
+msgid "Configure personality options that students can choose from. Each personality modifies the tutor's tone."
+msgstr "Configura as opções de personalidade que os alunos podem escolher. Cada personalidade altera o tom do tutor."
 
 #: templates/dashboard/settings.html:673
 msgid "Emoji"
@@ -3602,10 +3332,8 @@ msgid "AI System Prompts"
 msgstr "Prompts de Sistema da AI"
 
 #: templates/dashboard/settings.html:738
-msgid ""
-"Edit the prompts below. They are pre-populated with the built-in defaults."
-msgstr ""
-"Edita os prompts abaixo. Estão pré-preenchidos com os valores predefinidos."
+msgid "Edit the prompts below. They are pre-populated with the built-in defaults."
+msgstr "Edita os prompts abaixo. Estão pré-preenchidos com os valores predefinidos."
 
 #: templates/dashboard/settings.html:752
 msgid "Save AI Prompts"
@@ -3616,13 +3344,8 @@ msgid "Staff Accounts"
 msgstr "Contas de Pessoal"
 
 #: templates/dashboard/staff_list.html:10
-msgid ""
-"Platform admins (you) can delete teacher / staff accounts. Deletions cascade "
-"through their content + audit trail."
-msgstr ""
-"Os administradores da plataforma (tu) podem eliminar contas de professores / "
-"pessoal. As eliminações propagam-se pelo conteúdo e pelo registo de "
-"auditoria."
+msgid "Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail."
+msgstr "Os administradores da plataforma (tu) podem eliminar contas de professores / pessoal. As eliminações propagam-se pelo conteúdo e pelo registo de auditoria."
 
 #: templates/dashboard/staff_list.html:13
 msgid "Invite Staff"
@@ -3647,12 +3370,8 @@ msgstr "Repor palavra-passe"
 
 #: templates/dashboard/staff_list.html:51
 #, python-format
-msgid ""
-"Permanently delete staff account &quot;%(name)s&quot;? This cascades through "
-"their data and cannot be undone."
-msgstr ""
-"Eliminar permanentemente a conta de pessoal &quot;%(name)s&quot;? Isto "
-"propaga-se pelos seus dados e não pode ser desfeito."
+msgid "Permanently delete staff account &quot;%(name)s&quot;? This cascades through their data and cannot be undone."
+msgstr "Eliminar permanentemente a conta de pessoal &quot;%(name)s&quot;? Isto propaga-se pelos seus dados e não pode ser desfeito."
 
 #: templates/dashboard/staff_list.html:59
 msgid "No staff accounts found."
@@ -3671,12 +3390,8 @@ msgid "Show a temporary password"
 msgstr "Mostrar palavra-passe temporária"
 
 #: templates/dashboard/staff_list.html:82
-msgid ""
-"Copy it and share with the user. They will be forced to change it on next "
-"login."
-msgstr ""
-"Copia-a e partilha com o utilizador. Será obrigado a alterá-la no próximo "
-"início de sessão."
+msgid "Copy it and share with the user. They will be forced to change it on next login."
+msgstr "Copia-a e partilha com o utilizador. Será obrigado a alterá-la no próximo início de sessão."
 
 #: templates/dashboard/staff_list.html:85
 msgid "Working…"
@@ -3691,12 +3406,8 @@ msgid "Copy"
 msgstr "Copiar"
 
 #: templates/dashboard/staff_list.html:92
-msgid ""
-"⚠️ Will not be shown again. The user will be required to change it on next "
-"login."
-msgstr ""
-"⚠️ Não será mostrada novamente. O utilizador terá de a alterar no próximo "
-"início de sessão."
+msgid "⚠️ Will not be shown again. The user will be required to change it on next login."
+msgstr "⚠️ Não será mostrada novamente. O utilizador terá de a alterar no próximo início de sessão."
 
 #: templates/dashboard/staff_list.html:95
 msgid "✅ Reset link emailed to"
@@ -3730,21 +3441,15 @@ msgstr "Dispositivo partilhado"
 
 #: templates/dashboard/student_groups/list.html:68
 msgid "lets students share a device with their teacher-formed groupmates."
-msgstr ""
-"permite que os alunos partilhem um dispositivo com os colegas de grupo "
-"formado pelo professor."
+msgstr "permite que os alunos partilhem um dispositivo com os colegas de grupo formado pelo professor."
 
 #: templates/dashboard/student_groups/list.html:69
 msgid "Individual"
 msgstr "Individual"
 
 #: templates/dashboard/student_groups/list.html:69
-msgid ""
-"hides the add-student button — every student takes lessons solo on their own "
-"device."
-msgstr ""
-"esconde o botão de adicionar aluno — cada aluno tem aulas sozinho no seu "
-"próprio dispositivo."
+msgid "hides the add-student button — every student takes lessons solo on their own device."
+msgstr "esconde o botão de adicionar aluno — cada aluno tem aulas sozinho no seu próprio dispositivo."
 
 #: templates/dashboard/student_groups/list.html:79
 msgid "Save mode"
@@ -3752,21 +3457,15 @@ msgstr "Modo de gravação"
 
 #: templates/dashboard/student_groups/list.html:83
 msgid "Pick a specific school in the school picker to configure session mode."
-msgstr ""
-"Escolhe uma escola específica no seletor de escolas para configurar o modo "
-"de sessão."
+msgstr "Escolhe uma escola específica no seletor de escolas para configurar o modo de sessão."
 
 #: templates/dashboard/student_groups/list.html:90
 msgid "Create a New Group"
 msgstr "Criar um Novo Grupo"
 
 #: templates/dashboard/student_groups/list.html:94
-msgid ""
-"Pick any number of students. A student in a previous active group is moved "
-"into this new one when you save."
-msgstr ""
-"Escolhe qualquer número de alunos. Um aluno que esteja num grupo ativo "
-"anterior é movido para este novo ao guardares."
+msgid "Pick any number of students. A student in a previous active group is moved into this new one when you save."
+msgstr "Escolhe qualquer número de alunos. Um aluno que esteja num grupo ativo anterior é movido para este novo ao guardares."
 
 #: templates/dashboard/student_groups/list.html:100
 msgid "Group name"
@@ -3855,13 +3554,8 @@ msgstr "%(label)s para %(first)s %(last)s?"
 
 #: templates/dashboard/students/detail.html:54
 #, python-format
-msgid ""
-"Permanently delete student account &quot;%(name)s&quot;? This removes their "
-"tutoring history and exit ticket attempts and cannot be undone."
-msgstr ""
-"Eliminar permanentemente a conta do aluno &quot;%(name)s&quot;? Isto remove "
-"o histórico de tutoria e as tentativas de exit tickets e não pode ser "
-"desfeito."
+msgid "Permanently delete student account &quot;%(name)s&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone."
+msgstr "Eliminar permanentemente a conta do aluno &quot;%(name)s&quot;? Isto remove o histórico de tutoria e as tentativas de exit tickets e não pode ser desfeito."
 
 #: templates/dashboard/students/detail.html:56
 msgid "Delete student"
@@ -3873,6 +3567,7 @@ msgstr "Total de Sessões"
 
 #: templates/dashboard/students/detail.html:80
 #: templates/dashboard/students/detail.html:182
+#: templates/tutoring/catalog.html:162
 msgid "In Progress"
 msgstr "Em Curso"
 
@@ -3891,12 +3586,9 @@ msgid "Best"
 msgstr "Melhor"
 
 #: templates/dashboard/students/detail.html:125
-#, fuzzy, python-format
-#| msgid "%(count)s attempt"
+#, python-format
 msgid "%(count)s attempt"
-msgid_plural "%(count)s attempts"
-msgstr[0] "%(count)s tentativa"
-msgstr[1] "%(count)s tentativa"
+msgstr "%(count)s tentativa"
 
 #: templates/dashboard/students/detail.html:131
 msgid "Weak:"
@@ -3976,22 +3668,12 @@ msgstr "Ainda sem exame sumativo"
 
 #: templates/dashboard/summative/review.html:53
 #, python-format
-msgid ""
-"Generate a 90-question summative covering every teaching objective in "
-"<strong>%(title)s</strong>. Each student attempt sees 30 questions "
-"stratified across all objectives."
-msgstr ""
-"Gera um sumativo de 90 perguntas a cobrir todos os objetivos de ensino em "
-"<strong>%(title)s</strong>. Cada tentativa do aluno mostra 30 perguntas "
-"estratificadas por todos os objetivos."
+msgid "Generate a 90-question summative covering every teaching objective in <strong>%(title)s</strong>. Each student attempt sees 30 questions stratified across all objectives."
+msgstr "Gera um sumativo de 90 perguntas a cobrir todos os objetivos de ensino em <strong>%(title)s</strong>. Cada tentativa do aluno mostra 30 perguntas estratificadas por todos os objetivos."
 
 #: templates/dashboard/summative/review.html:60
-msgid ""
-"Generation queries the knowledge base for any uploaded question banks / past "
-"exam papers and mirrors their format. Takes ~1–2 minutes."
-msgstr ""
-"A geração consulta a base de conhecimento para bancos de perguntas / exames "
-"anteriores carregados e replica o seu formato. Demora ~1–2 minutos."
+msgid "Generation queries the knowledge base for any uploaded question banks / past exam papers and mirrors their format. Takes ~1–2 minutes."
+msgstr "A geração consulta a base de conhecimento para bancos de perguntas / exames anteriores carregados e replica o seu formato. Demora ~1–2 minutos."
 
 #: templates/dashboard/summative/review.html:66
 msgid "Bank summary"
@@ -4084,11 +3766,8 @@ msgid "Save"
 msgstr "Guardar"
 
 #: templates/dashboard/summative/review.html:289
-msgid ""
-"No questions yet — generation may still be running. Refresh in a minute."
-msgstr ""
-"Ainda não há perguntas — a geração pode ainda estar a decorrer. Atualiza "
-"dentro de um minuto."
+msgid "No questions yet — generation may still be running. Refresh in a minute."
+msgstr "Ainda não há perguntas — a geração pode ainda estar a decorrer. Atualiza dentro de um minuto."
 
 #: templates/tutoring/catalog.html:4
 msgid "My Subjects"
@@ -4100,9 +3779,7 @@ msgstr "Bem-vindo ao AI Tutor"
 
 #: templates/tutoring/catalog.html:14
 msgid "Your personal learning companion for Seychelles secondary students"
-msgstr ""
-"O teu companheiro pessoal de aprendizagem para alunos do secundário das "
-"Seicheles"
+msgstr "O teu companheiro pessoal de aprendizagem para alunos do secundário das Seicheles"
 
 #: templates/tutoring/catalog.html:16
 msgid "Get Started"
@@ -4114,17 +3791,12 @@ msgstr "Ainda não há disciplinas disponíveis"
 
 #: templates/tutoring/catalog.html:30
 #, python-format
-msgid ""
-"No published courses found for %(school_name)s. Publish courses from the "
-"Dashboard."
-msgstr ""
-"Não foram encontrados cursos publicados para %(school_name)s. Publica cursos "
-"a partir do Painel."
+msgid "No published courses found for %(school_name)s. Publish courses from the Dashboard."
+msgstr "Não foram encontrados cursos publicados para %(school_name)s. Publica cursos a partir do Painel."
 
 #: templates/tutoring/catalog.html:32
 msgid "No published courses found. Publish courses from the Dashboard."
-msgstr ""
-"Não foram encontrados cursos publicados. Publica cursos a partir do Painel."
+msgstr "Não foram encontrados cursos publicados. Publica cursos a partir do Painel."
 
 #: templates/tutoring/catalog.html:35
 msgid "Your courses are being set up. Check back soon!"
@@ -4196,6 +3868,36 @@ msgstr "entrega domingo %(date)s"
 msgid "Continue where you left off"
 msgstr "Continua de onde paraste"
 
+#: templates/tutoring/catalog.html:155
+msgid "Engage"
+msgstr "Engajar"
+
+#: templates/tutoring/catalog.html:156
+msgid "Explore"
+msgstr "Explorar"
+
+#: templates/tutoring/catalog.html:157
+msgid "Explain"
+msgstr "Explicar"
+
+#: templates/tutoring/catalog.html:158
+msgid "Practice"
+msgstr "Praticar"
+
+#: templates/tutoring/catalog.html:159
+msgid "Evaluate"
+msgstr "Avaliar"
+
+#: templates/tutoring/catalog.html:160
+#, python-format
+msgid "Quiz (%(c)s/10)"
+msgstr "Questionário (%(c)s/10)"
+
+#: templates/tutoring/catalog.html:165
+#, python-format
+msgid "%(t)s ago"
+msgstr "há %(t)s"
+
 #: templates/tutoring/catalog.html:167
 msgid "Resume"
 msgstr "Retomar"
@@ -4206,9 +3908,7 @@ msgstr "Iniciar diagnóstico"
 
 #: templates/tutoring/catalog.html:212
 msgid "Retake the course summative — useful for tracking growth over time."
-msgstr ""
-"Refaz a avaliação sumativa do curso — útil para acompanhar o teu progresso "
-"ao longo do tempo."
+msgstr "Refaz a avaliação sumativa do curso — útil para acompanhar o teu progresso ao longo do tempo."
 
 #: templates/tutoring/catalog.html:223
 msgid "Start"
@@ -4219,11 +3919,8 @@ msgid "Complete prerequisites to unlock"
 msgstr "Completa os pré-requisitos para desbloquear"
 
 #: templates/tutoring/catalog.html:294
-msgid ""
-"Take a 10-question pre-test instead — pass and the lesson is marked complete."
-msgstr ""
-"Faz um pré-teste de 10 perguntas — se passares, a lição fica marcada como "
-"concluída."
+msgid "Take a 10-question pre-test instead — pass and the lesson is marked complete."
+msgstr "Faz um pré-teste de 10 perguntas — se passares, a lição fica marcada como concluída."
 
 #: templates/tutoring/catalog.html:294
 msgid "Quick check"
@@ -4263,13 +3960,8 @@ msgid "How long do you have today?"
 msgstr "Quanto tempo tens hoje?"
 
 #: templates/tutoring/chat_tutor.html:98
-msgid ""
-"The tutor adapts the lesson depth to fit your time. You can answer the same "
-"number of questions either way — fewer steps just means less reinforcement."
-msgstr ""
-"O tutor adapta a profundidade da lição ao teu tempo. Podes responder ao "
-"mesmo número de perguntas em qualquer caso — menos passos significa apenas "
-"menos reforço."
+msgid "The tutor adapts the lesson depth to fit your time. You can answer the same number of questions either way — fewer steps just means less reinforcement."
+msgstr "O tutor adapta a profundidade da lição ao teu tempo. Podes responder ao mesmo número de perguntas em qualquer caso — menos passos significa apenas menos reforço."
 
 #: templates/tutoring/chat_tutor.html:101
 msgid "15 min"
