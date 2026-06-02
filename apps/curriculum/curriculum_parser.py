@@ -438,13 +438,18 @@ def detect_subject_and_locale(
 # ============================================================================
 
 
-MAX_OUTLINE_TEXT_CHARS = 100_000
-"""Soft cap on the document text we send to the outline-pass LLM. Sonnet
-4.6 handles 200K context comfortably, but at 100K we have plenty of
-headroom for the schema, locale hints, and a generous max_tokens budget.
-Above this, we send head+tail to preserve the table of contents (head)
-and the trailing units (tail). Most curriculum docs we've seen are under
-this cap: Mozambique Biology is 111K, Geography 130K, Math 95K."""
+MAX_OUTLINE_TEXT_CHARS = 180_000
+"""Soft cap on the document text we send to the outline-pass LLM.
+Sonnet 4.6 has a 200K context window — we cap below that to leave
+headroom for system prompt + schema + max_tokens. 180K fits every
+curriculum we've seen so far without trimming:
+  - Mozambique Biology: 111K
+  - Mozambique Geography: ~130K
+  - Mozambique Math: ~95K
+Lower caps risk chopping the final grade in multi-grade docs
+(observed on M4 first-run: 100K cap dropped 12ª Classe → 0 lessons
+for that grade's units). If a future doc exceeds 180K we head+tail
+to preserve both the index and the trailing units."""
 
 
 def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]:
@@ -507,23 +512,37 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"\n<task>\n"
         f"Extract the unit-level structure of this curriculum document.\n\n"
         f"GUIDELINES:\n"
-        f"1. Identify natural unit divisions (chapters, units, strands, "
-        f"themes, Unidades Temáticas, etc.) AS THEY APPEAR in the source. "
-        f"Do not invent units, do not merge units that the document "
-        f"treats as separate.\n"
-        f"2. If a unit recurs across multiple grades (e.g. \"Citologia\" "
+        f"1. Identify TOP-LEVEL unit divisions only (chapters, units, "
+        f"strands, themes, Unidades Temáticas, etc.) AS THEY APPEAR in "
+        f"the source's table of contents / index / overview table. "
+        f"Do NOT invent units, do NOT merge units the document treats "
+        f"as separate.\n"
+        f"2. DO NOT split a single unit into sub-units just because the "
+        f"source has multiple tables for it. Sub-tables like 'Reino "
+        f"Monera (continuação)' / 'Reino Protista (continuação)' / "
+        f"'(continuação)' are CONTINUATIONS of one parent unit "
+        f"(e.g. 'Sistemática dos Seres Vivos') — emit ONE outline entry "
+        f"for the parent, not one per continuation table. The fine-"
+        f"grained kingdom/phylum-level structure shows up later as "
+        f"LESSONS within that unit.\n"
+        f"3. If a unit recurs across multiple grades (e.g. 'Citologia' "
         f"in both 10ª Classe and 12ª Classe), emit ONE outline entry "
         f"per (unit, grade) pair — they will become separate Course "
         f"rows in our system, since each Course has a single grade.\n"
-        f"3. Use grade labels EXACTLY as they appear (10ª Classe / S3 / "
+        f"4. Use grade labels EXACTLY as they appear (10ª Classe / S3 / "
         f"Form 4 / etc.). Do not translate or coerce.\n"
-        f"4. SKIP non-structural content: title pages, copyright pages "
+        f"5. SKIP non-structural content: title pages, copyright pages "
         f"('Ficha Técnica'), introductions, methodological notes, "
         f"glossaries, bibliographies. These are NOT units.\n"
-        f"5. Provide a short (1-line) description per unit.\n"
-        f"6. For source_evidence, paste a 30-100 char VERBATIM snippet "
-        f"from the document where that unit is introduced (typically "
-        f"the heading line). This anchors the extraction.\n"
+        f"6. Provide a short (1-line) description per unit.\n"
+        f"7. For source_evidence, paste a 30-100 char VERBATIM snippet "
+        f"from the document where that unit is FIRST introduced "
+        f"(typically the FIRST heading line — not a continuation). "
+        f"This anchors the extraction.\n"
+        f"8. Expected unit counts: a typical 3-grade secondary school "
+        f"curriculum has 5-10 top-level units per grade. If you find "
+        f"yourself emitting 20+ units, you are likely splitting too "
+        f"finely — re-read guideline 2.\n"
         f"\nReturn JSON with this exact shape:\n"
         f"{{\n"
         f'  "units": [\n'
@@ -610,11 +629,342 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
     return outlines
 
 
-def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str) -> list[LessonV2]:
-    """Extract the lessons for one unit. Called in a bounded thread-pool
-    fan-out from ``parse_curriculum``. M4 deliverable.
+LESSONS_PASS_EXCERPT_CHARS = 8000
+"""Char window around the unit's source_evidence we send to the
+per-unit lessons LLM call. 8K is enough to capture a typical unit's
+3-column table (Objectivos | Conteúdos | Resultados) + the
+Sugestões metodológicas narrative that follows. Bigger excerpts
+don't improve accuracy and increase latency + cost per unit."""
+
+
+def _find_unit_body(full_text: str, anchor: str) -> int:
+    """Locate an anchor at the unit BODY position, not at the table-of-
+    contents entry that typically appears earlier in the document.
+
+    Heuristic: PDFs of curriculum docs include the unit heading in two
+    places — once in the index (typically followed by dots and a page
+    number) and again at the actual body of the unit (followed by
+    content like "OBJECTIVOS" / "O aluno" / a numbered subtopic).
+    Prefer the LAST occurrence; that's almost always the body. (The
+    index/TOC entry, if present, is by definition earlier in the
+    document than the unit body it points to.)
+
+    Tolerates whitespace differences between the LLM-supplied anchor
+    and the actual document text — pdftotext leaves wonky spacing
+    around colons and line breaks that the LLM may normalise.
+
+    Returns the character index, or -1 if not found.
     """
-    raise NotImplementedError("M4 deliverable — see memory/curriculum_parser_v2_plan.md §M4")
+    if not anchor:
+        return -1
+    # 1. Exact match (rfind = last occurrence skips the TOC entry).
+    idx = full_text.rfind(anchor)
+    if idx != -1:
+        return idx
+    # 2. Whitespace-tolerant search: build a regex where each run of
+    # whitespace in the anchor matches one-or-more whitespace chars in
+    # the text. This handles "II:  Genética" (LLM) vs "II: Genética"
+    # (doc body), or vice versa.
+    probe = anchor.strip()
+    if probe:
+        pattern = re.compile(
+            r'\s+'.join(re.escape(p) for p in probe.split()),
+            re.IGNORECASE,
+        )
+        matches = list(pattern.finditer(full_text))
+        if matches:
+            return matches[-1].start()  # last occurrence = body, not TOC
+    # 3. Last resort: first 40 chars of probe.
+    short = probe[:40] if probe else ''
+    if short:
+        idx = full_text.rfind(short)
+        if idx != -1:
+            return idx
+        idx = full_text.lower().rfind(short.lower())
+        if idx != -1:
+            return idx
+    return -1
+
+
+def _excerpt_for_unit(
+    full_text: str, outline: UnitOutlineV2, all_outlines: list[UnitOutlineV2]
+) -> str:
+    """Find the text window for one unit. Anchored on
+    ``outline.source_evidence`` at its BODY position (skipping the
+    table-of-contents entry); bounded by the next unit's body if we
+    find it within the excerpt window.
+
+    Falls back to searching for the unit title verbatim if evidence
+    is missing. Worst case (no anchor found), returns the first
+    LESSONS_PASS_EXCERPT_CHARS chars of the document — the LLM will
+    still produce SOMETHING but accuracy degrades.
+    """
+    anchor = outline.source_evidence or outline.title
+    if not anchor:
+        return full_text[:LESSONS_PASS_EXCERPT_CHARS]
+
+    idx = _find_unit_body(full_text, anchor)
+    if idx == -1:
+        logger.warning(
+            "[parser_v2] lessons_pass: anchor %r not found in document, "
+            "falling back to first %d chars",
+            anchor[:60], LESSONS_PASS_EXCERPT_CHARS,
+        )
+        return full_text[:LESSONS_PASS_EXCERPT_CHARS]
+
+    # Upper boundary: the body position of the NEXT unit's anchor.
+    # We search AFTER our current position so we don't pick up the
+    # current unit's own TOC entry, and so we don't pick up a sibling
+    # that has the same title across grades.
+    next_idx = idx + LESSONS_PASS_EXCERPT_CHARS
+    my_pos = all_outlines.index(outline) if outline in all_outlines else -1
+    for sibling in all_outlines[my_pos + 1:] if my_pos >= 0 else []:
+        sib_anchor = sibling.source_evidence or sibling.title
+        if not sib_anchor:
+            continue
+        # Search for sibling body AFTER our current position
+        sib_idx = full_text.rfind(sib_anchor)
+        if sib_idx <= idx:
+            # Sibling's last occurrence is before our position — skip
+            # it (probably the same unit name in a different grade).
+            continue
+        # Use the FIRST sibling occurrence after our position (we want
+        # the nearest boundary, not the last).
+        sib_idx = full_text.find(sib_anchor, idx + 1)
+        if sib_idx == -1:
+            sib_idx = full_text.find(sib_anchor[:40].strip(), idx + 1)
+        if sib_idx > idx:
+            next_idx = min(next_idx, sib_idx)
+            break
+
+    return full_text[idx:next_idx]
+
+
+def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
+                 all_outlines: Optional[list[UnitOutlineV2]] = None) -> list[LessonV2]:
+    """Extract the lessons for one unit. Called in a bounded thread-
+    pool fan-out from ``parse_curriculum``.
+
+    Approach:
+      - Slice a focused ~8K char excerpt around the unit's
+        source_evidence so the LLM stays grounded on this unit's
+        content (and so we don't pay to re-send 100K chars per unit).
+      - Single LLM call returning JSON. Schema-constrained.
+      - Anti-hallucination: each lesson must include a verbatim
+        snippet from the excerpt; lessons whose evidence isn't
+        present are dropped.
+
+    Raises exceptions on infra failure (LLM error, bad JSON after
+    retry). The orchestrator's ThreadPoolExecutor catches and logs
+    per-unit, so one unit failing doesn't kill the whole parse.
+    """
+    from apps.curriculum.locale_prompts import locale_parser_hints
+
+    all_outlines = all_outlines or [unit]
+    excerpt = _excerpt_for_unit(full_text, unit, all_outlines)
+    locale_hints = locale_parser_hints(locale)
+
+    system_prompt = (
+        "You are a curriculum-document lesson extractor. Given a single "
+        "unit's worth of text from a curriculum / teaching-programme "
+        "document, identify the INDIVIDUAL LESSONS that comprise it. "
+        "A lesson typically maps to one teaching objective or one "
+        "numbered topic in the unit's content list. Return ONLY lessons "
+        "you can ANCHOR to a verbatim snippet from the provided text. "
+        "Respond with a single JSON object."
+    )
+
+    user_prompt = (
+        # Document excerpt FIRST (query-last layout).
+        f"<unit_excerpt unit_title=\"{unit.title}\" grade=\"{unit.grade_level}\">\n"
+        f"{excerpt}\n"
+        f"</unit_excerpt>\n"
+        f"{locale_hints}"
+        f"\n<task>\n"
+        f"Extract the individual lessons in this unit.\n\n"
+        f"GUIDELINES:\n"
+        f"1. A lesson maps to ONE main concept or skill. Typical signal: "
+        f"a numbered subtopic (1.1, 1.2, …) or a discrete teaching "
+        f"objective. Look at the document's own structure — don't "
+        f"invent lessons.\n"
+        f"2. Title should be SHORT and student-friendly — name the "
+        f"concept, not the objective. \"The Cell Nucleus\" not "
+        f"\"Students will understand the cell nucleus\".\n"
+        f"3. Objective: 1-sentence terminal objective for this lesson "
+        f"(what the student will be able to do).\n"
+        f"4. enabling_objectives: 3-6 granular sub-skills (action-verb "
+        f"statements). Pull these from the document's specific-"
+        f"objectives column if available.\n"
+        f"5. Aim for 3-12 lessons per unit. Fewer is fine if the unit "
+        f"is small. Don't pad.\n"
+        f"6. order: 1-indexed position within the unit.\n"
+        f"7. For source_evidence: a 30-100 char verbatim snippet from "
+        f"the excerpt that anchors this lesson (typically the "
+        f"sub-heading or first content line). Anti-hallucination check.\n"
+        f"\nReturn JSON with this exact shape:\n"
+        f"{{\n"
+        f'  "lessons": [\n'
+        f'    {{\n'
+        f'      "title": "Short concept name",\n'
+        f'      "objective": "Terminal objective in 1 sentence",\n'
+        f'      "enabling_objectives": ["Sub-skill 1", "Sub-skill 2", ...],\n'
+        f'      "order": 1,\n'
+        f'      "source_evidence": "Verbatim snippet from the excerpt"\n'
+        f'    }},\n'
+        f'    ...\n'
+        f'  ]\n'
+        f"}}\n"
+        f"</task>"
+    )
+
+    parsed = _call_llm_structured(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=4096,
+    )
+
+    raw_lessons = parsed.get('lessons') or []
+    if not isinstance(raw_lessons, list):
+        raise ParseFailure(
+            'llm_error',
+            f"lessons_pass for {unit.title!r}: response.lessons was "
+            f"{type(raw_lessons).__name__}, expected list",
+        )
+
+    # Anti-hallucination filter — each lesson's evidence must appear in
+    # the excerpt (case + whitespace insensitive, 30-char probe).
+    excerpt_norm = ' '.join(excerpt.split()).lower()
+    lessons: list[LessonV2] = []
+    skipped_no_evidence = 0
+    for i, raw in enumerate(raw_lessons, start=1):
+        if not isinstance(raw, dict):
+            continue
+        title = (raw.get('title') or '').strip()
+        objective = (raw.get('objective') or '').strip()
+        if not title or not objective:
+            continue
+        evidence = (raw.get('source_evidence') or '').strip()
+        if evidence:
+            ev_norm = ' '.join(evidence.split()).lower()
+            ev_probe = ev_norm[:30] if len(ev_norm) > 30 else ev_norm
+            if ev_probe and ev_probe not in excerpt_norm:
+                logger.warning(
+                    "[parser_v2] lessons_pass dropping lesson %r for unit %r "
+                    "— evidence not in excerpt.", title, unit.title,
+                )
+                skipped_no_evidence += 1
+                continue
+        eos = raw.get('enabling_objectives') or []
+        if not isinstance(eos, list):
+            eos = [str(eos)]
+        eos = [str(e).strip() for e in eos if str(e).strip()]
+        try:
+            lessons.append(LessonV2(
+                title=title,
+                objective=objective,
+                enabling_objectives=eos,
+                order=int(raw.get('order') or i),
+            ))
+        except Exception:
+            logger.warning(
+                "[parser_v2] lessons_pass: malformed lesson dropped for unit %r: %r",
+                unit.title, {'title': title}
+            )
+
+    logger.info(
+        "[parser_v2] lessons_pass(%s, %s): %d lessons "
+        "(%d raw, %d evidence-misses)",
+        unit.title, unit.grade_level,
+        len(lessons), len(raw_lessons), skipped_no_evidence,
+    )
+    return lessons
+
+
+# ============================================================================
+# v2 — LESSONS FAN-OUT (M4)
+# ============================================================================
+
+
+LESSONS_FANOUT_MAX_WORKERS = 3
+"""Max concurrent per-unit lessons_pass calls. 3 is the sweet spot:
+high enough to make a 15-unit doc fit in ~5 LLM round-trips of latency,
+low enough to stay well under Anthropic's rate limits even on the
+slower workload-profile tiers. Mirrors the bounded concurrency in
+apps/tutoring/judges/__init__.py::run_all_judges."""
+
+LESSONS_PASS_TIMEOUT_SECONDS = 90
+"""Per-unit timeout. Sonnet 4.6 on an 8K excerpt typically returns
+in 8-15s; 90s gives 6x headroom for network glitches without letting
+one stuck unit block the whole parse forever."""
+
+
+def _lessons_fanout(
+    outlines: list[UnitOutlineV2],
+    *,
+    full_text: str,
+    locale: str,
+    progress_cb: Optional[Callable[[int], None]] = None,
+) -> tuple[list[UnitV2], int]:
+    """Fan-out lessons_pass across all units with bounded concurrency.
+
+    Fail-soft: per-unit exceptions are logged and that unit is returned
+    with empty lessons[]. Only the orchestrator's "all failed" check
+    raises ParseFailure. Same pattern as
+    ``apps/tutoring/judges/__init__.py::run_all_judges``.
+
+    Returns ``(units_with_lessons, failed_count)``.
+    """
+    import concurrent.futures as _cf
+
+    units: list[Optional[UnitV2]] = [None] * len(outlines)
+    failed = 0
+    done = 0
+
+    def _run_one(i: int, outline: UnitOutlineV2) -> tuple[int, list[LessonV2], Optional[Exception]]:
+        try:
+            lessons = lessons_pass(
+                outline,
+                full_text=full_text,
+                locale=locale,
+                all_outlines=outlines,
+            )
+            return i, lessons, None
+        except Exception as e:
+            logger.exception(
+                "[parser_v2] lessons_pass FAILED for unit %r (%s)",
+                outline.title, outline.grade_level,
+            )
+            return i, [], e
+
+    with _cf.ThreadPoolExecutor(max_workers=LESSONS_FANOUT_MAX_WORKERS) as ex:
+        futures = {
+            ex.submit(_run_one, i, o): (i, o)
+            for i, o in enumerate(outlines)
+        }
+        for fut in _cf.as_completed(futures, timeout=LESSONS_PASS_TIMEOUT_SECONDS * len(outlines)):
+            try:
+                i, lessons, err = fut.result(timeout=LESSONS_PASS_TIMEOUT_SECONDS)
+            except _cf.TimeoutError:
+                i, outline = futures[fut]
+                logger.warning(
+                    "[parser_v2] lessons_pass TIMEOUT for unit %r — "
+                    "returning empty lessons[].", outline.title,
+                )
+                lessons, err = [], TimeoutError("per-unit timeout")
+
+            if err is not None:
+                failed += 1
+            outline = futures[fut][1]
+            units[i] = UnitV2(**outline.model_dump(), lessons=lessons)
+            done += 1
+            if progress_cb:
+                try:
+                    progress_cb(done)
+                except Exception:
+                    logger.exception("[parser_v2] lessons fanout progress_cb raised — ignored")
+
+    # All slots filled (we initialised to None; should all be UnitV2 now).
+    return [u for u in units if u is not None], failed
 
 
 # ============================================================================
@@ -701,16 +1051,10 @@ def parse_curriculum(
 
     # ── 4. Lessons pass — bounded thread-pool fan-out (M4)
     _emit('lessons', unit_count=len(outlines))
-    units = []
-    failed = 0
-    for outline in outlines:
-        try:
-            lessons = lessons_pass(outline, full_text=text, locale=effective_locale)
-        except Exception:
-            logger.exception("[parser_v2] lessons_pass failed for unit %r", outline.title)
-            lessons = []
-            failed += 1
-        units.append(UnitV2(**outline.model_dump(), lessons=lessons))
+    units, failed = _lessons_fanout(
+        outlines, full_text=text, locale=effective_locale,
+        progress_cb=lambda done: _emit('lesson_unit_done', done=done, total=len(outlines)),
+    )
     if failed == len(outlines):
         raise ParseFailure(
             'lesson_pass_failed',
