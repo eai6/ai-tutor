@@ -1444,12 +1444,17 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
         )
 
     upload.status = 'completed'
+    upload.units_created = total_units
     upload.lessons_created = total_lessons
     # Pick the first course as the primary "created_course" link the UI uses.
     if course_ids:
         from apps.curriculum.models import Course
         upload.created_course = Course.objects.filter(id=course_ids[0]).first()
-    upload.add_log(f"🎉 Done — {len(course_ids)} course(s), {total_units} units, {total_lessons} lessons.")
+    upload.add_log(
+        f"🎉 Done — {len(course_ids)} course(s) created across "
+        f"{len(units_by_grade)} grade(s): {total_units} units, "
+        f"{total_lessons} lessons total."
+    )
     upload.save()
 
     return {
