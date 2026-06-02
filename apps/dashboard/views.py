@@ -1256,9 +1256,31 @@ def curriculum_upload(request):
     from apps.curriculum.models import Course
     from django.conf import settings as _settings
 
+    # Locale-aware grade-level options. Different national education
+    # systems use different labels for secondary grades — Seychelles
+    # uses S1-S5; Mozambique uses 8ª-12ª Classe (1º Ciclo: 8-10, 2º
+    # Ciclo: 11-12). The template renders both sets and JS toggles
+    # visibility based on the Idioma dropdown so the teacher sees only
+    # the relevant scheme.
+    seychelles_grades = PlatformConfig.get_grade_choices()
+    mozambique_grades = [
+        ('8ª Classe',  '8ª Classe'),
+        ('9ª Classe',  '9ª Classe'),
+        ('10ª Classe', '10ª Classe'),
+        ('11ª Classe', '11ª Classe'),
+        ('12ª Classe', '12ª Classe'),
+    ]
+    grades_by_locale = {
+        'en-us': seychelles_grades,
+        'pt-mz': mozambique_grades,
+    }
+
     context = {
         **request.staff_ctx,
-        'grade_levels': PlatformConfig.get_grade_choices(),
+        # Default (legacy callers + non-locale-aware code paths):
+        # the platform's configured set.
+        'grade_levels': seychelles_grades,
+        'grades_by_locale': grades_by_locale,
         'material_types': TeachingMaterialUpload.MaterialType.choices,
         'subject_code_choices': Course.SubjectCode.choices,
         # M5-wire: surface the platform's LANGUAGES tuple so the
@@ -1360,15 +1382,24 @@ def curriculum_generate(request, upload_id):
 def curriculum_approve(request, upload_id):
     """
     Approve the parsed curriculum and create database records.
-    
-    Accepts edited structure from the review form and optionally
-    generates lesson content (steps, exit tickets).
+
+    Wired to the v2 parser's per-grade fanout (memory/curriculum_parser_v2_plan.md
+    §M5). Accepts edited structure from the review form, persists it
+    back to ``upload.parsed_data``, then delegates to v2's
+    ``complete_curriculum_upload`` which creates ONE Course row per
+    detected grade. Each unit lands under its grade's Course based on
+    the per-unit ``grade_level`` field from ``parse_curriculum``.
+
+    Single-grade docs still produce a single Course (equivalent to
+    the pre-v2 behaviour). Multi-grade docs (e.g. Mozambique Biology
+    2º Ciclo covering 10ª/11ª/12ª) produce N Courses.
     """
     institution = request.staff_ctx['institution']
-    
+
     from apps.dashboard.models import CurriculumUpload
-    from apps.curriculum.models import Course, Unit, Lesson, LessonStep
-    
+    from apps.curriculum.models import Lesson
+    from apps.curriculum.curriculum_parser import complete_curriculum_upload as v2_complete
+
     lookup = {'id': upload_id}
     if institution is not None:
         lookup['institution'] = institution
@@ -1376,181 +1407,119 @@ def curriculum_approve(request, upload_id):
 
     if upload.status != 'review':
         return JsonResponse({'error': 'Not in review state'}, status=400)
-    
+
     try:
-        # Get data from request
         data = json.loads(request.body) if request.body else {}
-        
-        # Get the edited units (or use original parsed_data)
-        units_data = data.get('units')
-        if not units_data and upload.parsed_data:
-            units_data = upload.parsed_data.get('units', [])
-        
-        if not units_data:
-            return JsonResponse({'error': 'No units to create'}, status=400)
-        
-        # Update status to processing
-        upload.status = 'processing'
-        upload.current_step = 3
-        upload.add_log("💾 Creating curriculum records...")
-        upload.save()
-        
-        # Create or update course
-        from apps.curriculum.utils import format_grade_display
-        subject = upload.subject_name
-        grade_display = format_grade_display(upload.grade_level)
-        course_title = f"{subject} {grade_display}"
 
-        # Use upload's institution (None for platform-wide)
-        course_institution = upload.institution
-
-        course, created = Course.objects.update_or_create(
-            institution=course_institution,
-            title=course_title,
-            defaults={
-                'description': f"{subject} curriculum for {grade_display}",
-                'grade_level': upload.grade_level,
-                'is_published': False,
-                # M5-wire: persist the locale the teacher picked at
-                # upload time. Drives content-gen + tutor language.
-                'locale': getattr(upload, 'locale', 'en-us') or 'en-us',
+        # Capture teacher edits to the review form. If supplied, persist
+        # them back to upload.parsed_data so v2_complete picks them up.
+        # MERGE rather than replace — the review-form JS only scrapes
+        # visible fields (title, terminal_objectives, enabling_objectives,
+        # lessons), so a naive replace strips grade_level + source_evidence
+        # from each unit. We preserve those from the original parsed_data
+        # by matching units by title (the stable key).
+        edited_units = data.get('units')
+        if edited_units:
+            current = upload.parsed_data or {}
+            original_units = current.get('units', []) or []
+            grade_by_title = {
+                (u.get('title') or '').strip(): u.get('grade_level')
+                for u in original_units if u.get('title')
             }
-        )
-        
-        upload.created_course = course
-        upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title}")
+            evidence_by_title = {
+                (u.get('title') or '').strip(): u.get('source_evidence', '')
+                for u in original_units if u.get('title')
+            }
+            for u in edited_units:
+                title = (u.get('title') or '').strip()
+                if not u.get('grade_level') and title in grade_by_title:
+                    u['grade_level'] = grade_by_title[title]
+                if not u.get('source_evidence') and title in evidence_by_title:
+                    u['source_evidence'] = evidence_by_title[title]
+            current['units'] = edited_units
+            upload.parsed_data = current
+            upload.save(update_fields=['parsed_data'])
 
-        # Link any teaching materials uploaded with this curriculum to the new course
-        from apps.dashboard.models import TeachingMaterialUpload
-        linked_count = TeachingMaterialUpload.objects.filter(
-            curriculum_upload=upload, course__isnull=True
-        ).update(course=course)
-        if linked_count:
-            upload.add_log(f"   📎 Linked {linked_count} teaching material(s) to course")
+        if not (upload.parsed_data and upload.parsed_data.get('units')):
+            return JsonResponse({'error': 'No units to create'}, status=400)
 
-        units_created = 0
-        lessons_created = 0
-        
-        # Create units and lessons from edited data
-        for unit_idx, unit_data in enumerate(units_data):
-            unit_title = unit_data.get('title', '').strip()
-            if not unit_title:
-                continue
-            
-            unit, u_created = Unit.objects.update_or_create(
-                course=course,
-                title=unit_title,
-                defaults={
-                    'description': unit_data.get('description', ''),
-                    'order_index': unit_idx,
-                }
-            )
-            
-            if u_created:
-                units_created += 1
-            
-            upload.add_log(f"   📁 {unit.title}")
-            
-            for lesson_idx, lesson_data in enumerate(unit_data.get('lessons', [])):
-                lesson_title = lesson_data.get('title', '').strip()
-                if not lesson_title:
-                    continue
-                
-                # enabling_objectives — per-lesson Terminal Objectives
-                # the teacher edited in the review UI. Validate as a list
-                # of strings, dedupe case-insensitively, drop empties.
-                raw_eos = lesson_data.get('enabling_objectives') or []
-                if not isinstance(raw_eos, list):
-                    raw_eos = []
-                seen = set()
-                lesson_eos = []
-                for eo in raw_eos:
-                    if not isinstance(eo, str):
-                        continue
-                    text = eo.strip()
-                    if not text:
-                        continue
-                    key = ' '.join(text.lower().split())
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    lesson_eos.append(text)
+        # Delegate to v2 — per-grade Course fanout + locale stamp.
+        result = v2_complete(upload.id)
+        if not result.get('success'):
+            return JsonResponse({
+                'error': result.get('reason', 'unknown'),
+                'detail': result.get('detail', ''),
+            }, status=500)
 
-                lesson, l_created = Lesson.objects.update_or_create(
-                    unit=unit,
-                    title=lesson_title,
-                    defaults={
-                        'objective': lesson_data.get('objective', ''),
-                        'enabling_objectives': lesson_eos,
-                        'order_index': lesson_idx,
-                        'estimated_minutes': 20,
-                        'is_published': False,
-                        'metadata': {
-                            'key_concepts': lesson_data.get('key_concepts', []),
-                            'from_curriculum_upload': upload.id,
-                        }
-                    }
-                )
-                
-                if l_created:
-                    lessons_created += 1
-        
-        upload.units_created = units_created
-        upload.lessons_created = lessons_created
-        upload.add_log(f"   ✓ Created {units_created} units, {lessons_created} lessons")
-        upload.save()
-        
-        # Check if content generation was requested (default: yes)
+        course_ids = result.get('course_ids') or []
+        units_created = result.get('units_created', 0)
+        lessons_created = result.get('lessons_created', 0)
+
+        # Optional: kick off background content generation. The current
+        # background_tasks.generate_all_content_async takes a single
+        # course_id, so we fire one task per Course returned by v2.
         generate_content = data.get('generate_steps', True)
+        total_lessons_for_gen = sum(
+            Lesson.objects.filter(unit__course_id=cid).count() for cid in course_ids
+        ) if course_ids else 0
 
-        # Start background content generation for all lessons
-        lessons_in_course = Lesson.objects.filter(unit__course=course).count()
-
-        if generate_content and lessons_in_course > 0:
+        if generate_content and total_lessons_for_gen > 0:
             upload.status = 'processing'
             upload.current_step = 4
-            upload.add_log(f"📝 Starting background content generation for {lessons_in_course} lessons...")
+            upload.add_log(
+                f"📝 Starting background content generation for "
+                f"{total_lessons_for_gen} lessons across {len(course_ids)} course(s)…"
+            )
             upload.save()
 
             from apps.dashboard.background_tasks import run_async, generate_all_content_async
-            run_async(
-                generate_all_content_async,
-                course_id=course.id,
-                upload_id=upload.id,
-                generate_media=True,
-            )
+            for cid in course_ids:
+                run_async(
+                    generate_all_content_async,
+                    course_id=cid,
+                    upload_id=upload.id,
+                    generate_media=True,
+                )
 
             return JsonResponse({
                 'success': True,
                 'status': 'processing',
-                'message': f'Course created. Generating content for {lessons_in_course} lessons in the background.',
-                'course_id': course.id,
+                'message': (
+                    f'{len(course_ids)} course(s) created. Generating content '
+                    f'for {total_lessons_for_gen} lessons in the background.'
+                ),
+                'course_ids': course_ids,
+                'course_id': course_ids[0] if course_ids else None,  # legacy single-id field
                 'units_created': units_created,
                 'lessons_created': lessons_created,
             })
-        else:
-            upload.status = 'completed'
-            upload.steps_created = 0
-            upload.completed_at = timezone.now()
-            upload.add_log(f"✅ Course '{course.title}' created (no lessons to generate).")
-            upload.save()
 
-            return JsonResponse({
-                'success': True,
-                'status': 'completed',
-                'course_id': course.id,
-                'units_created': units_created,
-                'lessons_created': lessons_created,
-                'steps_created': 0,
-            })
-        
+        upload.status = 'completed'
+        upload.steps_created = 0
+        upload.completed_at = timezone.now()
+        upload.add_log(
+            f"✅ {len(course_ids)} course(s) created "
+            f"({units_created} units, {lessons_created} lessons). Skipped content generation."
+        )
+        upload.save()
+
+        return JsonResponse({
+            'success': True,
+            'status': 'completed',
+            'course_ids': course_ids,
+            'course_id': course_ids[0] if course_ids else None,  # legacy
+            'units_created': units_created,
+            'lessons_created': lessons_created,
+            'steps_created': 0,
+        })
+
     except Exception as e:
         import traceback
+        traceback.print_exc()
         upload.status = 'failed'
         upload.error_message = str(e)
         upload.add_log(f"❌ Error: {str(e)}")
         upload.save()
-        
         return JsonResponse({'error': str(e)}, status=500)
 
 

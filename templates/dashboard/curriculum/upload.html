@@ -310,16 +310,21 @@
                     </div>
                 </div>
 
-                <!-- Grade Level — multi-select checkboxes -->
+                <!-- Grade Level — multi-select checkboxes (locale-aware) -->
                 <div class="form-group">
                     <label class="form-label">{% trans "Grade Levels to Process" %}</label>
-                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;" id="grade-pills">
-                        {% for code, name in grade_levels %}
+                    {% for locale_code, locale_grades in grades_by_locale.items %}
+                    <div class="grade-pills-group" data-locale="{{ locale_code }}"
+                         style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                        {% for code, name in locale_grades %}
                         <label style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.375rem 0.75rem;border:2px solid var(--gray-200);border-radius:999px;cursor:pointer;font-size:0.875rem;transition:all 0.15s;">
-                            <input type="checkbox" name="grade_level" value="{{ code }}" style="accent-color:var(--primary);"> {{ name }}
+                            <input type="checkbox" name="grade_level" value="{{ code }}"
+                                   data-locale="{{ locale_code }}"
+                                   style="accent-color:var(--primary);"> {{ name }}
                         </label>
                         {% endfor %}
                     </div>
+                    {% endfor %}
                     <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
                         {% trans "Select which grade levels to extract. The document will be analyzed once and separate courses created per level." %}
                     </div>
@@ -440,6 +445,29 @@
 
 {% block extra_js %}
 <script>
+    // Locale-aware grade-level visibility. Seychelles (en-us) shows
+    // S1-S5, Mozambique (pt-mz) shows 8ª-12ª Classe. Toggling the
+    // Idioma dropdown swaps which set is visible AND clears any
+    // checkboxes from the now-hidden set so they don't submit.
+    (function() {
+        const localeSelect = document.getElementById('locale');
+        if (!localeSelect) return;
+        function syncGradeOptions() {
+            const sel = localeSelect.value;
+            document.querySelectorAll('.grade-pills-group').forEach(g => {
+                const show = g.dataset.locale === sel;
+                g.style.display = show ? 'flex' : 'none';
+                if (!show) {
+                    g.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        cb.checked = false;
+                    });
+                }
+            });
+        }
+        localeSelect.addEventListener('change', syncGradeOptions);
+        syncGradeOptions();  // initial render
+    })();
+
     // Curriculum file upload
     const uploadZone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('file-input');

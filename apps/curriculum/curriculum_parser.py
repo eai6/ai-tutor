@@ -1,2567 +1,1417 @@
+"""Curriculum Parser v2 — locale-aware, LLM-based structure extraction.
+
+Replaces the Seychelles-specific regex parsers in
+``curriculum_parser_archive``. Single public entry point:
+
+    parse_curriculum(file_path, *, subject_hint, grade_hint, locale,
+                     institution_id, progress_cb) -> ParsedCurriculumV2
+
+The v2 pipeline:
+
+  1. extract_text_from_file (unchanged — re-exported from archive)
+  2. detect_subject_and_locale (LLM, replaces English-keyword detect_subject)
+  3. outline_pass — units only — M3 deliverable
+  4. lessons_pass — one fan-out per unit — M4 deliverable
+  5. ParseFailure raised on any irrecoverable step — never silently
+     fall through to a worse path.
+
+This file is the canonical import path. Until M5 lands the runtime
+wiring, the legacy structure parsers (parse_curriculum_with_llm,
+parse_mathematics_curriculum, etc.) are still re-exported from the
+archive so existing call sites keep working unchanged. After M5 the
+archive's structure-parsing layer becomes dead code; archive deletion
+deferred to its own plan (see §M8 in
+``memory/curriculum_parser_v2_plan.md``).
+
+Architecture refs:
+  - memory/curriculum_parser_v2_plan.md — full plan + locked decisions
+  - apps/curriculum/locale_prompts.py — locale-aware prompt helpers
+  - apps/llm/client.py — BaseLLMClient.generate
 """
-Seychelles Curriculum Parser
+from __future__ import annotations
 
-Extracts structured curriculum data from:
-1. Mathematics Curriculum (text/markdown format)
-2. Geography Syllabus (requires OCR - images)
-
-This parser does NOT rely on AI for structure extraction.
-It uses pattern matching to extract curriculum data directly.
-"""
-
-import re
-import os
-import json
 import logging
-from typing import Dict, List, Optional, Tuple, Literal
-from dataclasses import dataclass, asdict
+import re
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, Field
-from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# TYPED EXCEPTIONS
-# =============================================================================
+# ============================================================================
+# BACK-COMPAT RE-EXPORTS (from the archive)
+# ----------------------------------------------------------------------------
+# Keep every callsite-needed symbol importable from this module so the M0
+# rename + this v2 rewrite stay invisible at integration time. The
+# extraction layer stays here permanently; the structure-parsing
+# functions stay re-exported until M5 unwires the orchestrator, at
+# which point we can stop re-exporting them. Archive deletion is a
+# separate later plan.
+# ============================================================================
 
-class OCRFailure(Exception):
-    """Vision-OCR fallback failed in a classifiable way.
+from apps.curriculum.curriculum_parser_archive import (  # noqa: F401
+    # text extraction (kept forever)
+    OCRFailure,
+    extract_text_from_file,
+    extract_from_pdf,
+    extract_from_docx,
+    extract_from_image,
+    extract_figures_from_pdf,
+    extract_curriculum_with_vision,
+    _classify_llm_error,
+    _render_page_within_b64_limit,
+    _strip_nul,
+    # legacy structure layer (re-exported as dormant helpers — no
+    # runtime path reaches them after M5; kept until archive deletion)
+    ParsedCurriculum,
+    FigureDescription,
+    FigureExtractionResult,
+    detect_subject,
+    parse_curriculum_file,
+    parse_curriculum_with_llm,
+    parse_mathematics_curriculum,
+    parse_geography_curriculum,
+    parse_generic_curriculum,
+    create_lessons_from_objectives,
+    create_lesson_title,
+    create_enabling_objectives,
+    create_curriculum_from_structure,
+    # process_curriculum_upload + complete_curriculum_upload INTENTIONALLY
+    # NOT re-exported — replaced by the v2 versions defined further down
+    # in this module. Callers that `from apps.curriculum.curriculum_parser
+    # import process_curriculum_upload` now hit the v2 version.
+)
 
-    Carries a stable `reason` slug (used by the materials pipeline to render
-    actionable UI + drive routing), plus a free-text `detail` for the log.
+
+# ============================================================================
+# v2 — FAILURE MODEL
+# ============================================================================
+
+
+class ParseFailure(Exception):
+    """Structured failure from the v2 parser.
+
+    Carries a stable ``reason`` slug so the upload UI can render an
+    actionable error without parsing the message text. The full
+    ``detail`` propagates to logs.
     """
 
     REASONS = (
-        'no_config',         # No active ModelConfig for the generation purpose
-        'rate_limit',        # 429 / sustained backoff
-        'auth',              # 401 / API key invalid
-        'context_too_large', # 400 from provider — page batch exceeds context window
-        'timeout',           # connection / request timeout
-        'oversized_page',    # all pages still over MAX_IMAGE_BYTES after fallback
-        'no_pages',          # zero renderable pages
-        'empty_response',    # provider returned no text
-        'all_providers_failed',  # every provider in the fallback chain failed
-        'unknown',           # uncategorised — see detail
+        'no_text',             # extracted < 100 chars (PDF unreadable / empty doc)
+        'subject_unclassified',# LLM couldn't pick a subject with confidence
+        'no_units_found',      # outline pass returned 0 units (M3)
+        'lesson_pass_failed',  # every per-unit lessons call crashed (M4)
+        'llm_unavailable',     # ModelConfig.get_for('generation') is None
+        'llm_error',           # provider-level error (rate limit, 4xx, parse)
     )
 
     def __init__(self, reason: str, detail: str = ''):
         if reason not in self.REASONS:
-            reason = 'unknown'
+            reason = 'llm_error'
         self.reason = reason
         self.detail = detail
-        super().__init__(f"OCR failed ({reason}): {detail}" if detail else f"OCR failed ({reason})")
+        super().__init__(f"ParseFailure({reason}): {detail}" if detail else f"ParseFailure({reason})")
 
 
-# =============================================================================
-# STRUCTURED OUTPUT SCHEMAS
-# =============================================================================
-
-class FigureDescription(BaseModel):
-    """A single figure extracted from a PDF page."""
-    page_number: int = Field(description="The page number where this figure appears")
-    figure_number: str = Field(description="The figure label, e.g. 'Figure 3.2' or 'unlabeled'")
-    figure_type: Literal["diagram", "chart", "graph", "map", "illustration", "photo", "table"] = Field(
-        description="Type of visual element"
-    )
-    description: str = Field(description="Detailed 2-4 sentence description specific enough to recreate the figure")
-    educational_context: str = Field(description="What concept this figure teaches or illustrates")
+# ============================================================================
+# v2 — SCHEMAS
+# ============================================================================
 
 
-class FigureExtractionResult(BaseModel):
-    """List of figures extracted from PDF pages."""
-    figures: List[FigureDescription] = Field(
+class LessonV2(BaseModel):
+    """A single lesson within a unit. Populated by ``lessons_pass`` (M4)."""
+    title: str = Field(description="Short, student-friendly title.")
+    objective: str = Field(description="What the student will be able to do after this lesson (terminal objective).")
+    enabling_objectives: list[str] = Field(
         default_factory=list,
-        description="List of figures found. Empty if no figures on the pages.",
+        description="Granular sub-skills the lesson teaches (action-verb statements).",
+    )
+    order: int = Field(default=0, description="Position within the unit (1-indexed).")
+
+
+class UnitOutlineV2(BaseModel):
+    """Unit-level shape — produced by ``outline_pass`` (M3) before lessons
+    are filled in."""
+    title: str = Field(description="Unit / topic / strand name as it appears in the source document.")
+    grade_level: str = Field(description="Grade label exactly as used in the source — 'S3', '10ª Classe', etc.")
+    description: str = Field(default="", description="One-line description of what the unit covers.")
+    source_evidence: str = Field(
+        default="",
+        description="Verbatim snippet from the document that anchors this unit (anti-hallucination).",
     )
 
 
-# ============================================================================
-# DATA CLASSES
-# ============================================================================
+class UnitV2(UnitOutlineV2):
+    """Unit + its lessons. Produced by combining ``outline_pass`` +
+    ``lessons_pass`` outputs."""
+    lessons: list[LessonV2] = Field(default_factory=list)
 
-@dataclass
-class ParsedCurriculum:
-    """Complete parsed curriculum."""
+
+class ParsedCurriculumV2(BaseModel):
+    """Final return shape from ``parse_curriculum``."""
     subject: str
-    grade_level: str
-    cycle: str
-    description: str
-    units: List[Dict]
-    teaching_strategies: List[str]
-    assessment_methods: List[str]
-
-
-# ============================================================================
-# TEXT EXTRACTION
-# ============================================================================
-
-def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
-    """
-    Extract text from curriculum file.
-
-    Returns: (text, file_type)
-
-    progress_cb is forwarded to extract_from_pdf for materials uploads that
-    want per-batch progress updates from the vision-OCR fallback. Other file
-    types ignore it (no streaming work to report on).
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-
-    if ext in ['.txt', '.md']:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            text = f.read()
-        return _strip_nul(text), 'text'
-
-    elif ext == '.docx':
-        return _strip_nul(extract_from_docx(file_path)), 'docx'
-
-    elif ext == '.doc':
-        # Legacy binary Word format (OLE2). python-docx only handles .docx
-        # (zip-based OOXML) — reading the binary as text scatters NUL bytes
-        # through the string and Postgres rejects it on insert. Fail fast
-        # with an actionable message rather than silently producing garbage.
-        raise ValueError(
-            "Legacy .doc files are not supported (this is the binary Word "
-            "format from Word 97-2003). Please convert to .docx or .pdf "
-            "and re-upload — most word processors offer 'Save As → PDF' "
-            "or 'Save As → Word Document (.docx)'."
-        )
-
-    elif ext == '.pdf':
-        return _strip_nul(extract_from_pdf(file_path, progress_cb=progress_cb)), 'pdf'
-
-    elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
-        return _strip_nul(extract_from_image(file_path)), 'image'
-
-    else:
-        # Try reading as text anyway
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                text = f.read()
-            return _strip_nul(text), 'text'
-        except:
-            raise ValueError(f"Unsupported file type: {ext}")
-
-
-def _strip_nul(text: str) -> str:
-    """Strip NUL (0x00) bytes from extracted text.
-
-    PostgreSQL's `text` type forbids NUL bytes — they raise
-    ``ValueError: A string literal cannot contain NUL (0x00) characters``
-    on insert. Any text extracted from a binary file (legacy .doc, scanned
-    PDF with embedded binary streams, etc.) may contain NUL. Strip them
-    universally as a defense-in-depth measure even though specific
-    extractors should be doing the right thing — the cost is one
-    str.replace pass and the upside is that one missed extraction edge
-    case doesn't blow up the whole pipeline.
-    """
-    if not text:
-        return text
-    return text.replace('\x00', '')
-
-
-def extract_from_docx(file_path: str) -> str:
-    """Extract text from DOCX file."""
-    try:
-        from docx import Document
-        doc = Document(file_path)
-        
-        text_parts = []
-        for para in doc.paragraphs:
-            text_parts.append(para.text)
-        
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text for cell in row.cells)
-                text_parts.append(row_text)
-        
-        return "\n".join(text_parts)
-    except Exception as e:
-        logger.warning(f"python-docx failed: {e}, trying as text")
-        # File might already be text (exported from Google Docs)
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
-
-
-def extract_from_pdf(file_path: str, progress_cb=None) -> str:
-    """Extract text from PDF, with multimodal LLM fallback for scanned docs.
-
-    OCRFailure (typed) propagates so the materials pipeline can record a
-    structured error. Generic exceptions are still swallowed → "" to
-    preserve historical behavior for other callers (curriculum upload).
-
-    Args:
-        file_path: PDF path
-        progress_cb: optional ``(pages_processed, pages_total, phase)`` callback
-            forwarded to ``_extract_pdf_with_vision`` so materials uploads can
-            update their `pages_processed` / `phase` fields per batch.
-    """
-    try:
-        import fitz
-        doc = fitz.open(file_path)
-
-        # First pass: embedded text
-        text = ""
-        for page in doc:
-            text += page.get_text()
-
-        if len(text.strip()) >= 100:
-            doc.close()
-            return text
-
-        # Multimodal LLM fallback
-        logger.info(f"Low text ({len(text.strip())} chars), trying LLM vision: {file_path}")
-        try:
-            llm_text = _extract_pdf_with_vision(doc, progress_cb=progress_cb)
-        except OCRFailure:
-            doc.close()
-            raise   # propagate typed failures so callers can render structured errors
-        except Exception as e:
-            logger.warning(f"LLM vision extraction failed (uncategorised): {e}")
-            doc.close()
-            return text
-        doc.close()
-        return llm_text if len(llm_text.strip()) > len(text.strip()) else text
-
-    except OCRFailure:
-        raise
-    except Exception as e:
-        logger.error(f"PDF extraction failed: {e}")
-        return ""
-
-
-# ============================================================================
-# FIGURE EXTRACTION
-# ============================================================================
-
-def _has_meaningful_figures(page) -> bool:
-    """
-    Check if a PDF page contains meaningful figures (not tiny icons).
-
-    Uses PyMuPDF to detect:
-    - Embedded raster images larger than 100x100 pixels
-    - Vector drawings with >10 operations (suggests diagram, not just borders)
-    """
-    # Check for embedded raster images (filter tiny icons < 100x100)
-    for img_info in page.get_images(full=True):
-        width, height = img_info[2], img_info[3]
-        if width > 100 and height > 100:
-            return True
-    # Check for vector drawings (>10 ops suggests a diagram, not just borders)
-    if len(page.get_drawings()) > 10:
-        return True
-    return False
-
-
-def extract_figures_from_pdf(file_path: str, institution_id: int = None) -> List[Dict]:
-    """
-    Extract figure descriptions from a PDF using LLM vision.
-
-    Only pages with meaningful figures (detected via PyMuPDF) are sent to the
-    LLM for description, controlling cost.
-
-    Args:
-        file_path: Path to the PDF file
-        institution_id: Optional institution ID for LLM config
-
-    Returns:
-        List of dicts with keys: page_number, figure_number, figure_type,
-        description, educational_context, page_image_bytes, page_image_media_type
-    """
-    try:
-        import fitz
-    except ImportError:
-        logger.warning("PyMuPDF (fitz) not installed, cannot extract figures")
-        return []
-
-    try:
-        doc = fitz.open(file_path)
-    except Exception as e:
-        logger.error(f"Could not open PDF for figure extraction: {e}")
-        return []
-
-    # Adaptive resize: shared helper produces a result that's guaranteed
-    # under Anthropic's 5 MiB base64 limit, with safe quality fallbacks
-    # for oversized pages instead of dropping them.
-    pages_with_figures = []
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        if _has_meaningful_figures(page):
-            # Figure extraction prefers 100 DPI baseline — slightly lower
-            # than the OCR path (which uses 200) because figures need
-            # less fine detail than text recognition.
-            result = _render_page_within_b64_limit(page, initial_dpi=100)
-            if result is None:
-                logger.warning(f"Page {page_num + 1} could not fit base64 limit even at floor — skipping")
-                continue
-            image_bytes, media_type = result
-
-            pages_with_figures.append({
-                'page_number': page_num + 1,
-                'image_bytes': image_bytes,
-                'media_type': media_type,
-            })
-
-    doc.close()
-
-    if not pages_with_figures:
-        logger.info(f"No meaningful figures found in {file_path}")
-        return []
-
-    logger.info(f"Found {len(pages_with_figures)} pages with figures in {file_path}")
-
-    # Process one page at a time with delay to respect rate limits (30k tokens/min)
-    import time
-    all_figures = []
-    for i, page_data in enumerate(pages_with_figures):
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                batch_figures = _batch_extract_figures_with_vision([page_data])
-                all_figures.extend(batch_figures)
-                # Pause between pages to stay under rate limits
-                if i < len(pages_with_figures) - 1:
-                    time.sleep(5)
-                break
-            except Exception as e:
-                if '429' in str(e) and attempt < max_retries - 1:
-                    wait = 30 * (attempt + 1)
-                    logger.warning(f"Rate limited on page {page_data['page_number']}, waiting {wait}s...")
-                    time.sleep(wait)
-                else:
-                    logger.error(f"Figure extraction failed for page {page_data['page_number']}: {e}")
-                    break
-
-    logger.info(f"Extracted {len(all_figures)} figure descriptions from {file_path}")
-    return all_figures
-
-
-def _batch_extract_figures_with_vision(pages_data: List[Dict]) -> List[Dict]:
-    """
-    Use LLM vision to extract figure descriptions from rendered page images.
-
-    Uses instructor for structured output with Anthropic Haiku.
-
-    Args:
-        pages_data: List of dicts with page_number, image_bytes, media_type
-
-    Returns:
-        List of figure dicts with descriptions and metadata
-    """
-    import base64
-    import instructor
-    import anthropic
-
-    # Use Haiku directly for figure extraction — cheapest, fastest, 50k token/min
-    # limit (vs 30k for Sonnet/Opus). Fully multimodal and good enough for
-    # describing figures. We bypass ModelConfig to avoid needing a DB entry.
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set for figure extraction")
-
-    client = instructor.from_anthropic(anthropic.Anthropic(api_key=api_key))
-
-    # Build multimodal message with all page images
-    content_parts = [
-        {
-            "type": "text",
-            "text": (
-                "Analyze the following PDF page images and extract ALL figures, diagrams, "
-                "charts, maps, illustrations, and visual elements (NOT decorative borders or "
-                "page numbers).\n\n"
-                "figure_type must be one of: diagram, chart, graph, map, illustration, photo, table\n"
-                "If a figure has no label, use 'unlabeled' for figure_number.\n"
-                "If no figures are found on a page, omit that page from results."
-            ),
-        }
-    ]
-
-    for page_data in pages_data:
-        b64_image = base64.b64encode(page_data['image_bytes']).decode('utf-8')
-        content_parts.append({
-            "type": "text",
-            "text": f"\n--- Page {page_data['page_number']} ---",
-        })
-        content_parts.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": page_data['media_type'],
-                "data": b64_image,
-            },
-        })
-
-    result = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=4096,
-        system="You are an expert at analyzing educational documents. Extract figure descriptions precisely.",
-        messages=[{"role": "user", "content": content_parts}],
-        response_model=FigureExtractionResult,
-        max_retries=2,
+    locale: str = Field(description="BCP-47 locale code, e.g. 'en-us', 'pt-mz'.")
+    grade_levels: list[str] = Field(description="Distinct grade labels detected in the doc.")
+    description: str = ""
+    units: list[UnitV2] = Field(default_factory=list)
+    detection_disagreed_with_hint: bool = Field(
+        default=False,
+        description="True when teacher-supplied hint conflicted with LLM detection; logged for audit.",
     )
 
-    # Attach page image bytes to each figure for later storage
-    page_data_by_num = {p['page_number']: p for p in pages_data}
-    results = []
-    for fig in result.figures:
-        fig_dict = fig.model_dump()
-        page_num = fig_dict.get('page_number')
-        page_info = page_data_by_num.get(page_num)
-        if page_info:
-            fig_dict['page_image_bytes'] = page_info['image_bytes']
-            fig_dict['page_image_media_type'] = page_info['media_type']
-        results.append(fig_dict)
 
-    return results
+# --- LLM response_model schemas (constrained decoding via instructor) ---
+# These are what we PASS to instructor.chat.completions.create(...,
+# response_model=...). Distinct from the public Pydantic types above
+# because the LLM-side schemas include source_evidence, hint_disagreement,
+# rationale fields the LLM produces but we don't surface to callers.
 
 
-def _classify_llm_error(exc: Exception) -> str:
-    """Map a provider exception to an OCRFailure.REASONS slug.
+class _DetectionResult(BaseModel):
+    """Schema for detect_subject_and_locale LLM response."""
+    subject: str = Field(description="Academic subject — Mathematics, Biology, Geography, etc. Avoid 'General'.")
+    locale: str = Field(description="BCP-47 lowercase. e.g. 'en-us', 'pt-mz'.")
+    grade_levels: list[str] = Field(description="Distinct grade labels EXACTLY AS THEY APPEAR in the doc — e.g. '10ª Classe', 'S3', 'Form 4'. Do NOT coerce between systems.")
+    hint_disagreement: bool = Field(default=False, description="True iff your detection differs meaningfully from teacher_hints.")
+    rationale: str = Field(default="", description="One short sentence explaining the call.")
 
-    Pattern-matches by exception class name + message — avoids importing
-    every provider SDK at the top of the parser. Returns 'unknown' for
-    anything we haven't seen yet so the detail string can carry context.
+
+class _OutlineUnit(BaseModel):
+    """One unit-outline entry within an _OutlineResult."""
+    title: str = Field(description="Unit name as it appears in the source.")
+    grade_level: str = Field(description="Grade label EXACTLY as in the source. Do not translate or coerce.")
+    description: str = Field(default="", description="One-line summary of what the unit covers.")
+    source_evidence: str = Field(default="", description="30-100 char verbatim snippet from the document anchoring this unit (heading line). Anti-hallucination.")
+
+
+class _OutlineResult(BaseModel):
+    """Schema for outline_pass LLM response."""
+    units: list[_OutlineUnit] = Field(default_factory=list)
+
+
+class _LessonRaw(BaseModel):
+    """One lesson entry within a _LessonsResult."""
+    title: str = Field(description="Short, student-friendly concept name. Not 'Students will learn X' — 'X'.")
+    objective: str = Field(description="Terminal objective in 1 sentence — what the student will be able to do.")
+    enabling_objectives: list[str] = Field(default_factory=list, description="3-6 granular sub-skills (action-verb statements).")
+    order: int = Field(default=0, description="1-indexed position within the unit.")
+    source_evidence: str = Field(default="", description="30-100 char verbatim snippet from the excerpt anchoring this lesson.")
+
+
+class _LessonsResult(BaseModel):
+    """Schema for lessons_pass LLM response."""
+    lessons: list[_LessonRaw] = Field(default_factory=list)
+
+
+# ============================================================================
+# v2 — LLM CLIENT WRAPPER
+# ============================================================================
+
+
+def _get_llm_client():
+    """Return (BaseLLMClient, ModelConfig) for purpose='generation', or
+    raise ParseFailure('llm_unavailable'). Centralised so every v2 LLM
+    call surfaces the same structured error when ModelConfig isn't
+    configured.
     """
-    name = type(exc).__name__
-    msg = str(exc).lower()
-    if 'ratelimit' in name.lower() or '429' in msg or 'rate limit' in msg:
-        return 'rate_limit'
-    if 'auth' in name.lower() or '401' in msg or 'invalid api key' in msg or 'unauthorized' in msg:
-        return 'auth'
-    if 'timeout' in name.lower() or 'timed out' in msg:
-        return 'timeout'
-    if 'context' in msg and ('length' in msg or 'window' in msg or 'limit' in msg):
-        return 'context_too_large'
-    if '400' in msg and 'too large' in msg:
-        return 'context_too_large'
-    return 'unknown'
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    cfg = ModelConfig.get_for('generation')
+    if cfg is None:
+        raise ParseFailure(
+            'llm_unavailable',
+            "No ModelConfig found for purpose='generation'. Configure one in the LLM admin.",
+        )
+    return get_llm_client(cfg), cfg
 
 
-# Anthropic's per-image limit is 5 MiB measured on the BASE64-ENCODED
-# payload, NOT the raw bytes. A 4.5 MB raw PNG becomes ~6 MB base64 →
-# over limit (we hit this in production: "5977936 bytes > 5242880 bytes"
-# was Anthropic rejecting a 4.49 MB raw image after base64 expansion).
-# Guard on the encoded size with a safety buffer under 5,242,880.
-_VISION_MAX_BASE64_BYTES = 5_000_000   # ~4.77 MiB base64 — under the 5 MiB ceiling
-_VISION_BATCH_SIZE = 10                # pages per LLM call
-_VISION_MAX_WORKERS = 5                # concurrent in-flight batches
-_VISION_MIN_DPI = 36                   # absolute floor — text barely readable
-_VISION_INITIAL_DPI = 200              # quality target for first attempt
-
-
-def _render_page_within_b64_limit(
-    page,
-    max_b64_bytes: int = _VISION_MAX_BASE64_BYTES,
-    initial_dpi: int = _VISION_INITIAL_DPI,
-) -> Optional[Tuple[bytes, str]]:
-    """Adaptively render a PDF page so the BASE64-encoded result fits
-    under ``max_b64_bytes``. Returns (raw_image_bytes, media_type)
-    or None only if the page can't fit even at the absolute floor.
-
-    Strategy:
-      1. Try 200 DPI PNG (highest quality).
-      2. If too big, JPEG q85 at the same DPI.
-      3. If still too big, compute an adaptive DPI from the size ratio
-         (bytes scale ~ DPI²) with a 0.85 safety factor.
-      4. If still too big, drop quality (q60 → q40 → q25).
-      5. Last resort: 36 DPI q20 — very low quality but gets SOME signal
-         through (better than dropping the page entirely).
-
-    The adaptive step is the key win — it picks the right size on the
-    second attempt instead of stepping through fixed DPI tiers blindly.
-    """
-    import base64
-    import math
-
-    def _b64_size(b: bytes) -> int:
-        return (len(b) * 4 + 2) // 3   # exact base64 length without encoding
-
-    # Tier 1 — 200 DPI PNG
-    pix = page.get_pixmap(dpi=initial_dpi)
-    img = pix.tobytes("png")
-    if _b64_size(img) <= max_b64_bytes:
-        return img, "image/png"
-
-    # Tier 2 — same DPI, JPEG q85
-    img = pix.tobytes("jpeg", jpg_quality=85)
-    if _b64_size(img) <= max_b64_bytes:
-        return img, "image/jpeg"
-
-    # Tier 3 — adaptive resize. JPEG bytes scale ~quadratically with
-    # DPI; pick a DPI that should land safely under the limit.
-    current_size = _b64_size(img)
-    ratio = max_b64_bytes / current_size
-    adaptive_dpi = max(_VISION_MIN_DPI, int(initial_dpi * math.sqrt(ratio) * 0.85))
-    pix = page.get_pixmap(dpi=adaptive_dpi)
-    img = pix.tobytes("jpeg", jpg_quality=80)
-    if _b64_size(img) <= max_b64_bytes:
-        return img, "image/jpeg"
-
-    # Tier 4 — drop JPEG quality at the adaptive DPI
-    for q in (60, 40, 25):
-        img = pix.tobytes("jpeg", jpg_quality=q)
-        if _b64_size(img) <= max_b64_bytes:
-            return img, "image/jpeg"
-
-    # Tier 5 — absolute floor (text barely readable but still OCRable)
-    pix = page.get_pixmap(dpi=_VISION_MIN_DPI)
-    img = pix.tobytes("jpeg", jpg_quality=20)
-    if _b64_size(img) <= max_b64_bytes:
-        return img, "image/jpeg"
-
-    # Truly impossible — should be unreachable for normal pages
-    return None
-
-
-def _render_page_for_vision(page) -> Optional[Tuple[str, str]]:
-    """Render one PyMuPDF page → (base64_str, media_type) or None.
-
-    Thin wrapper over `_render_page_within_b64_limit` that base64-encodes
-    the result. Kept for backward compatibility with callers that already
-    expect base64 strings.
-    """
-    import base64
-    result = _render_page_within_b64_limit(page)
-    if result is None:
-        return None
-    img_bytes, media_type = result
-    return base64.b64encode(img_bytes).decode("utf-8"), media_type
-
-
-def _extract_pdf_with_vision(
-    doc,
-    progress_cb=None,
-    start_page: int = 0,
+def _call_llm_structured(
+    *,
+    response_model: type,
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 4096,
 ):
-    """
-    Render PDF pages to images and use multimodal LLM to extract content.
+    """Call the generation LLM and return a typed Pydantic instance of
+    ``response_model``. Uses ``instructor.from_provider`` for
+    constrained decoding so the response shape is GUARANTEED by the
+    provider — no more json.loads + regex repair.
 
-    Provider strategy: uses ``apps.curriculum.vision_ocr`` for pluggable
-    multi-provider fallback. Per batch:
-      1. Try the primary provider (active ModelConfig for purpose='generation')
-      2. On any failure, fall through to the next provider in the chain
-         (typically a different vendor — e.g. Gemini → Claude → GPT)
-      3. If ALL providers fail for that batch, mark the batch skipped
-         and continue with the rest. The rest of the document still gets
-         indexed; one bad batch doesn't kill the whole run.
-
-    Streams page rendering (one batch at a time) and dispatches batches
-    concurrently (up to _VISION_MAX_WORKERS in flight) so memory stays bounded
-    AND wall-clock drops ~5× vs sequential.
-
-    Args:
-        doc: PyMuPDF document handle (caller owns close())
-        progress_cb: Optional callback ``(pages_processed, pages_total, phase)``
-            invoked after each batch completes.
-        start_page: Resume hint (P3). Pages [0, start_page) are skipped.
+    Mirrors the pattern used by tutor judges
+    (``apps/tutoring/judges/_instructor_helper.py``) and content
+    generation. See auto-memory feedback_use_instructor_for_structured_output.
 
     Raises:
-        OCRFailure: only when EVERY batch failed across EVERY provider, OR
-            when there are no providers configured, OR when there are no
-            renderable pages. Partial success → returns concatenated text.
+        ParseFailure('llm_unavailable') when no ModelConfig exists.
+        ParseFailure('llm_error') on provider call failure.
     """
-    from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
-    from apps.curriculum.vision_ocr import (
-        RenderedPage,
-        get_vision_provider_chain,
-        extract_text_with_fallback,
+    from apps.tutoring.judges._instructor_helper import (
+        get_instructor_from_client, structured_completion,
     )
 
-    providers = get_vision_provider_chain()
-    if not providers:
-        raise OCRFailure(
-            'no_config',
-            "No active ModelConfig found across purposes (generation, judge, "
-            "tutoring, exit_tickets) — cannot run vision OCR.",
+    client, cfg = _get_llm_client()
+    model_name = getattr(cfg, 'model_name', 'unknown')
+    provider = getattr(cfg, 'provider', '') or ''
+    logger.info(
+        "[parser_v2] LLM call: model=%s schema=%s max_tokens=%d",
+        model_name, response_model.__name__, max_tokens,
+    )
+
+    instructor_client = get_instructor_from_client(client)
+    if instructor_client is None:
+        raise ParseFailure(
+            'llm_error',
+            f"instructor.from_provider failed to wrap {model_name} — "
+            "check that the 'instructor' package is installed and the "
+            "provider is one of (anthropic, openai, google, ollama).",
         )
-
-    pages_total = len(doc)
-    if pages_total == 0:
-        raise OCRFailure('no_pages', "PDF rendered zero pages.")
-
-    if start_page >= pages_total:
-        # Caller has already processed everything — nothing to do.
-        return ""
-
-    system_prompt = (
-        "You are a document text extraction assistant. "
-        "Extract ALL text, labels, titles, and describe visual elements "
-        "(maps, diagrams, charts) from the provided document pages. "
-        "Return only the extracted content, no commentary."
-    )
-    extraction_prompt = (
-        "Extract ALL text, labels, titles, and describe visual elements "
-        "(maps, diagrams, charts) from these document pages."
-    )
-
-    # Build batch boundaries [start, end) over the unprocessed page range.
-    batches = [
-        (i, min(i + _VISION_BATCH_SIZE, pages_total))
-        for i in range(start_page, pages_total, _VISION_BATCH_SIZE)
-    ]
-    total_batches = len(batches)
-    results: List[Optional[str]] = [None] * total_batches
-    skipped_batches: List[Tuple[int, str]] = []   # [(batch_idx, reason)]
-    pages_done = start_page
-    skipped_oversized_total = 0
-
-    def _process_one_batch(batch_idx: int, pages: List[RenderedPage]) -> Tuple[int, Optional[str], Optional[str]]:
-        """Run the provider chain on one batch. Runs in worker thread.
-
-        Returns (batch_idx, text_or_None, error_reason_or_None).
-        Never raises — the orchestrator decides skip-vs-fail at the end.
-        """
-        if not pages:
-            return batch_idx, "", None   # whole batch was oversized; treat as empty
-
-        result = extract_text_with_fallback(
-            pages=pages,
-            providers=providers,
+    try:
+        return structured_completion(
+            instructor_client,
+            response_model,
             system_prompt=system_prompt,
-            extraction_prompt=extraction_prompt,
+            user_prompt=user_prompt,
+            max_tokens=max_tokens,
+            max_retries=2,
+            provider=str(provider).lower(),
         )
-        if result.success:
-            return batch_idx, result.text, None
-        # All providers failed for this batch
-        start, end = batches[batch_idx]
-        reason = (
-            f"batch {batch_idx + 1}/{total_batches} (pages {start + 1}-{end}): "
-            f"all providers failed; last={result.provider}/{result.model_name} "
-            f"({result.error_reason}: {result.error_detail[:200]})"
-        )
-        return batch_idx, None, reason
-
-    def _render_batch(batch_idx: int) -> Tuple[List[RenderedPage], int]:
-        """Render pages for batch_idx (main thread; PyMuPDF not thread-safe)."""
-        start, end = batches[batch_idx]
-        rendered: List[RenderedPage] = []
-        skipped = 0
-        for page_idx in range(start, end):
-            r = _render_page_for_vision(doc[page_idx])
-            if r is None:
-                logger.warning(
-                    f"Page {page_idx + 1} oversized after fallback compression — skipping"
-                )
-                skipped += 1
-            else:
-                rendered.append(RenderedPage(b64=r[0], media_type=r[1]))
-        return rendered, skipped
-
-    # Sliding window: keep at most _VISION_MAX_WORKERS batches in flight.
-    with ThreadPoolExecutor(max_workers=_VISION_MAX_WORKERS) as executor:
-        in_flight: Dict[object, Tuple[int, int]] = {}   # future -> (batch_idx, batch_pages)
-        next_to_submit = 0
-
-        def _submit_next():
-            nonlocal next_to_submit, skipped_oversized_total
-            while next_to_submit < total_batches and len(in_flight) < _VISION_MAX_WORKERS:
-                bi = next_to_submit
-                rendered, skipped = _render_batch(bi)
-                skipped_oversized_total += skipped
-                start, end = batches[bi]
-                fut = executor.submit(_process_one_batch, bi, rendered)
-                in_flight[fut] = (bi, end - start)
-                next_to_submit += 1
-
-        _submit_next()
-
-        while in_flight:
-            done, _pending = wait(list(in_flight.keys()), return_when=FIRST_COMPLETED)
-            for done_fut in done:
-                bi, batch_pages = in_flight.pop(done_fut)
-                try:
-                    _bi, text, error_reason = done_fut.result()
-                except Exception as exc:
-                    # _process_one_batch is no-raise by design; this would
-                    # be an orchestrator bug, not a provider failure.
-                    skipped_batches.append((bi, f"orchestrator-bug: {exc!r}"))
-                    text = None
-                else:
-                    if text is None:
-                        skipped_batches.append((bi, error_reason or 'unknown'))
-                        logger.warning(f"OCR batch skipped: {error_reason}")
-                    else:
-                        results[bi] = text
-                pages_done += batch_pages
-                if progress_cb is not None:
-                    try:
-                        progress_cb(pages_done, pages_total, f"vision_ocr_p{pages_done}_of_{pages_total}")
-                    except Exception as cb_exc:
-                        logger.warning(f"progress_cb raised — ignoring: {cb_exc}")
-            _submit_next()
-
-    # Decide outcome:
-    #   - At least one batch succeeded → return concatenated text +
-    #     log the skipped count so the materials UI can surface it
-    #   - Every batch failed → raise with the most informative reason
-    successful = [r for r in results if r and r.strip()]
-    if successful:
-        if skipped_batches:
-            logger.warning(
-                "Vision OCR completed with %d/%d batches skipped after all "
-                "providers failed: %s",
-                len(skipped_batches), total_batches,
-                '; '.join(f"#{bi+1}" for bi, _ in skipped_batches[:5]),
-            )
-        return "\n\n".join(r for r in results if r)
-
-    # Nothing succeeded — figure out the best reason to surface
-    if skipped_oversized_total == sum(end - start for start, end in batches):
-        raise OCRFailure(
-            'oversized_page',
-            f"All {skipped_oversized_total} page(s) exceeded {_VISION_MAX_BASE64_BYTES} bytes "
-            f"after fallback to 120 DPI JPEG.",
-        )
-    if skipped_batches:
-        # Use the first skipped batch's reason as the headline; it's
-        # already prefixed with "batch N/M (pages X-Y): all providers failed; last=..."
-        raise OCRFailure('all_providers_failed', skipped_batches[0][1])
-    raise OCRFailure(
-        'empty_response',
-        f"Vision LLM returned no text across {total_batches} batch(es).",
-    )
-
-
-def extract_curriculum_with_vision(file_path: str, subject: str, grade_level: str) -> Optional['ParsedCurriculum']:
-    """
-    Use LLM vision to extract complete curriculum structure from a PDF.
-
-    Renders each page to an image and sends batches to a multimodal LLM,
-    asking it to extract units, terminal objectives, enabling objectives,
-    teaching strategies, and lesson structure — reading the actual formatted
-    document as a human would.
-
-    This is more accurate than regex-based text extraction because it
-    preserves numbering, table structure, and multi-column layouts.
-    """
-    import base64
-    import fitz
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
-
-    try:
-        doc = fitz.open(file_path)
     except Exception as e:
-        logger.error(f"Could not open PDF for vision extraction: {e}")
-        return None
+        raise ParseFailure(
+            'llm_error',
+            f"structured call failed for {response_model.__name__} on "
+            f"{model_name}: {type(e).__name__}: {e}",
+        )
 
-    config = ModelConfig.get_for('generation')
-    if not config:
-        logger.warning("No LLM model configured for vision extraction")
-        return None
 
-    client = get_llm_client(config)
-    is_anthropic = config.provider == 'anthropic'
+# ============================================================================
+# v2 — DETECTION (M2 deliverable)
+# ============================================================================
 
-    # Render pages to images
-    MAX_IMAGE_BYTES = 4_500_000
-    page_images = []
-    for page_num, page in enumerate(doc):
-        pix = page.get_pixmap(dpi=150)
-        img_bytes = pix.tobytes("jpeg", jpg_quality=85)
-        media_type = "image/jpeg"
 
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            pix = page.get_pixmap(dpi=100)
-            img_bytes = pix.tobytes("jpeg", jpg_quality=75)
+SUPPORTED_LOCALES = ('en-us', 'pt-mz')  # extend as pilots land
+DEFAULT_LOCALE = 'en-us'
 
-        if len(img_bytes) > MAX_IMAGE_BYTES:
-            continue
 
-        page_images.append({
-            'page_num': page_num + 1,
-            'b64': base64.b64encode(img_bytes).decode('utf-8'),
-            'media_type': media_type,
-        })
+def detect_subject_and_locale(
+    text: str,
+    *,
+    subject_hint: str = '',
+    grade_hint: str = '',
+    locale_hint: str = '',
+) -> dict:
+    """Detect (subject, locale, grade_range) from the first ~3K chars of
+    the document using the generation LLM.
 
-    if not page_images:
-        return None
+    Teacher-supplied hints are treated as SOFT PRIORS — the LLM is told
+    "the teacher suggested X" but is free to disagree based on the
+    document content. Disagreement is logged for audit.
 
-    is_math = subject.lower() in ('mathematics', 'math', 'maths')
-    print(f"[VisionExtractor] {len(page_images)} pages rendered for {subject} {grade_level} (math={is_math})", flush=True)
+    Returns a dict with shape:
+        {
+            'subject': str,
+            'locale': str (one of SUPPORTED_LOCALES; defaults to DEFAULT_LOCALE),
+            'grade_levels': list[str],   # e.g. ["10ª Classe", "11ª Classe", "12ª Classe"]
+            'hint_disagreement': bool,
+            'rationale': str,            # 1-2 sentences for debug
+        }
 
-    # Process pages in batches — extract structure from each batch
-    all_units = []
-    batch_size = 8  # 8 pages per LLM call
+    Raises ParseFailure on llm_unavailable / llm_error / unrecognised
+    response shape.
+    """
+    # Sample first 2000 chars + a 500-char tail — enough to see title
+    # page + a chunk of the index / first unit. Keeps the call cheap.
+    head = text[:2000]
+    tail = text[-500:] if len(text) > 2500 else ''
+    sample = head + (f"\n\n[...{len(text) - 2500} chars elided...]\n\n" + tail if tail else '')
+
+    hints = []
+    if subject_hint:
+        hints.append(f"  - teacher_subject_hint: {subject_hint!r}")
+    if grade_hint:
+        hints.append(f"  - teacher_grade_hint: {grade_hint!r}")
+    if locale_hint:
+        hints.append(f"  - teacher_locale_hint: {locale_hint!r}")
+    hints_block = (
+        "\n<teacher_hints>\n"
+        + "The teacher uploading this document supplied the following hints. "
+        + "Treat them as SOFT PRIORS — useful context, but trust what you "
+        + "actually see in the document. If you disagree, set hint_disagreement=true "
+        + "and explain in rationale.\n"
+        + "\n".join(hints)
+        + "\n</teacher_hints>\n"
+        if hints else ""
+    )
 
     system_prompt = (
-        "You are a curriculum analysis expert. You analyze educational documents "
-        "and extract their complete structure with perfect accuracy. "
-        "You MUST extract every numbered item, every bullet point, every table entry. "
-        "Return ONLY valid JSON, no explanation."
+        "You are a curriculum-document classifier. Given a sample from the "
+        "first pages of a curriculum / syllabus / teaching-programme document, "
+        "identify the academic subject, the document language/locale, and the "
+        "grade level(s) it covers. Be precise — read the actual document "
+        "content, including in languages other than English. Respond with a "
+        "single JSON object — no prose, no markdown fences."
     )
 
-    for batch_start in range(0, len(page_images), batch_size):
-        batch = page_images[batch_start:batch_start + batch_size]
-        page_range = f"pages {batch[0]['page_num']}-{batch[-1]['page_num']}"
-        print(f"[VisionExtractor] Processing {page_range}...", flush=True)
+    user_prompt = (
+        f"<document_sample>\n{sample}\n</document_sample>\n"
+        f"{hints_block}\n"
+        f"<task>\n"
+        f"Classify this document.\n\n"
+        f"Constraints:\n"
+        f"- subject: use a specific name from the doc (Mathematics, "
+        f"Biology, Geography, Physics, Chemistry, etc.), NOT 'General'.\n"
+        f"- locale: BCP-47 lowercase. Supported: {list(SUPPORTED_LOCALES)}. "
+        f"If the doc is in a language we don't list, pick the closest "
+        f"supported locale.\n"
+        f"- grade_levels: list the distinct grade labels EXACTLY as they "
+        f"appear in the doc (e.g. ['10ª Classe', '11ª Classe', "
+        f"'12ª Classe'], or ['S3'], or ['Form 4', 'Form 5']). Do not "
+        f"coerce between national systems.\n"
+        f"- hint_disagreement: true iff your detection differs meaningfully "
+        f"from the teacher's hints (above).\n"
+        f"- rationale: one short sentence — what in the doc made you pick "
+        f"that subject/locale/grade.\n"
+        f"</task>"
+    )
 
-        is_math = subject.lower() in ('mathematics', 'math', 'maths')
+    parsed = _call_llm_structured(
+        response_model=_DetectionResult,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=512,
+    )
 
-        if is_math:
-            extraction_prompt = f"""Analyze these MATHEMATICS curriculum pages and extract the complete structure.
+    subject = parsed.subject.strip()
+    locale_raw = parsed.locale.strip().lower()
+    grade_levels = [str(g).strip() for g in (parsed.grade_levels or []) if str(g).strip()]
+    hint_disagreement = bool(parsed.hint_disagreement)
+    rationale = (parsed.rationale or '').strip()
 
-SUBJECT: {subject}
+    if not subject:
+        raise ParseFailure(
+            'subject_unclassified',
+            f"LLM returned empty subject. rationale={rationale!r}",
+        )
 
-This is a math termly plan organized by TOPICS and WEEKS. Each topic has TWO columns:
-- CORE (SET 3+): The foundational objectives every student must achieve
-- EXTENDED (SETS 1&2): The deeper/harder objectives for higher-ability students
+    # Coerce locale to a supported value — log if we override.
+    if locale_raw not in SUPPORTED_LOCALES:
+        logger.warning(
+            "[parser_v2] LLM returned unsupported locale %r; defaulting to %r. "
+            "Add to SUPPORTED_LOCALES if this is a new pilot language. "
+            "rationale=%s",
+            locale_raw, DEFAULT_LOCALE, rationale[:200],
+        )
+        locale = DEFAULT_LOCALE
+    else:
+        locale = locale_raw
 
-For EACH topic on these pages, extract:
-1. unit_title: The strand code and topic name (e.g., "Measures (M4) - Metric Measures")
-2. grade_level: The secondary level (S1, S2, S3, etc.)
-3. terminal_objectives: The CORE (SET 3+) objectives — extract EVERY bullet point from the Core column
-4. enabling_objectives: The EXTENDED (SETS 1&2) objectives — extract EVERY bullet point from the Extended column
-5. teaching_strategies: Assessment methods listed
-6. resources: Textbooks and materials listed
-7. weeks: How many weeks allocated (e.g., "2 weeks")
+    if hint_disagreement:
+        logger.info(
+            "[parser_v2] LLM disagreed with teacher hint: detected=(%s, %s, %s) "
+            "vs hints=(subject=%r, grade=%r, locale=%r). rationale=%s",
+            subject, locale, grade_levels,
+            subject_hint, grade_hint, locale_hint,
+            rationale[:200],
+        )
 
-IMPORTANT: Keep Core and Extended SEPARATE:
-- terminal_objectives = CORE column only
-- enabling_objectives = EXTENDED column only
-Do NOT merge them. Do NOT skip any bullet points.
+    return {
+        'subject': subject,
+        'locale': locale,
+        'grade_levels': grade_levels,
+        'hint_disagreement': hint_disagreement,
+        'rationale': rationale,
+    }
 
-Return a JSON array:
-[{{
-    "unit_title": "Measures (M4) - Metric Measures",
-    "grade_level": "S3",
-    "weeks": "2 weeks",
-    "terminal_objectives": [
-        "List units for area",
-        "Estimate area",
-        "List units of volume",
-        "Estimate volume and capacity",
-        "Convert units of volume and capacity",
-        "Solve simple problems involving the area, volume and capacity"
-    ],
-    "enabling_objectives": [
-        "List units for area",
-        "Convert units of area",
-        "Convert units of volume and capacity",
-        "Convert units and volume",
-        "Solve problems involving area, volume, capacity and conversion of units of measures"
-    ],
-    "teaching_strategies": ["verbal questions", "class discussion", "end of topic tests"],
-    "resources": ["Maths In Action Bk 2", "Complete Mathematics for Cambridge Secondary 1"]
-}}]
 
-Return ONLY valid JSON."""
-        else:
-            extraction_prompt = f"""Analyze these curriculum document pages and extract ALL units with their complete structure.
+# ============================================================================
+# v2 — OUTLINE + LESSONS PASSES (stubs — M3 + M4)
+# ============================================================================
 
-SUBJECT: {subject}
 
-Extract units from ALL grade levels visible on these pages. For each unit, include a "grade_level" field indicating which secondary level it belongs to (look for "Secondary One" = "S1", "Secondary Two" = "S2", "Secondary Three" = "S3", etc. Also "Cycle 4" covers S1-S3, "Cycle 5/IGCSE" covers S4-S5).
+MAX_OUTLINE_TEXT_CHARS = 180_000
+"""Soft cap on the document text we send to the outline-pass LLM.
+Sonnet 4.6 has a 200K context window — we cap below that to leave
+headroom for system prompt + schema + max_tokens. 180K fits every
+curriculum we've seen so far without trimming:
+  - Mozambique Biology: 111K
+  - Mozambique Geography: ~130K
+  - Mozambique Math: ~95K
+Lower caps risk chopping the final grade in multi-grade docs
+(observed on M4 first-run: 100K cap dropped 12ª Classe → 0 lessons
+for that grade's units). If a future doc exceeds 180K we head+tail
+to preserve both the index and the trailing units."""
 
-For EACH unit you find on these pages, extract:
-1. unit_title: The exact unit title (e.g., "Development and Trade")
-2. terminal_objectives: ALL numbered terminal objectives — extract EVERY single one, preserving exact text
-3. enabling_objectives: ALL bullet-point enabling objectives from the Teaching/Learning Scheme table — extract EVERY one
-4. teaching_strategies: Methods listed in the Teaching/Learning Strategies column
-5. resources: Resources listed in the Resources column
-6. assessment: Assessment methods listed
 
-Return a JSON array of units:
-[{{
-    "unit_title": "Unit 16: Development and Trade",
-    "grade_level": "S3",
-    "terminal_objectives": [
-        "Know the terminologies associated with development",
-        "Develop an understanding of the world pattern of development",
-        ...every single one...
-    ],
-    "enabling_objectives": [
-        "Define the terms Development, Globalization, MEDC, NIC, LEDC",
-        "Describe how the influence can give an indication...",
-        ...every single one from the table...
-    ],
-    "teaching_strategies": ["Discussions", "Written activities", ...],
-    "resources": ["The New Wider World", "Geography in Place 1", ...],
-    "assessment": ["Structured source-based written questions", ...]
-}}]
+def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]:
+    """Extract just the unit-level shape from the full document text.
+    Returns a list of UnitOutlineV2; lessons are filled in by
+    ``lessons_pass`` per-unit (M4).
 
-CRITICAL: Do NOT summarize or skip any objectives. Extract the EXACT text of every numbered item and every bullet point. If a terminal objective says "10. Understand how world trade works" extract "Understand how world trade works" (without the number).
+    Approach:
+      - Query-last layout: document FIRST, schema/instructions LAST
+        (~30 % quality bump on long-context extraction per Anthropic).
+      - Locale-aware structural hints from ``locale_parser_hints`` so
+        the LLM recognises PT terminology like "Unidade Temática",
+        "Conteúdos", etc.
+      - Schema-constrained JSON output — robust parse via
+        ``_call_llm_structured`` (markdown fences / prose wrappers OK).
+      - Anti-hallucination: each returned unit MUST include
+        ``source_evidence`` — a verbatim snippet from the document.
+        We post-validate that the evidence actually appears in the text
+        and drop units whose evidence we can't find.
 
-Return ONLY valid JSON."""
+    Raises ParseFailure('no_units_found') on empty/garbage output.
+    """
+    from apps.curriculum.locale_prompts import locale_parser_hints
 
-        # Build multimodal message — images FIRST, then text prompt (Anthropic format)
-        content_blocks = []
-        for pg in batch:
-            if is_anthropic:
-                content_blocks.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": pg['media_type'],
-                        "data": pg['b64'],
-                    }
-                })
-            else:
-                content_blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{pg['media_type']};base64,{pg['b64']}"},
-                })
-        content_blocks.append({"type": "text", "text": extraction_prompt})
+    # Trim if oversized — keep head + tail so the index/contents page
+    # (typically near the front) and the trailing units (which can
+    # cover the final grade in a multi-grade doc) are both represented.
+    doc_text = text
+    if len(doc_text) > MAX_OUTLINE_TEXT_CHARS:
+        head = doc_text[: int(MAX_OUTLINE_TEXT_CHARS * 0.7)]
+        tail = doc_text[-int(MAX_OUTLINE_TEXT_CHARS * 0.3):]
+        doc_text = head + "\n\n[... middle section elided ...]\n\n" + tail
+        logger.info(
+            "[parser_v2] outline_pass: doc trimmed %d → %d chars",
+            len(text), len(doc_text),
+        )
 
+    locale_hints = locale_parser_hints(locale)
+
+    system_prompt = (
+        "You are a curriculum-document structure extractor. Given a "
+        "curriculum / teaching-programme document, identify ITS NATURAL "
+        "UNIT-LEVEL STRUCTURE — typically called 'units', 'strands', "
+        "'themes', or 'Unidades Temáticas' depending on the country's "
+        "system. Return ONLY the unit-level skeleton (no individual "
+        "lessons yet). Use labels as they appear in the source — do "
+        "not coerce them into another country's notation. Anchor every "
+        "unit to a verbatim snippet from the document so we can verify "
+        "the extraction. Respond with a single JSON object."
+    )
+
+    user_prompt = (
+        # Document FIRST (query-last layout).
+        f"<document>\n{doc_text}\n</document>\n"
+        f"{locale_hints}"
+        f"\n<context>\n"
+        f"- subject: {subject}\n"
+        f"- locale: {locale}\n"
+        f"</context>\n"
+        f"\n<task>\n"
+        f"Extract the unit-level structure of this curriculum document.\n\n"
+        f"GUIDELINES:\n"
+        f"1. Identify TOP-LEVEL unit divisions only (chapters, units, "
+        f"strands, themes, Unidades Temáticas, etc.) AS THEY APPEAR in "
+        f"the source's table of contents / index / overview table. "
+        f"Do NOT invent units, do NOT merge units the document treats "
+        f"as separate.\n"
+        f"2. DO NOT split a single unit into sub-units just because the "
+        f"source has multiple tables for it. Sub-tables literally marked "
+        f"as 'continuação' / '(continuação)' / '(continued)' are "
+        f"CONTINUATIONS of one parent unit — emit ONE outline entry for "
+        f"the parent, not one per continuation table. (Example: "
+        f"\"Sistemática dos Seres Vivos\" with 5 continuation tables for "
+        f"5 kingdoms is ONE unit; the kingdom-level structure becomes "
+        f"LESSONS within that unit.) BUT: two units that happen to share "
+        f"a code or strand prefix (e.g. 'GM9 - Area & Volume' on one "
+        f"page and 'GM9 - Angles' on a later page covering different "
+        f"topics with different time slots) are SEPARATE units — emit "
+        f"both.\n"
+        f"3. If a unit recurs across multiple grades (e.g. 'Citologia' "
+        f"in both 10ª Classe and 12ª Classe), emit ONE outline entry "
+        f"per (unit, grade) pair — they will become separate Course "
+        f"rows in our system, since each Course has a single grade.\n"
+        f"4. Use grade labels EXACTLY as they appear (10ª Classe / S3 / "
+        f"Form 4 / Secondary 3 / etc.). Do not translate or coerce.\n"
+        f"5. SKIP non-structural content: title pages, copyright pages "
+        f"('Ficha Técnica'), introductions, methodological notes, "
+        f"glossaries, bibliographies. These are NOT units.\n"
+        f"6. Provide a short (1-line) description per unit.\n"
+        f"7. For source_evidence, paste a 30-100 char VERBATIM snippet "
+        f"from the document where that unit is FIRST introduced "
+        f"(typically the FIRST heading line — not a continuation). "
+        f"This anchors the extraction.\n"
+        f"8. BE EXHAUSTIVE. Scan the WHOLE document for unit headings — "
+        f"don't stop after the first few. Curriculum docs commonly "
+        f"have 5-15+ units per grade, sometimes spread across multiple "
+        f"terms / trimestres / cycles. If the document has a table of "
+        f"contents or overview table, use it as your unit-count target. "
+        f"Missing a unit on a later page is a BIGGER problem than "
+        f"splitting too finely.\n"
+        f"</task>"
+    )
+
+    # 8192 max_tokens: typical doc has 5-15 units, each ~400-600 chars
+    # of JSON (title + grade + description + 30-100 char source_evidence
+    # + structure overhead). 4096 truncated at ~8 units on a 12-unit
+    # Seychelles Geography doc; 8192 leaves headroom for 15-20 units.
+    parsed = _call_llm_structured(
+        response_model=_OutlineResult,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=8192,
+    )
+
+    raw_units = parsed.units
+
+    # Validate + anti-hallucination check.
+    outlines: list[UnitOutlineV2] = []
+    skipped_no_evidence = 0
+    for raw in raw_units:
+        # raw is an _OutlineUnit pydantic instance (instructor-typed).
+        title = (raw.title or '').strip()
+        grade = (raw.grade_level or '').strip()
+        if not title or not grade:
+            continue
+        description = (raw.description or '').strip()
+        evidence = (raw.source_evidence or '').strip()
+
+        # Anti-hallucination: the verbatim snippet should appear in the
+        # source text. Use the same whitespace-tolerant regex search
+        # as _find_unit_body — pdftotext often line-breaks headings
+        # mid-word ("Geometry-\nshapes\nand\nSpaces\n(GM9)"), which a
+        # strict substring check rejects even though the heading IS
+        # in the document.
+        if evidence:
+            if _find_unit_body(text, evidence) == -1 and \
+               _find_unit_body(text, evidence[:50]) == -1 and \
+               _find_unit_body(text, title) == -1:
+                logger.warning(
+                    "[parser_v2] outline_pass dropping unit %r — source_evidence "
+                    "%r not found in document (likely hallucinated).",
+                    title, evidence[:80],
+                )
+                skipped_no_evidence += 1
+                continue
         try:
-            response = client.generate(
-                messages=[{"role": "user", "content": content_blocks}],
-                system_prompt=system_prompt,
-                max_tokens=8000,
+            outlines.append(UnitOutlineV2(
+                title=title,
+                grade_level=grade,
+                description=description,
+                source_evidence=evidence,
+            ))
+        except Exception:  # pydantic ValidationError — skip malformed
+            logger.warning(
+                "[parser_v2] outline_pass: malformed unit dropped: %r",
+                {'title': title, 'grade': grade},
             )
 
-            # Parse JSON response
-            from apps.llm.json_utils import parse_llm_json
-            units = parse_llm_json(response.content, expect_array=True)
-            if units and isinstance(units, list):
-                all_units.extend(units)
-                print(f"[VisionExtractor] {page_range}: extracted {len(units)} units", flush=True)
-            else:
-                print(f"[VisionExtractor] {page_range}: no units found in response", flush=True)
-
-        except Exception as e:
-            print(f"[VisionExtractor] {page_range} failed: {e}", flush=True)
-            continue
-
-    if not all_units:
-        return None
-
-    # Filter to target grade level
-    # Deduplicate units by title
-    import re as _re
-    seen = {}
-    deduped = []
-    for u in all_units:
-        title = u.get('unit_title', '')
-        clean = _re.sub(r'[^a-z0-9 ]', '', title.lower())[:35]
-        if clean in seen:
-            # Merge objectives
-            existing = seen[clean]
-            for to in u.get('terminal_objectives', []):
-                if to not in existing.get('terminal_objectives', []):
-                    existing.setdefault('terminal_objectives', []).append(to)
-            for eo in u.get('enabling_objectives', []):
-                if eo not in existing.get('enabling_objectives', []):
-                    existing.setdefault('enabling_objectives', []).append(eo)
-        else:
-            seen[clean] = u
-            deduped.append(u)
-
-    # Filter to requested grade levels, then build ParsedCurriculum
-    from apps.curriculum.utils import determine_cycles, parse_grade_level_string
-    requested_grades = parse_grade_level_string(grade_level)
-    cycles = determine_cycles(grade_level)
-    cycle = "/".join(cycles)
-
-    # Build set of acceptable grade labels for filtering
-    # e.g. grade_level="S3" → accept S3, Cycle 4
-    # e.g. grade_level="S1,S2,S3,S4,S5" → accept all
-    accept_grades = set(g.upper() for g in requested_grades) if requested_grades else None
-    accept_cycles = set(cycles)  # e.g. {'4'} or {'4','5'}
-
-    def _grade_matches(unit_grade_str: str) -> bool:
-        """Check if a unit's grade matches the requested grades."""
-        if not accept_grades:
-            return True  # No filter — accept all
-        if not unit_grade_str:
-            return True  # No grade tagged — assume it matches
-
-        ug = unit_grade_str.upper().strip()
-        # Direct match: "S3" in {"S3"}
-        if ug in accept_grades:
-            return True
-        # Cycle match: "Cycle 4" with accept_cycles={'4'}
-        import re as _re2
-        cycle_match = _re2.search(r'cycle\s*(\d+)', ug, _re2.IGNORECASE)
-        if cycle_match and cycle_match.group(1) in accept_cycles:
-            return True
-        # IGCSE match: only if Cycle 5 is accepted
-        if 'igcse' in ug.lower() and '5' in accept_cycles:
-            return True
-        # Multi-grade label: "S1-S3" or "S1,S2,S3"
-        unit_grades = parse_grade_level_string(unit_grade_str)
-        if unit_grades and accept_grades.intersection(g.upper() for g in unit_grades):
-            return True
-        return False
-
-    filtered = [u for u in deduped if _grade_matches(u.get('grade_level', ''))]
-    print(f"[VisionExtractor] Grade filter: {len(deduped)} total → {len(filtered)} matching {grade_level}", flush=True)
-
-    units = []
-    for u in filtered:
-        title = u.get('unit_title', 'Untitled Unit')
-        unit_grade = u.get('grade_level', grade_level) or grade_level
-        # Remove "Unit N:" prefix for cleaner titles
-        title = _re.sub(r'^Unit\s+\d+\s*:\s*', '', title).strip()
-
-        tos = u.get('terminal_objectives', [])
-        eos = u.get('enabling_objectives', [])
-
-        # Unified teaching-objectives rule (2026-04-27): one lesson per
-        # teaching objective. We flatten the unit's terminal + enabling
-        # objectives into a single ordered, deduplicated list — TOs first
-        # (broad outcomes), then EOs (granular skills). Each item becomes
-        # one 20-minute lesson that drills that single objective intensely.
-        seen = set()
-        teaching_objectives = []
-        for obj in (tos or []) + (eos or []):
-            if not obj:
-                continue
-            key = ' '.join(str(obj).split()).lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            teaching_objectives.append(str(obj).strip())
-
-        lessons = []
-        for objective in teaching_objectives:
-            lessons.append({
-                'title': create_lesson_title(objective),
-                'objective': objective,
-                # Each lesson owns exactly ONE teaching objective. Stored
-                # in `enabling_objectives` for backward compatibility with
-                # the rest of the pipeline (content generator, exit-ticket
-                # generator, etc.).
-                'enabling_objectives': [objective],
-                'teaching_steps': [],
-                'teaching_strategies': u.get('teaching_strategies', []),
-                'resources': u.get('resources', []),
-                'assessment_methods': u.get('assessment', []),
-                'order': len(lessons) + 1,
-            })
-
-        units.append({
-            'number': len(units) + 1,
-            'title': title,
-            'grade_level': unit_grade,
-            'duration': '',
-            'introduction': '',
-            'terminal_objectives': tos,
-            'enabling_objectives': eos,
-            'lessons': lessons,
-        })
-
-    print(f"[VisionExtractor] Final: {len(units)} units, "
-          f"{sum(len(u['lessons']) for u in units)} lessons, "
-          f"{sum(len(u['terminal_objectives']) for u in units)} TOs, "
-          f"{sum(len(u['enabling_objectives']) for u in units)} EOs", flush=True)
-
-    return ParsedCurriculum(
-        subject=subject,
-        grade_level=grade_level,
-        cycle=cycle,
-        description=f"{subject} curriculum for {grade_level} (extracted via LLM vision)",
-        units=units,
-        teaching_strategies=list(set(
-            s for u in deduped for s in u.get('teaching_strategies', [])
-        ))[:10],
-        assessment_methods=list(set(
-            a for u in deduped for a in u.get('assessment', [])
-        ))[:10],
-    )
-
-
-def extract_from_image(file_path: str) -> str:
-    """Extract text/content from an image file using multimodal LLM."""
-    import base64
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
-
-    config = ModelConfig.get_for('generation')
-    if not config:
-        logger.warning("No active LLM configured, cannot extract from image")
-        return ""
-
-    # Determine media type from extension
-    ext = os.path.splitext(file_path)[1].lower()
-    media_types = {
-        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp',
-        '.tiff': 'image/tiff', '.tif': 'image/tiff',
-    }
-    media_type = media_types.get(ext, 'image/png')
-
-    with open(file_path, 'rb') as f:
-        img_bytes = f.read()
-
-    # Downsize if over 4.5MB (Anthropic limit is 5MB)
-    if len(img_bytes) > 4_500_000:
-        try:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(img_bytes))
-            # Scale down to ~75% until under limit
-            while len(img_bytes) > 4_500_000:
-                new_size = (int(img.width * 0.75), int(img.height * 0.75))
-                img = img.resize(new_size, Image.LANCZOS)
-                buf = io.BytesIO()
-                img.save(buf, format='JPEG', quality=85)
-                img_bytes = buf.getvalue()
-                media_type = 'image/jpeg'
-        except ImportError:
-            logger.warning("Pillow not installed, cannot resize large image")
-            return ""
-
-    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
-
-    is_anthropic = config.provider == ModelConfig.Provider.ANTHROPIC
-
-    if is_anthropic:
-        image_block = {
-            "type": "image",
-            "source": {"type": "base64", "media_type": media_type, "data": img_b64},
-        }
-    else:
-        image_block = {
-            "type": "image_url",
-            "image_url": {"url": f"data:{media_type};base64,{img_b64}"},
-        }
-
-    messages = [{"role": "user", "content": [
-        image_block,
-        {"type": "text", "text": (
-            "Extract ALL text, labels, titles, and describe visual elements "
-            "(maps, diagrams, charts) from this image."
-        )},
-    ]}]
-
-    client = get_llm_client(config)
-
-    try:
-        response = client.generate(
-            messages=messages,
-            system_prompt=(
-                "You are a document text extraction assistant. "
-                "Extract ALL text, labels, titles, and describe visual elements. "
-                "Return only the extracted content, no commentary."
-            ),
-            max_tokens=4096,
+    if not outlines:
+        raise ParseFailure(
+            'no_units_found',
+            f"outline_pass returned 0 valid units after anti-hallucination "
+            f"filter (raw={len(raw_units)}, evidence_misses={skipped_no_evidence})",
         )
-        return response.content
-    except Exception as e:
-        logger.warning(f"LLM image extraction failed: {e}")
-        return ""
+
+    logger.info(
+        "[parser_v2] outline_pass: %d valid units (%d raw, %d evidence-misses)",
+        len(outlines), len(raw_units), skipped_no_evidence,
+    )
+    return outlines
 
 
-# ============================================================================
-# DETECT SUBJECT TYPE
-# ============================================================================
+LESSONS_PASS_EXCERPT_CHARS = 8000
+"""Char window around the unit's source_evidence we send to the
+per-unit lessons LLM call. 8K is enough to capture a typical unit's
+3-column table (Objectivos | Conteúdos | Resultados) + the
+Sugestões metodológicas narrative that follows. Bigger excerpts
+don't improve accuracy and increase latency + cost per unit."""
 
-def detect_subject(text: str, provided_subject: str = "") -> str:
-    """Detect the subject from text content using weighted keyword scoring.
 
-    More robust than simple keyword matching — uses multiple keywords per subject
-    with scoring to handle documents that mention multiple subjects.
+def _find_unit_body(full_text: str, anchor: str) -> int:
+    """Locate an anchor at the unit BODY position, not at the table-of-
+    contents entry that typically appears earlier in the document.
+
+    Heuristic: PDFs of curriculum docs include the unit heading in two
+    places — once in the index (typically followed by dots and a page
+    number) and again at the actual body of the unit (followed by
+    content like "OBJECTIVOS" / "O aluno" / a numbered subtopic).
+    Prefer the LAST occurrence; that's almost always the body. (The
+    index/TOC entry, if present, is by definition earlier in the
+    document than the unit body it points to.)
+
+    Tolerates whitespace differences between the LLM-supplied anchor
+    and the actual document text. pdftotext leaves wonky spacing
+    (column-wrap, page breaks, soft hyphens) so we layer four
+    progressively-looser searches:
+      1. exact rfind
+      2. whitespace-tolerant regex of the full anchor
+      3. whitespace-tolerant regex of the first 5-6 word tokens
+         (handles the case where the LLM produced a longer
+         evidence string than what's contiguous in the source —
+         e.g. "Number (N9) CORE (SET 3+) EXTENDED (SETS 1 &2)
+         Fractions Weeks 3 & 4" where pdftotext put intermediate
+         words like ASSESSMENT in between)
+      4. first 40 chars as bare substring
+
+    Returns the character index, or -1 if not found.
     """
-    if provided_subject:
-        return provided_subject
+    if not anchor:
+        return -1
+    # 1. Exact match (rfind = last occurrence skips the TOC entry).
+    idx = full_text.rfind(anchor)
+    if idx != -1:
+        return idx
+    # Normalise "soft hyphen" line breaks — pdftotext extracts a
+    # hyphenated word split across lines as "Geometry-\nshapes" which
+    # becomes "Geometry- shapes" after whitespace collapse. The LLM
+    # likely re-joins it as "Geometry-shapes" (no space). Collapsing
+    # "-\s+" → "-" in BOTH sides reconciles them.
+    text_norm = re.sub(r'-\s+', '-', full_text)
+    probe = re.sub(r'-\s+', '-', anchor).strip()
+    # 2. Exact rfind on the soft-hyphen-normalised text.
+    if probe:
+        idx = text_norm.rfind(probe)
+        if idx != -1:
+            return idx
+    # 3. Whitespace-tolerant search for the FULL anchor.
+    if probe:
+        tokens = probe.split()
+        if tokens:
+            pattern = re.compile(
+                r'\s+'.join(re.escape(p) for p in tokens),
+                re.IGNORECASE,
+            )
+            matches = list(pattern.finditer(text_norm))
+            if matches:
+                return matches[-1].start()
+            # 4. Try just the first 5-6 word tokens. The LLM may have
+            # produced a longer evidence string than what's contiguous
+            # in the PDF (pdftotext interleaves columns; words can
+            # appear between the "logical" parts of the heading).
+            if len(tokens) >= 5:
+                short_tokens = tokens[:5]
+                pattern = re.compile(
+                    r'\s+'.join(re.escape(p) for p in short_tokens),
+                    re.IGNORECASE,
+                )
+                matches = list(pattern.finditer(text_norm))
+                if matches:
+                    return matches[-1].start()
+    # 5. Last resort: first 40 chars of probe as plain substring.
+    short = probe[:40] if probe else ''
+    if short:
+        idx = text_norm.rfind(short)
+        if idx != -1:
+            return idx
+        idx = text_norm.lower().rfind(short.lower())
+        if idx != -1:
+            return idx
+    return -1
 
-    text_lower = text[:10000].lower()  # Only scan first 10k chars for efficiency
 
-    # Weighted keyword sets — score-based detection handles ambiguous documents
-    subject_keywords = {
-        'Mathematics': [
-            'mathematics', 'algebra', 'arithmetic', 'equation', 'fraction',
-            'geometry', 'trigonometry', 'calculus', 'polynomial', 'quadratic',
-            'integer', 'decimal', 'percentage', 'multiplication', 'division',
-            'perimeter', 'pythagoras', 'histogram', 'probability',
-        ],
-        'Geography': [
-            'geography', 'map skills', 'settlement', 'population', 'climate',
-            'topographic', 'contour', 'erosion', 'tectonic', 'latitude',
-            'longitude', 'hemisphere', 'migration', 'urbanisation', 'development',
-        ],
-        'Biology': [
-            'biology', 'organism', 'cell', 'photosynthesis', 'ecosystem',
-            'genetics', 'evolution', 'anatomy', 'respiration', 'reproduction',
-        ],
-        'Physics': [
-            'physics', 'mechanics', 'velocity', 'acceleration', 'force',
-            'energy', 'electricity', 'magnetism', 'waves', 'thermodynamics',
-        ],
-        'Chemistry': [
-            'chemistry', 'element', 'compound', 'molecule', 'reaction',
-            'acid', 'periodic table', 'bonding', 'oxidation', 'titration',
-        ],
-        'Science': [
-            'science', 'scientific method', 'hypothesis', 'experiment',
-            'observation', 'laboratory',
-        ],
-    }
+def _excerpt_for_unit(
+    full_text: str, outline: UnitOutlineV2, all_outlines: list[UnitOutlineV2]
+) -> str:
+    """Find the text window for one unit. Anchored on
+    ``outline.source_evidence`` at its BODY position (skipping the
+    table-of-contents entry); bounded by the next unit's body if we
+    find it within the excerpt window.
 
-    scores = {}
-    for subject, keywords in subject_keywords.items():
-        scores[subject] = sum(1 for kw in keywords if kw in text_lower)
-
-    best_subject = max(scores, key=scores.get)
-    if scores[best_subject] >= 2:
-        return best_subject
-    return 'General'
-
-
-# ============================================================================
-# MATHEMATICS CURRICULUM PARSER
-# ============================================================================
-
-def parse_mathematics_curriculum(text: str, grade_level: str = "S1") -> ParsedCurriculum:
+    Falls back to searching for the unit title verbatim if evidence
+    is missing. Worst case (no anchor found), returns the first
+    LESSONS_PASS_EXCERPT_CHARS chars of the document — the LLM will
+    still produce SOMETHING but accuracy degrades.
     """
-    Parse Seychelles Mathematics curriculum text.
+    anchor = outline.source_evidence or outline.title
+    if not anchor:
+        return full_text[:LESSONS_PASS_EXCERPT_CHARS]
 
-    The curriculum is organized by:
-    - **Knowledge** (K-codes): Concept understanding per strand per cycle
-    - **Skills** (S-codes): Computation, Measuring, Communicating, Reasoning, Problem Solving
-    - **Attitudes** (A-codes): Learning behaviors
-    - **Terminal Objectives**: By cycle, organized by topic
-    - **Scope & Sequence**: Topics per strand per cycle
+    idx = _find_unit_body(full_text, anchor)
+    if idx == -1:
+        logger.warning(
+            "[parser_v2] lessons_pass: anchor %r not found in document, "
+            "falling back to first %d chars",
+            anchor[:60], LESSONS_PASS_EXCERPT_CHARS,
+        )
+        return full_text[:LESSONS_PASS_EXCERPT_CHARS]
 
-    Output is organized by **strand** (as Units) with **sub-strand topic groups** (as Lessons).
-    Each lesson gets enabling_objectives from K/S/A codes + terminal objectives.
-    """
-    import re as _re
-    from apps.curriculum.utils import determine_cycles
-    cycles = determine_cycles(grade_level)
-    cycle = "/".join(cycles)
-
-    # Map grade level to cycle column for K/S/A extraction
-    # Cycle 4 = S1-S2, Cycle 5 = S3-S5
-    target_cycles = set()
-    gl = grade_level.upper()
-    if gl in ('S1', 'S2'):
-        target_cycles = {'4', 'CYCLE 4'}
-    elif gl in ('S3', 'S4', 'S5'):
-        target_cycles = {'5', 'CYCLE 5'}
-    else:
-        target_cycles = {'4', '5', 'CYCLE 4', 'CYCLE 5'}
-
-    # ── Step 1: Extract coded objectives (K/S/A codes) ──
-    coded_objectives = {'K': [], 'S': [], 'A': []}
-    lines = text.split('\n')
-    for line in lines:
-        clean = line.strip()
-        # Match patterns like "K408 ...", "S401 ...", "A301 ..."
-        code_match = _re.match(r'^([KSA])(\d)(\d{2})\s+(.+)', clean)
-        if code_match:
-            prefix = code_match.group(1)      # K, S, or A
-            cycle_num = code_match.group(2)    # 1-5
-            obj_text = code_match.group(4).strip().rstrip('.')
-            full_code = f"{prefix}{code_match.group(2)}{code_match.group(3)}"
-            if cycle_num in target_cycles or f'CYCLE {cycle_num}' in target_cycles:
-                if len(obj_text) > 10:
-                    coded_objectives[prefix].append({
-                        'code': full_code,
-                        'text': obj_text,
-                        'full': f"{full_code}: {obj_text}",
-                    })
-
-    # ── Step 2: Extract terminal objectives for target cycle ──
-    terminal_objectives = {
-        'number': [], 'measures': [], 'fractions': [],
-        'shape': [], 'statistics': [], 'algebra': [],
-    }
-    current_topic = None
-    in_target_cycle = False
-
-    cycle_headers = {
-        '4': ['cycle 4', 'cycle four'],
-        '5': ['cycle 5', 'cycle five'],
-    }
-    target_cycle_keys = []
-    for tc in target_cycles:
-        tc_num = tc.replace('CYCLE ', '')
-        target_cycle_keys.extend(cycle_headers.get(tc_num, [f'cycle {tc_num}']))
-
-    for line in lines:
-        clean = line.strip()
-        lower = clean.lower()
-
-        # Detect cycle section
-        if any(ck in lower for ck in ['cycle 1', 'cycle 2', 'cycle 3', 'cycle 4', 'cycle 5']):
-            in_target_cycle = any(ck in lower for ck in target_cycle_keys)
+    # Upper boundary: the body position of the NEXT unit's anchor.
+    # We search AFTER our current position so we don't pick up the
+    # current unit's own TOC entry, and so we don't pick up a sibling
+    # that has the same title across grades.
+    next_idx = idx + LESSONS_PASS_EXCERPT_CHARS
+    my_pos = all_outlines.index(outline) if outline in all_outlines else -1
+    for sibling in all_outlines[my_pos + 1:] if my_pos >= 0 else []:
+        sib_anchor = sibling.source_evidence or sibling.title
+        if not sib_anchor:
             continue
-
-        if not in_target_cycle:
+        # Search for sibling body AFTER our current position
+        sib_idx = full_text.rfind(sib_anchor)
+        if sib_idx <= idx:
+            # Sibling's last occurrence is before our position — skip
+            # it (probably the same unit name in a different grade).
             continue
+        # Use the FIRST sibling occurrence after our position (we want
+        # the nearest boundary, not the last).
+        sib_idx = full_text.find(sib_anchor, idx + 1)
+        if sib_idx == -1:
+            sib_idx = full_text.find(sib_anchor[:40].strip(), idx + 1)
+        if sib_idx > idx:
+            next_idx = min(next_idx, sib_idx)
+            break
 
-        # Detect topic headers (match sub-headers in terminal objectives section)
-        topic_map = {
-            'whole number': 'number', 'number': 'number',
-            'addition': 'number', 'subtraction': 'number',
-            'multiplication': 'number', 'division': 'number',
-            'ratio': 'number', 'proportion': 'number', 'percentage': 'fractions',
-            'measurement': 'measures', 'measure': 'measures',
-            'length': 'measures', 'mass': 'measures', 'money': 'measures',
-            'time': 'measures', 'capacity': 'measures', 'temperature': 'measures',
-            'decimal measure': 'measures',
-            'fraction': 'fractions', 'decimal': 'fractions',
-            'shape': 'shape', 'space': 'shape', 'angle': 'shape',
-            'symmetry': 'shape', 'transformation': 'shape', 'position': 'shape',
-            '2-d': 'shape', '3-d': 'shape', 'movement': 'shape',
-            'statistic': 'statistics', 'data': 'statistics', 'handling data': 'statistics',
-            'probability': 'statistics',
-            'algebra': 'algebra', 'equation': 'algebra', 'pattern': 'algebra',
-        }
-        if len(clean) < 80:
-            for keyword, topic in topic_map.items():
-                if keyword in lower:
-                    current_topic = topic
-                    break
+    return full_text[idx:next_idx]
 
-        # Extract bullet-point objectives (handle \uf0b7 Windows bullet, •, -, etc.)
-        if current_topic and (clean.startswith('\u2022') or clean.startswith('-') or clean.startswith('•') or clean.startswith('\uf0b7')):
-            obj = clean.lstrip('•-\u2022\uf0b7 ').strip().rstrip('.')
-            if len(obj) > 15 and not obj.startswith('---'):
-                terminal_objectives[current_topic].append(obj)
 
-    # ── Step 3: Build strand-based units ──
-    STRANDS = [
-        {
-            'key': 'number',
-            'title': 'Number',
-            'sub_strands': [
-                ('Whole Numbers and Place Value', ['place value', 'read', 'write', 'order', 'numeral']),
-                ('Operations with Whole Numbers', ['add', 'subtract', 'multiply', 'divide', 'operation', 'mental']),
-                ('Fractions, Decimals and Percentages', ['fraction', 'decimal', 'percentage', 'mixed number', 'equivalent']),
-                ('Ratio and Proportion', ['ratio', 'proportion', 'scale']),
-            ],
-            'topics': ['number', 'fractions'],
-        },
-        {
-            'key': 'algebra',
-            'title': 'Algebra',
-            'sub_strands': [
-                ('Patterns and Sequences', ['pattern', 'sequence', 'term', 'generaliz']),
-                ('Expressions and Equations', ['expression', 'equation', 'formula', 'solve', 'variable', 'letter']),
-                ('Functions and Graphs', ['function', 'graph', 'coordinate', 'plot']),
-            ],
-            'topics': ['algebra'],
-        },
-        {
-            'key': 'shape',
-            'title': 'Shape and Space',
-            'sub_strands': [
-                ('2-D and 3-D Shapes', ['shape', 'triangle', 'rectangle', 'circle', 'polygon', 'cube', 'prism', 'net']),
-                ('Angles and Measurement', ['angle', 'protractor', 'degree', 'bearing']),
-                ('Symmetry and Transformation', ['symmetry', 'reflect', 'rotate', 'translate', 'transform', 'enlarg']),
-                ('Coordinates and Position', ['coordinate', 'grid', 'position', 'location']),
-            ],
-            'topics': ['shape'],
-        },
-        {
-            'key': 'measures',
-            'title': 'Measures',
-            'sub_strands': [
-                ('Money', ['money', 'rupee', 'currency', 'profit', 'loss', 'interest', 'wage']),
-                ('Time and Temperature', ['time', 'clock', 'calendar', 'temperature', 'timetable']),
-                ('Length, Mass and Capacity', ['length', 'mass', 'capacity', 'weight', 'metre', 'kilogram', 'litre', 'convert']),
-                ('Area, Perimeter and Volume', ['area', 'perimeter', 'volume', 'surface']),
-            ],
-            'topics': ['measures'],
-        },
-        {
-            'key': 'handling_data',
-            'title': 'Handling Data',
-            'sub_strands': [
-                ('Data Collection and Graphs', ['data', 'collect', 'graph', 'chart', 'table', 'bar', 'pie', 'histogram', 'frequency']),
-                ('Probability', ['probability', 'likely', 'certain', 'chance', 'random']),
-            ],
-            'topics': ['statistics'],
-        },
-    ]
+def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
+                 all_outlines: Optional[list[UnitOutlineV2]] = None) -> list[LessonV2]:
+    """Extract the lessons for one unit. Called in a bounded thread-
+    pool fan-out from ``parse_curriculum``.
 
-    # Collect all enabling objectives from K/S codes
-    all_eo = [o['full'] for o in coded_objectives['K']] + [o['full'] for o in coded_objectives['S']]
+    Approach:
+      - Slice a focused ~8K char excerpt around the unit's
+        source_evidence so the LLM stays grounded on this unit's
+        content (and so we don't pay to re-send 100K chars per unit).
+      - Single LLM call returning JSON. Schema-constrained.
+      - Anti-hallucination: each lesson must include a verbatim
+        snippet from the excerpt; lessons whose evidence isn't
+        present are dropped.
 
-    units = []
-    for strand in STRANDS:
-        # Collect terminal objectives for this strand's topics
-        strand_terminal = []
-        for topic_key in strand['topics']:
-            strand_terminal.extend(terminal_objectives.get(topic_key, []))
+    Raises exceptions on infra failure (LLM error, bad JSON after
+    retry). The orchestrator's ThreadPoolExecutor catches and logs
+    per-unit, so one unit failing doesn't kill the whole parse.
+    """
+    from apps.curriculum.locale_prompts import locale_parser_hints
 
-        # Match coded objectives to this strand by keyword
-        strand_enabling = []
-        strand_keywords = set()
-        for _, keywords in strand['sub_strands']:
-            strand_keywords.update(keywords)
+    all_outlines = all_outlines or [unit]
+    excerpt = _excerpt_for_unit(full_text, unit, all_outlines)
+    locale_hints = locale_parser_hints(locale)
 
-        for eo in all_eo:
-            eo_lower = eo.lower()
-            if any(kw in eo_lower for kw in strand_keywords):
-                strand_enabling.append(eo)
-
-        # Build lessons from sub-strands
-        lessons = []
-        for sub_title, sub_keywords in strand['sub_strands']:
-            # Match terminal objectives to this sub-strand
-            sub_objectives = []
-            for obj in strand_terminal:
-                obj_lower = obj.lower()
-                if any(kw in obj_lower for kw in sub_keywords):
-                    sub_objectives.append(obj)
-
-            # Match enabling objectives to this sub-strand
-            sub_enabling = []
-            for eo in strand_enabling:
-                eo_lower = eo.lower()
-                if any(kw in eo_lower for kw in sub_keywords):
-                    sub_enabling.append(eo)
-
-            # Also create enabling objectives from terminal objectives if no K/S codes matched
-            if not sub_enabling and sub_objectives:
-                sub_enabling = sub_objectives[:5]
-
-            if sub_objectives or sub_enabling:
-                lessons.append({
-                    "title": sub_title,
-                    "objective": sub_objectives[0] if sub_objectives else f"Master {sub_title.lower()} concepts",
-                    "enabling_objectives": sub_enabling or sub_objectives[:5],
-                    "teaching_strategies": ["Worked examples", "Practice exercises", "Problem solving"],
-                    "resources": ["Textbook", "Whiteboard", "Calculator"],
-                    "assessment_methods": ["Written exercises", "Problem-solving tasks"],
-                    "estimated_minutes": 20,
-                    "order": len(lessons) + 1,
-                })
-
-        if lessons:
-            units.append({
-                "number": len(units) + 1,
-                "title": f"{grade_level}: {strand['title']}",
-                "grade_level": grade_level,
-                "duration": "Multiple periods",
-                "introduction": f"{strand['title']} strand for {grade_level} (Cycle {cycle})",
-                "terminal_objectives": strand_terminal[:15],
-                "enabling_objectives": strand_enabling[:20],
-                "lessons": lessons,
-            })
-
-    teaching_strategies = [
-        "Worked examples with step-by-step solutions",
-        "Mental computation practice",
-        "Problem solving in real-world contexts",
-        "Group work and collaborative learning",
-        "Use of manipulatives and visual aids",
-        "Practice exercises with graduated difficulty",
-        "Application to Seychelles context (SCR, local measurements)",
-    ]
-
-    assessment_methods = [
-        "Written exercises",
-        "Problem-solving tasks",
-        "Mental math tests",
-        "Practical investigations",
-    ]
-
-    return ParsedCurriculum(
-        subject="Mathematics",
-        grade_level=grade_level,
-        cycle=cycle,
-        description=f"Mathematics curriculum for Seychelles secondary schools (Cycle {cycle})",
-        units=units,
-        teaching_strategies=teaching_strategies,
-        assessment_methods=assessment_methods,
+    system_prompt = (
+        "You are a curriculum-document lesson extractor. Given a single "
+        "unit's worth of text from a curriculum / teaching-programme "
+        "document, identify the INDIVIDUAL LESSONS that comprise it. "
+        "A lesson typically maps to one teaching objective or one "
+        "numbered topic in the unit's content list. Return ONLY lessons "
+        "you can ANCHOR to a verbatim snippet from the provided text. "
+        "Respond with a single JSON object."
     )
 
+    user_prompt = (
+        # Document excerpt FIRST (query-last layout).
+        f"<unit_excerpt unit_title=\"{unit.title}\" grade=\"{unit.grade_level}\">\n"
+        f"{excerpt}\n"
+        f"</unit_excerpt>\n"
+        f"{locale_hints}"
+        f"\n<task>\n"
+        f"Extract the individual lessons in this unit.\n\n"
+        f"GUIDELINES:\n"
+        f"1. A lesson maps to ONE main concept or skill. Typical signal: "
+        f"a numbered subtopic (1.1, 1.2, …) or a discrete teaching "
+        f"objective. Look at the document's own structure — don't "
+        f"invent lessons.\n"
+        f"2. Title should be SHORT and student-friendly — name the "
+        f"concept, not the objective. \"The Cell Nucleus\" not "
+        f"\"Students will understand the cell nucleus\".\n"
+        f"3. Objective: 1-sentence terminal objective for this lesson "
+        f"(what the student will be able to do).\n"
+        f"4. enabling_objectives: 3-6 granular sub-skills (action-verb "
+        f"statements). Pull these from the document's specific-"
+        f"objectives column if available.\n"
+        f"5. Aim for 3-12 lessons per unit. Fewer is fine if the unit "
+        f"is small. Don't pad.\n"
+        f"6. order: 1-indexed position within the unit.\n"
+        f"7. For source_evidence: a 30-100 char verbatim snippet from "
+        f"the excerpt that anchors this lesson (typically the "
+        f"sub-heading or first content line). Anti-hallucination check.\n"
+        f"</task>"
+    )
 
-def create_lessons_from_objectives(objectives: List[str], unit_title: str) -> List[Dict]:
-    """Create lesson structures from terminal objectives."""
-    lessons = []
-    
-    for i, objective in enumerate(objectives):
-        # Create lesson title from objective
-        title = create_lesson_title(objective)
-        
-        lessons.append({
-            "title": title,
-            "objective": objective,
-            "enabling_objectives": create_enabling_objectives(objective),
-            "teaching_strategies": ["Worked examples", "Practice exercises", "Discussion"],
-            "resources": get_resources_for_topic(unit_title),
-            "assessment_methods": ["Written exercises", "Oral questioning"],
-            "estimated_minutes": 20,
-            "order": i + 1
-        })
-    
+    parsed = _call_llm_structured(
+        response_model=_LessonsResult,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=4096,
+    )
+
+    raw_lessons = parsed.lessons
+
+    # Anti-hallucination filter — each lesson's evidence must appear in
+    # the excerpt. Use the same whitespace-tolerant search as
+    # _find_unit_body so pdftotext line-break artefacts don't drop
+    # genuine lessons.
+    lessons: list[LessonV2] = []
+    skipped_no_evidence = 0
+    for i, raw in enumerate(raw_lessons, start=1):
+        # raw is a _LessonRaw pydantic instance.
+        title = (raw.title or '').strip()
+        objective = (raw.objective or '').strip()
+        if not title or not objective:
+            continue
+        evidence = (raw.source_evidence or '').strip()
+        if evidence:
+            if _find_unit_body(excerpt, evidence) == -1 and \
+               _find_unit_body(excerpt, evidence[:50]) == -1 and \
+               _find_unit_body(excerpt, title) == -1:
+                logger.warning(
+                    "[parser_v2] lessons_pass dropping lesson %r for unit %r "
+                    "— evidence not in excerpt.", title, unit.title,
+                )
+                skipped_no_evidence += 1
+                continue
+        eos = [str(e).strip() for e in (raw.enabling_objectives or []) if str(e).strip()]
+        try:
+            lessons.append(LessonV2(
+                title=title,
+                objective=objective,
+                enabling_objectives=eos,
+                order=int(raw.order or i),
+            ))
+        except Exception:
+            logger.warning(
+                "[parser_v2] lessons_pass: malformed lesson dropped for unit %r: %r",
+                unit.title, {'title': title}
+            )
+
+    logger.info(
+        "[parser_v2] lessons_pass(%s, %s): %d lessons "
+        "(%d raw, %d evidence-misses)",
+        unit.title, unit.grade_level,
+        len(lessons), len(raw_lessons), skipped_no_evidence,
+    )
     return lessons
 
 
-def create_lesson_title(objective: str) -> str:
-    """Create a student-friendly lesson title from an objective."""
-    # Remove common prefixes
-    prefixes = [
-        "demonstrate the understanding of",
-        "demonstrate understanding of",
-        "understand and use",
-        "use with confidence",
-        "appreciate, discuss and express ideas about",
-        "work out",
-        "apply",
-        "solve problems involving",
-        "distinguish between",
-        "recognise and name",
-        "draw and measure",
-        "use the",
-        "form",
-        "determine",
-        "construct and solve",
-        "develop",
-        "know",
-        "make",
-        "choose",
-    ]
-    
-    title = objective
-    obj_lower = objective.lower()
-    
-    for prefix in prefixes:
-        if obj_lower.startswith(prefix):
-            title = objective[len(prefix):].strip()
-            break
-    
-    # Capitalize first letter
-    if title:
-        title = title[0].upper() + title[1:]
-    
-    # Limit length
-    if len(title) > 60:
-        title = title[:57] + "..."
-    
-    return title or objective[:60]
-
-
-def create_enabling_objectives(terminal_objective: str) -> List[str]:
-    """Break a terminal objective into smaller enabling objectives."""
-    parts = []
-    
-    # If objective mentions multiple skills, split them
-    if " and " in terminal_objective.lower():
-        segments = re.split(r'\s+and\s+', terminal_objective, flags=re.IGNORECASE)
-        for seg in segments[:3]:  # Max 3 segments
-            seg = seg.strip()
-            if seg and len(seg) > 10:
-                parts.append(seg)
-    
-    if not parts:
-        parts.append(terminal_objective)
-    
-    # Add standard enabling objectives
-    return parts[:5]  # Limit to 5
-
-
-def get_resources_for_topic(unit_name: str) -> List[str]:
-    """Get appropriate resources for a topic."""
-    base = ["Textbook", "Workbook", "Whiteboard"]
-    
-    extras = {
-        "Number": ["Calculator", "Number line"],
-        "Measures": ["Rulers", "Measuring tape", "Scales"],
-        "Shape and Space": ["Protractor", "Compass", "Graph paper"],
-        "Algebra": ["Algebra tiles", "Graphing calculator"],
-        "Handling Data": ["Graph paper", "Dice", "Survey forms"],
-    }
-    
-    return base + extras.get(unit_name, [])
-
-
 # ============================================================================
-# GEOGRAPHY CURRICULUM PARSER
+# v2 — LESSONS FAN-OUT (M4)
 # ============================================================================
 
-def parse_geography_curriculum(text: str, grade_level: str = "S1") -> ParsedCurriculum:
+
+LESSONS_FANOUT_MAX_WORKERS = 3
+"""Max concurrent per-unit lessons_pass calls. 3 is the sweet spot:
+high enough to make a 15-unit doc fit in ~5 LLM round-trips of latency,
+low enough to stay well under Anthropic's rate limits even on the
+slower workload-profile tiers. Mirrors the bounded concurrency in
+apps/tutoring/judges/__init__.py::run_all_judges."""
+
+LESSONS_PASS_TIMEOUT_SECONDS = 90
+"""Per-unit timeout. Sonnet 4.6 on an 8K excerpt typically returns
+in 8-15s; 90s gives 6x headroom for network glitches without letting
+one stuck unit block the whole parse forever."""
+
+
+def _lessons_fanout(
+    outlines: list[UnitOutlineV2],
+    *,
+    full_text: str,
+    locale: str,
+    progress_cb: Optional[Callable[[int], None]] = None,
+) -> tuple[list[UnitV2], int]:
+    """Fan-out lessons_pass across all units with bounded concurrency.
+
+    Fail-soft: per-unit exceptions are logged and that unit is returned
+    with empty lessons[]. Only the orchestrator's "all failed" check
+    raises ParseFailure. Same pattern as
+    ``apps/tutoring/judges/__init__.py::run_all_judges``.
+
+    Returns ``(units_with_lessons, failed_count)``.
     """
-    Parse Seychelles Geography curriculum text.
+    import concurrent.futures as _cf
 
-    The geography syllabus has two formats:
-    - Cycle 4 (S1-S2): Unit blocks with terminal objectives + Teaching/Learning Scheme
-      tables containing enabling objectives in the first column.
-    - Cycle 5 (S3-S5): IGCSE themes with "Candidates should be able to:" objectives.
+    units: list[Optional[UnitV2]] = [None] * len(outlines)
+    failed = 0
+    done = 0
 
-    Each unit block structure:
-        Unit N: Title
-        Duration: X periods
-        Introduction: ...
-        Terminal objectives: 1. ... 2. ...
-        Teaching/Learning Scheme:
-          Enabling objectives | Teaching Strategies | Resources | Assessment
-    """
-    import re as _re
-    from apps.curriculum.utils import determine_cycles
-    cycles = determine_cycles(grade_level)
-    cycle = "/".join(cycles)
-
-    gl = grade_level.upper()
-    # Cycle 4 = S1, S2, S3 (detailed syllabus with Teaching/Learning Scheme)
-    # Cycle 5 = S4, S5 (IGCSE programme with themes)
-    is_cycle_5_only = gl in ('S4', 'S5')
-    in_igcse_section = False  # Track when we enter IGCSE section
-
-    lines = text.split('\n')
-    units = []
-    current_unit = None
-    current_section = None  # 'intro', 'terminal', 'enabling', 'assessment'
-    current_term_grade = grade_level
-
-    # Bullet chars used in the document
-    BULLETS = {'\uf0b7', '•', '-', '\u2022'}
-
-    for i, raw_line in enumerate(lines):
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        line_lower = line.lower()
-
-        # ── Detect IGCSE/Cycle 5 section boundary ──
-        # Only match "CYCLE 5" as a standalone header, not mentions within unit text
-        if _re.match(r'^CYCLE\s+5', line, _re.IGNORECASE) or 'igcse programme' in line_lower:
-            in_igcse_section = True
-            if not is_cycle_5_only:
-                # For S1-S3: stop processing when we hit the IGCSE section header
-                break  # Exit the loop entirely — we have all Cycle 4 content
-
-        # ── Detect grade/term headers ──
-        term_match = _re.match(r'Secondary\s+(One|Two|Three|Four|Five)', line, _re.IGNORECASE)
-        if term_match:
-            grade_map = {'one': 'S1', 'two': 'S2', 'three': 'S3', 'four': 'S4', 'five': 'S5'}
-            current_term_grade = grade_map.get(term_match.group(1).lower(), grade_level)
-
-        # Skip content not for our target grade
-        # For S1-S3: only process Cycle 4 content (not IGCSE)
-        if not is_cycle_5_only and in_igcse_section:
-            continue
-        # For S4-S5: only process IGCSE content
-        if is_cycle_5_only and not in_igcse_section:
-            # Still detect unit headers to skip Cycle 4 units
-            if _re.match(r'Unit\s+\d+\s*:', line):
-                continue
-
-        # ── Detect unit headers ──
-        unit_match = _re.match(r'Unit\s+(\d+)\s*:\s*(.+)', line)
-        if not unit_match and (is_cycle_5_only or in_igcse_section):
-            # IGCSE theme format: "Theme 1: Population and settlement" or "1.1 Population dynamics"
-            unit_match = _re.match(r'(?:Theme\s+)?(\d+(?:\.\d+)?)\s*[:.]\s*(.+)', line)
-            if unit_match and len(unit_match.group(2)) < 5:
-                unit_match = None  # Skip short matches like page numbers
-
-        if unit_match:
-            # Save previous unit
-            if current_unit and (current_unit['terminal_objectives'] or current_unit['enabling_objectives']):
-                units.append(current_unit)
-
-            current_unit = {
-                'number': len(units) + 1,
-                'title': unit_match.group(2).strip().rstrip('.'),
-                'grade_level': current_term_grade,
-                'duration': '',
-                'introduction': '',
-                'terminal_objectives': [],
-                'enabling_objectives': [],
-                'teaching_strategies': [],
-                'resources': [],
-                'assessment_methods': [],
-                'lessons': [],
-            }
-            current_section = 'intro'
-            continue
-
-        if not current_unit:
-            continue
-
-        # ── Detect duration ──
-        dur_match = _re.match(r'Duration\s*:\s*(.+)', line, _re.IGNORECASE)
-        if dur_match:
-            current_unit['duration'] = dur_match.group(1).strip()
-            continue
-
-        # ── Detect section transitions ──
-        if 'terminal objective' in line_lower:
-            current_section = 'terminal'
-            continue
-        if 'enabling objective' in line_lower:
-            current_section = 'enabling'
-            continue
-        if 'teaching/learning scheme' in line_lower or 'teaching/learning strategies' in line_lower:
-            current_section = 'enabling'  # The scheme table starts with enabling objectives column
-            continue
-        if 'unit assessment' in line_lower or 'assessment:' in line_lower:
-            current_section = 'assessment'
-            continue
-        if 'candidates should be able to' in line_lower:
-            current_section = 'enabling'  # IGCSE format
-            continue
-        if line_lower.startswith('resources') or line_lower.startswith('assessment'):
-            # Column headers in the Teaching/Learning Scheme table — skip
-            continue
-
-        # ── Extract content based on section ──
-        if current_section == 'intro' and len(line) > 20:
-            current_unit['introduction'] += ' ' + line
-
-        elif current_section == 'terminal':
-            # Numbered objectives: "1. Understand that..."
-            obj_match = _re.match(r'\d+\.?\s+(.+)', line)
-            if obj_match:
-                obj = obj_match.group(1).strip().rstrip('.')
-                if len(obj) > 10:
-                    current_unit['terminal_objectives'].append(obj)
-            elif line[0] in BULLETS:
-                obj = line.lstrip(''.join(BULLETS) + ' ').strip().rstrip('.')
-                if len(obj) > 10:
-                    current_unit['terminal_objectives'].append(obj)
-
-        elif current_section == 'enabling':
-            # Bullet-point enabling objectives
-            if line[0] in BULLETS:
-                obj = line.lstrip(''.join(BULLETS) + ' ').strip().rstrip('.')
-                if len(obj) > 10:
-                    current_unit['enabling_objectives'].append(obj)
-            elif len(line) > 15 and not any(kw in line_lower for kw in [
-                'teacher', 'oral questioning', 'discussion', 'textbook',
-                'written activities', 'group work', 'explanation', 'brainstorm',
-                'handout', 'atlas', 'globe', 'video', 'map interpretation',
-                'informal', 'structured', 'source-based', 'photographs',
-                'exposition', 'demonstration', 'practical', 'newspaper',
-                'magazine', 'relevant document', 'handbook', 'teaching',
-                'learning strategies', 'visit:', 'meteorological',
-                'blue economy', 'documentary', 'chart', 'analysis of',
-                'interpretation of', 'videos', 'case study', 'research',
-                'field', 'investigate', 'project', 'presentation',
-            ]):
-                # Continuation of previous objective or standalone objective
-                if current_unit['enabling_objectives']:
-                    # Append to last objective if it looks like continuation
-                    last = current_unit['enabling_objectives'][-1]
-                    if not last.endswith('.') and len(line) < 80:
-                        current_unit['enabling_objectives'][-1] = last + ' ' + line
-                    elif len(line) > 20:
-                        current_unit['enabling_objectives'].append(line.rstrip('.'))
-                elif len(line) > 20:
-                    current_unit['enabling_objectives'].append(line.rstrip('.'))
-
-        elif current_section == 'assessment':
-            if len(line) > 15:
-                current_unit['assessment_methods'].append(line.rstrip('.'))
-
-    # Save last unit
-    if current_unit and (current_unit['terminal_objectives'] or current_unit['enabling_objectives']):
-        units.append(current_unit)
-
-    # ── Deduplicate units (same unit appears twice: intro block + Teaching/Learning Scheme) ──
-    # Strategy: merge by normalized title, prefer the version with more enabling objectives
-    deduped = []
-    seen_titles = {}
-    for u in units:
-        # Normalize: lowercase, strip punctuation and extra spaces, first 35 chars
-        clean_title = _re.sub(r'[^a-z0-9 ]', '', u['title'].lower()).strip()
-        clean_title = _re.sub(r'\s+', ' ', clean_title)[:35]
-        if clean_title in seen_titles:
-            # Merge into the existing unit (keep the one with more EOs)
-            existing = seen_titles[clean_title]
-            for eo in u.get('enabling_objectives', []):
-                if eo not in existing.get('enabling_objectives', []):
-                    existing.setdefault('enabling_objectives', []).append(eo)
-            for to in u.get('terminal_objectives', []):
-                if to not in existing.get('terminal_objectives', []):
-                    existing.setdefault('terminal_objectives', []).append(to)
-        else:
-            seen_titles[clean_title] = u
-            deduped.append(u)
-    units = deduped
-
-    # ── Filter units by target grade level ──
-    if gl in ('S1', 'S2', 'S3', 'S4', 'S5'):
-        filtered = [u for u in units if u.get('grade_level', '').upper() == gl]
-        if filtered:
-            units = filtered
-
-    # ── Post-process: clean enabling objectives ──
-    ACTION_VERBS = {
-        'define', 'describe', 'explain', 'list', 'state', 'identify', 'name',
-        'compare', 'distinguish', 'classify', 'demonstrate', 'apply', 'use',
-        'calculate', 'solve', 'give', 'know', 'understand', 'recognise',
-        'recognize', 'locate', 'illustrate', 'suggest', 'evaluate', 'discuss',
-        'outline', 'show', 'draw', 'measure', 'construct', 'assess',
-        'develop', 'determine', 'differentiate', 'interpret', 'analyse',
-        'analyze', 'investigate', 'with', 'select', 'read', 'work',
-    }
-    for unit in units:
-        cleaned = []
-        for eo in unit.get('enabling_objectives', []):
-            eo = eo.strip()
-            if len(eo) < 15:
-                continue
-            first_word = eo.split()[0].lower().rstrip('s') if eo else ''
-            # Keep if starts with an action verb or is clearly an objective
-            if first_word in ACTION_VERBS or any(v in eo.lower() for v in ['should be able', 'will be able']):
-                cleaned.append(eo)
-        unit['enabling_objectives'] = cleaned
-
-    # ── Build lessons from TERMINAL OBJECTIVES (primary) ──
-    # Terminal objectives are the assessment targets — always clearly defined.
-    # Enabling objectives supplement but are harder to extract reliably.
-    for unit in units:
-        # Use terminal objectives as the primary lesson driver
-        tos = unit.get('terminal_objectives', [])
-        eos = unit.get('enabling_objectives', [])
-
-        # Terminal objectives are the lesson backbone
-        # Enabling objectives provide additional granularity
-        if tos:
-            lesson_objectives = tos
-        elif eos:
-            lesson_objectives = eos
-        else:
-            continue
-
-        # Store all objectives on the unit for competency tracking
-        # Terminal objectives = what we assess, enabling = supplementary detail
-        unit['enabling_objectives'] = lesson_objectives + [
-            e for e in eos if e not in lesson_objectives
-        ]
-
-        # Group terminal objectives into lessons (1 TO per 20-minute lesson)
-        # Attach relevant enabling objectives as teaching steps for content generation
-        raw_eos = unit.get('enabling_objectives', [])  # The raw extracted EOs
-        lessons = []
-        chunk_size = 1  # One TO per lesson for focused 20-min sessions
-        for start in range(0, len(lesson_objectives), chunk_size):
-            chunk = lesson_objectives[start:start + chunk_size]
-            if not chunk:
-                continue
-
-            # Match enabling objectives to this lesson's terminal objectives by keyword overlap
-            lesson_eos = []
-            chunk_words = set()
-            for to in chunk:
-                chunk_words.update(w.lower() for w in to.split() if len(w) > 3)
-
-            for eo in raw_eos:
-                eo_words = set(w.lower() for w in eo.split() if len(w) > 3)
-                if len(chunk_words & eo_words) >= 2:
-                    lesson_eos.append(eo)
-
-            # Use first objective as lesson title seed
-            title = create_lesson_title(chunk[0])
-            lessons.append({
-                'title': title,
-                'objective': chunk[0],
-                # Terminal objectives = what we assess (the lesson targets)
-                'enabling_objectives': chunk,
-                # Enabling objectives = teaching steps (inform content generation)
-                'teaching_steps': lesson_eos,
-                'teaching_strategies': ['Explanation', 'Discussion', 'Practical activities'],
-                'resources': ['Textbook', 'Atlas', 'Maps'],
-                'assessment_methods': ['Structured source-based written questions', 'Oral questioning'],
-                'estimated_minutes': 20,
-                'order': len(lessons) + 1,
-            })
-
-        unit['lessons'] = lessons
-
-    teaching_strategies = [
-        'Teacher exposition and explanation',
-        'Oral questioning and discussion',
-        'Map interpretation and analysis',
-        'Group work and collaborative learning',
-        'Written activities and exercises',
-        'Use of photographs and visual sources',
-        'Fieldwork and observation',
-        'Data interpretation (graphs, tables, statistics)',
-    ]
-
-    assessment_methods = [
-        'Structured source-based written questions',
-        'Informal assessments based on oral questioning',
-        'Written exercises and assignments',
-        'Map and data interpretation tasks',
-    ]
-
-    return ParsedCurriculum(
-        subject='Geography',
-        grade_level=grade_level,
-        cycle=cycle,
-        description=f"Geography curriculum for Seychelles secondary schools (Cycle {cycle})",
-        units=units,
-        teaching_strategies=teaching_strategies,
-        assessment_methods=assessment_methods,
-    )
-
-
-# ============================================================================
-# LLM-BASED CURRICULUM PARSER (Robust)
-# ============================================================================
-
-def parse_curriculum_with_llm(text: str, subject: str, grade_level: str, institution_id: int = None) -> ParsedCurriculum:
-    """
-    Use LLM to parse curriculum structure from text.
-    This is more robust than regex-based parsing.
-
-    If institution_id is provided, queries the knowledge base for teaching
-    material context to help align unit/lesson structure with textbooks.
-    """
-    from apps.llm.models import ModelConfig
-    from apps.llm.client import get_llm_client
-
-    # Get LLM client
-    model_config = ModelConfig.get_for('generation')
-    if not model_config:
-        logger.warning("No LLM configured, falling back to regex parser")
-        return parse_generic_curriculum(text, subject, grade_level)
-
-    llm_client = get_llm_client(model_config)
-
-    # Query knowledge base for teaching material context if available
-    kb_context_str = ""
-    if institution_id:
+    def _run_one(i: int, outline: UnitOutlineV2) -> tuple[int, list[LessonV2], Optional[Exception]]:
         try:
-            from apps.curriculum.knowledge_base import CurriculumKnowledgeBase
-            kb = CurriculumKnowledgeBase(institution_id=institution_id)
-            kb_result = kb.query_for_content_generation(
-                lesson_title=subject,
-                lesson_objective=f"{subject} curriculum structure",
-                unit_title="",
-                subject=subject,
-                grade_level=grade_level,
-                n_results=8,
+            lessons = lessons_pass(
+                outline,
+                full_text=full_text,
+                locale=locale,
+                all_outlines=outlines,
             )
-            if kb_result and kb_result.chunks:
-                excerpts = "\n\n".join(
-                    f"--- From {c.get('metadata', {}).get('material_title', 'teaching material')} ---\n{c.get('content', '')[:400]}"
-                    for c in kb_result.chunks[:6]
-                    if c.get('content', '').strip()
-                )
-                if excerpts:
-                    kb_context_str = f"""
-REFERENCE MATERIAL FROM UPLOADED TEXTBOOKS/TEACHING RESOURCES:
-The following excerpts are from textbooks and materials used at this school.
-Align unit and lesson names with the terminology and structure used in these materials where appropriate.
-
-{excerpts}
-"""
+            return i, lessons, None
         except Exception as e:
-            logger.warning(f"KB query for curriculum parsing failed: {e}")
-
-    # Truncate text if too long (keep first and last parts for context)
-    max_chars = 30000
-    if len(text) > max_chars:
-        # Keep first 20k and last 10k
-        text = text[:20000] + "\n\n[...middle section truncated...]\n\n" + text[-10000:]
-
-    from apps.curriculum.utils import determine_cycles
-    cycles = determine_cycles(grade_level)
-    cycle = "/".join(cycles)
-
-    prompt = f"""Analyze this curriculum document and extract its structure.
-
-DOCUMENT TEXT:
-{text}
-
-CONTEXT:
-- Subject: {subject}
-- Grade Level: {grade_level} (Cycle {cycle})
-- This is a Seychelles secondary school curriculum
-{kb_context_str}
-TASK:
-Extract the curriculum structure as JSON with this format:
-{{
-    "units": [
-        {{
-            "title": "Unit title",
-            "grade_level": "S2",
-            "terminal_objectives": ["Broad outcome 1", "Broad outcome 2"],
-            "enabling_objectives": ["Define term X", "State that Y", "Explain why Z"],
-            "lessons": [
-                {{
-                    "title": "Lesson title (short, clear name)",
-                    "objective": "What students will learn/be able to do",
-                    "enabling_objectives": ["Define term X", "State that Y"]
-                }}
-            ]
-        }}
-    ]
-}}
-
-GUIDELINES:
-1. Look for natural divisions in the curriculum (chapters, units, topics, strands, themes)
-2. Each unit should have 3-15 lessons
-3. Each lesson should cover ONE main concept or skill
-4. Lesson titles should be clear and student-friendly (not "Objective 1.2")
-5. If you find terminal objectives or learning outcomes, extract them as unit terminal_objectives
-6. Extract enabling objectives (granular teaching steps with action verbs: define, state,
-   explain, describe, identify, compare) and assign each to the relevant lesson
-7. If the document has numbered sections, use those as units
-8. Extract as many lessons as you can find - don't skip content
-9. Each unit MUST have a grade_level field (e.g. "S1", "S2", "S3") based on the document content
-10. If the document covers multiple grade levels, create separate units per grade
-
-Return ONLY valid JSON, no explanation or markdown."""
-
-    try:
-        response = llm_client.generate(
-            prompt=prompt,
-            system_prompt="You are a curriculum parsing assistant. Extract structured curriculum data from documents. Return only valid JSON.",
-            max_tokens=8000,
-            temperature=0.1,
-        )
-        
-        # Parse the JSON response
-        content = response.get('content', '').strip()
-        
-        # Clean up common issues
-        if content.startswith('```'):
-            content = content.split('```')[1]
-            if content.startswith('json'):
-                content = content[4:]
-        content = content.strip()
-        
-        parsed = json.loads(content)
-        
-        # Convert to our format
-        units = []
-        for i, unit_data in enumerate(parsed.get('units', [])):
-            lessons = []
-            for j, lesson_data in enumerate(unit_data.get('lessons', [])):
-                lessons.append({
-                    "title": lesson_data.get('title', f'Lesson {j+1}'),
-                    "objective": lesson_data.get('objective', ''),
-                    "enabling_objectives": lesson_data.get('enabling_objectives', []),
-                    "teaching_strategies": ["Discussion", "Practice", "Examples"],
-                    "resources": ["Textbook", "Whiteboard"],
-                    "assessment_methods": ["Written work", "Oral questioning"],
-                    "estimated_minutes": 20,
-                    "order": j + 1
-                })
-
-            if lessons:  # Only add units that have lessons
-                units.append({
-                    "number": i + 1,
-                    "title": unit_data.get('title', f'Unit {i+1}'),
-                    "grade_level": unit_data.get('grade_level', grade_level),
-                    "duration": "Multiple periods",
-                    "introduction": f"{unit_data.get('title', '')} for {subject}",
-                    "terminal_objectives": unit_data.get('terminal_objectives',
-                        [l['objective'] for l in lessons if l['objective']]),
-                    "enabling_objectives": unit_data.get('enabling_objectives', []),
-                    "lessons": lessons
-                })
-        
-        return ParsedCurriculum(
-            subject=subject,
-            grade_level=grade_level,
-            cycle=cycle,
-            description=f"{subject} curriculum for {grade_level}",
-            units=units,
-            teaching_strategies=["Discussion", "Practical work", "Group activities", "Problem solving"],
-            assessment_methods=["Written tests", "Projects", "Oral questioning", "Practical tasks"]
-        )
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"LLM returned invalid JSON: {e}")
-        logger.error(f"Response was: {content[:500]}...")
-        # Fall back to regex parser
-        return parse_generic_curriculum(text, subject, grade_level)
-    except Exception as e:
-        logger.error(f"LLM parsing failed: {e}")
-        return parse_generic_curriculum(text, subject, grade_level)
-
-
-# ============================================================================
-# FALLBACK: REGEX-BASED PARSER
-# ============================================================================
-
-def parse_generic_curriculum(text: str, subject: str, grade_level: str) -> ParsedCurriculum:
-    """
-    Generic curriculum parser using flexible text extraction.
-    Handles various document formats.
-    """
-    from apps.curriculum.utils import determine_cycles
-    cycles = determine_cycles(grade_level)
-    cycle = "/".join(cycles)
-
-    units = []
-    current_unit = None
-    objectives = []
-    
-    lines = text.split('\n')
-    
-    # Patterns that indicate a section/unit header
-    def is_header(line):
-        line = line.strip()
-        if not line or len(line) < 5:
-            return False
-        # **Bold headers**
-        if line.startswith('**') and line.endswith('**'):
-            return True
-        # ALL CAPS headers
-        if line.isupper() and 5 < len(line) < 60:
-            return True
-        # Numbered sections like "1. Introduction" or "Unit 1:"
-        if re.match(r'^(Unit\s+)?\d+[\.\:\)]\s+\w', line, re.IGNORECASE):
-            return True
-        # Headers ending with colon
-        if line.endswith(':') and len(line) < 50 and not line.startswith('-'):
-            return True
-        # Markdown headers
-        if line.startswith('#'):
-            return True
-        return False
-    
-    # Patterns that indicate an objective/learning point
-    def is_objective(line):
-        line = line.strip()
-        if not line or len(line) < 10:
-            return False
-        # Bullet points
-        if line.startswith('-') or line.startswith('•') or line.startswith('*'):
-            return True
-        # Numbered lists
-        if re.match(r'^\d+[\.\)]\s+\w', line):
-            return True
-        # Lettered lists
-        if re.match(r'^[a-zA-Z][\.\)]\s+\w', line):
-            return True
-        return False
-    
-    def clean_header(line):
-        """Clean up header text."""
-        line = line.strip()
-        line = line.strip('*#:')
-        line = re.sub(r'^(Unit\s+)?\d+[\.\:\)]\s*', '', line, flags=re.IGNORECASE)
-        return line.strip()
-    
-    def clean_objective(line):
-        """Clean up objective text."""
-        line = line.strip()
-        # Remove bullet/number prefix
-        line = re.sub(r'^[-•*]\s*', '', line)
-        line = re.sub(r'^\d+[\.\)]\s*', '', line)
-        line = re.sub(r'^[a-zA-Z][\.\)]\s*', '', line)
-        return line.strip()
-    
-    for line in lines:
-        line_clean = line.strip()
-        
-        if is_header(line_clean):
-            # Save previous unit if it has objectives
-            if current_unit and objectives:
-                units.append({
-                    "number": len(units) + 1,
-                    "title": current_unit,
-                    "duration": "Multiple periods",
-                    "introduction": f"{current_unit} for {subject}",
-                    "terminal_objectives": objectives[:30],  # Limit per unit
-                    "lessons": create_lessons_from_objectives(objectives[:30], current_unit)
-                })
-            
-            # Start new unit
-            current_unit = clean_header(line_clean)
-            objectives = []
-        
-        elif is_objective(line_clean):
-            obj = clean_objective(line_clean)
-            # Filter garbage
-            if (obj and 
-                len(obj) > 10 and 
-                not obj.startswith('---') and
-                not all(c in '-=|+_' for c in obj.replace(' ', ''))):
-                objectives.append(obj)
-    
-    # Save last unit
-    if current_unit and objectives:
-        units.append({
-            "number": len(units) + 1,
-            "title": current_unit,
-            "duration": "Multiple periods",
-            "introduction": f"{current_unit} for {subject}",
-            "terminal_objectives": objectives[:30],
-            "lessons": create_lessons_from_objectives(objectives[:30], current_unit)
-        })
-    
-    # If no units found, try to extract ANY content as lessons
-    if not units:
-        # Look for sentences that could be objectives
-        all_objectives = []
-        
-        for line in lines:
-            line_clean = line.strip()
-            
-            # Skip very short or very long lines
-            if len(line_clean) < 15 or len(line_clean) > 300:
-                continue
-            
-            # Skip lines that look like metadata
-            if any(skip in line_clean.lower() for skip in 
-                   ['page', 'copyright', 'table of contents', 'index', 'chapter']):
-                continue
-            
-            # Check if it looks like an objective (contains action verbs)
-            action_verbs = ['understand', 'explain', 'describe', 'identify', 'analyze',
-                           'apply', 'evaluate', 'create', 'define', 'list', 'compare',
-                           'demonstrate', 'develop', 'recognize', 'use', 'know', 'learn']
-            
-            line_lower = line_clean.lower()
-            if any(verb in line_lower for verb in action_verbs):
-                # Clean it up
-                obj = clean_objective(line_clean)
-                if obj and len(obj) > 15:
-                    all_objectives.append(obj)
-        
-        # Also try bullet points one more time with looser criteria
-        if not all_objectives:
-            for line in lines:
-                line_clean = line.strip()
-                if is_objective(line_clean):
-                    obj = clean_objective(line_clean)
-                    if obj and len(obj) > 10:
-                        all_objectives.append(obj)
-        
-        # Create a single unit if we found anything
-        if all_objectives:
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_objectives = []
-            for obj in all_objectives:
-                if obj.lower() not in seen:
-                    seen.add(obj.lower())
-                    unique_objectives.append(obj)
-            
-            units.append({
-                "number": 1,
-                "title": f"{subject} Fundamentals",
-                "duration": "Multiple periods",
-                "introduction": f"Core concepts for {subject}",
-                "terminal_objectives": unique_objectives[:30],
-                "lessons": create_lessons_from_objectives(unique_objectives[:30], subject)
-            })
-    
-    return ParsedCurriculum(
-        subject=subject,
-        grade_level=grade_level,
-        cycle=cycle,
-        description=f"{subject} curriculum for {grade_level}",
-        units=units,
-        teaching_strategies=["Discussion", "Practical work", "Group activities", "Field observation"],
-        assessment_methods=["Written tests", "Projects", "Oral questioning", "Practical assessment"]
-    )
-
-
-# ============================================================================
-# MAIN PARSING FUNCTION
-# ============================================================================
-
-def parse_curriculum_file(file_path: str, subject: str, grade_level: str) -> Dict:
-    """
-    Main entry point for parsing curriculum files.
-    
-    This does NOT use AI - it extracts structure directly from text.
-    """
-    text, file_type = extract_text_from_file(file_path)
-    
-    if not text or len(text) < 100:
-        raise ValueError("Could not extract meaningful text from file")
-    
-    # Detect subject if not provided
-    detected_subject = detect_subject(text, subject)
-    
-    # Parse based on subject
-    if 'math' in detected_subject.lower():
-        curriculum = parse_mathematics_curriculum(text, grade_level)
-    else:
-        curriculum = parse_generic_curriculum(text, detected_subject, grade_level)
-    
-    return {
-        "curriculum": asdict(curriculum),
-        "source_file": file_path,
-        "extraction_method": file_type,
-    }
-
-
-# ============================================================================
-# DATABASE INTEGRATION
-# ============================================================================
-
-def create_curriculum_from_structure(structure: Dict, institution, upload=None) -> Dict:
-    """
-    Create Course, Units, and Lessons from parsed structure.
-    """
-    from apps.curriculum.models import Course, Unit, Lesson, LessonStep
-    
-    from apps.curriculum.utils import format_grade_display
-    subject_name = structure.get('subject', 'General')
-    grade = structure.get('grade_level', '')
-    grade_display = format_grade_display(grade)
-
-    # Create course
-    course_name = f"{subject_name} {grade_display}"
-
-    course, created = Course.objects.update_or_create(
-        institution=institution,
-        title=course_name,
-        defaults={
-            'grade_level': grade,
-            'description': structure.get('description', ''),
-            'is_published': False,
-        }
-    )
-    
-    if upload:
-        upload.created_course = course
-        upload.add_log(f"{'Created' if created else 'Updated'} course: {course.title}")
-    
-    lessons_created = 0
-    units_created = 0
-    
-    # Create Units and Lessons
-    for unit_data in structure.get('units', []):
-        unit, u_created = Unit.objects.update_or_create(
-            course=course,
-            title=unit_data.get('title', 'Unnamed Unit'),
-            defaults={
-                'description': unit_data.get('introduction', ''),
-                'order_index': unit_data.get('number', 0),
-            }
-        )
-        
-        if u_created:
-            units_created += 1
-        
-        if upload:
-            upload.add_log(f"  {'Created' if u_created else 'Updated'} unit: {unit.title}")
-        
-        # Create lessons
-        for lesson_data in unit_data.get('lessons', []):
-            lesson_metadata = {
-                'enabling_objectives': lesson_data.get('enabling_objectives', []),
-                'teaching_strategies': lesson_data.get('teaching_strategies', []),
-                'resources': lesson_data.get('resources', []),
-                'assessment_methods': lesson_data.get('assessment_methods', []),
-            }
-            
-            lesson, l_created = Lesson.objects.update_or_create(
-                unit=unit,
-                title=lesson_data.get('title', 'Unnamed Lesson'),
-                defaults={
-                    'objective': lesson_data.get('objective', ''),
-                    'estimated_minutes': lesson_data.get('estimated_minutes', 20),
-                    'order_index': lesson_data.get('order', 0),
-                    'is_published': False,
-                    'metadata': lesson_metadata,
-                }
+            logger.exception(
+                "[parser_v2] lessons_pass FAILED for unit %r (%s)",
+                outline.title, outline.grade_level,
             )
-            
-            if l_created:
-                lessons_created += 1
-                
-                # Create a basic teach step
-                LessonStep.objects.get_or_create(
-                    lesson=lesson,
-                    order_index=0,
-                    defaults={
-                        'step_type': 'teach',
-                        'teacher_script': f"Today we will learn about: {lesson.objective}",
-                    }
+            return i, [], e
+
+    with _cf.ThreadPoolExecutor(max_workers=LESSONS_FANOUT_MAX_WORKERS) as ex:
+        futures = {
+            ex.submit(_run_one, i, o): (i, o)
+            for i, o in enumerate(outlines)
+        }
+        for fut in _cf.as_completed(futures, timeout=LESSONS_PASS_TIMEOUT_SECONDS * len(outlines)):
+            try:
+                i, lessons, err = fut.result(timeout=LESSONS_PASS_TIMEOUT_SECONDS)
+            except _cf.TimeoutError:
+                i, outline = futures[fut]
+                logger.warning(
+                    "[parser_v2] lessons_pass TIMEOUT for unit %r — "
+                    "returning empty lessons[].", outline.title,
                 )
-                
-                if upload:
-                    upload.add_log(f"    Created lesson: {lesson.title}")
-    
-    if upload:
-        upload.lessons_created = lessons_created
-        upload.save()
-    
+                lessons, err = [], TimeoutError("per-unit timeout")
+
+            if err is not None:
+                failed += 1
+            outline = futures[fut][1]
+            units[i] = UnitV2(**outline.model_dump(), lessons=lessons)
+            done += 1
+            if progress_cb:
+                try:
+                    progress_cb(done)
+                except Exception:
+                    logger.exception("[parser_v2] lessons fanout progress_cb raised — ignored")
+
+    # All slots filled (we initialised to None; should all be UnitV2 now).
+    return [u for u in units if u is not None], failed
+
+
+# ============================================================================
+# v2 — PUBLIC ENTRY POINT
+# ============================================================================
+
+
+def parse_curriculum(
+    file_path: str,
+    *,
+    subject_hint: str = '',
+    grade_hint: str = '',
+    locale: str = DEFAULT_LOCALE,
+    institution_id: Optional[int] = None,
+    progress_cb: Optional[Callable[[str, dict], None]] = None,
+) -> ParsedCurriculumV2:
+    """Parse a curriculum file into a ``ParsedCurriculumV2`` structure.
+
+    Always uses the LLM — never falls back to regex. Raises
+    ``ParseFailure`` with a structured reason on any irrecoverable
+    step.
+
+    Args:
+        file_path: PDF / DOCX / TXT / image path. Vision-OCR fallback
+            in extract_text_from_file handles scanned PDFs.
+        subject_hint: optional teacher-supplied subject ("Biology",
+            "Mathematics"). Soft prior — LLM may override.
+        grade_hint: optional teacher-supplied grade ("10ª Classe",
+            "S3"). Soft prior.
+        locale: BCP-47 locale code. Defaults to en-us. Soft prior —
+            LLM may override based on document content.
+        institution_id: optional, used by future KB-grounded passes
+            (M3+) to align unit names with existing materials.
+        progress_cb: optional ``(phase, data)`` callback so the upload
+            UI can stream live updates. Phases:
+            'extract', 'detect', 'outline', 'lessons', 'done'.
+
+    Returns:
+        ParsedCurriculumV2.
+
+    Raises:
+        ParseFailure with one of the REASONS slugs.
+    """
+    def _emit(phase: str, **data):
+        if progress_cb:
+            try:
+                progress_cb(phase, data)
+            except Exception:
+                logger.exception("[parser_v2] progress_cb raised — ignored")
+
+    # ── 1. Extract text (delegates to archive — vision OCR + NUL strip etc.)
+    _emit('extract', file=file_path)
+    try:
+        text, file_type = extract_text_from_file(file_path)
+    except OCRFailure as e:
+        raise ParseFailure('no_text', f"OCR failed: {e.reason} — {e.detail}")
+    if not text or len(text.strip()) < 100:
+        raise ParseFailure(
+            'no_text',
+            f"extracted {len(text) if text else 0} chars from {file_path} "
+            f"(file_type={file_type}); minimum 100 to attempt parse.",
+        )
+
+    # ── 2. Detect subject + locale + grade range
+    _emit('detect', extracted_chars=len(text))
+    detection = detect_subject_and_locale(
+        text,
+        subject_hint=subject_hint,
+        grade_hint=grade_hint,
+        locale_hint=locale,
+    )
+    # Override the caller-supplied locale with the LLM-detected one —
+    # the teacher's dropdown is a soft prior; the document content wins.
+    effective_locale = detection['locale']
+
+    # ── 3. Outline pass (M3)
+    _emit('outline', subject=detection['subject'], locale=effective_locale)
+    outlines = outline_pass(text, subject=detection['subject'], locale=effective_locale)
+    if not outlines:
+        raise ParseFailure(
+            'no_units_found',
+            f"outline_pass returned 0 units for subject={detection['subject']!r}",
+        )
+
+    # ── 4. Lessons pass — bounded thread-pool fan-out (M4)
+    _emit('lessons', unit_count=len(outlines))
+    units, failed = _lessons_fanout(
+        outlines, full_text=text, locale=effective_locale,
+        progress_cb=lambda done: _emit('lesson_unit_done', done=done, total=len(outlines)),
+    )
+    if failed == len(outlines):
+        raise ParseFailure(
+            'lesson_pass_failed',
+            f"all {len(outlines)} per-unit lessons_pass calls failed — see logs.",
+        )
+
+    _emit('done', units=len(units), lessons=sum(len(u.lessons) for u in units))
+    return ParsedCurriculumV2(
+        subject=detection['subject'],
+        locale=effective_locale,
+        grade_levels=detection['grade_levels'],
+        description='',
+        units=units,
+        detection_disagreed_with_hint=detection['hint_disagreement'],
+    )
+
+
+# ============================================================================
+# v2 — UPLOAD ORCHESTRATOR (M5)
+# ----------------------------------------------------------------------------
+# Overrides the archive's process_curriculum_upload + complete_curriculum_upload.
+# Same call signature so apps/dashboard views + tasks keep working unchanged.
+# Wires parse_curriculum() into the upload flow; surfaces ParseFailure as a
+# clean upload.status='failed' with a structured reason slug rather than a
+# stack trace. No regex fallback is reachable from this path.
+# ============================================================================
+
+
+def _v2_to_review_shape(parsed: ParsedCurriculumV2, target_grade: Optional[str] = None) -> dict:
+    """Convert a ``ParsedCurriculumV2`` to the dict shape the upload
+    review UI (templates/dashboard/curriculum/process.html) + the
+    archive's ``create_curriculum_from_structure`` both expect.
+
+    If ``target_grade`` is given, returns ONLY the units for that
+    grade. Otherwise returns all units mixed (used at the review-UI
+    step where teachers see the whole parse before the grade fanout
+    happens on Approve).
+    """
+    units_for_payload = []
+    for i, u in enumerate(parsed.units):
+        if target_grade and u.grade_level != target_grade:
+            continue
+        # Collect unit-level terminal objectives from the lesson
+        # objectives (the review UI expects them at unit level; v2
+        # doesn't track them separately but lesson objectives are a
+        # reasonable seed teachers can edit).
+        terminal_objectives = [l.objective for l in u.lessons if l.objective]
+        # Unit-level enabling objectives: dedupe across lessons.
+        all_eos = []
+        seen = set()
+        for l in u.lessons:
+            for eo in l.enabling_objectives:
+                if eo and eo.lower() not in seen:
+                    seen.add(eo.lower())
+                    all_eos.append(eo)
+
+        units_for_payload.append({
+            'title': u.title,
+            'grade_level': u.grade_level,
+            'number': i + 1,
+            'introduction': u.description,
+            'description': u.description,
+            'terminal_objectives': terminal_objectives[:10],
+            'enabling_objectives': all_eos,
+            'source_evidence': u.source_evidence,
+            'lessons': [
+                {
+                    'title': l.title,
+                    'objective': l.objective,
+                    'enabling_objectives': l.enabling_objectives,
+                    'teaching_strategies': [],
+                    'resources': [],
+                    'assessment_methods': [],
+                    'estimated_minutes': 20,
+                    'order': l.order,
+                }
+                for l in u.lessons
+            ],
+        })
+
     return {
-        'course_id': course.id,
-        'course_name': course.title,
-        'units_created': units_created,
-        'lessons_created': lessons_created,
+        'subject': parsed.subject,
+        'locale': parsed.locale,
+        'grade_level': target_grade or '',  # for legacy single-grade callers
+        'grade_levels': parsed.grade_levels,
+        'description': parsed.description,
+        'detection_disagreed_with_hint': parsed.detection_disagreed_with_hint,
+        'units': units_for_payload,
+        'parser_version': 'v2',
     }
 
 
-# ============================================================================
-# MAIN PROCESSING FUNCTION (called by dashboard)
-# ============================================================================
+def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict:
+    """v2 orchestrator. Replaces the archive's regex-fallback chain
+    with the LLM-first ``parse_curriculum()``. Same call signature so
+    apps/dashboard call sites keep working unchanged.
 
-def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> Dict:
-    """
-    Process a curriculum upload with optional teacher review.
-    
-    Flow:
-    1. Extract text from document
-    2. Parse curriculum structure
-    3. (If not skip_review) Set status to 'review' and wait for approval
-    4. Create database records
-    
-    Args:
-        upload_id: ID of the CurriculumUpload record
-        skip_review: If True, skip the review step and create records immediately
+    Status transitions:
+      pending → processing → review (or → failed)
+      review  → (teacher approves via complete_curriculum_upload) → completed
     """
     from apps.dashboard.models import CurriculumUpload
-    
+
     upload = CurriculumUpload.objects.get(id=upload_id)
-    
+
+    def _bump(phase: str, data: dict):
+        """Forward parser_v2 progress events to the upload log so the
+        review UI's live-progress widget stays informative.
+
+        Signature matches the `progress_cb(phase, data_dict)` contract
+        in parse_curriculum._emit — note `data` is a dict, not kwargs.
+        """
+        data = data or {}
+        if phase == 'extract':
+            upload.add_log(f"📄 Step 1/4: Extracting text from {upload.file_path}…")
+        elif phase == 'detect':
+            upload.add_log(
+                f"   ✓ Extracted {data.get('extracted_chars', 0):,} characters."
+            )
+            upload.add_log("🔍 Step 2/4: Classifying subject, locale, and grade…")
+        elif phase == 'outline':
+            upload.add_log(
+                f"   ✓ Detected: subject={data.get('subject')!r}, "
+                f"locale={data.get('locale')!r}"
+            )
+            upload.add_log("📚 Step 3/4: Extracting unit-level structure…")
+        elif phase == 'lessons':
+            upload.add_log(
+                f"   ✓ Found {data.get('unit_count', 0)} units."
+            )
+            upload.add_log(
+                f"📖 Step 4/4: Extracting lessons (parallel fan-out, "
+                f"max {LESSONS_FANOUT_MAX_WORKERS} concurrent)…"
+            )
+        elif phase == 'lesson_unit_done':
+            done, total = data.get('done', 0), data.get('total', 0)
+            if done % 3 == 0 or done == total:
+                upload.add_log(f"   • {done}/{total} units processed")
+        elif phase == 'done':
+            pass  # final summary logged below
+        upload.save(update_fields=['processing_log'])
+
     try:
         upload.status = 'processing'
         upload.current_step = 1
         upload.processing_log = ""
-        upload.add_log("🚀 Starting curriculum processing...")
-        upload.save()
-        
-        # Step 1: Extract text
-        upload.add_log("📄 Step 1: Extracting text from document...")
+        upload.add_log("🚀 Starting curriculum parsing (v2 — locale-aware LLM)…")
         upload.add_log(f"   File: {upload.file_path}")
-        
-        text, file_type = extract_text_from_file(upload.file_path)
-        upload.extracted_text_length = len(text)
-        upload.add_log(f"   ✓ Extracted {len(text):,} characters ({file_type})")
-        
-        # Show preview of extracted text for debugging
-        if text:
-            preview = text[:500].replace('\n', ' ')[:200]
-            upload.add_log(f"   Preview: {preview}...")
-        
+        upload.add_log(f"   Teacher hints: subject={upload.subject_name!r}, "
+                       f"grade={upload.grade_level!r}, locale={getattr(upload, 'locale', None)!r}")
         upload.save()
-        
-        if len(text) < 100:
-            raise ValueError("Could not extract meaningful text from file. The document may be scanned images or in an unsupported format.")
-        
-        # Step 2: Parse curriculum structure
-        upload.current_step = 2
-        upload.add_log("📚 Step 2: Parsing curriculum structure...")
-        upload.save()
-        
-        detected_subject = detect_subject(text, upload.subject_name)
-        upload.add_log(f"   Subject detected: {detected_subject}")
-        
-        # Try LLM-based parsing first (more robust)
-        try:
-            upload.add_log("   Using AI to analyze document structure...")
-            curriculum = parse_curriculum_with_llm(
-                text, detected_subject, upload.grade_level or '',
-                institution_id=upload.institution_id,
-            )
-            upload.add_log("   ✓ AI parsing complete")
-        except Exception as e:
-            upload.add_log(f"   ⚠️ AI parsing failed: {e}")
-            upload.add_log("   Falling back to pattern-based parsing...")
-            # Fall back to regex-based parsing
-            if 'math' in detected_subject.lower():
-                curriculum = parse_mathematics_curriculum(text, upload.grade_level or '')
-            else:
-                curriculum = parse_generic_curriculum(text, detected_subject, upload.grade_level or '')
-        
-        structure = asdict(curriculum)
-        
-        units_count = len(structure.get('units', []))
-        lessons_count = sum(len(u.get('lessons', [])) for u in structure.get('units', []))
-        
-        upload.add_log(f"   ✓ Found {units_count} units with {lessons_count} lessons")
-        
-        # Log some details about what was found
-        for unit in structure.get('units', [])[:3]:  # Show first 3 units
-            upload.add_log(f"      📁 {unit.get('title')}: {len(unit.get('lessons', []))} lessons")
-        
-        upload.parsed_data = structure
-        upload.save()
-        
-        # If no content found, show warning but still allow proceeding
-        if lessons_count == 0:
-            upload.add_log("⚠️ No lessons extracted. The document format may not be recognized.")
-            upload.add_log(f"   Document had {len(text):,} characters of text.")
-            upload.add_log("   Try uploading a document with clear sections and bullet points.")
-            # Still go to review so teacher can see what happened
-            upload.status = 'review'
-            upload.add_log("⏸️ Please review - no content was extracted.")
-            upload.save()
-            
-            return {
-                'success': True,
-                'status': 'review',
-                'units_count': 0,
-                'lessons_count': 0,
-                'message': 'No lessons extracted. Please check document format.',
-            }
-        
-        # If review is required, stop here and wait for teacher approval
-        if not skip_review:
-            upload.status = 'review'
-            upload.add_log("⏸️ Waiting for teacher review...")
-            upload.save()
-            
-            return {
-                'success': True,
-                'status': 'review',
-                'units_count': units_count,
-                'lessons_count': lessons_count,
-                'message': 'Please review the parsed curriculum structure.',
-            }
-        
-        # Step 3: Create database records
-        return complete_curriculum_upload(upload_id)
-        
-    except Exception as e:
-        logger.exception(f"Curriculum processing failed: {e}")
-        upload.status = 'failed'
-        upload.error_message = str(e)
-        upload.add_log(f"❌ Error: {e}")
-        upload.save()
-        raise
 
-
-def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
-    """
-    Complete the curriculum upload by creating database records.
-    Called after teacher approves the parsed structure.
-    """
-    from apps.dashboard.models import CurriculumUpload
-    from django.utils import timezone
-    
-    upload = CurriculumUpload.objects.get(id=upload_id)
-    
-    try:
-        upload.status = 'processing'
-        upload.current_step = 3
-        
-        if feedback:
-            upload.teacher_feedback = feedback
-        
-        upload.add_log("💾 Step 3: Creating curriculum records...")
-        upload.save()
-        
-        structure = upload.parsed_data
-        if not structure:
-            raise ValueError("No parsed data available. Please re-process the document.")
-        
-        # Create database records
-        result = create_curriculum_from_structure(
-            structure=structure,
-            institution=upload.institution,
-            upload=upload
+        parsed = parse_curriculum(
+            upload.file_path,
+            subject_hint=upload.subject_name or '',
+            grade_hint=upload.grade_level or '',
+            locale=getattr(upload, 'locale', None) or DEFAULT_LOCALE,
+            institution_id=upload.institution_id,
+            progress_cb=_bump,
         )
-        
-        upload.units_created = result.get('units_created', 0)
-        upload.lessons_created = result.get('lessons_created', 0)
-        upload.add_log(f"   ✓ Created {result['units_created']} units, {result['lessons_created']} lessons")
-        
-        # Mark complete
-        upload.status = 'completed'
-        upload.completed_at = timezone.now()
-        upload.add_log(f"✅ Complete! Course '{result['course_name']}' is ready.")
+
+        # Convert to review-UI shape (one payload, all units, all grades).
+        structure = _v2_to_review_shape(parsed)
+        upload.parsed_data = structure
+        upload.extracted_text_length = sum(
+            len(l.objective) + len(l.title) for u in parsed.units for l in u.lessons
+        )  # rough proxy — original was extract_text_from_file len; not load-bearing
+
+        unit_count = len(parsed.units)
+        lesson_count = sum(len(u.lessons) for u in parsed.units)
+        upload.add_log(
+            f"✅ Parse complete: {unit_count} units, {lesson_count} lessons "
+            f"across {len(parsed.grade_levels)} grade(s) "
+            f"({', '.join(parsed.grade_levels)})."
+        )
+        if parsed.detection_disagreed_with_hint:
+            upload.add_log(
+                "   ⚠ Subject/locale detection disagreed with your hints — "
+                "the document's content was trusted. See parsed_data.detection_*."
+            )
+        if len(parsed.grade_levels) > 1:
+            upload.add_log(
+                f"   ℹ️ Multi-grade document — on Approve, one Course will be "
+                f"created per grade ({len(parsed.grade_levels)} Courses total)."
+            )
+
+        if skip_review:
+            upload.save()
+            return complete_curriculum_upload(upload_id)
+
+        upload.status = 'review'
+        upload.add_log("⏸️ Ready for teacher review — confirm and Approve to "
+                       "generate the Course / Unit / Lesson rows.")
         upload.save()
-        
+
         return {
             'success': True,
-            'status': 'completed',
-            'course_id': result['course_id'],
-            'course_name': result['course_name'],
-            'units_created': result['units_created'],
-            'lessons_created': result['lessons_created'],
+            'status': 'review',
+            'units_count': unit_count,
+            'lessons_count': lesson_count,
+            'grades': parsed.grade_levels,
+            'parser_version': 'v2',
         }
-        
+
+    except ParseFailure as e:
+        logger.warning(
+            "[parser_v2] process_curriculum_upload: ParseFailure(%s): %s",
+            e.reason, e.detail,
+        )
+        upload.status = 'failed'
+        upload.error_message = f"{e.reason}: {e.detail}"
+        upload.add_log(f"❌ Parse failed — reason: {e.reason}")
+        if e.detail:
+            upload.add_log(f"   Detail: {e.detail[:300]}")
+        # Reason-specific actionable next steps for the teacher.
+        if e.reason == 'no_text':
+            upload.add_log(
+                "   This usually means the PDF is a scanned image. Try "
+                "uploading a text-PDF version, or wait — vision OCR is "
+                "active and may have just failed on this specific page set."
+            )
+        elif e.reason == 'subject_unclassified':
+            upload.add_log(
+                "   The LLM couldn't identify the subject from the first "
+                "page. Pre-fill the Subject field on the upload form and "
+                "try again."
+            )
+        elif e.reason in ('llm_unavailable', 'llm_error'):
+            upload.add_log(
+                "   The AI parser is unavailable right now. Check ModelConfig "
+                "for purpose='generation' in the admin, or retry shortly."
+            )
+        upload.save()
+        return {
+            'success': False,
+            'status': 'failed',
+            'reason': e.reason,
+            'detail': e.detail,
+        }
     except Exception as e:
-        logger.exception(f"Curriculum completion failed: {e}")
+        logger.exception("[parser_v2] process_curriculum_upload: unexpected error")
         upload.status = 'failed'
         upload.error_message = str(e)
-        upload.add_log(f"❌ Error: {e}")
+        upload.add_log(f"❌ Unexpected error: {type(e).__name__}: {e}")
         upload.save()
         raise
+
+
+def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
+    """v2 completion — fans out by grade. One Course row per grade
+    detected in the document; each unit lands under its grade's Course.
+
+    For single-grade docs this is equivalent to the archive's one-
+    Course-per-upload behaviour. For multi-grade docs (e.g. Mozambique
+    Biology 10ª/11ª/12ª) it creates 3 Course rows. The data model
+    already supports this (Course.grade_level is a single string);
+    we just needed to actually fan out instead of jamming everything
+    under one Course.
+
+    Args:
+        upload_id: CurriculumUpload row id.
+        feedback: optional teacher feedback string (not currently used
+            in v2 — review-time edits are written directly to
+            upload.parsed_data by the review form).
+
+    Returns:
+        dict with course_ids, total units_created, lessons_created.
+    """
+    from apps.dashboard.models import CurriculumUpload
+    from apps.accounts.models import Institution
+
+    upload = CurriculumUpload.objects.get(id=upload_id)
+    structure = upload.parsed_data or {}
+    if not structure or not structure.get('units'):
+        upload.add_log("❌ complete_curriculum_upload: no parsed_data — nothing to commit.")
+        upload.status = 'failed'
+        upload.error_message = 'empty parsed_data'
+        upload.save()
+        return {'success': False, 'reason': 'empty_parsed_data'}
+
+    # Multi-grade fanout: group units by their grade_level. If units
+    # don't carry a grade_level (older data, or — observed during M7
+    # E2E — review form POST that scraped units without preserving the
+    # per-unit grade_level field), fall back to the LLM-detected
+    # grade_levels from parsed_data FIRST, then upload.grade_level as
+    # a last resort. The detected grade is the authoritative one;
+    # upload.grade_level is the teacher's hint which the parser
+    # already explicitly overrode at detect time.
+    fallback_grade = (
+        (structure.get('grade_levels') or [None])[0]
+        or upload.grade_level
+        or ''
+    )
+    units_by_grade: dict[str, list] = {}
+    for unit in structure['units']:
+        g = (unit.get('grade_level') or fallback_grade or '').strip()
+        units_by_grade.setdefault(g, []).append(unit)
+
+    upload.add_log(
+        f"📦 Creating Course rows for {len(units_by_grade)} grade(s): "
+        f"{', '.join(sorted(units_by_grade.keys()))}"
+    )
+
+    inst = Institution.objects.filter(id=upload.institution_id).first() if upload.institution_id else None
+    course_ids = []
+    total_units = 0
+    total_lessons = 0
+
+    # Detected locale to stamp on each Course row. The archive's
+    # create_curriculum_from_structure doesn't read or set locale —
+    # we patch it on after the row is created so downstream content
+    # generation picks the right register.
+    detected_locale = structure.get('locale') or 'en-us'
+
+    from apps.curriculum.models import Course as _Course
+
+    for grade, units in sorted(units_by_grade.items()):
+        # Build a structure dict for this grade and hand off to the
+        # archive's create_curriculum_from_structure (it still works
+        # fine; we just feed it a single-grade slice). After M5 this
+        # is the only place the archive's structure-creation code runs
+        # from the runtime path.
+        per_grade_struct = {
+            'subject': structure.get('subject', 'General'),
+            'grade_level': grade,
+            'description': structure.get('description', ''),
+            'units': units,
+        }
+        result = create_curriculum_from_structure(per_grade_struct, inst, upload=upload)
+        cid = result.get('course_id')
+        course_ids.append(cid)
+        total_units += result.get('units_created', 0)
+        total_lessons += result.get('lessons_created', 0)
+
+        # Stamp the detected locale on the Course so content
+        # generation runs in the correct register. The archive's
+        # create_curriculum_from_structure ignores locale.
+        if cid:
+            _Course.objects.filter(id=cid).update(locale=detected_locale)
+
+        upload.add_log(
+            f"   ✓ {grade or '(no grade)'}: Course #{cid} "
+            f"({result.get('units_created', 0)} units, "
+            f"{result.get('lessons_created', 0)} lessons, "
+            f"locale={detected_locale!r})"
+        )
+
+    upload.status = 'completed'
+    upload.lessons_created = total_lessons
+    # Pick the first course as the primary "created_course" link the UI uses.
+    if course_ids:
+        from apps.curriculum.models import Course
+        upload.created_course = Course.objects.filter(id=course_ids[0]).first()
+    upload.add_log(f"🎉 Done — {len(course_ids)} course(s), {total_units} units, {total_lessons} lessons.")
+    upload.save()
+
+    return {
+        'success': True,
+        'course_ids': course_ids,
+        'units_created': total_units,
+        'lessons_created': total_lessons,
+        'parser_version': 'v2',
+    }

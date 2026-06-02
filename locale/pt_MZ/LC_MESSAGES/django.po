@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 01:29+0000\n"
+"POT-Creation-Date: 2026-06-02 21:40+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -37,17 +37,17 @@ msgstr "Perfil atualizado."
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
-#: apps/dashboard/views.py:782 apps/dashboard/views.py:1901
+#: apps/dashboard/views.py:782 apps/dashboard/views.py:1850
 #, python-format
 msgid "Promote to %(grade)s"
 msgstr "Promover para %(grade)s"
 
-#: apps/dashboard/views.py:784 apps/dashboard/views.py:1903
-#: apps/dashboard/views.py:1904
+#: apps/dashboard/views.py:784 apps/dashboard/views.py:1852
+#: apps/dashboard/views.py:1853
 msgid "Graduate"
 msgstr "Graduar"
 
-#: apps/dashboard/views.py:786 apps/dashboard/views.py:1911
+#: apps/dashboard/views.py:786 apps/dashboard/views.py:1860
 #, python-format
 msgid "Demote to %(grade)s"
 msgstr "Despromover para %(grade)s"
@@ -166,7 +166,7 @@ msgstr "(o teu navegador vai perguntar qual ecrã / janela partilhar)"
 #: templates/dashboard/curriculum/process.html:305
 #: templates/dashboard/curriculum/step_edit.html:185
 #: templates/dashboard/curriculum/unit_create.html:32
-#: templates/dashboard/curriculum/upload.html:435
+#: templates/dashboard/curriculum/upload.html:440
 #: templates/dashboard/student_groups/list.html:178
 #: templates/dashboard/summative/review.html:284
 msgid "Cancel"
@@ -440,7 +440,7 @@ msgid "Select your school"
 msgstr "Seleciona a tua escola"
 
 #: templates/accounts/student_register.html:89
-#: templates/dashboard/curriculum/upload.html:379
+#: templates/dashboard/curriculum/upload.html:384
 #: templates/dashboard/materials/process.html:140
 msgid "Grade Level"
 msgstr "Classe"
@@ -641,12 +641,16 @@ msgstr "Relatório de Preparação da Turma"
 #: templates/dashboard/student_groups/list.html:138
 #, python-format
 msgid "%(count)s student"
-msgstr "%(count)s aluno"
+msgid_plural "%(count)s students"
+msgstr[0] "%(count)s aluno"
+msgstr[1] "%(count)s aluno"
 
 #: templates/dashboard/class_readiness.html:138
 #, python-format
 msgid "%(count)s enabling objective"
-msgstr "%(count)s objetivo facilitador"
+msgid_plural "%(count)s enabling objectives"
+msgstr[0] "%(count)s objetivo facilitador"
+msgstr[1] "%(count)s objetivo facilitador"
 
 #: templates/dashboard/class_readiness.html:147
 msgid "Class Readiness"
@@ -689,7 +693,9 @@ msgstr "Alunos que Precisam de Acompanhamento"
 #: templates/dashboard/class_readiness.html:212
 #, python-format
 msgid "%(count)s weak objective"
-msgstr "%(count)s objetivo fraco"
+msgid_plural "%(count)s weak objectives"
+msgstr[0] "%(count)s objetivo fraco"
+msgstr[1] "%(count)s objetivo fraco"
 
 #: templates/dashboard/classes/detail.html:4
 #: templates/dashboard/classes/detail.html:5
@@ -705,7 +711,9 @@ msgstr "Todas as turmas"
 #: templates/dashboard/classes/detail.html:18
 #, python-format
 msgid "%(count)s course for this grade"
-msgstr "%(count)s curso para esta classe"
+msgid_plural "%(count)s courses for this grade"
+msgstr[0] "%(count)s curso para esta classe"
+msgstr[1] "%(count)s curso para esta classe"
 
 #: templates/dashboard/classes/detail.html:26
 #, python-format
@@ -713,8 +721,8 @@ msgid "Courses for %(g)s"
 msgstr "Cursos para %(g)s"
 
 #: templates/dashboard/classes/detail.html:36
+#: templates/dashboard/curriculum/process.html:403
 #: templates/tutoring/catalog.html:234
-#, python-format
 #, python-format
 msgid "%(count)s lesson"
 msgid_plural "%(count)s lessons"
@@ -724,11 +732,14 @@ msgstr[1] "%(count)s lições"
 #: templates/dashboard/classes/detail.html:37
 #, python-format
 msgid "%(count)s student attempted"
-msgstr "%(count)s aluno tentou"
+msgid_plural "%(count)s students attempted"
+msgstr[0] "%(count)s aluno tentou"
+msgstr[1] "%(count)s aluno tentou"
 
 #: templates/dashboard/classes/detail.html:42
 #: templates/dashboard/curriculum/list.html:32
 #: templates/dashboard/curriculum/process.html:268
+#: templates/dashboard/curriculum/process.html:381
 msgid "Lessons"
 msgstr "Lições"
 
@@ -800,7 +811,9 @@ msgstr "Relatório"
 #: templates/dashboard/classes/detail.html:108
 #, python-format
 msgid "%(count)s student in %(g)s"
-msgstr "%(count)s aluno em %(g)s"
+msgid_plural "%(count)s students in %(g)s"
+msgstr[0] "%(count)s aluno em %(g)s"
+msgstr[1] "%(count)s aluno em %(g)s"
 
 #: templates/dashboard/classes/detail.html:130
 msgid "Select all"
@@ -848,11 +861,15 @@ msgstr "%(students)s alunos agrupados em %(classes_count)s turmas. Abre uma turm
 
 #: templates/dashboard/classes/list.html:31
 msgid "student"
-msgstr "aluno"
+msgid_plural "students"
+msgstr[0] "aluno"
+msgstr[1] "aluno"
 
 #: templates/dashboard/classes/list.html:44
 msgid "student without a grade set on their profile"
-msgstr "aluno sem classe definida no perfil"
+msgid_plural "students without a grade set on their profile"
+msgstr[0] "aluno sem classe definida no perfil"
+msgstr[1] "aluno sem classe definida no perfil"
 
 #: templates/dashboard/classes/list.html:64
 msgid "No students yet"
@@ -954,7 +971,9 @@ msgstr "Fraco em:"
 #: templates/dashboard/competency/class.html:148
 #, python-format
 msgid "%(count)s gap"
-msgstr "%(count)s lacuna"
+msgid_plural "%(count)s gaps"
+msgstr[0] "%(count)s lacuna"
+msgstr[1] "%(count)s lacuna"
 
 #: templates/dashboard/competency/student.html:4
 #, python-format
@@ -1191,7 +1210,9 @@ msgstr "Conteúdo"
 #: templates/dashboard/curriculum/course_detail.html:887
 #, python-format
 msgid "%(count)s step"
-msgstr "%(count)s passo"
+msgid_plural "%(count)s steps"
+msgstr[0] "%(count)s passo"
+msgstr[1] "%(count)s passo"
 
 #: templates/dashboard/curriculum/course_detail.html:889
 #: templates/dashboard/curriculum/course_detail.html:902
@@ -1201,7 +1222,9 @@ msgstr "Sem conteúdo"
 #: templates/dashboard/curriculum/course_detail.html:895
 #, python-format
 msgid "%(count)s media pending"
-msgstr "%(count)s média pendente"
+msgid_plural "%(count)s media pending"
+msgstr[0] "%(count)s média pendente"
+msgstr[1] "%(count)s média pendente"
 
 #: templates/dashboard/curriculum/course_detail.html:899
 msgid "Exit"
@@ -1322,6 +1345,7 @@ msgstr "Classe"
 
 #: templates/dashboard/curriculum/list.html:31
 #: templates/dashboard/curriculum/process.html:264
+#: templates/dashboard/curriculum/process.html:380
 msgid "Units"
 msgstr "Unidades"
 
@@ -1334,13 +1358,13 @@ msgid "Manage"
 msgstr "Gerir"
 
 #: templates/dashboard/curriculum/list.html:83
-#: templates/dashboard/curriculum/upload.html:367
+#: templates/dashboard/curriculum/upload.html:372
 #: templates/dashboard/materials/process.html:128
 msgid "Title"
 msgstr "Título"
 
 #: templates/dashboard/curriculum/list.html:84
-#: templates/dashboard/curriculum/upload.html:371
+#: templates/dashboard/curriculum/upload.html:376
 #: templates/dashboard/quality/content_edit_events_list.html:68
 msgid "Type"
 msgstr "Tipo"
@@ -1463,6 +1487,87 @@ msgstr "Documento"
 #: templates/dashboard/curriculum/process.html:304
 msgid "Start Processing"
 msgstr "Iniciar processamento"
+
+#: templates/dashboard/curriculum/process.html:365
+msgid "Review & Edit Structure"
+msgstr "Rever estrutura"
+
+#: templates/dashboard/curriculum/process.html:366
+msgid "Needs Review"
+msgstr "Rever"
+
+#: templates/dashboard/curriculum/process.html:372
+msgid "Review Your Curriculum"
+msgstr "Voltar ao Currículo"
+
+#: templates/dashboard/curriculum/process.html:374
+msgid "Click to expand units and review lessons. Edit titles and objectives as needed. Remove any that don't belong. When satisfied, click \\"
+msgstr "Clica para expandir as unidades e rever as lições. Edita os títulos e objetivos conforme necessário. Remove os que não pertencerem. Quando estiveres satisfeito, clica em \\"
+
+#: templates/dashboard/curriculum/process.html:382
+msgid "Characters"
+msgstr "Mín. 6 caracteres"
+
+#: templates/dashboard/curriculum/process.html:386
+msgid "Units & Lessons"
+msgstr "Total de Lições"
+
+#: templates/dashboard/curriculum/process.html:388
+msgid "Expand All"
+msgstr "Expandir painel"
+
+#: templates/dashboard/curriculum/process.html:389
+msgid "Collapse All"
+msgstr "Recolher Tudo"
+
+#: templates/dashboard/curriculum/process.html:390
+#: templates/dashboard/curriculum/unit_create.html:4
+msgid "Add Unit"
+msgstr "Adicionar unidade"
+
+#: templates/dashboard/curriculum/process.html:400
+msgid "Unit title"
+msgstr "Título da unidade *"
+
+#: templates/dashboard/curriculum/process.html:404
+msgid "Remove unit"
+msgstr "Remover figura"
+
+#: templates/dashboard/curriculum/process.html:411
+msgid "Terminal Objectives (Assessment Targets)"
+msgstr "Objetivos Terminais (Metas de Avaliação)"
+
+#: templates/dashboard/curriculum/process.html:412
+msgid "Add TO"
+msgstr "Adicionar OT"
+
+#: templates/dashboard/curriculum/process.html:419
+msgid "Remove"
+msgstr "Remover logótipo"
+
+#: templates/dashboard/curriculum/process.html:422
+msgid "No terminal objectives extracted. Click + Add TO to add manually."
+msgstr "Nenhum objetivo terminal extraído. Clica em + Adicionar OT para adicionares manualmente."
+
+#: templates/dashboard/curriculum/process.html:431
+msgid "Enabling Objectives (Teaching Steps)"
+msgstr "Objetivo Habilitador"
+
+#: templates/dashboard/curriculum/process.html:432
+msgid "Add EO"
+msgstr "Adicionar OE"
+
+#: templates/dashboard/curriculum/process.html:520
+msgid "Approve & Generate Content"
+msgstr "Gerar conteúdo"
+
+#: templates/dashboard/curriculum/process.html:523
+msgid "Save Structure Only"
+msgstr "Rever estrutura"
+
+#: templates/dashboard/curriculum/process.html:526
+msgid "Re-upload"
+msgstr "Carregamento em Massa"
 
 #: templates/dashboard/curriculum/step_edit.html:4
 msgid "Edit Step"
@@ -1609,10 +1714,6 @@ msgstr "Carrega uma imagem personalizada para este passo"
 msgid "Save Changes"
 msgstr "Guardar alterações"
 
-#: templates/dashboard/curriculum/unit_create.html:4
-msgid "Add Unit"
-msgstr "Adicionar unidade"
-
 #: templates/dashboard/curriculum/unit_create.html:5
 #, python-format
 msgid "Add Unit to %(title)s"
@@ -1699,80 +1800,80 @@ msgstr "Deixa em branco para usar o nome da disciplina. O título do curso fica 
 msgid "Grade Levels to Process"
 msgstr "Classes a processar"
 
-#: templates/dashboard/curriculum/upload.html:324
+#: templates/dashboard/curriculum/upload.html:329
 msgid "Select which grade levels to extract. The document will be analyzed once and separate courses created per level."
 msgstr "Seleciona quais classes extrair. O documento será analisado uma vez e serão criados cursos separados por classe."
 
-#: templates/dashboard/curriculum/upload.html:330
+#: templates/dashboard/curriculum/upload.html:335
 msgid "Target Lesson Duration"
 msgstr "Duração Alvo da Lição"
 
-#: templates/dashboard/curriculum/upload.html:333
+#: templates/dashboard/curriculum/upload.html:338
 msgid "15 min · 3 steps"
 msgstr "15 min · 3 passos"
 
-#: templates/dashboard/curriculum/upload.html:336
+#: templates/dashboard/curriculum/upload.html:341
 msgid "20 min · 4 steps (default)"
 msgstr "20 min · 4 passos (padrão)"
 
-#: templates/dashboard/curriculum/upload.html:339
+#: templates/dashboard/curriculum/upload.html:344
 msgid "25 min · 5 steps (full)"
 msgstr "25 min · 5 passos (completo)"
 
-#: templates/dashboard/curriculum/upload.html:343
+#: templates/dashboard/curriculum/upload.html:348
 msgid "Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime selector picks the subset matching the student's chosen duration. Shorter sessions skip the enrichment practice."
 msgstr "Cada lição gera 5 passos (3 de ensino/exploração + 2 de prática). O seletor em tempo de execução escolhe o subconjunto que corresponde à duração escolhida pelo aluno. Sessões mais curtas saltam a prática de enriquecimento."
 
-#: templates/dashboard/curriculum/upload.html:351
+#: templates/dashboard/curriculum/upload.html:356
 msgid "Attach teaching materials"
 msgstr "Anexar materiais didáticos"
 
-#: templates/dashboard/curriculum/upload.html:354
+#: templates/dashboard/curriculum/upload.html:359
 msgid "Upload worksheets, past exam papers, textbook chapters, teacher notes — each file gets its own type. These are indexed into the knowledge base for AI tutoring and assessment."
 msgstr "Carrega fichas de trabalho, exames anteriores, capítulos de manuais, notas do professor — cada ficheiro tem o seu tipo. São indexados na base de conhecimento para tutoria e avaliação com AI."
 
-#: templates/dashboard/curriculum/upload.html:363
+#: templates/dashboard/curriculum/upload.html:368
 msgid "Files"
 msgstr "Ficheiros"
 
-#: templates/dashboard/curriculum/upload.html:368
+#: templates/dashboard/curriculum/upload.html:373
 msgid "e.g., Geography Worksheet Unit 5"
 msgstr "p. ex., Ficha de Geografia Unidade 5"
 
-#: templates/dashboard/curriculum/upload.html:381
+#: templates/dashboard/curriculum/upload.html:386
 #: templates/dashboard/materials/process.html:142
 msgid "All Levels"
 msgstr "Todos os níveis"
 
-#: templates/dashboard/curriculum/upload.html:394
+#: templates/dashboard/curriculum/upload.html:399
 msgid "Add another material"
 msgstr "Adicionar outro material"
 
-#: templates/dashboard/curriculum/upload.html:402
+#: templates/dashboard/curriculum/upload.html:407
 msgid "Materials are saved now but processed AFTER the curriculum is parsed and courses are created. You can process them from the course page."
 msgstr "Os materiais são guardados agora mas processados DEPOIS de o currículo ser analisado e os cursos criados. Podes processá-los a partir da página do curso."
 
-#: templates/dashboard/curriculum/upload.html:415
+#: templates/dashboard/curriculum/upload.html:420
 msgid "What happens next?"
 msgstr "O que acontece a seguir?"
 
-#: templates/dashboard/curriculum/upload.html:417
+#: templates/dashboard/curriculum/upload.html:422
 msgid "AI will analyze your curriculum document"
 msgstr "A AI vai analisar o teu documento curricular"
 
-#: templates/dashboard/curriculum/upload.html:418
+#: templates/dashboard/curriculum/upload.html:423
 msgid "Units and lessons will be extracted automatically"
 msgstr "As unidades e lições serão extraídas automaticamente"
 
-#: templates/dashboard/curriculum/upload.html:419
+#: templates/dashboard/curriculum/upload.html:424
 msgid "You can review and edit before publishing"
 msgstr "Podes rever e editar antes de publicar"
 
-#: templates/dashboard/curriculum/upload.html:420
+#: templates/dashboard/curriculum/upload.html:425
 msgid "Exit tickets and content will be generated"
 msgstr "Serão gerados bilhetes de saída e conteúdos"
 
-#: templates/dashboard/curriculum/upload.html:433
+#: templates/dashboard/curriculum/upload.html:438
 msgid "Upload & Process"
 msgstr "Carregar e processar"
 
@@ -1992,7 +2093,9 @@ msgstr "Transcrição"
 #: templates/dashboard/flagged_session_detail.html:52
 #, python-format
 msgid "%(count)s message"
-msgstr "%(count)s mensagem"
+msgid_plural "%(count)s messages"
+msgstr[0] "%(count)s mensagem"
+msgstr[1] "%(count)s mensagem"
 
 #: templates/dashboard/flagged_sessions.html:11
 msgid "Safety Flags"
@@ -2821,7 +2924,9 @@ msgstr "Frase"
 
 #: templates/dashboard/session_exit_review.html:226
 msgid "Student blank"
-msgstr "Aluno em branco"
+msgid_plural "Student blanks"
+msgstr[0] "Aluno em branco"
+msgstr[1] "Aluno em branco"
 
 #: templates/dashboard/session_exit_review.html:228
 #: templates/dashboard/session_exit_review.html:248
@@ -3592,7 +3697,6 @@ msgstr "Melhor"
 
 #: templates/dashboard/students/detail.html:125
 #: templates/tutoring/catalog.html:283
-#, python-format
 #, python-format
 msgid "%(count)s attempt"
 msgid_plural "%(count)s attempts"

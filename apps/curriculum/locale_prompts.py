@@ -85,3 +85,70 @@ def locale_instruction_block(locale: str) -> str:
         f"tag '{code}'. Do not switch to English mid-content.\n"
         f"</locale>\n"
     )
+
+
+def locale_parser_hints(locale: str) -> str:
+    """Locale-aware hints for the curriculum PARSER (distinct from
+    ``locale_instruction_block``, which guides content GENERATION).
+
+    Returns an XML-tagged block that tells the LLM what section
+    terminology to recognise as structural cues in the source
+    document. Without this, an English-prompted LLM tends to coerce
+    PT structural labels into Seychelles equivalents (e.g. "Unidade
+    Temática" → "Strand", "10ª Classe" → "S3"), which we don't want
+    — the parser should produce labels as they appear in the source.
+
+    Returns an empty string for ``en-us`` so the EN cache key stays
+    byte-stable.
+
+    Part of M3 in ``memory/curriculum_parser_v2_plan.md``.
+    """
+    code = (locale or "en-us").lower()
+    if code in ("en-us", "en"):
+        return ""
+    if code == "pt-mz":
+        return (
+            "\n\n<locale_parser_hints locale=\"pt-mz\">\n"
+            "This document is in Mozambique Portuguese. Recognise these "
+            "section labels as STRUCTURAL CUES (not content):\n"
+            "- \"Unidade Temática\" / \"Unidade\" = a unit / strand. The "
+            "  Roman numeral or Arabic number that follows is its ordinal.\n"
+            "- \"Conteúdos\" = the topic/content list within a unit. "
+            "  Numbered entries (1.1, 1.2, …) are usually individual "
+            "  lessons or lesson topics.\n"
+            "- \"Objectivos Específicos\" = enabling objectives (the "
+            "  granular sub-skills a lesson teaches).\n"
+            "- \"Resultados de Aprendizagem\" = learning outcomes — what "
+            "  the student should be able to do, typically phrased "
+            "  \"O aluno: identifica…, explica…, aplica…\".\n"
+            "- \"Sugestões metodológicas\" = teaching methodology notes "
+            "  (narrative). NOT a unit or lesson.\n"
+            "- \"Tema Transversal\" = cross-cutting theme. Treat as a "
+            "  topic suggestion, not a separate unit.\n"
+            "- \"Trimestre\" (1º / 2º / 3º) = academic term divisions. "
+            "  Useful for ordering but do NOT create units from them.\n"
+            "- \"10ª Classe\" / \"11ª Classe\" / \"12ª Classe\" = grade "
+            "  levels. Use these labels VERBATIM — do not coerce to \"S1\", "
+            "  \"S3\", \"Form 1\", or any other system's notation.\n"
+            "- \"CH\" column = carga horária (hours). Ignore for structure "
+            "  extraction.\n"
+            "- \"Ficha Técnica\" = publication colophon (title, publisher, "
+            "  copyright). NOT curriculum content — skip.\n"
+            "- \"Índice\" = table of contents. Use it as ground truth for "
+            "  unit + grade structure if available.\n"
+            "Objective verbs in Portuguese to recognise as enabling-"
+            "objective cues: interpretar, descrever, identificar, "
+            "mencionar, explicar, aplicar, relacionar, comparar, "
+            "distinguir, analisar, utilizar, reconhecer, demonstrar, "
+            "definir, resolver, classificar, representar.\n"
+            "</locale_parser_hints>\n"
+        )
+    # Defensive fallback: empty (no hints) so the LLM falls back to its
+    # general reasoning. The detect_subject_and_locale step warns when
+    # an unsupported locale is detected, so this is just safety net.
+    logger.warning(
+        "locale_parser_hints: no parser hints defined for locale '%s'. "
+        "Add an explicit branch in apps/curriculum/locale_prompts.py.",
+        code,
+    )
+    return ""
