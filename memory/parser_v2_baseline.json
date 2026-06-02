@@ -1,7 +1,7 @@
 {
-  "schema_version": "2",
+  "schema_version": "3",
   "captured_at": "2026-06-02T17:33:29.943357Z",
-  "parser_state": "post-M1 (BaseLLMClient.generate signature fixed; LLM path now actually runs end-to-end). v2 still pending.",
+  "parser_state": "post-M3 (v2 detect + outline working; lessons_pass + orchestrator wiring pending M4-M5)",
   "notes": "Captured on feature/curriculum-parser-v2 after the M1 LLM-client signature fix landed in the archive. parse_curriculum_with_llm now successfully calls Claude and returns its structured output (no longer silently swallowing TypeError → regex fallback). Schema v2 supersedes the v1 snapshot from commit 2ee1182 (which captured the broken state). The Seychelles regression slices are still deferred to M6 — those PDFs aren't in the local repo; we'll pull CurriculumUpload.parsed_data from staging at that time. GAPS still visible vs ground truth: (a) subject = 'General' because detect_subject keyword list is English-only — pt-mz matches zero keywords; (b) grade_level = 'S1/S2/S3' because the LLM prompt hardcodes 'This is a Seychelles secondary school curriculum' — v2 prompt is locale-aware; (c) 10 units vs ground-truth 6 because the LLM split cross-grade units (Citologia 10ª + Citologia 11ª become separate units) — actually the correct shape for the downstream Course→Unit→Lesson model where a Course has a single grade.",
   "docs": [
     {
@@ -96,6 +96,65 @@
           "• Conceitos básicos",
           "O aluno",
           "• Sistema Rh"
+        ]
+      },
+      "v2_detect": {
+        "subject": "Biology",
+        "locale": "pt-mz",
+        "grade_levels": [
+          "10ª Classe",
+          "11ª Classe",
+          "12ª Classe"
+        ],
+        "hint_disagreement": false
+      },
+      "v2_outline": {
+        "unit_count": 15,
+        "evidence_misses": 0,
+        "units_by_grade": {
+          "10ª Classe": [
+            "Unidade Temática I: Citologia",
+            "Unidade Temática II: Genética",
+            "Unidade Temática III: Evolução",
+            "Unidade Temática IV: Ecologia e Ambiente",
+            "Unidade Temática V: Autodescobrimento"
+          ],
+          "11ª Classe": [
+            "Unidade Temática I: Taxonomia dos Seres Vivos",
+            "Unidade Temática II: Sistemática dos Seres Vivos - Reino Monera",
+            "Unidade Temática II: Sistemática dos Seres Vivos - Reino Protista",
+            "Unidade Temática II: Sistemática dos Seres Vivos - Reino dos Fungos",
+            "Unidade Temática II: Sistemática dos Seres Vivos - Reino das Plantas",
+            "Unidade Temática II: Sistemática dos Seres Vivos - Reino Animal"
+          ],
+          "12ª Classe": [
+            "Unidade Temática 1: Citologia",
+            "Unidade Temática II: Fisiologia vegetal",
+            "Unidade Temática III: Fisiologia animal",
+            "Unidade Temática IV: Saúde"
+          ]
+        },
+        "sample_evidence": [
+          {
+            "title": "Unidade Temática I: Citologia",
+            "evidence": "Unidade Temática I: Citologia"
+          },
+          {
+            "title": "Unidade Temática II: Genética",
+            "evidence": "Unidade Temática II:  Genética"
+          },
+          {
+            "title": "Unidade Temática III: Evolução",
+            "evidence": "Unidade Temática III: Evolução"
+          },
+          {
+            "title": "Unidade Temática IV: Ecologia e Ambiente",
+            "evidence": "Unidade Temática IV: Ecologia e Ambiente"
+          },
+          {
+            "title": "Unidade Temática V: Autodescobrimento",
+            "evidence": "Unidade Temática V: Autodescobrimento"
+          }
         ]
       }
     }

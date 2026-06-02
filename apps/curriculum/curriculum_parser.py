@@ -438,12 +438,176 @@ def detect_subject_and_locale(
 # ============================================================================
 
 
+MAX_OUTLINE_TEXT_CHARS = 100_000
+"""Soft cap on the document text we send to the outline-pass LLM. Sonnet
+4.6 handles 200K context comfortably, but at 100K we have plenty of
+headroom for the schema, locale hints, and a generous max_tokens budget.
+Above this, we send head+tail to preserve the table of contents (head)
+and the trailing units (tail). Most curriculum docs we've seen are under
+this cap: Mozambique Biology is 111K, Geography 130K, Math 95K."""
+
+
 def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]:
     """Extract just the unit-level shape from the full document text.
     Returns a list of UnitOutlineV2; lessons are filled in by
-    ``lessons_pass`` per-unit. M3 deliverable.
+    ``lessons_pass`` per-unit (M4).
+
+    Approach:
+      - Query-last layout: document FIRST, schema/instructions LAST
+        (~30 % quality bump on long-context extraction per Anthropic).
+      - Locale-aware structural hints from ``locale_parser_hints`` so
+        the LLM recognises PT terminology like "Unidade Temática",
+        "Conteúdos", etc.
+      - Schema-constrained JSON output — robust parse via
+        ``_call_llm_structured`` (markdown fences / prose wrappers OK).
+      - Anti-hallucination: each returned unit MUST include
+        ``source_evidence`` — a verbatim snippet from the document.
+        We post-validate that the evidence actually appears in the text
+        and drop units whose evidence we can't find.
+
+    Raises ParseFailure('no_units_found') on empty/garbage output.
     """
-    raise NotImplementedError("M3 deliverable — see memory/curriculum_parser_v2_plan.md §M3")
+    from apps.curriculum.locale_prompts import locale_parser_hints
+
+    # Trim if oversized — keep head + tail so the index/contents page
+    # (typically near the front) and the trailing units (which can
+    # cover the final grade in a multi-grade doc) are both represented.
+    doc_text = text
+    if len(doc_text) > MAX_OUTLINE_TEXT_CHARS:
+        head = doc_text[: int(MAX_OUTLINE_TEXT_CHARS * 0.7)]
+        tail = doc_text[-int(MAX_OUTLINE_TEXT_CHARS * 0.3):]
+        doc_text = head + "\n\n[... middle section elided ...]\n\n" + tail
+        logger.info(
+            "[parser_v2] outline_pass: doc trimmed %d → %d chars",
+            len(text), len(doc_text),
+        )
+
+    locale_hints = locale_parser_hints(locale)
+
+    system_prompt = (
+        "You are a curriculum-document structure extractor. Given a "
+        "curriculum / teaching-programme document, identify ITS NATURAL "
+        "UNIT-LEVEL STRUCTURE — typically called 'units', 'strands', "
+        "'themes', or 'Unidades Temáticas' depending on the country's "
+        "system. Return ONLY the unit-level skeleton (no individual "
+        "lessons yet). Use labels as they appear in the source — do "
+        "not coerce them into another country's notation. Anchor every "
+        "unit to a verbatim snippet from the document so we can verify "
+        "the extraction. Respond with a single JSON object."
+    )
+
+    user_prompt = (
+        # Document FIRST (query-last layout).
+        f"<document>\n{doc_text}\n</document>\n"
+        f"{locale_hints}"
+        f"\n<context>\n"
+        f"- subject: {subject}\n"
+        f"- locale: {locale}\n"
+        f"</context>\n"
+        f"\n<task>\n"
+        f"Extract the unit-level structure of this curriculum document.\n\n"
+        f"GUIDELINES:\n"
+        f"1. Identify natural unit divisions (chapters, units, strands, "
+        f"themes, Unidades Temáticas, etc.) AS THEY APPEAR in the source. "
+        f"Do not invent units, do not merge units that the document "
+        f"treats as separate.\n"
+        f"2. If a unit recurs across multiple grades (e.g. \"Citologia\" "
+        f"in both 10ª Classe and 12ª Classe), emit ONE outline entry "
+        f"per (unit, grade) pair — they will become separate Course "
+        f"rows in our system, since each Course has a single grade.\n"
+        f"3. Use grade labels EXACTLY as they appear (10ª Classe / S3 / "
+        f"Form 4 / etc.). Do not translate or coerce.\n"
+        f"4. SKIP non-structural content: title pages, copyright pages "
+        f"('Ficha Técnica'), introductions, methodological notes, "
+        f"glossaries, bibliographies. These are NOT units.\n"
+        f"5. Provide a short (1-line) description per unit.\n"
+        f"6. For source_evidence, paste a 30-100 char VERBATIM snippet "
+        f"from the document where that unit is introduced (typically "
+        f"the heading line). This anchors the extraction.\n"
+        f"\nReturn JSON with this exact shape:\n"
+        f"{{\n"
+        f'  "units": [\n'
+        f'    {{\n'
+        f'      "title": "Unit name as in source",\n'
+        f'      "grade_level": "Grade label as in source",\n'
+        f'      "description": "One-line summary of what the unit covers",\n'
+        f'      "source_evidence": "Verbatim heading text from the doc"\n'
+        f'    }},\n'
+        f'    ...\n'
+        f'  ]\n'
+        f"}}\n"
+        f"</task>"
+    )
+
+    parsed = _call_llm_structured(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=4096,
+    )
+
+    raw_units = parsed.get('units') or []
+    if not isinstance(raw_units, list):
+        raise ParseFailure(
+            'no_units_found',
+            f"outline_pass: response.units was {type(raw_units).__name__}, expected list",
+        )
+
+    # Validate + anti-hallucination check.
+    text_lower = text.lower()
+    outlines: list[UnitOutlineV2] = []
+    skipped_no_evidence = 0
+    for raw in raw_units:
+        if not isinstance(raw, dict):
+            continue
+        title = (raw.get('title') or '').strip()
+        grade = (raw.get('grade_level') or '').strip()
+        if not title or not grade:
+            continue
+        description = (raw.get('description') or '').strip()
+        evidence = (raw.get('source_evidence') or '').strip()
+
+        # Anti-hallucination: the verbatim snippet should appear in the
+        # source text (modulo whitespace + casing). If it doesn't,
+        # the LLM probably invented this unit — drop it.
+        if evidence:
+            # Be lenient: collapse whitespace, lowercase, and look for
+            # the first 30 chars of the evidence somewhere in the doc.
+            ev_norm = ' '.join(evidence.split()).lower()
+            ev_probe = ev_norm[:30] if len(ev_norm) > 30 else ev_norm
+            text_norm = ' '.join(text.split()).lower()
+            if ev_probe and ev_probe not in text_norm:
+                logger.warning(
+                    "[parser_v2] outline_pass dropping unit %r — source_evidence "
+                    "%r not found in document (likely hallucinated).",
+                    title, evidence[:80],
+                )
+                skipped_no_evidence += 1
+                continue
+        try:
+            outlines.append(UnitOutlineV2(
+                title=title,
+                grade_level=grade,
+                description=description,
+                source_evidence=evidence,
+            ))
+        except Exception:  # pydantic ValidationError — skip malformed
+            logger.warning(
+                "[parser_v2] outline_pass: malformed unit dropped: %r",
+                {'title': title, 'grade': grade},
+            )
+
+    if not outlines:
+        raise ParseFailure(
+            'no_units_found',
+            f"outline_pass returned 0 valid units after anti-hallucination "
+            f"filter (raw={len(raw_units)}, evidence_misses={skipped_no_evidence})",
+        )
+
+    logger.info(
+        "[parser_v2] outline_pass: %d valid units (%d raw, %d evidence-misses)",
+        len(outlines), len(raw_units), skipped_no_evidence,
+    )
+    return outlines
 
 
 def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str) -> list[LessonV2]:
