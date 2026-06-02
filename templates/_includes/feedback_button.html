@@ -1,4 +1,5 @@
 {% comment %}Floating "Report a bug / send feedback" button + modal. Included from `templates/base.html` (student) and `templates/dashboard/base.html` (teacher). Authenticated users only. Posts to `dashboard:feedback_submit`. See memory/pilot_launch_execution.md.{% endcomment %}
+{% load i18n %}
 {% if user.is_authenticated %}
 <style>
     .fb-btn {
@@ -117,60 +118,60 @@
     }
 </style>
 
-<button type="button" class="fb-btn" id="fb-open" title="Report a bug or send feedback">
+<button type="button" class="fb-btn" id="fb-open" title="{% trans 'Report a bug or send feedback' %}">
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
     </svg>
-    Help / Feedback
+    {% trans "Help / Feedback" %}
 </button>
 
 <div class="fb-overlay" id="fb-overlay" role="dialog" aria-modal="true" aria-labelledby="fb-title">
     <div class="fb-modal" onclick="event.stopPropagation();">
-        <h3 id="fb-title">Help & Support</h3>
+        <h3 id="fb-title">{% trans "Help & Support" %}</h3>
 
         <!-- Tab bar -->
         <div style="display:flex;gap:0.4rem;margin:0.4rem 0 0.9rem;border-bottom:1px solid #e5e7eb;">
-            <button type="button" id="fb-tab-ai" class="fb-tab fb-tab-active" style="background:none;border:none;border-bottom:2px solid #5b21b6;padding:0.5rem 0.9rem;font-weight:600;color:#5b21b6;cursor:pointer;">💬 Ask the AI</button>
-            <button type="button" id="fb-tab-support" class="fb-tab" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.5rem 0.9rem;font-weight:600;color:#6b7280;cursor:pointer;">📩 Send to support</button>
+            <button type="button" id="fb-tab-ai" class="fb-tab fb-tab-active" style="background:none;border:none;border-bottom:2px solid #5b21b6;padding:0.5rem 0.9rem;font-weight:600;color:#5b21b6;cursor:pointer;">💬 {% trans "Ask the AI" %}</button>
+            <button type="button" id="fb-tab-support" class="fb-tab" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.5rem 0.9rem;font-weight:600;color:#6b7280;cursor:pointer;">📩 {% trans "Send to support" %}</button>
         </div>
 
         <!-- TAB 1: AI chat -->
         <section id="fb-pane-ai" style="display:flex;flex-direction:column;gap:0.6rem;flex:1;min-height:0;">
             <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.7rem;flex:1;min-height:280px;max-height:60vh;overflow-y:auto;padding:0.6rem 0.4rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;"></div>
             <div style="display:flex;gap:0.4rem;align-items:flex-end;">
-                <textarea id="fb-ai-input" rows="2" placeholder="Ask anything about the platform — how do I…, where is…" style="flex:1;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:10px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:46px;max-height:140px;"></textarea>
-                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:10px;padding:0.6rem 1.05rem;font-weight:600;cursor:pointer;font-size:0.9rem;">Send</button>
+                <textarea id="fb-ai-input" rows="2" placeholder="{% trans 'Ask anything about the platform — how do I…, where is…' %}" style="flex:1;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:10px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:46px;max-height:140px;"></textarea>
+                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:10px;padding:0.6rem 1.05rem;font-weight:600;cursor:pointer;font-size:0.9rem;">{% trans "Send" %}</button>
             </div>
             <div id="fb-ai-error" class="fb-error" style="margin-top:0.4rem;"></div>
         </section>
 
         <!-- TAB 2: human-support form (existing) -->
         <section id="fb-pane-support" style="display:none;">
-            <p class="fb-help">Tell us what happened or what would help. We read every one.</p>
-            <div class="fb-success" id="fb-success">✅ Thanks — your message was sent. We'll review it soon.</div>
+            <p class="fb-help">{% trans "Tell us what happened or what would help. We read every one." %}</p>
+            <div class="fb-success" id="fb-success">✅ {% trans "Thanks — your message was sent. We'll review it soon." %}</div>
             <div class="fb-error" id="fb-error"></div>
 
             <div class="fb-row" id="fb-kind-row" data-value="bug">
-                <button type="button" class="fb-pill active" data-kind="bug">🐞 Bug</button>
-                <button type="button" class="fb-pill" data-kind="feedback">💬 Feedback</button>
-                <button type="button" class="fb-pill" data-kind="idea">💡 Idea</button>
+                <button type="button" class="fb-pill active" data-kind="bug">🐞 {% trans "Bug" %}</button>
+                <button type="button" class="fb-pill" data-kind="feedback">💬 {% trans "Feedback" %}</button>
+                <button type="button" class="fb-pill" data-kind="idea">💡 {% trans "Idea" %}</button>
             </div>
             <div class="fb-row" id="fb-severity-row" data-value="medium">
-                <button type="button" class="fb-pill" data-severity="low">Low</button>
-                <button type="button" class="fb-pill active" data-severity="medium">Medium</button>
-                <button type="button" class="fb-pill" data-severity="high">High — pilot blocker</button>
+                <button type="button" class="fb-pill" data-severity="low">{% trans "Low" %}</button>
+                <button type="button" class="fb-pill active" data-severity="medium">{% trans "Medium" %}</button>
+                <button type="button" class="fb-pill" data-severity="high">{% trans "High — pilot blocker" %}</button>
             </div>
 
-            <textarea class="fb-textarea" id="fb-message" placeholder="Describe what happened, what you expected, or any feedback…"></textarea>
+            <textarea class="fb-textarea" id="fb-message" placeholder="{% trans 'Describe what happened, what you expected, or any feedback…' %}"></textarea>
 
             <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:#374151;margin-top:0.5rem;cursor:pointer;">
                 <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:#5b21b6;">
-                <span>Include a screenshot of my current screen <span style="color:#6b7280;font-size:0.78rem;">(your browser will ask which screen / window to share)</span></span>
+                <span>{% trans "Include a screenshot of my current screen" %} <span style="color:#6b7280;font-size:0.78rem;">{% trans "(your browser will ask which screen / window to share)" %}</span></span>
             </label>
 
             <div class="fb-actions">
-                <button type="button" class="fb-cancel" id="fb-cancel">Cancel</button>
-                <button type="button" class="fb-submit" id="fb-submit">Send</button>
+                <button type="button" class="fb-cancel" id="fb-cancel">{% trans "Cancel" %}</button>
+                <button type="button" class="fb-submit" id="fb-submit">{% trans "Send" %}</button>
             </div>
         </section>
     </div>
@@ -339,7 +340,7 @@
         const summary = document.createElement('div');
         summary.style.fontWeight = '600';
         summary.style.marginBottom = '0.3rem';
-        summary.textContent = '⚡ Proposed action: ' + prop.name;
+        summary.textContent = '⚡ ' + gettext('Proposed action:') + ' ' + prop.name;
         const inputs = document.createElement('pre');
         inputs.style.cssText = 'font-size:0.78rem;background:#fff;padding:0.4rem;border-radius:6px;overflow-x:auto;margin:0.25rem 0;color:#374151;';
         inputs.textContent = JSON.stringify(prop.inputs, null, 2);
@@ -348,11 +349,11 @@
         const confirmBtn = document.createElement('button');
         confirmBtn.type = 'button';
         confirmBtn.style.cssText = 'background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;font-weight:600;cursor:pointer;';
-        confirmBtn.textContent = 'Confirm';
+        confirmBtn.textContent = gettext('Confirm');
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.style.cssText = 'background:#f9fafb;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;';
-        cancelBtn.textContent = 'Cancel';
+        cancelBtn.textContent = gettext('Cancel');
         confirmBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, true, card));
         cancelBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, false, card));
         actions.append(confirmBtn, cancelBtn);
@@ -371,7 +372,7 @@
         const link = document.createElement('a');
         link.href = url;
         link.style.cssText = 'align-self:flex-start;background:#5b21b6;color:#fff;padding:0.4rem 0.95rem;border-radius:999px;text-decoration:none;font-size:0.85rem;font-weight:600;';
-        link.textContent = '🔗 ' + (label || 'Take me there →');
+        link.textContent = '🔗 ' + (label || gettext('Take me there →'));
         aiThread.appendChild(link);
     }
 
@@ -381,7 +382,7 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.style.cssText = 'background:transparent;color:#6b7280;border:none;text-decoration:underline;font-size:0.78rem;cursor:pointer;padding:0;';
-        btn.textContent = 'Send this to support →';
+        btn.textContent = gettext('Send this to support →');
         btn.addEventListener('click', () => {
             // Switch to support tab and pre-fill the message field
             // with a snippet of the conversation.
@@ -404,7 +405,7 @@
             body: JSON.stringify({page_url: window.location.href}),
         });
         const data = await r.json().catch(() => ({}));
-        if (!r.ok || !data.ok) throw new Error(data.human_msg || 'Could not start chat.');
+        if (!r.ok || !data.ok) throw new Error(data.human_msg || gettext('Could not start chat.'));
         aiConversationId = data.conversation_id;
         if (data.greeting) aiAppendBubble('assistant', data.greeting);
         return aiConversationId;
@@ -420,7 +421,7 @@
                 body: JSON.stringify({message: text}),
             });
             const data = await r.json().catch(() => ({}));
-            if (!r.ok || !data.ok) throw new Error(data.human_msg || 'Assistant failed.');
+            if (!r.ok || !data.ok) throw new Error(data.human_msg || gettext('Assistant failed.'));
             if (data.content) {
                 aiAppendBubble('assistant', data.content);
                 // Render a verified "Take me there" button only when
@@ -449,7 +450,7 @@
             const data = await r.json().catch(() => ({}));
             if (cardEl) cardEl.style.opacity = '0.5';
             if (!r.ok || !data.ok) {
-                aiError.textContent = data.human_msg || 'Could not run that action.';
+                aiError.textContent = data.human_msg || gettext('Could not run that action.');
                 aiError.style.display = 'block';
                 return;
             }
@@ -459,10 +460,10 @@
             // prefer it over a generic "Done." line. If there's no
             // follow-up, fall back to the tool's human_msg.
             if (!accept) {
-                aiAppendBubble('assistant', '↩️ Cancelled.');
+                aiAppendBubble('assistant', '↩️ ' + gettext('Cancelled.'));
             } else {
                 const followText = (data.follow_up && data.follow_up.content) || '';
-                const fallbackText = (data.tool_result && data.tool_result.human_msg) || '✅ Done.';
+                const fallbackText = (data.tool_result && data.tool_result.human_msg) || ('✅ ' + gettext('Done.'));
                 aiAppendBubble('assistant', followText || fallbackText);
 
                 // Verified URL — prefer the follow-up's tool URL,
@@ -565,13 +566,13 @@
     submitBtn.addEventListener('click', async () => {
         const message = messageEl.value.trim();
         if (!message) {
-            errorEl.textContent = 'Please describe what happened.';
+            errorEl.textContent = gettext('Please describe what happened.');
             errorEl.style.display = 'block';
             return;
         }
         const wantScreenshot = document.getElementById('fb-include-screenshot').checked;
         submitBtn.disabled = true;
-        submitBtn.textContent = wantScreenshot ? 'Pick a window…' : 'Sending…';
+        submitBtn.textContent = wantScreenshot ? gettext('Pick a window…') : gettext('Sending…');
         errorEl.style.display = 'none';
 
         let screenshotBlob = null;
@@ -594,7 +595,7 @@
             // If capture failed/declined, just submit without it —
             // don't block the feedback flow on an attachment.
         }
-        submitBtn.textContent = 'Sending…';
+        submitBtn.textContent = gettext('Sending…');
 
         try {
             const fd = new FormData();
@@ -613,7 +614,7 @@
             });
             const data = await r.json().catch(() => ({}));
             if (!r.ok) {
-                errorEl.textContent = data.error || 'Submission failed. Please try again.';
+                errorEl.textContent = data.error || gettext('Submission failed. Please try again.');
                 errorEl.style.display = 'block';
             } else {
                 successEl.style.display = 'block';
@@ -621,11 +622,11 @@
                 setTimeout(closeModal, 1500);
             }
         } catch (e) {
-            errorEl.textContent = 'Network error. Try again in a moment.';
+            errorEl.textContent = gettext('Network error. Try again in a moment.');
             errorEl.style.display = 'block';
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Send';
+            submitBtn.textContent = gettext('Send');
         }
     });
 })();
