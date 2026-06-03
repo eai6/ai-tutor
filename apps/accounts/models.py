@@ -262,10 +262,14 @@ class StudentProfile(models.Model):
         help_text="Student's school"
     )
     grade_level = models.CharField(
-        max_length=5,
-        choices=GradeLevel.choices,
+        max_length=64,
         blank=True,
-        help_text="Current grade level"
+        help_text=(
+            "Current grade level. Country-specific and config-driven via "
+            "PlatformConfig.grades (Seychelles 'S1'–'S5', Mozambique "
+            "'8ª Classe', …), so it is not constrained to a fixed choice set. "
+            "Sized to match the other grade_level fields in the codebase."
+        ),
     )
     tutor_personality = models.ForeignKey(
         'TutorPersonality', on_delete=models.SET_NULL,

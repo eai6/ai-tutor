@@ -776,7 +776,10 @@ def settings(request):
     school_choices = list(
         Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')
     )
-    grade_choices = ['S1', 'S2', 'S3', 'S4', 'S5']
+    # Country-specific, config-driven (Seychelles 'S1'–'S5', Mozambique
+    # '8ª Classe', …). settings.html renders each entry as a bare string,
+    # so flatten the (code, name) choices to codes.
+    grade_choices = [code for code, _name in PlatformConfig.get_grade_choices()]
 
     from django.conf import settings as _settings
     return render(request, 'accounts/settings.html', {
@@ -851,6 +854,10 @@ def bulk_student_upload(request):
         created = 0
         skipped = 0
         errors_list = []
+        # Country-specific grade codes (Seychelles 'S1'–'S5', Mozambique
+        # '8ª Classe', …). Validate CSV rows against the configured set
+        # rather than a hardcoded one. Looked up once, not per row.
+        valid_grade_codes = [code for code, _name in PlatformConfig.get_grade_choices()]
 
         for row_num, row in enumerate(reader, start=2):
             student_id = (row.get('student_id') or '').strip()
@@ -858,7 +865,7 @@ def bulk_student_upload(request):
             last_name = (row.get('last_name') or '').strip()
             username = (row.get('username') or '').strip()
             password = (row.get('password') or '').strip()
-            grade_level = (row.get('grade_level') or '').strip().upper()
+            grade_raw = (row.get('grade_level') or '').strip()
 
             if not first_name or not username or not password:
                 errors_list.append(f"Row {row_num}: Missing required field (first_name, username, or password)")
@@ -875,8 +882,18 @@ def bulk_student_upload(request):
                 skipped += 1
                 continue
 
-            if grade_level not in ('S1', 'S2', 'S3', 'S4', 'S5', ''):
-                errors_list.append(f"Row {row_num}: Invalid grade level '{grade_level}'")
+            # Case-insensitive match to a configured code; canonicalise to
+            # the configured spelling. Empty grade is allowed.
+            grade_level = next(
+                (c for c in valid_grade_codes
+                 if c.strip().lower() == grade_raw.lower()),
+                '' if not grade_raw else None,
+            )
+            if grade_level is None:
+                errors_list.append(
+                    f"Row {row_num}: Invalid grade level '{grade_raw}' "
+                    f"(expected one of: {', '.join(valid_grade_codes)})"
+                )
                 skipped += 1
                 continue
 
