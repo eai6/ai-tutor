@@ -26,7 +26,14 @@ config:
   aitutor:min-replicas: "1"
   aitutor:max-replicas: "1"
   aitutor:file-share-quota-gb: "20"
-  aitutor:postgres-sku: Standard_B1ms
+  # Bumped B1ms → B2ms (Burstable, 2 vCore, 8Gi) on 2026-06-03. B1ms caps
+  # at 50 max_connections; a content-generation run (separate process /
+  # own connection pool) stacked on gunicorn's 4×4 workers exhausted the
+  # pool → "remaining connection slots are reserved for SUPERUSER", which
+  # also failed /health/'s DB check (false 503s). B2ms's 8Gi RAM lifts
+  # max_connections to ~200. Prod (pixel) is still B1ms with the same
+  # latent ceiling — revisit if prod ever runs heavy concurrent regen.
+  aitutor:postgres-sku: Standard_B2ms
   aitutor:postgres-storage-gb: "32"
   # Staging doesn't need to handle big textbook OCR — set to 0 to skip
   # provisioning the material-processor Job entirely. Bump to 2.0 if
