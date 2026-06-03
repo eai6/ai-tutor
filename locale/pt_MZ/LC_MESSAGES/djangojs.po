@@ -2,13 +2,12 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor-js\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-02 00:05+0000\n"
+"POT-Creation-Date: 2026-06-03 18:07+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-
 
 #: templates/_includes/feedback_button.html:343
 msgid "Proposed action:"
@@ -75,6 +74,18 @@ msgstr "Erro de rede ao adicionar aluno."
 msgid "Send"
 msgstr "Enviar"
 
+#: templates/tutoring/_partials/exit_modal.html:713
+msgid "Correct!"
+msgstr "Correto!"
+
+#: templates/tutoring/_partials/exit_modal.html:716
+msgid "Hint:"
+msgstr "Dica:"
+
+#: templates/tutoring/_partials/exit_modal.html:717
+msgid "Not quite — review this topic during remediation."
+msgstr "Não exatamente — revê este tópico durante a revisão."
+
 #: templates/tutoring/catalog.html:963
 msgid "Lesson Locked"
 msgstr "Lição Bloqueada"
@@ -88,9 +99,12 @@ msgid "Got it"
 msgstr "Entendido"
 
 #: templates/tutoring/catalog.html:1015
-#, javascript-format
+#, fuzzy, javascript-format
+#| msgid "%s day streak"
 msgid "%s day streak"
-msgstr "Sequência de %s dias"
+msgid_plural "%s day streak"
+msgstr[0] "Sequência de %s dias"
+msgstr[1] "Sequência de %s dias"
 
 #: templates/tutoring/catalog.html:1030
 msgid "Trophies (%(earned)s/%(total)s)"
@@ -128,111 +142,156 @@ msgstr "Falha ao carregar a classificação."
 msgid "Achievement Unlocked!"
 msgstr "Conquista Desbloqueada!"
 
-#: templates/tutoring/chat_tutor.html:1468
+#: templates/tutoring/chat_tutor.html:1386
+msgid "Areas to revisit:"
+msgstr "Áreas a rever:"
+
+#: templates/tutoring/chat_tutor.html:1388
+#, javascript-format
+msgid "%s attempt"
+msgid_plural "%s attempts"
+msgstr[0] "%s tentativa"
+msgstr[1] "%s tentativas"
+
+#: templates/tutoring/chat_tutor.html:1390
+msgid "Your best:"
+msgstr "A tua melhor:"
+
+#: templates/tutoring/chat_tutor.html:1392
+msgid "%(score)s% — passing threshold %(threshold)s%"
+msgstr "%(score)s% — limiar de aprovação %(threshold)s%"
+
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Great work! You passed!"
+msgstr "Bom trabalho! Passaste!"
+
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Keep going — review the explanations above, then continue."
+msgstr "Continua — revê as explicações acima e depois continua."
+
+#: templates/tutoring/chat_tutor.html:1400
+msgid "Scroll up to review your answers and explanations."
+msgstr "Desliza para cima para rever as tuas respostas e explicações."
+
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue"
+msgstr "Continuar"
+
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue to Review"
+msgstr "Continuar para a revisão"
+
+#: templates/tutoring/chat_tutor.html:1471
 msgid "Engage"
 msgstr "Envolver"
 
-#: templates/tutoring/chat_tutor.html:1469
+#: templates/tutoring/chat_tutor.html:1472
 msgid "Explore"
 msgstr "Explorar"
 
-#: templates/tutoring/chat_tutor.html:1470
+#: templates/tutoring/chat_tutor.html:1473
 msgid "Explain"
 msgstr "Explicar"
 
-#: templates/tutoring/chat_tutor.html:1471
+#: templates/tutoring/chat_tutor.html:1474
 msgid "Practice"
 msgstr "Praticar"
 
-#: templates/tutoring/chat_tutor.html:1472
+#: templates/tutoring/chat_tutor.html:1475
 msgid "Evaluate"
 msgstr "Avaliar"
 
-#: templates/tutoring/chat_tutor.html:1473
+#: templates/tutoring/chat_tutor.html:1476
 msgid "Exit Quiz"
 msgstr "Avaliação Final"
 
-#: templates/tutoring/chat_tutor.html:1474
+#: templates/tutoring/chat_tutor.html:1477
 msgid "Review"
 msgstr "Revisão"
 
-#: templates/tutoring/chat_tutor.html:1475
+#: templates/tutoring/chat_tutor.html:1478
 msgid "Completed"
 msgstr "Concluído"
 
-#: templates/tutoring/chat_tutor.html:1603
+#: templates/tutoring/chat_tutor.html:1606
 msgid "Show how you got there — formulas, steps, reasoning…"
 msgstr "Mostra como chegaste lá — fórmulas, passos, raciocínio…"
 
-#: templates/tutoring/chat_tutor.html:1651
+#: templates/tutoring/chat_tutor.html:1654
 msgid "Your answer…"
 msgstr "A tua resposta…"
 
-#: templates/tutoring/chat_tutor.html:1654
+#: templates/tutoring/chat_tutor.html:1657
 msgid "Submit answer"
 msgstr "Enviar resposta"
 
-#: templates/tutoring/chat_tutor.html:1695
+#: templates/tutoring/chat_tutor.html:1698
 msgid "Pick an option first."
 msgstr "Escolhe primeiro uma opção."
 
-#: templates/tutoring/chat_tutor.html:1706
+#: templates/tutoring/chat_tutor.html:1709
 msgid "Fill in at least one blank."
 msgstr "Preenche pelo menos um espaço em branco."
 
-#: templates/tutoring/chat_tutor.html:1714
+#: templates/tutoring/chat_tutor.html:1717
 msgid "Type a final answer first."
 msgstr "Escreve primeiro uma resposta final."
 
-#: templates/tutoring/chat_tutor.html:1809
-msgid "Welcome back — your previous question is still waiting in the panel on the right."
-msgstr "Bem-vindo de volta — a tua pergunta anterior continua à espera no painel à direita."
+#: templates/tutoring/chat_tutor.html:1812
+msgid ""
+"Welcome back — your previous question is still waiting in the panel on the "
+"right."
+msgstr ""
+"Bem-vindo de volta — a tua pergunta anterior continua à espera no painel à "
+"direita."
 
-#: templates/tutoring/chat_tutor.html:1901
+#: templates/tutoring/chat_tutor.html:1904
 msgid "earlier messages"
 msgstr "mensagens anteriores"
 
-#: templates/tutoring/chat_tutor.html:1956
+#: templates/tutoring/chat_tutor.html:1959
 msgid "Ask your teacher to add you to a group to share this lesson."
-msgstr "Pede ao teu professor para te adicionar a um grupo para partilhares esta lição."
+msgstr "Pede ao teu professor para te adicionar a um grupo para partilhar esta lição."
+"Pede ao teu professor para te adicionar a um grupo para partilhares esta "
+"lição."
 
-#: templates/tutoring/chat_tutor.html:2021
+#: templates/tutoring/chat_tutor.html:2024
 #, javascript-format
 msgid "Could not add %s: %s"
 msgstr "Não foi possível adicionar %s: %s"
 
-#: templates/tutoring/chat_tutor.html:2021
+#: templates/tutoring/chat_tutor.html:2024
 msgid "student"
 msgstr "aluno"
 
-#: templates/tutoring/chat_tutor.html:2021
+#: templates/tutoring/chat_tutor.html:2024
 msgid "unknown"
 msgstr "desconhecido"
 
-#: templates/tutoring/chat_tutor.html:2027
+#: templates/tutoring/chat_tutor.html:2030
 msgid "Network error adding student."
 msgstr "Erro de rede ao adicionar aluno."
 
-#: templates/tutoring/chat_tutor.html:2032
+#: templates/tutoring/chat_tutor.html:2035
 msgid "Remove this student from the group session?"
 msgstr "Remover este aluno da sessão de grupo?"
 
-#: templates/tutoring/chat_tutor.html:2185
+#: templates/tutoring/chat_tutor.html:2188
 msgid "Interactive Content"
 msgstr "Conteúdo Interativo"
 
-#: templates/tutoring/chat_tutor.html:2371
+#: templates/tutoring/chat_tutor.html:2374
 msgid "Type your answer…"
 msgstr "Escreve a tua resposta…"
 
-#: templates/tutoring/chat_tutor.html:2413
+#: templates/tutoring/chat_tutor.html:2416
 msgid "Check answer"
 msgstr "Verificar resposta"
 
-#: templates/tutoring/chat_tutor.html:2480
+#: templates/tutoring/chat_tutor.html:2483
 msgid "Will send when online"
 msgstr "Será enviado quando estiveres online"
 
-#: templates/tutoring/chat_tutor.html:2697
+#: templates/tutoring/chat_tutor.html:2700
 msgid "Could not restart the lesson. Please try again."
 msgstr "Não foi possível reiniciar a lição. Tenta novamente."

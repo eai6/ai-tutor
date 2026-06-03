@@ -10,9 +10,19 @@ config:
   # month for the always-on container vs UX-debugging time it saves.
   # Azure doesn't offer a D2 dedicated profile — only D4/D8/D16/D32 —
   # so Consumption is the cheapest smaller-than-prod option.
+  #
+  # Sized at the Consumption ceiling (4 vCPU / 8Gi) as of 2026-06-03.
+  # The previous 2 CPU / 4Gi crashed in a probe-failure restart loop:
+  # the 4.7GB image + EMBEDDING_BACKEND=local loads all-MiniLM-L6-v2
+  # (~500MB) into each of gunicorn's 4 workers (~2GB) on top of Django,
+  # exceeding 4Gi → liveness 503 → restart → loop. This is the same OOM
+  # prod hit on 4Gi Consumption before it moved to 8Gi. Staying on the
+  # serverless Consumption profile (not Dedicated D4) keeps staging cheap
+  # — 4/8 is the per-replica max Consumption allows, matching prod's
+  # per-replica resources without an always-on dedicated node.
   aitutor:workload-profile-type: Consumption
-  aitutor:container-cpu: "2.0"
-  aitutor:container-memory: 4Gi
+  aitutor:container-cpu: "4.0"
+  aitutor:container-memory: 8Gi
   aitutor:min-replicas: "1"
   aitutor:max-replicas: "1"
   aitutor:file-share-quota-gb: "20"

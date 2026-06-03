@@ -1383,20 +1383,23 @@ window.EXIT_MODAL_CONFIG = {
         const summaryDiv = document.createElement('div');
         summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
         const weakHtml = (weakConcepts && weakConcepts.length)
-            ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">Areas to revisit: <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
+            ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">${gettext('Areas to revisit:')} <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
             : '';
+        const attemptLabel = interpolate(ngettext('%s attempt', '%s attempts', attempts), [attempts]);
         const bestHtml = (bestPct !== null)
-            ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">Your best: <strong>${bestPct}%</strong> · ${attempts} attempt${attempts === 1 ? '' : 's'}</div>`
+            ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">${gettext('Your best:')} <strong>${bestPct}%</strong> · ${attemptLabel}</div>`
             : '';
+        const thresholdLine = interpolate(gettext('%(score)s% — passing threshold %(threshold)s%'), {score: scorePct, threshold: thresholdPct}, true);
+        const statusMsg = passed ? gettext('Great work! You passed!') : gettext('Keep going — review the explanations above, then continue.');
         summaryDiv.innerHTML = `
             <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
-            <div style="font-size:0.95rem;color:#71717a;">${scorePct}% — passing threshold ${thresholdPct}%</div>
+            <div style="font-size:0.95rem;color:#71717a;">${thresholdLine}</div>
             ${bestHtml}
-            <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${passed ? 'Great work! You passed!' : 'Keep going — review the explanations above, then continue.'}</div>
+            <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${statusMsg}</div>
             ${weakHtml}
-            <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">Scroll up to review your answers and explanations.</div>
+            <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">${gettext('Scroll up to review your answers and explanations.')}</div>
             <button onclick="continueAfterExit()" class="btn btn-primary" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
-                ${passed ? '✓ Continue' : '→ Continue to Review'}
+                ${passed ? '✓ ' + gettext('Continue') : '→ ' + gettext('Continue to Review')}
             </button>
         `;
         container.appendChild(summaryDiv);

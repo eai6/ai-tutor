@@ -16,7 +16,7 @@ import time
 import logging
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -1490,8 +1490,10 @@ class LessonStepSchema(BaseModel):
         "ENGAGE and EVALUATE steps may use '' (empty). "
         "Each concept block must end with a practice or quiz step."
     ))
-    teacher_script: str = Field(description=(
-        "The tutor's dialogue/instruction text. "
+    teacher_script: str = Field(default="", description=(
+        "The tutor's dialogue/instruction text. Required for 'teach' and "
+        "'worked_example' steps. For 'practice'/'quiz' steps the prompt "
+        "lives in `question`, so teacher_script may be omitted. "
         "When media is attached, anchor the script in the figure: "
         "'Look at the diagram — you can see…', 'Find angle 5 on the figure…'. "
         "Treat the figure as already visible; never ask the student to "
@@ -1540,6 +1542,23 @@ class LessonStepSchema(BaseModel):
         ),
     )
 
+    @model_validator(mode="after")
+    def _require_script_for_teaching_steps(self):
+        """teacher_script is mandatory for instructional steps but optional
+        for question steps. Models (esp. Haiku) routinely omit it on
+        practice/quiz steps because the prompt lives in `question`; making
+        the field unconditionally required hard-failed those generations.
+        Enforce it only where it's pedagogically load-bearing so instructor
+        retries genuine gaps, not legitimate omissions."""
+        if not (self.teacher_script or "").strip() and self.step_type in (
+            "teach",
+            "worked_example",
+        ):
+            raise ValueError(
+                f"teacher_script is required for step_type='{self.step_type}'"
+            )
+        return self
+
 
 class SummaryVocab(BaseModel):
     term: str
@@ -1557,6 +1576,22 @@ class GeneratedLessonContent(BaseModel):
     """Complete generated lesson content following the 5E pedagogical model."""
     steps: List[LessonStepSchema] = Field(description="5-6 concept-grouped lesson steps for a 20-minute lesson")
     lesson_summary: Optional[LessonSummarySchema] = None
+
+    @field_validator("steps", "lesson_summary", mode="before")
+    @classmethod
+    def _coerce_json_string(cls, v):
+        """Some models (observed with Haiku via tool-use) emit a nested
+        field as a JSON-encoded *string* instead of a real array/object —
+        e.g. steps='[{...}]'. Coerce it back rather than burning an
+        instructor retry on a `list_type`/`dict_type` error. Mirrors the
+        single-quote tolerance of `_try_fix_json` elsewhere in this module."""
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return v  # let normal validation surface a clear error
+        return v
 
 
 # ============================================================================

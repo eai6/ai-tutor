@@ -710,11 +710,11 @@ function showExitResults(results) {
         const indicator = document.createElement('div');
         indicator.className = r.is_correct ? 'exit-result-correct' : 'exit-result-incorrect';
         if (r.is_correct) {
-            indicator.textContent = 'Correct!';
+            indicator.textContent = gettext('Correct!');
         } else {
             indicator.innerHTML = r.explanation
-                ? '<strong>Hint:</strong> ' + r.explanation
-                : 'Not quite — review this topic during remediation.';
+                ? '<strong>' + gettext('Hint:') + '</strong> ' + r.explanation
+                : gettext('Not quite — review this topic during remediation.');
         }
         qDiv.appendChild(indicator);
     });
