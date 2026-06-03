@@ -251,13 +251,18 @@ def lesson_catalog(request):
     from apps.curriculum.utils import parse_grade_level_string
     student_grade = ''
     if hasattr(request.user, 'student_profile'):
-        student_grade = request.user.student_profile.grade_level or ''
+        student_grade = (request.user.student_profile.grade_level or '').strip()
+    # Match whitespace/case-insensitively: a student's grade may carry a
+    # trailing space from the configured grade code (e.g. '8ª Classe '),
+    # while parse_grade_level_string strips the course side — an exact
+    # `in` check then silently hides every course from that student.
+    student_grade_cf = student_grade.casefold()
 
     if student_grade and not is_staff:
         filtered = []
         for course in courses:
-            course_grades = parse_grade_level_string(course.grade_level)
-            if not course_grades or student_grade in course_grades:
+            course_grades = {g.casefold() for g in parse_grade_level_string(course.grade_level)}
+            if not course_grades or student_grade_cf in course_grades:
                 filtered.append(course)
         courses = filtered
 
@@ -297,8 +302,8 @@ def lesson_catalog(request):
         for unit in course.units.all().order_by('order_index'):
             # Skip units not matching student's grade
             if student_grade and not is_staff:
-                unit_grades = parse_grade_level_string(unit.grade_level)
-                if unit_grades and student_grade not in unit_grades:
+                unit_grades = {g.casefold() for g in parse_grade_level_string(unit.grade_level)}
+                if unit_grades and student_grade_cf not in unit_grades:
                     continue
             unit_lessons = []
             for lesson in unit.lessons.filter(is_published=True).order_by('order_index'):

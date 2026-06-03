@@ -436,7 +436,10 @@ class PlatformConfig(models.Model):
     def get_grade_choices(cls):
         obj = cls.load()
         if obj.grades:
-            return [(g['code'], g['name']) for g in obj.grades]
+            # Strip stray whitespace from configured codes/labels: a
+            # trailing space (e.g. '8ª Classe ') gets stored on the
+            # student and silently breaks grade matching in the catalog.
+            return [(g['code'].strip(), g['name'].strip()) for g in obj.grades]
         return StudentProfile.DEFAULT_GRADE_CHOICES
 
     class Meta:

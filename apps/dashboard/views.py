@@ -1081,9 +1081,14 @@ def course_detail(request, course_id):
             status='processing', updated_at__gte=stale_cutoff,
         ).exists(),
         'material_types': TeachingMaterialUpload.MaterialType.choices,
-        # R2 — subject + grade dropdowns for the course edit form
+        # R2 — subject + grade dropdowns for the course edit form.
+        # Grade options come from the platform's configured grade set
+        # (Seychelles 'S1'–'S5', Mozambique '8ª Classe'–'12ª Classe', …),
+        # NOT the hardcoded Course.SecondaryYear enum — otherwise a
+        # Mozambique teacher can only tick S-codes that never match a
+        # student's configured grade.
         'subject_code_choices': Course.SubjectCode.choices,
-        'secondary_year_choices': Course.SecondaryYear.choices,
+        'secondary_year_choices': PlatformConfig.get_grade_choices(),
         # R2.3 — inherited materials from platform-wide courses matching
         # this course's subject_code + grade_levels. Surfaced as a badge
         # so teachers see they're not orphaned when they didn't upload
@@ -6890,9 +6895,11 @@ def course_edit(request, course_id):
         messages.error(request, f"Invalid subject_code: {subject_code!r}.")
         return redirect('dashboard:course_detail', course_id=course.id)
 
-    # Validate + normalise grade_levels
-    valid_years = {c[0] for c in Course.SecondaryYear.choices}
-    grade_levels = sorted({g for g in grade_levels_raw if g in valid_years})
+    # Validate + normalise grade_levels against the platform's configured
+    # grade set (country-specific), not the hardcoded S1–S6 enum — else a
+    # ticked Mozambique grade ('8ª Classe') gets silently dropped here.
+    valid_years = {c[0].strip() for c in PlatformConfig.get_grade_choices()}
+    grade_levels = sorted({g.strip() for g in grade_levels_raw if g.strip() in valid_years})
 
     # Auto-derive grade_level (CharField) from grade_levels list when blank
     if not grade_level and grade_levels:
