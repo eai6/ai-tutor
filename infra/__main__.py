@@ -473,6 +473,16 @@ def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
                 name="TUTORING_QUESTION_TYPES", value=_tutoring_q_types,
             ),
         )
+    # Default UI locale for anonymous visitors (pre-login). Seychelles
+    # prod leaves this unset → settings.py falls back to 'en-us'; the
+    # Mozambique pilot sets it to 'pt-mz' so the landing/registration
+    # pages render in Portuguese without the student hunting for the
+    # language toggle.
+    _default_language = config.get("default-language")
+    if _default_language:
+        env_vars.append(
+            app.EnvironmentVarArgs(name="DEFAULT_LANGUAGE", value=_default_language),
+        )
     if include_job_dispatch_env:
         env_vars.extend([
             app.EnvironmentVarArgs(name="AZURE_RESOURCE_GROUP", value=rg.name),

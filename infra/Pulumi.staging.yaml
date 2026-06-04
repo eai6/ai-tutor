@@ -23,8 +23,18 @@ config:
   aitutor:workload-profile-type: Consumption
   aitutor:container-cpu: "4.0"
   aitutor:container-memory: 8Gi
+  # max raised to 2 (2026-06-03) for a ~50-concurrent-student pilot test.
+  # min stays 1 (cheap baseline); the http-concurrency scale rule
+  # (concurrentRequests=12) spins up the 2nd replica under load. Each
+  # replica serves gunicorn 4 workers × 4 threads = 16 concurrent → up to
+  # ~32 in-flight request slots across both once scaled out. Trade-off:
+  # the 2nd replica has a ~15s embedding cold-start when the spike first
+  # hits. NOTE: vectordb WRITES (curriculum/material uploads) must run at
+  # single-replica — drop max back to 1 before any admin reindex.
   aitutor:min-replicas: "1"
-  aitutor:max-replicas: "1"
+  aitutor:max-replicas: "2"
+  # Default UI locale for anonymous visitors — Mozambique pilot.
+  aitutor:default-language: pt-mz
   aitutor:file-share-quota-gb: "20"
   # Bumped B1ms → B2ms (Burstable, 2 vCore, 8Gi) on 2026-06-03. B1ms caps
   # at 50 max_connections; a content-generation run (separate process /
