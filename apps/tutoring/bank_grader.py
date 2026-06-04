@@ -521,7 +521,8 @@ def _grade_chat_authored_grounded(
         "teaches).\n"
         "  2. Live web search results (use Google Search to verify "
         "any factual claim about places, dates, numbers, named "
-        "entities — especially Seychelles-specific facts).\n"
+        "entities — especially local or regional facts that may be "
+        "outside your training data).\n"
         "  3. Your own domain knowledge (last resort).\n\n"
         "Be GENEROUS on phrasing — what matters is whether the "
         "student conveys the correct idea, not whether they used the "
@@ -546,8 +547,9 @@ def _grade_chat_authored_grounded(
         grounding_instruction=(
             "Use Google Search to verify any place name, date, "
             "number, or named entity in the question or student "
-            "response. Especially relevant for Seychelles geography "
-            "facts which may be missing from your training data. "
+            "response. This matters most for local or regional facts — "
+            "place names, dates, populations, geography — that may be "
+            "missing from your training data. "
             "Cite the sources you used inline."
         ),
     )

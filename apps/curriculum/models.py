@@ -739,6 +739,14 @@ class SeychellesContext(models.Model):
         help_text="Data source or attribution"
     )
     is_active = models.BooleanField(default=True)
+    locale = models.CharField(
+        max_length=10,
+        default='en-us',
+        db_index=True,
+        help_text="Course locale this fact applies to (e.g. 'en-us', 'pt-mz'). "
+                  "Only injected into prompts for matching-locale content, so "
+                  "Seychelles facts don't leak into Mozambique courses.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -747,7 +755,20 @@ class SeychellesContext(models.Model):
         verbose_name_plural = 'Seychelles context entries'
 
     def __str__(self):
-        return f"[{self.get_category_display()}] {self.title}"
+        return f"[{self.get_category_display()}] {self.title} ({self.locale})"
+
+    @classmethod
+    def for_locale(cls, locale, *, active_only=True):
+        """Active context entries scoped to a course locale (default en-us).
+
+        The local-context library is country-specific: an en-us (Seychelles)
+        course must not be grounded in pt-mz facts and vice-versa. Entries
+        are tagged with the locale they describe; nothing is returned for a
+        locale with no curated facts yet (e.g. pt-mz until seeded)."""
+        qs = cls.objects.filter(locale=(locale or 'en-us').lower())
+        if active_only:
+            qs = qs.filter(is_active=True)
+        return qs
 
 
 # ─── Curriculum knowledge base — pgvector replacement for ChromaDB ─────

@@ -221,7 +221,14 @@ def _retrieve_evidence_for_step(
             w.lower() for w in re.findall(r"\w{4,}", step_text or "")
         }
         if keywords:
-            candidates = SeychellesContext.objects.filter(is_active=True)
+            # Scope to the lesson's course locale — don't fact-check a
+            # pt-mz step against Seychelles facts.
+            _loc = 'en-us'
+            try:
+                _loc = (lesson.unit.course.locale or 'en-us').lower()
+            except Exception:
+                pass
+            candidates = SeychellesContext.for_locale(_loc)
             scored = []
             for ctx in candidates:
                 haystack = f"{ctx.title} {ctx.content}".lower()

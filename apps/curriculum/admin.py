@@ -154,7 +154,7 @@ class LessonStepAdmin(admin.ModelAdmin):
 
 @admin.register(SeychellesContext)
 class SeychellesContextAdmin(admin.ModelAdmin):
-    list_display = ['title', 'category', 'subject_tags', 'is_active', 'updated_at']
-    list_filter = ['category', 'is_active']
+    list_display = ['title', 'locale', 'category', 'subject_tags', 'is_active', 'updated_at']
+    list_filter = ['locale', 'category', 'is_active']
     search_fields = ['title', 'content']
     list_editable = ['is_active']

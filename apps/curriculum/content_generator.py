@@ -2222,11 +2222,17 @@ These are the granular steps from the curriculum. Use them to structure your
 explanation, examples, and practice for each terminal objective above.
 """
 
-        # Build Seychelles context library section
+        # Build local-context library section, scoped to the course locale
+        # so Seychelles facts don't leak into non-Seychelles (e.g. pt-mz) courses.
         seychelles_str = ""
         try:
             from apps.curriculum.models import SeychellesContext
-            sey_entries = SeychellesContext.objects.filter(is_active=True)
+            _loc = 'en-us'
+            try:
+                _loc = (lesson.unit.course.locale or 'en-us').lower()
+            except Exception:
+                pass
+            sey_entries = SeychellesContext.for_locale(_loc)
             if subject:
                 sey_entries = sey_entries.filter(subject_tags__contains=subject.lower())
             sey_entries = list(sey_entries.values('category', 'title', 'content')[:12])
@@ -2235,8 +2241,10 @@ explanation, examples, and practice for each terminal objective above.
                     f"- [{e['category'].upper()}] {e['title']}: {e['content']}"
                     for e in sey_entries
                 )
+                _heading = 'SEYCHELLES' if _loc == 'en-us' else 'LOCAL'
+                _noun = 'Seychelles' if _loc == 'en-us' else 'local'
                 seychelles_str = f"""
-SEYCHELLES CONTEXT LIBRARY (use these real facts, do NOT invent Seychelles data):
+{_heading} CONTEXT LIBRARY (use these real facts, do NOT invent {_noun} data):
 {sey_lines}
 """
         except Exception as e:
@@ -3050,17 +3058,24 @@ def generate_exit_ticket_for_lesson(lesson, institution_id: int = None, force_re
     except Exception:
         pass
 
-    # Seychelles context
+    # Local-context library, scoped to the course locale so Seychelles
+    # facts don't leak into non-Seychelles (e.g. pt-mz) exit tickets.
     seychelles_context = ""
     try:
         from apps.curriculum.models import SeychellesContext
-        entries = SeychellesContext.objects.filter(is_active=True)
+        _loc = 'en-us'
+        try:
+            _loc = (lesson.unit.course.locale or 'en-us').lower()
+        except Exception:
+            pass
+        entries = SeychellesContext.for_locale(_loc)
         # Filter by subject — use Python-level check for SQLite compat
         entries = [e for e in entries.values('title', 'content', 'subject_tags')
                    if subject.lower() in (e.get('subject_tags') or [])][:8]
         if entries:
             lines = "\n".join(f"- {e['title']}: {e['content']}" for e in entries)
-            seychelles_context = f"\nSEYCHELLES CONTEXT (use these real facts):\n{lines}\n"
+            _heading = 'SEYCHELLES' if _loc == 'en-us' else 'LOCAL'
+            seychelles_context = f"\n{_heading} CONTEXT (use these real facts):\n{lines}\n"
     except Exception:
         pass
 
