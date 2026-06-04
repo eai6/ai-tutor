@@ -269,16 +269,25 @@ def submit_exit_ticket(session, answers: list) -> dict:
         len(batch_items),
     )
 
-    from django.utils.translation import gettext
-    if passed:
-        message = gettext("🎉 You scored %(score)d/%(total)d — that's a pass. Well done!") % {
-            'score': correct_count, 'total': total,
-        }
-    else:
-        message = gettext(
-            "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. "
-            "Let's revisit the concepts you missed."
-        ) % {'score': correct_count, 'total': total}
+    from django.utils import translation
+    # Render in the COURSE locale, not the ambient request locale: the
+    # exit-ticket submit endpoint (chat_exit_ticket) doesn't activate the
+    # course locale the way the page view does, so without this override a
+    # pt-mz student could get an English result message.
+    try:
+        _loc = (session.lesson.unit.course.locale or 'en-us').lower()
+    except Exception:
+        _loc = 'en-us'
+    with translation.override(_loc):
+        if passed:
+            message = translation.gettext(
+                "🎉 You scored %(score)d/%(total)d — that's a pass. Well done!"
+            ) % {'score': correct_count, 'total': total}
+        else:
+            message = translation.gettext(
+                "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. "
+                "Let's revisit the concepts you missed."
+            ) % {'score': correct_count, 'total': total}
 
     return {
         'message': message,

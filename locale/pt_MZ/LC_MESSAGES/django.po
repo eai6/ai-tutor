@@ -103,7 +103,7 @@ msgid ""
 "\n"
 "You scored %(score)d out of %(total)d. Let's revisit the concepts you missed."
 msgstr ""
-"📋 **Revisão do bilhete de saída**\n"
+"📋 **Revisão da avaliação final**\n"
 "\n"
 "Tiveste %(score)d em %(total)d. Vamos rever os conceitos que falhaste."
 
