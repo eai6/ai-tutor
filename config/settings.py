@@ -152,7 +152,12 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-LANGUAGE_CODE = 'en-us'
+# Default UI locale for anonymous visitors (pre-login) and the global
+# fallback in LocaleResolverMiddleware. Env-driven so a single codebase
+# can default differently per deployment: Seychelles prod leaves it unset
+# → 'en-us'; the Mozambique pilot sets DEFAULT_LANGUAGE=pt-mz (wired via
+# Pulumi.staging.yaml) so students see Portuguese without toggling.
+LANGUAGE_CODE = os.getenv('DEFAULT_LANGUAGE', 'en-us')
 # Supported locales for the unified multi-locale platform. Per-course
 # locale is the primary signal at runtime (see memory/multi_locale_
 # architecture_research.md). The .po directories live under locale/ as

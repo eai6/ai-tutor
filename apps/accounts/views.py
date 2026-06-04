@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import Http404
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 
@@ -93,7 +94,7 @@ def student_register(request):
     from apps.accounts.models import PlatformTerms
     school_choices = PlatformConfig.get_school_choices()
     grade_choices = PlatformConfig.get_grade_choices()
-    active_terms = PlatformTerms.active()
+    active_terms = PlatformTerms.active(locale=get_language())
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
@@ -272,7 +273,7 @@ def staff_self_register(request):
 
     from apps.accounts.models import PlatformTerms
     school_choices = PlatformConfig.get_school_choices()
-    active_terms = PlatformTerms.active()
+    active_terms = PlatformTerms.active(locale=get_language())
 
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
@@ -948,7 +949,7 @@ def bulk_student_upload(request):
 def terms_page(request):
     """Public, unauthenticated render of the active platform terms."""
     from apps.accounts.models import PlatformTerms
-    active = PlatformTerms.active()
+    active = PlatformTerms.active(locale=get_language())
     return render(request, 'accounts/terms.html', {
         'terms': active,
     })
@@ -962,7 +963,7 @@ def terms_accept(request):
     from apps.accounts.models import PlatformTerms, StudentProfile
     from django.utils import timezone as _tz
 
-    active = PlatformTerms.active()
+    active = PlatformTerms.active(locale=get_language())
     if not active:
         return redirect('tutoring:catalog')
 

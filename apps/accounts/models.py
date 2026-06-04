@@ -504,7 +504,11 @@ class PlatformTerms(models.Model):
     users whose `terms_accepted_version` is below the active version
     are routed through `/terms/accept/` on next login.
     """
-    version = models.PositiveIntegerField(unique=True)
+    version = models.PositiveIntegerField()
+    locale = models.CharField(
+        max_length=10, default='en-us', db_index=True,
+        help_text="UI locale these terms are written in (e.g. 'en-us', 'pt-mz').",
+    )
     title = models.CharField(max_length=200, default="AI Tutor — Terms")
     summary = models.CharField(
         max_length=300, blank=True,
@@ -519,18 +523,35 @@ class PlatformTerms(models.Model):
         ordering = ['-version']
         verbose_name = "Platform terms"
         verbose_name_plural = "Platform terms"
+        # A version is published once per locale (en-us v1, pt-mz v1, …).
+        unique_together = (('version', 'locale'),)
 
     def __str__(self):
-        return f"v{self.version} {'(active)' if self.is_active else ''}"
+        return f"v{self.version} [{self.locale}] {'(active)' if self.is_active else ''}"
 
     @classmethod
-    def active(cls):
-        """Return the currently active terms row, or None."""
-        return cls.objects.filter(is_active=True).order_by('-version').first()
+    def active(cls, locale=None):
+        """Return the active terms row for the given UI locale, falling back
+        to the same base language, then the platform default locale, then
+        any active row. ``None`` if no terms exist."""
+        qs = cls.objects.filter(is_active=True)
+        if locale:
+            row = qs.filter(locale=locale).order_by('-version').first()
+            if row:
+                return row
+            base = locale.split('-')[0]
+            row = qs.filter(locale__startswith=base).order_by('-version').first()
+            if row:
+                return row
+        default_locale = getattr(django_settings, 'LANGUAGE_CODE', 'en-us')
+        return (
+            qs.filter(locale=default_locale).order_by('-version').first()
+            or qs.order_by('-version').first()
+        )
 
     @classmethod
-    def active_version(cls) -> int:
-        active = cls.active()
+    def active_version(cls, locale=None) -> int:
+        active = cls.active(locale=locale)
         return active.version if active else 0
 
 
