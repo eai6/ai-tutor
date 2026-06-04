@@ -1274,7 +1274,7 @@ def start_for_view(session) -> dict:
     has_prior_turns = SessionTurn.objects.filter(session=session).exists()
 
     if in_flight is not None and has_prior_turns:
-        message = _build_resume_message(in_flight)
+        message = _build_resume_message(in_flight, _course_locale(session))
         step = _load_current_step(session)
         SessionTurn.objects.create(
             session=session,
@@ -1292,18 +1292,24 @@ def start_for_view(session) -> dict:
     return _project_start_payload(session, out.get('content', ''))
 
 
-def _build_resume_message(slot) -> str:
+def _build_resume_message(slot, locale: str = 'en-us') -> str:
     """Deterministic welcome-back text + re-display of the in-flight
     slot's question. Used by ``start_for_view`` on resume so we don't
     burn an LLM call (and risk orphaning the slot) just to render a
-    question we already have.
+    question we already have. Localised to the course locale so a pt-mz
+    student doesn't get an English banner above a Portuguese question.
     """
     from apps.tutoring.models import InFlightQuestion
+    from django.utils import translation
 
     stem = (slot.question_text or '').strip()
+    with translation.override(locale):
+        welcome = translation.gettext(
+            "👋 Welcome back! You were working on this question — "
+            "let's pick up where we left off:"
+        )
     parts = [
-        "👋 Welcome back! You were working on this question — let's pick "
-        "up where we left off:",
+        welcome,
         '',
         stem,
     ]
