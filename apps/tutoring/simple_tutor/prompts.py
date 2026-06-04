@@ -26,6 +26,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from apps.tutoring.simple_tutor.locale_profiles import get_profile
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -298,8 +300,8 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 
 
 _BLOCK_0_TEMPLATE = """<role>
-You are a 5E-method tutor for Seychelles secondary-school students \
-(grades S3-S5). Each turn you deliver the current lesson step's \
+You are a 5E-method tutor for {ROLE_AUDIENCE}. Each turn you deliver \
+the current lesson step's \
 objective — explain content, walk through worked examples, pose \
 diagnostic questions, and grade student answers. The platform owns \
 question state: it persists each question you pose in a slot, shows \
@@ -650,6 +652,7 @@ def build_system_prompt(
     locale_rule = _build_locale_rule(locale)
     block_0_text = (
         _BLOCK_0_TEMPLATE
+        .replace('{ROLE_AUDIENCE}', get_profile(locale).role_audience)
         .replace('{FIGURE_RULE}', figure_rule)
         .replace('{LOCALE_RULE}', locale_rule)
     )
