@@ -1,5 +1,12 @@
 # Tutor country/locale context — configurable, not hardcoded — Plan (2026-06-04)
 
+## STATUS (updated 2026-06-04)
+- **Phase 1 DONE** (commit a0e90c7): `locale_profiles.py` + `{ROLE_AUDIENCE}` in the simple-tutor role block. en-us byte-identical; pt-mz = "Mozambican … 8ª–12ª Classe".
+- **Fact-library locale-scoping DONE** (commit 72f3da8): `SeychellesContext.locale` field + `for_locale()`; the 3 content-gen injection sites (lesson-step gen, exit-ticket gen, factual_step judge) now scope by course locale — Seychelles facts no longer leak into pt-mz content. Admin shows/filters by locale.
+- **bank_grader de-Seychelles'd DONE** (72f3da8): grader grounding hint is country-neutral.
+- **REMAINING:** seed Mozambique facts (admin rows with `locale='pt-mz'`) — blocked on **who provides the facts** (open question 2). Until then pt-mz tutor/content is grounded in lesson content only (fine). Optional cosmetic: rename `SeychellesContext` → `LocalContext`.
+- **Phase 3 (legacy `conversational_tutor.py`) = WON'T DO.** Edward confirmed 2026-06-04 the legacy ConversationalTutor "is no longer going to be used ever again" — the simple engine is the only path. Its Seychelles hardcodes (+ `fact_verifier.py`) are dead code; candidate for deletion, not localization.
+
 ## Problem
 The tutor's **language** is already locale-driven (good), but its **country identity, grade vocabulary, and local-fact grounding are hardcoded to Seychelles**. A Mozambique (pt-mz) student's tutor replies in Portuguese yet is told in its system prompt that it teaches *"Seychelles secondary-school students (grades S3-S5)"* — wrong country and wrong grade band (Mozambique = 8ª–12ª Classe), with no Mozambican local context. We want country/language/grade and local context **derived from the selected Course → Unit → Lesson**, mirroring the per-course-locale architecture already locked in `memory/multi_locale_architecture_research.md`.
 
