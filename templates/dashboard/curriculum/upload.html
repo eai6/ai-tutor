@@ -331,6 +331,32 @@
                     </div>
                 </div>
 
+                <!-- Page range — scope a single grade out of a multi-grade PDF -->
+                <div class="form-group">
+                    <label class="form-label">{% trans "Page range (optional — for multi-grade PDFs)" %}</label>
+                    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+                        <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.875rem;">
+                            {% trans "First page" %}
+                            <input type="number" name="first_page" id="first_page" min="1" step="1"
+                                   class="form-control" style="width:6rem;"
+                                   placeholder="{% trans 'start' %}">
+                        </label>
+                        <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.875rem;">
+                            {% trans "Last page" %}
+                            <input type="number" name="last_page" id="last_page" min="1" step="1"
+                                   class="form-control" style="width:6rem;"
+                                   placeholder="{% trans 'end' %}">
+                        </label>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.375rem;">
+                        {% trans "Leave blank to read the whole document and auto-detect grade(s) from its content. To upload one grade at a time from a syllabus that covers several, enter the first and last page for that grade — and select just that one grade above." %}
+                    </div>
+                    <div id="page-range-grade-hint"
+                         style="display:none;font-size:0.75rem;color:var(--warning,#b45309);margin-top:0.375rem;">
+                        {% trans "You've set a page range — these pages should belong to a single grade. Select just one grade above." %}
+                    </div>
+                </div>
+
                 <!-- Lesson Duration -->
                 <div class="form-group">
                     <label class="form-label">{% trans "Target Lesson Duration" %}</label>
@@ -471,6 +497,31 @@
         }
         localeSelect.addEventListener('change', syncGradeOptions);
         syncGradeOptions();  // initial render
+    })();
+
+    // Soft nudge: a page range scopes a single grade, so prompt the teacher
+    // to select exactly one grade when they fill in first/last page. Does NOT
+    // block submit — the backend uses the first selected grade if several are
+    // ticked (multi-grade uploads stay valid).
+    (function() {
+        const first = document.getElementById('first_page');
+        const last = document.getElementById('last_page');
+        const hint = document.getElementById('page-range-grade-hint');
+        if (!first || !last || !hint) return;
+        function checkedVisibleGrades() {
+            return Array.from(document.querySelectorAll('.grade-pills-group'))
+                .filter(g => g.style.display !== 'none')
+                .flatMap(g => Array.from(g.querySelectorAll('input[type="checkbox"]:checked')));
+        }
+        function refresh() {
+            const hasRange = !!(first.value || last.value);
+            hint.style.display = (hasRange && checkedVisibleGrades().length !== 1) ? 'block' : 'none';
+        }
+        first.addEventListener('input', refresh);
+        last.addEventListener('input', refresh);
+        document.querySelectorAll('input[name="grade_level"]').forEach(cb =>
+            cb.addEventListener('change', refresh));
+        refresh();
     })();
 
     // Curriculum file upload

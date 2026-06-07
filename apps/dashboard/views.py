@@ -1109,6 +1109,34 @@ def course_detail(request, course_id):
     return render(request, 'dashboard/curriculum/course_detail.html', context)
 
 
+def _parse_page_range(post):
+    """Parse optional first_page/last_page from a POST dict.
+
+    Returns ``(first_page, last_page)`` as ints-or-None on success. Returns
+    the sentinel ``(False, False)`` when the input is present but invalid
+    (non-integer, < 1, or last < first) so callers can reject with a message.
+    Blank inputs are valid and yield None (= whole document).
+    """
+    raw_first = (post.get('first_page') or '').strip()
+    raw_last = (post.get('last_page') or '').strip()
+
+    def _coerce(raw):
+        if not raw:
+            return None
+        if not raw.isdigit():
+            return False
+        n = int(raw)
+        return n if n >= 1 else False
+
+    first_page = _coerce(raw_first)
+    last_page = _coerce(raw_last)
+    if first_page is False or last_page is False:
+        return (False, False)
+    if first_page and last_page and last_page < first_page:
+        return (False, False)
+    return (first_page, last_page)
+
+
 @teacher_required
 def curriculum_upload(request):
     """Upload curriculum document with optional teaching material attachment."""
@@ -1174,6 +1202,15 @@ def curriculum_upload(request):
             messages.error(request, "Please select at least one grade level.")
             return redirect('dashboard:curriculum_upload')
 
+        # Optional page range (1-based, inclusive) to scope a single grade out
+        # of a multi-grade PDF. Blank = parse the whole document. Bounds against
+        # the real page count are clamped at extraction time; here we only
+        # reject obviously invalid form input (non-positive, last < first).
+        first_page, last_page = _parse_page_range(request.POST)
+        if first_page is False:  # sentinel: invalid input
+            messages.error(request, "Page range must be positive whole numbers, with last page ≥ first page.")
+            return redirect('dashboard:curriculum_upload')
+
         # Save curriculum file
         import os
         from django.conf import settings
@@ -1199,6 +1236,8 @@ def curriculum_upload(request):
             grade_level=grade_level,
             lesson_duration_minutes=lesson_duration,
             locale=locale,
+            first_page=first_page or None,
+            last_page=last_page or None,
             status='pending'
         )
 
@@ -6963,21 +7002,22 @@ def course_edit(request, course_id):
         # SkillPracticeLog rows. A re-parse therefore wiped the whole pilot's
         # competency history — exactly the data we are trying to preserve.
         #
-        # `complete_curriculum_upload` (apps/curriculum/pipeline.py) already
-        # uses `update_or_create` keyed on (course, unit_title) and
-        # (unit, lesson_title). Re-parsing now upserts in place, so:
-        #   - existing Lesson rows keep their PK → student progress, sessions,
-        #     mastery, and exit-ticket history all survive
-        #   - new lessons in the re-parsed structure are created fresh
+        # `complete_curriculum_upload` (apps/curriculum/pipeline.py) is an
+        # ADDITIVE merge keyed on (course, unit_title) and (unit, lesson_title):
+        # get_or_create only — see memory/curriculum_reupload_and_page_range_plan.md
+        # (Part C). Re-parsing grows the course in place, so:
+        #   - existing Unit/Lesson rows are left completely untouched (objective,
+        #     ordering, metadata, LessonStep/ExitTicket, and all student data
+        #     survive) — a re-parse never overwrites them
+        #   - only units/lessons not already present (by title) are appended,
+        #     after the last existing order_index
         #   - lessons that no longer appear in the new parse are LEFT in the DB
-        #     (orphans) rather than deleted — teacher can prune manually if
-        #     wanted, but no data is silently destroyed
+        #     (orphans) rather than deleted — no data is silently destroyed
         #
-        # Trade-off: a renamed lesson title creates a duplicate (the old row
-        # stays under its old title, a new row is created under the new
-        # title). This is the right default — losing student data to a
-        # cosmetic title change would be far worse than a one-time manual
-        # cleanup.
+        # Trade-off: a renamed lesson title appends a new row alongside the old
+        # one. Phase 4 (context-dedupe) feeds the existing structure to the
+        # parser to suppress these; until then a one-time manual prune is the
+        # cost, which is far cheaper than losing student data.
 
         # Re-plan lessons only (skip text extraction + vectorization — already done)
         # Auto-completes after replan: the user already explicitly chose to
@@ -7052,6 +7092,125 @@ def course_edit(request, course_id):
         return redirect('dashboard:course_detail', course_id=course.id)
 
     messages.success(request, f"Course updated.")
+    return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
+def course_reupload(request, course_id):
+    """Edit an existing course by re-uploading a (new) curriculum PDF.
+
+    Additive merge: the new document is parsed (v2, with optional page-range
+    scoping for a single grade out of a multi-grade PDF) and its units/lessons
+    are merged INTO this course — existing units/lessons and their generated
+    content + student data are left untouched; only genuinely new items are
+    appended. The parser is also given the course's current structure so it
+    reuses exact existing titles and avoids reworded-title duplicates.
+
+    See memory/curriculum_reupload_and_page_range_plan.md (Parts A–C).
+    """
+    import os
+    from django.conf import settings
+    from apps.dashboard.models import CurriculumUpload
+    from apps.dashboard.background_tasks import run_async
+
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        course = get_object_or_404(Course, id=course_id, institution=institution)
+    else:
+        course = get_object_or_404(Course, id=course_id)
+
+    uploaded_file = request.FILES.get('curriculum_file')
+    if not uploaded_file:
+        messages.error(request, "Please choose a curriculum file to upload.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    first_page, last_page = _parse_page_range(request.POST)
+    if first_page is False:  # sentinel: invalid input
+        messages.error(request, "Page range must be positive whole numbers, with last page ≥ first page.")
+        return redirect('dashboard:course_detail', course_id=course.id)
+
+    # Persist the new file.
+    upload_dir = os.path.join(settings.MEDIA_ROOT, 'curriculum_uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, uploaded_file.name)
+    with open(file_path, 'wb+') as dest:
+        for chunk in uploaded_file.chunks():
+            dest.write(chunk)
+
+    # Reuse the course's existing upload row when there is one (keeps the
+    # created_course link → the additive writer targets THIS course), else
+    # create one and link it so future re-parses also find a source PDF.
+    upload = None
+    if course.curriculum_upload_id:
+        upload = CurriculumUpload.objects.filter(id=course.curriculum_upload_id).first()
+    if not upload:
+        upload = CurriculumUpload.objects.filter(created_course=course).first()
+
+    if upload:
+        upload.file_path = file_path
+        upload.original_filename = uploaded_file.name
+        upload.first_page = first_page or None
+        upload.last_page = last_page or None
+        upload.status = 'processing'
+        upload.processing_log = ''
+        upload.error_message = ''
+        upload.created_course = course
+        upload.save()
+    else:
+        subject_label = dict(Course.SubjectCode.choices).get(course.subject_code, '') if course.subject_code else ''
+        upload = CurriculumUpload.objects.create(
+            institution=course.institution,
+            uploaded_by=request.user,
+            file_path=file_path,
+            original_filename=uploaded_file.name,
+            subject_name=subject_label or course.title,
+            subject_code=course.subject_code or '',
+            grade_level=course.grade_level or '',
+            locale=getattr(course, 'locale', None) or 'en-us',
+            first_page=first_page or None,
+            last_page=last_page or None,
+            created_course=course,
+            status='processing',
+        )
+
+    # Link the upload back onto the course so the re-parse-from-stored-file
+    # button works next time too.
+    if course.curriculum_upload_id != upload.id:
+        course.curriculum_upload = upload
+        course.save(update_fields=['curriculum_upload', 'updated_at'])
+
+    def _reupload_job(upload_id):
+        import django.db
+        django.db.connections.close_all()
+        try:
+            from apps.curriculum.curriculum_parser import process_curriculum_upload
+            # skip_review=True → parse + auto-complete via the additive writer.
+            process_curriculum_upload(upload_id, skip_review=True)
+            print(f"[Reupload] Done for upload {upload_id}", flush=True)
+        except Exception as e:
+            print(f"[Reupload] FAILED: {e}", flush=True)
+            import traceback; traceback.print_exc()
+            try:
+                from apps.dashboard.models import CurriculumUpload as _CU
+                up = _CU.objects.get(id=upload_id)
+                up.status = 'failed'
+                up.error_message = str(e)
+                up.add_log(f"❌ Re-upload failed: {e}")
+                up.save()
+            except Exception:
+                pass
+
+    run_async(_reupload_job, upload.id)
+    range_msg = ""
+    if first_page or last_page:
+        range_msg = f" (pages {first_page or 'start'}–{last_page or 'end'})"
+    messages.success(
+        request,
+        f"Re-uploading curriculum{range_msg}. New units/lessons will be added "
+        f"to this course; existing lessons, content, and student data are "
+        f"preserved. Refresh in ~1 minute to see the result.",
+    )
     return redirect('dashboard:course_detail', course_id=course.id)
 
 

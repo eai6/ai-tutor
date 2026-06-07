@@ -484,7 +484,8 @@ for that grade's units). If a future doc exceeds 180K we head+tail
 to preserve both the index and the trailing units."""
 
 
-def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]:
+def outline_pass(text: str, *, subject: str, locale: str,
+                 existing_units: Optional[list[dict]] = None) -> list[UnitOutlineV2]:
     """Extract just the unit-level shape from the full document text.
     Returns a list of UnitOutlineV2; lessons are filled in by
     ``lessons_pass`` per-unit (M4).
@@ -522,6 +523,36 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
     locale_hints = locale_parser_hints(locale)
     output_lang = _output_language_block(locale)
 
+    # Re-parse dedupe context. On a first upload existing_units is empty and
+    # BOTH of these render to "" — the prompt is byte-for-byte the original,
+    # so first-upload extraction is unchanged. On a re-parse we list the units
+    # already in the course (data block in <context>) and add a guideline (in
+    # the trailing <task>) telling Claude to reuse the EXACT existing title for
+    # already-covered units so the additive writer recognises them instead of
+    # appending a reworded duplicate.
+    existing_units_block = ""
+    dedupe_guideline = ""
+    if existing_units:
+        _lines = "\n".join(
+            f"- {u.get('title','')}  (grade: {u.get('grade_level','')})"
+            for u in existing_units if u.get('title')
+        )
+        existing_units_block = (
+            f"\n<existing_units>\n"
+            f"These units already exist for this curriculum (created by an "
+            f"earlier upload):\n{_lines}\n"
+            f"</existing_units>\n"
+        )
+        dedupe_guideline = (
+            f"9. Some units already exist (see <existing_units>). When this "
+            f"document covers a unit that is the same as one already listed, "
+            f"reuse its EXACT existing title and grade verbatim so we recognise "
+            f"it as the same unit rather than a duplicate. Give a new title "
+            f"only to a unit that is genuinely not in that list. Still emit "
+            f"every unit the document contains — both the ones that already "
+            f"exist and the new ones.\n"
+        )
+
     system_prompt = (
         "You are a curriculum-document structure extractor. Given a "
         "curriculum / teaching-programme document, identify ITS NATURAL "
@@ -543,6 +574,7 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"- subject: {subject}\n"
         f"- locale: {locale}\n"
         f"</context>\n"
+        f"{existing_units_block}"
         f"\n<task>\n"
         f"Extract the unit-level structure of this curriculum document.\n\n"
         f"GUIDELINES:\n"
@@ -584,6 +616,7 @@ def outline_pass(text: str, *, subject: str, locale: str) -> list[UnitOutlineV2]
         f"contents or overview table, use it as your unit-count target. "
         f"Missing a unit on a later page is a BIGGER problem than "
         f"splitting too finely.\n"
+        f"{dedupe_guideline}"
         f"</task>"
     )
 
@@ -801,7 +834,8 @@ def _excerpt_for_unit(
 
 
 def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
-                 all_outlines: Optional[list[UnitOutlineV2]] = None) -> list[LessonV2]:
+                 all_outlines: Optional[list[UnitOutlineV2]] = None,
+                 existing_lessons: Optional[list[str]] = None) -> list[LessonV2]:
     """Extract the lessons for one unit. Called in a bounded thread-
     pool fan-out from ``parse_curriculum``.
 
@@ -825,6 +859,28 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
     locale_hints = locale_parser_hints(locale)
     output_lang = _output_language_block(locale)
 
+    # Re-parse dedupe context (empty → renders to "" → original prompt). On a
+    # re-parse we list the lessons already in this unit and ask Claude to reuse
+    # their EXACT titles for already-covered lessons so the additive writer
+    # matches them instead of appending reworded duplicates.
+    existing_lessons_block = ""
+    dedupe_guideline = ""
+    if existing_lessons:
+        _lines = "\n".join(f"- {t}" for t in existing_lessons if t)
+        existing_lessons_block = (
+            f"\n<existing_lessons>\n"
+            f"This unit already contains these lessons (from an earlier "
+            f"upload):\n{_lines}\n"
+            f"</existing_lessons>\n"
+        )
+        dedupe_guideline = (
+            f"8. Some lessons already exist in this unit (see "
+            f"<existing_lessons>). Reuse the EXACT existing title for any "
+            f"lesson that is the same as one already listed; give a new title "
+            f"only to a genuinely new lesson. Emit both the existing lessons "
+            f"and any new ones.\n"
+        )
+
     system_prompt = (
         "You are a curriculum-document lesson extractor. Given a single "
         "unit's worth of text from a curriculum / teaching-programme "
@@ -842,6 +898,7 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
         f"{excerpt}\n"
         f"</unit_excerpt>\n"
         f"{locale_hints}"
+        f"{existing_lessons_block}"
         f"\n<task>\n"
         f"Extract the individual lessons in this unit.\n\n"
         f"GUIDELINES:\n"
@@ -863,6 +920,7 @@ def lessons_pass(unit: UnitOutlineV2, full_text: str, *, locale: str,
         f"7. For source_evidence: a 30-100 char verbatim snippet from "
         f"the excerpt that anchors this lesson (typically the "
         f"sub-heading or first content line). Anti-hallucination check.\n"
+        f"{dedupe_guideline}"
         f"</task>"
     )
 
@@ -945,6 +1003,7 @@ def _lessons_fanout(
     full_text: str,
     locale: str,
     progress_cb: Optional[Callable[[int], None]] = None,
+    existing_structure: Optional[list[dict]] = None,
 ) -> tuple[list[UnitV2], int]:
     """Fan-out lessons_pass across all units with bounded concurrency.
 
@@ -957,6 +1016,17 @@ def _lessons_fanout(
     """
     import concurrent.futures as _cf
 
+    # Map existing unit title (normalised) → its existing lesson titles, so each
+    # per-unit lessons_pass can be told what's already there for dedupe. Empty
+    # on first upload → lessons_pass sees existing_lessons=None (no change).
+    existing_lessons_by_unit: dict[str, list[str]] = {}
+    for u in (existing_structure or []):
+        key = (u.get('title') or '').strip().lower()
+        if key:
+            existing_lessons_by_unit[key] = [
+                t for t in (u.get('lessons') or []) if t
+            ]
+
     units: list[Optional[UnitV2]] = [None] * len(outlines)
     failed = 0
     done = 0
@@ -968,6 +1038,9 @@ def _lessons_fanout(
                 full_text=full_text,
                 locale=locale,
                 all_outlines=outlines,
+                existing_lessons=existing_lessons_by_unit.get(
+                    (outline.title or '').strip().lower()
+                ),
             )
             return i, lessons, None
         except Exception as e:
@@ -1021,6 +1094,9 @@ def parse_curriculum(
     locale: str = DEFAULT_LOCALE,
     institution_id: Optional[int] = None,
     progress_cb: Optional[Callable[[str, dict], None]] = None,
+    first_page: Optional[int] = None,
+    last_page: Optional[int] = None,
+    existing_structure: Optional[list[dict]] = None,
 ) -> ParsedCurriculumV2:
     """Parse a curriculum file into a ``ParsedCurriculumV2`` structure.
 
@@ -1042,6 +1118,13 @@ def parse_curriculum(
         progress_cb: optional ``(phase, data)`` callback so the upload
             UI can stream live updates. Phases:
             'extract', 'detect', 'outline', 'lessons', 'done'.
+        first_page: optional 1-based first page (inclusive) to scope a
+            single grade out of a multi-grade PDF. None = whole document.
+        last_page: optional 1-based last page (inclusive). None = to end.
+        existing_structure: optional list of the course's current units —
+            ``[{'title', 'grade_level', 'lessons': [titles]}]`` — supplied on a
+            re-parse so the outline/lessons passes reuse exact existing titles
+            for already-covered units/lessons (dedupe). None on first upload.
 
     Returns:
         ParsedCurriculumV2.
@@ -1057,9 +1140,11 @@ def parse_curriculum(
                 logger.exception("[parser_v2] progress_cb raised — ignored")
 
     # ── 1. Extract text (delegates to archive — vision OCR + NUL strip etc.)
-    _emit('extract', file=file_path)
+    _emit('extract', file=file_path, first_page=first_page, last_page=last_page)
     try:
-        text, file_type = extract_text_from_file(file_path)
+        text, file_type = extract_text_from_file(
+            file_path, first_page=first_page, last_page=last_page,
+        )
     except OCRFailure as e:
         raise ParseFailure('no_text', f"OCR failed: {e.reason} — {e.detail}")
     if not text or len(text.strip()) < 100:
@@ -1083,7 +1168,10 @@ def parse_curriculum(
 
     # ── 3. Outline pass (M3)
     _emit('outline', subject=detection['subject'], locale=effective_locale)
-    outlines = outline_pass(text, subject=detection['subject'], locale=effective_locale)
+    outlines = outline_pass(
+        text, subject=detection['subject'], locale=effective_locale,
+        existing_units=existing_structure,
+    )
     if not outlines:
         raise ParseFailure(
             'no_units_found',
@@ -1095,6 +1183,7 @@ def parse_curriculum(
     units, failed = _lessons_fanout(
         outlines, full_text=text, locale=effective_locale,
         progress_cb=lambda done: _emit('lesson_unit_done', done=done, total=len(outlines)),
+        existing_structure=existing_structure,
     )
     if failed == len(outlines):
         raise ParseFailure(
@@ -1188,6 +1277,36 @@ def _v2_to_review_shape(parsed: ParsedCurriculumV2, target_grade: Optional[str] 
     }
 
 
+def _build_existing_structure(upload) -> Optional[list[dict]]:
+    """Snapshot the units/lessons already in the course(s) this upload feeds.
+
+    Used on a re-parse so the parser can reuse exact existing titles (dedupe).
+    Returns ``[{'title', 'grade_level', 'lessons': [titles]}]`` or ``None`` when
+    the upload hasn't produced a course yet (first upload → no dedupe context).
+    """
+    from apps.curriculum.models import Course
+    from django.db.models import Q
+
+    course_q = Q(curriculum_upload=upload)
+    if upload.created_course_id:
+        course_q |= Q(id=upload.created_course_id)
+    courses = (
+        Course.objects.filter(course_q)
+        .distinct()
+        .prefetch_related('units__lessons')
+    )
+
+    structure: list[dict] = []
+    for course in courses:
+        for unit in course.units.all():
+            structure.append({
+                'title': unit.title,
+                'grade_level': unit.grade_level or course.grade_level or '',
+                'lessons': [l.title for l in unit.lessons.all()],
+            })
+    return structure or None
+
+
 def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict:
     """v2 orchestrator. Replaces the archive's regex-fallback chain
     with the LLM-first ``parse_curriculum()``. Same call signature so
@@ -1246,6 +1365,21 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict
         upload.add_log(f"   File: {upload.file_path}")
         upload.add_log(f"   Teacher hints: subject={upload.subject_name!r}, "
                        f"grade={upload.grade_level!r}, locale={getattr(upload, 'locale', None)!r}")
+        first_page = getattr(upload, 'first_page', None)
+        last_page = getattr(upload, 'last_page', None)
+        if first_page or last_page:
+            upload.add_log(
+                f"   📑 Page range: {first_page or 'start'}–{last_page or 'end'} "
+                f"(scoping this upload to one grade)"
+            )
+        # Re-parse dedupe context: snapshot existing units/lessons so the parser
+        # reuses their exact titles instead of appending reworded duplicates.
+        existing_structure = _build_existing_structure(upload)
+        if existing_structure:
+            upload.add_log(
+                f"   ♻️  Re-parse: {len(existing_structure)} existing unit(s) "
+                f"supplied to the parser for de-duplication."
+            )
         upload.save()
 
         parsed = parse_curriculum(
@@ -1255,6 +1389,9 @@ def process_curriculum_upload(upload_id: int, skip_review: bool = False) -> dict
             locale=getattr(upload, 'locale', None) or DEFAULT_LOCALE,
             institution_id=upload.institution_id,
             progress_cb=_bump,
+            first_page=first_page,
+            last_page=last_page,
+            existing_structure=existing_structure,
         )
 
         # Convert to review-UI shape (one payload, all units, all grades).
@@ -1404,6 +1541,13 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
     total_units = 0
     total_lessons = 0
 
+    # Re-upload / re-parse targeting: if this upload already produced a course,
+    # merge straight back into it so a re-parse can never spawn a duplicate
+    # course when detection shifts the computed "{subject} {grade}" title. Only
+    # engages for the grade matching that course (or when the parse is
+    # single-grade); other grades fall back to title matching.
+    target_course = upload.created_course if upload.created_course_id else None
+
     # Detected locale to stamp on each Course row. The archive's
     # create_curriculum_from_structure doesn't read or set locale —
     # we patch it on after the row is created so downstream content
@@ -1424,7 +1568,17 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
             'description': structure.get('description', ''),
             'units': units,
         }
-        result = create_curriculum_from_structure(per_grade_struct, inst, upload=upload)
+        # Engage the target course only for the matching grade (or when the
+        # parse yielded a single grade — the re-upload common case).
+        _tc = None
+        if target_course is not None and (
+            len(units_by_grade) == 1
+            or (target_course.grade_level or '').strip() == (grade or '').strip()
+        ):
+            _tc = target_course
+        result = create_curriculum_from_structure(
+            per_grade_struct, inst, upload=upload, target_course=_tc,
+        )
         cid = result.get('course_id')
         course_ids.append(cid)
         total_units += result.get('units_created', 0)

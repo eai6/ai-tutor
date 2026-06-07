@@ -97,7 +97,13 @@ class ParsedCurriculum:
 # TEXT EXTRACTION
 # ============================================================================
 
-def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
+def extract_text_from_file(
+    file_path: str,
+    progress_cb=None,
+    *,
+    first_page: Optional[int] = None,
+    last_page: Optional[int] = None,
+) -> Tuple[str, str]:
     """
     Extract text from curriculum file.
 
@@ -106,8 +112,18 @@ def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
     progress_cb is forwarded to extract_from_pdf for materials uploads that
     want per-batch progress updates from the vision-OCR fallback. Other file
     types ignore it (no streaming work to report on).
+
+    first_page/last_page (1-based, inclusive) scope extraction to a page range
+    — only meaningful for PDFs. For non-PDF inputs a supplied range is logged
+    and ignored (those formats have no page model).
     """
     ext = os.path.splitext(file_path)[1].lower()
+
+    if (first_page or last_page) and ext != '.pdf':
+        logger.warning(
+            f"Page range (first={first_page}, last={last_page}) ignored for "
+            f"non-PDF file {file_path} ({ext}) — page scoping only applies to PDFs."
+        )
 
     if ext in ['.txt', '.md']:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -130,7 +146,10 @@ def extract_text_from_file(file_path: str, progress_cb=None) -> Tuple[str, str]:
         )
 
     elif ext == '.pdf':
-        return _strip_nul(extract_from_pdf(file_path, progress_cb=progress_cb)), 'pdf'
+        return _strip_nul(extract_from_pdf(
+            file_path, progress_cb=progress_cb,
+            first_page=first_page, last_page=last_page,
+        )), 'pdf'
 
     elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff', '.tif']:
         return _strip_nul(extract_from_image(file_path)), 'image'
@@ -185,7 +204,13 @@ def extract_from_docx(file_path: str) -> str:
             return f.read()
 
 
-def extract_from_pdf(file_path: str, progress_cb=None) -> str:
+def extract_from_pdf(
+    file_path: str,
+    progress_cb=None,
+    *,
+    first_page: Optional[int] = None,
+    last_page: Optional[int] = None,
+) -> str:
     """Extract text from PDF, with multimodal LLM fallback for scanned docs.
 
     OCRFailure (typed) propagates so the materials pipeline can record a
@@ -197,24 +222,52 @@ def extract_from_pdf(file_path: str, progress_cb=None) -> str:
         progress_cb: optional ``(pages_processed, pages_total, phase)`` callback
             forwarded to ``_extract_pdf_with_vision`` so materials uploads can
             update their `pages_processed` / `phase` fields per batch.
+        first_page: optional 1-based first page to extract (inclusive). Lets a
+            multi-grade syllabus be uploaded one grade at a time. ``None`` =
+            from the start of the document.
+        last_page: optional 1-based last page to extract (inclusive). ``None`` =
+            to the end of the document. Bounds are clamped to the real page
+            count, so out-of-range values degrade gracefully rather than error.
     """
     try:
         import fitz
         doc = fitz.open(file_path)
 
-        # First pass: embedded text
+        # Resolve the 0-based half-open slice [lo, hi) from the 1-based
+        # inclusive (first_page, last_page) the teacher entered. Clamp to the
+        # real page count so an over-long last_page just reads to the end.
+        n = doc.page_count
+        lo = max(1, first_page) - 1 if first_page else 0
+        hi = min(n, last_page) if last_page else n
+        sliced = bool(first_page or last_page)
+        if sliced and (lo >= hi or lo >= n):
+            logger.warning(
+                f"PDF page range first={first_page} last={last_page} is empty "
+                f"for {file_path} ({n} pages) — extracting nothing."
+            )
+            doc.close()
+            return ""
+        if sliced:
+            logger.info(
+                f"PDF page-range scope: pages {lo + 1}-{hi} of {n} ({file_path})"
+            )
+
+        # First pass: embedded text (over the selected page range only)
         text = ""
-        for page in doc:
-            text += page.get_text()
+        for i in range(lo, hi):
+            text += doc[i].get_text()
 
         if len(text.strip()) >= 100:
             doc.close()
             return text
 
-        # Multimodal LLM fallback
+        # Multimodal LLM fallback — scope it to the same page range so a
+        # scanned slice doesn't OCR the whole document.
         logger.info(f"Low text ({len(text.strip())} chars), trying LLM vision: {file_path}")
         try:
-            llm_text = _extract_pdf_with_vision(doc, progress_cb=progress_cb)
+            llm_text = _extract_pdf_with_vision(
+                doc, progress_cb=progress_cb, start_page=lo, end_page=hi,
+            )
         except OCRFailure:
             doc.close()
             raise   # propagate typed failures so callers can render structured errors
@@ -534,6 +587,7 @@ def _extract_pdf_with_vision(
     doc,
     progress_cb=None,
     start_page: int = 0,
+    end_page: Optional[int] = None,
 ):
     """
     Render PDF pages to images and use multimodal LLM to extract content.
@@ -556,6 +610,8 @@ def _extract_pdf_with_vision(
         progress_cb: Optional callback ``(pages_processed, pages_total, phase)``
             invoked after each batch completes.
         start_page: Resume hint (P3). Pages [0, start_page) are skipped.
+        end_page: optional 0-based exclusive upper bound (page-range scoping).
+            ``None`` = OCR to the end of the document.
 
     Raises:
         OCRFailure: only when EVERY batch failed across EVERY provider, OR
@@ -581,8 +637,12 @@ def _extract_pdf_with_vision(
     if pages_total == 0:
         raise OCRFailure('no_pages', "PDF rendered zero pages.")
 
-    if start_page >= pages_total:
-        # Caller has already processed everything — nothing to do.
+    # Upper bound for OCR. When a page range was requested, end_page caps the
+    # last page (0-based, half-open) so we don't OCR beyond the selected grade.
+    end = pages_total if end_page is None else min(end_page, pages_total)
+
+    if start_page >= end:
+        # Caller has already processed everything (or the slice is empty).
         return ""
 
     system_prompt = (
@@ -598,8 +658,8 @@ def _extract_pdf_with_vision(
 
     # Build batch boundaries [start, end) over the unprocessed page range.
     batches = [
-        (i, min(i + _VISION_BATCH_SIZE, pages_total))
-        for i in range(start_page, pages_total, _VISION_BATCH_SIZE)
+        (i, min(i + _VISION_BATCH_SIZE, end))
+        for i in range(start_page, end, _VISION_BATCH_SIZE)
     ]
     total_batches = len(batches)
     results: List[Optional[str]] = [None] * total_batches
@@ -687,7 +747,7 @@ def _extract_pdf_with_vision(
                 pages_done += batch_pages
                 if progress_cb is not None:
                     try:
-                        progress_cb(pages_done, pages_total, f"vision_ocr_p{pages_done}_of_{pages_total}")
+                        progress_cb(pages_done, end, f"vision_ocr_p{pages_done}_of_{end}")
                     except Exception as cb_exc:
                         logger.warning(f"progress_cb raised — ignoring: {cb_exc}")
             _submit_next()
@@ -2292,12 +2352,30 @@ def parse_curriculum_file(file_path: str, subject: str, grade_level: str) -> Dic
 # DATABASE INTEGRATION
 # ============================================================================
 
-def create_curriculum_from_structure(structure: Dict, institution, upload=None) -> Dict:
+def create_curriculum_from_structure(structure: Dict, institution, upload=None,
+                                     target_course=None) -> Dict:
     """
     Create Course, Units, and Lessons from parsed structure.
+
+    target_course: when provided (re-upload / re-parse onto a SPECIFIC existing
+    course), units/lessons are merged into THAT course directly instead of
+    matching a course by computed "{subject} {grade}" title. This guarantees a
+    re-upload lands on the chosen course even if the new document's detected
+    subject/locale would compute a different title (which would otherwise spawn
+    a duplicate course). None → original title-matching behaviour (first upload).
+
+    ADDITIVE MERGE (2026-06): this writer never overwrites or deletes an
+    existing Course / Unit / Lesson, nor any generated content (LessonStep,
+    ExitTicket) hanging off them. It only *appends* units/lessons that are not
+    already present (matched by title). A re-parse therefore grows a course in
+    place — existing rows keep their PK, objective, ordering, steps, exit
+    tickets, and all student data untouched; only genuinely new items are added.
+    For a brand-new course this is identical to a plain create.
+    See memory/curriculum_reupload_and_page_range_plan.md (Part C).
     """
     from apps.curriculum.models import Course, Unit, Lesson, LessonStep
-    
+    from django.db.models import Max
+
     from apps.curriculum.utils import format_grade_display
     subject_name = structure.get('subject', 'General')
     grade = structure.get('grade_level', '')
@@ -2306,41 +2384,69 @@ def create_curriculum_from_structure(structure: Dict, institution, upload=None) 
     # Create course
     course_name = f"{subject_name} {grade_display}"
 
-    course, created = Course.objects.update_or_create(
-        institution=institution,
-        title=course_name,
-        defaults={
+    if target_course is not None:
+        # Re-upload / re-parse targeting a specific course — merge into it
+        # directly, no title matching (avoids spawning a duplicate course when
+        # detection shifts the computed title).
+        course, created = target_course, False
+    else:
+        # get_or_create (not update_or_create): an existing course keeps its meta
+        # (title/description/grade/teacher edits) — a re-parse must not rewrite it.
+        # Link the source upload on creation so the "Re-parse from stored file"
+        # button and _build_existing_structure() can find this course's origin
+        # PDF later (the v2 path previously left curriculum_upload unset).
+        _defaults = {
             'grade_level': grade,
             'description': structure.get('description', ''),
             'is_published': False,
         }
-    )
-    
+        if upload is not None:
+            _defaults['curriculum_upload'] = upload
+        course, created = Course.objects.get_or_create(
+            institution=institution,
+            title=course_name,
+            defaults=_defaults,
+        )
+
     if upload:
         upload.created_course = course
-        upload.add_log(f"{'Created' if created else 'Updated'} course: {course.title}")
-    
+        upload.add_log(f"{'Created' if created else 'Reusing'} course: {course.title}")
+
     lessons_created = 0
     units_created = 0
-    
-    # Create Units and Lessons
+
+    # Append new units after the last existing one so a re-parse doesn't
+    # renumber (or collide with) the order_index of units already in the course.
+    # NB: explicit None check — `(max or -1)` would misfire when max == 0
+    # (0 is falsy), collapsing a second unit onto order_index 0.
+    _max_u = course.units.aggregate(m=Max('order_index'))['m']
+    next_unit_order = (_max_u + 1) if _max_u is not None else 0
+
+    # Create Units and Lessons (additive)
     for unit_data in structure.get('units', []):
-        unit, u_created = Unit.objects.update_or_create(
+        unit, u_created = Unit.objects.get_or_create(
             course=course,
             title=unit_data.get('title', 'Unnamed Unit'),
             defaults={
                 'description': unit_data.get('introduction', ''),
-                'order_index': unit_data.get('number', 0),
+                'order_index': next_unit_order,
             }
         )
-        
+
         if u_created:
             units_created += 1
-        
-        if upload:
-            upload.add_log(f"  {'Created' if u_created else 'Updated'} unit: {unit.title}")
-        
-        # Create lessons
+            next_unit_order += 1
+            if upload:
+                upload.add_log(f"  Created unit: {unit.title}")
+        elif upload:
+            upload.add_log(f"  Unit exists, appending any new lessons: {unit.title}")
+
+        # Append new lessons after the unit's last existing lesson
+        # (explicit None check — see the order_index==0 note above).
+        _max_l = unit.lessons.aggregate(m=Max('order_index'))['m']
+        next_lesson_order = (_max_l + 1) if _max_l is not None else 0
+
+        # Create lessons (additive — existing lessons + their steps untouched)
         for lesson_data in unit_data.get('lessons', []):
             lesson_metadata = {
                 'enabling_objectives': lesson_data.get('enabling_objectives', []),
@@ -2348,22 +2454,23 @@ def create_curriculum_from_structure(structure: Dict, institution, upload=None) 
                 'resources': lesson_data.get('resources', []),
                 'assessment_methods': lesson_data.get('assessment_methods', []),
             }
-            
-            lesson, l_created = Lesson.objects.update_or_create(
+
+            lesson, l_created = Lesson.objects.get_or_create(
                 unit=unit,
                 title=lesson_data.get('title', 'Unnamed Lesson'),
                 defaults={
                     'objective': lesson_data.get('objective', ''),
                     'estimated_minutes': lesson_data.get('estimated_minutes', 20),
-                    'order_index': lesson_data.get('order', 0),
+                    'order_index': next_lesson_order,
                     'is_published': False,
                     'metadata': lesson_metadata,
                 }
             )
-            
+
             if l_created:
                 lessons_created += 1
-                
+                next_lesson_order += 1
+
                 # Create a basic teach step
                 LessonStep.objects.get_or_create(
                     lesson=lesson,
@@ -2373,14 +2480,14 @@ def create_curriculum_from_structure(structure: Dict, institution, upload=None) 
                         'teacher_script': f"Today we will learn about: {lesson.objective}",
                     }
                 )
-                
+
                 if upload:
                     upload.add_log(f"    Created lesson: {lesson.title}")
-    
+
     if upload:
         upload.lessons_created = lessons_created
         upload.save()
-    
+
     return {
         'course_id': course.id,
         'course_name': course.title,

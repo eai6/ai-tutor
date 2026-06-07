@@ -35,6 +35,7 @@ urlpatterns = [
     
     # Course management
     path('curriculum/course/<int:course_id>/edit/', views.course_edit, name='course_edit'),
+    path('curriculum/course/<int:course_id>/reupload/', views.course_reupload, name='course_reupload'),
     path('curriculum/course/<int:course_id>/change-institution/', views.course_change_institution, name='course_change_institution'),
     path('curriculum/course/<int:course_id>/delete/', views.course_delete, name='course_delete'),
     path('curriculum/course/<int:course_id>/regenerate-all/', views.course_regenerate_all, name='course_regenerate_all'),

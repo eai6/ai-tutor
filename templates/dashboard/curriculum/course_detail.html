@@ -329,6 +329,39 @@
                 </button>
             </form>
         </details>
+
+        <details style="margin-top: 0.75rem; padding: 1rem; background: #f9fafb; border: 1px solid var(--gray-200); border-radius: 8px;">
+            <summary style="cursor: pointer; font-weight: 600; color: var(--gray-700); font-size: 0.875rem;">
+                ⬆️ Update from new PDF
+            </summary>
+            <p style="font-size: 0.8125rem; color: var(--gray-500); margin: 0.75rem 0;">
+                Upload a new or corrected curriculum PDF to <strong>add</strong> to this course. The new document is parsed and any units/lessons not already here are appended — existing lessons, generated content, and student data are never overwritten or deleted. For a syllabus that covers several grades, set the page range to scope this course's grade.
+            </p>
+            <form method="post" action="{% url 'dashboard:course_reupload' course.id %}" enctype="multipart/form-data"
+                  onsubmit="return confirm('Re-upload a curriculum PDF and merge new units/lessons into this course?\n\nAdditive — nothing existing is overwritten or deleted.');">
+                {% csrf_token %}
+                <div style="margin-bottom: 0.75rem;">
+                    <input type="file" name="curriculum_file" accept=".pdf,.docx,.doc,.txt" required
+                           class="form-control" style="font-size: 0.8125rem;">
+                </div>
+                <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-bottom:0.75rem;">
+                    <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
+                        First page
+                        <input type="number" name="first_page" min="1" step="1" placeholder="start"
+                               class="form-control" style="width:5.5rem;">
+                    </label>
+                    <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
+                        Last page
+                        <input type="number" name="last_page" min="1" step="1" placeholder="end"
+                               class="form-control" style="width:5.5rem;">
+                    </label>
+                    <span style="font-size:0.75rem;color:var(--gray-400);">optional — for multi-grade PDFs</span>
+                </div>
+                <button type="submit" class="btn btn-sm" style="background: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;">
+                    Upload &amp; add to course
+                </button>
+            </form>
+        </details>
         {% endif %}
     </div>
 </div>

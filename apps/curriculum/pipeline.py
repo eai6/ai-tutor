@@ -1436,7 +1436,11 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
             if grade:
                 course_defaults['grade_levels'] = [grade]
 
-            course, created = Course.objects.update_or_create(
+            # Additive merge (2026-06): get_or_create, never update_or_create.
+            # A re-parse must not overwrite an existing course's meta or its
+            # units/lessons/generated-content — it only appends what's new.
+            # See memory/curriculum_reupload_and_page_range_plan.md (Part C).
+            course, created = Course.objects.get_or_create(
                 institution=upload.institution,
                 title=course_title,
                 defaults=course_defaults,
@@ -1446,7 +1450,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
                 first_course = course
                 upload.created_course = course
 
-            upload.add_log(f"   {'Created' if created else 'Updated'} course: {course.title} ({len(grade_units)} units)")
+            upload.add_log(f"   {'Created' if created else 'Reusing'} course: {course.title} ({len(grade_units)} units)")
 
             # Link teaching materials matching this grade
             linked = TeachingMaterialUpload.objects.filter(
@@ -1457,14 +1461,23 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
             if linked:
                 upload.add_log(f"   Linked {linked} material(s) to {course_title}")
 
-            # Create units and lessons for this grade
-            for unit_idx, unit_data in enumerate(grade_units):
-                unit, u_created = Unit.objects.update_or_create(
+            # Create units and lessons for this grade (additive merge —
+            # get_or_create only; existing units/lessons + their generated
+            # content are left untouched, new ones appended after the last
+            # existing order_index so a re-parse never renumbers/collides).
+            from django.db.models import Max
+            # explicit None check — `(max or -1)` misfires when max == 0 (falsy),
+            # collapsing a second unit onto order_index 0.
+            _max_u = course.units.aggregate(m=Max('order_index'))['m']
+            next_unit_order = (_max_u + 1) if _max_u is not None else 0
+
+            for unit_data in grade_units:
+                unit, u_created = Unit.objects.get_or_create(
                     course=course,
                     title=unit_data['title'],
                     defaults={
                         'description': unit_data.get('description', ''),
-                        'order_index': unit_idx,
+                        'order_index': next_unit_order,
                         'grade_level': unit_data.get('grade_level', ''),
                         'terminal_objectives': unit_data.get('terminal_objectives', []),
                         'enabling_objectives': unit_data.get('enabling_objectives', []),
@@ -1473,18 +1486,21 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
 
                 if u_created:
                     units_created += 1
+                    next_unit_order += 1
 
-                upload.add_log(f"   📁 {unit.title}")
+                upload.add_log(f"   📁 {unit.title}{'' if u_created else ' (exists — appending new lessons)'}")
 
                 target_duration = getattr(upload, 'lesson_duration_minutes', 20) or 20
+                _max_l = unit.lessons.aggregate(m=Max('order_index'))['m']
+                next_lesson_order = (_max_l + 1) if _max_l is not None else 0
 
-                for lesson_idx, lesson_data in enumerate(unit_data.get('lessons', [])):
-                    lesson, l_created = Lesson.objects.update_or_create(
+                for lesson_data in unit_data.get('lessons', []):
+                    lesson, l_created = Lesson.objects.get_or_create(
                         unit=unit,
                         title=lesson_data['title'],
                         defaults={
                             'objective': lesson_data.get('objective', ''),
-                            'order_index': lesson_idx,
+                            'order_index': next_lesson_order,
                             'estimated_minutes': target_duration,
                             'is_published': False,
                             'enabling_objectives': lesson_data.get('enabling_objectives', []),
@@ -1499,6 +1515,7 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> Dict:
 
                     if l_created:
                         lessons_created += 1
+                        next_lesson_order += 1
 
                         # Create initial teaching step
                         LessonStep.objects.get_or_create(

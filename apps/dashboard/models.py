@@ -99,6 +99,22 @@ class CurriculumUpload(models.Model):
         help_text="Target lesson duration in minutes (controls steps and EOs per lesson)"
     )
 
+    # Page-range scoping for multi-grade PDFs. 1-based, inclusive. When set,
+    # only these pages are extracted before parsing, so a single national
+    # syllabus covering several grades can be uploaded one grade at a time.
+    # Null/blank = parse the whole document (grade(s) detected from context,
+    # current behaviour). See memory/curriculum_reupload_and_page_range_plan.md.
+    first_page = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="1-based first page of the target grade within a multi-grade PDF. "
+                  "Blank = parse the whole document.",
+    )
+    last_page = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="1-based last page (inclusive) of the target grade. "
+                  "Blank = read to the end of the document.",
+    )
+
     # Processing log
     processing_log = models.TextField(blank=True)
     teacher_feedback = models.TextField(blank=True)  # Store teacher feedback
