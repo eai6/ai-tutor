@@ -7214,6 +7214,67 @@ def course_reupload(request, course_id):
     return redirect('dashboard:course_detail', course_id=course.id)
 
 
+def _apply_order(queryset, ordered_ids):
+    """Reassign order_index = position for the given ids.
+
+    ``ordered_ids`` must be exactly the set of the queryset's current child ids
+    (a permutation) — otherwise we reject so a stale page or a tampered request
+    can't drop, foreign-key, or partially reorder rows. Returns (ok, error).
+    """
+    current = list(queryset.values_list('id', flat=True))
+    try:
+        ordered = [int(i) for i in ordered_ids]
+    except (TypeError, ValueError):
+        return False, "Order must be a list of integer ids."
+    if sorted(ordered) != sorted(current):
+        return False, "Order must list exactly this item's current children."
+    from django.db import transaction
+    by_id = {obj.id: obj for obj in queryset}
+    with transaction.atomic():
+        for position, oid in enumerate(ordered):
+            obj = by_id[oid]
+            if obj.order_index != position:
+                obj.order_index = position
+                obj.save(update_fields=['order_index'])
+    return True, None
+
+
+@teacher_required
+@require_POST
+def course_reorder_units(request, course_id):
+    """Persist a drag-reordered unit sequence for a course (AJAX, JSON body)."""
+    institution = request.staff_ctx['institution']
+    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    try:
+        order = json.loads(request.body or '{}').get('order', [])
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+    ok, err = _apply_order(course.units.all(), order)
+    if not ok:
+        return JsonResponse({'success': False, 'error': err}, status=400)
+    return JsonResponse({'success': True, 'count': len(order)})
+
+
+@teacher_required
+@require_POST
+def unit_reorder_lessons(request, unit_id):
+    """Persist a drag-reordered lesson sequence for a unit (AJAX, JSON body)."""
+    from apps.curriculum.models import Unit
+    institution = request.staff_ctx['institution']
+    if institution is not None:
+        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    else:
+        unit = get_object_or_404(Unit, id=unit_id)
+    try:
+        order = json.loads(request.body or '{}').get('order', [])
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+    ok, err = _apply_order(unit.lessons.all(), order)
+    if not ok:
+        return JsonResponse({'success': False, 'error': err}, status=400)
+    return JsonResponse({'success': True, 'count': len(order)})
+
+
 @teacher_required
 @require_POST
 def course_change_institution(request, course_id):

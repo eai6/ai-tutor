@@ -1,6 +1,7 @@
 {% extends "dashboard/base.html" %}
 {% load dashboard_extras %}
 {% load i18n %}
+{% load static %}
 
 {% block title %}{{ course.title }}{% endblock %}
 {% block page_title %}{{ course.title }}{% endblock %}
@@ -855,6 +856,7 @@ lessons even when curriculum editing is locked down.
 </details>
 
 <!-- Units and Lessons -->
+<div id="units-sortable" data-course-id="{{ course.id }}"{% if can_edit_content %} data-reorderable="1" data-reorder-url="{% url 'dashboard:course_reorder_units' course.id %}"{% endif %}>
 {% for unit in units %}
 {% ifchanged unit.grade_level %}
 {% if unit.grade_level %}
@@ -864,9 +866,10 @@ lessons even when curriculum editing is locked down.
 </div>
 {% endif %}
 {% endifchanged %}
-<div class="card" style="margin-bottom: 1rem;">
+<div class="card unit-card" data-unit-id="{{ unit.id }}" style="margin-bottom: 1rem;">
     <div class="card-header collapsible-header" style="background: var(--gray-50);" onclick="toggleCollapse(this)">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
+            {% if can_edit_content %}<span class="unit-handle" title="{% trans 'Drag to reorder units' %}" onclick="event.stopPropagation();" style="cursor: grab; color: var(--gray-400); font-size: 1.1rem; line-height: 1; padding: 0 0.15rem; user-select: none;">⠿</span>{% endif %}
             <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
@@ -896,9 +899,12 @@ lessons even when curriculum editing is locked down.
                 <div></div>
             </div>
 
+            <div class="lessons-sortable" data-unit-id="{{ unit.id }}"{% if can_edit_content %} data-reorderable="1" data-reorder-url="{% url 'dashboard:unit_reorder_lessons' unit.id %}"{% endif %}>
             {% for lesson in unit.lessons.all %}
-            <div class="lesson-row">
-                <div style="color: var(--gray-400); font-weight: 500;">{{ forloop.counter }}</div>
+            <div class="lesson-row" data-lesson-id="{{ lesson.id }}">
+                <div style="color: var(--gray-400); font-weight: 500; display: flex; align-items: center; gap: 0.3rem;">
+                    {% if can_edit_content %}<span class="lesson-handle" title="{% trans 'Drag to reorder lessons' %}" style="cursor: grab; color: var(--gray-300); user-select: none;">⠿</span>{% endif %}<span class="lesson-number">{{ forloop.counter }}</span>
+                </div>
 
                 <div>
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" style="font-weight: 500; color: var(--gray-900); text-decoration: none;">
@@ -1001,6 +1007,7 @@ lessons even when curriculum editing is locked down.
                 </div>
             </div>
             {% endfor %}
+            </div><!-- /.lessons-sortable -->
 
             {% else %}
             <div class="empty-state" style="padding: 2rem;">
@@ -1022,6 +1029,7 @@ lessons even when curriculum editing is locked down.
     </div>
 </div>
 {% endfor %}
+</div><!-- /#units-sortable -->
 
 {% if units %}
 <a href="{% url 'dashboard:unit_create' course.id %}" class="btn btn-secondary" style="margin-top: 1rem;">
@@ -1184,4 +1192,92 @@ function updateBatchActions() {
     setTimeout(pollOnce, POLL_MS);
 })();
 </script>
+{% endblock %}
+
+{% block extra_js %}
+{% if can_edit_content %}
+<script src="{% static 'js/Sortable.min.js' %}"></script>
+<script>
+// Drag-to-reorder units (within a course) and lessons (within a unit).
+// Persists the new order_index sequence via the reorder endpoints. The
+// student-facing catalog reads order_index, so changes apply immediately.
+(function () {
+    if (typeof Sortable === 'undefined') return;
+
+    function getCookie(name) {
+        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
+        return m ? decodeURIComponent(m[2]) : '';
+    }
+
+    function toast(msg, ok) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText =
+            'position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);' +
+            'z-index:9999;padding:0.6rem 1rem;border-radius:8px;font-size:0.875rem;' +
+            'font-weight:600;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);' +
+            'background:' + (ok ? '#16a34a' : '#dc2626');
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2600);
+    }
+
+    // Persist a container's child order. itemSelector picks the draggable rows;
+    // idAttr is the data-* holding each row's pk. On failure we reload so the
+    // DOM snaps back to the server's truth.
+    function persist(container, itemSelector, idAttr, renumber) {
+        const url = container.dataset.reorderUrl;
+        const order = Array.from(container.querySelectorAll(itemSelector))
+            .map(el => parseInt(el.dataset[idAttr], 10));
+        fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            credentials: 'same-origin',
+            body: JSON.stringify({order: order}),
+        })
+        .then(r => r.json().then(d => ({ok: r.ok, d})))
+        .then(({ok, d}) => {
+            if (ok && d.success) { toast('Order saved', true); if (renumber) renumber(); }
+            else { toast((d && d.error) || 'Could not save order', false); setTimeout(() => location.reload(), 1200); }
+        })
+        .catch(() => { toast('Network error — reverting', false); setTimeout(() => location.reload(), 1200); });
+    }
+
+    // Units
+    const unitsEl = document.getElementById('units-sortable');
+    if (unitsEl && unitsEl.dataset.reorderable) {
+        Sortable.create(unitsEl, {
+            handle: '.unit-handle',
+            draggable: '.unit-card',
+            animation: 150,
+            onEnd: () => persist(unitsEl, '.unit-card', 'unitId', () => {
+                // Re-number the "N. Title" prefix in each unit header.
+                let i = 0;
+                unitsEl.querySelectorAll('.unit-card .card-title').forEach(h => {
+                    i += 1;
+                    for (const node of h.childNodes) {
+                        if (node.nodeType === 3 && /\d+\.\s/.test(node.nodeValue)) {
+                            node.nodeValue = node.nodeValue.replace(/^\s*\d+\.\s*/, i + '. ');
+                            break;
+                        }
+                    }
+                });
+            }),
+        });
+    }
+
+    // Lessons (one sortable per unit)
+    document.querySelectorAll('.lessons-sortable[data-reorderable]').forEach(el => {
+        Sortable.create(el, {
+            handle: '.lesson-handle',
+            draggable: '.lesson-row',
+            animation: 150,
+            onEnd: () => persist(el, '.lesson-row', 'lessonId', () => {
+                let i = 0;
+                el.querySelectorAll('.lesson-row .lesson-number').forEach(n => { i += 1; n.textContent = i; });
+            }),
+        });
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
