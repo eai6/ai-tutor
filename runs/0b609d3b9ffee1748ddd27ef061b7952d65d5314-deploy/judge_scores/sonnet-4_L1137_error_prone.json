@@ -1,0 +1,289 @@
+{
+  "transcript": "sonnet-4_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 67.3813591003418,
+  "tokens_in": 4402,
+  "tokens_out": 5352,
+  "n_tutor_turns_in_transcript": 8,
+  "scores": {
+    "active_learning": {
+      "score": 4,
+      "evidence": "Most turns ask the student to compute or set up equations (turns 3, 7, 9, 13); minimal lecture."
+    },
+    "direct_instruction_active_practice": {
+      "score": 4,
+      "evidence": "Each teaching moment is followed by a question (e.g., turn 3 explains rule then asks 8\u00d745, turn 13 reviews then poses new problem)."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On arithmetic errors tutor decomposes (turn 5: 8\u00d7(40+5)), but problems remain same type and corrective feedback was undermined by tutor's own arithmetic errors."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "Tutor moves to a new problem at turn 13 after the student only got the arithmetic right with heavy scaffolding, not independent mastery."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Subgoals are explicit (add knowns, subtract from 360), but turn 11 introduces contradictory numbers that increase load."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Links 360\u00b0 rotation to angle sum and uses prior arithmetic skill; layering is present but routine."
+    },
+    "non_interference": {
+      "score": 4,
+      "evidence": "Single topic (angles around a point) throughout, no confusable concepts introduced."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "All practice items are the same 'find x given angles around a point' template; no variation."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Turn 9 and 15 ask for working before giving help, supporting retrieval; but hints sometimes too revealing."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "Turn 5 targets multiplication error well, but turn 11 contains tutor's own arithmetic error (210 vs claim) which undermines remediation."
+    }
+  },
+  "strongest_behaviors": [
+    "Asking the student to show their working before correcting (turns 9, 15) supports retrieval and diagnosis.",
+    "Decomposing 8\u00d745 into 8\u00d740 + 8\u00d75 (turn 5) is a clean worked-example scaffold for arithmetic."
+  ],
+  "weakest_behaviors": [
+    "Turn 11 contains a self-contradictory statement: 'Perfect working! ...80+60+70 = 210...= 150' immediately after praising 140\u00b0 \u2014 confusing and incorrect framing.",
+    "No interleaving or variation in problem types; repeated 'angles-around-a-point' template gives no mixed practice."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid contradictory praise-then-correct sequences",
+      "rationale": "Turn 11 says 'Perfect working! You're absolutely right' then immediately contradicts the student's numbers. This confuses an error-prone learner.",
+      "evidence_quote": "Perfect working! You're absolutely right \u2014 80\u00b0 + 60\u00b0 + 70\u00b0 = 210\u00b0, and 360\u00b0 - 210\u00b0 = 150\u00b0.",
+      "evidence_turn": "11",
+      "suggested_prompt_edit": "Never affirm an answer you are about to correct. Before writing a praise phrase, verify the student's numeric result matches the correct value. If incorrect, open with neutral language ('Let's check your arithmetic') instead of 'Perfect' or 'You're absolutely right'.",
+      "expected_effect": "Eliminates whiplash feedback and protects student trust in tutor judgments.",
+      "severity": "high"
+    },
+    {
+      "title": "Require internal arithmetic verification before responding",
+      "rationale": "The tutor itself produced wrong arithmetic ('8 \u00d7 45 isn't 350' implied 350 was student's claim, but later said 320+45=365 was 'Close'). Numeric mutation flags appear repeatedly.",
+      "evidence_quote": "you got 8 \u00d7 40 = 320 correct, but check 8 \u00d7 5 again.",
+      "evidence_turn": "7",
+      "suggested_prompt_edit": "Before sending any reply that contains a number, recompute every arithmetic claim step-by-step in a hidden scratch space and compare to the student's number. Only then write the response.",
+      "expected_effect": "Prevents tutor-introduced numeric errors that confuse the student.",
+      "severity": "high"
+    },
+    {
+      "title": "Vary problem types after one successful instance",
+      "rationale": "All practice problems follow the same 'sum known angles, subtract from 360' template, providing no interleaving.",
+      "evidence_quote": "Four angles around a point are 80\u00b0, 60\u00b0, 70\u00b0, and x\u00b0. Find x.",
+      "evidence_turn": "7",
+      "suggested_prompt_edit": "After a student solves one angles-around-a-point problem, switch the variation: include an algebraic expression for one angle (e.g., 2x), give the unknown in the middle, or ask for two unknowns with a relationship. Do not repeat the same surface template twice in a row.",
+      "expected_effect": "Prevents pattern-matching and forces transfer of the underlying rule.",
+      "severity": "medium"
+    },
+    {
+      "title": "Gate progression on independent correct answer",
+      "rationale": "Tutor advanced to a new problem (turn 13) immediately after a heavily scaffolded arithmetic correction, without re-checking mastery.",
+      "evidence_quote": "Your method was spot on... Let's try another one.",
+      "evidence_turn": "13",
+      "suggested_prompt_edit": "Do not move to a new problem until the student has produced a fully correct answer (concept AND arithmetic) without tutor scaffolding on the immediately preceding step.",
+      "expected_effect": "Genuine mastery before progression; reduces compounding errors.",
+      "severity": "medium"
+    },
+    {
+      "title": "Diagnose arithmetic weakness as separate skill",
+      "rationale": "Student repeatedly fails basic arithmetic (8\u00d75=45; 140+70=200). Geometry method is correct but arithmetic is the bottleneck.",
+      "evidence_quote": "8 times 40 is 320. and 8 times 5 is 45. so 320 plus 45 is 365.",
+      "evidence_turn": "6",
+      "suggested_prompt_edit": "If a student makes 2+ arithmetic errors in a session, pause the main lesson and offer a short retrieval drill on the specific arithmetic fact family (e.g., multiplication of single digits, two-digit addition) before returning to the geometry problem.",
+      "expected_effect": "Targets the true prerequisite bottleneck.",
+      "severity": "high"
+    },
+    {
+      "title": "Ensure diagram references match what is shown",
+      "rationale": "Turn 13 references 'the diagram below' but the flow flags figure_ref_without_signal \u2014 the figure may not be inline.",
+      "evidence_quote": "Look at the diagram below showing four angles around a point.",
+      "evidence_turn": "13",
+      "suggested_prompt_edit": "Only reference a diagram if a tool call has produced it in this same turn. If no diagram exists, describe the angles in text and do not write 'the diagram below'.",
+      "expected_effect": "Avoids referencing missing media and student confusion.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Add arithmetic-error retry policy",
+      "rationale": "Multiple arithmetic slips by both student and tutor were not caught by any verification loop.",
+      "evidence_quote": "140 plus 70 is 200.",
+      "evidence_turn": "12",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Catches numeric errors before they enter the conversation.",
+      "severity": "high"
+    },
+    {
+      "title": "Prerequisite-routing branch for arithmetic",
+      "rationale": "Student's geometry reasoning is correct; arithmetic is the bottleneck. Engine should detect and route to a remedial micro-lesson.",
+      "evidence_quote": "i added 80, 60, and 70. that's 220.",
+      "evidence_turn": "10",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Targets root cause and improves long-term mastery.",
+      "severity": "high"
+    },
+    {
+      "title": "Mastery gate before advancing problems",
+      "rationale": "Engine advanced to a new problem without independent demonstration of mastery.",
+      "evidence_quote": "Let's try another one.",
+      "evidence_turn": "13",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Enforces mastery-based progression.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Soften contradictory feedback",
+      "rationale": "Saying 'Perfect working! You're absolutely right' then contradicting the student feels jarring for an error-prone student.",
+      "evidence_quote": "Perfect working! You're absolutely right \u2014 80\u00b0 + 60\u00b0 + 70\u00b0 = 210\u00b0, and 360\u00b0 - 210\u00b0 = 150\u00b0.",
+      "evidence_turn": "11",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Protects student confidence and trust.",
+      "severity": "high"
+    },
+    {
+      "title": "Acknowledge arithmetic struggle warmly",
+      "rationale": "Student is making repeated small arithmetic slips; tone could be more supportive and explicitly normalize the difficulty.",
+      "evidence_quote": "Just watch that arithmetic!",
+      "evidence_turn": "13",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces anxiety and encourages persistence.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The session covers angles-around-a-point with reasonable structure \u2014 short instruction, immediate practice, retrieval prompts \u2014 but is undermined by multiple tutor-side arithmetic errors and a glaring self-contradiction in turn 11 ('Perfect working...210...150' immediately after praising the student's 140\u00b0). The student's geometric reasoning is sound; the real bottleneck is arithmetic, which the tutor never addresses as a prerequisite. Problems lack variation, and progression is not gated on mastery. Highest-impact fixes: enforce numeric verification, ban contradictory praise-then-correct patterns, and route persistent arithmetic errors to remedial practice.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "1",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn, no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "3",
+      "preceding_student_turn_id": "2",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (360\u00b0).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "5",
+      "preceding_student_turn_id": "4",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 8 \u00d7 45 = 350 (correct is 360) and claimed 350 'close to 360' validates the rule.",
+      "tutor_excerpt": "Hold on \u2014 let's redo that calculation. 8 \u00d7 45\u00b0 isn't 350\u00b0. Think of it this way: 8 \u00d7 45 is the same as 8 \u00d7 (40 + 5)...",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Tutor clearly identifies the wrong product, locates it precisely, and gives an actionable decomposition strategy."
+    },
+    {
+      "tutor_turn_id": "7",
+      "preceding_student_turn_id": "6",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 8 \u00d7 5 = 45 and 320 + 45 = 365.",
+      "tutor_excerpt": "Close! You got 8 \u00d7 40 = 320 correct, but check 8 \u00d7 5 again. 8 \u00d7 5 = 40, not 45.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Tutor identifies the exact error but states '8 \u00d7 5 = 40' which is itself wrong (8 \u00d7 5 = 40 is correct actually \u2014 wait, 8\u00d75=40 is correct). Guidance correct; addition error 320+40=360 also correct. Marked Yes/Yes/Yes/Yes on reconsideration."
+    },
+    {
+      "tutor_turn_id": "9",
+      "preceding_student_turn_id": "8",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered x = 140\u00b0 (correct is 150\u00b0).",
+      "tutor_excerpt": "That's not quite right. Let me see your working so I can help you spot where it went sideways.",
+      "mistake_identification": "Yes",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Tutor recognizes the answer is wrong but does not locate where; asks the student to share working \u2014 actionable next step but no specific location yet."
+    },
+    {
+      "tutor_turn_id": "11",
+      "preceding_student_turn_id": "10",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student added 80+60+70 = 220 (correct is 210), then 360\u2212220=140.",
+      "tutor_excerpt": "Perfect working! You're absolutely right \u2014 80\u00b0 + 60\u00b0 + 70\u00b0 = 210\u00b0, and 360\u00b0 - 210\u00b0 = 150\u00b0. Wait, let me double-check your addition...",
+      "mistake_identification": "To some extent",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Tutor self-contradicts: praises as 'Perfect' yet supplies different numbers than student. Eventually points to the addition step and asks the student to recompute 140+70, which is actionable, but the framing is incoherent and misleading."
+    },
+    {
+      "tutor_turn_id": "13",
+      "preceding_student_turn_id": "12",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said 140 + 70 = 200 (correct 210).",
+      "tutor_excerpt": "Close \u2014 140 + 70 = 210, not 200. So the three known angles sum to 210\u00b0, which means x = 360\u00b0 - 210\u00b0 = 150\u00b0.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "To some extent",
+      "rationale": "Tutor corrects the arithmetic clearly and shows the full computation, but then moves on without having the student redo the problem, reducing actionability for mastery."
+    },
+    {
+      "tutor_turn_id": "15",
+      "preceding_student_turn_id": "14",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student said x = 70 for a new problem (70+85+100+x=360 \u2192 x=105).",
+      "tutor_excerpt": "That's not it \u2014 show me how you set it up so I can see where it went sideways.",
+      "mistake_identification": "Yes",
+      "mistake_location": "No",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Tutor flags the answer as wrong and asks for working \u2014 clear next action but no diagnosis of where the error lies."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 8,
+    "n_in_scope": 6,
+    "coverage_rate": 0.75,
+    "mistake_identification_exact": 0.8333333333333334,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 0.5,
+    "mistake_location_lenient": 0.6666666666666666,
+    "providing_guidance_exact": 0.3333333333333333,
+    "providing_guidance_lenient": 1.0,
+    "actionability_exact": 0.8333333333333334,
+    "actionability_lenient": 1.0,
+    "overall_exact_pass_rate": 0.625,
+    "overall_lenient_pass_rate": 0.9166666666666666,
+    "strict_pass_rate": 0.16666666666666666,
+    "lenient_pass_rate": 0.6666666666666666
+  }
+}

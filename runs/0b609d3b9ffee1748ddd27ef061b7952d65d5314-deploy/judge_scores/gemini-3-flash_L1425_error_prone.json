@@ -1,0 +1,12 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 120.42854619026184,
+  "tokens_in": 7975,
+  "tokens_out": 10462,
+  "n_tutor_turns_in_transcript": 28,
+  "parse_error": "ValueError: Unbalanced JSON braces in response",
+  "raw_response_head": "{\n  \"scores\": {\n    \"active_learning\": {\"score\": 3, \"evidence\": \"Session is mostly MCQ practice (turns 90, 94, 116, 120, etc.), with student doing more than reading, though tutor sometimes over-explains.\"},\n    \"direct_instruction_active_practice\": {\"score\": 3, \"evidence\": \"Most instruction segments are followed by an MCQ (e.g., turn 102\u2192103, 120\u2192121), but some teaching blocks are short and rushed without checks.\"},\n    \"deliberate_practice\": {\"score\": 2, \"evidence\": \"On errors tutor sometimes g"
+}

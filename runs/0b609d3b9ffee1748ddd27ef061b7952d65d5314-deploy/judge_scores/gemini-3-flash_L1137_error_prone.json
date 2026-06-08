@@ -1,0 +1,307 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 70.75591707229614,
+  "tokens_in": 3953,
+  "tokens_out": 5485,
+  "n_tutor_turns_in_transcript": 8,
+  "scores": {
+    "active_learning": {
+      "score": 3,
+      "evidence": "Session is mostly student attempts at MCQs (turns 71, 75, 79, 81, 83) with brief tutor scaffolding; minimal lecturing."
+    },
+    "direct_instruction_active_practice": {
+      "score": 3,
+      "evidence": "Each tutor instruction is followed by a student MCQ attempt (e.g., turn 78 explanation \u2192 turn 79 attempt), though some tutor turns mix two instructions before asking."
+    },
+    "deliberate_practice": {
+      "score": 2,
+      "evidence": "On the 190\u00b0 error (turn 76), tutor gave corrective feedback, but then repeated essentially the same subtraction problem multiple times (turns 78, 80, 82) without varying the skill."
+    },
+    "mastery_learning": {
+      "score": 2,
+      "evidence": "After repeated arithmetic failures (turns 79, 81, 83), tutor announces 'You've got the method down' (turn 84) and moves on despite student never producing 170 themselves."
+    },
+    "cognitive_load": {
+      "score": 3,
+      "evidence": "Tutor broke subtraction into smaller steps in turn 82 ('360 - 100 = 260. Now, what is 260 - 90?'), reducing load."
+    },
+    "layering": {
+      "score": 3,
+      "evidence": "Turn 74 explicitly links the new problem to the just-mastered fact: 'angles around a point always sum to a full turn. Let's apply that rule.'"
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "Only one topic (angles around a point) covered; no confusable concepts introduced."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "All practice items are the same problem type (angles-at-a-point subtraction); no variation in problem structure."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor asks student to attempt before revealing (e.g., turn 76 'Show me how you set up your calculation'); retrieval is genuine."
+    },
+    "targeted_remediation": {
+      "score": 2,
+      "evidence": "Tutor identified arithmetic as the bottleneck (turn 82 broke down subtraction) but didn't run remedial subtraction practice \u2014 just revealed 170 in turn 84."
+    }
+  },
+  "strongest_behaviors": [
+    "Diagnosing the bottleneck by asking the student to show their setup (turn 76) rather than reteaching from scratch.",
+    "Decomposing 360-190 into smaller arithmetic steps (turn 82) to reduce cognitive load."
+  ],
+  "weakest_behaviors": [
+    "Foreign-language artifact in turn 72 ('\u5f3a\u5316\u786e\u8ba4\uff1a\u662f\u7684...') which breaks the learner experience.",
+    "Declaring mastery and moving on in turn 84 after the student never produced the correct answer themselves."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Forbid non-English output",
+      "rationale": "Turn 72 produced Chinese text ('\u5f3a\u5316\u786e\u8ba4\uff1a\u662f\u7684\uff0c360\u00b0\u662f\u6b63\u786e\u7684'), which is incomprehensible to a Seychellois S3 student.",
+      "evidence_quote": "\u5f3a\u5316\u786e\u8ba4\uff1a\u662f\u7684\uff0c360\u00b0\u662f\u6b63\u786e\u7684\uff01\u56f4\u7ed5\u4e00\u4e2a\u70b9\u7684\u6240\u6709\u89d2\u4e4b\u548c\u603b\u662f360\u00b0",
+      "evidence_turn": "72",
+      "suggested_prompt_edit": "Add: 'All output MUST be in English. Never emit any non-English characters or scripts. If you detect non-English tokens in your draft, regenerate in English before responding.'",
+      "expected_effect": "Eliminates language-mismatch failures and tool-call leakage.",
+      "severity": "high"
+    },
+    {
+      "title": "Suppress tool-call syntax in user-visible text",
+      "rationale": "Turn 72 leaked raw tool syntax 'call:custom:pose_question{slot:2}' to the student.",
+      "evidence_quote": "call:custom:pose_question{slot:2}",
+      "evidence_turn": "72",
+      "suggested_prompt_edit": "Add: 'Never include tool call syntax, function names, or system markers in messages to the student. Tool calls happen separately from learner-visible text.'",
+      "expected_effect": "Clean learner-facing messages.",
+      "severity": "high"
+    },
+    {
+      "title": "Require student-produced correct answer before progressing",
+      "rationale": "In turn 84 the tutor reveals 170 and moves on after the student selected wrong three times, violating mastery gating.",
+      "evidence_quote": "Actually, $260 - 90 = 170$. You've got the method down \u2014 just a small slip... Let's try this one from the diagram.",
+      "evidence_turn": "84",
+      "suggested_prompt_edit": "Add: 'Do not advance to a new problem until the student has produced the correct final answer themselves. After revealing a step, re-ask the original question for the student to answer.'",
+      "expected_effect": "Genuine mastery before progression.",
+      "severity": "high"
+    },
+    {
+      "title": "Route repeated arithmetic errors to prerequisite practice",
+      "rationale": "Student failed basic subtraction (360-190, 260-90) three times; tutor never offered remedial subtraction practice.",
+      "evidence_quote": "Not quite\u2014if we add $190 + 160$, we only get to $350$.",
+      "evidence_turn": "82",
+      "suggested_prompt_edit": "Add: 'If a student makes \u22652 arithmetic errors on a sub-step, pause the main problem and run 2-3 short prerequisite arithmetic items (e.g., simple 3-digit subtractions) before resuming.'",
+      "expected_effect": "Targets the real bottleneck (subtraction) instead of recycling angle problems.",
+      "severity": "high"
+    },
+    {
+      "title": "Vary MCQ distractors and avoid leaking the answer pattern",
+      "rationale": "Turns 78, 80, 82 reuse the same A/B/C/D set (150/160/170/180) where 160 is highlighted, anchoring the student to the wrong choice.",
+      "evidence_quote": "A) 150\u00b0 B) 160\u00b0 C) 170\u00b0 D) 180\u00b0",
+      "evidence_turn": "80",
+      "suggested_prompt_edit": "Add: 'When re-asking after a wrong MCQ answer, change distractor values and order so the student must recompute rather than pattern-match.'",
+      "expected_effect": "Forces genuine retrieval on retry.",
+      "severity": "medium"
+    },
+    {
+      "title": "Never truncate or end a tutor turn mid-sentence",
+      "rationale": "Turn 76 ends with 'In' \u2014 an incomplete sentence, confusing the student.",
+      "evidence_quote": "Show me how you set up your calculation so I can see where it went sideways. In",
+      "evidence_turn": "76",
+      "suggested_prompt_edit": "Add: 'Always end with a complete sentence and an explicit question for the student. Re-read your draft before sending; if truncated, regenerate.'",
+      "expected_effect": "Coherent tutor turns.",
+      "severity": "medium"
+    },
+    {
+      "title": "One instructional move per turn",
+      "rationale": "Turn 78 explains the subtraction AND poses a new MCQ in the same turn, doubling cognitive load.",
+      "evidence_quote": "what do you get when you subtract that $190$ from $360$? If the sum of the known angles is 190\u00b0, what is the value of x?",
+      "evidence_turn": "78",
+      "suggested_prompt_edit": "Add: 'Each turn contains exactly ONE question to the student. Do not ask two questions in the same turn.'",
+      "expected_effect": "Cleaner deliberate practice loop.",
+      "severity": "medium"
+    },
+    {
+      "title": "Interleave problem types within the topic",
+      "rationale": "All practice was 'find missing angle by subtraction'; no variation (e.g., four angles, algebraic x, straight line).",
+      "evidence_quote": "If three angles (90\u00b0, 100\u00b0, and x) meet at a point, what is the value of x?",
+      "evidence_turn": "74",
+      "suggested_prompt_edit": "Add: 'Within an angle topic, alternate problem variants: 2 unknowns, sum to 180\u00b0 vs 360\u00b0, expressions like 2x, to prevent procedural mimicry.'",
+      "expected_effect": "Better transfer and retention.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Add a regeneration check for language and tool-syntax leaks",
+      "rationale": "Turn 72 emitted Chinese and a raw tool call together; an output filter would catch both.",
+      "evidence_quote": "call:custom:pose_question{slot:2}\n\n\u5f3a\u5316\u786e\u8ba4\uff1a\u662f\u7684",
+      "evidence_turn": "72",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents leaked tool calls and non-English text reaching the student.",
+      "severity": "high"
+    },
+    {
+      "title": "Prerequisite routing on consecutive arithmetic failures",
+      "rationale": "Engine should detect that the student's errors are in subtraction, not angle reasoning, and branch into a subtraction mini-module.",
+      "evidence_quote": "$260 - 90 = 170$. You've got the method down \u2014 just a small slip in the subtraction!",
+      "evidence_turn": "84",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Targeted remediation on the true bottleneck.",
+      "severity": "high"
+    },
+    {
+      "title": "Mastery gate before next-problem transition",
+      "rationale": "Turn 84 transitions to a new diagram problem without the student ever producing the correct answer; gating logic should block this.",
+      "evidence_quote": "Let's try this one from the diagram.",
+      "evidence_turn": "84",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Enforces mastery learning at the orchestration layer.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warmer, persona-aware tone for error-prone students",
+      "rationale": "After three wrong tries the student gets a brisk 'Actually, \u2026' rather than encouragement; an error-prone learner needs reassurance.",
+      "evidence_quote": "Actually, $260 - 90 = 170$. You've got the method down \u2014 just a small slip in the subtraction!",
+      "evidence_turn": "84",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Maintains motivation for error-prone learners.",
+      "severity": "medium"
+    },
+    {
+      "title": "Include the referenced diagram inline",
+      "rationale": "Turn 84 says 'Let's try this one from the diagram' but no diagram is shown.",
+      "evidence_quote": "Let's try this one from the diagram.",
+      "evidence_turn": "84",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Avoids confusion from missing media.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session shows a reasonable retrieval-and-practice structure but is undermined by serious surface failures (non-English text and tool-call leakage in turn 72, truncations) and a critical pedagogical lapse: after the student repeatedly chose 160\u00b0 due to arithmetic errors, the tutor revealed 170\u00b0 and moved on rather than running prerequisite subtraction remediation or re-asking until mastery. Strengths include diagnosing via 'show me your setup' and decomposing the subtraction; weaknesses are repetitive problem type, MCQ distractor reuse, and premature progression.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "70",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "First tutor turn; no preceding student turn.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "72",
+      "preceding_student_turn_id": "71",
+      "student_made_mistake": false,
+      "skip_reason": "Student answered correctly (360\u00b0).",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "74",
+      "preceding_student_turn_id": "73",
+      "student_made_mistake": false,
+      "skip_reason": "Student posed a new question rather than making a mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "76",
+      "preceding_student_turn_id": "75",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student chose 190\u00b0 (sum of 90+100) instead of 360-190=170\u00b0.",
+      "tutor_excerpt": "That's not it \u2014 190\u00b0 is the sum of the two angles we know, but not the value of $x$. Show me how you set up your calculation so I can see where it went sideways.",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Clearly identifies the error, pinpoints that 190 is the sum not x, and asks student to share setup."
+    },
+    {
+      "tutor_turn_id": "78",
+      "preceding_student_turn_id": "77",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student stopped at 90+100 without subtracting from 360.",
+      "tutor_excerpt": "Right, $90 + 100 = 190$. Since the total must be $360^\\circ$, what do you get when you subtract that $190$ from $360$?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Confirms the partial work, identifies missing step (subtract from 360), and prompts the next action."
+    },
+    {
+      "tutor_turn_id": "80",
+      "preceding_student_turn_id": "79",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 160\u00b0 to 360-190; correct is 170\u00b0.",
+      "tutor_excerpt": "Almost \u2014 check your subtraction of 360 - 190 one more time. What is the result?",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "To some extent",
+      "actionability": "Yes",
+      "rationale": "Identifies error and asks to redo, but offers no decomposition or hint about where the subtraction went wrong."
+    },
+    {
+      "tutor_turn_id": "82",
+      "preceding_student_turn_id": "81",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student again chose 160\u00b0 for 360-190.",
+      "tutor_excerpt": "Not quite\u2014if we add $190 + 160$, we only get to $350$. We need to reach $360$ for a full turn. Let's try breaking the subtraction down: $360 - 100 = 260$. Now, what is $260 - 90$?",
+      "mistake_identification": "Yes",
+      "mistake_location": "Yes",
+      "providing_guidance": "Yes",
+      "actionability": "Yes",
+      "rationale": "Verifies via inverse, then decomposes the subtraction into a smaller step \u2014 strong scaffolding."
+    },
+    {
+      "tutor_turn_id": "84",
+      "preceding_student_turn_id": "83",
+      "student_made_mistake": true,
+      "skip_reason": null,
+      "mistake_description": "Student answered 160 to 260-90; correct is 170.",
+      "tutor_excerpt": "Actually, $260 - 90 = 170$. You've got the method down \u2014 just a small slip in the subtraction! Let's try this one from the diagram.",
+      "mistake_identification": "Yes",
+      "mistake_location": "To some extent",
+      "providing_guidance": "No",
+      "actionability": "No",
+      "rationale": "Reveals the answer and moves on without addressing why the student keeps getting 160, no remediation on subtraction, and the next 'diagram' problem is not shown."
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 8,
+    "n_in_scope": 5,
+    "coverage_rate": 0.625,
+    "mistake_identification_exact": 1.0,
+    "mistake_identification_lenient": 1.0,
+    "mistake_location_exact": 0.6,
+    "mistake_location_lenient": 1.0,
+    "providing_guidance_exact": 0.6,
+    "providing_guidance_lenient": 0.8,
+    "actionability_exact": 0.8,
+    "actionability_lenient": 0.8,
+    "overall_exact_pass_rate": 0.75,
+    "overall_lenient_pass_rate": 0.9,
+    "strict_pass_rate": 0.6,
+    "lenient_pass_rate": 0.8
+  }
+}
