@@ -1,10 +1,12 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Bulk Student Registration{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Bulk Student Registration" %}{% endblock %}
+{% block page_title %}{% trans "Bulk Student Registration" %}{% endblock %}
 
 {% block content %}
 <div style="max-width: 800px;">
-    <h2>Bulk Student Registration</h2>
-    <p style="color: var(--gray-500); margin-bottom: 1.5rem;">Upload a CSV file to register multiple students at once.</p>
+    <h2>{% trans "Bulk Student Registration" %}</h2>
+    <p style="color: var(--gray-500); margin-bottom: 1.5rem;">{% trans "Upload a CSV file to register multiple students at once." %}</p>
 
     {% if results %}
     <div class="card" style="margin-bottom: 1.5rem;">
@@ -12,16 +14,16 @@
             <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
                 <div>
                     <div style="font-size: 2rem; font-weight: 800; color: #059669;">{{ results.created }}</div>
-                    <div style="font-size: 0.8125rem; color: var(--gray-500);">Students Created</div>
+                    <div style="font-size: 0.8125rem; color: var(--gray-500);">{% trans "Students Created" %}</div>
                 </div>
                 <div>
                     <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">{{ results.skipped }}</div>
-                    <div style="font-size: 0.8125rem; color: var(--gray-500);">Skipped</div>
+                    <div style="font-size: 0.8125rem; color: var(--gray-500);">{% trans "Skipped" %}</div>
                 </div>
             </div>
             {% if results.errors %}
             <details>
-                <summary style="cursor: pointer; font-weight: 600; font-size: 0.875rem; color: #dc2626;">Show errors ({{ results.errors|length }})</summary>
+                <summary style="cursor: pointer; font-weight: 600; font-size: 0.875rem; color: #dc2626;">{% blocktrans count counter=results.errors|length %}Show error ({{ counter }}){% plural %}Show errors ({{ counter }}){% endblocktrans %}</summary>
                 <ul style="margin-top: 0.5rem; font-size: 0.8125rem; color: var(--gray-600);">
                     {% for err in results.errors %}
                     <li>{{ err }}</li>
@@ -39,9 +41,9 @@
                 {% csrf_token %}
 
                 <div class="form-group">
-                    <label class="form-label">School</label>
+                    <label class="form-label">{% trans "School" %}</label>
                     <select name="school" class="form-control" required>
-                        <option value="">— Select school —</option>
+                        <option value="">{% trans "— Select school —" %}</option>
                         {% for code, name in school_choices %}
                         <option value="{{ code }}">{{ name }}</option>
                         {% endfor %}
@@ -49,22 +51,22 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">CSV File</label>
+                    <label class="form-label">{% trans "CSV File" %}</label>
                     <input type="file" name="csv_file" accept=".csv" class="form-control" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Upload & Register Students</button>
+                <button type="submit" class="btn btn-primary">{% trans "Upload & Register Students" %}</button>
             </form>
         </div>
     </div>
 
     <div class="card" style="margin-top: 1.5rem;">
         <div class="card-header">
-            <h3 class="card-title">CSV Format</h3>
+            <h3 class="card-title">{% trans "CSV Format" %}</h3>
         </div>
         <div class="card-body">
             <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 1rem;">
-                Your CSV file must have these column headers (first row):
+                {% trans "Your CSV file must have these column headers (first row):" %}
             </p>
             <div style="background: #f4f4f5; border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.8125rem; overflow-x: auto;">
                 student_id,first_name,last_name,username,password,grade_level<br>
@@ -75,41 +77,41 @@
             <table style="width: 100%; margin-top: 1rem; font-size: 0.8125rem; border-collapse: collapse;">
                 <thead>
                     <tr style="border-bottom: 2px solid var(--gray-200);">
-                        <th style="text-align: left; padding: 0.5rem;">Column</th>
-                        <th style="text-align: left; padding: 0.5rem;">Required</th>
-                        <th style="text-align: left; padding: 0.5rem;">Notes</th>
+                        <th style="text-align: left; padding: 0.5rem;">{% trans "Column" %}</th>
+                        <th style="text-align: left; padding: 0.5rem;">{% trans "Required" %}</th>
+                        <th style="text-align: left; padding: 0.5rem;">{% trans "Notes" %}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr style="border-bottom: 1px solid var(--gray-100);">
                         <td style="padding: 0.5rem;"><code>student_id</code></td>
-                        <td style="padding: 0.5rem;">Optional</td>
-                        <td style="padding: 0.5rem;">School management system ID</td>
+                        <td style="padding: 0.5rem;">{% trans "Optional" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "School management system ID" %}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-100);">
                         <td style="padding: 0.5rem;"><code>first_name</code></td>
-                        <td style="padding: 0.5rem;">Required</td>
-                        <td style="padding: 0.5rem;">Student's first name</td>
+                        <td style="padding: 0.5rem;">{% trans "Required" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "Student's first name" %}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-100);">
                         <td style="padding: 0.5rem;"><code>last_name</code></td>
-                        <td style="padding: 0.5rem;">Optional</td>
-                        <td style="padding: 0.5rem;">Student's last name</td>
+                        <td style="padding: 0.5rem;">{% trans "Optional" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "Student's last name" %}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-100);">
                         <td style="padding: 0.5rem;"><code>username</code></td>
-                        <td style="padding: 0.5rem;">Required</td>
-                        <td style="padding: 0.5rem;">Min 3 characters, must be unique</td>
+                        <td style="padding: 0.5rem;">{% trans "Required" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "Min 3 characters, must be unique" %}</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--gray-100);">
                         <td style="padding: 0.5rem;"><code>password</code></td>
-                        <td style="padding: 0.5rem;">Required</td>
-                        <td style="padding: 0.5rem;">Initial password (students can change later)</td>
+                        <td style="padding: 0.5rem;">{% trans "Required" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "Initial password (students can change later)" %}</td>
                     </tr>
                     <tr>
                         <td style="padding: 0.5rem;"><code>grade_level</code></td>
-                        <td style="padding: 0.5rem;">Optional</td>
-                        <td style="padding: 0.5rem;">S1, S2, S3, S4, or S5</td>
+                        <td style="padding: 0.5rem;">{% trans "Optional" %}</td>
+                        <td style="padding: 0.5rem;">{% trans "S1, S2, S3, S4, or S5" %}</td>
                     </tr>
                 </tbody>
             </table>

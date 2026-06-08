@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-04 14:09+0000\n"
+"POT-Creation-Date: 2026-06-08 13:47+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -36,17 +36,17 @@ msgstr "Perfil atualizado."
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
-#: apps/dashboard/views.py:782 apps/dashboard/views.py:1875
+#: apps/dashboard/views.py:782 apps/dashboard/views.py:1914
 #, python-format
 msgid "Promote to %(grade)s"
 msgstr "Promover para %(grade)s"
 
-#: apps/dashboard/views.py:784 apps/dashboard/views.py:1877
-#: apps/dashboard/views.py:1878
+#: apps/dashboard/views.py:784 apps/dashboard/views.py:1916
+#: apps/dashboard/views.py:1917
 msgid "Graduate"
 msgstr "Graduar"
 
-#: apps/dashboard/views.py:786 apps/dashboard/views.py:1885
+#: apps/dashboard/views.py:786 apps/dashboard/views.py:1924
 #, python-format
 msgid "Demote to %(grade)s"
 msgstr "Despromover para %(grade)s"
@@ -91,12 +91,12 @@ msgstr ""
 "👋 Bem-vindo de volta! Estavas a trabalhar nesta pergunta — vamos continuar "
 "de onde paraste:"
 
-#: apps/tutoring/simple_tutor/exit_ticket.py:274
+#: apps/tutoring/simple_tutor/exit_ticket.py:284
 #, python-format
 msgid "🎉 You scored %(score)d/%(total)d — that's a pass. Well done!"
 msgstr "🎉 Tiveste %(score)d/%(total)d — passaste. Parabéns!"
 
-#: apps/tutoring/simple_tutor/exit_ticket.py:279
+#: apps/tutoring/simple_tutor/exit_ticket.py:288
 #, python-format
 msgid ""
 "📋 **Exit ticket review**\n"
@@ -187,11 +187,110 @@ msgstr "(o teu navegador vai perguntar qual ecrã / janela partilhar)"
 #: templates/dashboard/curriculum/process.html:305
 #: templates/dashboard/curriculum/step_edit.html:185
 #: templates/dashboard/curriculum/unit_create.html:32
-#: templates/dashboard/curriculum/upload.html:441
+#: templates/dashboard/curriculum/upload.html:467
 #: templates/dashboard/student_groups/list.html:178
 #: templates/dashboard/summative/review.html:284
 msgid "Cancel"
 msgstr "Cancelar"
+
+#: templates/accounts/bulk_student_upload.html:3
+#: templates/accounts/bulk_student_upload.html:4
+#: templates/accounts/bulk_student_upload.html:8
+msgid "Bulk Student Registration"
+msgstr "Registo em Massa de Alunos"
+
+#: templates/accounts/bulk_student_upload.html:9
+msgid "Upload a CSV file to register multiple students at once."
+msgstr "Carrega um ficheiro CSV para registar vários alunos de uma só vez."
+
+#: templates/accounts/bulk_student_upload.html:17
+msgid "Students Created"
+msgstr "Alunos Criados"
+
+#: templates/accounts/bulk_student_upload.html:21
+msgid "Skipped"
+msgstr "Ignorados"
+
+#: templates/accounts/bulk_student_upload.html:26
+#, python-format
+msgid "Show error (%(counter)s)"
+msgid_plural "Show errors (%(counter)s)"
+msgstr[0] "Mostrar erro (%(counter)s)"
+msgstr[1] "Mostrar erros (%(counter)s)"
+
+#: templates/accounts/bulk_student_upload.html:44
+#: templates/accounts/settings.html:178
+#: templates/accounts/student_register.html:79
+#: templates/dashboard/settings.html:72 templates/dashboard/settings.html:367
+#: templates/dashboard/students/list.html:22
+msgid "School"
+msgstr "Escola"
+
+#: templates/accounts/bulk_student_upload.html:46
+msgid "— Select school —"
+msgstr "— Seleciona a escola —"
+
+#: templates/accounts/bulk_student_upload.html:54
+msgid "CSV File"
+msgstr "Ficheiro CSV"
+
+#: templates/accounts/bulk_student_upload.html:58
+msgid "Upload & Register Students"
+msgstr "Carregar e Registar Alunos"
+
+#: templates/accounts/bulk_student_upload.html:65
+msgid "CSV Format"
+msgstr "Formato do CSV"
+
+#: templates/accounts/bulk_student_upload.html:69
+msgid "Your CSV file must have these column headers (first row):"
+msgstr ""
+"O teu ficheiro CSV deve ter estes cabeçalhos de coluna (primeira linha):"
+
+#: templates/accounts/bulk_student_upload.html:80
+msgid "Column"
+msgstr "Coluna"
+
+#: templates/accounts/bulk_student_upload.html:81
+#: templates/accounts/bulk_student_upload.html:93
+#: templates/accounts/bulk_student_upload.html:103
+#: templates/accounts/bulk_student_upload.html:108
+msgid "Required"
+msgstr "Obrigatório"
+
+#: templates/accounts/bulk_student_upload.html:82
+msgid "Notes"
+msgstr "Notas"
+
+#: templates/accounts/bulk_student_upload.html:88
+#: templates/accounts/bulk_student_upload.html:98
+#: templates/accounts/bulk_student_upload.html:113
+msgid "Optional"
+msgstr "Opcional"
+
+#: templates/accounts/bulk_student_upload.html:89
+msgid "School management system ID"
+msgstr "ID do sistema de gestão escolar"
+
+#: templates/accounts/bulk_student_upload.html:94
+msgid "Student's first name"
+msgstr "Nome próprio do aluno"
+
+#: templates/accounts/bulk_student_upload.html:99
+msgid "Student's last name"
+msgstr "Apelido do aluno"
+
+#: templates/accounts/bulk_student_upload.html:104
+msgid "Min 3 characters, must be unique"
+msgstr "Mín. 3 caracteres, deve ser único"
+
+#: templates/accounts/bulk_student_upload.html:109
+msgid "Initial password (students can change later)"
+msgstr "Palavra-passe inicial (os alunos podem alterá-la depois)"
+
+#: templates/accounts/bulk_student_upload.html:114
+msgid "S1, S2, S3, S4, or S5"
+msgstr "S1, S2, S3, S4 ou S5"
 
 #: templates/accounts/landing.html:243
 #, python-format
@@ -321,13 +420,6 @@ msgstr "Email"
 #: templates/accounts/settings.html:174
 msgid "Used for password reset."
 msgstr "Usado para repor a palavra-passe."
-
-#: templates/accounts/settings.html:178
-#: templates/accounts/student_register.html:79
-#: templates/dashboard/settings.html:72 templates/dashboard/settings.html:367
-#: templates/dashboard/students/list.html:22
-msgid "School"
-msgstr "Escola"
 
 #: templates/accounts/settings.html:188
 msgid "Grade level"
@@ -471,7 +563,7 @@ msgid "Select your school"
 msgstr "Seleciona a tua escola"
 
 #: templates/accounts/student_register.html:89
-#: templates/dashboard/curriculum/upload.html:385
+#: templates/dashboard/curriculum/upload.html:411
 #: templates/dashboard/materials/process.html:140
 msgid "Grade Level"
 msgstr "Classe"
@@ -555,7 +647,7 @@ msgstr "Painel"
 #: templates/dashboard/base.html:590 templates/dashboard/classes/detail.html:67
 #: templates/dashboard/classes/detail.html:106
 #: templates/dashboard/competency/class.html:89
-#: templates/dashboard/curriculum/course_detail.html:865
+#: templates/dashboard/curriculum/course_detail.html:901
 #: templates/dashboard/student_groups/list.html:104
 #: templates/dashboard/students/list.html:4
 #: templates/dashboard/students/list.html:5
@@ -801,7 +893,7 @@ msgid "most recent first · quick links to monitor + report"
 msgstr "mais recente primeiro · ligações rápidas para monitorizar + relatar"
 
 #: templates/dashboard/classes/detail.html:65
-#: templates/dashboard/curriculum/course_detail.html:863
+#: templates/dashboard/curriculum/course_detail.html:899
 #: templates/dashboard/curriculum/step_edit.html:45
 #: templates/dashboard/flagged_sessions.html:37
 #: templates/dashboard/quality/content_edit_events_list.html:69
@@ -844,7 +936,7 @@ msgid "Monitor"
 msgstr "Monitorizar"
 
 #: templates/dashboard/classes/detail.html:91
-#: templates/dashboard/curriculum/course_detail.html:972
+#: templates/dashboard/curriculum/course_detail.html:1011
 msgid "Report"
 msgstr "Relatório"
 
@@ -1064,7 +1156,7 @@ msgid "Has final"
 msgstr "Tem final"
 
 #: templates/dashboard/competency/student.html:66
-#: templates/dashboard/curriculum/course_detail.html:866
+#: templates/dashboard/curriculum/course_detail.html:902
 #: templates/dashboard/curriculum/list.html:34
 #: templates/dashboard/curriculum/list.html:85
 #: templates/dashboard/curriculum/process.html:299
@@ -1137,7 +1229,7 @@ msgid "Complete"
 msgstr "Concluído"
 
 #: templates/dashboard/curriculum/content_progress.html:104
-#: templates/dashboard/curriculum/course_detail.html:927
+#: templates/dashboard/curriculum/course_detail.html:966
 #: templates/dashboard/curriculum/list.html:106
 #: templates/dashboard/curriculum/media_progress.html:96
 #: templates/dashboard/materials/process.html:26
@@ -1167,7 +1259,7 @@ msgid "Back to Course"
 msgstr "Voltar ao Curso"
 
 #: templates/dashboard/curriculum/content_progress.html:131
-#: templates/dashboard/curriculum/course_detail.html:160
+#: templates/dashboard/curriculum/course_detail.html:161
 #: templates/dashboard/curriculum/process.html:280
 #: templates/dashboard/materials/process.html:195
 msgid "Back to Curriculum"
@@ -1179,51 +1271,51 @@ msgstr "Voltar ao Currículo"
 msgid "Error:"
 msgstr "Erro:"
 
-#: templates/dashboard/curriculum/course_detail.html:171
-#: templates/dashboard/curriculum/course_detail.html:920
+#: templates/dashboard/curriculum/course_detail.html:172
+#: templates/dashboard/curriculum/course_detail.html:959
 #: templates/dashboard/curriculum/list.html:33
 #: templates/dashboard/curriculum/list.html:60
 #: templates/dashboard/summative/review.html:68
 msgid "Published"
 msgstr "Publicado"
 
-#: templates/dashboard/curriculum/course_detail.html:173
+#: templates/dashboard/curriculum/course_detail.html:174
 #: templates/dashboard/curriculum/lesson_detail.html:235
 #: templates/dashboard/curriculum/list.html:62
 #: templates/dashboard/summative/review.html:68
 msgid "Draft"
 msgstr "Rascunho"
 
-#: templates/dashboard/curriculum/course_detail.html:197
+#: templates/dashboard/curriculum/course_detail.html:198
 msgid "Summative Exam"
 msgstr "Exame Sumativo"
 
-#: templates/dashboard/curriculum/course_detail.html:198
+#: templates/dashboard/curriculum/course_detail.html:199
 #: templates/dashboard/reports/overview.html:105
 msgid "Class Competency & Readiness"
 msgstr "Competência e Prontidão da Turma"
 
-#: templates/dashboard/curriculum/course_detail.html:200
+#: templates/dashboard/curriculum/course_detail.html:201
 msgid "Edit Course"
 msgstr "Editar Curso"
 
-#: templates/dashboard/curriculum/course_detail.html:204
+#: templates/dashboard/curriculum/course_detail.html:205
 msgid "Publish all lessons in this course?"
 msgstr "Publicar todas as lições deste curso?"
 
-#: templates/dashboard/curriculum/course_detail.html:204
+#: templates/dashboard/curriculum/course_detail.html:205
 msgid "Publish All"
 msgstr "Publicar Tudo"
 
-#: templates/dashboard/curriculum/course_detail.html:208
+#: templates/dashboard/curriculum/course_detail.html:209
 msgid "Unpublish all lessons in this course?"
 msgstr "Despublicar todas as lições deste curso?"
 
-#: templates/dashboard/curriculum/course_detail.html:208
+#: templates/dashboard/curriculum/course_detail.html:209
 msgid "Unpublish All"
 msgstr "Despublicar Tudo"
 
-#: templates/dashboard/curriculum/course_detail.html:212
+#: templates/dashboard/curriculum/course_detail.html:213
 msgid ""
 "Are you sure you want to delete this course and ALL its units, lessons, and "
 "content? This cannot be undone."
@@ -1231,7 +1323,7 @@ msgstr ""
 "Tens a certeza de que queres eliminar este curso e TODAS as suas unidades, "
 "lições e conteúdos? Esta ação não pode ser desfeita."
 
-#: templates/dashboard/curriculum/course_detail.html:212
+#: templates/dashboard/curriculum/course_detail.html:213
 #: templates/dashboard/curriculum/step_edit.html:161
 #: templates/dashboard/settings.html:439 templates/dashboard/settings.html:701
 #: templates/dashboard/staff_list.html:53
@@ -1239,86 +1331,94 @@ msgstr ""
 msgid "Delete"
 msgstr "Eliminar"
 
-#: templates/dashboard/curriculum/course_detail.html:340
+#: templates/dashboard/curriculum/course_detail.html:374
 msgid "Total Lessons"
 msgstr "Total de Lições"
 
-#: templates/dashboard/curriculum/course_detail.html:344
+#: templates/dashboard/curriculum/course_detail.html:378
 msgid "With Content"
 msgstr "Com Conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:348
+#: templates/dashboard/curriculum/course_detail.html:382
 msgid "Media Assets"
 msgstr "Recursos Multimédia"
 
-#: templates/dashboard/curriculum/course_detail.html:352
+#: templates/dashboard/curriculum/course_detail.html:386
 msgid "Media Pending"
 msgstr "Multimédia Pendente"
 
-#: templates/dashboard/curriculum/course_detail.html:356
+#: templates/dashboard/curriculum/course_detail.html:390
 msgid "Content Progress"
 msgstr "Progresso do Conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:366
+#: templates/dashboard/curriculum/course_detail.html:400
 #, python-format
 msgid "%(pct)s%% complete"
 msgstr "%(pct)s%% concluído"
 
-#: templates/dashboard/curriculum/course_detail.html:864
+#: templates/dashboard/curriculum/course_detail.html:876
+msgid "Drag to reorder units"
+msgstr ""
+
+#: templates/dashboard/curriculum/course_detail.html:900
 msgid "Content"
 msgstr "Conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:887
+#: templates/dashboard/curriculum/course_detail.html:910
+msgid "Drag to reorder lessons"
+msgstr ""
+
+#: templates/dashboard/curriculum/course_detail.html:926
 #, python-format
 msgid "%(count)s step"
 msgid_plural "%(count)s steps"
 msgstr[0] "%(count)s passo"
 msgstr[1] "%(count)s passo"
 
-#: templates/dashboard/curriculum/course_detail.html:889
-#: templates/dashboard/curriculum/course_detail.html:902
+#: templates/dashboard/curriculum/course_detail.html:928
+#: templates/dashboard/curriculum/course_detail.html:941
 msgid "No content"
 msgstr "Sem conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:895
+#: templates/dashboard/curriculum/course_detail.html:934
 #, python-format
 msgid "%(count)s media pending"
 msgid_plural "%(count)s media pending"
 msgstr[0] "%(count)s média pendente"
 msgstr[1] "%(count)s média pendente"
 
-#: templates/dashboard/curriculum/course_detail.html:899
+#: templates/dashboard/curriculum/course_detail.html:938
 msgid "Exit"
 msgstr "Quiz"
 
-#: templates/dashboard/curriculum/course_detail.html:925
+#: templates/dashboard/curriculum/course_detail.html:964
 msgid "Generating"
 msgstr "Gerada"
 
-#: templates/dashboard/curriculum/course_detail.html:930
+#: templates/dashboard/curriculum/course_detail.html:969
 #: templates/dashboard/curriculum/process.html:300
 msgid "Ready"
 msgstr "Pronto"
 
-#: templates/dashboard/curriculum/course_detail.html:932
+#: templates/dashboard/curriculum/course_detail.html:971
 msgid "Has Content"
 msgstr "Com Conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:935
+#: templates/dashboard/curriculum/course_detail.html:974
 msgid "No Content"
 msgstr "Com Conteúdo"
 
-#: templates/dashboard/curriculum/course_detail.html:971
+#: templates/dashboard/curriculum/course_detail.html:1010
 #: templates/dashboard/lesson_monitor.html:297
 #: templates/tutoring/catalog.html:296
 msgid "Review"
 msgstr "Rever"
 
-#: templates/dashboard/curriculum/course_detail.html:972
+#: templates/dashboard/curriculum/course_detail.html:1011
 msgid "Competency report for this lesson"
 msgstr "Relatórios de Competências"
 
-#: templates/dashboard/curriculum/course_detail.html:979
+#: templates/dashboard/curriculum/course_detail.html:1019
 msgid "No lessons in this unit yet"
 msgstr "Ainda não há sessões para esta lição."
 
@@ -1419,13 +1519,13 @@ msgid "Manage"
 msgstr "Gerir"
 
 #: templates/dashboard/curriculum/list.html:83
-#: templates/dashboard/curriculum/upload.html:373
+#: templates/dashboard/curriculum/upload.html:399
 #: templates/dashboard/materials/process.html:128
 msgid "Title"
 msgstr "Título"
 
 #: templates/dashboard/curriculum/list.html:84
-#: templates/dashboard/curriculum/upload.html:377
+#: templates/dashboard/curriculum/upload.html:403
 #: templates/dashboard/quality/content_edit_events_list.html:68
 msgid "Type"
 msgstr "Tipo"
@@ -1912,22 +2012,64 @@ msgstr ""
 "criados cursos separados por classe."
 
 #: templates/dashboard/curriculum/upload.html:336
+msgid "Page range (optional — for multi-grade PDFs)"
+msgstr ""
+
+#: templates/dashboard/curriculum/upload.html:339
+#, fuzzy
+#| msgid "First name"
+msgid "First page"
+msgstr "Nome"
+
+#: templates/dashboard/curriculum/upload.html:342
+#, fuzzy
+#| msgid "Start"
+msgid "start"
+msgstr "Começar"
+
+#: templates/dashboard/curriculum/upload.html:345
+#, fuzzy
+#| msgid "Last name"
+msgid "Last page"
+msgstr "Apelido"
+
+#: templates/dashboard/curriculum/upload.html:348
+#, fuzzy
+#| msgid "Send"
+msgid "end"
+msgstr "Enviar"
+
+#: templates/dashboard/curriculum/upload.html:352
+msgid ""
+"Leave blank to read the whole document and auto-detect grade(s) from its "
+"content. To upload one grade at a time from a syllabus that covers several, "
+"enter the first and last page for that grade — and select just that one "
+"grade above."
+msgstr ""
+
+#: templates/dashboard/curriculum/upload.html:356
+msgid ""
+"You've set a page range — these pages should belong to a single grade. "
+"Select just one grade above."
+msgstr ""
+
+#: templates/dashboard/curriculum/upload.html:362
 msgid "Target Lesson Duration"
 msgstr "Duração Alvo da Lição"
 
-#: templates/dashboard/curriculum/upload.html:339
+#: templates/dashboard/curriculum/upload.html:365
 msgid "15 min · 3 steps"
 msgstr "15 min · 3 passos"
 
-#: templates/dashboard/curriculum/upload.html:342
+#: templates/dashboard/curriculum/upload.html:368
 msgid "20 min · 4 steps (default)"
 msgstr "20 min · 4 passos (padrão)"
 
-#: templates/dashboard/curriculum/upload.html:345
+#: templates/dashboard/curriculum/upload.html:371
 msgid "25 min · 5 steps (full)"
 msgstr "25 min · 5 passos (completo)"
 
-#: templates/dashboard/curriculum/upload.html:349
+#: templates/dashboard/curriculum/upload.html:375
 msgid ""
 "Each lesson generates 5 steps (3 teach/explore + 2 practice). The runtime "
 "selector picks the subset matching the student's chosen duration. Shorter "
@@ -1937,11 +2079,11 @@ msgstr ""
 "em tempo de execução escolhe o subconjunto que corresponde à duração "
 "escolhida pelo aluno. Sessões mais curtas saltam a prática de enriquecimento."
 
-#: templates/dashboard/curriculum/upload.html:357
+#: templates/dashboard/curriculum/upload.html:383
 msgid "Attach teaching materials"
 msgstr "Anexar materiais didáticos"
 
-#: templates/dashboard/curriculum/upload.html:360
+#: templates/dashboard/curriculum/upload.html:386
 msgid ""
 "Upload worksheets, past exam papers, textbook chapters, teacher notes — each "
 "file gets its own type. These are indexed into the knowledge base for AI "
@@ -1951,24 +2093,24 @@ msgstr ""
 "do professor — cada ficheiro tem o seu tipo. São indexados na base de "
 "conhecimento para tutoria e avaliação com AI."
 
-#: templates/dashboard/curriculum/upload.html:369
+#: templates/dashboard/curriculum/upload.html:395
 msgid "Files"
 msgstr "Ficheiros"
 
-#: templates/dashboard/curriculum/upload.html:374
+#: templates/dashboard/curriculum/upload.html:400
 msgid "e.g., Geography Worksheet Unit 5"
 msgstr "p. ex., Ficha de Geografia Unidade 5"
 
-#: templates/dashboard/curriculum/upload.html:387
+#: templates/dashboard/curriculum/upload.html:413
 #: templates/dashboard/materials/process.html:142
 msgid "All Levels"
 msgstr "Todos os níveis"
 
-#: templates/dashboard/curriculum/upload.html:400
+#: templates/dashboard/curriculum/upload.html:426
 msgid "Add another material"
 msgstr "Adicionar outro material"
 
-#: templates/dashboard/curriculum/upload.html:408
+#: templates/dashboard/curriculum/upload.html:434
 msgid ""
 "Materials are saved now but processed AFTER the curriculum is parsed and "
 "courses are created. You can process them from the course page."
@@ -1977,27 +2119,27 @@ msgstr ""
 "analisado e os cursos criados. Podes processá-los a partir da página do "
 "curso."
 
-#: templates/dashboard/curriculum/upload.html:421
+#: templates/dashboard/curriculum/upload.html:447
 msgid "What happens next?"
 msgstr "O que acontece a seguir?"
 
-#: templates/dashboard/curriculum/upload.html:423
+#: templates/dashboard/curriculum/upload.html:449
 msgid "AI will analyze your curriculum document"
 msgstr "A AI vai analisar o teu documento curricular"
 
-#: templates/dashboard/curriculum/upload.html:424
+#: templates/dashboard/curriculum/upload.html:450
 msgid "Units and lessons will be extracted automatically"
 msgstr "As unidades e lições serão extraídas automaticamente"
 
-#: templates/dashboard/curriculum/upload.html:425
+#: templates/dashboard/curriculum/upload.html:451
 msgid "You can review and edit before publishing"
 msgstr "Podes rever e editar antes de publicar"
 
-#: templates/dashboard/curriculum/upload.html:426
+#: templates/dashboard/curriculum/upload.html:452
 msgid "Exit tickets and content will be generated"
 msgstr "Serão gerados bilhetes de saída e conteúdos"
 
-#: templates/dashboard/curriculum/upload.html:439
+#: templates/dashboard/curriculum/upload.html:465
 msgid "Upload & Process"
 msgstr "Carregar e processar"
 
