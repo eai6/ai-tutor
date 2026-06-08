@@ -5,66 +5,24 @@
 
 {% block content %}
 <style>
-    .help-wrap { max-width: 880px; margin: 1rem auto 4rem; padding: 0 1rem; }
+    .help-wrap { max-width: 760px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
     .help-wrap h1 { font-size: 1.6rem; color: #111; margin: 0 0 0.5rem; }
-    .help-wrap > p.lead { color: #555; margin: 0 0 1.5rem; }
-    .help-section {
-        background: #fff;
-        border: 1px solid #e5e7eb;
+    .help-wrap > p.lead { color: #555; margin: 0 0 1.5rem; line-height: 1.6; }
+    .video-frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
         border-radius: 12px;
-        padding: 1.1rem 1.4rem;
-        margin-bottom: 0.85rem;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
     }
-    .help-section summary {
-        cursor: pointer;
-        font-size: 1.05rem;
-        font-weight: 600;
-        color: #111;
-        padding: 0.25rem 0;
-        list-style: none;
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-    }
-    .help-section summary::-webkit-details-marker { display: none; }
-    .help-section summary::after {
-        content: '+';
-        margin-left: auto;
-        color: #8b5cf6;
-        font-weight: 700;
-        font-size: 1.2rem;
-    }
-    .help-section[open] summary::after { content: '–'; }
-    .help-section .body { padding-top: 0.8rem; color: #333; line-height: 1.6; font-size: 0.95rem; }
-    .help-section .body h4 { color: #111; margin: 1rem 0 0.4rem; font-size: 0.95rem; }
-    .help-section .body ol, .help-section .body ul { padding-left: 1.4rem; }
-    .help-section .body li { margin-bottom: 0.3rem; }
-    .video-slot {
-        background: #f3f4f6;
-        border: 1px dashed #d1d5db;
-        border-radius: 10px;
-        padding: 0.9rem 1rem;
-        margin: 0.8rem 0;
-        font-size: 0.85rem;
-        color: #6b7280;
-    }
-    .video-slot strong { color: #5b21b6; }
-    .help-tag {
-        display: inline-block;
-        font-size: 0.7rem;
-        background: #ede9fe;
-        color: #5b21b6;
-        padding: 0.1rem 0.55rem;
-        border-radius: 999px;
-        font-weight: 600;
-        margin-right: 0.35rem;
-    }
-    .help-tag.staff { background: #fef3c7; color: #92400e; }
-    code, kbd {
-        background: #f3f4f6;
-        padding: 0.1rem 0.4rem;
-        border-radius: 4px;
-        font-size: 0.85rem;
+    .video-frame iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
     }
 </style>
 
@@ -76,319 +34,16 @@
         ← Dashboard
     </a>
     {% endif %}
-    <h1>Help &amp; FAQ</h1>
-    <p class="lead">Quick walkthroughs and answers to common questions. If something's still off, click <strong>Help / Feedback</strong> in the bottom-right corner of any page.</p>
+    <h1>Getting started</h1>
+    <p class="lead">New here? Watch this short introduction — it shows you how to sign up and take your first lesson on the platform.</p>
 
-    <details class="help-section" open>
-        <summary><span class="help-tag">All</span> Getting started</summary>
-        <div class="body">
-            <p>This is a tutoring platform that walks students through one lesson at a time. Each lesson drills a single teaching objective and ends with a short check.</p>
-
-            <h4>Sign in</h4>
-            <ol>
-                <li>Go to the home page and click <strong>Sign In</strong>.</li>
-                <li>Use the username and password your teacher gave you.</li>
-                <li>Forgot your password? Use the <strong>Forgot password</strong> link — a reset email arrives in a minute.</li>
-            </ol>
-
-            <h4>Pick a lesson</h4>
-            <ol>
-                <li>From the home page, click on a course tile.</li>
-                <li>Scroll to the lesson list and tap the lesson you want to start.</li>
-                <li>Lessons that you've already mastered show a green check; the platform suggests the next one.</li>
-            </ol>
-
-            <div class="video-slot">📹 <strong>Video coming soon:</strong> 90-second walkthrough — sign in, pick a lesson, finish a lesson.</div>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> During a lesson</summary>
-        <div class="body">
-            <p>The tutor is conversational — type your answer the way you'd write it on paper. The tutor will guide you when you're stuck.</p>
-
-            <h4>If a problem feels too hard or too easy</h4>
-            <p>Open the menu next to the input box and tap <strong>Too hard</strong> or <strong>Too easy</strong>. The tutor will adjust.</p>
-
-            <h4>If the tutor doesn't understand your answer</h4>
-            <p>Try rephrasing in shorter sentences, or use numbers / symbols (e.g. <code>x = 4</code>). If it keeps misreading you, hit <strong>Help / Feedback</strong> and tell us what you typed.</p>
-
-            <h4>Audio</h4>
-            <p>Tap the speaker icon on a tutor message to hear it read aloud (works best with headphones).</p>
-
-            <div class="video-slot">📹 <strong>Video coming soon:</strong> What to do when you're stuck.</div>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> Group sessions (sharing a device)</summary>
-        <div class="body">
-            <p>If your school uses shared devices, you'll have a <strong>group</strong> created by your teacher. You can add a groupmate to your session before the lesson starts.</p>
-
-            <h4>How to add your groupmate</h4>
-            <ol>
-                <li>Open the lesson — at the top you'll see your name and a <strong>+ Add groupmate</strong> button.</li>
-                <li>Tap it. A list of students in your group appears.</li>
-                <li>Tap the name of the student sitting next to you. They join immediately — no password needed.</li>
-            </ol>
-
-            <h4>What if I don't see the button?</h4>
-            <p>Either your school is in <em>individual mode</em> (everyone takes lessons solo on their own device), or your teacher hasn't put you in a group yet. Tell your teacher.</p>
-
-            <h4>Can I add anyone?</h4>
-            <p>No — only students your teacher has placed in your group. This stops random pairings.</p>
-
-            <div class="video-slot">📹 <strong>Video coming soon:</strong> Starting a paired session, 60s.</div>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> Exit tickets &amp; mastery</summary>
-        <div class="body">
-            <p>At the end of every lesson there's a short <strong>exit ticket</strong> — 10 questions drawn from a 35-question bank, mixed across five formats so you're not just clicking A/B/C/D the whole time:</p>
-            <ul>
-                <li><strong>Multiple choice</strong> — 4 options, pick a letter.</li>
-                <li><strong>Fill in the blank</strong> — type the missing word or number.</li>
-                <li><strong>True or false</strong> — single statement, two answers.</li>
-                <li><strong>Short answer</strong> — one or two sentences in your own words.</li>
-                <li><strong>Data interpretation</strong> — read a chart or diagram and answer.</li>
-            </ul>
-            <p>Pass and you've mastered the lesson. The pass threshold is shown at the top of the ticket.</p>
-            <ul>
-                <li>If you don't pass, the tutor walks you through what you missed and you can retry.</li>
-                <li>Mastery is permanent — once you've earned it, it stays on your record even if your teacher reworks the lesson later.</li>
-                <li>You can review your finished exit tickets on the lesson page.</li>
-            </ul>
-            <h4>Typing math symbols</h4>
-            <p>For <strong>math lessons</strong>, both the main chat input AND the short-answer boxes on the exit ticket have a small purple toolbar above them with quick-insert buttons for the symbols you can't easily type on a phone keyboard: <code>°  π  √  ²  ³  ±  ≤  ≥  ≠  ×  ÷  ½  ¼  ¾  θ</code>. Click any symbol to drop it at the cursor. Non-math lessons (Geography, etc.) don't show the toolbar since the symbols would just be clutter.</p>
-            <p>The grader is also forgiving — typing <code>38</code> and <code>38°</code> count as the same answer, so you won't be marked wrong for skipping the degree symbol on a fast-paced session.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> Course exam (baseline + retake)</summary>
-        <div class="body">
-            <p>Each course has a <strong>summative exam</strong> — a 30-question check across the whole course. You take it twice (or more):</p>
-            <ol>
-                <li><strong>Baseline</strong> — before you start any lessons. Don't worry about scoring high; we use it to figure out which lessons to prioritise for you. Lessons unlock after you submit it.</li>
-                <li><strong>Final</strong> — after you've worked through the course. The "Δ (final − baseline)" column on the class report tracks your growth.</li>
-                <li><strong>Retakes</strong> — once you have at least one attempt, a <strong>📝 Retake course exam</strong> pill appears on your subject card. Take it as often as you want; every attempt updates the dashboard's "latest" score.</li>
-            </ol>
-            <p>Your full attempt history (baseline → final → retakes) is on the summative review page so you can see growth over time.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> This week's lessons</summary>
-        <div class="body">
-            <p>Your home page shows a yellow <strong>"This week's lessons"</strong> panel listing the lessons your teacher has assigned for the current week. The panel also flags which ones you've already completed and which are still pending.</p>
-            <p>You'll receive a Monday email reminder summarising the week's plan. If your email isn't verified yet, the verification banner at the top has a <strong>Resend link</strong> button — verify so reminders reach you. You can dismiss the banner with the × button if it's distracting; it's a soft prompt, not a hard requirement.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> Choosing how long a lesson takes</summary>
-        <div class="body">
-            <p>When you open a lesson you'll see a small purple banner at the top: <strong>"⏱️ How long do you have today?"</strong> with quick choices.</p>
-            <ul>
-                <li><strong>15 min</strong> — quick run: 3 essential steps (engage + teach + check).</li>
-                <li><strong>20 min</strong> — adds a practice step.</li>
-                <li><strong>30 min</strong> — the standard depth: warm-up, teach, worked example, two practices, quiz.</li>
-                <li><strong>Use the lesson default</strong> — your teacher's setting (usually 20 min).</li>
-            </ul>
-            <p>The picker waits until you click — no time pressure. You're answering the same teaching objective either way; shorter sessions just skip the enrichment steps.</p>
-            <p>If you don't see the banner, your teacher has locked the duration for everyone in this course. Sessions use the teacher's default in that case.</p>
-        </div>
-    </details>
-
-    {% if is_staff_user %}
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Uploading curriculum</summary>
-        <div class="body">
-            <p>From <strong>Curriculum → Upload</strong>:</p>
-            <ol>
-                <li>Pick the curriculum PDF.</li>
-                <li>Set the subject and grade level.</li>
-                <li>Pick a default lesson duration (20 min is a good starting point — you can change it any time on the course page without re-parsing).</li>
-                <li>Optionally attach teaching materials (textbooks, worksheets, past exam papers). Each material gets its own type — that drives where it shows up in the AI tutoring.</li>
-                <li>Submit. The vision-extraction parser reads the PDF and produces one lesson per teaching objective. You'll be redirected to the course page; refresh after a minute or two.</li>
-            </ol>
-            <h4>Re-parsing later</h4>
-            <p>To refresh the unit/lesson skeleton from the source PDF: open the course, expand <strong>Re-parse &amp; Re-plan Lessons</strong>, click <strong>Re-parse</strong>. There's no duration knob on the re-parse — duration is now a live runtime setting, not a generation-time decision.</p>
-            <p><strong>Re-parsing is non-destructive.</strong> Existing units and lessons with the same titles are updated in place; new ones are added. Student data — mastery levels, session transcripts, exit-ticket attempt history, the permanent competency transcript — all survive. If a lesson title changes between parses you may end up with a duplicate (the old row is left intact rather than silently destroyed); clean those up manually if needed.</p>
-            <div class="video-slot">📹 <strong>Video coming soon:</strong> 3-minute curriculum upload walkthrough.</div>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Generating &amp; regenerating lesson content</summary>
-        <div class="body">
-            <p>Lesson content (the 5E steps, figures, hints) is generated by the LLM from the parsed curriculum. Three buttons trigger generation, each with a different scope:</p>
-            <ul>
-                <li><strong>⚡ on a single lesson row</strong> (course detail page) — wipes that lesson's steps and regenerates only that one. The exit ticket is left in place.</li>
-                <li><strong>⚡ Generate All Content</strong> (yellow banner on course detail) — only appears when one or more lessons have no content yet. Generates them in parallel.</li>
-                <li><strong>🔁 Regenerate all content</strong> (purple banner on course detail) — replaces every lesson's steps AND exit-ticket questions across the whole course (and rebuilds the summative bank for math courses). Runs 3 lessons in parallel; ~30–40 minutes for a 50-lesson course. Use this after curriculum updates or to apply new prompt changes / arithmetic-defense layers. Mastery levels + permanent competency transcript are preserved; exit-ticket attempt history on regenerated lessons is reset.</li>
-            </ul>
-            <h4>Default lesson duration (no regen)</h4>
-            <p>The green <strong>"⏱️ Default lesson duration"</strong> form on the course page sets <code>estimated_minutes</code> on every lesson, instantly. Lessons are generated at <strong>full depth (10 steps)</strong> and tagged with priority; the tutoring engine selects a subset at session start, so changing duration is a metadata flip, not a regeneration.</p>
-            <ul>
-                <li>15 min → 3 steps (engage + teach + quiz; priority-1 only)</li>
-                <li>20 min → 4 steps (adds practice)</li>
-                <li>25 min → 5 steps (adds worked example)</li>
-                <li>30 min → 6 steps (adds priority-2 core steps)</li>
-                <li>40 min → 8 steps (adds priority-3 enrichment)</li>
-                <li>50 min → all 10 steps</li>
-            </ul>
-            <p>One teaching objective per lesson always — duration only controls how deep the engine goes, never which objectives the student sees.</p>
-            <h4>Letting students pick — or locking it down</h4>
-            <p>The same green form has an <strong>"Allow students to change"</strong> checkbox. When ticked (default) students see a duration picker at the top of each lesson chat and can shorten/lengthen the session. Untick to lock everyone to the course default — useful for timed in-class sessions where everyone needs to finish together.</p>
-            <h4>What's preserved on lesson regen</h4>
-            <p>Lesson row IDs are stable, and lesson regen now rebuilds STEPS only — the ExitTicket row is left alone. So:</p>
-            <ul>
-                <li><strong>Mastery levels</strong> on <code>StudentLessonProgress</code> — preserved.</li>
-                <li><strong>Skill mastery (SM-2 spaced repetition)</strong> — preserved.</li>
-                <li><strong>Session transcripts</strong> — preserved.</li>
-                <li><strong>Permanent competency transcript</strong> (each student's earned-mastery record) — preserved regardless of regen.</li>
-                <li><strong>Exit-ticket questions + attempt history</strong> — preserved. Lesson regen rebuilds the lesson STEPS only; the exit-ticket bank stays as-is, so every past attempt survives.</li>
-            </ul>
-            <h4>Content style</h4>
-            <p>Lessons generate with rich scaffolding by default — multiple figures, varied question formats (MCQ + short numeric + true/false + free text), 3 hints per practice step. The tutoring engine adapts presentation per student at runtime based on their skill profile and the Too Hard / Too Easy buttons, so one rich content stream serves every learner.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Summative exam (course-level)</summary>
-        <div class="body">
-            <h4>Generating the bank</h4>
-            <p>Open <strong>Course → Summative</strong> and click <strong>Generate</strong>. The system samples <strong>at least 5 questions per teaching objective</strong> from each lesson's exit-ticket bank — so a 56-lesson course produces a ~280-question bank. Students see 30 randomised questions per attempt; the larger bank means retakes feel genuinely different rather than recycling the same six questions.</p>
-            <h4>Publishing</h4>
-            <p>Newly generated summatives default to <strong>unpublished</strong>. Click <strong>Publish</strong> on the summative page to make it active. Until you publish, students see no baseline gate and lessons are open. Publishing the summative triggers the baseline gate: students must take the baseline before any lesson unlocks.</p>
-            <h4>Regenerating</h4>
-            <p>The <strong>Regenerate</strong> button rebuilds the summative bank by re-sampling from current exit-ticket questions. Existing student attempts on the previous bank are cleared (working on it). Use this after a curriculum update so the bank reflects current lessons.</p>
-            <h4>Coverage</h4>
-            <p>The summative bank shows "<em>N teaching objectives covered</em>" — every question is tagged with the lesson-level teaching-objective string. The class competency map iterates the same canonical strings, so attempts join exactly to matrix rows. If you see the matrix showing 0/N across all rows after a fresh regen, that's expected: students need to take the new baseline first.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Setting up student groups</summary>
-        <div class="body">
-            <p>Open <strong>Students → Student Groups</strong>.</p>
-            <h4>Choose your school's session mode</h4>
-            <ul>
-                <li><strong>Shared device</strong> — students share devices and can add a groupmate to their session.</li>
-                <li><strong>Individual</strong> — every student works solo. The "Add groupmate" button is hidden.</li>
-            </ul>
-            <h4>Create a group</h4>
-            <ol>
-                <li>Type a name (e.g., "Pair A" or "Group 3").</li>
-                <li>Tick the students who belong to this group. Group sizes are flexible — pairs, triples, larger.</li>
-                <li>Click <strong>Create Group</strong>.</li>
-            </ol>
-            <h4>Move a student between groups</h4>
-            <p>Open the new group's <strong>Edit</strong>, tick the student. They're moved out of their previous active group automatically.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Live monitoring &amp; reports</summary>
-        <div class="body">
-            <h4>Live monitor</h4>
-            <p>From a course or lesson page, click <strong>Live Monitor</strong>. You'll see active sessions, current step, and time on task. Refreshes automatically.</p>
-
-            <h4>Session report</h4>
-            <p>Open <strong>Reports → Lesson session report</strong>. Shows who passed/failed/didn't take the exit ticket, broken down by student. Click a row to read the full chat transcript.</p>
-
-            <h4>Class competency map</h4>
-            <p>From a course page, <strong>Classes → Competency Map</strong> shows the class-wide view. Each row is one atomic teaching objective (one per lesson). Data source: <strong>per-lesson exit tickets only</strong> — 10 questions per lesson is a much richer signal than the summative's ~5 sampled per objective, so we don't mix them. Columns: <strong>Baseline</strong> (first exit-ticket attempt on the lesson) → <strong>Latest</strong> (most recent) → <strong>Final</strong> (best score so far) → <strong>Δ</strong> growth → <strong>Mastered ≥70%</strong>. Plus class readiness %, struggling objectives, and the students with the most gaps.</p>
-            <p>The course summative is reported separately as an X/30 overall score and still feeds the SM-2 skills map for personalised tutoring — it just doesn't drive this per-objective matrix.</p>
-            <p>Click any student row to drill into their per-objective breakdown.</p>
-
-            <h4>Permanent competency transcript</h4>
-            <p>Every time a student transitions to mastered (on a lesson or skill) we write a permanent record on their account. These records survive course re-parses, lesson regenerations, and even course deletion — they're the durable evidence of what a student has earned, regardless of whether the source course still exists in its original form. The teacher dashboard can surface these as a transcript per student in upcoming UI work.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Editing exit-ticket questions</summary>
-        <div class="body">
-            <ol>
-                <li>Open a lesson — the lesson detail page lists the 35 exit-ticket questions across the five formats (MCQ, fill-in-blank, matching, short-answer, data-interpretation).</li>
-                <li>Click any question to edit wording, options, accepted alternatives, embedded charts, or figures. Data-interpretation questions render server-side from a structured spec, so you edit the spec rather than the rendered image.</li>
-                <li>Each question is tagged with <code>concept_tag</code> (the fine-grained sub-skill it tests). The summative sampling rolls these up to lesson-objective level for cross-attempt reporting.</li>
-            </ol>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag staff">Teachers</span> Weekly assignments &amp; student communication</summary>
-        <div class="body">
-            <h4>Setting weekly lessons</h4>
-            <p>From the course detail page, expand the <strong>📅 Weekly assignments</strong> card. For each upcoming week, tick the lessons you want students to work on and add an optional note. Students see these in their home-page panel and receive a Monday email reminder.</p>
-            <h4>Email verification</h4>
-            <p>Students who haven't verified their email see a soft-prompt banner with a Resend button. They can dismiss it, but reminders won't reach unverified addresses. The banner stays hidden once dismissed (per browser).</p>
-            <h4>In-app feedback</h4>
-            <p>The <strong>Help / Feedback</strong> button (bottom-right of every page) routes student bug reports + feedback to the Feedback &amp; Bugs view in your dashboard. Reports include the page URL, user agent, and — when the student opted in (default-on checkbox) — a real-pixel screenshot of their screen at the moment they reported. Screenshots appear inline as thumbnails on the Feedback &amp; Bugs list.</p>
-        </div>
-    </details>
-    {% endif %}
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> Troubleshooting</summary>
-        <div class="body">
-            <h4>The page looks frozen or stuck "Loading…"</h4>
-            <p>Refresh the page. If it keeps happening, click <strong>Help / Feedback</strong> with the page URL.</p>
-
-            <h4>I get logged out unexpectedly</h4>
-            <p>Sessions last 2 weeks. If you're being kicked out sooner, your school may have stricter cookie settings — let us know.</p>
-
-            <h4>Tutor said something wrong / inappropriate</h4>
-            <p>Click the flag icon under the message. Teachers see flagged chats under <strong>Safety → Flagged Chats</strong>.</p>
-
-            <h4>The verify-email banner won't go away</h4>
-            <p>Click the <strong>×</strong> on the right edge of the banner to dismiss it. It stays hidden in that browser unless you sign in elsewhere or clear storage. Verifying your email is still recommended so weekly reminders reach you.</p>
-
-            <h4>Voice / audio doesn't play</h4>
-            <p>Some browsers block autoplay audio. Tap the speaker icon to start it manually. On mobile, make sure your silent switch is off.</p>
-
-            <h4>Images aren't loading</h4>
-            <p>Slow internet — give it a few seconds. The platform caches images so a second visit is faster.</p>
-
-            <h4>The "Retake course exam" button isn't showing</h4>
-            <p>It only appears once you have at least one completed attempt on the published summative. If your teacher hasn't published the summative yet, or you haven't taken the baseline, the button is hidden. Take the baseline first; the retake pill appears after you submit it.</p>
-
-            <h4>Still stuck?</h4>
-            <p>Click <strong>Help / Feedback</strong> bottom-right. Tell us:</p>
-            <ul>
-                <li>What you were trying to do</li>
-                <li>What you expected</li>
-                <li>What happened instead</li>
-            </ul>
-            <p>We'll see it within 24 hours.</p>
-        </div>
-    </details>
-
-    <details class="help-section">
-        <summary><span class="help-tag">All</span> About this pilot</summary>
-        <div class="body">
-            <p>This is a Seychelles pilot of the AI Tutor platform, running through 2026. Some features are still being added — if you spot a rough edge, that's why. Click <strong>Help / Feedback</strong> and tell us; the things you flag get fixed.</p>
-            <p>Thanks for being part of it 🙏</p>
-            <h4>What's new (April 2026)</h4>
-            <ul>
-                <li><strong>Lesson duration is a runtime knob, not a regen.</strong> Every lesson is generated at full depth (10 steps) and the tutor engine picks a subset based on the duration. Teachers set a course default; students can pick "I have N minutes today" before each session (unless the teacher locks it).</li>
-                <li><strong>Math-symbol picker + forgiving grader</strong> — short-answer textboxes have a quick-insert toolbar for °, π, √, ², ±, etc. The grader treats "38" and "38°" as the same answer, so students aren't penalised for skipping symbols on a phone keyboard.</li>
-                <li><strong>Screenshot attachment on bug reports</strong> — the in-app feedback widget can now grab a real-pixel screenshot when the student submits, so we can see exactly what they were looking at.</li>
-                <li><strong>Lesson regen preserves exit-ticket attempts</strong> — re-running content generation rebuilds lesson STEPS only; the exit-ticket bank and every past student attempt survive untouched.</li>
-                <li><strong>Summative bank size scales with the course</strong> — at least 5 questions per teaching objective, no global cap. Retakes feel genuinely different.</li>
-                <li><strong>Rich-content lessons</strong> — multiple figures, varied question formats, 3 hint levels, runtime adaptation per student (slow → recognition + earlier hints; advanced → free-response + delayed hints).</li>
-                <li><strong>Permanent competency transcript</strong> — every mastery transition writes a durable record on the student's account, independent of course rewrites or deletions.</li>
-                <li><strong>Course-wide regenerate</strong> (teachers) — one click rebuilds every lesson in parallel, ~30–40 min for a 50-lesson course.</li>
-                <li><strong>Non-destructive re-parse</strong> — refreshing a course from its source PDF upserts by title; mastery, transcripts, and attempt history all survive.</li>
-                <li><strong>Single source of truth for objectives</strong> — lesson content, exit-ticket tags, summative tags, and the competency map all share one canonical string per lesson; the matrix joins exactly to what students attempted.</li>
-                <li><strong>Retake course exam</strong> — once a student has at least one summative attempt, the 📝 Retake pill lets them take it as often as they want; every attempt updates the dashboard's "latest" score.</li>
-                <li><strong>Dismissible verify-email banner</strong> — soft prompt with a × button; stays hidden once dismissed (per browser).</li>
-            </ul>
-        </div>
-    </details>
+    <div class="video-frame">
+        <iframe
+            src="https://www.youtube.com/embed/Fh_nOqNESZs"
+            title="How to sign up and take a lesson"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen></iframe>
+    </div>
 </div>
 {% endblock %}
