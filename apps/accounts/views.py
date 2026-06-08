@@ -296,8 +296,14 @@ def staff_self_register(request):
 
         if not email:
             errors.append("Email is required for teacher accounts.")
-        elif User.objects.filter(email=email).exists():
-            errors.append("Email already registered.")
+        elif Membership.objects.filter(role='staff', user__email__iexact=email).exists():
+            # Many teachers were registered as STUDENTS during training, so
+            # their email is already taken by a student account. Allow them to
+            # create a fresh teacher account on the same email (separate User
+            # with its own username + password) — only block a duplicate
+            # TEACHER account. Password-reset emails include the username, so
+            # the student and teacher accounts stay distinguishable.
+            errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
         if len(password) < 8:
             errors.append("Password must be at least 8 characters.")
@@ -424,8 +430,10 @@ def staff_register(request, token=None):
         if User.objects.filter(username=username).exists():
             errors.append("Username already taken.")
 
-        if email and User.objects.filter(email=email).exists():
-            errors.append("Email already registered.")
+        if email and Membership.objects.filter(role='staff', user__email__iexact=email).exists():
+            # Allow an email already used by a student account; only block a
+            # duplicate teacher account (see staff_self_register for rationale).
+            errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
         if len(password) < 8:
             errors.append("Password must be at least 8 characters.")

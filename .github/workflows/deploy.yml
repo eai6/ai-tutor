@@ -196,12 +196,14 @@ jobs:
   #   - `eval-fixtures/baseline.json` committed (regenerate with
   #     `python scripts/extract_eval_fixture.py`)
   #
-  # Skip via workflow_dispatch input `skip_eval=true`.
+  # Skip via workflow_dispatch input `skip_eval=true`, OR by putting
+  # `[skip eval]` anywhere in the head commit message of a push (lets a
+  # plain `git push` to main deploy without paying for the eval run).
   post_deploy_eval:
     name: Post-deploy tutor evaluation
     needs: deploy
     runs-on: ubuntu-latest
-    if: ${{ success() && github.event.inputs.skip_eval != 'true' }}
+    if: ${{ success() && github.event.inputs.skip_eval != 'true' && !contains(github.event.head_commit.message, '[skip eval]') }}
     timeout-minutes: 60  # 4-cell deploy matrix runs ~25 min sim + ~10 min judge; Gemini error_prone cells hit ~10 min each
     continue-on-error: true  # eval failures must not mark the deploy as failed
     permissions:
