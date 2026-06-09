@@ -957,7 +957,7 @@ if enable_appgw:
         location=rg.location,
         policy_settings=network.PolicySettingsArgs(
             state="Enabled",
-            mode="Detection",  # start in Detection; switch to Prevention after a clean baseline
+            mode="Prevention",  # actively blocks OWASP rule matches (pentest-ready)
             request_body_check=True,
             max_request_body_size_in_kb=128,
             file_upload_limit_in_mb=100,

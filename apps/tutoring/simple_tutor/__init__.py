@@ -23,19 +23,21 @@ References:
 import os
 
 
-# Env-driven enable flag. Truthy values: 'on' / 'true' / '1' / 'yes' / 'simple'.
-# Default OFF — preserves the legacy v1 path for all sessions until
-# explicitly flipped via Container App env var.
-_TRUTHY = {'on', 'true', '1', 'yes', 'simple', 'enabled'}
+# simple_tutor is now the DEFAULT engine (2026-06-09). The legacy
+# ConversationalTutor runs ONLY if SIMPLE_TUTOR_ENGINE is explicitly set to a
+# falsy value below. Unset / empty / anything else → simple_tutor. This makes
+# the default survive environment rebuilds (the flag no longer has to be set
+# out-of-band for simple_tutor to run).
+_FALSY = {'off', 'false', '0', 'no', 'disabled', 'legacy', 'v1', 'old'}
 
 
 def is_enabled() -> bool:
     """Return True when the simple-tutor engine should handle new turns.
 
-    Read fresh from ``os.environ`` on every call so the flag can be
-    flipped without a process restart (e.g. via ``az containerapp
-    update --set-env-vars`` between deploys). Per-turn cost is one env
-    lookup — negligible.
+    simple_tutor is the default; this returns True unless SIMPLE_TUTOR_ENGINE is
+    explicitly set to a falsy value (off/false/0/no/legacy/v1). Read fresh from
+    ``os.environ`` on every call so the engine can be flipped without a process
+    restart. Per-turn cost is one env lookup — negligible.
     """
     val = (os.environ.get('SIMPLE_TUTOR_ENGINE') or '').strip().lower()
-    return val in _TRUTHY
+    return val not in _FALSY
