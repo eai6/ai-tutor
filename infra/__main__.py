@@ -1024,7 +1024,10 @@ if enable_appgw:
             port=443, protocol="Https",
             cookie_based_affinity="Disabled",
             pick_host_name_from_backend_address=True,
-            request_timeout=30,
+            # Tutoring responses (LLM + judges, buffered JSON — no SSE in prod)
+            # routinely exceed 30s. Match the app's gunicorn 120s timeout so the
+            # gateway doesn't 504 slow turns ("couldn't reach the server").
+            request_timeout=120,
             probe=network.SubResourceArgs(id=_agw("probes", "acaProbe")),
         )],
         http_listeners=[
