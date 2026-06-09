@@ -49,7 +49,16 @@ urlpatterns = [
     path('support/', include('apps.support.urls')),
 ]
 
-# Always serve media (Azure Files mount in production)
-urlpatterns += [
-    path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
-]
+# Serve media on our own domain (school-network-friendly, behind the WAF).
+# When blob media is enabled, stream from the private blob container (range-
+# capable) with a File-Share fallback for un-migrated files; otherwise serve
+# straight from the File Share mount.
+if getattr(settings, 'USE_BLOB_MEDIA', False):
+    from apps.media_library.blob_media import serve_media
+    urlpatterns += [
+        path('media/<path:path>', serve_media),
+    ]
+else:
+    urlpatterns += [
+        path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
+    ]

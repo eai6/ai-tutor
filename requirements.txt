@@ -184,3 +184,6 @@ azure-communication-email>=1.0.0
 # to start material-processor Job executions for large textbook uploads.
 azure-identity>=1.16.0
 azure-mgmt-appcontainers>=3.0.0
+# Media hosting on Azure Blob (private container; app streams via www.seselai.sc).
+# See memory/blob_media_hosting_plan.md.
+django-storages[azure]>=1.14

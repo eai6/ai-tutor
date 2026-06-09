@@ -412,6 +412,23 @@ storage_keys = pulumi.Output.all(rg.name, sa.name).apply(
 )
 storage_key = storage_keys.apply(lambda k: k.keys[0].value)
 
+# ── Blob container for media (Phase 1 media migration) ───────────────────────
+# PRIVATE container (no anonymous access). The app reads/writes with the
+# account key and streams media to users on www.seselai.sc (behind the WAF),
+# so there's no public blob endpoint and no new domain for schools to allow.
+# Gated behind `enable-blob` so it's inert until we turn it on.
+# See memory/blob_media_hosting_plan.md.
+enable_blob = config.get_bool("enable-blob") or False
+if enable_blob:
+    media_blob_container = storage.BlobContainer(
+        "media-blob",
+        container_name="media",
+        account_name=sa.name,
+        resource_group_name=rg.name,
+        public_access=storage.PublicAccess.NONE,
+    )
+    pulumi.export("media_blob_container", media_blob_container.name)
+
 # Link storage to Container Apps Environment
 env_storage = app.ManagedEnvironmentsStorage(
     f"aitutor-{stack}-env-storage",
@@ -572,7 +589,11 @@ shared_secrets = [
     app.SecretArgs(name="elevenlabs-api-key", value=elevenlabs_api_key),
 ] + ([
     app.SecretArgs(name="acs-connection-string", value=acs_connection_string),
-] if acs_connection_string is not None else [])
+] if acs_connection_string is not None else []) + ([
+    # Storage account key for blob media access (Phase 1). Only declared when
+    # blob media is enabled. Reuses the existing media storage account key.
+    app.SecretArgs(name="blob-media-key", value=storage_key),
+] if enable_blob else [])
 
 shared_registries = [
     app.RegistryCredentialsArgs(
@@ -608,6 +629,14 @@ def _build_app_env_vars(*, csrf_origins=None, include_job_dispatch_env=False):
         app.EnvironmentVarArgs(name="POSTHOG_DISABLED", value="true"),
         app.EnvironmentVarArgs(name="INSTRUCTOR_TELEMETRY", value="false"),
     ]
+    # Blob media (Phase 1) — only when enabled. Account name + container are
+    # plain; the key is a secret. Activates STORAGES->Azure + serve_media.
+    if enable_blob:
+        env_vars += [
+            app.EnvironmentVarArgs(name="AZURE_BLOB_MEDIA_ACCOUNT", value=storage_account_name),
+            app.EnvironmentVarArgs(name="AZURE_BLOB_MEDIA_CONTAINER", value="media"),
+            app.EnvironmentVarArgs(name="AZURE_BLOB_MEDIA_KEY", secret_ref="blob-media-key"),
+        ]
     # Simple-tutor engine + exit-ticket tunables — opt-in via Pulumi
     # config so prod stays on the legacy ConversationalTutor until
     # explicitly flipped. Staging sets these in Pulumi.staging.yaml
@@ -973,9 +1002,12 @@ if enable_appgw:
     kv_cert_secret_id = key_vault.properties.apply(
         lambda p: f"{p.vault_uri}secrets/www-seselai-sc"
     )
-    app_backend_fqdn = container_app.configuration.apply(
-        lambda c: c.ingress.fqdn if c and c.ingress and c.ingress.fqdn else ""
-    )
+    # Derive the internal app FQDN from stable inputs (app name + env default
+    # domain) rather than the container app's live `configuration` output — the
+    # latter goes "unknown" on every app update and churns the gateway's backend
+    # pool on each `pulumi up`. The env default domain only changes on an env
+    # replace, so this stays stable.
+    app_backend_fqdn = Output.concat(container_app_name, ".", env.default_domain)
 
     appgw = network.ApplicationGateway(
         appgw_name,
