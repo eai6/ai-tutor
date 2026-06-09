@@ -25,6 +25,10 @@ from pulumi_azure_native import (
     dbforpostgresql,
     communication,
     authorization,
+    keyvault,
+    managedidentity,
+    network,
+    privatedns,
 )
 
 config = Config("aitutor")
@@ -142,12 +146,61 @@ acr_credentials = pulumi.Output.all(rg.name, acr.name).apply(
     )
 )
 
+# ── 3b. WAF Step 3 (Option B, fully private): VNet ───────────────────────────
+# Gated behind `enable-appgw` (SEPARATE from `enable-waf`) so the disruptive
+# environment recreation only fires when we explicitly turn it on for the
+# maintenance window — an unrelated `pulumi up` won't trigger it.
+# See memory/waf_static_ip_security_plan.md (Step 3).
+enable_appgw = config.get_bool("enable-appgw") or False
+
+vnet = aca_subnet = appgw_subnet = None
+if enable_appgw:
+    vnet = network.VirtualNetwork(
+        f"aitutor-{stack}-vnet",
+        virtual_network_name=f"aitutor-{stack}-vnet",
+        resource_group_name=rg.name,
+        location=rg.location,
+        address_space=network.AddressSpaceArgs(address_prefixes=["10.20.0.0/16"]),
+    )
+    # Subnet delegated to Container Apps (infrastructure subnet, /23).
+    aca_subnet = network.Subnet(
+        f"aitutor-{stack}-aca-subnet",
+        subnet_name="aca-infra",
+        resource_group_name=rg.name,
+        virtual_network_name=vnet.name,
+        address_prefix="10.20.0.0/23",
+        delegations=[network.DelegationArgs(
+            name="aca-delegation",
+            service_name="Microsoft.App/environments",
+        )],
+    )
+    # Dedicated subnet for the Application Gateway (/24). Serialized after the
+    # first subnet — Azure rejects concurrent subnet writes on one VNet.
+    appgw_subnet = network.Subnet(
+        f"aitutor-{stack}-appgw-subnet",
+        subnet_name="appgw",
+        resource_group_name=rg.name,
+        virtual_network_name=vnet.name,
+        address_prefix="10.20.4.0/24",
+        opts=pulumi.ResourceOptions(depends_on=[aca_subnet]),
+    )
+
 # ── 4. Container Apps Environment ───────────────────────────────────────────
 env = app.ManagedEnvironment(
     f"aitutor-{stack}-env",
     environment_name=f"aitutor-{stack}-env",
     resource_group_name=rg.name,
     location=rg.location,
+    # When enable_appgw is on, the environment is VNet-injected and INTERNAL
+    # (no public endpoint) — App Gateway becomes the only public door. Flipping
+    # this from None → config triggers a Pulumi *replace* of the environment
+    # (the maintenance-window downtime + internal-IP change).
+    vnet_configuration=(
+        app.VnetConfigurationArgs(
+            infrastructure_subnet_id=aca_subnet.id,
+            internal=True,
+        ) if enable_appgw else None
+    ),
     app_logs_configuration=app.AppLogsConfigurationArgs(
         destination="log-analytics",
         log_analytics_configuration=app.LogAnalyticsConfigurationArgs(
@@ -170,6 +223,18 @@ env = app.ManagedEnvironment(
             ),
         ),
     ],
+    # Azure makes an environment's VNet config IMMUTABLE — it cannot be added
+    # in place. So when enable_appgw flips vnet_configuration on, force Pulumi
+    # to REPLACE the environment (delete + recreate it VNet-injected). This is
+    # the maintenance-window outage. delete_before_replace is required because
+    # the replacement reuses the same environment name. NOTE: this destroys only
+    # the env + its app/storage-mount association — the Storage Account / File
+    # Share (media) and PostgreSQL (all platform data) are SEPARATE resources
+    # and are NOT touched.
+    opts=pulumi.ResourceOptions(
+        replace_on_changes=["vnetConfiguration"],
+        delete_before_replace=True,
+    ),
 )
 
 # ── 4b. Managed Certificates (one per custom domain) ─────────────────────
@@ -193,8 +258,11 @@ def _cert_name(domain: str) -> str:
     return f"{domain}-cert"
 
 
+# When private (enable_appgw), the app has no public endpoint, so Azure's
+# CNAME-validated managed certs can't be issued and aren't needed — App Gateway
+# terminates TLS with the Key Vault cert. Skip them in that mode.
 managed_certs: dict[str, app.ManagedCertificate] = {}
-for domain in custom_domains:
+for domain in (custom_domains if not enable_appgw else []):
     managed_certs[domain] = app.ManagedCertificate(
         f"{domain}-cert",
         managed_certificate_name=_cert_name(domain),
@@ -206,6 +274,111 @@ for domain in custom_domains:
             domain_control_validation=app.ManagedCertificateDomainControlValidation.CNAME,
         ),
     )
+
+# ── 4d. Private DNS for the internal environment (Step 3) ─────────────────────
+# When the env is internal, its FQDNs resolve only inside the VNet via a private
+# DNS zone named exactly the env's default domain, with a wildcard A record to
+# the env's internal static IP. App Gateway (in the same VNet) uses this to
+# reach the app's internal FQDN.
+if enable_appgw:
+    aca_private_zone = privatedns.PrivateZone(
+        f"aitutor-{stack}-aca-zone",
+        private_zone_name=env.default_domain,
+        resource_group_name=rg.name,
+        location="global",
+    )
+    privatedns.VirtualNetworkLink(
+        f"aitutor-{stack}-aca-zone-link",
+        private_zone_name=aca_private_zone.name,
+        resource_group_name=rg.name,
+        location="global",
+        registration_enabled=False,
+        virtual_network=privatedns.SubResourceArgs(id=vnet.id),
+    )
+    privatedns.PrivateRecordSet(
+        f"aitutor-{stack}-aca-wildcard",
+        private_zone_name=aca_private_zone.name,
+        resource_group_name=rg.name,
+        record_type="A",
+        relative_record_set_name="*",
+        ttl=3600,
+        a_records=[privatedns.ARecordArgs(ipv4_address=env.static_ip)],
+    )
+
+# ── 4c. WAF rollout — Step 1: Key Vault + identity for App Gateway TLS ────────
+# Path B (DNS stays on name.com). The whole WAF rollout is gated behind the
+# `enable-waf` config flag so this code is INERT on any stack that hasn't opted
+# in — `pixel` (prod) is unaffected until we set the flag. Enable per stack:
+#     pulumi config set aitutor:enable-waf true
+# See memory/waf_static_ip_security_plan.md.
+waf_enabled = config.get_bool("enable-waf") or False
+
+if waf_enabled:
+    _client_cfg = authorization.get_client_config()
+
+    # Identity App Gateway uses to read the TLS cert from Key Vault.
+    appgw_identity = managedidentity.UserAssignedIdentity(
+        f"aitutor-{stack}-appgw-id",
+        resource_name_=f"aitutor-{stack}-appgw-id",
+        resource_group_name=rg.name,
+        location=rg.location,
+    )
+
+    # Key Vault holding the Let's Encrypt cert (populated by the acme.sh GitHub
+    # Action via name.com DNS-01). String literals used for permissions/sku to
+    # avoid enum-name pitfalls.
+    key_vault = keyvault.Vault(
+        f"aitutor-{stack}-kv",
+        vault_name=f"aitutor{stack}kv",  # <=24 chars, globally unique
+        resource_group_name=rg.name,
+        location=rg.location,
+        properties=keyvault.VaultPropertiesArgs(
+            tenant_id=_client_cfg.tenant_id,
+            sku=keyvault.SkuArgs(family="A", name="standard"),
+            enable_soft_delete=True,
+            soft_delete_retention_in_days=7,
+            access_policies=[
+                # App Gateway identity — read certs/secrets only.
+                keyvault.AccessPolicyEntryArgs(
+                    tenant_id=_client_cfg.tenant_id,
+                    object_id=appgw_identity.principal_id,
+                    permissions=keyvault.PermissionsArgs(
+                        secrets=["get", "list"],
+                        certificates=["get", "list"],
+                    ),
+                ),
+                # Deployer principal (whoever runs `pulumi up`) — full cert/secret
+                # management.
+                keyvault.AccessPolicyEntryArgs(
+                    tenant_id=_client_cfg.tenant_id,
+                    object_id=_client_cfg.object_id,
+                    permissions=keyvault.PermissionsArgs(
+                        secrets=["get", "list", "set", "delete"],
+                        certificates=["get", "list", "import", "create", "update", "delete"],
+                    ),
+                ),
+                # CI/CD service principal — the ACME GitHub Action runs as this SP
+                # and imports/renews the Let's Encrypt cert. Object id supplied per
+                # stack via config `cicd-sp-object-id` (omit to skip this entry).
+                *(
+                    [keyvault.AccessPolicyEntryArgs(
+                        tenant_id=_client_cfg.tenant_id,
+                        object_id=config.require("cicd-sp-object-id"),
+                        permissions=keyvault.PermissionsArgs(
+                            secrets=["get", "list", "set", "delete"],
+                            certificates=["get", "list", "import", "create", "update", "delete"],
+                        ),
+                    )]
+                    if config.get("cicd-sp-object-id") else []
+                ),
+            ],
+        ),
+    )
+
+    pulumi.export("waf_key_vault_name", key_vault.name)
+    pulumi.export("waf_appgw_identity_id", appgw_identity.id)
+    pulumi.export("waf_appgw_identity_principal", appgw_identity.principal_id)
+
 
 # ── 5. Storage Account + File Share ─────────────────────────────────────────
 storage_account_name = f"aitutor{stack}sa"
@@ -512,6 +685,9 @@ container_app = app.ContainerApp(
             external=True,
             target_port=8000,
             transport=app.IngressTransportMethod.AUTO,
+            # Public custom-domain bindings only when NOT behind App Gateway.
+            # In private mode the public hostname (www.seselai.sc) terminates at
+            # App Gateway, and the app is reached internally by its env FQDN.
             custom_domains=[
                 app.CustomDomainArgs(
                     name=domain,
@@ -519,7 +695,7 @@ container_app = app.ContainerApp(
                     binding_type=app.BindingType.SNI_ENABLED,
                 )
                 for domain in custom_domains
-            ] if custom_domains else None,
+            ] if (custom_domains and not enable_appgw) else None,
         ),
         registries=shared_registries,
         secrets=shared_secrets,
@@ -611,6 +787,17 @@ container_app = app.ContainerApp(
     ),
     opts=pulumi.ResourceOptions(
         depends_on=[env_storage, pg_firewall] + list(managed_certs.values()),
+        # The CI/CD pipeline (.github/workflows/deploy.yml) deploys new images
+        # and env vars to the live app via `az containerapp update` — OUTSIDE
+        # Pulumi. Without this, every `pulumi up` (e.g. an infra change like the
+        # WAF rollout) would try to revert the container's image/env back to
+        # what this program describes, disturbing production. Ignoring these two
+        # paths lets Pulumi own the infra while CI owns deployments. Scale,
+        # probes, ingress, volumes, etc. are still Pulumi-managed.
+        ignore_changes=[
+            "template.containers[0].env",
+            "template.containers[0].image",
+        ],
     ),
 )
 
@@ -683,7 +870,16 @@ if provision_material_job:
                 ),
             ],
         ),
-        opts=pulumi.ResourceOptions(depends_on=[env_storage]),
+        opts=pulumi.ResourceOptions(
+            depends_on=[env_storage],
+            # Same rationale as the main app: the Job shares the `aitutor:latest`
+            # image and env, both updated by CI via `az` outside Pulumi. Ignore
+            # them so infra applies don't fight deployments.
+            ignore_changes=[
+                "template.containers[0].env",
+                "template.containers[0].image",
+            ],
+        ),
     )
 
 # Grant the main Container App's managed identity permission to start
@@ -728,6 +924,155 @@ if material_job is not None:
             "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",   # Container Apps Jobs Operator
         ),
     )
+
+# ── 10. WAF Step 3 — static IP + WAF policy + Application Gateway ─────────────
+# Only when enable_appgw. App Gateway terminates TLS (Key Vault cert via the
+# user-assigned identity), runs the OWASP WAF (Detection mode to start), and
+# forwards to the app's INTERNAL FQDN over HTTPS (resolved via the private DNS
+# zone). www.seselai.sc points at the gateway's static public IP.
+if enable_appgw:
+    appgw_name = f"aitutor-{stack}-appgw"
+    _sub = az_config.require("subscriptionId")
+    _agw_base = Output.concat(
+        "/subscriptions/", _sub, "/resourceGroups/", rg.name,
+        "/providers/Microsoft.Network/applicationGateways/", appgw_name,
+    )
+
+    def _agw(child: str, name: str):
+        return Output.concat(_agw_base, "/", child, "/", name)
+
+    appgw_pip = network.PublicIPAddress(
+        f"aitutor-{stack}-appgw-pip",
+        public_ip_address_name=f"aitutor-{stack}-appgw-pip",
+        resource_group_name=rg.name,
+        location=rg.location,
+        sku=network.PublicIPAddressSkuArgs(name="Standard", tier="Regional"),
+        public_ip_allocation_method="Static",
+    )
+
+    waf_policy = network.WebApplicationFirewallPolicy(
+        f"aitutor-{stack}-wafpolicy",
+        policy_name=f"aitutor-{stack}-wafpolicy",
+        resource_group_name=rg.name,
+        location=rg.location,
+        policy_settings=network.PolicySettingsArgs(
+            state="Enabled",
+            mode="Detection",  # start in Detection; switch to Prevention after a clean baseline
+            request_body_check=True,
+            max_request_body_size_in_kb=128,
+            file_upload_limit_in_mb=100,
+        ),
+        managed_rules=network.ManagedRulesDefinitionArgs(
+            managed_rule_sets=[network.ManagedRuleSetArgs(
+                rule_set_type="OWASP",
+                rule_set_version="3.2",
+            )],
+        ),
+    )
+
+    kv_cert_secret_id = key_vault.properties.apply(
+        lambda p: f"{p.vault_uri}secrets/www-seselai-sc"
+    )
+    app_backend_fqdn = container_app.configuration.apply(
+        lambda c: c.ingress.fqdn if c and c.ingress and c.ingress.fqdn else ""
+    )
+
+    appgw = network.ApplicationGateway(
+        appgw_name,
+        application_gateway_name=appgw_name,
+        resource_group_name=rg.name,
+        location=rg.location,
+        sku=network.ApplicationGatewaySkuArgs(name="WAF_v2", tier="WAF_v2"),
+        autoscale_configuration=network.ApplicationGatewayAutoscaleConfigurationArgs(
+            min_capacity=1, max_capacity=3,
+        ),
+        identity=network.ManagedServiceIdentityArgs(
+            type=network.ResourceIdentityType.USER_ASSIGNED,
+            user_assigned_identities=appgw_identity.id.apply(lambda i: {i: {}}),
+        ),
+        firewall_policy=network.SubResourceArgs(id=waf_policy.id),
+        gateway_ip_configurations=[network.ApplicationGatewayIPConfigurationArgs(
+            name="appGwIpConfig",
+            subnet=network.SubResourceArgs(id=appgw_subnet.id),
+        )],
+        frontend_ip_configurations=[network.ApplicationGatewayFrontendIPConfigurationArgs(
+            name="appGwPublicFrontendIp",
+            public_ip_address=network.SubResourceArgs(id=appgw_pip.id),
+        )],
+        frontend_ports=[
+            network.ApplicationGatewayFrontendPortArgs(name="port_443", port=443),
+            network.ApplicationGatewayFrontendPortArgs(name="port_80", port=80),
+        ],
+        ssl_certificates=[network.ApplicationGatewaySslCertificateArgs(
+            name="wwwcert",
+            key_vault_secret_id=kv_cert_secret_id,
+        )],
+        backend_address_pools=[network.ApplicationGatewayBackendAddressPoolArgs(
+            name="acaBackend",
+            backend_addresses=[network.ApplicationGatewayBackendAddressArgs(fqdn=app_backend_fqdn)],
+        )],
+        probes=[network.ApplicationGatewayProbeArgs(
+            name="acaProbe",
+            protocol="Https",
+            path="/health/",
+            interval=30, timeout=30, unhealthy_threshold=3,
+            pick_host_name_from_backend_http_settings=True,
+            match=network.ApplicationGatewayProbeHealthResponseMatchArgs(status_codes=["200-399"]),
+        )],
+        backend_http_settings_collection=[network.ApplicationGatewayBackendHttpSettingsArgs(
+            name="httpsSettings",
+            port=443, protocol="Https",
+            cookie_based_affinity="Disabled",
+            pick_host_name_from_backend_address=True,
+            request_timeout=30,
+            probe=network.SubResourceArgs(id=_agw("probes", "acaProbe")),
+        )],
+        http_listeners=[
+            network.ApplicationGatewayHttpListenerArgs(
+                name="httpsListener",
+                frontend_ip_configuration=network.SubResourceArgs(id=_agw("frontendIPConfigurations", "appGwPublicFrontendIp")),
+                frontend_port=network.SubResourceArgs(id=_agw("frontendPorts", "port_443")),
+                protocol="Https",
+                ssl_certificate=network.SubResourceArgs(id=_agw("sslCertificates", "wwwcert")),
+                host_name="www.seselai.sc",
+            ),
+            network.ApplicationGatewayHttpListenerArgs(
+                name="httpListener",
+                frontend_ip_configuration=network.SubResourceArgs(id=_agw("frontendIPConfigurations", "appGwPublicFrontendIp")),
+                frontend_port=network.SubResourceArgs(id=_agw("frontendPorts", "port_80")),
+                protocol="Http",
+            ),
+        ],
+        redirect_configurations=[network.ApplicationGatewayRedirectConfigurationArgs(
+            name="httpToHttps",
+            redirect_type="Permanent",
+            target_listener=network.SubResourceArgs(id=_agw("httpListeners", "httpsListener")),
+            include_path=True,
+            include_query_string=True,
+        )],
+        request_routing_rules=[
+            network.ApplicationGatewayRequestRoutingRuleArgs(
+                name="httpsRule",
+                rule_type="Basic",
+                priority=100,
+                http_listener=network.SubResourceArgs(id=_agw("httpListeners", "httpsListener")),
+                backend_address_pool=network.SubResourceArgs(id=_agw("backendAddressPools", "acaBackend")),
+                backend_http_settings=network.SubResourceArgs(id=_agw("backendHttpSettingsCollection", "httpsSettings")),
+            ),
+            network.ApplicationGatewayRequestRoutingRuleArgs(
+                name="httpRedirectRule",
+                rule_type="Basic",
+                priority=110,
+                http_listener=network.SubResourceArgs(id=_agw("httpListeners", "httpListener")),
+                redirect_configuration=network.SubResourceArgs(id=_agw("redirectConfigurations", "httpToHttps")),
+            ),
+        ],
+        opts=pulumi.ResourceOptions(depends_on=[key_vault, appgw_identity]),
+    )
+
+    pulumi.export("waf_appgw_public_ip", appgw_pip.ip_address)
+    pulumi.export("waf_appgw_name", appgw.name)
+
 
 # ── Exports ─────────────────────────────────────────────────────────────────
 pulumi.export("app_url", container_app.configuration.apply(

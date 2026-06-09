@@ -31,3 +31,6 @@ config:
   aitutor:custom-domains:
     - ai-tutor.wbg.edwardamoah.com
     - www.seselai.sc
+  aitutor:enable-waf: "true"
+  aitutor:cicd-sp-object-id: 4341d1f9-ecdb-4445-802a-3a79b322f440
+  aitutor:enable-appgw: "true"

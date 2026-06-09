@@ -1,0 +1,93 @@
+name: Renew TLS cert (Let's Encrypt → Key Vault)
+
+# Issues / renews a free Let's Encrypt certificate for the App Gateway hostname
+# using a DNS-01 challenge via the name.com API, then imports it into Azure Key
+# Vault. App Gateway references the Key Vault cert by versionless secret id, so
+# it picks up each renewal automatically.
+#
+# Required GitHub secrets:
+#   AZURE_CREDENTIALS  – existing service-principal JSON (must have Key Vault
+#                        certificate import rights; granted via Pulumi
+#                        `cicd-sp-object-id` access policy on aitutorpixelkv).
+#   NAMECOM_USERNAME   – name.com API username.
+#   NAMECOM_TOKEN      – name.com API token.
+#
+# Run manually the first time (Actions → this workflow → Run workflow) to seed
+# the cert into Key Vault before the App Gateway is created. After that the
+# weekly schedule keeps it renewed (Let's Encrypt certs last 90 days; acme.sh
+# renews when <30 days remain).
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'          # Mondays 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Hostname to issue the cert for'
+        required: false
+        default: 'www.seselai.sc'
+      force:
+        description: 'Force re-issue even if not due for renewal'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  KEYVAULT_NAME: aitutorpixelkv
+  CERT_NAME: www-seselai-sc          # Key Vault certificate name (App Gateway refs this)
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve domain
+        id: vars
+        run: echo "domain=${{ github.event.inputs.domain || 'www.seselai.sc' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install acme.sh
+        run: |
+          curl -fsSL https://get.acme.sh | sh -s email=eamoah@worldbank.org
+          echo "$HOME/.acme.sh" >> "$GITHUB_PATH"
+
+      - name: Issue / renew certificate (DNS-01 via name.com)
+        env:
+          Namecom_Username: ${{ secrets.NAMECOM_USERNAME }}
+          Namecom_Token: ${{ secrets.NAMECOM_TOKEN }}
+        run: |
+          set -euo pipefail
+          DOMAIN="${{ steps.vars.outputs.domain }}"
+          ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+          FORCE=""
+          [ "${{ github.event.inputs.force }}" = "true" ] && FORCE="--force"
+          set +e
+          ~/.acme.sh/acme.sh --issue --dns dns_namecom -d "$DOMAIN" --keylength 2048 $FORCE
+          rc=$?
+          set -e
+          # acme.sh: 0 = issued/renewed, 2 = skipped (not due). Both are fine.
+          if [ "$rc" != "0" ] && [ "$rc" != "2" ]; then
+            echo "acme.sh failed with code $rc"; exit "$rc"
+          fi
+
+      - name: Export PFX and import into Key Vault
+        run: |
+          set -euo pipefail
+          DOMAIN="${{ steps.vars.outputs.domain }}"
+          CERT_DIR="$HOME/.acme.sh/${DOMAIN}"
+          PFX_PASS="$(openssl rand -base64 24)"
+          openssl pkcs12 -export \
+            -inkey "$CERT_DIR/${DOMAIN}.key" \
+            -in    "$CERT_DIR/${DOMAIN}.cer" \
+            -certfile "$CERT_DIR/ca.cer" \
+            -out cert.pfx -passout "pass:$PFX_PASS"
+          az keyvault certificate import \
+            --vault-name "$KEYVAULT_NAME" \
+            --name "$CERT_NAME" \
+            --file cert.pfx \
+            --password "$PFX_PASS"
+          rm -f cert.pfx
+          echo "Imported $DOMAIN into Key Vault $KEYVAULT_NAME as '$CERT_NAME'."
