@@ -34,3 +34,5 @@ config:
   aitutor:enable-waf: "true"
   aitutor:cicd-sp-object-id: 4341d1f9-ecdb-4445-802a-3a79b322f440
   aitutor:enable-appgw: "true"
+  aitutor:enable-blob: "true"
+  aitutor:workload-profile-type: Consumption
