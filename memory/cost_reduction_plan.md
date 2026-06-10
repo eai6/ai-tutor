@@ -117,6 +117,30 @@ profile already exists in `aitutor-pixel-env`). Reconcile Pulumi after.
 4. Update `infra/__main__.py` (config `workload-profile-type=Consumption`, `min-replicas=1`),
    `pulumi preview` to confirm no destructive diff (esp. NOT recreating the env), commit.
 
+## Non-prod environments — audit + actions (2026-06-10)
+**Deploy topology clarified:** only TWO envs are in CI — `main`->`deploy.yml`->prod
+(`aitutor-pixel-rg`, Seychelles); `dev` branch->`deploy-staging.yml`->staging
+(`aitutor-staging-rg`, Mozambique). The other RGs were Pulumi-provisioned infra not
+wired to any branch (the `dev` *stack* name collided with the `dev` *branch*, causing
+confusion — they are unrelated).
+
+Actions:
+- **Dev** (`aitutor-pixeldev-rg`): was always-on dedicated-D4 (~$90/mo), no CI. Moved
+  app+job to Consumption scale-to-zero, removed D4 profile — then **DELETED the RG**
+  (orphaned; its Pulumi `dev` stack pointed at a long-gone `aitutor-dev-rg`).
+- **Preview** (`aitutor-preview-rg`): no CI. Scaled to zero, then **DELETED** (+ `preview` stack).
+- **Legacy** (`aitutor-rg`): original App Service + Azure SQL deploy. **DELETED** (not Pulumi).
+- Removed orphaned Pulumi stacks `dev` + `preview` and configs (Pulumi.dev.yaml,
+  Pulumi.pixeldev.yaml). Remaining stacks: `pixel` + `staging` only.
+- **Staging (Mozambique) — KEPT, still to optimize:** Consumption min-1 ($27/mo), Postgres
+  **B2ms** ($25/mo; Pulumi config says B1ms = drift, someone bumped it), ACR overage ($10/mo).
+  Candidates: prune staging ACR; B2ms->B1ms or stop-when-idle; min-0/cron. Pilot is active,
+  so confirm cold-start tolerance before scaling staging to zero.
+
+## Remaining follow-ups
+- Recurring ACR purge (`--keep 20`) in `deploy.yml` (prod + staging) so tags don't re-pile.
+- Staging optimization (PG tier / ACR prune) — needs user OK (active pilot env).
+
 ## Open questions
 - None blocking.
 
