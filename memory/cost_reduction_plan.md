@@ -146,8 +146,11 @@ Actions:
   - Staging app/job ACR: add the recurring purge too.
 
 ## Remaining follow-ups
-- Recurring ACR purge (`--keep 20`) in `deploy.yml` (prod + staging) so tags don't re-pile.
-- Staging optimization (PG tier / ACR prune) — needs user OK (active pilot env).
+- ~~Recurring ACR purge (`--keep 20`) in `deploy.yml` (prod + staging)~~ DONE 2026-06-10:
+  added a non-fatal `acr purge --filter 'aitutor:.*' --ago 0d --keep 20 --untagged` step at the
+  end of the `deploy` job in both `deploy.yml` and `deploy-staging.yml`.
+- ~~Staging optimization (PG tier / ACR prune)~~ DONE 2026-06-10 (see staging section above).
+- Pulumi reconciliation for staging cron-warm/min-0 (applied via az; not yet in the staging stack).
 
 ## Open questions
 - None blocking.
