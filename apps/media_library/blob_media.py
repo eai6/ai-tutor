@@ -108,11 +108,16 @@ def serve_media(request, path):
         return _filesystem_fallback(path)
 
     size = props.size
-    content_type = (
-        props.content_settings.content_type
-        or mimetypes.guess_type(path)[0]
-        or "application/octet-stream"
-    )
+    # Prefer the extension-based guess when the blob has no stored content-type
+    # OR a generic one. Bulk-migrated files (azcopy) land as
+    # ``application/octet-stream``, which would make browsers download PDFs and
+    # mis-handle media instead of rendering them inline.
+    stored_ct = props.content_settings.content_type
+    guessed_ct = mimetypes.guess_type(path)[0]
+    if guessed_ct and (not stored_ct or stored_ct == "application/octet-stream"):
+        content_type = guessed_ct
+    else:
+        content_type = stored_ct or "application/octet-stream"
 
     range_header = request.headers.get("Range", "")
     start, end = 0, size - 1
