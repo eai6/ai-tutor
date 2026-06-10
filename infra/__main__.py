@@ -237,6 +237,22 @@ env = app.ManagedEnvironment(
     ),
 )
 
+# Pin the environment's stable outputs (default_domain, static_ip) and the app's
+# managed-identity principal id to config values when present, falling back to the
+# live output otherwise. These values don't change for the life of the env/app, but
+# Pulumi marks them [unknown] during preview whenever the env/app is updated — which
+# cascades the private DNS zone, its wildcard record, the VNet link, and the job
+# role assignment into spurious REPLACE ops (replacing the zone that fronts the App
+# Gateway backend = downtime). Sourcing the known values from config decouples those
+# resources so a routine env/app edit (e.g. a workload-profile change) no longer
+# churns DNS/role assignments. Unset config (first deploy / other stacks) -> live output.
+#   pulumi config set aitutor:env-default-domain <env defaultDomain>
+#   pulumi config set aitutor:env-static-ip <env internal staticIp>
+#   pulumi config set aitutor:app-identity-principal-id <container app principalId>
+env_default_domain = config.get("env-default-domain") or env.default_domain
+env_static_ip = config.get("env-static-ip") or env.static_ip
+app_identity_principal_id = config.get("app-identity-principal-id")
+
 # ── 4b. Managed Certificates (one per custom domain) ─────────────────────
 # Free auto-renewing certs from Azure. The Azure-resource-name (the
 # `managed_certificate_name` arg) needs to be unique within the
@@ -283,7 +299,7 @@ for domain in (custom_domains if not enable_appgw else []):
 if enable_appgw:
     aca_private_zone = privatedns.PrivateZone(
         f"aitutor-{stack}-aca-zone",
-        private_zone_name=env.default_domain,
+        private_zone_name=env_default_domain,
         resource_group_name=rg.name,
         location="global",
     )
@@ -302,7 +318,7 @@ if enable_appgw:
         record_type="A",
         relative_record_set_name="*",
         ttl=3600,
-        a_records=[privatedns.ARecordArgs(ipv4_address=env.static_ip)],
+        a_records=[privatedns.ARecordArgs(ipv4_address=env_static_ip)],
     )
 
 # ── 4c. WAF rollout — Step 1: Key Vault + identity for App Gateway TLS ────────
@@ -740,7 +756,7 @@ container_app = app.ContainerApp(
                 ),
                 env=_build_app_env_vars(
                     csrf_origins=Output.concat(
-                        "https://", container_app_name, ".", env.default_domain,
+                        "https://", container_app_name, ".", env_default_domain,
                         "".join(f",https://{d}" for d in custom_domains),
                     ),
                     include_job_dispatch_env=True,
@@ -942,7 +958,9 @@ if material_job is not None:
             ).hex
         ),
         scope=material_job.id,
-        principal_id=container_app.identity.apply(
+        # Pinned principal id (config) avoids the [unknown]->replace cascade when
+        # the container app is updated; falls back to the live identity output.
+        principal_id=app_identity_principal_id or container_app.identity.apply(
             lambda i: i.principal_id if i and i.principal_id else ""
         ),
         principal_type=authorization.PrincipalType.SERVICE_PRINCIPAL,
@@ -1007,7 +1025,7 @@ if enable_appgw:
     # latter goes "unknown" on every app update and churns the gateway's backend
     # pool on each `pulumi up`. The env default domain only changes on an env
     # replace, so this stays stable.
-    app_backend_fqdn = Output.concat(container_app_name, ".", env.default_domain)
+    app_backend_fqdn = Output.concat(container_app_name, ".", env_default_domain)
 
     appgw = network.ApplicationGateway(
         appgw_name,
