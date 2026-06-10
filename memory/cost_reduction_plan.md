@@ -132,10 +132,18 @@ Actions:
 - **Legacy** (`aitutor-rg`): original App Service + Azure SQL deploy. **DELETED** (not Pulumi).
 - Removed orphaned Pulumi stacks `dev` + `preview` and configs (Pulumi.dev.yaml,
   Pulumi.pixeldev.yaml). Remaining stacks: `pixel` + `staging` only.
-- **Staging (Mozambique) — KEPT, still to optimize:** Consumption min-1 ($27/mo), Postgres
-  **B2ms** ($25/mo; Pulumi config says B1ms = drift, someone bumped it), ACR overage ($10/mo).
-  Candidates: prune staging ACR; B2ms->B1ms or stop-when-idle; min-0/cron. Pilot is active,
-  so confirm cold-start tolerance before scaling staging to zero.
+- **Staging (Mozambique) — KEPT, optimized 2026-06-10:**
+  - ACR **pruned** (76->20 tags, 56 deleted): ~$30 -> ~$5/mo.
+  - App **cron-warm + scale-to-zero**: min 0, max 2, rules = `school-hours` (cron,
+    `Africa/Maputo`, Mon-Fri 06:00-18:00, desired 1) + `http-concurrency` (kept — REQUIRED
+    so the app activates from zero on a request OUTSIDE the cron window; verified ~35s cold
+    start -> 200). Staging has NO App Gateway, so scale-to-zero genuinely fires. ~$80 -> ~$15-30/mo.
+  - Postgres **B2ms -> B1ms** ($75 -> ~$18/mo). ⚠️ **WATCH / MAY NEED TO REVERT:** B1ms is the
+    Pulumi-config value; B2ms was a manual bump done earlier because **B1ms throughput was too
+    low for content-generation / bursty operations**. Reverted to B1ms for cost now; if content
+    generation or other bursty ops on the Mozambique pilot are slow/timing-out, revert with
+    `az postgres flexible-server update -g aitutor-staging-rg -n aitutor-staging-pg --sku-name Standard_B2ms`.
+  - Staging app/job ACR: add the recurring purge too.
 
 ## Remaining follow-ups
 - Recurring ACR purge (`--keep 20`) in `deploy.yml` (prod + staging) so tags don't re-pile.
