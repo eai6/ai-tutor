@@ -8,21 +8,81 @@
     <p class="muted">Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place.</p>
 </div>
 
-{# Reset offer — shown when 'Create Super Admin' was submitted with an existing email #}
-{% if reset_target %}
-<div class="card" style="border:1px solid #f0c36d;background:#fff8e6;margin-bottom:1rem;">
+{# ── Find / debug any account (incl. students who can't log in as staff) ── #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3 class="card-title">Find / debug a user</h3></div>
     <div class="card-body">
-        <strong>Account already exists</strong> —
-        {{ reset_target.email }} ({{ reset_target.get_full_name|default:reset_target.username }}) already has an account.
-        Reset its password instead of creating a new one:
-        <button type="button" class="btn btn-sm staff-reset-btn"
-                data-user-id="{{ reset_target.id }}" data-username="{{ reset_target.username }}" data-email="{{ reset_target.email }}"
-                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.4rem;">
-            Reset password
-        </button>
+        <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.6rem;">Look up any account by email or username — including students — to see why a login isn't working and fix it.</p>
+        <form method="get" style="display:flex;gap:0.5rem;max-width:480px;">
+            <input type="text" class="form-control" name="find" value="{{ find_query }}" placeholder="email or username" style="flex:1;">
+            <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        </form>
+
+        {% if find_query %}
+        {% for f in found_users %}
+        <div style="margin-top:1rem;padding:0.9rem 1rem;border:1px solid var(--gray-200);border-radius:8px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div>
+                    <strong>{{ f.user.get_full_name|default:f.user.username }}</strong>
+                    {% if f.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);">(you)</span>{% endif %}
+                    <div style="font-size:0.85rem;color:var(--gray-500);">{{ f.user.email }}</div>
+                </div>
+                <div style="text-align:right;font-size:0.78rem;color:var(--gray-500);">
+                    {% if f.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">Super Admin</span>{% endif %}
+                    {% if f.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
+                    <div style="margin-top:0.25rem;">Last login: {{ f.user.last_login|date:"M d, Y H:i"|default:"never" }}</div>
+                </div>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.82rem;">
+                <strong>Memberships:</strong>
+                {% for m in f.memberships %}<span class="badge" style="margin-right:0.25rem;">{{ m.role }} @ {{ m.institution }}{% if not m.is_active %} (inactive){% endif %}</span>{% empty %}<span style="color:var(--gray-500);">none</span>{% endfor %}
+            </div>
+            <div style="margin-top:0.5rem;padding:0.5rem 0.7rem;border-radius:6px;background:#fff8e6;border:1px solid #f0c36d;font-size:0.82rem;">⚠️ {{ f.diagnosis }}</div>
+            {% if not f.is_self %}
+            <div style="margin-top:0.7rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+                {# Grant staff access at a school #}
+                <form method="post" style="display:flex;gap:0.3rem;align-items:center;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="grant_staff">
+                    <input type="hidden" name="user_id" value="{{ f.user.id }}">
+                    <select name="school_id" class="form-control" style="font-size:0.78rem;padding:3px 6px;width:auto;">
+                        <option value="">Grant staff at…</option>
+                        {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Grant staff</button>
+                </form>
+                <form method="post" style="display:inline;" onsubmit="return confirm('{% if f.is_admin %}Remove Super Admin from{% else %}Make Super Admin:{% endif %} {{ f.user.get_full_name|default:f.user.email|escapejs }}?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_admin">
+                    <input type="hidden" name="user_id" value="{{ f.user.id }}">
+                    <button type="submit" class="btn btn-sm" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}Remove admin{% else %}Make Super Admin{% endif %}</button>
+                </form>
+                <button type="button" class="btn btn-sm staff-reset-btn"
+                        data-user-id="{{ f.user.id }}" data-username="{{ f.user.username }}" data-email="{{ f.user.email }}"
+                        style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Reset password</button>
+                {% if not f.is_admin %}
+                <form method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_user">
+                    <input type="hidden" name="user_id" value="{{ f.user.id }}">
+                    <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                </form>
+                <form method="post" style="display:inline;" onsubmit="return confirm('Permanently delete {{ f.user.get_full_name|default:f.user.email|escapejs }}? This cancels the signup and cannot be undone.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete_user">
+                    <input type="hidden" name="user_id" value="{{ f.user.id }}">
+                    <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p style="margin-top:1rem;color:var(--gray-500);font-size:0.85rem;">No account found matching "{{ find_query }}".</p>
+        {% endfor %}
+        {% endif %}
     </div>
 </div>
-{% endif %}
 
 {# ── Pending approvals (self-registered, awaiting admin OK) ── #}
 {% if pending_approvals %}

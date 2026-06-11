@@ -4368,14 +4368,17 @@ def staff_list(request):
             if not email:
                 messages.error(request, "Email is required.")
             elif existing:
-                # Known-email trap: offer a reset instead of dead-ending.
+                # Known-email trap: surface the FULL account state below (it may be
+                # a student / lack staff access) so the admin can debug + fix it —
+                # grant staff access, make admin, reset its password, or delete it.
+                from urllib.parse import quote
                 messages.warning(
                     request,
                     f"An account already exists for '{email}' "
                     f"({existing.get_full_name() or existing.username}). "
-                    f"Reset its password below instead of creating a new one."
+                    f"See its status below — grant staff access, reset its password, or delete it."
                 )
-                return redirect(f"{reverse('dashboard:staff_list')}?reset_user={existing.id}")
+                return redirect(f"{reverse('dashboard:staff_list')}?find={quote(email)}")
             elif not password:
                 messages.error(request, "Password is required.")
             else:
@@ -4449,6 +4452,39 @@ def staff_list(request):
                 messages.success(request, f"User '{name}' deleted.")
             else:
                 messages.error(request, "Cannot delete this user.")
+            return redirect('dashboard:staff_list')
+
+        if action == 'grant_staff':
+            # Give an existing account (e.g. a student who can't log in as staff)
+            # staff access at a school. Membership is unique per (user, school),
+            # so this converts any existing membership there to active staff.
+            target = _target()
+            school_id = request.POST.get('school_id')
+            inst = Institution.objects.filter(id=school_id, is_active=True).first() if school_id else None
+            if not target:
+                messages.error(request, "User not found.")
+            elif not inst:
+                messages.error(request, "Please select a valid school.")
+            else:
+                Membership.objects.update_or_create(
+                    user=target, institution=inst,
+                    defaults={'role': 'staff', 'is_active': True},
+                )
+                if not target.is_active:
+                    target.is_active = True
+                    target.save(update_fields=['is_active'])
+                SafetyAuditLog.log(
+                    'permission_change', user=request.user,
+                    details={'mode': 'grant_staff', 'target_user_id': target.id,
+                             'institution_id': inst.id},
+                    severity='warning', request=request,
+                )
+                messages.success(
+                    request,
+                    f"Granted staff access to {target.get_full_name() or target.email} at {inst.name}.")
+            from urllib.parse import quote
+            if target and target.email:
+                return redirect(f"{reverse('dashboard:staff_list')}?find={quote(target.email)}")
             return redirect('dashboard:staff_list')
 
         if action == 'invite_staff':
@@ -4555,10 +4591,42 @@ def staff_list(request):
         invites_qs = invites_qs.filter(institution=institution)
     pending_invites = list(invites_qs.order_by('-created_at'))
 
-    reset_target = None
-    rt_id = request.GET.get('reset_user')
-    if rt_id:
-        reset_target = User.objects.filter(id=rt_id).first()
+    # Find / debug ANY account (incl. students) by email or username, so an admin
+    # can diagnose "account exists but can't log in as staff" cases and fix them.
+    find_query = request.GET.get('find', '').strip()
+    found_users = []
+    if find_query:
+        matches = (
+            User.objects.filter(Q(email__icontains=find_query) | Q(username__icontains=find_query))
+            .distinct().prefetch_related('memberships__institution').order_by('username')[:10]
+        )
+        for u in matches:
+            ms = list(u.memberships.all())
+            has_staff_access = u.is_staff or any(m.role == 'staff' and m.is_active for m in ms)
+            if u.is_staff:
+                diagnosis = "Super Admin — can sign in to the dashboard."
+            elif has_staff_access and u.is_active:
+                diagnosis = "Active staff — can sign in as staff."
+            elif any(m.role == 'staff' and not m.is_active for m in ms):
+                diagnosis = "Staff membership is inactive (pending approval) — Approve/Activate to enable login."
+            elif any(m.role == 'student' for m in ms):
+                diagnosis = "Student account — has no staff access. Grant staff access or make Super Admin to allow staff login."
+            elif not u.is_active:
+                diagnosis = "Account is inactive — Activate it (and grant staff access) to allow login."
+            else:
+                diagnosis = "No staff access — grant staff access or make Super Admin to allow staff login."
+            found_users.append({
+                'user': u,
+                'memberships': [
+                    {'role': m.role, 'is_active': m.is_active,
+                     'institution': m.institution.name if m.institution else '—'} for m in ms
+                ],
+                'is_admin': u.is_staff,
+                'is_active': u.is_active,
+                'has_staff_access': has_staff_access,
+                'is_self': u.id == request.user.id,
+                'diagnosis': diagnosis,
+            })
 
     active_schools = Institution.objects.filter(is_active=True).order_by('name')
 
@@ -4567,7 +4635,8 @@ def staff_list(request):
         'people': people,
         'pending_approvals': pending_approvals,
         'pending_invites': pending_invites,
-        'reset_target': reset_target,
+        'find_query': find_query,
+        'found_users': found_users,
         'active_schools': active_schools,
     }
     return render(request, 'dashboard/staff_list.html', context)
