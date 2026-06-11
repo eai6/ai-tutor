@@ -436,6 +436,52 @@
                 <p style="color:var(--gray-500);font-style:italic;">No other users yet.</p>
                 {% endif %}
 
+                {# Offer a reset when 'Create Super Admin' was submitted with an existing email #}
+                {% if reset_target %}
+                <div id="reset-offer" style="margin-top:1rem;padding:0.875rem 1rem;border:1px solid #f0c36d;background:#fff8e6;border-radius:8px;">
+                    <p style="font-weight:600;font-size:0.875rem;margin:0 0 0.25rem;">Account already exists</p>
+                    <p style="font-size:0.8125rem;color:var(--gray-600);margin:0 0 0.75rem;">
+                        <strong>{{ reset_target.email }}</strong>
+                        ({{ reset_target.get_full_name|default:reset_target.username }}) already has an account.
+                        Reset its password instead of creating a new one.
+                    </p>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="resetAdminShow({{ reset_target.id }})">Reset password (show temporary)</button>
+                    {% if reset_target.email %}
+                    <button type="button" class="btn btn-secondary btn-sm" style="margin-left:0.5rem;" onclick="resetAdminEmail({{ reset_target.id }})">Email reset link</button>
+                    {% endif %}
+                    <div id="reset-offer-result" style="margin-top:0.75rem;font-size:0.8125rem;"></div>
+                </div>
+                <script>
+                (function () {
+                  const CSRF = '{{ csrf_token }}';
+                  const out = () => document.getElementById('reset-offer-result');
+                  async function post(url) {
+                    const r = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
+                    let data = {};
+                    try { data = await r.json(); } catch (e) {}
+                    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+                    return data;
+                  }
+                  window.resetAdminShow = async function (id) {
+                    out().textContent = 'Resetting…';
+                    try {
+                      const d = await post('/dashboard/staff/' + id + '/reset-password/show/');
+                      out().innerHTML = 'New temporary password for <strong>' + (d.username || '') +
+                        '</strong>: <code style="user-select:all;background:#eee;padding:2px 6px;border-radius:4px;">' +
+                        (d.temporary_password || '') + '</code><br>Share it securely — the user must change it on next login.';
+                    } catch (e) { out().textContent = 'Error: ' + e.message; }
+                  };
+                  window.resetAdminEmail = async function (id) {
+                    out().textContent = 'Sending…';
+                    try {
+                      await post('/dashboard/staff/' + id + '/reset-password/email/');
+                      out().textContent = 'Reset link emailed to the account address.';
+                    } catch (e) { out().textContent = 'Error: ' + e.message; }
+                  };
+                })();
+                </script>
+                {% endif %}
+
                 {# Create new Super Admin #}
                 <form method="post" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200);">
                     {% csrf_token %}

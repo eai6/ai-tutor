@@ -3249,10 +3249,27 @@ def settings_page(request):
             admin_first = request.POST.get('admin_first_name', '').strip()
             admin_last = request.POST.get('admin_last_name', '').strip()
             admin_password = request.POST.get('admin_password', '').strip()
-            if not admin_email or not admin_password:
-                messages.error(request, "Email and password are required.")
-            elif User.objects.filter(email=admin_email).exists():
-                messages.error(request, f"A user with email '{admin_email}' already exists.")
+            existing = (
+                User.objects.filter(email__iexact=admin_email).first()
+                if admin_email else None
+            )
+            if not admin_email:
+                messages.error(request, "Email is required.")
+            elif existing:
+                # Don't dead-end on a known email (the lost-password trap):
+                # surface the existing account so the superadmin can reset its
+                # password instead of being unable to create OR log in.
+                messages.warning(
+                    request,
+                    f"An account already exists for '{admin_email}' "
+                    f"({existing.get_full_name() or existing.username}). "
+                    f"Reset its password below instead of creating a new one."
+                )
+                return redirect(
+                    f"{reverse('dashboard:settings')}?reset_user={existing.id}"
+                )
+            elif not admin_password:
+                messages.error(request, "Password is required.")
             else:
                 new_admin = User.objects.create_user(
                     username=admin_email,
@@ -3557,9 +3574,19 @@ def settings_page(request):
         .order_by('-is_staff', 'last_name', 'first_name')
     ) if is_superadmin else []
 
+    # When the create-admin form hit an existing email, it redirects here with
+    # ?reset_user=<id> so the template can offer a password reset for that
+    # account instead of dead-ending.
+    reset_target = None
+    if is_superadmin:
+        rt_id = request.GET.get('reset_user')
+        if rt_id:
+            reset_target = User.objects.filter(id=rt_id).first()
+
     context = {
         **request.staff_ctx,
         'is_superadmin': is_superadmin,
+        'reset_target': reset_target,
         'prompt_pack': prompt_pack,
         'prompt_fields': prompt_fields,
         'platform_config': platform_config,
