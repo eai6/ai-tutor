@@ -3220,80 +3220,8 @@ def settings_page(request):
             else:
                 messages.error(request, "School name and slug are required.")
 
-        elif action == 'toggle_user' and is_superadmin:
-            user_id = request.POST.get('user_id')
-            if user_id:
-                target = User.objects.filter(id=user_id).first()
-                if target and target != request.user and not target.is_staff:
-                    target.is_active = not target.is_active
-                    target.save(update_fields=['is_active'])
-                    Membership.objects.filter(user=target).update(is_active=target.is_active)
-                    status = "activated" if target.is_active else "deactivated"
-                    messages.success(request, f"User '{target.get_full_name() or target.email}' {status}.")
-                else:
-                    messages.error(request, "Cannot modify this user.")
-
-        elif action == 'delete_user' and is_superadmin:
-            user_id = request.POST.get('user_id')
-            if user_id:
-                target = User.objects.filter(id=user_id).first()
-                if target and target != request.user and not target.is_staff:
-                    name = target.get_full_name() or target.email
-                    target.delete()
-                    messages.success(request, f"User '{name}' deleted.")
-                else:
-                    messages.error(request, "Cannot delete this user.")
-
-        elif action == 'create_admin' and is_superadmin:
-            admin_email = request.POST.get('admin_email', '').strip()
-            admin_first = request.POST.get('admin_first_name', '').strip()
-            admin_last = request.POST.get('admin_last_name', '').strip()
-            admin_password = request.POST.get('admin_password', '').strip()
-            existing = (
-                User.objects.filter(email__iexact=admin_email).first()
-                if admin_email else None
-            )
-            if not admin_email:
-                messages.error(request, "Email is required.")
-            elif existing:
-                # Don't dead-end on a known email (the lost-password trap):
-                # surface the existing account so the superadmin can reset its
-                # password instead of being unable to create OR log in.
-                messages.warning(
-                    request,
-                    f"An account already exists for '{admin_email}' "
-                    f"({existing.get_full_name() or existing.username}). "
-                    f"Reset its password below instead of creating a new one."
-                )
-                return redirect(
-                    f"{reverse('dashboard:settings')}?reset_user={existing.id}"
-                )
-            elif not admin_password:
-                messages.error(request, "Password is required.")
-            else:
-                new_admin = User.objects.create_user(
-                    username=admin_email,
-                    email=admin_email,
-                    password=admin_password,
-                    first_name=admin_first,
-                    last_name=admin_last,
-                    is_staff=True,
-                )
-                messages.success(request, f"Super Admin '{new_admin.get_full_name() or admin_email}' created.")
-
-        elif action == 'toggle_admin' and is_superadmin:
-            user_id = request.POST.get('user_id')
-            if user_id:
-                target = User.objects.filter(id=user_id).first()
-                if target and target != request.user:
-                    target.is_staff = not target.is_staff
-                    target.save(update_fields=['is_staff'])
-                    if target.is_staff:
-                        messages.success(request, f"'{target.get_full_name() or target.email}' promoted to Super Admin.")
-                    else:
-                        messages.success(request, f"'{target.get_full_name() or target.email}' demoted from Super Admin.")
-                else:
-                    messages.error(request, "Cannot modify your own admin status.")
+        # Staff/admin management (create_admin, toggle_admin, toggle_user,
+        # delete_user) moved to the centralized Staff page (dashboard:staff_list).
 
         elif action == 'toggle_school' and is_superadmin:
             school_id = request.POST.get('school_id')
@@ -3563,37 +3491,18 @@ def settings_page(request):
         .order_by('name')
         .values('id', 'name')
     )
-    all_users = (
-        User.objects.exclude(id=request.user.id)
-        .filter(
-            Q(is_staff=True) |
-            Q(memberships__role='staff')
-        )
-        .distinct()
-        .prefetch_related('memberships__institution')
-        .order_by('-is_staff', 'last_name', 'first_name')
-    ) if is_superadmin else []
-
-    # When the create-admin form hit an existing email, it redirects here with
-    # ?reset_user=<id> so the template can offer a password reset for that
-    # account instead of dead-ending.
-    reset_target = None
-    if is_superadmin:
-        rt_id = request.GET.get('reset_user')
-        if rt_id:
-            reset_target = User.objects.filter(id=rt_id).first()
+    # Staff/user management moved to the centralized Staff page
+    # (dashboard:staff_list) — no all_users / reset_target here anymore.
 
     context = {
         **request.staff_ctx,
         'is_superadmin': is_superadmin,
-        'reset_target': reset_target,
         'prompt_pack': prompt_pack,
         'prompt_fields': prompt_fields,
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
         'user_school_choices': user_school_choices,
-        'all_users': all_users,
         'tutor_provider': tutor_provider,
         'tutor_model': tutor_model,
         'has_tutor_db_key': has_tutor_db_key,
@@ -4421,40 +4330,246 @@ def delete_student(request, student_id):
 
 @staff_required
 def staff_list(request):
-    """Admin-only list of staff members for an institution.
+    """Centralized staff management hub (superadmin only).
 
-    Superadmins see all staff; institution admins see staff for their
-    selected institution. Each row links to a delete action.
+    One place for all staff/admin/teacher management: list admins + active
+    staff, approve pending self-registrations, view/revoke outstanding email
+    invites, create super admins, invite staff, and reset passwords.
+
+    Security: gated to platform superadmins (`request.user.is_staff`). Every
+    mutating action is audit-logged via SafetyAuditLog, refuses to act on the
+    requester's own privileged status, and admin passwords are run through
+    Django's password validators. POST follows redirect-after-post.
     """
     from django.contrib.auth.models import User
-    from apps.accounts.models import Membership
+    from apps.accounts.models import Membership, StaffInvitation, Institution
+    from apps.safety import SafetyAuditLog
 
+    # Hard gate — staff management is sensitive; superadmins only.
     if not request.user.is_staff:
-        # Restrict to platform admins for now (consistent with staff invite).
         messages.error(request, "Admin access required.")
         return redirect('dashboard:home')
 
     institution = request.staff_ctx['institution']
-    qs = Membership.objects.filter(role='staff').select_related(
-        'user', 'institution',
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+
+        def _target():
+            uid = request.POST.get('user_id')
+            return User.objects.filter(id=uid).first() if uid else None
+
+        if action == 'create_admin':
+            email = request.POST.get('admin_email', '').strip()
+            first = request.POST.get('admin_first_name', '').strip()
+            last = request.POST.get('admin_last_name', '').strip()
+            password = request.POST.get('admin_password', '').strip()
+            existing = User.objects.filter(email__iexact=email).first() if email else None
+            if not email:
+                messages.error(request, "Email is required.")
+            elif existing:
+                # Known-email trap: offer a reset instead of dead-ending.
+                messages.warning(
+                    request,
+                    f"An account already exists for '{email}' "
+                    f"({existing.get_full_name() or existing.username}). "
+                    f"Reset its password below instead of creating a new one."
+                )
+                return redirect(f"{reverse('dashboard:staff_list')}?reset_user={existing.id}")
+            elif not password:
+                messages.error(request, "Password is required.")
+            else:
+                from django.contrib.auth.password_validation import validate_password
+                from django.core.exceptions import ValidationError as PwValidationError
+                try:
+                    validate_password(password)
+                except PwValidationError as exc:
+                    messages.error(request, "Password too weak: " + " ".join(exc.messages))
+                else:
+                    new_admin = User.objects.create_user(
+                        username=email, email=email, password=password,
+                        first_name=first, last_name=last, is_staff=True,
+                    )
+                    SafetyAuditLog.log(
+                        'account_created', user=request.user,
+                        details={'mode': 'admin_creates_admin',
+                                 'target_user_id': new_admin.id,
+                                 'target_username': new_admin.username},
+                        severity='warning', request=request,
+                    )
+                    messages.success(request, f"Super Admin '{new_admin.get_full_name() or email}' created.")
+            return redirect('dashboard:staff_list')
+
+        if action == 'toggle_admin':
+            target = _target()
+            if target and target != request.user:
+                target.is_staff = not target.is_staff
+                target.save(update_fields=['is_staff'])
+                SafetyAuditLog.log(
+                    'permission_change', user=request.user,
+                    details={'mode': 'toggle_admin', 'target_user_id': target.id,
+                             'now_admin': target.is_staff},
+                    severity='warning', request=request,
+                )
+                verb = 'promoted to' if target.is_staff else 'demoted from'
+                messages.success(request, f"'{target.get_full_name() or target.email}' {verb} Super Admin.")
+            else:
+                messages.error(request, "Cannot modify your own admin status.")
+            return redirect('dashboard:staff_list')
+
+        if action == 'toggle_user':  # approve / activate / deactivate staff
+            target = _target()
+            if target and target != request.user and not target.is_staff:
+                target.is_active = not target.is_active
+                target.save(update_fields=['is_active'])
+                Membership.objects.filter(user=target).update(is_active=target.is_active)
+                SafetyAuditLog.log(
+                    'permission_change', user=request.user,
+                    details={'mode': 'toggle_active', 'target_user_id': target.id,
+                             'now_active': target.is_active},
+                    severity='info', request=request,
+                )
+                status = "activated" if target.is_active else "deactivated"
+                messages.success(request, f"User '{target.get_full_name() or target.email}' {status}.")
+            else:
+                messages.error(request, "Cannot modify this user.")
+            return redirect('dashboard:staff_list')
+
+        if action == 'delete_user':
+            target = _target()
+            if target and target != request.user and not target.is_staff:
+                name = target.get_full_name() or target.email
+                SafetyAuditLog.log(
+                    'account_deleted', user=request.user,
+                    details={'mode': 'admin_deletes_staff', 'target_user_id': target.id,
+                             'target_username': target.username},
+                    severity='warning', request=request,
+                )
+                target.delete()
+                messages.success(request, f"User '{name}' deleted.")
+            else:
+                messages.error(request, "Cannot delete this user.")
+            return redirect('dashboard:staff_list')
+
+        if action == 'invite_staff':
+            email = request.POST.get('invite_email', '').strip()
+            school_id = request.POST.get('invite_school_id', '')
+            inst = Institution.objects.filter(id=school_id, is_active=True).first() if school_id else None
+            if not inst:
+                messages.error(request, "Please select a valid school.")
+            elif email and '@' not in email:
+                messages.error(request, "Please enter a valid email address.")
+            elif email and StaffInvitation.objects.filter(
+                    email__iexact=email, institution=inst, is_used=False).exists():
+                messages.warning(request, f"An invitation is already pending for {email} at {inst.name}.")
+            else:
+                import secrets
+                inv = StaffInvitation.objects.create(
+                    institution=inst, email=email, role='staff',
+                    invited_by=request.user, token=secrets.token_urlsafe(32),
+                )
+                invite_url = request.build_absolute_uri(
+                    reverse('accounts:staff_register', args=[inv.token]))
+                SafetyAuditLog.log(
+                    'staff_invited', user=request.user,
+                    details={'email': email, 'institution_id': inst.id, 'invite_id': inv.id},
+                    severity='info', request=request,
+                )
+                if email:
+                    from django.core.mail import send_mail
+                    from django.conf import settings as dj_settings
+                    from apps.dashboard.models import PlatformConfig
+                    try:
+                        platform_name = PlatformConfig.load().platform_name or 'AI Tutor'
+                    except Exception:
+                        platform_name = 'AI Tutor'
+                    try:
+                        send_mail(
+                            subject=f"You're invited to join {inst.name} on {platform_name}",
+                            message=(
+                                f"Hello,\n\nYou've been invited to join {inst.name} as a staff "
+                                f"member on {platform_name}.\n\nComplete your registration:\n"
+                                f"{invite_url}\n\nInvited by "
+                                f"{request.user.get_full_name() or request.user.username}.\n\n— {platform_name}"
+                            ),
+                            from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[email], fail_silently=False,
+                        )
+                        messages.success(request, f"Invitation emailed to {email}.")
+                    except Exception as exc:
+                        messages.warning(
+                            request,
+                            f"Invite created but the email failed ({exc}). Share this link: {invite_url}")
+                else:
+                    messages.success(request, f"Invite link created — share it: {invite_url}")
+            return redirect('dashboard:staff_list')
+
+        if action == 'revoke_invite':
+            inv_id = request.POST.get('invite_id')
+            inv = StaffInvitation.objects.filter(id=inv_id, is_used=False).first() if inv_id else None
+            if inv:
+                inv.delete()
+                messages.success(request, "Invitation revoked.")
+            else:
+                messages.error(request, "Invitation not found.")
+            return redirect('dashboard:staff_list')
+
+        messages.error(request, "Unknown action.")
+        return redirect('dashboard:staff_list')
+
+    # ---- GET: build the management view ----
+    # Everyone who is a platform admin OR has a staff membership, deduped
+    # (a user can be both an admin and hold a staff membership).
+    candidates = (
+        User.objects.filter(Q(is_staff=True) | Q(memberships__role='staff'))
+        .distinct()
+        .prefetch_related('memberships__institution')
     )
+    people, pending_approvals = [], []
+    for u in candidates:
+        staff_ms = [m for m in u.memberships.all() if m.role == 'staff']
+        # Institution-scoped admins see only staff of the selected school
+        # (platform admins themselves are always shown).
+        if institution is not None and not u.is_staff:
+            if not any(m.institution_id == institution.id for m in staff_ms):
+                continue
+        inst_names = sorted({m.institution.name for m in staff_ms if m.institution})
+        row = {
+            'user': u,
+            'institutions': ", ".join(inst_names) or ('All' if u.is_staff else '—'),
+            'is_admin': u.is_staff,
+            'is_active': u.is_active,
+            'is_self': u.id == request.user.id,
+        }
+        is_pending = (
+            not u.is_staff and staff_ms
+            and not any(m.is_active for m in staff_ms)
+            and u.last_login is None
+        )
+        (pending_approvals if is_pending else people).append(row)
+    people.sort(key=lambda r: (not r['is_admin'], (r['user'].last_name or '').lower(), r['user'].username))
+
+    invites_qs = StaffInvitation.objects.filter(is_used=False).select_related(
+        'institution', 'invited_by')
     if institution is not None:
-        qs = qs.filter(institution=institution)
+        invites_qs = invites_qs.filter(institution=institution)
+    pending_invites = list(invites_qs.order_by('-created_at'))
 
-    staff_rows = []
-    seen_users = set()
-    for m in qs.order_by('user__username'):
-        if m.user_id in seen_users:
-            continue
-        seen_users.add(m.user_id)
-        staff_rows.append({
-            'user': m.user,
-            'institution': m.institution,
-            'is_active': m.is_active,
-            'is_self': m.user_id == request.user.id,
-        })
+    reset_target = None
+    rt_id = request.GET.get('reset_user')
+    if rt_id:
+        reset_target = User.objects.filter(id=rt_id).first()
 
-    context = {**request.staff_ctx, 'staff_rows': staff_rows}
+    active_schools = Institution.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        **request.staff_ctx,
+        'people': people,
+        'pending_approvals': pending_approvals,
+        'pending_invites': pending_invites,
+        'reset_target': reset_target,
+        'active_schools': active_schools,
+    }
     return render(request, 'dashboard/staff_list.html', context)
 
 

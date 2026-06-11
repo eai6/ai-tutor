@@ -3,62 +3,212 @@
 {% block title %}Staff{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
-    <div>
-        <h1>Staff Accounts</h1>
-        <p class="muted">Platform admins (you) can delete teacher / staff accounts. Deletions cascade through their content + audit trail.</p>
-    </div>
-    <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary" style="white-space:nowrap;">
-        + Invite Staff
-    </a>
+<div class="page-header" style="margin-bottom:1rem;">
+    <h1>Staff Management</h1>
+    <p class="muted">Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place.</p>
 </div>
 
-<div class="card">
+{# Reset offer — shown when 'Create Super Admin' was submitted with an existing email #}
+{% if reset_target %}
+<div class="card" style="border:1px solid #f0c36d;background:#fff8e6;margin-bottom:1rem;">
+    <div class="card-body">
+        <strong>Account already exists</strong> —
+        {{ reset_target.email }} ({{ reset_target.get_full_name|default:reset_target.username }}) already has an account.
+        Reset its password instead of creating a new one:
+        <button type="button" class="btn btn-sm staff-reset-btn"
+                data-user-id="{{ reset_target.id }}" data-username="{{ reset_target.username }}" data-email="{{ reset_target.email }}"
+                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.4rem;">
+            Reset password
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{# ── Pending approvals (self-registered, awaiting admin OK) ── #}
+{% if pending_approvals %}
+<div class="card" style="margin-bottom:1.5rem;border:1px solid #fde68a;">
+    <div class="card-header" style="background:#fffbeb;"><h3 class="card-title">Pending approval ({{ pending_approvals|length }})</h3></div>
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;">
+            <tbody>
+                {% for row in pending_approvals %}
+                <tr style="border-top:1px solid var(--gray-100);">
+                    <td style="padding:0.6rem 1rem;">{{ row.user.get_full_name|default:row.user.username }}</td>
+                    <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
+                    <td style="padding:0.6rem 1rem;">{{ row.institutions }}</td>
+                    <td style="padding:0.6rem 1rem;text-align:right;white-space:nowrap;">
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_user">
+                            <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Approve</button>
+                        </form>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Reject and delete this pending account?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ── Admins & active staff ── #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3 class="card-title">Admins &amp; staff</h3></div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.75rem 1rem;">Username</th>
                     <th style="padding:0.75rem 1rem;">Name</th>
                     <th style="padding:0.75rem 1rem;">Email</th>
-                    <th style="padding:0.75rem 1rem;">Institution</th>
+                    <th style="padding:0.75rem 1rem;">Role</th>
+                    <th style="padding:0.75rem 1rem;">School</th>
                     <th style="padding:0.75rem 1rem;">Status</th>
                     <th style="padding:0.75rem 1rem;text-align:right;"></th>
                 </tr>
             </thead>
             <tbody>
-                {% for row in staff_rows %}
+                {% for row in people %}
                 <tr style="border-top:1px solid var(--gray-100);">
-                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">(you)</span>{% endif %}</td>
-                    <td style="padding:0.75rem 1rem;">{{ row.user.first_name }} {{ row.user.last_name }}</td>
+                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.get_full_name|default:row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">(you)</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
-                    <td style="padding:0.75rem 1rem;">{{ row.institution.name|default:"—" }}</td>
-                    <td style="padding:0.75rem 1rem;">
-                        {% if row.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
-                        {% if row.user.is_staff %}<span class="badge" style="background:#ede9fe;color:#5b21b6;margin-left:0.25rem;">Admin</span>{% endif %}
-                    </td>
-                    <td style="padding:0.75rem 1rem;text-align:right;">
+                    <td style="padding:0.75rem 1rem;">{% if row.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">Super Admin</span>{% else %}<span class="badge">Staff</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{{ row.institutions }}</td>
+                    <td style="padding:0.75rem 1rem;">{% if row.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;text-align:right;white-space:nowrap;">
                         {% if not row.is_self %}
-                        <button type="button"
-                                class="btn btn-sm staff-reset-btn"
-                                data-user-id="{{ row.user.id }}"
-                                data-username="{{ row.user.username }}"
-                                data-email="{{ row.user.email }}"
-                                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-right:0.4rem;">
-                            Reset password
-                        </button>
-                        <form method="post" action="{% url 'dashboard:delete_staff' row.user.id %}" style="display:inline;" onsubmit="return confirm('Permanently delete staff account &quot;{{ row.user.username }}&quot;? This cascades through their data and cannot be undone.');">
+                        <button type="button" class="btn btn-sm staff-reset-btn"
+                                data-user-id="{{ row.user.id }}" data-username="{{ row.user.username }}" data-email="{{ row.user.email }}"
+                                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Reset password</button>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('{% if row.is_admin %}Demote from{% else %}Promote to{% endif %} Super Admin: {{ row.user.get_full_name|default:row.user.email|escapejs }}?');">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-danger btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
+                            <input type="hidden" name="action" value="toggle_admin">
+                            <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}Demote{% else %}Promote{% endif %}</button>
                         </form>
+                        {% if not row.is_admin %}
+                        <form method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_user">
+                            <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                        </form>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Permanently delete {{ row.user.get_full_name|default:row.user.email|escapejs }}? This cascades through their data and cannot be undone.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_user">
+                            <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Delete</button>
+                        </form>
+                        {% endif %}
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">No staff accounts found.</td></tr>
+                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">No staff or admins yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+{# ── Pending invites (not yet accepted) ── #}
+{% if pending_invites %}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header"><h3 class="card-title">Pending invites ({{ pending_invites|length }})</h3></div>
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:var(--gray-50);">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+                    <th style="padding:0.6rem 1rem;">Email</th><th style="padding:0.6rem 1rem;">School</th>
+                    <th style="padding:0.6rem 1rem;">Invited by</th><th style="padding:0.6rem 1rem;">Sent</th>
+                    <th style="padding:0.6rem 1rem;text-align:right;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in pending_invites %}
+                <tr style="border-top:1px solid var(--gray-100);">
+                    <td style="padding:0.6rem 1rem;">{{ inv.email|default:"(link-only)" }}</td>
+                    <td style="padding:0.6rem 1rem;">{{ inv.institution.name }}</td>
+                    <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.invited_by.get_full_name|default:inv.invited_by.username|default:"—" }}</td>
+                    <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.created_at|date:"M d, Y" }}</td>
+                    <td style="padding:0.6rem 1rem;text-align:right;white-space:nowrap;">
+                        <button type="button" class="btn btn-sm copy-invite-btn" data-path="{% url 'accounts:staff_register' inv.token %}"
+                                style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Copy link</button>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Revoke this invitation?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="revoke_invite">
+                            <input type="hidden" name="invite_id" value="{{ inv.id }}">
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Revoke</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
+    {# ── Invite teacher / staff ── #}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Invite teacher / staff</h3></div>
+        <div class="card-body">
+            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">Sends an email invite (or generates a link). They register themselves and are active immediately.</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="invite_staff">
+                <div class="form-group">
+                    <label class="form-label">School</label>
+                    <select class="form-control" name="invite_school_id" required>
+                        <option value="">Select a school…</option>
+                        {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.75rem;">
+                    <label class="form-label">Email <span style="font-weight:normal;color:var(--gray-500);">(optional — blank = link-only)</span></label>
+                    <input type="email" class="form-control" name="invite_email" placeholder="teacher@school.edu">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Send invite</button>
+            </form>
+        </div>
+    </div>
+
+    {# ── Create Super Admin ── #}
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Create Super Admin</h3></div>
+        <div class="card-body">
+            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">Platform-wide admin. If the email already exists you'll be offered a password reset instead.</p>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_admin">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label class="form-label">First Name</label>
+                        <input type="text" class="form-control" name="admin_first_name" placeholder="First name">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" class="form-control" name="admin_last_name" placeholder="Last name">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="admin_email" placeholder="admin@school.edu" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0.75rem;">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="admin_password" placeholder="Strong password" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Create Admin</button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -217,6 +367,19 @@
             window.getSelection().removeAllRanges();
             window.getSelection().addRange(range);
         }
+    });
+
+    // Copy invite links (absolute URL) for pending invites.
+    document.querySelectorAll('.copy-invite-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const url = window.location.origin + btn.dataset.path;
+            try {
+                await navigator.clipboard.writeText(url);
+                const old = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(() => { btn.textContent = old; }, 1500);
+            } catch (e) { window.prompt('Copy this invite link:', url); }
+        });
     });
 })();
 </script>
