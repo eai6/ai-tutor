@@ -57,7 +57,8 @@ md(f"## Cell 2 — clone the repo (branch `{BRANCH}`) using the GH_TOKEN classic
 code(rf"""
 from google.colab import userdata
 import subprocess, os
-tok = userdata.get('GH_TOKEN')
+tok = (userdata.get('GH_TOKEN') or '').strip()   # strip stray spaces/newlines
+assert tok and ' ' not in tok, "GH_TOKEN missing or contains a space — re-save the secret with no whitespace"
 url = f"https://{{tok}}@github.com/{REPO}.git"
 subprocess.run(['rm', '-rf', '/content/ai-tutor'], check=True)
 subprocess.run(['git', 'clone', '--depth', '1', '-b', '{BRANCH}', url, '/content/ai-tutor'], check=True)
