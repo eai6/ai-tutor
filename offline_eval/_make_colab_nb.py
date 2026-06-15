@@ -29,17 +29,19 @@ Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
-2. On your **laptop**, zip the repo source and upload it to Google Drive. The zip
-   keeps the committed laptop result JSONs so you get a **combined** leaderboard:
+2. On your **laptop**, make a clean zip of the repo with `git archive` (tracked
+   files only — small, no `venv`/`.git`/weights; keeps the committed laptop result
+   JSONs so you get a **combined** leaderboard):
    ```bash
    cd /path/to/ai-tutor
-   zip -rq ~/ai-tutor-src.zip . \
-     -x '.git/*' 'venv/*' 'staticfiles/*' 'node_modules/*' \
-        'media/*' 'vectordb/*' 'offline_eval/ollama_models/*' 'db.sqlite3'
+   git archive --format=zip -o ~/ai-tutor-src.zip HEAD
    ```
    Upload `~/ai-tutor-src.zip` to `MyDrive/ai-tutor-src.zip`.
-   (The zip includes your `.env` with API keys — fine on your private Drive. To
-   exclude it, add `'.env'` to the excludes and run **Cell 5**.)
+   (`git archive` zips the **committed** state — commit any local tweaks first.)
+3. Add your API keys as **Colab Secrets** (🔑 icon, *Notebook access ON*):
+   `ANTHROPIC_API_KEY` (required — judge + student-sim), plus `GOOGLE_API_KEY` and
+   `OPENAI_API_KEY` (keep all three so the judge cascade matches the laptop runs).
+   `.env` is **not** in the zip (it's gitignored), so **Cell 5 is required**.
 
 **T4 fits models up to ~14B q4.** For 32B/70B (and the big GLM-4.6/4.7/5 tier)
 use Colab Pro (A100) — same notebook, just a bigger `models.txt` in Cell 8.
@@ -83,8 +85,9 @@ else:
     print('ollama NOT ready — check /content/ollama.log')
 """)
 
-md("## Cell 5 — *(only if you EXCLUDED .env from the zip)* write it from Colab Secrets\n"
-   "Keep **all three** keys so the judge/grader cascade matches the laptop runs (comparable scores).")
+md("## Cell 5 — **required** — write .env from Colab Secrets\n"
+   "`.env` isn't in the `git archive` zip (gitignored). Keep **all three** keys so "
+   "the judge/grader cascade matches the laptop runs (comparable scores).")
 code(r"""
 from google.colab import userdata
 open('.env', 'w').write(
