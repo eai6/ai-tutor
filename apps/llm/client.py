@@ -12,6 +12,7 @@ Supports: Anthropic, OpenAI, Ollama (local)
 """
 
 import os
+import re
 import json
 import time
 import logging
@@ -242,38 +243,61 @@ def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
     )
 
 
-def _maybe_parse_text_tool_call(text: str):
-    """If ``text`` begins with a JSON object shaped like a tool call —
-    ``{"name": ..., "arguments": {...}}`` — return that dict, else None.
-
-    Some Ollama model templates (e.g. qwen2.5) emit the tool call as a
-    JSON object in the *content* string instead of the structured
-    ``tool_calls`` channel. Conservative: only triggers on a clean
-    leading JSON object that has both ``name`` and ``arguments`` keys.
-    """
-    if not text:
-        return None
-    s = text.strip()
-    if not s.startswith('{'):
-        return None
-    candidates = [s]
-    depth = 0
-    for i, ch in enumerate(s):
-        if ch == '{':
+def _extract_balanced(s: str, start: int):
+    """Return the balanced ``{...}`` substring beginning at ``s[start] == '{'``
+    (quote- and escape-aware), or None if unbalanced."""
+    depth, in_str, esc = 0, None, False
+    for i in range(start, len(s)):
+        ch = s[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == in_str:
+                in_str = None
+        elif ch in ('"', "'"):
+            in_str = ch
+        elif ch == '{':
             depth += 1
         elif ch == '}':
             depth -= 1
             if depth == 0:
-                candidates.append(s[:i + 1])
-                break
-    for c in candidates:
-        try:
-            obj = json.loads(c)
-        except Exception:
-            continue
-        if isinstance(obj, dict) and 'name' in obj and 'arguments' in obj:
-            return obj
+                return s[start:i + 1]
     return None
+
+
+def _maybe_parse_text_tool_call(text: str):
+    """If ``text`` contains a JSON object shaped like a tool call —
+    ``{"name": ..., "arguments": {...}}`` — return that dict, else None.
+
+    Some Ollama model templates (e.g. qwen2.5) emit the tool call as a JSON
+    object in the *content* string instead of the structured ``tool_calls``
+    channel — sometimes wrapped in a ``json`` code fence or ``<tool_call>``
+    tags, or after a short preamble. We strip those wrappers and scan for the
+    first balanced ``{...}`` carrying both ``name`` and ``arguments`` keys.
+    """
+    if not text:
+        return None
+    s = text.strip()
+    s = re.sub(r'</?tool_call>', '', s, flags=re.IGNORECASE)  # GLM/Hermes tags
+    s = re.sub(r'```[a-zA-Z]*', '', s)                        # code fences
+    idx = 0
+    while True:
+        b = s.find('{', idx)
+        if b == -1:
+            return None
+        cand = _extract_balanced(s, b)
+        if cand:
+            try:
+                obj = json.loads(cand)
+                if isinstance(obj, dict) and 'name' in obj and 'arguments' in obj:
+                    return obj
+            except Exception:
+                pass
+            idx = b + len(cand)
+        else:
+            idx = b + 1
 
 
 def _maybe_parse_text_call_syntax(text: str, tools: list | None):
@@ -413,6 +437,12 @@ def _adapt_ollama_response(
         parsed = _maybe_parse_text_tool_call(text)
         if parsed is None:
             parsed = _maybe_parse_text_call_syntax(text, tools)
+        if parsed is None and text.strip() and os.environ.get('OLLAMA_DEBUG_RAW'):
+            # Diagnostic: a model leaked a tool call in a shape we don't parse
+            # yet. Flip OLLAMA_DEBUG_RAW=1 to log the raw content and extend the
+            # parser to match. (See _maybe_parse_text_call_syntax / _tool_call.)
+            logger.warning("[OllamaToolLeak] unparsed content for %s: %r",
+                           model_name, text[:800])
         if parsed is not None:
             blocks.append(AdaptedToolUseBlock(
                 name=parsed.get('name', ''),
