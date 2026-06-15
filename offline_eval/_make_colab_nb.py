@@ -1,14 +1,16 @@
 """Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for
 evaluating bigger OSS models on a free T4 GPU.
 
-Workflow: upload a ZIP of the repo to Google Drive (no GitHub needed). When the
-repo owner shares a GH_TOKEN later, switch Cell 2 back to a git clone — see the
-commented CLONE_CELL below for the drop-in replacement.
+Workflow: git-clone the repo using a GitHub classic PAT (works when you are a
+collaborator on the repo, not just the owner). No zip upload needed.
 
 Run: python offline_eval/_make_colab_nb.py
 """
 import json
 from pathlib import Path
+
+REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
+BRANCH = 'pixeldesignlabs-dev-portuguese'
 
 cells = []
 
@@ -21,7 +23,7 @@ def code(s: str):
                   "outputs": [], "source": s.strip("\n").splitlines(keepends=True)})
 
 
-md(r"""
+md(rf"""
 # AI Tutor — offline-model eval on Google Colab (free T4)
 
 Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
@@ -29,39 +31,38 @@ Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
-2. On your **laptop**, make a clean zip of the repo with `git archive` (tracked
-   files only — small, no `venv`/`.git`/weights; keeps the committed laptop result
-   JSONs so you get a **combined** leaderboard):
-   ```bash
-   cd /path/to/ai-tutor
-   git archive --format=zip -o ~/ai-tutor-src.zip HEAD
-   ```
-   Upload `~/ai-tutor-src.zip` to `MyDrive/ai-tutor-src.zip`.
-   (`git archive` zips the **committed** state — commit any local tweaks first.)
-3. Add your API keys as **Colab Secrets** (🔑 icon, *Notebook access ON*):
-   `ANTHROPIC_API_KEY` (required — judge + student-sim), plus `GOOGLE_API_KEY` and
-   `OPENAI_API_KEY` (keep all three so the judge cascade matches the laptop runs).
-   `.env` is **not** in the zip (it's gitignored), so **Cell 5 is required**.
+2. Add these **Colab Secrets** (🔑 icon in the left sidebar), each toggled
+   *Notebook access ON*:
+   - `GH_TOKEN` — a GitHub **classic** Personal Access Token with the **`repo`**
+     scope. Make it at github.com/settings/tokens → *Generate new token
+     (classic)* → check **repo**. A classic token works on `{REPO}` because you
+     are a **collaborator** (a fine-grained token would only work if you *owned*
+     the repo).
+   - `ANTHROPIC_API_KEY` — required (judge + student-simulator).
+   - `GOOGLE_API_KEY` and `OPENAI_API_KEY` — keep these too so the judge/grader
+     cross-vendor cascade matches the laptop runs (comparable scores).
 
-**T4 fits models up to ~14B q4.** For 32B/70B (and the big GLM-4.6/4.7/5 tier)
-use Colab Pro (A100) — same notebook, just a bigger `models.txt` in Cell 8.
-
-> **Later (clone workflow):** once the repo owner shares a `GH_TOKEN`, replace
-> Cell 2 with a `git clone` of the private repo — the drop-in cell is at the
-> bottom of this notebook. Then you skip the zip-and-upload step entirely.
+**T4 fits models up to ~14B q4.** For the bigger A100/Colab-Pro tier (commented
+out in Cell 8), use a Colab Pro A100 runtime — nothing else changes.
 """)
 
-md("## Cell 1 — confirm GPU + mount Drive")
+md("## Cell 1 — confirm GPU + mount Drive (Drive persists results across disconnects)")
 code(r"""
 !nvidia-smi -L
 from google.colab import drive
 drive.mount('/content/drive')
 """)
 
-md("## Cell 2 — unzip the source from Drive")
-code(r"""
-!mkdir -p /content/ai-tutor && unzip -oq /content/drive/MyDrive/ai-tutor-src.zip -d /content/ai-tutor
-%cd /content/ai-tutor
+md(f"## Cell 2 — clone the repo (branch `{BRANCH}`) using the GH_TOKEN classic PAT")
+code(rf"""
+from google.colab import userdata
+import subprocess, os
+tok = userdata.get('GH_TOKEN')
+url = f"https://{{tok}}@github.com/{REPO}.git"
+subprocess.run(['rm', '-rf', '/content/ai-tutor'], check=True)
+subprocess.run(['git', 'clone', '--depth', '1', '-b', '{BRANCH}', url, '/content/ai-tutor'], check=True)
+os.chdir('/content/ai-tutor')
+print('cloned at', os.getcwd())
 """)
 
 md("## Cell 3 — fix hardcoded laptop paths (essential)")
@@ -86,8 +87,8 @@ else:
 """)
 
 md("## Cell 5 — **required** — write .env from Colab Secrets\n"
-   "`.env` isn't in the `git archive` zip (gitignored). Keep **all three** keys so "
-   "the judge/grader cascade matches the laptop runs (comparable scores).")
+   "`.env` isn't in the repo (gitignored). Keep **all three** keys so the "
+   "judge/grader cascade matches the laptop runs (comparable scores).")
 code(r"""
 from google.colab import userdata
 open('.env', 'w').write(
@@ -104,12 +105,12 @@ code(r"""
 !python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
 """)
 
-md("## Cell 7 — persist results to Drive (seed with the laptop results, then symlink)\n"
+md("## Cell 7 — persist results to Drive (seed with the committed laptop results, then symlink)\n"
    "This makes resume survive disconnects AND gives a **combined** leaderboard "
    "(laptop small models + the big models you run here).")
 code(r"""
 !mkdir -p /content/drive/MyDrive/ai-tutor-eval-results
-# seed the Drive folder with the laptop results shipped in the zip (no-clobber)
+# seed the Drive folder with the laptop results committed in the repo (no-clobber)
 !cp -n offline_eval/results/*.json /content/drive/MyDrive/ai-tutor-eval-results/ 2>/dev/null || true
 !rm -rf offline_eval/results && ln -s /content/drive/MyDrive/ai-tutor-eval-results offline_eval/results
 !ls offline_eval/results/
@@ -159,10 +160,12 @@ code(r"""
 !python offline_eval/aggregate.py
 """)
 
-md(r"""
+md(rf"""
 ## After a Colab disconnect (free tier: ~90 min idle / ~12 h max)
 Re-run **Cells 1–8**, then **Cell 9** again. Because results live on Drive (Cell 7),
 `run_matrix.sh` **skips already-scored models** and continues.
+
+To pick up new commits on the branch, just re-run **Cell 2** (it re-clones).
 
 **Tips:** keep the tab active (free Colab kills idle sessions); a model interrupted
 mid-run restarts (resume only skips *completed* models); each model is also bound on
@@ -172,19 +175,10 @@ To pull these results back to your laptop: copy the JSONs from
 `MyDrive/ai-tutor-eval-results/` into the repo's `offline_eval/results/` and run
 `python offline_eval/aggregate.py`.
 
----
-### Later: clone instead of zip (when the owner shares a GH_TOKEN)
-Add `GH_TOKEN` (repo **Contents: Read** scope) to Colab Secrets, then **replace
-Cell 2** with this and skip the zip-and-upload step:
-```python
-from google.colab import userdata
-import subprocess, os
-tok = userdata.get('GH_TOKEN')
-url = f"https://x-access-token:{tok}@github.com/<owner>/ai-tutor.git"
-subprocess.run(['rm','-rf','/content/ai-tutor'], check=True)
-subprocess.run(['git','clone','--depth','1','-b','pixeldesignlabs-dev-portuguese',url,'/content/ai-tutor'], check=True)
-os.chdir('/content/ai-tutor')
-```
+**If GLM under-scores:** it leaks tool calls as text under the full prompt. Set
+`OLLAMA_DEBUG_RAW=1` before Cell 9, then check `offline_eval/results/glm4_9b.log`
+for an `[OllamaToolLeak]` line and share it — the parser can then be extended to
+match glm4's exact format.
 """)
 
 nb = {
