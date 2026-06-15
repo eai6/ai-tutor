@@ -1,12 +1,14 @@
-"""Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook
-for evaluating bigger OSS models on a free T4 GPU, cloning the repo from GitHub.
+"""Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for
+evaluating bigger OSS models on a free T4 GPU.
+
+Workflow: upload a ZIP of the repo to Google Drive (no GitHub needed). When the
+repo owner shares a GH_TOKEN later, switch Cell 2 back to a git clone — see the
+commented CLONE_CELL below for the drop-in replacement.
+
 Run: python offline_eval/_make_colab_nb.py
 """
 import json
 from pathlib import Path
-
-REPO = 'pixeldesignlabs-dev/ai-tutor'        # fork remote — matches the fine-grained PAT scope
-BRANCH = 'pixeldesignlabs-dev-portuguese'
 
 cells = []
 
@@ -19,7 +21,7 @@ def code(s: str):
                   "outputs": [], "source": s.strip("\n").splitlines(keepends=True)})
 
 
-md(rf"""
+md(r"""
 # AI Tutor — offline-model eval on Google Colab (free T4)
 
 Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
@@ -27,35 +29,37 @@ Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
-2. Add these **Colab Secrets** (🔑 icon in the left sidebar), each toggled
-   *Notebook access ON*:
-   - `GH_TOKEN` — a GitHub Personal Access Token with **repo read** scope (the
-     repo `{REPO}` is private, so the clone needs it).
-   - `ANTHROPIC_API_KEY` — required (judge + student-simulator).
-   - `GOOGLE_API_KEY` and `OPENAI_API_KEY` — keep these too so the judge/grader
-     cross-vendor cascade matches the laptop runs (comparable scores).
+2. On your **laptop**, zip the repo source and upload it to Google Drive. The zip
+   keeps the committed laptop result JSONs so you get a **combined** leaderboard:
+   ```bash
+   cd /path/to/ai-tutor
+   zip -rq ~/ai-tutor-src.zip . \
+     -x '.git/*' 'venv/*' 'staticfiles/*' 'node_modules/*' \
+        'media/*' 'vectordb/*' 'offline_eval/ollama_models/*' 'db.sqlite3'
+   ```
+   Upload `~/ai-tutor-src.zip` to `MyDrive/ai-tutor-src.zip`.
+   (The zip includes your `.env` with API keys — fine on your private Drive. To
+   exclude it, add `'.env'` to the excludes and run **Cell 5**.)
 
 **T4 fits models up to ~14B q4.** For 32B/70B (and the big GLM-4.6/4.7/5 tier)
 use Colab Pro (A100) — same notebook, just a bigger `models.txt` in Cell 8.
+
+> **Later (clone workflow):** once the repo owner shares a `GH_TOKEN`, replace
+> Cell 2 with a `git clone` of the private repo — the drop-in cell is at the
+> bottom of this notebook. Then you skip the zip-and-upload step entirely.
 """)
 
-md("## Cell 1 — confirm GPU + mount Drive (Drive persists results across disconnects)")
+md("## Cell 1 — confirm GPU + mount Drive")
 code(r"""
 !nvidia-smi -L
 from google.colab import drive
 drive.mount('/content/drive')
 """)
 
-md(f"## Cell 2 — clone the repo (branch `{BRANCH}`) using the GH_TOKEN secret")
-code(rf"""
-from google.colab import userdata
-import subprocess, os
-tok = userdata.get('GH_TOKEN')
-url = f"https://x-access-token:{{tok}}@github.com/{REPO}.git"
-subprocess.run(['rm', '-rf', '/content/ai-tutor'], check=True)
-subprocess.run(['git', 'clone', '--depth', '1', '-b', '{BRANCH}', url, '/content/ai-tutor'], check=True)
-os.chdir('/content/ai-tutor')
-print('cloned at', os.getcwd())
+md("## Cell 2 — unzip the source from Drive")
+code(r"""
+!mkdir -p /content/ai-tutor && unzip -oq /content/drive/MyDrive/ai-tutor-src.zip -d /content/ai-tutor
+%cd /content/ai-tutor
 """)
 
 md("## Cell 3 — fix hardcoded laptop paths (essential)")
@@ -79,8 +83,8 @@ else:
     print('ollama NOT ready — check /content/ollama.log')
 """)
 
-md("## Cell 5 — write .env from Colab Secrets\n"
-   "Keep **all three** API keys so the judge/grader cascade matches the laptop runs (comparable scores).")
+md("## Cell 5 — *(only if you EXCLUDED .env from the zip)* write it from Colab Secrets\n"
+   "Keep **all three** keys so the judge/grader cascade matches the laptop runs (comparable scores).")
 code(r"""
 from google.colab import userdata
 open('.env', 'w').write(
@@ -97,12 +101,12 @@ code(r"""
 !python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
 """)
 
-md("## Cell 7 — persist results to Drive (seed with the committed laptop results, then symlink)\n"
+md("## Cell 7 — persist results to Drive (seed with the laptop results, then symlink)\n"
    "This makes resume survive disconnects AND gives a **combined** leaderboard "
    "(laptop small models + the big models you run here).")
 code(r"""
 !mkdir -p /content/drive/MyDrive/ai-tutor-eval-results
-# seed the Drive folder with the laptop results committed in the repo (no-clobber)
+# seed the Drive folder with the laptop results shipped in the zip (no-clobber)
 !cp -n offline_eval/results/*.json /content/drive/MyDrive/ai-tutor-eval-results/ 2>/dev/null || true
 !rm -rf offline_eval/results && ln -s /content/drive/MyDrive/ai-tutor-eval-results offline_eval/results
 !ls offline_eval/results/
@@ -132,7 +136,7 @@ code(r"""
 !python offline_eval/aggregate.py
 """)
 
-md(rf"""
+md(r"""
 ## After a Colab disconnect (free tier: ~90 min idle / ~12 h max)
 Re-run **Cells 1–8**, then **Cell 9** again. Because results live on Drive (Cell 7),
 `run_matrix.sh` **skips already-scored models** and continues.
@@ -144,6 +148,20 @@ the Anthropic judge calls, so plan 1–3 models per session.
 To pull these results back to your laptop: copy the JSONs from
 `MyDrive/ai-tutor-eval-results/` into the repo's `offline_eval/results/` and run
 `python offline_eval/aggregate.py`.
+
+---
+### Later: clone instead of zip (when the owner shares a GH_TOKEN)
+Add `GH_TOKEN` (repo **Contents: Read** scope) to Colab Secrets, then **replace
+Cell 2** with this and skip the zip-and-upload step:
+```python
+from google.colab import userdata
+import subprocess, os
+tok = userdata.get('GH_TOKEN')
+url = f"https://x-access-token:{tok}@github.com/<owner>/ai-tutor.git"
+subprocess.run(['rm','-rf','/content/ai-tutor'], check=True)
+subprocess.run(['git','clone','--depth','1','-b','pixeldesignlabs-dev-portuguese',url,'/content/ai-tutor'], check=True)
+os.chdir('/content/ai-tutor')
+```
 """)
 
 nb = {
