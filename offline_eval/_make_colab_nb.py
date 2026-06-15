@@ -115,16 +115,36 @@ code(r"""
 !ls offline_eval/results/
 """)
 
-md("## Cell 8 — choose the big-model matrix (T4 fits ≤14B) + seed configs")
+md("## Cell 8 — choose the big-model matrix + seed configs\n"
+   "All models below are **tool-calling capable** (the engine requires it). The "
+   "**T4 tier** (≤~14B q4) runs on free Colab. The **A100 / Colab-Pro tier** "
+   "(>16GB VRAM) is commented out so it won't OOM a T4 — uncomment those lines "
+   "only on an A100 runtime. Trim the list to control runtime (~20–40 min each).")
 code(r"""
 open('offline_eval/models.txt', 'w').write('''\
-# Bigger than the 8GB laptop could run — T4 (16GB) tier
-qwen2.5:7b      laptop
-llama3.1:8b     laptop
-mistral:7b      laptop
-glm4:9b         laptop
-qwen2.5:14b     big
-phi4            big
+# ============ T4 (free Colab, 16GB) tier — fits ~14B q4 ============
+qwen2.5:7b            big
+llama3.1:8b           big
+mistral:7b            big
+glm4:9b               big
+qwen2.5:14b           big
+phi4                  big
+mistral-nemo:12b      big
+granite3.1-dense:8b   big
+hermes3:8b            big
+aya-expanse:8b        big    # Cohere — multilingual, relevant for MZ/TZ
+falcon3:10b           big
+command-r7b           big    # Cohere 7B — multilingual + tools
+
+# ============ A100 / Colab-Pro tier — needs >16GB VRAM; UNCOMMENT on A100 ===
+# mistral-small:24b   xl
+# qwen2.5:32b         xl
+# command-r:35b       xl     # strong tool-use + multilingual
+# mixtral:8x7b        xl     # 47B MoE
+# llama3.3:70b        xl
+# qwen2.5:72b         xl
+# athene-v2:72b       xl
+# command-r-plus:104b xl     # 104B — needs an 80GB A100
 ''')
 !python offline_eval/seed_ollama_configs.py
 """)
