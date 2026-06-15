@@ -1,6 +1,6 @@
 # Offline tutor-model evaluation — findings
 
-**Date:** 2026-06-12 · **Status:** Laptop tier complete (11 models); 14B+ tier pending (Colab)
+**Date:** 2026-06-15 · **Status:** 23 open-source models scored (laptop + Colab T4). Cloud benchmarks (Gemini / Claude) in progress.
 **Author:** AI Tutor team · **Context:** model selection for offline / low-connectivity deployment (Mozambique, Tanzania)
 
 ## Why we ran this
@@ -10,66 +10,84 @@ low-connectivity schools, we need a tutor model that runs **locally on-device**
 well they drive our **real production tutoring engine** — not a toy benchmark.
 
 ## How we measured it
-- **Tutor under test:** each open-source model, run locally via Ollama, driving the
-  production `simple_tutor` engine (it controls pedagogy through tool-calls:
-  pose question → grade answer → advance step).
-- **Scorers held constant on Anthropic** (our top-tier, trusted reference): the
-  **judge** and the **student-simulator** are the same Anthropic models we use today,
-  so every model is graded on an identical, high-quality yardstick.
-- **Test set:** 60 single-turn lesson scenarios spanning math and reading, across
-  several student personas, scored on pass/fail + a 0–1 quality rubric.
-- **One engine change** was required and is done: the tutor engine previously
-  hard-coded the Anthropic SDK; it now goes through our pluggable client layer, so
-  any provider (incl. local models) can drive it. The Anthropic path is unchanged.
+- **Tutor under test:** each model drives the production `simple_tutor` engine
+  (it controls pedagogy through tool-calls: pose question → grade answer → advance).
+- **Scorers held constant on Anthropic** (our trusted reference): the **judge** and
+  **student-simulator** are the same Anthropic models we use in production, so every
+  model is graded on an identical, high-quality yardstick. The pass/fail grader is
+  **cross-family** (it excludes the tutor's own vendor), so a model never grades itself.
+- **Test set:** 60 single-turn lesson scenarios (math + reading, multiple personas),
+  scored pass/fail + a 0–1 quality rubric.
+- **Two engine changes** were required and are done: (1) the engine was hard-wired to
+  the Anthropic SDK — now it routes any provider through our pluggable client layer;
+  (2) some open models emit tool-calls as text rather than via the structured channel —
+  the client now parses those leaks. The Anthropic path is unchanged.
+- **Hardware:** small models (≤9B) on an 8 GB CPU laptop; 7–14B models on a free
+  Google Colab T4 GPU. Same harness, same scenarios → directly comparable scores.
 
-## Results (60 scenarios each, 0 errors)
+## Results — 23 open-source models (60 scenarios each, 0 errors)
 
-| Rank | Model | Device tier | Pass rate | Quality (rubric) |
-|---:|---|---|---:|---:|
-| 1 | **qwen2.5:3b** | phone/tablet | **45%** | **0.61** |
-| 2 | llama3.2:3b | phone/tablet | 28% | 0.46 |
-| 2 | qwen2.5:1.5b | phone/tablet | 28% | 0.50 |
-| 4 | llama3-groq-tool-use:8b | laptop | 22% | 0.46 |
-| 5 | granite3.1-dense:2b | phone/tablet | 15% | 0.41 |
-| 5 | granite3.1-moe:3b | phone/tablet | 15% | 0.37 |
-| 7 | llama3.2:1b | phone/tablet | 8% | 0.29 |
-| 7 | nemotron-mini | phone/tablet | 8% | 0.39 |
-| 9 | qwen2.5:0.5b | phone/tablet | 7% | 0.37 |
-| 10 | hermes3:3b | phone/tablet | 3% | 0.34 |
-| 11 | gemma2:2b | phone/tablet | 0% | 0.32 |
+| Rank | Model | Params | Device tier | Pass rate | Rubric |
+|---:|---|---|---|---:|---:|
+| 1 | **qwen2.5:14b** | 14B | GPU laptop/server | **55%** | 0.66 |
+| 2 | mistral-nemo:12b | 12B | GPU laptop/server | 53% | 0.67 |
+| 3 | **qwen2.5:7b** | 7B | GPU laptop | 52% | **0.71** |
+| 4 | **qwen2.5:3b** | 3B | **phone/tablet** | 45% | 0.61 |
+| 5 | glm4:9b | 9B | GPU laptop | 43% | 0.60 |
+| 6 | granite3.1-dense:8b | 8B | GPU laptop | 33% | 0.56 |
+| 6 | llama3.1:8b | 8B | GPU laptop | 33% | 0.53 |
+| 8 | mistral:7b | 7B | GPU laptop | 32% | 0.54 |
+| 9 | llama3.2:3b | 3B | phone/tablet | 28% | 0.46 |
+| 9 | qwen2.5:1.5b | 1.5B | phone/tablet | 28% | 0.50 |
+| 11 | hermes3:8b | 8B | GPU laptop | 22% | 0.43 |
+| 11 | llama3-groq-tool-use:8b | 8B | GPU laptop | 22% | 0.46 |
+| 13 | command-r7b | 7B | GPU laptop | 15% | 0.42 |
+| 13 | granite3.1-dense:2b | 2B | phone/tablet | 15% | 0.41 |
+| 13 | granite3.1-moe:3b | 3B | phone/tablet | 15% | 0.37 |
+| 16 | aya-expanse:8b | 8B | GPU laptop | 10% | 0.38 |
+| 17 | llama3.2:1b · nemotron-mini | 1–4B | phone/tablet | 8% | 0.29–0.39 |
+| 19 | qwen2.5:0.5b | 0.5B | phone/tablet | 7% | 0.37 |
+| 20 | hermes3:3b | 3B | phone/tablet | 3% | 0.34 |
+| 21 | falcon3:10b · gemma2:2b · phi4 | 2–14B | — | 0% | 0.32 |
 
 ## Key findings
-1. **`qwen2.5:3b` is the clear leader** — 45% pass / 0.61 quality, nearly double the
-   next-best, and it's small enough to run on a **tablet/phone**. This is our lead
-   candidate for offline deployment.
-2. **Bigger did not mean better.** The largest model that fit our 8 GB test laptop
-   (the 8B tool-tuned Llama) came **4th**, beaten by three sub-3B models. Picking the
-   right model family matters far more than raw size for on-device tutoring.
-3. **One model is unusable:** `gemma2:2b` scored 0% — it cannot make the tool-calls
-   the engine needs.
-4. **Common weak spot:** adapting tone/register to each student persona
-   ("persona_handling") is the most frequent failure across nearly all models, and
-   the math reasoning is the 8B model's specific weakness. Both are addressable with
-   targeted prompt tuning on the chosen model.
+1. **Qwen2.5 sweeps every size tier** — 3B (45%) → 7B (52%) → 14B (55%). Scaling
+   helps but with **diminishing returns**, and the **7B has the best teaching-quality
+   score (0.71) of all 23 models**. Recommendations by tier:
+   - **Phone/tablet:** `qwen2.5:3b` (45%) — the clear on-device champion.
+   - **Laptop / school server:** `qwen2.5:7b` — near-top pass rate at half the size of
+     14B, and the best rubric quality. The value pick.
+2. **Model family matters far more than size.** `mistral-nemo:12b` (53%) beats
+   `llama3.1:8b` (33%) by 20 points; the largest model that fit our 8 GB laptop (an 8B)
+   sits mid-pack. Picking the right family beats simply going bigger.
+3. **GLM-4:9b (43%) is a viable alternative** — once the engine parsed its tool-call
+   format, it scored solidly.
+4. **Three models scored 0% (falcon3:10b, phi4, gemma2:2b)** — a tool-protocol failure,
+   not a teaching failure. gemma2 has no tool capability; falcon3/phi4 likely leak
+   tool-calls in a format the parser doesn't yet handle. **phi4 (a strong 14B) is worth
+   recovering** — a follow-up diagnostic run will capture its format.
+5. **Universal weak spots:** math reasoning and persona/tone adaptation are the most
+   common failure categories across the board — both addressable with targeted prompt
+   tuning on the chosen model.
 
 ## What this means for deployment
-- A **~3B model is viable on-device today** at meaningfully better quality than the
-  smaller options — promising for the phone/tablet tier.
-- **45% is a starting baseline, not the ceiling.** These are stock models with no
-  tutor-specific tuning. The hosted Anthropic baseline is far higher; the goal is to
-  close that gap with the best offline candidate via prompt/fine-tuning.
+- A **~3B model is viable on-device today** (45%), and a **7B on a school server** is
+  meaningfully better (52%) at the best teaching quality measured.
+- **These are stock models with no tutor-specific tuning** — a starting baseline, not a
+  ceiling. The cloud benchmarks below establish the target to close toward.
 
 ## Cost & footprint
-- Run **entirely on a local laptop** (8 GB RAM, no GPU) — no infrastructure spend.
-  Only cost was Anthropic API calls for the judge/student-simulator scoring.
+- Small models ran on a **local 8 GB laptop, no GPU** (zero infra cost). The 7–14B tier
+  ran on a **free Colab T4**. Only spend was Anthropic API calls for scoring.
 
 ## Next steps
-1. **Larger models (14B–70B)** can't run on the 8 GB laptop. A ready-to-run Google
-   Colab (free T4 GPU) notebook is prepared to test `qwen2.5:14b`, `phi4`, etc. — to
-   see whether scaling Qwen past 3B is worth the heavier hardware.
-2. **Prompt-tune the leading candidate** on its two weak areas (persona handling,
-   math) and re-measure.
-3. **Decide the deployment tier** (3B on-device vs. a larger model on a school
-   server) once the 14B+ numbers are in.
+1. **Cloud benchmarks (in progress):** Gemini (2.5/3.x Pro & Flash) and Claude
+   (Opus / Sonnet / Haiku) run through the *same* harness to mark the quality ceiling
+   the offline candidates should aim for. (Caveat: when a Claude model is the *tutor*,
+   the pass/fail grader stays cross-family, but the Anthropic rubric judge is
+   same-family — read those rubric numbers with that in mind.)
+2. **Recover phi4 / falcon3** via the tool-leak diagnostic, then re-score.
+3. **Prompt-tune the leading offline candidate** (qwen2.5:7b / :3b) on math + persona.
+4. **Pick the deployment tier** once the cloud ceiling and the tuned numbers are in.
 
-*All work is local; nothing has been committed or deployed.*
+*All work is local/Colab; nothing has been deployed to production.*
