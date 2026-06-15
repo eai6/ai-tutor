@@ -5,7 +5,7 @@ Run: python offline_eval/_make_colab_nb.py
 import json
 from pathlib import Path
 
-REPO = 'eai6/ai-tutor'                       # origin remote
+REPO = 'pixeldesignlabs-dev/ai-tutor'        # fork remote — matches the fine-grained PAT scope
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 
 cells = []
