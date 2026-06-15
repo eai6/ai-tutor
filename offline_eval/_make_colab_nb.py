@@ -74,8 +74,12 @@ code(r"""
 md("## Cell 4 — install deps + start Ollama (a few min; ignore pip resolver warnings)")
 code(r"""
 !pip install -q -r requirements.txt
+# The Ollama installer is now zstd-compressed; the Colab VM lacks zstd, so install
+# it first (otherwise the installer aborts and `ollama` is never created).
+!apt-get -qq install -y zstd || (apt-get -qq update && apt-get -qq install -y zstd)
 !curl -fsSL https://ollama.com/install.sh | sh
-import subprocess, time
+import subprocess, time, shutil
+assert shutil.which('ollama'), "ollama did not install — check the install output above (zstd?)"
 subprocess.Popen(['ollama', 'serve'],
                  stdout=open('/content/ollama.log', 'w'),
                  stderr=subprocess.STDOUT)
