@@ -276,7 +276,109 @@ def _maybe_parse_text_tool_call(text: str):
     return None
 
 
-def _adapt_ollama_response(data: dict, *, model_name: str = '') -> AdaptedMessage:
+def _maybe_parse_text_call_syntax(text: str, tools: list | None):
+    """If ``text`` contains a Python-style call to one of the engine's tools —
+    e.g. ``pose_question("...")`` or ``advance_step()`` — return a
+    ``{"name", "arguments"}`` dict, else None.
+
+    Some model templates (e.g. glm4) write the tool call as a function-call
+    *string* in the content instead of using the structured ``tool_calls``
+    channel or a JSON object (handled by ``_maybe_parse_text_tool_call``).
+    Parsed with ``ast`` (no eval); only calls whose name matches a supplied
+    tool are accepted, and the tool schema maps positional args to parameter
+    names. Conservative: unknown names / unparseable args are ignored.
+    """
+    if not text or not tools:
+        return None
+    import ast
+
+    schemas = {t.get('name'): (t.get('input_schema') or {})
+               for t in tools if t.get('name')}
+    if not schemas:
+        return None
+
+    def _from_call(node):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            return None
+        name = node.func.id
+        if name not in schemas:
+            return None
+        props = list((schemas[name].get('properties') or {}).keys())
+        required = [p for p in (schemas[name].get('required') or []) if p in props]
+        order = required + [p for p in props if p not in required]
+        args = {}
+        for i, a in enumerate(node.args):
+            try:
+                val = ast.literal_eval(a)
+            except Exception:
+                continue
+            if i < len(order):
+                args[order[i]] = val
+        for kw in node.keywords:
+            if kw.arg is None:
+                continue
+            try:
+                args[kw.arg] = ast.literal_eval(kw.value)
+            except Exception:
+                continue
+        return {'name': name, 'arguments': args}
+
+    s = text.strip()
+    if s.startswith('```'):
+        s = s.strip('`').strip()
+        for prefix in ('python', 'json'):
+            if s.lower().startswith(prefix):
+                s = s[len(prefix):].strip()
+
+    # Candidate sources: the whole string, plus a quote-aware balanced
+    # extraction of "<tool_name>(...)" for each known tool (so commas /
+    # parens / '?' inside a string arg don't truncate the call).
+    candidates = [s]
+    for name in schemas:
+        start = s.find(name + '(')
+        if start == -1:
+            continue
+        depth, in_str, esc, end = 0, None, False, None
+        for i in range(start + len(name), len(s)):
+            ch = s[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == '\\':
+                    esc = True
+                elif ch == in_str:
+                    in_str = None
+            elif ch in ('"', "'"):
+                in_str = ch
+            elif ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        if end:
+            candidates.append(s[start:end])
+
+    for src in candidates:
+        src = src.strip()
+        try:
+            nodes = [ast.parse(src, mode='eval').body]
+        except Exception:
+            try:
+                nodes = list(ast.walk(ast.parse(src)))
+            except Exception:
+                continue
+        for node in nodes:
+            result = _from_call(node)
+            if result is not None:
+                return result
+    return None
+
+
+def _adapt_ollama_response(
+    data: dict, *, model_name: str = '', tools: list | None = None,
+) -> AdaptedMessage:
     """Adapt an Ollama ``/api/chat`` JSON response → AdaptedMessage.
 
     Ollama returns an OpenAI-ish shape: ``data['message']`` has
@@ -306,8 +408,11 @@ def _adapt_ollama_response(data: dict, *, model_name: str = '') -> AdaptedMessag
                 id=f"ollama_tool_{i}",
             ))
     else:
-        # No structured tool call — some templates leak it as JSON text.
+        # No structured tool call — some templates leak it as JSON text
+        # (qwen-style) or as a Python-style call string (glm4-style).
         parsed = _maybe_parse_text_tool_call(text)
+        if parsed is None:
+            parsed = _maybe_parse_text_call_syntax(text, tools)
         if parsed is not None:
             blocks.append(AdaptedToolUseBlock(
                 name=parsed.get('name', ''),
@@ -950,7 +1055,7 @@ class OllamaClient(BaseLLMClient):
                 "Make sure Ollama is running (ollama serve)."
             )
         adapted = _adapt_ollama_response(
-            data, model_name=self.config.model_name,
+            data, model_name=self.config.model_name, tools=tools,
         )
         logger.info(
             "[OllamaTools] response: in=%d out=%d blocks=%s",
