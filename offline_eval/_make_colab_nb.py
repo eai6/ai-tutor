@@ -155,9 +155,12 @@ command-r7b           big    # Cohere 7B — multilingual + tools
 !python offline_eval/seed_ollama_configs.py
 """)
 
-md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)")
+md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)\n"
+   "`CLEANUP_MODELS=1` deletes each model's weights from disk right after it's "
+   "scored, so Colab's ~112 GB disk never fills up (results are already saved to "
+   "Drive, so a re-run still skips done models).")
 code(r"""
-!SIMPLE_TUTOR_ENGINE=1 bash offline_eval/run_matrix.sh
+!SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
 """)
 
 md("## Cell 10 — combined leaderboard (run anytime)")

@@ -67,7 +67,14 @@ while read -r tag tier _rest; do
   else
     echo "!! no run JSON (rc=$rc, ${elapsed}s) — inspect $log"
   fi
-  ollama stop "$tag" >/dev/null 2>&1 || true   # unload to free the 8GB RAM
+  ollama stop "$tag" >/dev/null 2>&1 || true   # unload to free RAM
+  # CLEANUP_MODELS=1 also deletes the weights from disk after scoring — used on
+  # Colab (small disk; results already saved so a re-run skips this model
+  # without re-pulling). Off by default so the laptop keeps its cached models.
+  if [[ "${CLEANUP_MODELS:-0}" == "1" && -f "$RESULTS/${safe}.json" ]]; then
+    ollama rm "$tag" >/dev/null 2>&1 || true
+    echo ">> removed $tag weights from disk (CLEANUP_MODELS=1)"
+  fi
   echo
 done < "$MODELS_FILE"
 
