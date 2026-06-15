@@ -1,0 +1,33 @@
+# Offline-model evaluation matrix — one Ollama tag per line: "<tag>  <tier>".
+# Lines starting with # are skipped. q4 quantization (Ollama default).
+# Active set = models already CACHED locally (no download — the network is
+# throttling pulls to ~20KB/s, making fresh multi-GB downloads infeasible).
+# The 6 already-scored models are kept so the sweep skips them (resume-safe).
+
+# --- already evaluated (skipped on resume; kept for the leaderboard) ---
+qwen2.5:0.5b    mobile
+qwen2.5:1.5b    mobile
+qwen2.5:3b      mobile
+llama3.2:1b     mobile
+llama3.2:3b     mobile
+gemma2:2b       mobile
+
+# --- cached, NOT yet scored (run these now — no download) ---
+granite3.1-dense:2b       mobile
+granite3.1-moe:3b         mobile
+nemotron-mini             mobile
+hermes3:3b                mobile
+llama3-groq-tool-use:8b   laptop
+
+# --- GLM (Zhipu AI). glm4:9b is the only GLM that fits an 8GB CPU laptop;
+#     glm-4.6/4.7/5 are 30B-744B (server/A100 tier). MUST pass the tool-probe
+#     before sweeping — Ollama doesn't advertise tool support for glm4. ---
+glm4:9b                   laptop
+
+# --- NOT cached: need slow downloads (deferred until network improves) ---
+# phi3.5          mobile
+# smollm2:1.7b    mobile
+# qwen2.5:7b      laptop
+# llama3.1:8b     laptop
+# mistral:7b      laptop
+# gemma2:9b       laptop

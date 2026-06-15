@@ -242,6 +242,93 @@ def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
     )
 
 
+def _maybe_parse_text_tool_call(text: str):
+    """If ``text`` begins with a JSON object shaped like a tool call —
+    ``{"name": ..., "arguments": {...}}`` — return that dict, else None.
+
+    Some Ollama model templates (e.g. qwen2.5) emit the tool call as a
+    JSON object in the *content* string instead of the structured
+    ``tool_calls`` channel. Conservative: only triggers on a clean
+    leading JSON object that has both ``name`` and ``arguments`` keys.
+    """
+    if not text:
+        return None
+    s = text.strip()
+    if not s.startswith('{'):
+        return None
+    candidates = [s]
+    depth = 0
+    for i, ch in enumerate(s):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                candidates.append(s[:i + 1])
+                break
+    for c in candidates:
+        try:
+            obj = json.loads(c)
+        except Exception:
+            continue
+        if isinstance(obj, dict) and 'name' in obj and 'arguments' in obj:
+            return obj
+    return None
+
+
+def _adapt_ollama_response(data: dict, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt an Ollama ``/api/chat`` JSON response → AdaptedMessage.
+
+    Ollama returns an OpenAI-ish shape: ``data['message']`` has
+    ``content`` (str) and optional ``tool_calls`` (list of
+    ``{'function': {'name', 'arguments'}}``). Lets the tutor engine +
+    SelfRetry walk ``.content/.type/.text/.name/.input`` uniformly
+    across every provider (task #245).
+    """
+    msg = (data or {}).get('message', {}) or {}
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    text = msg.get('content') or ''
+    structured = msg.get('tool_calls') or []
+
+    if structured:
+        if text.strip():
+            blocks.append(AdaptedTextBlock(text=text))
+        for i, tc in enumerate(structured):
+            fn = (tc or {}).get('function', {}) or {}
+            args = fn.get('arguments')
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
+            blocks.append(AdaptedToolUseBlock(
+                name=fn.get('name', ''), input=args or {},
+                id=f"ollama_tool_{i}",
+            ))
+    else:
+        # No structured tool call — some templates leak it as JSON text.
+        parsed = _maybe_parse_text_tool_call(text)
+        if parsed is not None:
+            blocks.append(AdaptedToolUseBlock(
+                name=parsed.get('name', ''),
+                input=parsed.get('arguments') or {},
+                id="ollama_tool_0",
+            ))
+        elif text:
+            blocks.append(AdaptedTextBlock(text=text))
+
+    stop = 'tool_use' if any(
+        getattr(b, 'type', '') == 'tool_use' for b in blocks
+    ) else 'end_turn'
+    usage = AdaptedUsage(
+        input_tokens=int(data.get('prompt_eval_count', 0) or 0),
+        output_tokens=int(data.get('eval_count', 0) or 0),
+    )
+    return AdaptedMessage(
+        content=blocks, stop_reason=stop, usage=usage, model=model_name,
+    )
+
+
 class BaseLLMClient(ABC):
     """Abstract base class for LLM clients.
 
@@ -730,6 +817,147 @@ class OllamaClient(BaseLLMClient):
             raise TimeoutError(
                 "Ollama request timed out. The model may be loading or the request is too complex."
             )
+
+    def _translate_messages_for_ollama(self, messages: list[dict]) -> list[dict]:
+        """Translate Anthropic-shaped messages — including the tutor
+        two-call tool loop's assistant content-blocks and user
+        tool_result blocks — into Ollama ``/api/chat`` shape.
+
+        - assistant message whose ``content`` is a list of blocks →
+          ``{role:assistant, content:<text>, tool_calls:[...]}``
+        - user message containing ``tool_result`` blocks → one
+          ``{role:tool, content:<result>}`` per result
+        - plain-string content passes through unchanged
+
+        Handles both dict blocks (Anthropic native / engine-built) and
+        the Adapted* dataclass blocks this module emits.
+        """
+        out: list[dict] = []
+        for msg in messages or []:
+            role = msg.get('role', 'user')
+            content = msg.get('content')
+            if isinstance(content, str):
+                out.append({'role': role, 'content': content})
+                continue
+            if not isinstance(content, list):
+                out.append({'role': role, 'content': str(content)})
+                continue
+            text_parts: list[str] = []
+            tool_calls: list[dict] = []
+            tool_results: list[str] = []
+            for block in content:
+                if isinstance(block, dict):
+                    btype = block.get('type')
+                    getv = block.get
+                else:
+                    btype = getattr(block, 'type', None)
+                    getv = lambda k, d=None, _b=block: getattr(_b, k, d)
+                if btype == 'text':
+                    t = getv('text') or ''
+                    if t:
+                        text_parts.append(t)
+                elif btype == 'tool_use':
+                    tool_calls.append({'function': {
+                        'name': getv('name') or '',
+                        'arguments': getv('input') or {},
+                    }})
+                elif btype == 'tool_result':
+                    c = getv('content')
+                    tool_results.append(
+                        c if isinstance(c, str) else json.dumps(c, default=str)
+                    )
+                elif btype == 'image':
+                    # Ollama wants base64 images in a separate 'images'
+                    # field; the tool loop's threaded turns don't carry
+                    # images, so skip rather than mistranslate.
+                    continue
+            if role == 'assistant':
+                m: dict = {'role': 'assistant', 'content': '\n'.join(text_parts)}
+                if tool_calls:
+                    m['tool_calls'] = tool_calls
+                out.append(m)
+            elif tool_results:
+                for tr in tool_results:
+                    out.append({'role': 'tool', 'content': tr})
+                if text_parts:
+                    out.append({'role': role, 'content': '\n'.join(text_parts)})
+            else:
+                out.append({'role': role, 'content': '\n'.join(text_parts)})
+        return out
+
+    def generate_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        tools: list[dict],
+        max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
+    ):
+        """Ollama tool-calling. Accepts the same Anthropic-style tool
+        schema ``{name, description, input_schema}`` the tutor engine
+        builds, converts to Ollama's ``{type:function, function:{...}}``
+        shape, and returns an AdaptedMessage so the engine can introspect
+        tool_use content blocks uniformly (task #245).
+
+        ``tool_choice`` is accepted for signature parity but NOT
+        forwarded — Ollama's forced-tool support is unreliable across
+        models, and the tutor prompt already directs tool use.
+        """
+        import requests
+
+        ollama_tools = []
+        for t in (tools or []):
+            ollama_tools.append({
+                'type': 'function',
+                'function': {
+                    'name': t.get('name'),
+                    'description': t.get('description', ''),
+                    'parameters': (
+                        t.get('input_schema')
+                        or {'type': 'object', 'properties': {}}
+                    ),
+                },
+            })
+
+        ollama_messages = [{'role': 'system', 'content': system_prompt}]
+        ollama_messages.extend(self._translate_messages_for_ollama(messages))
+
+        api_base = self.config.api_base or "http://localhost:11434"
+        url = f"{api_base}/api/chat"
+        payload = {
+            'model': self.config.model_name,
+            'messages': ollama_messages,
+            'tools': ollama_tools,
+            'stream': False,
+            'options': {
+                'temperature': self.config.temperature,
+                'num_predict': max_tokens or self.config.max_tokens,
+            },
+        }
+        logger.info(
+            "[OllamaTools] llm_call: messages=%d system_chars=%d tools=%d model=%s",
+            len(ollama_messages), len(system_prompt or ''),
+            len(ollama_tools), self.config.model_name,
+        )
+        try:
+            response = requests.post(url, json=payload, timeout=600)
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(
+                f"Could not connect to Ollama at {api_base}. "
+                "Make sure Ollama is running (ollama serve)."
+            )
+        adapted = _adapt_ollama_response(
+            data, model_name=self.config.model_name,
+        )
+        logger.info(
+            "[OllamaTools] response: in=%d out=%d blocks=%s",
+            adapted.usage.input_tokens, adapted.usage.output_tokens,
+            [getattr(b, 'type', '?') for b in adapted.content],
+        )
+        return adapted
 
 
 class OpenAIClient(BaseLLMClient):

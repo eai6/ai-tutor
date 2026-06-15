@@ -1,0 +1,11 @@
+# Offline-model evaluation workspace.
+# The tooling (*.py / *.sh / *.md / models.txt / colab_eval.ipynb) IS committed.
+# Model weights, run outputs, logs, and caches stay local. Result JSONs are
+# ignored by default but a curated set is force-added (git add -f) so the
+# leaderboard is reproducible — see FINDINGS_offline_model_eval.md.
+ollama_models/
+results/
+runs/
+*.log
+*.jsonl
+__pycache__/

@@ -1,0 +1,45 @@
+=== llama3-groq-tool-use:8b ===
+  tool_calls returned: 0
+  RESULT: model did NOT tool-call ✗ (simple_tutor would fall back)
+
+=== hermes3:3b ===
+  tool_calls returned: 0
+  RESULT: model did NOT tool-call ✗ (simple_tutor would fall back)
+
+=== nemotron-mini ===
+  tool_calls returned: 0
+  RESULT: model did NOT tool-call ✗ (simple_tutor would fall back)
+
+=== granite3.1-moe:3b ===
+  tool_calls returned: 0
+  RESULT: model did NOT tool-call ✗ (simple_tutor would fall back)
+
+=== granite3.1-dense:2b ===
+  tool_calls returned: 0
+  RESULT: model did NOT tool-call ✗ (simple_tutor would fall back)
+
+=== llama3.2:3b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== llama3.2:1b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== llama3.1:8b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== mistral:7b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== qwen3:1.7b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== qwen3:4b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== command-r7b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+=== gemma2:2b ===
+  PULL FAILED (tag may not exist in this Ollama lib) — skip
+
+DONE

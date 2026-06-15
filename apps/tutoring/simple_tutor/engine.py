@@ -652,6 +652,24 @@ def _build_figure_catalog(step) -> list[dict]:
 # ============================================================================
 
 
+def _system_blocks_to_text(system_blocks) -> str:
+    """Flatten Anthropic system blocks (``[{'type':'text','text':..}]``,
+    possibly carrying cache_control) into a single string for the
+    provider-agnostic ``generate_with_tools()``, which re-applies any
+    provider-specific prompt caching internally."""
+    if isinstance(system_blocks, str):
+        return system_blocks
+    parts: list[str] = []
+    for b in system_blocks or []:
+        if isinstance(b, dict):
+            t = b.get('text')
+            if t:
+                parts.append(t)
+        elif isinstance(b, str):
+            parts.append(b)
+    return '\n\n'.join(parts)
+
+
 def _call_llm(
     *,
     system_blocks: list,
@@ -685,33 +703,71 @@ def _call_llm(
         logger.warning("_call_llm: no tutoring ModelConfig found")
         return None
 
-    api_key = config.get_api_key()
     model_name = config.model_name
-    if not api_key or not model_name:
-        logger.warning("_call_llm: missing api_key or model_name")
+    if not model_name:
+        logger.warning("_call_llm: no model_name on tutoring config")
         return None
 
-    try:
-        import anthropic
-    except ImportError:
-        logger.warning("_call_llm: anthropic SDK not installed")
-        return None
+    provider = str(getattr(config, 'provider', '') or '').lower()
 
+    # Anthropic: keep the native SDK path byte-for-byte so production
+    # tutor behaviour is unchanged.
+    if provider == 'anthropic':
+        api_key = config.get_api_key()
+        if not api_key:
+            logger.warning("_call_llm: missing api_key for anthropic config")
+            return None
+        try:
+            import anthropic
+        except ImportError:
+            logger.warning("_call_llm: anthropic SDK not installed")
+            return None
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            return client.messages.create(
+                model=model_name,
+                max_tokens=1024,
+                system=system_blocks,
+                tools=tools,
+                messages=messages,
+            )
+        except Exception as exc:
+            msg = str(exc).strip().replace('\n', ' ')[:200]
+            logger.warning(
+                "_call_llm: Anthropic call failed: %s: %s",
+                type(exc).__name__, msg,
+            )
+            return None
+
+    # Any other provider (OpenAI / Gemini / local Ollama): route through
+    # the pluggable client factory's generate_with_tools(), which returns
+    # an Anthropic-Message-shaped object (AdaptedMessage) that
+    # _dispatch_tools walks identically. This is what lets the tutor run
+    # on an open-source local model.
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model=model_name,
-            max_tokens=1024,
-            system=system_blocks,
-            tools=tools,
-            messages=messages,
+        from apps.llm.client import get_llm_client
+        client = get_llm_client(config)
+    except Exception as exc:
+        logger.warning("_call_llm: get_llm_client failed: %s", exc)
+        return None
+    if not hasattr(client, 'generate_with_tools'):
+        logger.warning(
+            "_call_llm: %s has no generate_with_tools — cannot run tool loop",
+            type(client).__name__,
         )
-        return response
+        return None
+    try:
+        return client.generate_with_tools(
+            messages=messages,
+            system_prompt=_system_blocks_to_text(system_blocks),
+            tools=tools,
+            max_tokens=1024,
+        )
     except Exception as exc:
         msg = str(exc).strip().replace('\n', ' ')[:200]
         logger.warning(
-            "_call_llm: Anthropic call failed: %s: %s",
-            type(exc).__name__, msg,
+            "_call_llm: generate_with_tools(%s) failed: %s: %s",
+            provider, type(exc).__name__, msg,
         )
         return None
 

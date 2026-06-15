@@ -1,0 +1,57 @@
+"""Seed an inactive local_ollama ModelConfig row per model in models.txt.
+
+Why: ModelConfig.resolve_runtime() (invoked when TUTOR_MODEL_OVERRIDE is set)
+resolves a (provider, model_name) pair by finding an existing row first. For
+keyless local providers it returns None unless such a row exists. We create
+the rows as is_active=False so they're invisible to normal get_for() resolution
+(which filters is_active=True) but findable by the override's exact-pair lookup.
+
+Idempotent. Run once before the matrix sweep:
+    venv/bin/python offline_eval/seed_ollama_configs.py
+"""
+import os, sys, django
+ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+os.chdir(ROOT); sys.path.insert(0, ROOT)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from apps.llm.models import ModelConfig
+from apps.accounts.models import Institution
+
+
+def load_tags(path):
+    tags = []
+    for line in open(path, encoding='utf-8'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        tags.append(line.split()[0])
+    return tags
+
+
+def main():
+    inst = Institution.objects.filter(pk=999001).first() or Institution.get_global()
+    tags = load_tags(os.path.join(ROOT, 'offline_eval', 'models.txt'))
+    created = updated = 0
+    for tag in tags:
+        obj, was_created = ModelConfig.objects.update_or_create(
+            provider='local_ollama', model_name=tag,
+            defaults=dict(
+                institution=inst,
+                name=f'offline-eval: {tag}',
+                purpose='tutoring',          # harmless: is_active=False won't shadow
+                api_key_env_var='',          # Ollama needs no key
+                api_base='',                 # client defaults to http://localhost:11434
+                temperature=0.2,             # within the tutoring [0.1, 0.3] clamp
+                max_tokens=1024,
+                is_active=False,
+            ),
+        )
+        created += was_created
+        updated += (not was_created)
+        print(f"  {'created' if was_created else 'updated'}: local_ollama/{tag}")
+    print(f"\nSeeded {len(tags)} ollama configs ({created} created, {updated} updated).")
+
+
+if __name__ == '__main__':
+    main()
