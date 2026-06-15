@@ -1,7 +1,33 @@
 # Offline tutor-model evaluation — findings
 
-**Date:** 2026-06-15 · **Status:** 23 open-source models scored (laptop + Colab T4). Cloud benchmarks (Gemini / Claude) in progress.
+**Date:** 2026-06-16 · **Status:** 30 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini).
 **Author:** AI Tutor team · **Context:** model selection for offline / low-connectivity deployment (Mozambique, Tanzania)
+
+## TL;DR
+The proprietary ceiling is **Claude Opus 4.7 at 90%**. The best offline model,
+**qwen2.5:14b at 55%**, reaches ~61% of that — a real but closeable gap. For
+on-device use, **qwen2.5:3b (45%)** is the phone/tablet pick and **qwen2.5:7b
+(52%, best rubric 0.71 of any open model)** the laptop/server pick. A 7B open model
+already rivals Gemini 3.5 Flash (50%). Stock models, no tutor-specific tuning yet.
+
+## Proprietary benchmark ceiling (same harness, 60 scenarios)
+
+| Model | Vendor | Pass rate | Rubric |
+|---|---|---:|---:|
+| claude-opus-4-7 | Anthropic | **90%** | 0.88 |
+| claude-haiku-4-5 | Anthropic | 82% | 0.86 |
+| claude-sonnet-4-6 | Anthropic | 78% | 0.82 |
+| gemini-2.5-flash | Google | 65% | 0.74 |
+| gemini-3.1-pro-preview | Google | 58% | 0.71 |
+| gemini-3.5-flash | Google | 50% | 0.66 |
+| gemini-2.5-pro | Google | 43%* | 0.64 |
+
+\* **Gemini Pro anomaly:** the Pro models score *below* the Flash models
+(2.5-flash 65% > 3.1-pro 58% > 2.5-pro 43%), which is backwards. The Pro models
+returned empty responses in id-probing (thinking-mode), so this is likely a harness
+interaction, not true capability — treat the Gemini-Pro rows as **suspect pending a
+diagnostic** (same playbook that recovered GLM-4). Haiku 4.5 (82%) also beats
+Sonnet 4.6 (78%), which is plausible for this recent, strong small model.
 
 ## Why we ran this
 The pilot runs on a hosted Anthropic model. For data-residency and offline use in
@@ -72,22 +98,29 @@ well they drive our **real production tutoring engine** — not a toy benchmark.
 
 ## What this means for deployment
 - A **~3B model is viable on-device today** (45%), and a **7B on a school server** is
-  meaningfully better (52%) at the best teaching quality measured.
-- **These are stock models with no tutor-specific tuning** — a starting baseline, not a
-  ceiling. The cloud benchmarks below establish the target to close toward.
+  meaningfully better (52%) at the best teaching quality of any open model.
+- The **frontier ceiling is Opus 4.7 at 90%**; the best offline model reaches ~61% of
+  that pass rate. **These are stock models with no tutor-specific tuning** — a starting
+  baseline. The gap to the ceiling is the target to close with prompt/fine-tuning.
 
 ## Cost & footprint
 - Small models ran on a **local 8 GB laptop, no GPU** (zero infra cost). The 7–14B tier
-  ran on a **free Colab T4**. Only spend was Anthropic API calls for scoring.
+  ran on a **free Colab T4**. Cloud benchmarks ran via API (paid). Scoring spend was
+  Anthropic/Gemini judge calls throughout.
+
+## Methodology note (for the benchmark rows)
+The headline **pass rate is cross-family judged for every model** — the grader excludes
+the tutor's own vendor, so no model grades itself. Only the secondary rubric/label
+layers can be same-family for a Claude or Gemini tutor; read those columns with that in
+mind. All 30 models ran the identical 60-scenario single-turn set.
 
 ## Next steps
-1. **Cloud benchmarks (in progress):** Gemini (2.5/3.x Pro & Flash) and Claude
-   (Opus / Sonnet / Haiku) run through the *same* harness to mark the quality ceiling
-   the offline candidates should aim for. (Caveat: when a Claude model is the *tutor*,
-   the pass/fail grader stays cross-family, but the Anthropic rubric judge is
-   same-family — read those rubric numbers with that in mind.)
-2. **Recover phi4 / falcon3** via the tool-leak diagnostic, then re-score.
-3. **Prompt-tune the leading offline candidate** (qwen2.5:7b / :3b) on math + persona.
-4. **Pick the deployment tier** once the cloud ceiling and the tuned numbers are in.
+1. **Diagnose the Gemini-Pro anomaly** (Pro scoring below Flash; likely thinking-mode /
+   tool-handling) and the **phi4 / falcon3** 0% (tool-leak format), then re-score — three
+   capable models currently under-measured by harness artifacts, not ability.
+2. **Prompt-tune the leading offline candidate** (qwen2.5:7b / :3b) on math + persona,
+   the two universal weak spots, and re-measure against the ceiling.
+3. **Pick the deployment tier** (3B on-device vs 7–14B on a school server) once the
+   tuned numbers are in.
 
-*All work is local/Colab; nothing has been deployed to production.*
+*All work is local / Colab / API; nothing has been deployed to production.*
