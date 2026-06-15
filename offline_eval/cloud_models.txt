@@ -1,0 +1,14 @@
+# Cloud benchmark models — "provider/model_name  <result_filename>".
+# These run via the API (no Ollama), as a quality CEILING for the OSS sweep.
+# Judge + student-sim stay Anthropic; the pass/fail grader is cross-family.
+
+# --- Anthropic ---
+anthropic/claude-opus-4-7             claude-opus-4-7
+anthropic/claude-sonnet-4-6           claude-sonnet-4-6
+anthropic/claude-haiku-4-5-20251001   claude-haiku-4-5
+
+# --- Gemini (paid tier) ---
+google/gemini-3.1-pro-preview         gemini-3.1-pro
+google/gemini-3.5-flash               gemini-3.5-flash
+google/gemini-2.5-pro                 gemini-2.5-pro
+google/gemini-2.5-flash               gemini-2.5-flash

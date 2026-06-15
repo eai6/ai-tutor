@@ -1354,7 +1354,10 @@ class GeminiClient(BaseLLMClient):
     # is per-project quota; 5xx are server-side. The judge fallback
     # chain handles judge calls when the retries exhaust, but the
     # tutor path has no fallback so retries are the only defense.
-    MAX_RETRIES = 3
+    # GEMINI_MAX_RETRIES env override lets ops fail-fast to the judge fallback
+    # chain when Gemini is degraded/quota-exhausted (avoids ~19s of wasted
+    # backoff per call before cascading). Defaults to 3.
+    MAX_RETRIES = int(os.environ.get('GEMINI_MAX_RETRIES', 3))
     RETRY_BACKOFF = [2, 5, 12]  # seconds — shorter than Anthropic's
                                 # since Google capacity recovers faster
     _RETRYABLE_GEMINI_STATUSES = (429, 500, 502, 503, 504)
