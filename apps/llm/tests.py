@@ -1,5 +1,34 @@
 from django.test import SimpleTestCase, TestCase
 from apps.llm.models import ModelConfig
+from apps.llm.client import _adapt_openai_dict
+
+# Real shapes captured from the live Vertex MaaS endpoint (2026-06-17).
+DEEPSEEK_TEXT = {
+    "choices": [{"finish_reason": "stop", "index": 0, "matched_stop": 1,
+                 "message": {"content": "OK", "reasoning_content": None,
+                             "role": "assistant", "tool_calls": None}}],
+    "model": "deepseek-ai/deepseek-v3.2-maas",
+    "usage": {"prompt_tokens": 9, "completion_tokens": 2, "total_tokens": 11},
+}
+DEEPSEEK_TOOL = {
+    "choices": [{"finish_reason": "tool_calls", "index": 0,
+                 "message": {"content": None, "role": "assistant", "tool_calls": [
+                     {"function": {"arguments": "{\"question\": \"What is 3/4 + 2/3?\"}",
+                                   "name": "pose_question"},
+                      "id": "call_abc", "index": 0, "type": "function"}]}}],
+    "model": "deepseek-ai/deepseek-v3.2-maas",
+    "usage": {"prompt_tokens": 306, "completion_tokens": 34},
+}
+KIMI_TOOL_WITH_REASONING = {
+    "choices": [{"finish_reason": "tool_calls", "index": 0,
+                 "message": {"content": "", "reasoning_content": "let me think...",
+                             "role": "assistant", "tool_calls": [
+                     {"function": {"arguments": "{\"question\": \"Name a fraction equal to 1/2.\"}",
+                                   "name": "pose_question"},
+                      "id": "call_xyz", "index": 0, "type": "function"}]}}],
+    "model": "moonshotai/kimi-k2-thinking-maas",
+    "usage": {"prompt_tokens": 69, "completion_tokens": 309},
+}
 
 
 class VertexProviderEnumTests(SimpleTestCase):
@@ -18,3 +47,34 @@ class VertexResolveRuntimeTests(TestCase):
         assert cfg.model_name == "deepseek-ai/deepseek-v3.2-maas"
         assert cfg.api_key_env_var == "GOOGLE_CLOUD_PROJECT"
         assert cfg.pk is None  # never persisted
+
+
+class AdaptOpenAIDictTests(SimpleTestCase):
+    def test_text_response(self):
+        msg = _adapt_openai_dict(DEEPSEEK_TEXT, model_name="x")
+        assert msg.stop_reason == "end_turn"
+        assert [b.type for b in msg.content] == ["text"]
+        assert msg.content[0].text == "OK"
+        assert msg.usage.input_tokens == 9
+        assert msg.usage.output_tokens == 2
+
+    def test_tool_call_response(self):
+        msg = _adapt_openai_dict(DEEPSEEK_TOOL)
+        assert msg.stop_reason == "tool_use"
+        tool_blocks = [b for b in msg.content if b.type == "tool_use"]
+        assert len(tool_blocks) == 1
+        assert tool_blocks[0].name == "pose_question"
+        assert tool_blocks[0].input == {"question": "What is 3/4 + 2/3?"}
+
+    def test_reasoning_content_is_ignored(self):
+        msg = _adapt_openai_dict(KIMI_TOOL_WITH_REASONING)
+        # reasoning text must NOT appear as a content block
+        texts = [b.text for b in msg.content if b.type == "text"]
+        assert "let me think..." not in "".join(texts)
+        assert any(b.type == "tool_use" and b.name == "pose_question"
+                   for b in msg.content)
+
+    def test_empty_choices(self):
+        msg = _adapt_openai_dict({"choices": None})
+        assert msg.content == []
+        assert msg.stop_reason == "end_turn"

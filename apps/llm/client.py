@@ -243,6 +243,55 @@ def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
     )
 
 
+def _adapt_openai_dict(data: dict, *, model_name: str = '') -> AdaptedMessage:
+    """Adapt a RAW OpenAI-shaped response *dict* → AdaptedMessage.
+
+    Sibling of `_adapt_openai_response` (which reads the SDK's parsed object).
+    Used by `VertexModelGardenClient`, which parses `json.loads(raw.text)`
+    because the SDK's parsed `ChatCompletion.choices` is intermittently None
+    for DeepSeek MaaS even when the body is valid (verified 2026-06-17).
+    Reads `data['choices'][0]['message']` ('content' / 'tool_calls'); ignores
+    'reasoning_content' (thinking models populate it).
+    """
+    blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
+    stop_reason = 'end_turn'
+    choices = (data or {}).get('choices') or []
+    if choices:
+        choice = choices[0] or {}
+        finish = choice.get('finish_reason')
+        if finish == 'length':
+            stop_reason = 'max_tokens'
+        elif finish == 'tool_calls':
+            stop_reason = 'tool_use'
+        elif finish == 'content_filter':
+            stop_reason = 'stop_sequence'
+        msg = choice.get('message') or {}
+        text = msg.get('content')  # NB: ignore reasoning_content
+        if text:
+            blocks.append(AdaptedTextBlock(text=text))
+        for i, tc in enumerate(msg.get('tool_calls') or []):
+            fn = (tc or {}).get('function') or {}
+            raw_args = fn.get('arguments') or ''
+            try:
+                args = json.loads(raw_args) if raw_args else {}
+            except (ValueError, TypeError):
+                args = {}
+            blocks.append(AdaptedToolUseBlock(
+                id=(tc or {}).get('id') or f'vertex_tool_{i}',
+                name=fn.get('name') or '',
+                input=args,
+            ))
+    usage_obj = (data or {}).get('usage') or {}
+    usage = AdaptedUsage(
+        input_tokens=usage_obj.get('prompt_tokens', 0) or 0,
+        output_tokens=usage_obj.get('completion_tokens', 0) or 0,
+    )
+    return AdaptedMessage(
+        content=blocks, stop_reason=stop_reason, usage=usage,
+        model=(data or {}).get('model') or model_name or '',
+    )
+
+
 def _extract_balanced(s: str, start: int):
     """Return the balanced ``{...}`` substring beginning at ``s[start] == '{'``
     (quote- and escape-aware), or None if unbalanced."""
