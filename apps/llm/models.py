@@ -116,6 +116,7 @@ class ModelConfig(models.Model):
         GOOGLE = 'google', 'Google (Gemini)'
         AZURE_OPENAI = 'azure_openai', 'Azure OpenAI'
         LOCAL_OLLAMA = 'local_ollama', 'Local (Ollama)'
+        VERTEX_MODEL_GARDEN = 'vertex_model_garden', 'Vertex Model Garden (MaaS)'
 
     class Purpose(models.TextChoices):
         GENERATION = 'generation', 'Content Generation (Curriculum, Lessons)'
@@ -353,6 +354,10 @@ class ModelConfig(models.Model):
         'openai': 'OPENAI_API_KEY',
         'google': 'GOOGLE_API_KEY',
         'azure_openai': 'AZURE_OPENAI_API_KEY',
+        # Vertex MaaS uses ADC (google.auth), not a static key — this entry only
+        # lets resolve_runtime build an in-memory config; the client reads
+        # GOOGLE_CLOUD_PROJECT/LOCATION + ADC at call time.
+        'vertex_model_garden': 'GOOGLE_CLOUD_PROJECT',
     }
 
     @classmethod
