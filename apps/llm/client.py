@@ -1395,6 +1395,162 @@ class OpenAIClient(BaseLLMClient):
         )
 
 
+class VertexModelGardenClient(OpenAIClient):
+    """DeepSeek / Kimi / etc. served by Vertex AI Model Garden (MaaS) over the
+    OpenAI-compatible endpoint.
+
+    Auth is Application Default Credentials (`google.auth`) with an hourly
+    OAuth token; the base URL is per-region. Overrides the two generate methods
+    to parse from the RAW JSON body and RETRY on empty `choices` — the OpenAI
+    SDK's parsed `ChatCompletion.choices` is intermittently None for DeepSeek
+    MaaS even when the body is valid (verified 2026-06-17). Reuses the parent's
+    message translation + tool-schema/tool_choice handling.
+    """
+
+    _SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+    EMPTY_MAX_RETRIES = 3
+    EMPTY_RETRY_BACKOFF = [1, 2, 4]  # seconds
+
+    def __init__(self, config: ModelConfig):
+        # Skip OpenAIClient.__init__ (it builds a static-key client + raises on
+        # empty key). Grandparent sets config + api_key('').
+        BaseLLMClient.__init__(self, config)
+        project = (os.environ.get('GOOGLE_CLOUD_PROJECT', '') or '').strip()
+        if not project:
+            raise ValueError(
+                "GOOGLE_CLOUD_PROJECT must be set for the vertex_model_garden "
+                "provider (Vertex AI Model Garden MaaS)."
+            )
+        self._project = project
+        self._location = (
+            (os.environ.get('GOOGLE_CLOUD_LOCATION', '') or '').strip()
+            or 'us-central1'
+        )
+        import google.auth
+        self._creds, _ = google.auth.default(scopes=self._SCOPES)
+        host = ('aiplatform.googleapis.com' if self._location == 'global'
+                else f'{self._location}-aiplatform.googleapis.com')
+        self._base_url = (
+            f"https://{host}/v1/projects/{self._project}"
+            f"/locations/{self._location}/endpoints/openapi"
+        )
+
+    def _get_api_key(self) -> str:
+        # Credential is the OAuth token (see `client`), not a static env key.
+        return ''
+
+    @property
+    def client(self):
+        """Fresh OpenAI client pointed at the Vertex MaaS endpoint, with a
+        refreshed OAuth token (tokens expire ~hourly — refresh when invalid)."""
+        import google.auth.transport.requests
+        import openai
+        if not self._creds.valid:
+            self._creds.refresh(google.auth.transport.requests.Request())
+        return openai.OpenAI(base_url=self._base_url, api_key=self._creds.token)
+
+    def _create_raw(self, **kwargs) -> dict:
+        """POST chat/completions via `with_raw_response`, return the parsed JSON
+        dict. Retry when `choices` is empty/None (intermittent DeepSeek MaaS
+        failure). Raise after the budget."""
+        client = self.client
+        for attempt in range(self.EMPTY_MAX_RETRIES + 1):
+            raw = client.chat.completions.with_raw_response.create(**kwargs)
+            data = json.loads(raw.text)
+            if data.get('choices'):
+                return data
+            logger.warning(
+                "[VertexMaaS] empty choices attempt=%d/%d model=%s body=%s",
+                attempt + 1, self.EMPTY_MAX_RETRIES + 1,
+                self.config.model_name, (raw.text or '')[:200],
+            )
+            if attempt < self.EMPTY_MAX_RETRIES:
+                time.sleep(self.EMPTY_RETRY_BACKOFF[attempt])
+        raise RuntimeError(
+            "Vertex MaaS returned empty choices after "
+            f"{self.EMPTY_MAX_RETRIES + 1} attempts: {self.config.model_name}"
+        )
+
+    def _generate_impl(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        max_tokens: int | None = None,
+        *,
+        temperature: float | None = None,
+    ) -> LLMResponse:
+        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages.extend(self._translate_messages_for_openai(messages))
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=temperature,
+        )
+        data = self._create_raw(
+            model=self.config.model_name,
+            messages=openai_messages,
+            **completion_kwargs,
+        )
+        choice = data["choices"][0]
+        msg = choice.get("message") or {}
+        usage = data.get("usage") or {}
+        return LLMResponse(
+            content=msg.get("content") or "",
+            tokens_in=usage.get("prompt_tokens", 0) or 0,
+            tokens_out=usage.get("completion_tokens", 0) or 0,
+            model=data.get("model") or self.config.model_name,
+            stop_reason=choice.get("finish_reason"),
+        )
+
+    def generate_with_tools(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        tools: list[dict],
+        max_tokens: int | None = None,
+        *,
+        tool_choice: dict | str | None = None,
+    ):
+        # Anthropic-style tool schema -> OpenAI function schema. Duplicated from
+        # OpenAIClient per the project's Rule of Three (2nd use; don't extract).
+        openai_tools = [{
+            "type": "function",
+            "function": {
+                "name": t.get("name"),
+                "description": t.get("description", ""),
+                "parameters": t.get("input_schema") or {"type": "object", "properties": {}},
+            },
+        } for t in (tools or [])]
+
+        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages.extend(self._translate_messages_for_openai(messages))
+        kwargs = dict(
+            model=self.config.model_name,
+            messages=openai_messages,
+            tools=openai_tools,
+        )
+        if isinstance(tool_choice, dict):
+            if tool_choice.get("type") == "tool" and tool_choice.get("name"):
+                kwargs["tool_choice"] = {
+                    "type": "function",
+                    "function": {"name": tool_choice["name"]},
+                }
+            elif tool_choice.get("type") in ("any", "required"):
+                kwargs["tool_choice"] = "required"
+            elif tool_choice.get("type") == "none":
+                kwargs["tool_choice"] = "none"
+        elif isinstance(tool_choice, str):
+            low = tool_choice.strip().lower()
+            if low == "any":
+                kwargs["tool_choice"] = "required"
+            elif low in ("required", "none"):
+                kwargs["tool_choice"] = low
+
+        completion_kwargs = self._build_completion_kwargs(
+            max_tokens=max_tokens, temperature=None,
+        )
+        data = self._create_raw(**kwargs, **completion_kwargs)
+        return _adapt_openai_dict(data, model_name=self.config.model_name)
+
+
 class GeminiClient(BaseLLMClient):
     """Client for Google's Gemini API."""
 

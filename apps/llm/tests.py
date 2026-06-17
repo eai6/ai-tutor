@@ -78,3 +78,125 @@ class AdaptOpenAIDictTests(SimpleTestCase):
         msg = _adapt_openai_dict({"choices": None})
         assert msg.content == []
         assert msg.stop_reason == "end_turn"
+
+
+import json
+import os
+from unittest.mock import patch, PropertyMock, MagicMock
+from apps.llm.client import VertexModelGardenClient, LLMResponse
+
+
+class _FakeCreds:
+    valid = True
+    token = "fake-token"
+    def refresh(self, request):  # noqa: D401
+        self.token = "refreshed"
+
+
+def _make_vertex_client(location="global", project="test-proj"):
+    """Build a VertexModelGardenClient without real ADC."""
+    env = {"GOOGLE_CLOUD_PROJECT": project, "GOOGLE_CLOUD_LOCATION": location}
+    with patch.dict(os.environ, env), \
+         patch("google.auth.default", return_value=(_FakeCreds(), project)):
+        cfg = ModelConfig(provider="vertex_model_garden",
+                          model_name="deepseek-ai/deepseek-v3.2-maas",
+                          max_tokens=256, temperature=0.2, purpose="tutoring")
+        return VertexModelGardenClient(cfg)
+
+
+class VertexClientInitTests(SimpleTestCase):
+    def test_base_url_regional(self):
+        c = _make_vertex_client(location="us-west2")
+        assert c._base_url == (
+            "https://us-west2-aiplatform.googleapis.com/v1/projects/test-proj"
+            "/locations/us-west2/endpoints/openapi")
+
+    def test_base_url_global(self):
+        c = _make_vertex_client(location="global")
+        assert c._base_url == (
+            "https://aiplatform.googleapis.com/v1/projects/test-proj"
+            "/locations/global/endpoints/openapi")
+
+    def test_missing_project_raises(self):
+        with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": ""}), \
+             patch("google.auth.default", return_value=(_FakeCreds(), None)):
+            cfg = ModelConfig(provider="vertex_model_garden",
+                              model_name="deepseek-ai/deepseek-v3.2-maas")
+            with self.assertRaises(ValueError):
+                VertexModelGardenClient(cfg)
+
+
+def _raw(text):
+    m = MagicMock()
+    m.text = text
+    return m
+
+
+class VertexCreateRawTests(SimpleTestCase):
+    def test_retries_on_empty_choices_then_succeeds(self):
+        c = _make_vertex_client()
+        fake = MagicMock()
+        fake.chat.completions.with_raw_response.create.side_effect = [
+            _raw('{"choices": null}'),
+            _raw('{"choices": []}'),
+            _raw('{"choices": [{"finish_reason": "stop", "message": '
+                 '{"content": "hi"}}], "usage": {"prompt_tokens": 1, '
+                 '"completion_tokens": 1}}'),
+        ]
+        with patch.object(VertexModelGardenClient, "client",
+                          new_callable=PropertyMock, return_value=fake), \
+             patch("time.sleep"):
+            data = c._create_raw(model="m", messages=[])
+        assert data["choices"][0]["message"]["content"] == "hi"
+        assert fake.chat.completions.with_raw_response.create.call_count == 3
+
+    def test_raises_after_retry_budget(self):
+        c = _make_vertex_client()
+        fake = MagicMock()
+        fake.chat.completions.with_raw_response.create.return_value = _raw('{"choices": []}')
+        with patch.object(VertexModelGardenClient, "client",
+                          new_callable=PropertyMock, return_value=fake), \
+             patch("time.sleep"):
+            with self.assertRaises(RuntimeError):
+                c._create_raw(model="m", messages=[])
+
+
+class VertexGenerateTests(SimpleTestCase):
+    def test_generate_with_tools_returns_adapted_tool_call(self):
+        c = _make_vertex_client()
+        body = ('{"choices": [{"finish_reason": "tool_calls", "message": '
+                '{"content": null, "tool_calls": [{"id": "call_1", "type": '
+                '"function", "function": {"name": "pose_question", "arguments": '
+                '"{\\"question\\": \\"Q?\\"}"}}]}}], "usage": {"prompt_tokens": '
+                '5, "completion_tokens": 3}, "model": "deepseek-ai/deepseek-v3.2-maas"}')
+        fake = MagicMock()
+        fake.chat.completions.with_raw_response.create.return_value = _raw(body)
+        tools = [{"name": "pose_question", "description": "ask",
+                  "input_schema": {"type": "object",
+                                   "properties": {"question": {"type": "string"}}}}]
+        with patch.object(VertexModelGardenClient, "client",
+                          new_callable=PropertyMock, return_value=fake):
+            msg = c.generate_with_tools([{"role": "user", "content": "go"}],
+                                        "sys", tools, tool_choice="any")
+        tool_blocks = [b for b in msg.content if b.type == "tool_use"]
+        assert tool_blocks and tool_blocks[0].name == "pose_question"
+        assert tool_blocks[0].input == {"question": "Q?"}
+        # tool_choice "any" → OpenAI "required"
+        _, kwargs = fake.chat.completions.with_raw_response.create.call_args
+        assert kwargs["tool_choice"] == "required"
+
+    def test_generate_impl_returns_llm_response(self):
+        c = _make_vertex_client()
+        body = ('{"choices": [{"finish_reason": "stop", "message": '
+                '{"content": "answer"}}], "usage": {"prompt_tokens": 7, '
+                '"completion_tokens": 4}, "model": "deepseek-ai/deepseek-v3.2-maas"}')
+        fake = MagicMock()
+        fake.chat.completions.with_raw_response.create.return_value = _raw(body)
+        with patch.object(VertexModelGardenClient, "client",
+                          new_callable=PropertyMock, return_value=fake):
+            resp = c._generate_impl([{"role": "user", "content": "q"}], "sys",
+                                    max_tokens=50, temperature=0.2)
+        assert isinstance(resp, LLMResponse)
+        assert resp.content == "answer"
+        assert resp.tokens_in == 7 and resp.tokens_out == 4
+        assert resp.stop_reason == "stop"
