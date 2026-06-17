@@ -12,3 +12,10 @@ google/gemini-3.1-pro-preview         gemini-3.1-pro
 google/gemini-3.5-flash               gemini-3.5-flash
 google/gemini-2.5-pro                 gemini-2.5-pro
 google/gemini-2.5-flash               gemini-2.5-flash
+
+# --- Vertex Model Garden (MaaS) — provider/model  safe_name  region ---
+vertex_model_garden/deepseek-ai/deepseek-v3.2-maas      deepseek-v3.2     global
+vertex_model_garden/deepseek-ai/deepseek-v3.1-maas      deepseek-v3.1     us-west2
+vertex_model_garden/moonshotai/kimi-k2-thinking-maas    kimi-k2-thinking  global
+# Follow-up (reasoning model — run after the above pass cleanly):
+vertex_model_garden/deepseek-ai/deepseek-r1-0528-maas   deepseek-r1       us-central1

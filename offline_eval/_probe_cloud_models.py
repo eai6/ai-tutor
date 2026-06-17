@@ -28,6 +28,11 @@ CANDIDATES = [
     ('google', 'gemini-3-flash-preview'),
     ('google', 'gemini-3.5-flash'),
     ('google', 'gemini-3-flash'),
+    # Vertex Model Garden MaaS — (provider, model, region). Regions differ.
+    ('vertex_model_garden', 'deepseek-ai/deepseek-v3.2-maas', 'global'),
+    ('vertex_model_garden', 'deepseek-ai/deepseek-v3.1-maas', 'us-west2'),
+    ('vertex_model_garden', 'moonshotai/kimi-k2-thinking-maas', 'global'),
+    ('vertex_model_garden', 'deepseek-ai/deepseek-r1-0528-maas', 'us-central1'),
 ]
 
 
@@ -38,7 +43,7 @@ def probe(provider, model):
     try:
         client = get_llm_client(cfg)
         resp = client.generate(messages=[{'role': 'user', 'content': 'hi'}],
-                               system_prompt='Reply with one word.', max_tokens=5)
+                               system_prompt='Reply with one word.', max_tokens=32)
         txt = (getattr(resp, 'content', '') or getattr(resp, 'text', '') or '')[:30]
         return True, repr(txt)
     except Exception as e:
@@ -47,9 +52,14 @@ def probe(provider, model):
 
 def main():
     ok = []
-    for provider, model in CANDIDATES:
+    for cand in CANDIDATES:
+        provider, model = cand[0], cand[1]
+        region = cand[2] if len(cand) > 2 else None
+        if region:
+            os.environ['GOOGLE_CLOUD_LOCATION'] = region
         good, detail = probe(provider, model)
-        print(f"  [{'OK ' if good else 'XX '}] {provider}/{model:32} {detail}")
+        label = f"{provider}/{model}" + (f" @{region}" if region else "")
+        print(f"  [{'OK ' if good else 'XX '}] {label:48} {detail}")
         if good:
             ok.append(f"{provider}/{model}")
     print("\nReachable:")
