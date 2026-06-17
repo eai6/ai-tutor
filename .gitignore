@@ -1,4 +1,6 @@
 .env
+# Local-only Google Cloud work-mode helper (isolated CLOUDSDK_CONFIG); see pdl-gcloud.sh
+/pdl-gcloud.sh
 venv
 azure
 notes.txt
@@ -14,6 +16,7 @@ media/vectordb/
 openstax_resources */
 media
 design/LOCAL_TESTING_GUIDE.md
+
 
 
 # Pulumi stack secrets passphrase — never commit
