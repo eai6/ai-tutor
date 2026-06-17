@@ -1,6 +1,6 @@
 # Offline tutor-model evaluation — findings
 
-**Date:** 2026-06-16 · **Status:** 30 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini).
+**Date:** 2026-06-18 · **Status:** 34 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini) + 4 large open-weight via Vertex Model Garden MaaS (DeepSeek / Kimi).
 **Author:** AI Tutor team · **Context:** model selection for offline / low-connectivity deployment (Mozambique, Tanzania)
 
 ## TL;DR
@@ -9,6 +9,9 @@ The proprietary ceiling is **Claude Opus 4.7 at 90%**. The best offline model,
 on-device use, **qwen2.5:3b (45%)** is the phone/tablet pick and **qwen2.5:7b
 (52%, best rubric 0.71 of any open model)** the laptop/server pick. A 7B open model
 already rivals Gemini 3.5 Flash (50%). Stock models, no tutor-specific tuning yet.
+Cloud-hosted open weights go further: **DeepSeek V3.2 via Vertex Model Garden hits
+58%** — the best open-weight result, on par with Gemini 3.1 Pro and above every
+locally-run open model (see the Vertex Model Garden section below).
 
 ## Proprietary benchmark ceiling (same harness, 60 scenarios)
 
@@ -28,6 +31,38 @@ returned empty responses in id-probing (thinking-mode), so this is likely a harn
 interaction, not true capability — treat the Gemini-Pro rows as **suspect pending a
 diagnostic** (same playbook that recovered GLM-4). Haiku 4.5 (82%) also beats
 Sonnet 4.6 (78%), which is plausible for this recent, strong small model.
+
+## Vertex Model Garden — large open-weight models via MaaS (new, 2026-06-18)
+
+Same 60-scenario single-turn harness, same Anthropic judge + student-sim; the
+tutor is served by **Google Vertex AI Model Garden** as Model-as-a-Service
+(pay-per-token, OpenAI-compatible endpoint — no GPU endpoints deployed). All four
+ran with **0 harness errors and 0 empty-response retries**.
+
+| Model | Vendor | Mode | Pass rate | Rubric |
+|---|---|---|---:|---:|
+| deepseek-v3.2 | DeepSeek | non-thinking | **58%** | 0.71 |
+| kimi-k2-thinking | Moonshot | thinking | 57% | 0.68 |
+| deepseek-v3.1 | DeepSeek | non-thinking | 45% | 0.62 |
+| deepseek-r1-0528 | DeepSeek | thinking | 22% | 0.41 |
+
+**Findings:**
+1. **DeepSeek V3.2 (58%, rubric 0.71) is the strongest open-weight model tested** —
+   it ties Gemini 3.1 Pro, beats Gemini 3.5 Flash (50%) and *every* locally-run open
+   model (best was qwen2.5:14b at 55%). A genuine cloud-hosted open-weight option in
+   the Gemini-Flash tier.
+2. **Newer beats older within DeepSeek:** V3.2 (58%) clearly outscores V3.1 (45%).
+3. **Kimi K2 Thinking (57%) is competitive** — its structured tool-calls drove the
+   tutor cleanly despite being a reasoning model.
+4. **DeepSeek R1 (22%) is poorly suited to this task** — R1 is reasoning-only, and
+   DeepSeek tool-calling is documented as non-thinking-mode only, so the tool-driven
+   tutor underperforms. The low score is model/task fit, **not** a harness artifact
+   (0 errors, 0 empty-response retries). Math + persona remain the dominant failure
+   categories, consistent with the rest of the field.
+
+*Integration: `apps/llm/client.py::VertexModelGardenClient` (OpenAI-compatible
+Vertex MaaS endpoint, ADC auth, per-region routing). See
+`docs/superpowers/specs/2026-06-17-vertex-model-garden-eval-design.md`.*
 
 ## Why we ran this
 The pilot runs on a hosted Anthropic model. For data-residency and offline use in
