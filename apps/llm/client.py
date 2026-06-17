@@ -1453,9 +1453,10 @@ class VertexModelGardenClient(OpenAIClient):
         """POST chat/completions via `with_raw_response`, return the parsed JSON
         dict. Retry when `choices` is empty/None (intermittent DeepSeek MaaS
         failure). Raise after the budget."""
-        client = self.client
         for attempt in range(self.EMPTY_MAX_RETRIES + 1):
-            raw = client.chat.completions.with_raw_response.create(**kwargs)
+            # Re-read the `client` property each attempt so a token that expires
+            # mid-retry is refreshed (the property refreshes when invalid).
+            raw = self.client.chat.completions.with_raw_response.create(**kwargs)
             data = json.loads(raw.text)
             if data.get('choices'):
                 return data
