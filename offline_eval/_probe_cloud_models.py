@@ -57,6 +57,10 @@ def main():
         region = cand[2] if len(cand) > 2 else None
         if region:
             os.environ['GOOGLE_CLOUD_LOCATION'] = region
+        else:
+            # Clear any region left by a prior candidate so a regionless
+            # provider never inherits a stale GOOGLE_CLOUD_LOCATION.
+            os.environ.pop('GOOGLE_CLOUD_LOCATION', None)
         good, detail = probe(provider, model)
         label = f"{provider}/{model}" + (f" @{region}" if region else "")
         print(f"  [{'OK ' if good else 'XX '}] {label:48} {detail}")

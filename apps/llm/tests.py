@@ -1,6 +1,15 @@
+import os
+from unittest.mock import patch, PropertyMock, MagicMock
+
 from django.test import SimpleTestCase, TestCase
+
 from apps.llm.models import ModelConfig
-from apps.llm.client import _adapt_openai_dict
+from apps.llm.client import (
+    _adapt_openai_dict,
+    VertexModelGardenClient,
+    LLMResponse,
+    get_llm_client,
+)
 
 # Real shapes captured from the live Vertex MaaS endpoint (2026-06-17).
 DEEPSEEK_TEXT = {
@@ -78,12 +87,6 @@ class AdaptOpenAIDictTests(SimpleTestCase):
         msg = _adapt_openai_dict({"choices": None})
         assert msg.content == []
         assert msg.stop_reason == "end_turn"
-
-
-import json
-import os
-from unittest.mock import patch, PropertyMock, MagicMock
-from apps.llm.client import VertexModelGardenClient, LLMResponse
 
 
 class _FakeCreds:
@@ -200,9 +203,6 @@ class VertexGenerateTests(SimpleTestCase):
         assert resp.content == "answer"
         assert resp.tokens_in == 7 and resp.tokens_out == 4
         assert resp.stop_reason == "stop"
-
-
-from apps.llm.client import get_llm_client
 
 
 class VertexFactoryTests(SimpleTestCase):
