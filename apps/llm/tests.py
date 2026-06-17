@@ -200,3 +200,17 @@ class VertexGenerateTests(SimpleTestCase):
         assert resp.content == "answer"
         assert resp.tokens_in == 7 and resp.tokens_out == 4
         assert resp.stop_reason == "stop"
+
+
+from apps.llm.client import get_llm_client
+
+
+class VertexFactoryTests(SimpleTestCase):
+    def test_factory_returns_vertex_client(self):
+        with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": "test-proj",
+                                     "GOOGLE_CLOUD_LOCATION": "global"}), \
+             patch("google.auth.default", return_value=(_FakeCreds(), "test-proj")):
+            cfg = ModelConfig(provider="vertex_model_garden",
+                              model_name="deepseek-ai/deepseek-v3.2-maas")
+            client = get_llm_client(cfg)
+        assert isinstance(client, VertexModelGardenClient)

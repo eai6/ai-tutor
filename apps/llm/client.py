@@ -1936,5 +1936,7 @@ def get_llm_client(config: ModelConfig, use_mock: bool = False) -> BaseLLMClient
         return GeminiClient(config)
     elif config.provider == ModelConfig.Provider.LOCAL_OLLAMA:
         return OllamaClient(config)
+    elif config.provider == ModelConfig.Provider.VERTEX_MODEL_GARDEN:
+        return VertexModelGardenClient(config)
 
     raise ValueError(f"Unsupported provider: {config.provider}")
