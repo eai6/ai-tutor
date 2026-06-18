@@ -1,6 +1,6 @@
 # Offline tutor-model evaluation — findings
 
-**Date:** 2026-06-18 · **Status:** 34 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini) + 4 large open-weight via Vertex Model Garden MaaS (DeepSeek / Kimi).
+**Date:** 2026-06-18 · **Status:** 44 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini) + 14 large open-weight via Vertex Model Garden MaaS (DeepSeek / Kimi / Qwen3 / Grok / GLM).
 **Author:** AI Tutor team · **Context:** model selection for offline / low-connectivity deployment (Mozambique, Tanzania)
 
 ## TL;DR
@@ -9,9 +9,10 @@ The proprietary ceiling is **Claude Opus 4.7 at 90%**. The best offline model,
 on-device use, **qwen2.5:3b (45%)** is the phone/tablet pick and **qwen2.5:7b
 (52%, best rubric 0.71 of any open model)** the laptop/server pick. A 7B open model
 already rivals Gemini 3.5 Flash (50%). Stock models, no tutor-specific tuning yet.
-Cloud-hosted open weights go further: **DeepSeek V3.2 via Vertex Model Garden hits
-58%** — the best open-weight result, on par with Gemini 3.1 Pro and above every
-locally-run open model (see the Vertex Model Garden section below).
+Cloud-hosted open weights go much further: via Vertex Model Garden, **Grok 4.1-fast
+(reasoning) hits 72%** — the best non-Anthropic model in the whole benchmark, behind
+only Claude (Opus/Haiku/Sonnet) and ahead of every Gemini — with **Qwen3-Coder 480B
+at 68%** and **GLM-4.7 at 67%** close behind. See the two Vertex Model Garden sections.
 
 ## Proprietary benchmark ceiling (same harness, 60 scenarios)
 
@@ -63,6 +64,49 @@ ran with **0 harness errors and 0 empty-response retries**.
 *Integration: `apps/llm/client.py::VertexModelGardenClient` (OpenAI-compatible
 Vertex MaaS endpoint, ADC auth, per-region routing). See
 `docs/superpowers/specs/2026-06-17-vertex-model-garden-eval-design.md`.*
+
+## Vertex Model Garden — batch 2: Qwen3 / Grok / GLM (2026-06-18)
+
+Ten more MaaS models on the same 60-scenario harness (all `global`). All scored
+**0 harness errors**.
+
+| Model | Vendor | Mode | Pass rate | Rubric |
+|---|---|---|---:|---:|
+| grok-4.1-fast-reasoning | xAI | reasoning | **72%** | 0.80 |
+| qwen3-coder-480b-a35b | Qwen | instruct | 68% | 0.76 |
+| glm-4.7 | Zhipu | — | 67% | 0.75 |
+| qwen3-next-80b-a3b-instruct | Qwen | instruct | 65% | 0.71 |
+| qwen3-235b-a22b-instruct-2507 | Qwen | instruct | 63% | 0.74 |
+| glm-5 | Zhipu | — | 57% | 0.73 |
+| grok-4.1-fast-non-reasoning | xAI | non-reasoning | 57% | 0.72 |
+| grok-4.20-non-reasoning | xAI | non-reasoning | 48% | 0.64 |
+| grok-4.20-reasoning | xAI | reasoning | 45% | 0.65 |
+| qwen3-next-80b-a3b-thinking | Qwen | thinking | 2% | 0.34 |
+
+**Findings:**
+1. **Grok 4.1-fast (reasoning) at 72% is the best non-Anthropic model in the entire
+   44-model benchmark** — behind only Claude Opus/Haiku/Sonnet, ahead of every Gemini,
+   DeepSeek, Qwen and GLM. A strong cloud-hosted frontier option.
+2. **Qwen3-Coder 480B (68%) and GLM-4.7 (67%)** are the next tier — both beat
+   Gemini 2.5 Flash (65%) and every locally-run open model. Qwen3 instruct models are
+   uniformly strong (Coder 68%, Next-80B 65%, 235B 63%).
+3. **Newer ≠ better, twice:** GLM-4.7 (67%) > GLM-5 (57%), and Grok 4.1-fast
+   (72%/57%) > Grok 4.20 (45%/48%) on both reasoning and non-reasoning variants.
+4. **Reasoning mode is model-dependent for the tool-driven tutor:** it *helps* Grok
+   4.1-fast (72% reasoning vs 57% non-reasoning) but *hurts* Grok 4.20 (45% vs 48%).
+5. **Pure-thinking models truncate badly:** qwen3-next-80b-**thinking** scored 2%
+   (vs 65% for its **instruct** sibling) — reasoning tokens exhaust the tutor's
+   budget before it emits the tool call, the same failure as deepseek-r1 (22%). For
+   this tool-loop tutor, **instruct/non-thinking variants are the right default.**
+
+**Data-integrity note:** the first pass of this batch was corrupted by a **client-side
+internet outage** mid-sweep — the Anthropic rubric-judge calls returned
+`APIConnectionError` for 7 of the 10 models, scoring capable models as 0% (a judge
+outage, not model capability; tool-calls verified working throughout). Those 7 were
+re-run once connectivity returned; **all 10 rows above are from runs with
+`judge_failed=0`.** Follow-up worth doing: harden the harness so a judge
+connectivity failure is recorded as `errored` (or retried) rather than silently
+scored as a model failure.
 
 ## Why we ran this
 The pilot runs on a hosted Anthropic model. For data-residency and offline use in
