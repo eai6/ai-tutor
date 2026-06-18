@@ -33,6 +33,17 @@ CANDIDATES = [
     ('vertex_model_garden', 'deepseek-ai/deepseek-v3.1-maas', 'us-west2'),
     ('vertex_model_garden', 'moonshotai/kimi-k2-thinking-maas', 'global'),
     ('vertex_model_garden', 'deepseek-ai/deepseek-r1-0528-maas', 'us-central1'),
+    # Batch 2 — Qwen3 / Grok / GLM (all global)
+    ('vertex_model_garden', 'qwen/qwen3-next-80b-a3b-instruct-maas', 'global'),
+    ('vertex_model_garden', 'qwen/qwen3-next-80b-a3b-thinking-maas', 'global'),
+    ('vertex_model_garden', 'qwen/qwen3-coder-480b-a35b-instruct-maas', 'global'),
+    ('vertex_model_garden', 'qwen/qwen3-235b-a22b-instruct-2507-maas', 'global'),
+    ('vertex_model_garden', 'xai/grok-4.1-fast-reasoning', 'global'),
+    ('vertex_model_garden', 'xai/grok-4.1-fast-non-reasoning', 'global'),
+    ('vertex_model_garden', 'xai/grok-4.20-reasoning', 'global'),
+    ('vertex_model_garden', 'xai/grok-4.20-non-reasoning', 'global'),
+    ('vertex_model_garden', 'zai-org/glm-5-maas', 'global'),
+    ('vertex_model_garden', 'zai-org/glm-4.7-maas', 'global'),
 ]
 
 
