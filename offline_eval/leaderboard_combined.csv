@@ -1,0 +1,45 @@
+rank,model,type,vendor,passed,total,pass_rate_pct,rubric,errors,top_failure,top_failure_count
+1,claude-opus-4-7,Proprietary,Anthropic,54,60,90,0.88,0,persona_handling,3
+2,claude-haiku-4-5,Proprietary,Anthropic,49,60,82,0.86,0,math,5
+3,claude-sonnet-4-6,Proprietary,Anthropic,47,60,78,0.82,0,persona_handling,6
+4,grok-4.1-fast-reasoning,Cloud MaaS,xAI,43,60,72,0.8,0,math,7
+5,qwen3-coder-480b,Cloud MaaS,Qwen,41,60,68,0.76,0,math,8
+6,glm-4.7,Cloud MaaS,Zhipu,40,60,67,0.75,0,math,8
+7,gemini-2.5-flash,Proprietary,Google,39,60,65,0.74,0,math,9
+8,qwen3-next-80b-instruct,Cloud MaaS,Qwen,39,60,65,0.71,0,math,12
+9,qwen3-235b-instruct,Cloud MaaS,Qwen,38,60,63,0.74,0,diagnostic,7
+10,deepseek-v3.2,Cloud MaaS,DeepSeek,35,60,58,0.71,0,math,8
+11,gemini-3.1-pro,Proprietary,Google,35,60,58,0.71,0,math,9
+12,glm-5,Cloud MaaS,Zhipu,34,60,57,0.73,0,math,9
+13,grok-4.1-fast-non-reasoning,Cloud MaaS,xAI,34,60,57,0.72,0,math,10
+14,kimi-k2-thinking,Cloud MaaS,Moonshot,34,60,57,0.68,0,math,12
+15,qwen2.5_14b,Local OSS,Qwen,33,60,55,0.66,0,math,11
+16,mistral-nemo_12b,Local OSS,Mistral,32,60,53,0.67,0,math,10
+17,qwen2.5_7b,Local OSS,Qwen,31,60,52,0.71,0,crosscutting,9
+18,gemini-3.5-flash,Proprietary,Google,30,60,50,0.66,0,crosscutting,8
+19,grok-4.20-non-reasoning,Cloud MaaS,xAI,29,60,48,0.64,0,crosscutting,9
+20,deepseek-v3.1,Cloud MaaS,DeepSeek,27,60,45,0.62,0,math,13
+21,grok-4.20-reasoning,Cloud MaaS,xAI,27,60,45,0.65,0,math,11
+22,qwen2.5_3b,Local OSS,Qwen,27,60,45,0.61,0,persona_handling,11
+23,gemini-2.5-pro,Proprietary,Google,26,60,43,0.64,0,math,10
+24,glm4_9b,Local OSS,Zhipu,26,60,43,0.6,0,crosscutting,9
+25,granite3.1-dense_8b,Local OSS,IBM,20,60,33,0.56,0,math,13
+26,llama3.1_8b,Local OSS,Meta,20,60,33,0.53,0,persona_handling,13
+27,mistral_7b,Local OSS,Mistral,19,60,32,0.54,0,math,15
+28,llama3.2_3b,Local OSS,Meta,17,60,28,0.46,0,persona_handling,13
+29,qwen2.5_1.5b,Local OSS,Qwen,17,60,28,0.5,0,persona_handling,13
+30,deepseek-r1,Cloud MaaS,DeepSeek,13,60,22,0.41,0,math,14
+31,hermes3_8b,Local OSS,Nous,13,60,22,0.43,0,math,15
+32,llama3-groq-tool-use_8b,Local OSS,Meta/Groq,13,60,22,0.46,0,math,13
+33,command-r7b,Local OSS,Cohere,9,60,15,0.42,0,math,17
+34,granite3.1-dense_2b,Local OSS,IBM,9,60,15,0.41,0,math,18
+35,granite3.1-moe_3b,Local OSS,IBM,9,60,15,0.37,0,persona_handling,16
+36,aya-expanse_8b,Local OSS,Cohere,6,60,10,0.38,0,persona_handling,17
+37,llama3.2_1b,Local OSS,Meta,5,60,8,0.29,0,persona_handling,17
+38,nemotron-mini,Local OSS,NVIDIA,5,60,8,0.39,0,persona_handling,16
+39,qwen2.5_0.5b,Local OSS,Qwen,4,60,7,0.37,0,persona_handling,17
+40,hermes3_3b,Local OSS,Nous,2,60,3,0.34,0,persona_handling,19
+41,qwen3-next-80b-thinking,Cloud MaaS,Qwen,1,60,2,0.34,0,persona_handling,18
+42,falcon3_10b,Local OSS,TII,0,60,0,0.32,0,persona_handling,19
+43,gemma2_2b,Local OSS,Google,0,60,0,0.32,0,persona_handling,19
+44,phi4,Local OSS,Microsoft,0,60,0,0.33,0,persona_handling,19

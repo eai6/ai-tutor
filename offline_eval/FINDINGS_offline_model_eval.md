@@ -1,4 +1,4 @@
-# Offline tutor-model evaluation — findings
+   # Offline tutor-model evaluation — findings
 
 **Date:** 2026-06-18 · **Status:** 44 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini) + 14 large open-weight via Vertex Model Garden MaaS (DeepSeek / Kimi / Qwen3 / Grok / GLM).
 **Author:** AI Tutor team · **Context:** model selection for offline / low-connectivity deployment (Mozambique, Tanzania)
@@ -13,6 +13,68 @@ Cloud-hosted open weights go much further: via Vertex Model Garden, **Grok 4.1-f
 (reasoning) hits 72%** — the best non-Anthropic model in the whole benchmark, behind
 only Claude (Opus/Haiku/Sonnet) and ahead of every Gemini — with **Qwen3-Coder 480B
 at 68%** and **GLM-4.7 at 67%** close behind. See the two Vertex Model Garden sections.
+
+## Combined leaderboard — all 44 models (one ranking)
+
+Every model, same 60-scenario single-turn harness, **0 errors** across the board.
+**Pass** = cross-family pass rate (primary). **Rubric** = mean 0–1 teaching-quality
+score (Anthropic-Haiku judge). **Top failure** = biggest bottleneck category (count).
+Type: *Proprietary* (hosted API) · *Cloud MaaS* (open-weight via Vertex Model
+Garden, pay-per-token) · *Local OSS* (on-device/laptop via Ollama). Regenerate with
+`venv/bin/python offline_eval/aggregate.py`; CSV at `offline_eval/leaderboard_combined.csv`.
+
+| # | Model | Type · Vendor | Pass | Rubric | Top failure |
+|--:|---|---|--:|--:|---|
+| 1 | claude-opus-4-7 | Proprietary · Anthropic | **90%** | 0.88 | persona (3) |
+| 2 | claude-haiku-4-5 | Proprietary · Anthropic | 82% | 0.86 | math (5) |
+| 3 | claude-sonnet-4-6 | Proprietary · Anthropic | 78% | 0.82 | persona (6) |
+| 4 | grok-4.1-fast-reasoning | Cloud MaaS · xAI | 72% | 0.80 | math (7) |
+| 5 | qwen3-coder-480b | Cloud MaaS · Qwen | 68% | 0.76 | math (8) |
+| 6 | glm-4.7 | Cloud MaaS · Zhipu | 67% | 0.75 | math (8) |
+| 7 | gemini-2.5-flash | Proprietary · Google | 65% | 0.74 | math (9) |
+| 8 | qwen3-next-80b-instruct | Cloud MaaS · Qwen | 65% | 0.71 | math (12) |
+| 9 | qwen3-235b-instruct | Cloud MaaS · Qwen | 63% | 0.74 | diagnostic (7) |
+| 10 | deepseek-v3.2 | Cloud MaaS · DeepSeek | 58% | 0.71 | math (8) |
+| 11 | gemini-3.1-pro | Proprietary · Google | 58% | 0.71 | math (9) |
+| 12 | glm-5 | Cloud MaaS · Zhipu | 57% | 0.73 | math (9) |
+| 13 | grok-4.1-fast-non-reasoning | Cloud MaaS · xAI | 57% | 0.72 | math (10) |
+| 14 | kimi-k2-thinking | Cloud MaaS · Moonshot | 57% | 0.68 | math (12) |
+| 15 | qwen2.5:14b | Local OSS · Qwen | 55% | 0.66 | math (11) |
+| 16 | mistral-nemo:12b | Local OSS · Mistral | 53% | 0.67 | math (10) |
+| 17 | qwen2.5:7b | Local OSS · Qwen | 52% | 0.71 | crosscutting (9) |
+| 18 | gemini-3.5-flash | Proprietary · Google | 50% | 0.66 | crosscutting (8) |
+| 19 | grok-4.20-non-reasoning | Cloud MaaS · xAI | 48% | 0.64 | crosscutting (9) |
+| 20 | deepseek-v3.1 | Cloud MaaS · DeepSeek | 45% | 0.62 | math (13) |
+| 21 | grok-4.20-reasoning | Cloud MaaS · xAI | 45% | 0.65 | math (11) |
+| 22 | qwen2.5:3b | Local OSS · Qwen | 45% | 0.61 | persona (11) |
+| 23 | gemini-2.5-pro | Proprietary · Google | 43%\* | 0.64 | math (10) |
+| 24 | glm4:9b | Local OSS · Zhipu | 43% | 0.60 | crosscutting (9) |
+| 25 | granite3.1-dense:8b | Local OSS · IBM | 33% | 0.56 | math (13) |
+| 26 | llama3.1:8b | Local OSS · Meta | 33% | 0.53 | persona (13) |
+| 27 | mistral:7b | Local OSS · Mistral | 32% | 0.54 | math (15) |
+| 28 | llama3.2:3b | Local OSS · Meta | 28% | 0.46 | persona (13) |
+| 29 | qwen2.5:1.5b | Local OSS · Qwen | 28% | 0.50 | persona (13) |
+| 30 | deepseek-r1 | Cloud MaaS · DeepSeek | 22%† | 0.41 | math (14) |
+| 31 | hermes3:8b | Local OSS · Nous | 22% | 0.43 | math (15) |
+| 32 | llama3-groq-tool-use:8b | Local OSS · Meta/Groq | 22% | 0.46 | math (13) |
+| 33 | command-r7b | Local OSS · Cohere | 15% | 0.42 | math (17) |
+| 34 | granite3.1-dense:2b | Local OSS · IBM | 15% | 0.41 | math (18) |
+| 35 | granite3.1-moe:3b | Local OSS · IBM | 15% | 0.37 | persona (16) |
+| 36 | aya-expanse:8b | Local OSS · Cohere | 10% | 0.38 | persona (17) |
+| 37 | llama3.2:1b | Local OSS · Meta | 8% | 0.29 | persona (17) |
+| 38 | nemotron-mini | Local OSS · NVIDIA | 8% | 0.39 | persona (16) |
+| 39 | qwen2.5:0.5b | Local OSS · Qwen | 7% | 0.37 | persona (17) |
+| 40 | hermes3:3b | Local OSS · Nous | 3% | 0.34 | persona (19) |
+| 41 | qwen3-next-80b-thinking | Cloud MaaS · Qwen | 2%† | 0.34 | persona (18) |
+| 42 | falcon3:10b | Local OSS · TII | 0%‡ | 0.32 | persona (19) |
+| 43 | gemma2:2b | Local OSS · Google | 0%‡ | 0.32 | persona (19) |
+| 44 | phi4 | Local OSS · Microsoft | 0%‡ | 0.33 | persona (19) |
+
+\* gemini-2.5-pro suspect (Pro < Flash — likely thinking-mode harness interaction).
+† deepseek-r1 / qwen3-next-**thinking**: reasoning-token truncation before the tool
+call (task-fit artifact; instruct siblings score far higher), not raw capability.
+‡ falcon3 / gemma2 / phi4: tool-protocol failures (no/garbled tool-calls), not
+teaching failures. Detailed per-tier tables and methodology follow below.
 
 ## Proprietary benchmark ceiling (same harness, 60 scenarios)
 
