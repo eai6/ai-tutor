@@ -170,6 +170,20 @@ jobs:
               "TUTOR_PROMPT_VARIANT=${{ steps.cfg.outputs.prompt_variant }}" \
               "TUTOR_MODEL_OVERRIDE=${{ steps.cfg.outputs.model_override }}"
 
+      # Prune old images so the Basic ACR doesn't re-accumulate storage
+      # overage. ~4 months of un-pruned per-commit builds reached 2.3 TB
+      # (~$180/mo overage) before a one-time cleanup on 2026-06-10. This
+      # keeps the 20 most-recent tags (latest + the just-pushed SHA +
+      # rollback targets) and deletes the rest plus dangling manifests,
+      # on every deploy. Runs server-side as an ACR task.
+      # Non-fatal: a purge hiccup must never fail the deploy.
+      - name: Prune old ACR images (keep newest 20)
+        continue-on-error: true
+        run: |
+          az acr run --registry ${ACR%%.*} \
+            --cmd "acr purge --filter 'aitutor:.*' --ago 0d --keep 20 --untagged" \
+            /dev/null
+
   # ─────────────────────────────────────────────────────────────────
   # Post-deploy tutor evaluation
   # ─────────────────────────────────────────────────────────────────
@@ -196,12 +210,14 @@ jobs:
   #   - `eval-fixtures/baseline.json` committed (regenerate with
   #     `python scripts/extract_eval_fixture.py`)
   #
-  # Skip via workflow_dispatch input `skip_eval=true`.
+  # Skip via workflow_dispatch input `skip_eval=true`, OR by putting
+  # `[skip eval]` anywhere in the head commit message of a push (lets a
+  # plain `git push` to main deploy without paying for the eval run).
   post_deploy_eval:
     name: Post-deploy tutor evaluation
     needs: deploy
     runs-on: ubuntu-latest
-    if: ${{ success() && github.event.inputs.skip_eval != 'true' }}
+    if: ${{ success() && github.event.inputs.skip_eval != 'true' && !contains(github.event.head_commit.message, '[skip eval]') }}
     timeout-minutes: 60  # 4-cell deploy matrix runs ~25 min sim + ~10 min judge; Gemini error_prone cells hit ~10 min each
     continue-on-error: true  # eval failures must not mark the deploy as failed
     permissions:

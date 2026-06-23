@@ -31,3 +31,11 @@ config:
   aitutor:custom-domains:
     - ai-tutor.wbg.edwardamoah.com
     - www.seselai.sc
+  aitutor:enable-waf: "true"
+  aitutor:cicd-sp-object-id: 4341d1f9-ecdb-4445-802a-3a79b322f440
+  aitutor:enable-appgw: "true"
+  aitutor:enable-blob: "true"
+  aitutor:workload-profile-type: Consumption
+  aitutor:env-default-domain: redbush-f73ec411.centralus.azurecontainerapps.io
+  aitutor:env-static-ip: 10.20.0.23
+  aitutor:app-identity-principal-id: 916a138c-d938-4c31-92eb-6ec87677489b

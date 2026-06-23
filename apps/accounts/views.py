@@ -298,8 +298,14 @@ def staff_self_register(request):
 
         if not email:
             errors.append("Email is required for teacher accounts.")
-        elif User.objects.filter(email=email).exists():
-            errors.append("Email already registered.")
+        elif Membership.objects.filter(role='staff', user__email__iexact=email).exists():
+            # Many teachers were registered as STUDENTS during training, so
+            # their email is already taken by a student account. Allow them to
+            # create a fresh teacher account on the same email (separate User
+            # with its own username + password) — only block a duplicate
+            # TEACHER account. Password-reset emails include the username, so
+            # the student and teacher accounts stay distinguishable.
+            errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
         if len(password) < 8:
             errors.append("Password must be at least 8 characters.")
@@ -426,8 +432,10 @@ def staff_register(request, token=None):
         if User.objects.filter(username=username).exists():
             errors.append("Username already taken.")
 
-        if email and User.objects.filter(email=email).exists():
-            errors.append("Email already registered.")
+        if email and Membership.objects.filter(role='staff', user__email__iexact=email).exists():
+            # Allow an email already used by a student account; only block a
+            # duplicate teacher account (see staff_self_register for rationale).
+            errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
         if len(password) < 8:
             errors.append("Password must be at least 8 characters.")
@@ -482,98 +490,12 @@ def staff_register(request, token=None):
 
 @login_required
 def invite_staff(request):
-    """Superadmin can invite staff members to a specific school."""
+    """Deprecated standalone invite page. Staff invites are now managed on the
+    centralized Staff page (dashboard:staff_list); redirect any old links there."""
     if not request.user.is_staff:
         messages.error(request, "Only administrators can invite staff.")
         return redirect('dashboard:home')
-
-    from apps.accounts.models import StaffInvitation
-    import secrets
-
-    active_schools = Institution.objects.filter(is_active=True).order_by('name')
-    if not active_schools.exists():
-        messages.error(request, "No active schools found. Please create a school first.")
-        return redirect('dashboard:settings')
-
-    if request.method == 'POST':
-        email = request.POST.get('email', '').strip()
-        school_id = request.POST.get('school_id', '')
-
-        # Validate school selection
-        institution = active_schools.filter(id=school_id).first() if school_id else None
-        if not institution:
-            messages.error(request, "Please select a valid school.")
-            return redirect('accounts:invite_staff')
-
-        # Validate email only if provided
-        if email and '@' not in email:
-            messages.error(request, "Please enter a valid email address.")
-            return redirect('accounts:invite_staff')
-
-        # Duplicate check only if email provided
-        if email:
-            existing = StaffInvitation.objects.filter(
-                email=email,
-                institution=institution,
-                is_used=False
-            ).first()
-            if existing:
-                messages.warning(request, f"An invitation was already sent to {email} for {institution.name}.")
-                return redirect('accounts:invite_staff')
-
-        # Create invitation (always role=staff)
-        invitation = StaffInvitation.objects.create(
-            institution=institution,
-            email=email,
-            role='staff',
-            invited_by=request.user,
-            token=secrets.token_urlsafe(32),
-        )
-
-        from django.urls import reverse
-        invite_url = request.build_absolute_uri(reverse('accounts:staff_register', args=[invitation.token]))
-
-        # Send email if address was provided
-        if email:
-            from django.core.mail import send_mail
-            from django.conf import settings
-            platform_name = PlatformConfig.load().platform_name or 'AI Tutor'
-            try:
-                send_mail(
-                    subject=f"You're invited to join {institution.name} on {platform_name}",
-                    message=(
-                        f"Hello,\n\n"
-                        f"You've been invited to join {institution.name} as a staff member "
-                        f"on {platform_name}.\n\n"
-                        f"Click the link below to complete your registration:\n"
-                        f"{invite_url}\n\n"
-                        f"This invitation was sent by {request.user.get_full_name() or request.user.username}.\n\n"
-                        f"— {platform_name}"
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email],
-                    fail_silently=False,
-                )
-                messages.success(request, f"Invitation emailed to {email} at {institution.name}!")
-            except Exception as e:
-                messages.success(request, f"Invitation created for {email} at {institution.name}! (Email delivery failed: {e})")
-        else:
-            messages.success(request, f"Link-only invitation created for {institution.name}!")
-
-        return render(request, 'accounts/invite_success.html', {
-            'invitation': invitation,
-            'invite_url': invite_url,
-        })
-
-    # Show pending invitations across all schools
-    pending = StaffInvitation.objects.filter(
-        is_used=False
-    ).select_related('institution').order_by('-created_at')
-
-    return render(request, 'accounts/invite_staff.html', {
-        'pending_invitations': pending,
-        'active_schools': active_schools,
-    })
+    return redirect('dashboard:staff_list')
 
 
 # ============================================================================

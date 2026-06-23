@@ -510,11 +510,9 @@ class SafetyAuditLog:
     
     @staticmethod
     def _get_client_ip(request):
-        """Get client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR')
+        """Real client IP, proxy-aware + spoof-resistant (see apps.safety.client_ip)."""
+        from apps.safety.client_ip import get_client_ip
+        return get_client_ip(request)
 
 
 # ============================================================================

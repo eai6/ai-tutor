@@ -281,6 +281,22 @@ STORAGES = {
     },
 }
 
+# ── Media on Azure Blob (Phase 1) ────────────────────────────────────────────
+# Active only when the account + key env vars are present (prod). Media is then
+# stored in a PRIVATE blob container and served from our own domain via
+# apps.media_library.blob_media.serve_media (school-network-friendly, behind the
+# WAF, range-capable). Without these vars (local/dev) media stays on the
+# filesystem / File Share — no behaviour change. See
+# memory/blob_media_hosting_plan.md.
+AZURE_BLOB_MEDIA_ACCOUNT = os.getenv('AZURE_BLOB_MEDIA_ACCOUNT', '')
+AZURE_BLOB_MEDIA_KEY = os.getenv('AZURE_BLOB_MEDIA_KEY', '')
+AZURE_BLOB_MEDIA_CONTAINER = os.getenv('AZURE_BLOB_MEDIA_CONTAINER', 'media')
+USE_BLOB_MEDIA = bool(AZURE_BLOB_MEDIA_ACCOUNT and AZURE_BLOB_MEDIA_KEY)
+if USE_BLOB_MEDIA:
+    STORAGES['default'] = {
+        'BACKEND': 'apps.media_library.blob_media.AzureMediaStorage',
+    }
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Logging — output to stdout for container logs
