@@ -5,18 +5,18 @@
 
 {% block content %}
 <div class="page-header" style="margin-bottom:1rem;">
-    <h1>Staff Management</h1>
-    <p class="muted">Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place.</p>
+    <h1>{% trans "Staff Management" %}</h1>
+    <p class="muted">{% trans "Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place." %}</p>
 </div>
 
 {# ── Find / debug any account (incl. students who can't log in as staff) ── #}
 <div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">Find / debug a user</h3></div>
+    <div class="card-header"><h3 class="card-title">{% trans "Find / debug a user" %}</h3></div>
     <div class="card-body">
-        <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.6rem;">Look up any account by email or username — including students — to see why a login isn't working and fix it.</p>
+        <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.6rem;">{% trans "Look up any account by email or username — including students — to see why a login isn't working and fix it." %}</p>
         <form method="get" style="display:flex;gap:0.5rem;max-width:480px;">
-            <input type="text" class="form-control" name="find" value="{{ find_query }}" placeholder="email or username" style="flex:1;">
-            <button type="submit" class="btn btn-primary btn-sm">Search</button>
+            <input type="text" class="form-control" name="find" value="{{ find_query }}" placeholder="{% trans 'email or username' %}" style="flex:1;">
+            <button type="submit" class="btn btn-primary btn-sm">{% trans "Search" %}</button>
         </form>
 
         {% if find_query %}
@@ -25,18 +25,18 @@
             <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
                 <div>
                     <strong>{{ f.user.get_full_name|default:f.user.username }}</strong>
-                    {% if f.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);">(you)</span>{% endif %}
+                    {% if f.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);">{% trans "(you)" %}</span>{% endif %}
                     <div style="font-size:0.85rem;color:var(--gray-500);">{{ f.user.email }}</div>
                 </div>
                 <div style="text-align:right;font-size:0.78rem;color:var(--gray-500);">
-                    {% if f.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">Super Admin</span>{% endif %}
-                    {% if f.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
-                    <div style="margin-top:0.25rem;">Last login: {{ f.user.last_login|date:"M d, Y H:i"|default:"never" }}</div>
+                    {% if f.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">{% trans "Super Admin" %}</span>{% endif %}
+                    {% if f.is_active %}<span class="badge badge-success">{% trans "Active" %}</span>{% else %}<span class="badge">{% trans "Inactive" %}</span>{% endif %}
+                    <div style="margin-top:0.25rem;">{% trans "Last login:" %} {{ f.user.last_login|date:"M d, Y H:i"|default:"never" }}</div>
                 </div>
             </div>
             <div style="margin-top:0.5rem;font-size:0.82rem;">
-                <strong>Memberships:</strong>
-                {% for m in f.memberships %}<span class="badge" style="margin-right:0.25rem;">{{ m.role }} @ {{ m.institution }}{% if not m.is_active %} (inactive){% endif %}</span>{% empty %}<span style="color:var(--gray-500);">none</span>{% endfor %}
+                <strong>{% trans "Memberships:" %}</strong>
+                {% for m in f.memberships %}<span class="badge" style="margin-right:0.25rem;">{{ m.role }} @ {{ m.institution }}{% if not m.is_active %} {% trans "(inactive)" %}{% endif %}</span>{% empty %}<span style="color:var(--gray-500);">{% trans "none" %}</span>{% endfor %}
             </div>
             <div style="margin-top:0.5rem;padding:0.5rem 0.7rem;border-radius:6px;background:#fff8e6;border:1px solid #f0c36d;font-size:0.82rem;">⚠️ {{ f.diagnosis }}</div>
             {% if not f.is_self %}
@@ -47,39 +47,39 @@
                     <input type="hidden" name="action" value="grant_staff">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
                     <select name="school_id" class="form-control" style="font-size:0.78rem;padding:3px 6px;width:auto;">
-                        <option value="">Grant staff at…</option>
+                        <option value="">{% trans "Grant staff at…" %}</option>
                         {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
                     </select>
-                    <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Grant staff</button>
+                    <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Grant staff" %}</button>
                 </form>
-                <form method="post" style="display:inline;" onsubmit="return confirm('{% if f.is_admin %}Remove Super Admin from{% else %}Make Super Admin:{% endif %} {{ f.user.get_full_name|default:f.user.email|escapejs }}?');">
+                <form method="post" style="display:inline;" onsubmit="return confirm('{% if f.is_admin %}{% trans 'Remove Super Admin from' %}{% else %}{% trans 'Make Super Admin:' %}{% endif %} {{ f.user.get_full_name|default:f.user.email|escapejs }}?');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="toggle_admin">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}Remove admin{% else %}Make Super Admin{% endif %}</button>
+                    <button type="submit" class="btn btn-sm" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}{% trans "Remove admin" %}{% else %}{% trans "Make Super Admin" %}{% endif %}</button>
                 </form>
                 <button type="button" class="btn btn-sm staff-reset-btn"
                         data-user-id="{{ f.user.id }}" data-username="{{ f.user.username }}" data-email="{{ f.user.email }}"
-                        style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Reset password</button>
+                        style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
                 {% if not f.is_admin %}
                 <form method="post" style="display:inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="toggle_user">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                    <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
                 </form>
-                <form method="post" style="display:inline;" onsubmit="return confirm('Permanently delete {{ f.user.get_full_name|default:f.user.email|escapejs }}? This cancels the signup and cannot be undone.');">
+                <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=f.user.get_full_name|default:f.user.email|escapejs %}Permanently delete {{ name }}? This cancels the signup and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="delete_user">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Delete</button>
+                    <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Delete" %}</button>
                 </form>
                 {% endif %}
             </div>
             {% endif %}
         </div>
         {% empty %}
-        <p style="margin-top:1rem;color:var(--gray-500);font-size:0.85rem;">No account found matching "{{ find_query }}".</p>
+        <p style="margin-top:1rem;color:var(--gray-500);font-size:0.85rem;">{% blocktrans with q=find_query %}No account found matching "{{ q }}".{% endblocktrans %}</p>
         {% endfor %}
         {% endif %}
     </div>
@@ -88,7 +88,7 @@
 {# ── Pending approvals (self-registered, awaiting admin OK) ── #}
 {% if pending_approvals %}
 <div class="card" style="margin-bottom:1.5rem;border:1px solid #fde68a;">
-    <div class="card-header" style="background:#fffbeb;"><h3 class="card-title">Pending approval ({{ pending_approvals|length }})</h3></div>
+    <div class="card-header" style="background:#fffbeb;"><h3 class="card-title">{% trans "Pending approval" %} ({{ pending_approvals|length }})</h3></div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <tbody>
@@ -102,13 +102,13 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Approve</button>
+                            <button type="submit" class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Approve" %}</button>
                         </form>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('Reject and delete this pending account?');">
+                        <form method="post" style="display:inline;" onsubmit="return confirm('{% trans 'Reject and delete this pending account?' %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Reject</button>
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Reject" %}</button>
                         </form>
                     </td>
                 </tr>
@@ -121,57 +121,57 @@
 
 {# ── Admins & active staff ── #}
 <div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">Admins &amp; staff</h3></div>
+    <div class="card-header"><h3 class="card-title">{% trans "Admins & staff" %}</h3></div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.75rem 1rem;">Name</th>
-                    <th style="padding:0.75rem 1rem;">Email</th>
-                    <th style="padding:0.75rem 1rem;">Role</th>
-                    <th style="padding:0.75rem 1rem;">School</th>
-                    <th style="padding:0.75rem 1rem;">Status</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Name" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Email" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Role" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "School" %}</th>
+                    <th style="padding:0.75rem 1rem;">{% trans "Status" %}</th>
                     <th style="padding:0.75rem 1rem;text-align:right;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in people %}
                 <tr style="border-top:1px solid var(--gray-100);">
-                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.get_full_name|default:row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">(you)</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.get_full_name|default:row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">{% trans "(you)" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
-                    <td style="padding:0.75rem 1rem;">{% if row.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">Super Admin</span>{% else %}<span class="badge">Staff</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{% if row.is_admin %}<span class="badge" style="background:#ede9fe;color:#5b21b6;">{% trans "Super Admin" %}</span>{% else %}<span class="badge">{% trans "Staff" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;">{{ row.institutions }}</td>
-                    <td style="padding:0.75rem 1rem;">{% if row.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{% if row.is_active %}<span class="badge badge-success">{% trans "Active" %}</span>{% else %}<span class="badge">{% trans "Inactive" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;text-align:right;white-space:nowrap;">
                         {% if not row.is_self %}
                         <button type="button" class="btn btn-sm staff-reset-btn"
                                 data-user-id="{{ row.user.id }}" data-username="{{ row.user.username }}" data-email="{{ row.user.email }}"
-                                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Reset password</button>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('{% if row.is_admin %}Demote from{% else %}Promote to{% endif %} Super Admin: {{ row.user.get_full_name|default:row.user.email|escapejs }}?');">
+                                style="background:#5b21b6;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('{% if row.is_admin %}{% trans 'Demote from Super Admin:' %}{% else %}{% trans 'Promote to Super Admin:' %}{% endif %} {{ row.user.get_full_name|default:row.user.email|escapejs }}?');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_admin">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}Demote{% else %}Promote{% endif %}</button>
+                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}{% trans "Demote" %}{% else %}{% trans "Promote" %}{% endif %}</button>
                         </form>
                         {% if not row.is_admin %}
                         <form method="post" style="display:inline;">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                            <button type="submit" class="btn btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
                         </form>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('Permanently delete {{ row.user.get_full_name|default:row.user.email|escapejs }}? This cascades through their data and cannot be undone.');">
+                        <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=row.user.get_full_name|default:row.user.email|escapejs %}Permanently delete {{ name }}? This cascades through their data and cannot be undone.{% endblocktrans %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Delete</button>
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Delete" %}</button>
                         </form>
                         {% endif %}
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">No staff or admins yet.</td></tr>
+                <tr><td colspan="6" style="padding:2rem;text-align:center;color:var(--gray-500);">{% trans "No staff or admins yet." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -181,31 +181,31 @@
 {# ── Pending invites (not yet accepted) ── #}
 {% if pending_invites %}
 <div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">Pending invites ({{ pending_invites|length }})</h3></div>
+    <div class="card-header"><h3 class="card-title">{% trans "Pending invites" %} ({{ pending_invites|length }})</h3></div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
-                    <th style="padding:0.6rem 1rem;">Email</th><th style="padding:0.6rem 1rem;">School</th>
-                    <th style="padding:0.6rem 1rem;">Invited by</th><th style="padding:0.6rem 1rem;">Sent</th>
+                    <th style="padding:0.6rem 1rem;">{% trans "Email" %}</th><th style="padding:0.6rem 1rem;">{% trans "School" %}</th>
+                    <th style="padding:0.6rem 1rem;">{% trans "Invited by" %}</th><th style="padding:0.6rem 1rem;">{% trans "Sent" %}</th>
                     <th style="padding:0.6rem 1rem;text-align:right;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for inv in pending_invites %}
                 <tr style="border-top:1px solid var(--gray-100);">
-                    <td style="padding:0.6rem 1rem;">{{ inv.email|default:"(link-only)" }}</td>
+                    <td style="padding:0.6rem 1rem;">{% if inv.email %}{{ inv.email }}{% else %}{% trans "(link-only)" %}{% endif %}</td>
                     <td style="padding:0.6rem 1rem;">{{ inv.institution.name }}</td>
                     <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.invited_by.get_full_name|default:inv.invited_by.username|default:"—" }}</td>
                     <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.created_at|date:"M d, Y" }}</td>
                     <td style="padding:0.6rem 1rem;text-align:right;white-space:nowrap;">
                         <button type="button" class="btn btn-sm copy-invite-btn" data-path="{% url 'accounts:staff_register' inv.token %}"
-                                style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">Copy link</button>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('Revoke this invitation?');">
+                                style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Copy link" %}</button>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('{% trans 'Revoke this invitation?' %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="revoke_invite">
                             <input type="hidden" name="invite_id" value="{{ inv.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">Revoke</button>
+                            <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Revoke" %}</button>
                         </form>
                     </td>
                 </tr>
@@ -219,55 +219,55 @@
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
     {# ── Invite teacher / staff ── #}
     <div class="card">
-        <div class="card-header"><h3 class="card-title">Invite teacher / staff</h3></div>
+        <div class="card-header"><h3 class="card-title">{% trans "Invite teacher / staff" %}</h3></div>
         <div class="card-body">
-            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">Sends an email invite (or generates a link). They register themselves and are active immediately.</p>
+            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">{% trans "Sends an email invite (or generates a link). They register themselves and are active immediately." %}</p>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="invite_staff">
                 <div class="form-group">
-                    <label class="form-label">School</label>
+                    <label class="form-label">{% trans "School" %}</label>
                     <select class="form-control" name="invite_school_id" required>
-                        <option value="">Select a school…</option>
+                        <option value="">{% trans "Select a school…" %}</option>
                         {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0.75rem;">
-                    <label class="form-label">Email <span style="font-weight:normal;color:var(--gray-500);">(optional — blank = link-only)</span></label>
-                    <input type="email" class="form-control" name="invite_email" placeholder="teacher@school.edu">
+                    <label class="form-label">{% trans "Email" %} <span style="font-weight:normal;color:var(--gray-500);">{% trans "(optional — blank = link-only)" %}</span></label>
+                    <input type="email" class="form-control" name="invite_email" placeholder="{% trans 'teacher@school.edu' %}">
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Send invite</button>
+                <button type="submit" class="btn btn-primary btn-sm">{% trans "Send invite" %}</button>
             </form>
         </div>
     </div>
 
     {# ── Create Super Admin ── #}
     <div class="card">
-        <div class="card-header"><h3 class="card-title">Create Super Admin</h3></div>
+        <div class="card-header"><h3 class="card-title">{% trans "Create Super Admin" %}</h3></div>
         <div class="card-body">
-            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">Platform-wide admin. If the email already exists you'll be offered a password reset instead.</p>
+            <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">{% trans "Platform-wide admin. If the email already exists you'll be offered a password reset instead." %}</p>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="create_admin">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
                     <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">First Name</label>
-                        <input type="text" class="form-control" name="admin_first_name" placeholder="First name">
+                        <label class="form-label">{% trans "First Name" %}</label>
+                        <input type="text" class="form-control" name="admin_first_name" placeholder="{% trans 'First name' %}">
                     </div>
                     <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">Last Name</label>
-                        <input type="text" class="form-control" name="admin_last_name" placeholder="Last name">
+                        <label class="form-label">{% trans "Last Name" %}</label>
+                        <input type="text" class="form-control" name="admin_last_name" placeholder="{% trans 'Last name' %}">
                     </div>
                     <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-control" name="admin_email" placeholder="admin@school.edu" required>
+                        <label class="form-label">{% trans "Email" %}</label>
+                        <input type="email" class="form-control" name="admin_email" placeholder="{% trans 'admin@school.edu' %}" required>
                     </div>
                     <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-control" name="admin_password" placeholder="Strong password" required>
+                        <label class="form-label">{% trans "Password" %}</label>
+                        <input type="password" class="form-control" name="admin_password" placeholder="{% trans 'Strong password' %}" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Create Admin</button>
+                <button type="submit" class="btn btn-primary btn-sm">{% trans "Create Admin" %}</button>
             </form>
         </div>
     </div>

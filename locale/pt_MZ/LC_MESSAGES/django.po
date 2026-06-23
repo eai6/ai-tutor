@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-08 13:47+0000\n"
+"POT-Creation-Date: 2026-06-23 14:19+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -24,15 +24,15 @@ msgstr "Olá, %(name)s! 🎉 Vamos começar a aprender!"
 msgid "Welcome, %(name)s!"
 msgstr "Olá, %(name)s!"
 
-#: apps/accounts/views.py:605
+#: apps/accounts/views.py:527
 msgid "You've been logged out."
 msgstr "Sessão terminada."
 
-#: apps/accounts/views.py:764
+#: apps/accounts/views.py:686
 msgid "Profile updated."
 msgstr "Perfil atualizado."
 
-#: apps/accounts/views.py:772
+#: apps/accounts/views.py:694
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
@@ -75,7 +75,7 @@ msgstr "e ajudar-te a encontrar a lição certa. "
 msgid "What's up?"
 msgstr "Tudo bem?"
 
-#: apps/tutoring/simple_tutor/engine.py:973
+#: apps/tutoring/simple_tutor/engine.py:1029
 msgid ""
 "Great — you've worked through the lesson! Now let's check what you've locked "
 "in with a short quiz. Take your time on each question, then submit."
@@ -83,7 +83,7 @@ msgstr ""
 "Boa — terminaste a lição! Agora vamos ver o que fixaste com um pequeno "
 "questionário. Pensa bem em cada pergunta e depois submete."
 
-#: apps/tutoring/simple_tutor/engine.py:1308
+#: apps/tutoring/simple_tutor/engine.py:1364
 msgid ""
 "👋 Welcome back! You were working on this question — let's pick up where we "
 "left off:"
@@ -221,7 +221,9 @@ msgstr[1] "Mostrar erros (%(counter)s)"
 #: templates/accounts/bulk_student_upload.html:44
 #: templates/accounts/settings.html:178
 #: templates/accounts/student_register.html:79
-#: templates/dashboard/settings.html:72 templates/dashboard/settings.html:367
+#: templates/dashboard/settings.html:72 templates/dashboard/staff_list.html:132
+#: templates/dashboard/staff_list.html:189
+#: templates/dashboard/staff_list.html:229
 #: templates/dashboard/students/list.html:22
 msgid "School"
 msgstr "Escola"
@@ -348,7 +350,6 @@ msgstr "Entra para continuar a aprender"
 #: templates/accounts/login.html:25 templates/accounts/settings.html:148
 #: templates/accounts/student_login.html:25
 #: templates/accounts/student_register.html:55
-#: templates/dashboard/staff_list.html:22
 msgid "Username"
 msgstr "Utilizador"
 
@@ -359,7 +360,7 @@ msgstr "Introduz o teu nome de utilizador"
 #: templates/accounts/login.html:38 templates/accounts/settings.html:213
 #: templates/accounts/student_login.html:38
 #: templates/accounts/student_register.html:106
-#: templates/dashboard/settings.html:471
+#: templates/dashboard/staff_list.html:266
 msgid "Password"
 msgstr "Palavra-passe"
 
@@ -376,7 +377,7 @@ msgid "Create one"
 msgstr "Cria uma"
 
 #: templates/accounts/settings.html:4 templates/accounts/settings.html:131
-#: templates/dashboard/base.html:688 templates/dashboard/base.html:702
+#: templates/dashboard/base.html:700 templates/dashboard/base.html:706
 #: templates/dashboard/settings.html:4 templates/dashboard/settings.html:5
 msgid "Settings"
 msgstr "Definições"
@@ -398,22 +399,24 @@ msgid "Update the name and email we use for you."
 msgstr "Atualiza o nome e o email que usamos para ti."
 
 #: templates/accounts/settings.html:153 templates/dashboard/settings.html:81
-#: templates/dashboard/settings.html:366
+#: templates/dashboard/staff_list.html:131
 msgid "Role"
 msgstr "Função"
 
-#: templates/accounts/settings.html:163 templates/dashboard/settings.html:460
+#: templates/accounts/settings.html:163 templates/dashboard/staff_list.html:255
 msgid "First name"
 msgstr "Nome"
 
-#: templates/accounts/settings.html:167 templates/dashboard/settings.html:464
+#: templates/accounts/settings.html:167 templates/dashboard/staff_list.html:259
 msgid "Last name"
 msgstr "Apelido"
 
 #: templates/accounts/settings.html:172
 #: templates/dashboard/classes/detail.html:146
-#: templates/dashboard/settings.html:67 templates/dashboard/settings.html:365
-#: templates/dashboard/settings.html:467 templates/dashboard/staff_list.html:24
+#: templates/dashboard/settings.html:67 templates/dashboard/staff_list.html:130
+#: templates/dashboard/staff_list.html:189
+#: templates/dashboard/staff_list.html:236
+#: templates/dashboard/staff_list.html:262
 msgid "Email"
 msgstr "Email"
 
@@ -478,7 +481,7 @@ msgid "Sign out on this device."
 msgstr "Termina a sessão neste dispositivo."
 
 #: templates/accounts/settings.html:248 templates/base.html:328
-#: templates/dashboard/base.html:714
+#: templates/dashboard/base.html:718
 msgid "Logout"
 msgstr "Sair"
 
@@ -533,7 +536,7 @@ msgid "Join AI Tutor and start learning today!"
 msgstr "Junta-te ao AI Tutor e começa a aprender hoje!"
 
 #: templates/accounts/student_register.html:30
-#: templates/dashboard/settings.html:59 templates/dashboard/settings.html:459
+#: templates/dashboard/settings.html:59 templates/dashboard/staff_list.html:254
 msgid "First Name"
 msgstr "Nome"
 
@@ -542,7 +545,7 @@ msgid "Your first name"
 msgstr "O teu nome"
 
 #: templates/accounts/student_register.html:43
-#: templates/dashboard/settings.html:63 templates/dashboard/settings.html:463
+#: templates/dashboard/settings.html:63 templates/dashboard/staff_list.html:258
 msgid "Last Name"
 msgstr "Apelido"
 
@@ -637,7 +640,7 @@ msgstr "Sair"
 msgid "Teacher Dashboard"
 msgstr "Painel do professor"
 
-#: templates/dashboard/base.html:585 templates/dashboard/base.html:739
+#: templates/dashboard/base.html:585 templates/dashboard/base.html:743
 #: templates/dashboard/home.html:4
 #: templates/dashboard/quality/content_edit_events_list.html:11
 #: templates/tutoring/catalog.html:50 templates/tutoring/chat_tutor.html:18
@@ -696,44 +699,47 @@ msgstr "Conversas Sinalizadas"
 msgid "Feedback & Bugs"
 msgstr "Comentários e Erros"
 
-#: templates/dashboard/base.html:656
-msgid "Developer"
-msgstr "Programador"
-
-#: templates/dashboard/base.html:661
-msgid "Tutoring Evaluation"
-msgstr "Avaliação da Tutoria"
-
-#: templates/dashboard/base.html:667
-msgid "Scoring Runs"
-msgstr "Execuções de Pontuação"
-
-#: templates/dashboard/base.html:675
-msgid "Content Quality"
-msgstr "Qualidade do Conteúdo"
-
-#: templates/dashboard/base.html:681
-msgid "Edit events"
-msgstr "Editar eventos"
-
-#: templates/dashboard/base.html:694 templates/dashboard/staff_list.html:4
+#: templates/dashboard/base.html:656 templates/dashboard/base.html:661
+#: templates/dashboard/staff_list.html:4
+#: templates/dashboard/staff_list.html:142
 msgid "Staff"
 msgstr "Equipa"
 
-#: templates/dashboard/base.html:708
+#: templates/dashboard/base.html:668
+msgid "Developer"
+msgstr "Programador"
+
+#: templates/dashboard/base.html:673
+msgid "Tutoring Evaluation"
+msgstr "Avaliação da Tutoria"
+
+#: templates/dashboard/base.html:679
+msgid "Scoring Runs"
+msgstr "Execuções de Pontuação"
+
+#: templates/dashboard/base.html:687
+msgid "Content Quality"
+msgstr "Qualidade do Conteúdo"
+
+#: templates/dashboard/base.html:693
+msgid "Edit events"
+msgstr "Editar eventos"
+
+#: templates/dashboard/base.html:712
 msgid "Back to Tutor"
 msgstr "Voltar ao Tutor"
 
-#: templates/dashboard/base.html:729
+#: templates/dashboard/base.html:733
 msgid "Open navigation"
 msgstr "Abrir navegação"
 
-#: templates/dashboard/base.html:747 templates/tutoring/catalog.html:55
+#: templates/dashboard/base.html:751 templates/tutoring/catalog.html:55
 msgid "All Schools"
 msgstr "Todas as escolas"
 
-#: templates/dashboard/base.html:757 templates/dashboard/settings.html:82
-#: templates/dashboard/settings.html:379
+#: templates/dashboard/base.html:761 templates/dashboard/settings.html:82
+#: templates/dashboard/staff_list.html:32
+#: templates/dashboard/staff_list.html:142
 msgid "Super Admin"
 msgstr "Super Administrador"
 
@@ -1165,8 +1171,8 @@ msgstr "Tem final"
 #: templates/dashboard/lesson_monitor.html:274
 #: templates/dashboard/lesson_session_report.html:433
 #: templates/dashboard/lesson_session_report.html:446
-#: templates/dashboard/settings.html:287 templates/dashboard/settings.html:368
-#: templates/dashboard/settings.html:676 templates/dashboard/staff_list.html:26
+#: templates/dashboard/settings.html:287 templates/dashboard/settings.html:544
+#: templates/dashboard/staff_list.html:133
 #: templates/dashboard/summative/review.html:126
 msgid "Status"
 msgstr "Estado"
@@ -1325,8 +1331,8 @@ msgstr ""
 
 #: templates/dashboard/curriculum/course_detail.html:213
 #: templates/dashboard/curriculum/step_edit.html:161
-#: templates/dashboard/settings.html:439 templates/dashboard/settings.html:701
-#: templates/dashboard/staff_list.html:53
+#: templates/dashboard/settings.html:569 templates/dashboard/staff_list.html:75
+#: templates/dashboard/staff_list.html:167
 #: templates/dashboard/summative/review.html:216
 msgid "Delete"
 msgstr "Eliminar"
@@ -1551,7 +1557,6 @@ msgstr "A processar"
 #: templates/dashboard/curriculum/list.html:108
 #: templates/dashboard/curriculum/step_edit.html:140
 #: templates/dashboard/materials/process.html:30
-#: templates/dashboard/settings.html:403
 msgid "Pending"
 msgstr "Pendente"
 
@@ -2256,7 +2261,6 @@ msgstr "Resolvido"
 #: templates/dashboard/quality/content_edit_events_list.html:24
 #: templates/dashboard/quality/content_edit_events_list.html:32
 #: templates/dashboard/quality/content_edit_events_list.html:40
-#: templates/dashboard/settings.html:390
 msgid "All"
 msgstr "Todos"
 
@@ -2496,8 +2500,9 @@ msgid "Session Report"
 msgstr "Relatório da Sessão"
 
 #: templates/dashboard/lesson_monitor.html:230
-#: templates/dashboard/settings.html:297 templates/dashboard/settings.html:401
-#: templates/dashboard/settings.html:692 templates/dashboard/staff_list.html:38
+#: templates/dashboard/settings.html:297 templates/dashboard/settings.html:560
+#: templates/dashboard/staff_list.html:33
+#: templates/dashboard/staff_list.html:144
 msgid "Active"
 msgstr "Ativa"
 
@@ -2531,7 +2536,7 @@ msgid "Exit Score"
 msgstr "Nota Final"
 
 #: templates/dashboard/lesson_monitor.html:261
-#: templates/dashboard/settings.html:677
+#: templates/dashboard/settings.html:545
 msgid "Actions"
 msgstr "Ações"
 
@@ -2792,7 +2797,7 @@ msgid "Material Type"
 msgstr "Tipo de Material"
 
 #: templates/dashboard/materials/process.html:151
-#: templates/dashboard/settings.html:675
+#: templates/dashboard/settings.html:543
 msgid "Description"
 msgstr "Descrição"
 
@@ -3555,9 +3560,9 @@ msgstr ""
 "Cada escola é uma instituição separada. Alunos e funcionários pertencem a "
 "escolas específicas."
 
-#: templates/dashboard/settings.html:287 templates/dashboard/settings.html:364
-#: templates/dashboard/settings.html:497 templates/dashboard/settings.html:674
-#: templates/dashboard/staff_list.html:23
+#: templates/dashboard/settings.html:287 templates/dashboard/settings.html:365
+#: templates/dashboard/settings.html:542
+#: templates/dashboard/staff_list.html:129
 msgid "Name"
 msgstr "Nome"
 
@@ -3565,16 +3570,19 @@ msgstr "Nome"
 msgid "Slug"
 msgstr "Slug"
 
-#: templates/dashboard/settings.html:299 templates/dashboard/settings.html:405
-#: templates/dashboard/settings.html:692 templates/dashboard/staff_list.html:38
+#: templates/dashboard/settings.html:299 templates/dashboard/settings.html:560
+#: templates/dashboard/staff_list.html:33
+#: templates/dashboard/staff_list.html:144
 msgid "Inactive"
 msgstr "Inativo"
 
-#: templates/dashboard/settings.html:308 templates/dashboard/settings.html:431
+#: templates/dashboard/settings.html:308 templates/dashboard/staff_list.html:69
+#: templates/dashboard/staff_list.html:161
 msgid "Deactivate"
 msgstr "Desativar"
 
-#: templates/dashboard/settings.html:308 templates/dashboard/settings.html:431
+#: templates/dashboard/settings.html:308 templates/dashboard/staff_list.html:69
+#: templates/dashboard/staff_list.html:161
 msgid "Activate"
 msgstr "Ativar"
 
@@ -3594,69 +3602,16 @@ msgstr "ex. mont-fleuri"
 msgid "Add School"
 msgstr "Adicionar Escola"
 
-#: templates/dashboard/settings.html:352
-msgid "Manage Users"
-msgstr "Gerir Utilizadores"
-
-#: templates/dashboard/settings.html:356
-msgid "Teachers and admins only. Staff are added via 'Invite Staff'."
-msgstr ""
-"Apenas professores e administradores. O pessoal é adicionado através de "
-"'Convidar Pessoal'."
-
-#: templates/dashboard/settings.html:410
-#, python-format
-msgid "Remove Super Admin privileges from %(name)s?"
-msgstr "Remover os privilégios de Super Admin de %(name)s?"
-
-#: templates/dashboard/settings.html:414
-msgid "Demote"
-msgstr "Despromover"
-
-#: templates/dashboard/settings.html:417
-#, python-format
-msgid "Promote %(name)s to Super Admin?"
-msgstr "Promover %(name)s a Super Admin?"
-
-#: templates/dashboard/settings.html:421
-msgid "Promote"
-msgstr "Promover"
-
-#: templates/dashboard/settings.html:428
-msgid "Approve"
-msgstr "Aprovar"
-
-#: templates/dashboard/settings.html:435
-#, python-format
-msgid "Delete user %(name)s? This cannot be undone."
-msgstr "Eliminar o utilizador %(name)s? Esta ação não pode ser desfeita."
-
-#: templates/dashboard/settings.html:449
-msgid "No other users yet."
-msgstr "Ainda não há outros utilizadores."
-
-#: templates/dashboard/settings.html:456
-msgid "Create Super Admin"
-msgstr "Criar Super Admin"
-
-#: templates/dashboard/settings.html:472
-msgid "Min 6 characters"
-msgstr "Mín. 6 caracteres"
-
-#: templates/dashboard/settings.html:475
-msgid "Create Admin"
-msgstr "Criar Admin"
-
-#: templates/dashboard/settings.html:489
+#: templates/dashboard/settings.html:357
 msgid "Grade Levels"
 msgstr "Níveis de Ensino"
 
-#: templates/dashboard/settings.html:489 templates/dashboard/settings.html:663
-#: templates/dashboard/settings.html:734
+#: templates/dashboard/settings.html:357 templates/dashboard/settings.html:531
+#: templates/dashboard/settings.html:602
 msgid "(click to expand)"
 msgstr "(clica para expandir)"
 
-#: templates/dashboard/settings.html:493
+#: templates/dashboard/settings.html:361
 msgid ""
 "Configure grade levels available to students during registration. Leave "
 "empty to use built-in defaults."
@@ -3664,98 +3619,98 @@ msgstr ""
 "Configura os níveis de escolaridade disponíveis para os estudantes durante o "
 "registo. Deixa vazio para usar os valores predefinidos."
 
-#: templates/dashboard/settings.html:497
+#: templates/dashboard/settings.html:365
 msgid "Code"
 msgstr "Código"
 
-#: templates/dashboard/settings.html:501
+#: templates/dashboard/settings.html:369
 msgid "+ Add Grade"
 msgstr "+ Adicionar Nível"
 
-#: templates/dashboard/settings.html:505
+#: templates/dashboard/settings.html:373
 msgid "Save Grade Levels"
 msgstr "Guardar Níveis"
 
-#: templates/dashboard/settings.html:516
+#: templates/dashboard/settings.html:384
 msgid "Student Tutoring Model"
 msgstr "Modelo de Tutoria de Estudantes"
 
-#: templates/dashboard/settings.html:520
+#: templates/dashboard/settings.html:388
 msgid ""
 "LLM used for live tutoring sessions, exit tickets, and skill extraction."
 msgstr ""
 "LLM usado para sessões de tutoria ao vivo, exit tickets e extração de "
 "competências."
 
-#: templates/dashboard/settings.html:525 templates/dashboard/settings.html:573
-#: templates/dashboard/settings.html:621
+#: templates/dashboard/settings.html:393 templates/dashboard/settings.html:441
+#: templates/dashboard/settings.html:489
 msgid "Provider"
 msgstr "Fornecedor"
 
-#: templates/dashboard/settings.html:533 templates/dashboard/settings.html:581
-#: templates/dashboard/settings.html:629
+#: templates/dashboard/settings.html:401 templates/dashboard/settings.html:449
+#: templates/dashboard/settings.html:497
 msgid "Model Name"
 msgstr "Nome do Modelo"
 
-#: templates/dashboard/settings.html:539 templates/dashboard/settings.html:587
-#: templates/dashboard/settings.html:635
+#: templates/dashboard/settings.html:407 templates/dashboard/settings.html:455
+#: templates/dashboard/settings.html:503
 msgid "API Key"
 msgstr "Chave de API"
 
-#: templates/dashboard/settings.html:541 templates/dashboard/settings.html:589
-#: templates/dashboard/settings.html:637
+#: templates/dashboard/settings.html:409 templates/dashboard/settings.html:457
+#: templates/dashboard/settings.html:505
 msgid "Key stored in database (leave blank to keep)"
 msgstr "Chave guardada na base de dados (deixa em branco para manter)"
 
-#: templates/dashboard/settings.html:541 templates/dashboard/settings.html:589
-#: templates/dashboard/settings.html:637
+#: templates/dashboard/settings.html:409 templates/dashboard/settings.html:457
+#: templates/dashboard/settings.html:505
 msgid "Using environment variable (leave blank to keep)"
 msgstr "A usar variável de ambiente (deixa em branco para manter)"
 
-#: templates/dashboard/settings.html:541 templates/dashboard/settings.html:589
+#: templates/dashboard/settings.html:409 templates/dashboard/settings.html:457
 msgid "Enter API key..."
 msgstr "Introduz a chave API..."
 
-#: templates/dashboard/settings.html:542 templates/dashboard/settings.html:590
+#: templates/dashboard/settings.html:410 templates/dashboard/settings.html:458
 msgid "Leave blank to keep the current key."
 msgstr "Deixa em branco para manter a chave atual."
 
-#: templates/dashboard/settings.html:546 templates/dashboard/settings.html:594
-#: templates/dashboard/settings.html:642
+#: templates/dashboard/settings.html:414 templates/dashboard/settings.html:462
+#: templates/dashboard/settings.html:510
 #: templates/dashboard/student_groups/list.html:80
 msgid "Current:"
 msgstr "Atual:"
 
-#: templates/dashboard/settings.html:547 templates/dashboard/settings.html:595
-#: templates/dashboard/settings.html:643
+#: templates/dashboard/settings.html:415 templates/dashboard/settings.html:463
+#: templates/dashboard/settings.html:511
 msgid "not configured"
 msgstr "não configurada"
 
-#: templates/dashboard/settings.html:549 templates/dashboard/settings.html:597
-#: templates/dashboard/settings.html:645
+#: templates/dashboard/settings.html:417 templates/dashboard/settings.html:465
+#: templates/dashboard/settings.html:513
 msgid "Key:"
 msgstr "Chave:"
 
-#: templates/dashboard/settings.html:551 templates/dashboard/settings.html:599
-#: templates/dashboard/settings.html:647
+#: templates/dashboard/settings.html:419 templates/dashboard/settings.html:467
+#: templates/dashboard/settings.html:515
 msgid "Stored in DB"
 msgstr "Guardada na BD"
 
-#: templates/dashboard/settings.html:553 templates/dashboard/settings.html:601
-#: templates/dashboard/settings.html:649
+#: templates/dashboard/settings.html:421 templates/dashboard/settings.html:469
+#: templates/dashboard/settings.html:517
 msgid "From env var"
 msgstr "Da variável de ambiente"
 
-#: templates/dashboard/settings.html:555 templates/dashboard/settings.html:603
-#: templates/dashboard/settings.html:651
+#: templates/dashboard/settings.html:423 templates/dashboard/settings.html:471
+#: templates/dashboard/settings.html:519
 msgid "Not configured"
 msgstr "Não configurada"
 
-#: templates/dashboard/settings.html:564
+#: templates/dashboard/settings.html:432
 msgid "Content Generation Model"
 msgstr "Modelo de Geração de Conteúdo"
 
-#: templates/dashboard/settings.html:568
+#: templates/dashboard/settings.html:436
 msgid ""
 "LLM used for curriculum generation, lesson content, and image generation "
 "prompts."
@@ -3763,11 +3718,11 @@ msgstr ""
 "LLM usado para gerar o currículo, conteúdo das lições e prompts para geração "
 "de imagens."
 
-#: templates/dashboard/settings.html:612
+#: templates/dashboard/settings.html:480
 msgid "Image Generation Model"
 msgstr "Modelo de Geração de Imagens"
 
-#: templates/dashboard/settings.html:616
+#: templates/dashboard/settings.html:484
 msgid ""
 "Used for AI-generated diagrams, maps, charts, and illustrations. Must be a "
 "Gemini image model."
@@ -3775,25 +3730,25 @@ msgstr ""
 "Usado para diagramas, mapas, gráficos e ilustrações gerados por IA. Tem de "
 "ser um modelo Gemini de imagens."
 
-#: templates/dashboard/settings.html:637
+#: templates/dashboard/settings.html:505
 msgid "Leave blank to use the same key as above"
 msgstr "Deixa em branco para usar a mesma chave acima"
 
-#: templates/dashboard/settings.html:638
+#: templates/dashboard/settings.html:506
 msgid "Leave blank to reuse the Google key from Tutoring or Generation config."
 msgstr ""
 "Deixa em branco para reutilizar a chave Google da configuração de Tutoria ou "
 "Geração."
 
-#: templates/dashboard/settings.html:657
+#: templates/dashboard/settings.html:525
 msgid "Save AI Models"
 msgstr "Guardar Modelos de IA"
 
-#: templates/dashboard/settings.html:663
+#: templates/dashboard/settings.html:531
 msgid "Tutor Personalities"
 msgstr "Personalidades do Tutor"
 
-#: templates/dashboard/settings.html:667
+#: templates/dashboard/settings.html:535
 msgid ""
 "Configure personality options that students can choose from. Each "
 "personality modifies the tutor's tone."
@@ -3801,149 +3756,311 @@ msgstr ""
 "Configura as opções de personalidade que os alunos podem escolher. Cada "
 "personalidade altera o tom do tutor."
 
-#: templates/dashboard/settings.html:673
+#: templates/dashboard/settings.html:541
 msgid "Emoji"
 msgstr "Emoji"
 
-#: templates/dashboard/settings.html:697
+#: templates/dashboard/settings.html:565
 #, python-format
 msgid "Delete personality '%(name)s'?"
 msgstr "Eliminar a personalidade '%(name)s'?"
 
-#: templates/dashboard/settings.html:709
+#: templates/dashboard/settings.html:577
 msgid "No personalities configured. Add one below or run"
 msgstr "Nenhuma personalidade configurada. Adiciona uma abaixo ou executa"
 
-#: templates/dashboard/settings.html:712
+#: templates/dashboard/settings.html:580
 msgid "Add New Personality"
 msgstr "Adicionar Nova Personalidade"
 
-#: templates/dashboard/settings.html:718
+#: templates/dashboard/settings.html:586
 msgid "Name (e.g. Friendly)"
 msgstr "Nome (ex.: Amigável)"
 
-#: templates/dashboard/settings.html:720
+#: templates/dashboard/settings.html:588
 msgid "Short description shown to students"
 msgstr "Breve descrição mostrada aos alunos"
 
-#: templates/dashboard/settings.html:721
+#: templates/dashboard/settings.html:589
 msgid "System prompt modifier (injected into the tutor system prompt)"
 msgstr "Modificador do prompt de sistema (injetado no prompt do tutor)"
 
-#: templates/dashboard/settings.html:722
+#: templates/dashboard/settings.html:590
 msgid "Add Personality"
 msgstr "Adicionar Personalidade"
 
-#: templates/dashboard/settings.html:734
+#: templates/dashboard/settings.html:602
 msgid "AI System Prompts"
 msgstr "Prompts de Sistema da AI"
 
-#: templates/dashboard/settings.html:738
+#: templates/dashboard/settings.html:606
 msgid ""
 "Edit the prompts below. They are pre-populated with the built-in defaults."
 msgstr ""
 "Edita os prompts abaixo. Estão pré-preenchidos com os valores predefinidos."
 
-#: templates/dashboard/settings.html:752
+#: templates/dashboard/settings.html:620
 msgid "Save AI Prompts"
 msgstr "Guardar Prompts da AI"
 
+#: templates/dashboard/staff_list.html:8
+msgid "Staff Management"
+msgstr "Gestão da equipa"
+
 #: templates/dashboard/staff_list.html:9
-msgid "Staff Accounts"
-msgstr "Contas de Pessoal"
-
-#: templates/dashboard/staff_list.html:10
 msgid ""
-"Platform admins (you) can delete teacher / staff accounts. Deletions cascade "
-"through their content + audit trail."
-msgstr ""
-"Os administradores da plataforma (tu) podem eliminar contas de professores / "
-"pessoal. As eliminações propagam-se pelo conteúdo e pelo registo de "
-"auditoria."
+"Create and manage admins and teachers, approve pending sign-ups, and send "
+"invites — all in one place."
+msgstr "Cria e gere administradores e professores, aprova inscrições pendentes e envia convites — tudo num só lugar."
 
-#: templates/dashboard/staff_list.html:13
-msgid "Invite Staff"
-msgstr "Convidar Pessoal"
+#: templates/dashboard/staff_list.html:14
+msgid "Find / debug a user"
+msgstr "Encontrar / diagnosticar um utilizador"
 
-#: templates/dashboard/staff_list.html:25
-msgid "Institution"
-msgstr "Instituição"
+#: templates/dashboard/staff_list.html:16
+msgid ""
+"Look up any account by email or username — including students — to see why a "
+"login isn't working and fix it."
+msgstr "Procura qualquer conta por email ou nome de utilizador — incluindo alunos — para veres porque é que um início de sessão não funciona e corrigi-lo."
 
-#: templates/dashboard/staff_list.html:33
+#: templates/dashboard/staff_list.html:18
+msgid "email or username"
+msgstr "email ou nome de utilizador"
+
+#: templates/dashboard/staff_list.html:19
+msgid "Search"
+msgstr "Procurar"
+
+#: templates/dashboard/staff_list.html:28
+#: templates/dashboard/staff_list.html:140
 msgid "(you)"
 msgstr "(tu)"
 
-#: templates/dashboard/staff_list.html:39
-msgid "Admin"
-msgstr "Administrador"
+#: templates/dashboard/staff_list.html:34
+msgid "Last login:"
+msgstr "Último início de sessão:"
 
-#: templates/dashboard/staff_list.html:49
-#: templates/dashboard/staff_list.html:70
+#: templates/dashboard/staff_list.html:38
+msgid "Memberships:"
+msgstr "Associações:"
+
+#: templates/dashboard/staff_list.html:39
+msgid "(inactive)"
+msgstr "(inativa)"
+
+#: templates/dashboard/staff_list.html:39
+msgid "none"
+msgstr "nenhuma"
+
+#: templates/dashboard/staff_list.html:50
+msgid "Grant staff at…"
+msgstr "Conceder acesso em…"
+
+#: templates/dashboard/staff_list.html:53
+msgid "Grant staff"
+msgstr "Conceder acesso"
+
+#: templates/dashboard/staff_list.html:55
+msgid "Remove Super Admin from"
+msgstr "Remover Super Administrador de"
+
+#: templates/dashboard/staff_list.html:55
+msgid "Make Super Admin:"
+msgstr "Tornar Super Administrador:"
+
+#: templates/dashboard/staff_list.html:59
+msgid "Remove admin"
+msgstr "Remover admin"
+
+#: templates/dashboard/staff_list.html:59
+msgid "Make Super Admin"
+msgstr "Tornar Super Administrador"
+
+#: templates/dashboard/staff_list.html:63
+#: templates/dashboard/staff_list.html:149
+#: templates/dashboard/staff_list.html:280
 msgid "Reset password"
 msgstr "Repor palavra-passe"
 
-#: templates/dashboard/staff_list.html:51
+#: templates/dashboard/staff_list.html:71
 #, python-format
 msgid ""
-"Permanently delete staff account &quot;%(name)s&quot;? This cascades through "
-"their data and cannot be undone."
-msgstr ""
-"Eliminar permanentemente a conta de pessoal &quot;%(name)s&quot;? Isto "
-"propaga-se pelos seus dados e não pode ser desfeito."
+"Permanently delete %(name)s? This cancels the signup and cannot be undone."
+msgstr "Eliminar permanentemente %(name)s? Isto cancela a inscrição e não pode ser desfeito."
 
-#: templates/dashboard/staff_list.html:59
-msgid "No staff accounts found."
-msgstr "Nenhuma conta de pessoal encontrada."
+#: templates/dashboard/staff_list.html:82
+#, python-format
+msgid "No account found matching \"%(q)s\"."
+msgstr "Nenhuma conta encontrada para \"%(q)s\"."
 
-#: templates/dashboard/staff_list.html:75
+#: templates/dashboard/staff_list.html:91
+msgid "Pending approval"
+msgstr "Aprovação pendente"
+
+#: templates/dashboard/staff_list.html:105
+msgid "Approve"
+msgstr "Aprovar"
+
+#: templates/dashboard/staff_list.html:107
+msgid "Reject and delete this pending account?"
+msgstr "Rejeitar e eliminar esta conta pendente?"
+
+#: templates/dashboard/staff_list.html:111
+msgid "Reject"
+msgstr "Rejeitar"
+
+#: templates/dashboard/staff_list.html:124
+msgid "Admins & staff"
+msgstr "Administradores e equipa"
+
+#: templates/dashboard/staff_list.html:150
+msgid "Demote from Super Admin:"
+msgstr "Despromover de Super Administrador:"
+
+#: templates/dashboard/staff_list.html:150
+msgid "Promote to Super Admin:"
+msgstr "Promover a Super Administrador:"
+
+#: templates/dashboard/staff_list.html:154
+msgid "Demote"
+msgstr "Despromover"
+
+#: templates/dashboard/staff_list.html:154
+msgid "Promote"
+msgstr "Promover"
+
+#: templates/dashboard/staff_list.html:163
+#, python-format
+msgid ""
+"Permanently delete %(name)s? This cascades through their data and cannot be "
+"undone."
+msgstr "Eliminar permanentemente %(name)s? Isto propaga-se por todos os seus dados e não pode ser desfeito."
+
+#: templates/dashboard/staff_list.html:174
+msgid "No staff or admins yet."
+msgstr "Ainda não há equipa nem administradores."
+
+#: templates/dashboard/staff_list.html:184
+msgid "Pending invites"
+msgstr "Convites pendentes"
+
+#: templates/dashboard/staff_list.html:190
+msgid "Invited by"
+msgstr "Convidado por"
+
+#: templates/dashboard/staff_list.html:190
+msgid "Sent"
+msgstr "Enviado"
+
+#: templates/dashboard/staff_list.html:197
+msgid "(link-only)"
+msgstr "(apenas link)"
+
+#: templates/dashboard/staff_list.html:203
+msgid "Copy link"
+msgstr "Copiar link"
+
+#: templates/dashboard/staff_list.html:204
+msgid "Revoke this invitation?"
+msgstr "Revogar este convite?"
+
+#: templates/dashboard/staff_list.html:208
+msgid "Revoke"
+msgstr "Revogar"
+
+#: templates/dashboard/staff_list.html:222
+msgid "Invite teacher / staff"
+msgstr "Convidar professor / equipa"
+
+#: templates/dashboard/staff_list.html:224
+msgid ""
+"Sends an email invite (or generates a link). They register themselves and "
+"are active immediately."
+msgstr "Envia um convite por email (ou gera um link). Registam-se a si próprios e ficam ativos imediatamente."
+
+#: templates/dashboard/staff_list.html:231
+msgid "Select a school…"
+msgstr "Seleciona uma escola…"
+
+#: templates/dashboard/staff_list.html:236
+msgid "(optional — blank = link-only)"
+msgstr "(opcional — vazio = apenas link)"
+
+#: templates/dashboard/staff_list.html:237
+msgid "teacher@school.edu"
+msgstr "professor@escola.edu"
+
+#: templates/dashboard/staff_list.html:239
+msgid "Send invite"
+msgstr "Enviar convite"
+
+#: templates/dashboard/staff_list.html:246
+msgid "Create Super Admin"
+msgstr "Criar Super Admin"
+
+#: templates/dashboard/staff_list.html:248
+msgid ""
+"Platform-wide admin. If the email already exists you'll be offered a "
+"password reset instead."
+msgstr "Administrador de toda a plataforma. Se o email já existir, ser-te-á oferecida a reposição da palavra-passe."
+
+#: templates/dashboard/staff_list.html:263
+msgid "admin@school.edu"
+msgstr "admin@escola.edu"
+
+#: templates/dashboard/staff_list.html:267
+msgid "Strong password"
+msgstr "Palavra-passe forte"
+
+#: templates/dashboard/staff_list.html:270
+msgid "Create Admin"
+msgstr "Criar Admin"
+
+#: templates/dashboard/staff_list.html:285
 msgid "Pick how to deliver the new password:"
 msgstr "Escolhe como entregar a nova palavra-passe:"
 
-#: templates/dashboard/staff_list.html:77
+#: templates/dashboard/staff_list.html:287
 msgid "Email a reset link"
 msgstr "Enviar link de redefinição por e-mail"
 
-#: templates/dashboard/staff_list.html:81
+#: templates/dashboard/staff_list.html:291
 msgid "Show a temporary password"
 msgstr "Mostrar palavra-passe temporária"
 
-#: templates/dashboard/staff_list.html:82
+#: templates/dashboard/staff_list.html:292
 msgid ""
 "Copy it and share with the user. They will be forced to change it on next "
 "login."
-msgstr ""
-"Copia-a e partilha com o utilizador. Será obrigado a alterá-la no próximo "
-"início de sessão."
+msgstr "Copia-a e partilha com o utilizador. Será obrigado a alterá-la no próximo início de sessão."
 
-#: templates/dashboard/staff_list.html:85
+#: templates/dashboard/staff_list.html:295
 msgid "Working…"
 msgstr "A processar…"
 
-#: templates/dashboard/staff_list.html:87
+#: templates/dashboard/staff_list.html:297
 msgid "Temporary password for"
 msgstr "Palavra-passe temporária para"
 
-#: templates/dashboard/staff_list.html:90
+#: templates/dashboard/staff_list.html:300
 msgid "Copy"
 msgstr "Copiar"
 
-#: templates/dashboard/staff_list.html:92
+#: templates/dashboard/staff_list.html:302
 msgid ""
 "⚠️ Will not be shown again. The user will be required to change it on next "
 "login."
-msgstr ""
-"⚠️ Não será mostrada novamente. O utilizador terá de a alterar no próximo "
-"início de sessão."
+msgstr "⚠️ Não será mostrada novamente. O utilizador terá de a alterar no próximo início de sessão."
 
-#: templates/dashboard/staff_list.html:95
+#: templates/dashboard/staff_list.html:305
 msgid "✅ Reset link emailed to"
 msgstr "✅ Link de redefinição enviado por email para"
 
-#: templates/dashboard/staff_list.html:95
+#: templates/dashboard/staff_list.html:305
 msgid "The link expires shortly."
 msgstr "O link expira em breve."
 
-#: templates/dashboard/staff_list.html:100 templates/tutoring/catalog.html:102
+#: templates/dashboard/staff_list.html:310 templates/tutoring/catalog.html:102
 #: templates/tutoring/catalog.html:111 templates/tutoring/chat_tutor.html:207
 msgid "Close"
 msgstr "Fechar"
@@ -4631,3 +4748,41 @@ msgstr "Rever Lição"
 #: templates/tutoring/chat_tutor.html:234
 msgid "Continue Learning"
 msgstr "Continuar a aprender"
+
+#~ msgid "Manage Users"
+#~ msgstr "Gerir Utilizadores"
+
+#~ msgid "Teachers and admins only. Staff are added via 'Invite Staff'."
+#~ msgstr ""
+#~ "Apenas professores e administradores. O pessoal é adicionado através de "
+#~ "'Convidar Pessoal'."
+
+#, python-format
+#~ msgid "Delete user %(name)s? This cannot be undone."
+#~ msgstr "Eliminar o utilizador %(name)s? Esta ação não pode ser desfeita."
+
+#~ msgid "No other users yet."
+#~ msgstr "Ainda não há outros utilizadores."
+
+#~ msgid "Min 6 characters"
+#~ msgstr "Mín. 6 caracteres"
+
+#~ msgid "Staff Accounts"
+#~ msgstr "Contas de Pessoal"
+
+#~ msgid ""
+#~ "Platform admins (you) can delete teacher / staff accounts. Deletions "
+#~ "cascade through their content + audit trail."
+#~ msgstr ""
+#~ "Os administradores da plataforma (tu) podem eliminar contas de "
+#~ "professores / pessoal. As eliminações propagam-se pelo conteúdo e pelo "
+#~ "registo de auditoria."
+
+#~ msgid "Institution"
+#~ msgstr "Instituição"
+
+#~ msgid "Admin"
+#~ msgstr "Administrador"
+
+#~ msgid "No staff accounts found."
+#~ msgstr "Nenhuma conta de pessoal encontrada."
