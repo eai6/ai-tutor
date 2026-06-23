@@ -1,3 +1,4 @@
+   
    # Offline tutor-model evaluation — findings
 
 **Date:** 2026-06-18 · **Status:** 44 models scored — 23 open-source (laptop + Colab T4) + 7 proprietary benchmarks (Claude / Gemini) + 14 large open-weight via Vertex Model Garden MaaS (DeepSeek / Kimi / Qwen3 / Grok / GLM).
