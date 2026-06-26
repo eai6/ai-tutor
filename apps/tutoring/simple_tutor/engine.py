@@ -203,6 +203,20 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     course_locale = _course_locale(session)
 
     from apps.tutoring.simple_tutor.prompts import build_system_prompt
+    # Eval-only per-family prompt FORMAT (Gemini/Qwen → 'markdown') from the
+    # model profile keyed on TUTOR_MODEL_OVERRIDE. None / production → 'xml'
+    # (unchanged). Fail-soft so a lookup error never breaks tutoring.
+    _prompt_format = 'xml'
+    try:
+        import os as _os
+        from apps.llm.model_profiles import get_model_profile
+        _spec = _os.getenv('TUTOR_MODEL_OVERRIDE', '').strip()
+        if _spec:
+            _prof = get_model_profile(_spec)
+            if _prof is not None:
+                _prompt_format = _prof.prompt_format
+    except Exception:
+        _prompt_format = 'xml'
     system_blocks, tools = build_system_prompt(
         session=session,
         step=step,
@@ -216,6 +230,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         exit_ticket_review=exit_ticket_review,
         student_intent=student_intent,
         locale=course_locale,
+        prompt_format=_prompt_format,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -710,6 +725,39 @@ def _call_llm(
 
     provider = str(getattr(config, 'provider', '') or '').lower()
 
+    # ── Eval-only per-family profile (apps/llm/model_profiles) ──────────
+    # Keyed on the sweep override spec; None in production (override unset)
+    # → behaviour unchanged. Bypasses the [0.1,0.3] tutoring clamp the same
+    # way the regen ensemble does — by passing explicit sampling/max_tokens
+    # at the call site rather than mutating ModelConfig.effective_temperature.
+    import os
+    profile = None
+    try:
+        from apps.llm.model_profiles import get_model_profile
+        spec = os.getenv('TUTOR_MODEL_OVERRIDE', '').strip()
+        profile = get_model_profile(spec or model_name)
+    except Exception as exc:
+        logger.warning("_call_llm: model_profile lookup failed: %s", exc)
+        profile = None
+
+    max_tokens = profile.max_tokens if profile else 1024
+    sampling = profile.sampling_dict() if profile else None
+    effective_blocks = system_blocks
+    if profile is not None:
+        try:
+            from apps.tutoring.simple_tutor.prompts import family_prompt_delta
+            delta = family_prompt_delta(profile.family, profile.prompt_strategy)
+        except Exception:
+            delta = ''
+        if delta:
+            # New list (idempotent across the 2-call loop) — append the delta as
+            # an uncached trailing block so the production cache key is untouched.
+            effective_blocks = list(system_blocks) + [{'type': 'text', 'text': delta}]
+        logger.info(
+            "_call_llm: profile family=%s mode=%s max_tokens=%d sampling=%s",
+            profile.family, profile.mode, max_tokens, sampling or {},
+        )
+
     # Anthropic: keep the native SDK path byte-for-byte so production
     # tutor behaviour is unchanged.
     if provider == 'anthropic':
@@ -726,8 +774,8 @@ def _call_llm(
             client = anthropic.Anthropic(api_key=api_key)
             return client.messages.create(
                 model=model_name,
-                max_tokens=1024,
-                system=system_blocks,
+                max_tokens=max_tokens,
+                system=effective_blocks,
                 tools=tools,
                 messages=messages,
             )
@@ -759,9 +807,10 @@ def _call_llm(
     try:
         return client.generate_with_tools(
             messages=messages,
-            system_prompt=_system_blocks_to_text(system_blocks),
+            system_prompt=_system_blocks_to_text(effective_blocks),
             tools=tools,
-            max_tokens=1024,
+            max_tokens=max_tokens,
+            sampling=sampling,
         )
     except Exception as exc:
         msg = str(exc).strip().replace('\n', ' ')[:200]

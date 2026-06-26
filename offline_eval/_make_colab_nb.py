@@ -24,10 +24,23 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — offline-model eval on Google Colab (free T4)
+# AI Tutor — offline-model eval on Google Colab (free T4)  ·  *Improved (per-family tuned)*
 
 Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
 **same harness** (tutor = OSS via Ollama; judge + student-sim = Anthropic).
+
+**What's new in this run.** Each model is now sampled with the **per-family
+settings** from `offline_eval/PROMPT_ENGINEERING_FRAMEWORK.md` — applied
+automatically by `apps/llm/model_profiles.py` (e.g. Mistral-Nemo temp **0.3**,
+Qwen2.5 **0.7 / top_p 0.8 / top_k 20**), instead of the old blanket temp ≈ 0.
+Results land in **`offline_eval/results2/`** so they extend the *Improved
+Evaluation 1* leaderboard alongside the cloud re-run. No per-model setup is
+needed — the profile resolves from the model tag (Cell 8 prints what each model
+will use).
+
+> Requires the `{BRANCH}` branch to contain the per-family-tuning commit
+> (`apps/llm/model_profiles.py` + the `sampling` plumbing). Cell 2 clones that
+> branch, so just make sure it's pushed before running.
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
@@ -110,15 +123,16 @@ code(r"""
 !python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
 """)
 
-md("## Cell 7 — persist results to Drive (seed with the committed laptop results, then symlink)\n"
-   "This makes resume survive disconnects AND gives a **combined** leaderboard "
-   "(laptop small models + the big models you run here).")
+md("## Cell 7 — persist results to Drive (seed with the committed cloud results2, then symlink)\n"
+   "Writes into **`results2/`** so the OSS models extend the *Improved Evaluation 1* "
+   "leaderboard. Seeds from any committed cloud `results2/*.json` so the combined "
+   "leaderboard shows cloud + OSS together, and survives Colab disconnects.")
 code(r"""
-!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results
-# seed the Drive folder with the laptop results committed in the repo (no-clobber)
-!cp -n offline_eval/results/*.json /content/drive/MyDrive/ai-tutor-eval-results/ 2>/dev/null || true
-!rm -rf offline_eval/results && ln -s /content/drive/MyDrive/ai-tutor-eval-results offline_eval/results
-!ls offline_eval/results/
+!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results2
+# seed the Drive folder with the improved cloud results committed in the repo (no-clobber)
+!cp -n offline_eval/results2/*.json /content/drive/MyDrive/ai-tutor-eval-results2/ 2>/dev/null || true
+!rm -rf offline_eval/results2 && ln -s /content/drive/MyDrive/ai-tutor-eval-results2 offline_eval/results2
+!ls offline_eval/results2/
 """)
 
 md("## Cell 8 — choose the big-model matrix + seed configs\n"
@@ -153,19 +167,37 @@ command-r7b           big    # Cohere 7B — multilingual + tools
 # command-r-plus:104b xl     # 104B — needs an 80GB A100
 ''')
 !python offline_eval/seed_ollama_configs.py
+# Show the per-family sampling each model will use (from apps/llm/model_profiles).
+# This is the "improved" tuning — confirm it resolves before spending GPU time.
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from apps.llm.model_profiles import get_model_profile
+print(f"{'MODEL':<22} {'FAMILY':<9} {'MODE':<11} {'MAXTOK':>7}  SAMPLING")
+print('-' * 78)
+for line in open('offline_eval/models.txt'):
+    tag = line.split('#')[0].split()[0] if line.split('#')[0].split() else ''
+    if not tag:
+        continue
+    p = get_model_profile(f'local_ollama/{tag}')
+    if p:
+        print(f"{tag:<22} {p.family:<9} {p.mode:<11} {p.max_tokens:>7}  {p.sampling_dict()}")
+    else:
+        print(f"{tag:<22} (no profile — runs at engine default)")
 """)
 
 md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)\n"
+   "`RESULTS_DIR=…/results2` keeps these on the *Improved Evaluation 1* board. "
    "`CLEANUP_MODELS=1` deletes each model's weights from disk right after it's "
    "scored, so Colab's ~112 GB disk never fills up (results are already saved to "
    "Drive, so a re-run still skips done models).")
 code(r"""
-!SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
+!RESULTS_DIR=$PWD/offline_eval/results2 SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
 """)
 
-md("## Cell 10 — combined leaderboard (run anytime)")
+md("## Cell 10 — combined Improved leaderboard (cloud + OSS; run anytime)")
 code(r"""
-!python offline_eval/aggregate.py
+!RESULTS_DIR=$PWD/offline_eval/results2 python offline_eval/aggregate.py
 """)
 
 md(rf"""
@@ -180,11 +212,11 @@ mid-run restarts (resume only skips *completed* models); each model is also boun
 the Anthropic judge calls, so plan 1–3 models per session.
 
 To pull these results back to your laptop: copy the JSONs from
-`MyDrive/ai-tutor-eval-results/` into the repo's `offline_eval/results/` and run
-`python offline_eval/aggregate.py`.
+`MyDrive/ai-tutor-eval-results2/` into the repo's `offline_eval/results2/` and run
+`RESULTS_DIR=offline_eval/results2 python offline_eval/aggregate.py`.
 
 **If GLM under-scores:** it leaks tool calls as text under the full prompt. Set
-`OLLAMA_DEBUG_RAW=1` before Cell 9, then check `offline_eval/results/glm4_9b.log`
+`OLLAMA_DEBUG_RAW=1` before Cell 9, then check `offline_eval/results2/glm4_9b.log`
 for an `[OllamaToolLeak]` line and share it — the parser can then be extended to
 match glm4's exact format.
 """)

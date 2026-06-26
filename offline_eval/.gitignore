@@ -5,7 +5,13 @@
 # leaderboard is reproducible — see FINDINGS_offline_model_eval.md.
 ollama_models/
 results/
+results2/
+results2_md/
 runs/
 *.log
 *.jsonl
 __pycache__/
+# results2/ holds the improved (per-family-tuned) board; its JSONs are
+# force-added (git add -f) like results/. results2_md/ + cloud_models_md.txt are
+# the Markdown-vs-XML experiment scratch — local only.
+cloud_models_md.txt

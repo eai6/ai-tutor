@@ -12,7 +12,9 @@ import os
 from collections import defaultdict
 
 ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
-RESULTS = os.path.join(ROOT, 'offline_eval', 'results')
+# RESULTS_DIR env override lets a re-run aggregate from an alternate folder
+# (e.g. results2 for the improved per-family-tuned sweep). Defaults to results/.
+RESULTS = os.environ.get('RESULTS_DIR') or os.path.join(ROOT, 'offline_eval', 'results')
 
 
 def summarize(path):

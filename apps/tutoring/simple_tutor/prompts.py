@@ -585,6 +585,43 @@ your re-teaching.
 </remediation_mode>"""
 
 
+# ============================================================================
+# Per-family prompt deltas (eval-only)
+# ============================================================================
+#
+# Sampling/mode knobs live in apps/llm/model_profiles.py; the WORDS live here so
+# all tutor prompt text stays single-sourced. Applied by the eval call site
+# (simple_tutor/engine.py::_call_llm) only when a model profile resolves —
+# production tutoring (no TUTOR_MODEL_OVERRIDE) never sees these.
+
+# Grok ships a strong default personality + a documented 4.1 sycophancy
+# regression (framework §3.2). For neutral tutoring/extraction, suppress the
+# persona and forbid agreement-seeking. Positive framing, no CRITICAL caps
+# (matches the project's Claude-4.x rule).
+_PERSONA_SUPPRESS_DELTA = (
+    "<neutral_tutor>\n"
+    "You are a neutral subject tutor, not a chatbot persona. Stay factual and "
+    "on-task: do not editorialize, joke, or refer to yourself by a brand name. "
+    "Prioritize correctness over agreement — if the student is wrong, say so "
+    "plainly and correct them rather than going along with it.\n"
+    "</neutral_tutor>"
+)
+
+
+def family_prompt_delta(family: str | None, prompt_strategy: str = "default") -> str:
+    """Return an eval-only system-prompt suffix for a model family's quirks.
+
+    Empty string for the default strategy (and for DeepSeek-R1, whose
+    no-system/no-few-shot rule is handled structurally via its sampling
+    profile + larger token budget, not by adding prompt text). Appended to the
+    uncached per-turn block by the eval call site so it never alters the
+    production cache key.
+    """
+    if prompt_strategy == "persona_suppress":
+        return _PERSONA_SUPPRESS_DELTA
+    return ""
+
+
 def build_system_prompt(
     *,
     session: 'TutorSession',
@@ -599,6 +636,7 @@ def build_system_prompt(
     exit_ticket_review: dict | None = None,
     student_intent: str | None = None,
     locale: str = 'en-us',
+    prompt_format: str = 'xml',
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -650,8 +688,14 @@ def build_system_prompt(
             "tool is unavailable on this lesson."
         )
     locale_rule = _build_locale_rule(locale)
+    # Family-specific Block-0 FORMAT (eval): Gemini/Qwen get the Markdown +
+    # positive-framing variant from family_prompts.py; everyone else (default)
+    # uses the XML template. Same placeholders, so the .replace() calls are
+    # identical. None → default XML.
+    from apps.tutoring.simple_tutor.family_prompts import get_block_0_template
+    base_template = get_block_0_template(prompt_format) or _BLOCK_0_TEMPLATE
     block_0_text = (
-        _BLOCK_0_TEMPLATE
+        base_template
         .replace('{ROLE_AUDIENCE}', get_profile(locale).role_audience)
         .replace('{FIGURE_RULE}', figure_rule)
         .replace('{LOCALE_RULE}', locale_rule)

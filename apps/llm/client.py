@@ -831,6 +831,8 @@ class AnthropicClient(BaseLLMClient):
         tools: list[dict],
         max_tokens: int | None = None,
         tool_choice: dict | None = None,
+        *,
+        sampling: dict | None = None,
     ):
         """Non-streaming call that returns the full Anthropic Message
         object (not just text) so the caller can introspect tool_use
@@ -873,7 +875,13 @@ class AnthropicClient(BaseLLMClient):
         if tool_choice is not None:
             kwargs["tool_choice"] = tool_choice
         if self._supports_temperature():
-            kwargs["temperature"] = self.config.temperature
+            # Eval may pass a per-family temperature via ``sampling``;
+            # otherwise use the config value (production behaviour).
+            _samp = sampling or {}
+            kwargs["temperature"] = (
+                _samp["temperature"] if _samp.get("temperature") is not None
+                else self.config.temperature
+            )
         logger.info(
             "[QuestionTool] llm_call: messages=%d system_chars=%d "
             "tools=%d max_tokens=%d model=%s",
@@ -1077,6 +1085,7 @@ class OllamaClient(BaseLLMClient):
         max_tokens: int | None = None,
         *,
         tool_choice: dict | str | None = None,
+        sampling: dict | None = None,
     ):
         """Ollama tool-calling. Accepts the same Anthropic-style tool
         schema ``{name, description, input_schema}`` the tutor engine
@@ -1109,15 +1118,28 @@ class OllamaClient(BaseLLMClient):
 
         api_base = self.config.api_base or "http://localhost:11434"
         url = f"{api_base}/api/chat"
+        # Eval-only per-family sampling (apps/llm/model_profiles); production
+        # passes none, so options stay the config temperature + num_predict.
+        sampling = sampling or {}
+        options = {
+            'temperature': (
+                sampling['temperature'] if sampling.get('temperature') is not None
+                else self.config.temperature
+            ),
+            'num_predict': max_tokens or self.config.max_tokens,
+        }
+        if sampling.get('top_p') is not None:
+            options['top_p'] = sampling['top_p']
+        if sampling.get('top_k') is not None:
+            options['top_k'] = sampling['top_k']
+        if sampling.get('presence_penalty') is not None:
+            options['presence_penalty'] = sampling['presence_penalty']
         payload = {
             'model': self.config.model_name,
             'messages': ollama_messages,
             'tools': ollama_tools,
             'stream': False,
-            'options': {
-                'temperature': self.config.temperature,
-                'num_predict': max_tokens or self.config.max_tokens,
-            },
+            'options': options,
         }
         logger.info(
             "[OllamaTools] llm_call: messages=%d system_chars=%d tools=%d model=%s",
@@ -1236,25 +1258,47 @@ class OpenAIClient(BaseLLMClient):
         *,
         max_tokens: int | None,
         temperature: float | None,
+        sampling: dict | None = None,
     ) -> dict:
         """Return the kwargs to pass to chat.completions.create that
         match the target model's expectations:
           - new-gen (GPT-5+, o-series): max_completion_tokens, no
             temperature override (model reasons internally)
           - legacy: max_tokens + temperature
+
+        ``sampling`` (eval-only, from apps/llm/model_profiles) carries
+        per-family overrides: temperature / top_p / presence_penalty go
+        as top-level Chat Completions params; ``top_k`` and any provider
+        thinking-mode toggle ride ``extra_body`` (the OpenAI-compatible
+        Vertex MaaS endpoint forwards extra_body into the request JSON).
+        Absent keys fall back to the existing behaviour — production
+        callers pass no sampling and are unaffected.
         """
         resolved_max = max_tokens or self.config.max_tokens
         if self._is_new_generation():
-            # New-gen — only max_completion_tokens, no temperature.
+            # New-gen — only max_completion_tokens, no temperature/sampling.
             return {"max_completion_tokens": resolved_max}
-        # Legacy: max_tokens + temperature
-        resolved_temp = (
-            temperature if temperature is not None else self.config.temperature
-        )
-        return {
-            "max_tokens": resolved_max,
-            "temperature": resolved_temp,
-        }
+        sampling = sampling or {}
+        # Legacy: max_tokens + temperature (sampling overrides when present)
+        if sampling.get("temperature") is not None:
+            resolved_temp = sampling["temperature"]
+        elif temperature is not None:
+            resolved_temp = temperature
+        else:
+            resolved_temp = self.config.temperature
+        out = {"max_tokens": resolved_max, "temperature": resolved_temp}
+        if sampling.get("top_p") is not None:
+            out["top_p"] = sampling["top_p"]
+        if sampling.get("presence_penalty") is not None:
+            out["presence_penalty"] = sampling["presence_penalty"]
+        # top_k is not a Chat Completions param; fold it + any thinking
+        # toggle into extra_body for the OpenAI-compatible endpoint.
+        extra_body = dict(sampling.get("extra_body") or {})
+        if sampling.get("top_k") is not None:
+            extra_body["top_k"] = sampling["top_k"]
+        if extra_body:
+            out["extra_body"] = extra_body
+        return out
 
     def _generate_impl(
         self,
@@ -1298,6 +1342,7 @@ class OpenAIClient(BaseLLMClient):
         max_tokens: int | None = None,
         *,
         tool_choice: dict | str | None = None,
+        sampling: dict | None = None,
     ):
         """OpenAI function-calling wrapper.
 
@@ -1372,7 +1417,13 @@ class OpenAIClient(BaseLLMClient):
         # and reject temperature; legacy GPT-4* uses max_tokens +
         # temperature (Phase 2b of task #229).
         completion_kwargs = self._build_completion_kwargs(
-            max_tokens=max_tokens, temperature=None,
+            max_tokens=max_tokens, temperature=None, sampling=sampling,
+        )
+        logger.info(
+            "[OpenAITools] llm_call: model=%s max_tokens=%s sampling=%s",
+            self.config.model_name,
+            completion_kwargs.get("max_tokens") or completion_kwargs.get("max_completion_tokens"),
+            sampling or {},
         )
         response = self.client.chat.completions.create(
             **kwargs,
@@ -1509,6 +1560,7 @@ class VertexModelGardenClient(OpenAIClient):
         max_tokens: int | None = None,
         *,
         tool_choice: dict | str | None = None,
+        sampling: dict | None = None,
     ):
         # Anthropic-style tool schema -> OpenAI function schema. Duplicated from
         # OpenAIClient per the project's Rule of Three (2nd use; don't extract).
@@ -1546,7 +1598,13 @@ class VertexModelGardenClient(OpenAIClient):
                 kwargs["tool_choice"] = low
 
         completion_kwargs = self._build_completion_kwargs(
-            max_tokens=max_tokens, temperature=None,
+            max_tokens=max_tokens, temperature=None, sampling=sampling,
+        )
+        logger.info(
+            "[VertexMaaSTools] llm_call: model=%s max_tokens=%s sampling=%s",
+            self.config.model_name,
+            completion_kwargs.get("max_tokens") or completion_kwargs.get("max_completion_tokens"),
+            sampling or {},
         )
         data = self._create_raw(**kwargs, **completion_kwargs)
         return _adapt_openai_dict(data, model_name=self.config.model_name)
@@ -1773,6 +1831,7 @@ class GeminiClient(BaseLLMClient):
         max_tokens: int | None = None,
         *,
         tool_choice: dict | str | None = None,
+        sampling: dict | None = None,
     ):
         """Gemini function-calling wrapper.
 
@@ -1808,8 +1867,20 @@ class GeminiClient(BaseLLMClient):
         config_kwargs = dict(
             system_instruction=system_prompt,
             max_output_tokens=max_tokens or self.config.max_tokens,
-            temperature=self.config.temperature,
         )
+        # Temperature: production (no sampling) keeps the config temperature
+        # for back-compat. Eval (sampling provided) uses the per-family value,
+        # or OMITS temperature when None so Gemini uses its own default — the
+        # framework says leave Gemini-3 at the default (do not send 0.0).
+        if sampling is None:
+            config_kwargs["temperature"] = self.config.temperature
+        else:
+            if sampling.get("temperature") is not None:
+                config_kwargs["temperature"] = sampling["temperature"]
+            if sampling.get("top_p") is not None:
+                config_kwargs["top_p"] = sampling["top_p"]
+            if sampling.get("top_k") is not None:
+                config_kwargs["top_k"] = sampling["top_k"]
         if gemini_tools:
             config_kwargs["tools"] = gemini_tools
 

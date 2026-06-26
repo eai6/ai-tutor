@@ -12,7 +12,7 @@ set -uo pipefail
 ROOT="/home/daniel/Documents/work/Nyansapo/web/ai-tutor"
 cd "$ROOT"
 PY="$ROOT/venv/bin/python"
-RESULTS="$ROOT/offline_eval/results"
+RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/results}"
 MODELS_FILE="${CLOUD_MODELS_FILE:-$ROOT/offline_eval/cloud_models.txt}"
 MODE="${MODE:---single-turn}"
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
