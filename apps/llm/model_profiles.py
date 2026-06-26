@@ -310,7 +310,12 @@ def get_model_profile(spec_or_model_name: str | None) -> ModelProfile | None:
     exact = MODEL_PROFILES.get(spec)
     if exact is not None:
         return exact
+    # Family-pattern fallback matches the MODEL-NAME part only (after the last
+    # '/'), never the provider prefix — otherwise "local_ollama" (which contains
+    # the substring "llama") false-matches the llama pattern and mis-tags every
+    # Ollama model. e.g. local_ollama/phi4 -> "phi4" -> no match -> None.
+    tail = spec.rsplit('/', 1)[-1]
     for pattern, profile in FAMILY_PATTERNS:
-        if pattern.search(spec):
+        if pattern.search(tail):
             return profile
     return None
