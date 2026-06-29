@@ -636,7 +636,7 @@ def build_system_prompt(
     exit_ticket_review: dict | None = None,
     student_intent: str | None = None,
     locale: str = 'en-us',
-    prompt_format: str = 'xml',
+    family: str | None = None,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -688,12 +688,13 @@ def build_system_prompt(
             "tool is unavailable on this lesson."
         )
     locale_rule = _build_locale_rule(locale)
-    # Family-specific Block-0 FORMAT (eval): Gemini/Qwen get the Markdown +
-    # positive-framing variant from family_prompts.py; everyone else (default)
-    # uses the XML template. Same placeholders, so the .replace() calls are
-    # identical. None → default XML.
-    from apps.tutoring.simple_tutor.family_prompts import get_block_0_template
-    base_template = get_block_0_template(prompt_format) or _BLOCK_0_TEMPLATE
+    # Family-specific Block 0 (eval): the selected model's family picks its own
+    # prompt — Qwen → Markdown variant; Gemini → this XML base + targeted rules;
+    # everyone else (incl. Anthropic/production, family=None) → the base XML
+    # template UNCHANGED. Same {ROLE_AUDIENCE}/{FIGURE_RULE}/{LOCALE_RULE}
+    # placeholders, so the .replace() calls below are identical for all variants.
+    from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
+    base_template = build_family_block_0(family, _BLOCK_0_TEMPLATE)
     block_0_text = (
         base_template
         .replace('{ROLE_AUDIENCE}', get_profile(locale).role_audience)

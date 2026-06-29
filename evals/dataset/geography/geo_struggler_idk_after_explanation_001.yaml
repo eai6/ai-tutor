@@ -17,12 +17,11 @@ student_turn: "idk"
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
-# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
-# review the reference_answer for accuracy.
+# instead of grading.
 seed_inflight_question:
   question_text: "A 1:10,000 map shows much more detail than a 1:1,000,000 map. Can you think why?"
   question_type: short_answer
-  reference_answer: "PLACEHOLDER_REF"
+  reference_answer: "it covers a smaller area, so more detail fits"
   source: inline_authored
 
 assertions:

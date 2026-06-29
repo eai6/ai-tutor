@@ -17,12 +17,11 @@ student_turn: "yeah"
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
-# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
-# review the reference_answer for accuracy.
+# instead of grading.
 seed_inflight_question:
   question_text: "Angles around a point always sum to 360\xB0. So if three angles are 90\xB0, 100\xB0, and x, we can find x by subtracting from 360. Does that make sense?"
   question_type: short_answer
-  reference_answer: "PLACEHOLDER_REF"
+  reference_answer: "yes"
   source: inline_authored
 
 assertions:

@@ -21,8 +21,7 @@ student_turn: "D"
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
-# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
-# review the reference_answer for accuracy.
+# instead of grading.
 seed_inflight_question:
   question_text: "Two angles on a straight line. One is 65\xB0. What is the other?"
   question_type: mcq
@@ -31,7 +30,7 @@ seed_inflight_question:
     - "B) 115\xB0"
     - "C) 180\xB0"
     - "D) 245\xB0"
-  reference_answer: "D"
+  reference_answer: "B"
   source: inline_authored
 
 assertions:

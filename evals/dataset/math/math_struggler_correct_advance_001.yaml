@@ -21,8 +21,7 @@ student_turn: "145"
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
-# instead of grading. Inferred by scripts/migrate_seed_inflight_question.py;
-# review the reference_answer for accuracy.
+# instead of grading.
 seed_inflight_question:
   question_text: "Right. Now: angles around a point sum to 360\xB0. So x = 360 - 215. What's x?"
   question_type: short_numeric

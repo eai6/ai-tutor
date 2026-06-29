@@ -203,10 +203,12 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     course_locale = _course_locale(session)
 
     from apps.tutoring.simple_tutor.prompts import build_system_prompt
-    # Eval-only per-family prompt FORMAT (Gemini/Qwen → 'markdown') from the
-    # model profile keyed on TUTOR_MODEL_OVERRIDE. None / production → 'xml'
-    # (unchanged). Fail-soft so a lookup error never breaks tutoring.
-    _prompt_format = 'xml'
+    # Eval-only: the selected model's FAMILY picks its own Block-0 prompt
+    # (Qwen → Markdown variant; Gemini → XML base + targeted rules; everything
+    # else, incl. Anthropic/production, → the base XML template unchanged). The
+    # family comes from the model profile keyed on TUTOR_MODEL_OVERRIDE; None in
+    # production. Fail-soft so a lookup error never breaks tutoring.
+    _family = None
     try:
         import os as _os
         from apps.llm.model_profiles import get_model_profile
@@ -214,9 +216,9 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         if _spec:
             _prof = get_model_profile(_spec)
             if _prof is not None:
-                _prompt_format = _prof.prompt_format
+                _family = _prof.family
     except Exception:
-        _prompt_format = 'xml'
+        _family = None
     system_blocks, tools = build_system_prompt(
         session=session,
         step=step,
@@ -230,7 +232,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         exit_ticket_review=exit_ticket_review,
         student_intent=student_intent,
         locale=course_locale,
-        prompt_format=_prompt_format,
+        family=_family,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────

@@ -101,14 +101,15 @@ class AdaptedMessage:
     model: str = ''
 
 
-def _adapt_gemini_response(response, *, model_name: str = '') -> AdaptedMessage:
+def _adapt_gemini_response(response, *, model_name: str = '', tools: list | None = None) -> AdaptedMessage:
     """Adapt google.genai GenerateContentResponse → AdaptedMessage.
 
     Walks `candidates[0].content.parts`. Each part is either:
       - text part: `.text` set
       - function_call part: `.function_call.name` + `.function_call.args`
     Mirrors Anthropic block order (text first, tool_use after — matches
-    Gemini's own ordering when both are emitted).
+    Gemini's own ordering when both are emitted). ``tools`` enables B1
+    leaked-tool-call recovery (a call emitted as plain text).
     """
     blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
     stop_reason = 'end_turn'
@@ -154,6 +155,7 @@ def _adapt_gemini_response(response, *, model_name: str = '') -> AdaptedMessage:
             if text:
                 blocks.append(AdaptedTextBlock(text=text))
 
+    blocks = _recover_text_tool_call(blocks, tools)
     usage = AdaptedUsage()
     usage_meta = getattr(response, 'usage_metadata', None)
     if usage_meta is not None:
@@ -176,12 +178,12 @@ def _adapt_gemini_response(response, *, model_name: str = '') -> AdaptedMessage:
     )
 
 
-def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
+def _adapt_openai_response(response, *, model_name: str = '', tools: list | None = None) -> AdaptedMessage:
     """Adapt openai ChatCompletion → AdaptedMessage.
 
     Walks `choices[0].message`: `.content` (text or None) and
     `.tool_calls` (list with .id, .function.name, .function.arguments
-    as JSON string).
+    as JSON string). ``tools`` enables B1 leaked-tool-call recovery.
     """
     blocks: List[Union[AdaptedTextBlock, AdaptedToolUseBlock]] = []
     stop_reason = 'end_turn'
@@ -220,6 +222,7 @@ def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
                 input=args,
             ))
 
+    blocks = _recover_text_tool_call(blocks, tools)
     usage = AdaptedUsage()
     usage_obj = getattr(response, 'usage', None)
     if usage_obj is not None:
@@ -243,7 +246,7 @@ def _adapt_openai_response(response, *, model_name: str = '') -> AdaptedMessage:
     )
 
 
-def _adapt_openai_dict(data: dict, *, model_name: str = '') -> AdaptedMessage:
+def _adapt_openai_dict(data: dict, *, model_name: str = '', tools: list | None = None) -> AdaptedMessage:
     """Adapt a RAW OpenAI-shaped response *dict* → AdaptedMessage.
 
     Sibling of `_adapt_openai_response` (which reads the SDK's parsed object).
@@ -281,6 +284,7 @@ def _adapt_openai_dict(data: dict, *, model_name: str = '') -> AdaptedMessage:
                 name=fn.get('name') or '',
                 input=args,
             ))
+    blocks = _recover_text_tool_call(blocks, tools)
     usage_obj = (data or {}).get('usage') or {}
     usage = AdaptedUsage(
         input_tokens=usage_obj.get('prompt_tokens', 0) or 0,
@@ -447,6 +451,40 @@ def _maybe_parse_text_call_syntax(text: str, tools: list | None):
             if result is not None:
                 return result
     return None
+
+
+def _recover_text_tool_call(blocks, tools):
+    """If ``blocks`` carries no structured ``tool_use`` block but a text block
+    *is* (or contains) a leaked tool-call signature — e.g. the literal
+    ``record_answer(extracted_answer="110")`` emitted as plain text — return a
+    new block list with a recovered ``AdaptedToolUseBlock`` and the leaked text
+    removed. Mirrors the leak recovery ``_adapt_ollama_response`` already does,
+    for the OpenAI/Vertex/Gemini adapters: those models occasionally emit the
+    call as text instead of via the structured tool_calls/function_call channel,
+    and the student would otherwise see the raw signature as the reply (B1).
+
+    No-op when ``tools`` is falsy, a structured ``tool_use`` already exists, or
+    no signature is found — so ordinary text replies pass through untouched.
+    """
+    if not tools or not blocks:
+        return blocks
+    if any(getattr(b, 'type', '') == 'tool_use' for b in blocks):
+        return blocks
+    text = ''.join(
+        getattr(b, 'text', '') or '' for b in blocks
+        if getattr(b, 'type', '') == 'text'
+    )
+    if not text.strip():
+        return blocks
+    parsed = (_maybe_parse_text_call_syntax(text, tools)
+              or _maybe_parse_text_tool_call(text))
+    if not parsed or not parsed.get('name'):
+        return blocks
+    return [AdaptedToolUseBlock(
+        name=parsed.get('name', ''),
+        input=parsed.get('arguments') or {},
+        id='recovered_tool_0',
+    )]
 
 
 def _adapt_ollama_response(
@@ -1201,56 +1239,80 @@ class OpenAIClient(BaseLLMClient):
         """Convert Anthropic-shaped content blocks to OpenAI's
         Chat Completions shape.
 
-        The tutor engine builds multimodal user messages in Anthropic
-        shape: `content` is either a string or a list of blocks
-        `{"type":"text","text":...}` / `{"type":"image","source":{...}}`.
-        OpenAI Chat Completions accepts `{"type":"text",...}` verbatim
-        but rejects `{"type":"image",...}` — it requires
-        `{"type":"image_url","image_url":{"url":"data:<mime>;base64,<b64>"}}`.
+        Two jobs:
+        1. Multimodal user messages: `{"type":"image",...}` →
+           `{"type":"image_url","image_url":{"url":"data:<mime>;base64,..."}}`
+           (OpenAI rejects the Anthropic image shape). Task #247.
+        2. The tutor's two-call tool loop re-sends Call-1's assistant
+           `tool_use` blocks + a user `tool_result` block. These arrive as
+           either dicts (engine-built) OR the module's ``Adapted*`` dataclass
+           objects. The old code passed non-dict blocks through verbatim,
+           which the OpenAI SDK then failed to JSON-serialise
+           (``AdaptedToolUseBlock is not JSON serializable``) — breaking
+           Call 2 for every Vertex/OpenAI model. We now fold the continuation
+           into plain text turns: the ``tool_result`` verdict becomes a user
+           turn (that is what Call 2 needs to compose its reply) and the bare
+           ``tool_use`` call is dropped (surfacing the call syntax would also
+           teach the model to leak it). The structured function-call protocol
+           is not required just to author a text reply.
 
-        Block-by-block translation, idempotent (already-translated
-        blocks pass through). String contents and non-image blocks
-        are untouched. Math L638 (figures) was failing every
-        OpenAI tutor call until this landed (task #247).
+        Handles dict and ``Adapted*`` blocks; string contents pass through.
         """
         translated: list[dict] = []
         for msg in messages or []:
+            role = msg.get('role', 'user')
             content = msg.get('content')
             if not isinstance(content, list):
-                # Plain-string content — OpenAI accepts as-is.
+                # Plain-string content — OpenAI accepts as-is (judge/regen path).
                 translated.append(msg)
                 continue
-            new_blocks: list[dict] = []
+            new_blocks: list[dict] = []       # text / image_url parts
+            tool_result_texts: list[str] = []  # rendered grading verdict(s)
             for block in content:
-                if not isinstance(block, dict):
-                    new_blocks.append(block)
-                    continue
-                btype = block.get('type')
-                if btype == 'image':
-                    src = block.get('source') or {}
-                    media_type = src.get('media_type') or 'image/png'
-                    if src.get('type') == 'base64':
-                        data = src.get('data') or ''
-                        url = f"data:{media_type};base64,{data}"
-                    elif src.get('type') == 'url':
+                if isinstance(block, dict):
+                    btype = block.get('type')
+                    getv = block.get
+                else:
+                    btype = getattr(block, 'type', None)
+                    getv = lambda k, d=None, _b=block: getattr(_b, k, d)
+                if btype == 'text':
+                    t = getv('text') or ''
+                    if t:
+                        new_blocks.append({"type": "text", "text": t})
+                elif btype == 'image':
+                    src = getv('source') or {}
+                    media_type = (src.get('media_type') if isinstance(src, dict) else None) or 'image/png'
+                    stype = src.get('type') if isinstance(src, dict) else None
+                    if stype == 'base64':
+                        url = f"data:{media_type};base64,{src.get('data') or ''}"
+                    elif stype == 'url':
                         url = src.get('url') or ''
                     else:
-                        # Unknown shape — drop the image quietly rather
-                        # than crashing the whole request.
                         logger.warning(
-                            "[OpenAITranslate] unknown image source "
-                            "type=%s — dropping block", src.get('type'),
-                        )
+                            "[OpenAITranslate] unknown image source type=%s — dropping", stype)
                         continue
-                    new_blocks.append({
-                        "type": "image_url",
-                        "image_url": {"url": url},
-                    })
-                else:
-                    # text / image_url / anything else OpenAI knows
-                    # passes through verbatim.
-                    new_blocks.append(block)
-            translated.append({**msg, 'content': new_blocks})
+                    new_blocks.append({"type": "image_url", "image_url": {"url": url}})
+                elif btype == 'image_url':
+                    iu = getv('image_url') or {}
+                    new_blocks.append({"type": "image_url", "image_url": iu})
+                elif btype == 'tool_use':
+                    continue  # fold away — do not surface tool-call syntax
+                elif btype == 'tool_result':
+                    c = getv('content')
+                    tool_result_texts.append(
+                        c if isinstance(c, str) else json.dumps(c, default=str))
+            if tool_result_texts:
+                # Call-2 user turn carrying the grading verdict.
+                extra = ' '.join(b['text'] for b in new_blocks if b.get('type') == 'text')
+                text = '\n'.join(tool_result_texts)
+                translated.append({'role': 'user', 'content': (text + ('\n' + extra if extra else '')).strip()})
+            elif role == 'assistant':
+                # Call-1 assistant turn: keep its text; placeholder if empty so
+                # the turn isn't blank (some providers reject empty content).
+                text = ' '.join(b['text'] for b in new_blocks if b.get('type') == 'text').strip()
+                translated.append({'role': 'assistant', 'content': text or '...'})
+            else:
+                translated.append({**msg, 'content': new_blocks})
         return translated
 
     def _build_completion_kwargs(
@@ -1442,7 +1504,7 @@ class OpenAIClient(BaseLLMClient):
         # all three providers (task #245). The raw ChatCompletion fails
         # the engine's isinstance(.content, list) shape check.
         return _adapt_openai_response(
-            response, model_name=self.config.model_name,
+            response, model_name=self.config.model_name, tools=tools,
         )
 
 
@@ -1607,7 +1669,7 @@ class VertexModelGardenClient(OpenAIClient):
             sampling or {},
         )
         data = self._create_raw(**kwargs, **completion_kwargs)
-        return _adapt_openai_dict(data, model_name=self.config.model_name)
+        return _adapt_openai_dict(data, model_name=self.config.model_name, tools=tools)
 
 
 class GeminiClient(BaseLLMClient):
@@ -1673,49 +1735,74 @@ class GeminiClient(BaseLLMClient):
             raise last_exc
 
     def _build_contents(self, messages):
-        """Map chat messages to Gemini Content objects, supporting multimodal."""
+        """Map chat messages to Gemini Content objects, supporting multimodal.
+
+        Handles dict AND the module's ``Adapted*`` dataclass blocks. The tutor
+        two-call loop re-sends Call-1's ``tool_use`` blocks + a user
+        ``tool_result`` block; the old code called ``block.get('type')`` on the
+        dataclass objects (``AttributeError: 'AdaptedToolUseBlock' object has no
+        attribute 'get'``), crashing Call 2 for every Gemini model. We fold the
+        continuation into plain text turns — the ``tool_result`` verdict becomes
+        a user turn (what Call 2 needs) and the bare ``tool_use`` call is dropped
+        — which also preserves Gemini's required user/model role alternation.
+        """
         import base64
         from google.genai import types
         contents = []
         for msg in messages:
-            role = 'model' if msg['role'] == 'assistant' else 'user'
-            content = msg['content']
+            role_in = msg.get('role', 'user')
+            content = msg.get('content')
 
-            # Handle multimodal content blocks (list of dicts with type/text/image)
-            if isinstance(content, list):
-                parts = []
-                for block in content:
-                    if block.get('type') == 'text':
-                        parts.append(types.Part(text=block['text']))
-                    elif block.get('type') == 'image':
-                        # Anthropic format: source.type=base64
-                        source = block.get('source', {})
-                        parts.append(types.Part(
-                            inline_data=types.Blob(
-                                mime_type=source.get('media_type', 'image/jpeg'),
-                                data=base64.b64decode(source.get('data', '')),
-                            )
-                        ))
-                    elif block.get('type') == 'image_url':
-                        # OpenAI format: image_url.url=data:mime;base64,...
-                        url = block.get('image_url', {}).get('url', '')
-                        if url.startswith('data:'):
-                            # Parse data URI: data:image/jpeg;base64,/9j/...
-                            header, b64_data = url.split(',', 1)
-                            mime = header.split(':')[1].split(';')[0]
-                            parts.append(types.Part(
-                                inline_data=types.Blob(
-                                    mime_type=mime,
-                                    data=base64.b64decode(b64_data),
-                                )
-                            ))
-                contents.append(types.Content(role=role, parts=parts))
-            else:
-                # Simple string content
+            if not isinstance(content, list):
                 contents.append(types.Content(
-                    role=role,
-                    parts=[types.Part(text=content)],
+                    role='model' if role_in == 'assistant' else 'user',
+                    parts=[types.Part(text=str(content))],
                 ))
+                continue
+
+            parts = []
+            tool_result_texts: list[str] = []
+            for block in content:
+                if isinstance(block, dict):
+                    btype = block.get('type')
+                    getv = block.get
+                else:
+                    btype = getattr(block, 'type', None)
+                    getv = lambda k, d=None, _b=block: getattr(_b, k, d)
+                if btype == 'text':
+                    t = getv('text')
+                    if t:
+                        parts.append(types.Part(text=t))
+                elif btype == 'image':
+                    source = getv('source') or {}
+                    parts.append(types.Part(inline_data=types.Blob(
+                        mime_type=(source.get('media_type', 'image/jpeg') if isinstance(source, dict) else 'image/jpeg'),
+                        data=base64.b64decode(source.get('data', '') if isinstance(source, dict) else ''),
+                    )))
+                elif btype == 'image_url':
+                    iu = getv('image_url') or {}
+                    url = iu.get('url', '') if isinstance(iu, dict) else ''
+                    if url.startswith('data:'):
+                        header, b64_data = url.split(',', 1)
+                        mime = header.split(':')[1].split(';')[0]
+                        parts.append(types.Part(inline_data=types.Blob(
+                            mime_type=mime, data=base64.b64decode(b64_data))))
+                elif btype == 'tool_use':
+                    continue  # fold away
+                elif btype == 'tool_result':
+                    c = getv('content')
+                    tool_result_texts.append(
+                        c if isinstance(c, str) else json.dumps(c, default=str))
+
+            if tool_result_texts:
+                preamble = ' '.join(getattr(p, 'text', '') or '' for p in parts).strip()
+                text = '\n'.join(tool_result_texts) + (('\n' + preamble) if preamble else '')
+                contents.append(types.Content(role='user', parts=[types.Part(text=text.strip())]))
+            else:
+                if not parts:
+                    parts = [types.Part(text='...')]  # avoid empty parts
+                contents.append(types.Content(
+                    role='model' if role_in == 'assistant' else 'user', parts=parts))
         return contents
 
     def _search_tools(self):
@@ -1952,7 +2039,7 @@ class GeminiClient(BaseLLMClient):
         # all three providers (task #245). The raw GenerateContentResponse
         # fails the engine's isinstance(.content, list) shape check.
         return _adapt_gemini_response(
-            response, model_name=self.config.model_name,
+            response, model_name=self.config.model_name, tools=tools,
         )
 
 

@@ -54,6 +54,12 @@ class RubricItemScore:
     item: str
     score: float
     reasoning: str = ''
+    # False when the judge returned "n/a" — a conditional item whose
+    # precondition doesn't hold (e.g. an "if the student made a mistake…" item
+    # on a no-mistake turn). N/A items are EXCLUDED from the mean (B3), so a
+    # spurious 0.0 on an inapplicable item no longer sinks an otherwise-passing
+    # scenario. ``score`` is 0.0 for n/a items but is not counted.
+    applicable: bool = True
 
 
 @dataclass
@@ -341,8 +347,16 @@ Score each item on a continuous scale from 0.0 to 1.0:
 - 0.3 = barely satisfies — significant issue
 - 0.0 = does not satisfy
 
+Some items are CONDITIONAL — they start with "If …" (e.g. "If the student made \
+a mistake, …"). When such an item's condition does NOT hold for this turn (e.g. \
+the student made no mistake and gave no answer — an off-topic, clarification, or \
+distress turn), the item does not apply: return the string "n/a" as its score \
+instead of a number. An "n/a" item is excluded from scoring — it neither helps \
+nor hurts. Use "n/a" ONLY for genuinely inapplicable conditional items; when in \
+doubt whether an item applies, score it normally.
+
 Output ONLY a JSON object with EXACTLY this shape:
-{"scores": [{"item": "<verbatim rubric item text>", "score": <float>, "reasoning": "<one sentence>"}, ...]}
+{"scores": [{"item": "<verbatim rubric item text>", "score": <float or "n/a">, "reasoning": "<one sentence>"}, ...]}
 
 Do not include any text outside the JSON. Do not wrap in markdown code fences. \
 Use the exact rubric item text as the `item` key — verbatim.\
@@ -629,22 +643,39 @@ def _call_and_parse(
     # Map judged scores back to the rubric items by index — the judge is
     # told to return items in the same order. Tolerate length mismatch by
     # padding missing items with 0.0 and a "judge did not score this" note.
+    # A score of "n/a" marks an inapplicable conditional item (B3): it is
+    # recorded but excluded from the mean.
     for i, item in enumerate(rubric_items):
         if i < len(raw_scores) and isinstance(raw_scores[i], dict):
             raw = raw_scores[i]
-            score_val = float(raw.get('score', 0.0))
-            score_val = max(0.0, min(1.0, score_val))
-            result.items.append(RubricItemScore(
-                item=item, score=score_val,
-                reasoning=str(raw.get('reasoning', '')).strip(),
-            ))
+            raw_score = raw.get('score', 0.0)
+            reasoning = str(raw.get('reasoning', '')).strip()
+            if isinstance(raw_score, str) and raw_score.strip().lower() in ('n/a', 'na'):
+                result.items.append(RubricItemScore(
+                    item=item, score=0.0, reasoning=reasoning, applicable=False,
+                ))
+            else:
+                try:
+                    score_val = max(0.0, min(1.0, float(raw_score)))
+                except (TypeError, ValueError):
+                    score_val = 0.0
+                result.items.append(RubricItemScore(
+                    item=item, score=score_val, reasoning=reasoning,
+                ))
         else:
             result.items.append(RubricItemScore(
                 item=item, score=0.0,
                 reasoning='judge did not score this item',
             ))
 
-    if result.items:
-        result.mean_score = sum(s.score for s in result.items) / len(result.items)
+    # Mean over APPLICABLE items only — n/a (inapplicable conditional) items are
+    # excluded so a spurious 0.0 can't sink an otherwise-passing scenario. If
+    # every item is n/a (no applicable rubric to judge), treat the layer as a
+    # vacuous pass.
+    scored = [s for s in result.items if s.applicable]
+    if scored:
+        result.mean_score = sum(s.score for s in scored) / len(scored)
+    elif result.items:
+        result.mean_score = 1.0
     result.passed = result.mean_score >= result.pass_threshold
     return result
