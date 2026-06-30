@@ -24,22 +24,21 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — offline-model eval on Google Colab (free T4)  ·  *Improved (per-family tuned)*
+# AI Tutor — OSS **Qwen** eval on Google Colab (free T4)  ·  *Improved Evaluation (results3)*
 
-Evaluate bigger open-source tutor models than an 8 GB laptop can run, using the
-**same harness** (tutor = OSS via Ollama; judge + student-sim = Anthropic).
+Evaluate the open-source **Qwen** tutor models that an 8 GB laptop can't run, using
+the **same harness** (tutor = Qwen via Ollama; judge + student-sim = Anthropic).
 
-**What's new in this run.** Each model is now sampled with the **per-family
-settings** from `offline_eval/PROMPT_ENGINEERING_FRAMEWORK.md` — applied
-automatically by `apps/llm/model_profiles.py` (e.g. Mistral-Nemo temp **0.3**,
-Qwen2.5 **0.7 / top_p 0.8 / top_k 20**), instead of the old blanket temp ≈ 0.
-Results land in **`offline_eval/results2/`** so they extend the *Improved
-Evaluation 1* leaderboard alongside the cloud re-run. No per-model setup is
-needed — the profile resolves from the model tag (Cell 8 prints what each model
-will use).
+**This run is Qwen-only.** Cell 8 lists only `qwen2.5:7b` and `qwen2.5:14b` (the
+free-T4 tier); the larger `qwen2.5:32b/72b` are commented out for an A100/Colab-Pro
+runtime. Each model is sampled with the **per-family Qwen settings** from
+`apps/llm/model_profiles.py` (**temp 0.7 / top_p 0.8 / top_k 20**) and uses the
+**Qwen-specific Block-0 prompt** (Markdown + targeted rules + few-shot), selected
+automatically by the engine. Results land in **`offline_eval/results3/`** so they
+join the Gemini + Qwen-MaaS cloud re-run on the new board.
 
-> Requires the `{BRANCH}` branch to contain the per-family-tuning commit
-> (`apps/llm/model_profiles.py` + the `sampling` plumbing). Cell 2 clones that
+> Requires the `{BRANCH}` branch to contain the bottleneck-fix commit (B1/B2 engine
+> fixes, per-family prompts, rubric n/a, dataset reference fixes). Cell 2 clones that
 > branch, so just make sure it's pushed before running.
 
 **Before you start**
@@ -123,48 +122,32 @@ code(r"""
 !python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
 """)
 
-md("## Cell 7 — persist results to Drive (seed with the committed cloud results2, then symlink)\n"
-   "Writes into **`results2/`** so the OSS models extend the *Improved Evaluation 1* "
-   "leaderboard. Seeds from any committed cloud `results2/*.json` so the combined "
+md("## Cell 7 — persist results to Drive (seed with the committed cloud results3, then symlink)\n"
+   "Writes into **`results3/`** so the OSS Qwen models join the Gemini + Qwen-MaaS "
+   "cloud re-run. Seeds from any committed cloud `results3/*.json` so the combined "
    "leaderboard shows cloud + OSS together, and survives Colab disconnects.")
 code(r"""
-!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results2
-# seed the Drive folder with the improved cloud results committed in the repo (no-clobber)
-!cp -n offline_eval/results2/*.json /content/drive/MyDrive/ai-tutor-eval-results2/ 2>/dev/null || true
-!rm -rf offline_eval/results2 && ln -s /content/drive/MyDrive/ai-tutor-eval-results2 offline_eval/results2
-!ls offline_eval/results2/
+!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results3
+# seed the Drive folder with the cloud results committed in the repo (no-clobber)
+!cp -n offline_eval/results3/*.json /content/drive/MyDrive/ai-tutor-eval-results3/ 2>/dev/null || true
+!rm -rf offline_eval/results3 && ln -s /content/drive/MyDrive/ai-tutor-eval-results3 offline_eval/results3
+!ls offline_eval/results3/
 """)
 
-md("## Cell 8 — choose the big-model matrix + seed configs\n"
-   "All models below are **tool-calling capable** (the engine requires it). The "
-   "**T4 tier** (≤~14B q4) runs on free Colab. The **A100 / Colab-Pro tier** "
-   "(>16GB VRAM) is commented out so it won't OOM a T4 — uncomment those lines "
-   "only on an A100 runtime. Trim the list to control runtime (~20–40 min each).")
+md("## Cell 8 — OSS Qwen matrix + seed configs\n"
+   "**Qwen-only run.** Both models are tool-calling capable (the engine requires it) "
+   "and fit the **free-T4 tier** (≤~14B q4). The larger `qwen2.5:32b/72b` are "
+   "commented out (needs an A100 / Colab-Pro runtime; uncomment there). Each runs "
+   "~20–40 min.")
 code(r"""
 open('offline_eval/models.txt', 'w').write('''\
 # ============ T4 (free Colab, 16GB) tier — fits ~14B q4 ============
 qwen2.5:7b            big
-llama3.1:8b           big
-mistral:7b            big
-glm4:9b               big
 qwen2.5:14b           big
-phi4                  big
-mistral-nemo:12b      big
-granite3.1-dense:8b   big
-hermes3:8b            big
-aya-expanse:8b        big    # Cohere — multilingual, relevant for MZ/TZ
-falcon3:10b           big
-command-r7b           big    # Cohere 7B — multilingual + tools
 
 # ============ A100 / Colab-Pro tier — needs >16GB VRAM; UNCOMMENT on A100 ===
-# mistral-small:24b   xl
 # qwen2.5:32b         xl
-# command-r:35b       xl     # strong tool-use + multilingual
-# mixtral:8x7b        xl     # 47B MoE
-# llama3.3:70b        xl
 # qwen2.5:72b         xl
-# athene-v2:72b       xl
-# command-r-plus:104b xl     # 104B — needs an 80GB A100
 ''')
 !python offline_eval/seed_ollama_configs.py
 # Show the per-family sampling each model will use (from apps/llm/model_profiles).
@@ -187,17 +170,17 @@ for line in open('offline_eval/models.txt'):
 """)
 
 md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)\n"
-   "`RESULTS_DIR=…/results2` keeps these on the *Improved Evaluation 1* board. "
+   "`RESULTS_DIR=…/results3` puts these on the new board (Gemini + Qwen-MaaS + OSS Qwen). "
    "`CLEANUP_MODELS=1` deletes each model's weights from disk right after it's "
    "scored, so Colab's ~112 GB disk never fills up (results are already saved to "
    "Drive, so a re-run still skips done models).")
 code(r"""
-!RESULTS_DIR=$PWD/offline_eval/results2 SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
+!RESULTS_DIR=$PWD/offline_eval/results3 SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
 """)
 
-md("## Cell 10 — combined Improved leaderboard (cloud + OSS; run anytime)")
+md("## Cell 10 — combined results3 leaderboard (cloud + OSS Qwen; run anytime)")
 code(r"""
-!RESULTS_DIR=$PWD/offline_eval/results2 python offline_eval/aggregate.py
+!RESULTS_DIR=$PWD/offline_eval/results3 python offline_eval/aggregate.py
 """)
 
 md(rf"""
@@ -212,13 +195,13 @@ mid-run restarts (resume only skips *completed* models); each model is also boun
 the Anthropic judge calls, so plan 1–3 models per session.
 
 To pull these results back to your laptop: copy the JSONs from
-`MyDrive/ai-tutor-eval-results2/` into the repo's `offline_eval/results2/` and run
-`RESULTS_DIR=offline_eval/results2 python offline_eval/aggregate.py`.
+`MyDrive/ai-tutor-eval-results3/` into the repo's `offline_eval/results3/` and run
+`RESULTS_DIR=offline_eval/results3 python offline_eval/aggregate.py`.
 
-**If GLM under-scores:** it leaks tool calls as text under the full prompt. Set
-`OLLAMA_DEBUG_RAW=1` before Cell 9, then check `offline_eval/results2/glm4_9b.log`
-for an `[OllamaToolLeak]` line and share it — the parser can then be extended to
-match glm4's exact format.
+**If a Qwen model leaks tool calls as text** (the engine's text-tool-call recovery
+should now catch `record_answer(...)`): set `OLLAMA_DEBUG_RAW=1` before Cell 9, then
+check `offline_eval/results3/qwen2.5_14b.log` for an `[OllamaToolLeak]` line and
+share it — the parser can then be extended to match that exact format.
 """)
 
 nb = {
