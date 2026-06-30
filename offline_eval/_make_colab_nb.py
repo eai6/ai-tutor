@@ -24,22 +24,35 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — OSS **Qwen** eval on Google Colab (free T4)  ·  *Improved Evaluation (results3)*
+# AI Tutor — OSS **Qwen + Gemma** eval on Google Colab (free T4)  ·  *Improved Evaluation (results3)*
 
-Evaluate the open-source **Qwen** tutor models that an 8 GB laptop can't run, using
-the **same harness** (tutor = Qwen via Ollama; judge + student-sim = Anthropic).
+Evaluate the open-source **Qwen** and **Gemma** tutor models that an 8 GB laptop
+can't run, using the **same harness** (tutor = OSS via Ollama; judge + student-sim
+= Anthropic).
 
-**This run is Qwen-only.** Cell 8 lists only `qwen2.5:7b` and `qwen2.5:14b` (the
-free-T4 tier); the larger `qwen2.5:32b/72b` are commented out for an A100/Colab-Pro
-runtime. Each model is sampled with the **per-family Qwen settings** from
-`apps/llm/model_profiles.py` (**temp 0.7 / top_p 0.8 / top_k 20**) and uses the
-**Qwen-specific Block-0 prompt** (Markdown + targeted rules + few-shot), selected
-automatically by the engine. Results land in **`offline_eval/results3/`** so they
-join the Gemini + Qwen-MaaS cloud re-run on the new board.
+**Models (Cell 8).** The free-T4 tier runs `qwen2.5:{{0.5,1.5,3,7,14}}b` and
+`gemma3:{{1,4,12}}b`. The **XL tier is now active** (no longer commented):
+`qwen2.5:32b/72b`, `gemma3:27b`, plus `qwen3:30b-a3b`, `qwen3.6:27b`,
+`qwen3.6:35b-a3b` — these need an **A100 (80 GB for the 72b) / Colab-Pro**
+runtime and will OOM a free T4. Each model is auto-tuned by
+`apps/llm/model_profiles.py`:
+- **Qwen2.5** → temp **0.7 / top_p 0.8 / top_k 20**, **Markdown** Block-0
+  (targeted rules + few-shot).
+- **Gemma 3** → temp **1.0 / top_p 0.95 / top_k 64** (Gemma's documented default),
+  **XML** Block-0 + targeted rules (Google lineage favours XML here).
+
+Results land in **`offline_eval/results3/`** so they join the Gemini + Qwen-MaaS
+cloud re-run on the new board.
+
+> **Gemma tool-calling caveat.** The engine requires tool calls; Gemma's
+> tool-calling via Ollama is weaker than Qwen's, so it leans on the engine's
+> text-tool-call recovery + the "never emit tool syntax" rule. If Cell 9 shows
+> Gemma erroring every scenario with *"does not support tools"*, that Ollama build
+> can't run it through the tool-required harness — check the per-model `.log`.
 
 > Requires the `{BRANCH}` branch to contain the bottleneck-fix commit (B1/B2 engine
-> fixes, per-family prompts, rubric n/a, dataset reference fixes). Cell 2 clones that
-> branch, so just make sure it's pushed before running.
+> fixes, per-family prompts incl. Gemma routing, rubric n/a, dataset reference
+> fixes). Cell 2 clones that branch, so make sure it's pushed before running.
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
@@ -134,20 +147,34 @@ code(r"""
 !ls offline_eval/results3/
 """)
 
-md("## Cell 8 — OSS Qwen matrix + seed configs\n"
-   "**Qwen-only run.** Both models are tool-calling capable (the engine requires it) "
-   "and fit the **free-T4 tier** (≤~14B q4). The larger `qwen2.5:32b/72b` are "
-   "commented out (needs an A100 / Colab-Pro runtime; uncomment there). Each runs "
-   "~20–40 min.")
+md("## Cell 8 — OSS Qwen + Gemma matrix + seed configs\n"
+   "The **free-T4 tier** (≤~14B q4) holds the full small-to-mid Qwen2.5 range plus "
+   "Gemma 3. The **XL tier is active** (`qwen2.5:32b/72b`, `gemma3:27b`, and the "
+   "Qwen3 / Qwen3.6 MoE+dense models) — these need an **A100 (80 GB for the 72b) / "
+   "Colab-Pro** runtime and OOM a free T4. ~20–40 min each (XL longer); it's "
+   "**resume-safe** across Colab disconnects (done models are skipped). Trim the "
+   "list to fit your runtime + session budget.")
 code(r"""
 open('offline_eval/models.txt', 'w').write('''\
 # ============ T4 (free Colab, 16GB) tier — fits ~14B q4 ============
-qwen2.5:7b            big
-qwen2.5:14b           big
+# Qwen2.5 — full small-to-mid range
+qwen2.5:0.5b         big
+qwen2.5:1.5b         big
+qwen2.5:3b           big
+qwen2.5:7b           big
+qwen2.5:14b          big
+# Gemma 3 — Google OSS (weaker Ollama tool-calling; see caveat at top)
+gemma3:1b            big
+gemma3:4b            big
+gemma3:12b           big
 
-# ============ A100 / Colab-Pro tier — needs >16GB VRAM; UNCOMMENT on A100 ===
-# qwen2.5:32b         xl
-# qwen2.5:72b         xl
+# ============ XL tier — >16GB VRAM; A100 (80GB for 72b) / Colab-Pro; OOMs a T4 ===
+qwen2.5:32b          xl
+qwen2.5:72b          xl     # q4 ~47GB — needs the 80GB A100
+gemma3:27b           xl
+qwen3:30b-a3b        xl     # Qwen3 30B MoE (3B active)
+qwen3.6:27b          xl     # Qwen3.6 dense 27B
+qwen3.6:35b-a3b      xl     # Qwen3.6 35B MoE (3B active)
 ''')
 !python offline_eval/seed_ollama_configs.py
 # Show the per-family sampling each model will use (from apps/llm/model_profiles).
@@ -169,16 +196,48 @@ for line in open('offline_eval/models.txt'):
         print(f"{tag:<22} (no profile — runs at engine default)")
 """)
 
+md("## Cell 8b — reclaim disk BEFORE the sweep (important on a resumed session)\n"
+   "A reconnected / re-cloned Colab can start with old pulled model weights + caches "
+   "still on disk (the last sweep left it ~half full). This clears every "
+   "previously-pulled Ollama model and the package caches **before** the first "
+   "download, then prints free space. On a fresh VM it's a harmless no-op.")
+code(r"""
+import subprocess
+def _df(tag):
+    print(f"--- disk {tag} ---\n" + subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
+_df('BEFORE cleanup')
+# remove every model the Ollama server currently holds (server-mediated → frees blobs)
+!ollama list 2>/dev/null | tail -n +2 | awk '{print $1}' | xargs -r -n1 ollama rm 2>/dev/null || true
+# backstop: wipe any stray model store + pip/apt/HF caches (server re-creates on next pull)
+!rm -rf /root/.ollama/models/blobs/* /root/.ollama/models/manifests/* offline_eval/ollama_models/* 2>/dev/null || true
+!pip cache purge 2>/dev/null || true
+!apt-get clean 2>/dev/null || true
+!rm -rf /root/.cache/huggingface /root/.cache/pip 2>/dev/null || true
+_df('AFTER cleanup')
+""")
+
 md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)\n"
-   "`RESULTS_DIR=…/results3` puts these on the new board (Gemini + Qwen-MaaS + OSS Qwen). "
-   "`CLEANUP_MODELS=1` deletes each model's weights from disk right after it's "
-   "scored, so Colab's ~112 GB disk never fills up (results are already saved to "
-   "Drive, so a re-run still skips done models).")
+   "`RESULTS_DIR=…/results3` puts these on the new board (Gemini + Qwen-MaaS + OSS). "
+   "`CLEANUP_MODELS=1` deletes each model's weights from disk **right after** it's "
+   "scored, so peak disk ≈ one model at a time and it never fills up (results are "
+   "already on Drive, so a re-run still skips done models).")
 code(r"""
 !RESULTS_DIR=$PWD/offline_eval/results3 SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
 """)
 
-md("## Cell 10 — combined results3 leaderboard (cloud + OSS Qwen; run anytime)")
+md("## Cell 9b — reclaim disk AFTER the sweep (final backstop)\n"
+   "`CLEANUP_MODELS=1` already removes each model as it finishes; this drops anything "
+   "left and prints free space. Results are safe on Drive (Cell 7).")
+code(r"""
+!ollama list 2>/dev/null | tail -n +2 | awk '{print $1}' | xargs -r -n1 ollama rm 2>/dev/null || true
+!rm -rf /root/.ollama/models/blobs/* /root/.ollama/models/manifests/* offline_eval/ollama_models/* 2>/dev/null || true
+!pip cache purge 2>/dev/null || true
+!apt-get clean 2>/dev/null || true
+import subprocess
+print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
+""")
+
+md("## Cell 10 — combined results3 leaderboard (cloud + OSS Qwen/Gemma; run anytime)")
 code(r"""
 !RESULTS_DIR=$PWD/offline_eval/results3 python offline_eval/aggregate.py
 """)

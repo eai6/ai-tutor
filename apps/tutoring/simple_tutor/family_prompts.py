@@ -361,9 +361,11 @@ def build_family_block_0(family: str | None, base_template: str) -> str:
     """Return the Block-0 template text for ``family``.
 
     - ``qwen``   → the Markdown variant (favours Markdown; framework §3.3).
-    - ``gemini`` → the XML ``base_template`` + the targeted pedagogy rules
-      (favours XML here; kept separate from the base so Gemini tuning never
-      changes the Anthropic/default prompt).
+    - ``gemini`` / ``gemma`` → the XML ``base_template`` + the targeted pedagogy
+      rules. Both are Google-lineage and favour XML here (results2 XML>Markdown
+      test); Gemma additionally leans on the "never emit tool syntax" rule
+      because its Ollama tool-calling is weaker. Kept separate from the base so
+      Google-family tuning never changes the Anthropic/default prompt.
     - anything else (incl. ``None`` / Anthropic) → ``base_template`` unchanged.
 
     ``base_template`` is passed in by ``prompts.py`` (which owns
@@ -375,6 +377,6 @@ def build_family_block_0(family: str | None, base_template: str) -> str:
     fam = (family or "").strip().lower()
     if fam == "qwen":
         return MARKDOWN_BLOCK_0_TEMPLATE
-    if fam == "gemini":
+    if fam in ("gemini", "gemma"):
         return base_template.rstrip() + "\n" + GEMINI_TARGETED_RULES_XML
     return base_template

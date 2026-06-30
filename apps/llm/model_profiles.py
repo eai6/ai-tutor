@@ -263,6 +263,17 @@ _FAMILY_PATTERNS_RAW: list[tuple[str, ModelProfile]] = [
     (r"claude|anthropic", ModelProfile(
         family="anthropic", mode="instruct", max_tokens=_MT_ANTHROPIC)),
 
+    # Gemma 3 (Google OSS): not a thinking model. Use Gemma's documented sampling
+    # (temp 1.0 / top_p 0.95 / top_k 64) — "family-recommended", consistent with
+    # leaving the Gemini family at its provider default. Gets the XML Block-0 +
+    # targeted rules (Google lineage favours XML here; see build_family_block_0),
+    # which also gives it the "never emit tool syntax" rule its weaker Ollama
+    # tool-calling needs. max_tokens 2048: instruct reply + one tool call.
+    (r"gemma", ModelProfile(
+        family="gemma", mode="instruct", max_tokens=2048,
+        temperature=1.0, top_p=0.95, top_k=64,
+        notes="Gemma 3 default sampling; XML+targeted-rules prompt.")),
+
     # Other local OSS families — standard instruct defaults.
     (r"granite", ModelProfile(family="granite", mode="instruct", max_tokens=1024, temperature=0.3)),
     (r"llama", ModelProfile(family="llama", mode="instruct", max_tokens=1024, temperature=0.3)),
