@@ -148,33 +148,41 @@ code(r"""
 """)
 
 md("## Cell 8 — OSS Qwen + Gemma matrix + seed configs\n"
-   "The **free-T4 tier** (≤~14B q4) holds the full small-to-mid Qwen2.5 range plus "
-   "Gemma 3. The **XL tier is active** (`qwen2.5:32b/72b`, `gemma3:27b`, and the "
-   "Qwen3 / Qwen3.6 MoE+dense models) — these need an **A100 (80 GB for the 72b) / "
-   "Colab-Pro** runtime and OOM a free T4. ~20–40 min each (XL longer); it's "
-   "**resume-safe** across Colab disconnects (done models are skipped). Trim the "
-   "list to fit your runtime + session budget.")
+   "**This run: the small Qwen3.5 + Qwen3 dense line** (all <14B → free-T4 tier). "
+   "Everything already evaluated (qwen2.5, gemma3, the XL tier) is commented out; "
+   "their results stay on the board (seeded from the committed `results3/*.json` + "
+   "your Drive). All Qwen3-family models are tool-capable, so they run cleanly. "
+   "~15–40 min each; **resume-safe** (done models are skipped).")
 code(r"""
 open('offline_eval/models.txt', 'w').write('''\
-# ============ T4 (free Colab, 16GB) tier — fits ~14B q4 ============
-# Qwen2.5 — full small-to-mid range
-qwen2.5:0.5b         big
-qwen2.5:1.5b         big
-qwen2.5:3b           big
-qwen2.5:7b           big
-qwen2.5:14b          big
-# Gemma 3 — Google OSS (weaker Ollama tool-calling; see caveat at top)
-gemma3:1b            big
-gemma3:4b            big
-gemma3:12b           big
+# ============ THIS RUN — Qwen3.5 + Qwen3 small dense (<14B, free-T4 tier) ======
+qwen3.5:0.8b         big
+qwen3.5:2b           big
+qwen3.5:4b           big
+qwen3.5:9b           big
+qwen3:0.6b           big
+qwen3:1.7b           big
+qwen3:4b             big
+qwen3:8b             big
+qwen3:14b            big
 
-# ============ XL tier — >16GB VRAM; A100 (80GB for 72b) / Colab-Pro; OOMs a T4 ===
-qwen2.5:32b          xl
-qwen2.5:72b          xl     # q4 ~47GB — needs the 80GB A100
-gemma3:27b           xl
-qwen3:30b-a3b        xl     # Qwen3 30B MoE (3B active)
-qwen3.6:27b          xl     # Qwen3.6 dense 27B
-qwen3.6:35b-a3b      xl     # Qwen3.6 35B MoE (3B active)
+# ============ Already evaluated — commented out (results kept on the board) =====
+# --- T4 tier ---
+# qwen2.5:0.5b        big
+# qwen2.5:1.5b        big
+# qwen2.5:3b          big
+# qwen2.5:7b          big
+# qwen2.5:14b         big
+# gemma3:1b           big    # BROKEN: gemma3 has no tool support in Ollama -> 400s
+# gemma3:4b           big
+# gemma3:12b          big
+# --- XL tier (A100 / Colab-Pro) ---
+# qwen2.5:32b         xl
+# qwen2.5:72b         xl     # q4 ~47GB — needs the 80GB A100
+# gemma3:27b          xl     # BROKEN (see above)
+# qwen3:30b-a3b       xl     # Qwen3 30B MoE (3B active)
+# qwen3.6:27b         xl     # Qwen3.6 dense 27B
+# qwen3.6:35b-a3b     xl     # Qwen3.6 35B MoE (3B active)
 ''')
 !python offline_eval/seed_ollama_configs.py
 # Show the per-family sampling each model will use (from apps/llm/model_profiles).
