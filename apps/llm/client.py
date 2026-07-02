@@ -1159,12 +1159,23 @@ class OllamaClient(BaseLLMClient):
         # Eval-only per-family sampling (apps/llm/model_profiles); production
         # passes none, so options stay the config temperature + num_predict.
         sampling = sampling or {}
+        num_predict = max_tokens or self.config.max_tokens
         options = {
             'temperature': (
                 sampling['temperature'] if sampling.get('temperature') is not None
                 else self.config.temperature
             ),
-            'num_predict': max_tokens or self.config.max_tokens,
+            'num_predict': num_predict,
+            # num_ctx = the FULL context window (prompt + generation). Ollama
+            # defaults to 4096, which is fatal for reasoning models: the ~2K-token
+            # prompt leaves ~2K for output, the <think> trace consumes it, and the
+            # answer is truncated away → empty completion → the engine serves its
+            # "Let's keep going." placeholder (qwen3.5 lost 34-48/60 turns this way,
+            # inverting the size curve). Size it to hold the prompt + num_predict +
+            # the two-call tool-result history. Non-thinking models (qwen2.5) are
+            # unaffected — they answered in <400 tokens and already fit. A profile
+            # may pin it via sampling['num_ctx'].
+            'num_ctx': sampling.get('num_ctx') or max(8192, (num_predict or 2048) + 8192),
         }
         if sampling.get('top_p') is not None:
             options['top_p'] = sampling['top_p']

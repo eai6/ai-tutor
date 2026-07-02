@@ -24,35 +24,30 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — OSS **Qwen + Gemma** eval on Google Colab (free T4)  ·  *Improved Evaluation (results3)*
+# AI Tutor — OSS **Qwen3 / Qwen3.5 re-run** on Google Colab (free T4)  ·  *results3b*
 
-Evaluate the open-source **Qwen** and **Gemma** tutor models that an 8 GB laptop
-can't run, using the **same harness** (tutor = OSS via Ollama; judge + student-sim
-= Anthropic).
+Re-run of the small **Qwen3** and **Qwen3.5** reasoning models after the
+**`num_ctx` fix**, using the **same harness** (tutor = OSS via Ollama; judge +
+student-sim = Anthropic).
 
-**Models (Cell 8).** The free-T4 tier runs `qwen2.5:{{0.5,1.5,3,7,14}}b` and
-`gemma3:{{1,4,12}}b`. The **XL tier is now active** (no longer commented):
-`qwen2.5:32b/72b`, `gemma3:27b`, plus `qwen3:30b-a3b`, `qwen3.6:27b`,
-`qwen3.6:35b-a3b` — these need an **A100 (80 GB for the 72b) / Colab-Pro**
-runtime and will OOM a free T4. Each model is auto-tuned by
-`apps/llm/model_profiles.py`:
-- **Qwen2.5** → temp **0.7 / top_p 0.8 / top_k 20**, **Markdown** Block-0
-  (targeted rules + few-shot).
-- **Gemma 3** → temp **1.0 / top_p 0.95 / top_k 64** (Gemma's documented default),
-  **XML** Block-0 + targeted rules (Google lineage favours XML here).
+**Why re-run.** The first pass gave nonsense (qwen3.5:9b scored *below* the 2b).
+Root cause: the Ollama request never set `num_ctx`, so it defaulted to **4096** —
+the ~2K-token prompt left only ~2K for output, and these reasoning models were
+**cut off mid-`<think>`** before the answer landed → empty completion → the engine's
+"Let's keep going." placeholder. qwen3.5 lost **34–48 of 60** turns this way. The
+fix (`apps/llm/client.py`) sizes `num_ctx` to fit the prompt + generation
+(~24K here). Non-thinking models (qwen2.5) were unaffected.
 
-Results land in **`offline_eval/results3/`** so they join the Gemini + Qwen-MaaS
-cloud re-run on the new board.
+**Models (Cell 8).** All 9 fit the **free-T4 tier** (<14B):
+`qwen3.5:{{0.8,2,4,9}}b` + `qwen3:{{0.6,1.7,4,8,14}}b`. Each auto-tunes to the
+**qwen** profile (temp 0.7 / top_p 0.8 / top_k 20, Markdown Block-0, num_ctx 24K).
 
-> **Gemma tool-calling caveat.** The engine requires tool calls; Gemma's
-> tool-calling via Ollama is weaker than Qwen's, so it leans on the engine's
-> text-tool-call recovery + the "never emit tool syntax" rule. If Cell 9 shows
-> Gemma erroring every scenario with *"does not support tools"*, that Ollama build
-> can't run it through the tool-required harness — check the per-model `.log`.
+**Output → `offline_eval/results3b/`** (a fresh folder), seeded from the committed
+`results3/*.json` (the 20 prior valid models: cloud + qwen2.5 + qwen3.6 + …), so
+Cell 10 shows the full combined board with the corrected Qwen3/3.5 rows.
 
-> Requires the `{BRANCH}` branch to contain the bottleneck-fix commit (B1/B2 engine
-> fixes, per-family prompts incl. Gemma routing, rubric n/a, dataset reference
-> fixes). Cell 2 clones that branch, so make sure it's pushed before running.
+> Requires the `{BRANCH}` branch to contain the `num_ctx` fix commit. Cell 2 clones
+> that branch, so make sure it's pushed before running.
 
 **Before you start**
 1. Runtime → **Change runtime type → T4 GPU**.
@@ -135,23 +130,25 @@ code(r"""
 !python manage.py loaddata evals/fixtures/institution.json evals/fixtures/lessons.json
 """)
 
-md("## Cell 7 — persist results to Drive (seed with the committed cloud results3, then symlink)\n"
-   "Writes into **`results3/`** so the OSS Qwen models join the Gemini + Qwen-MaaS "
-   "cloud re-run. Seeds from any committed cloud `results3/*.json` so the combined "
-   "leaderboard shows cloud + OSS together, and survives Colab disconnects.")
+md("## Cell 7 — persist results to a FRESH results3b folder on Drive\n"
+   "This is a clean re-run, so it writes into a **new** `results3b/` — seeded from "
+   "the committed `results3/*.json` (the 20 prior valid models: cloud + qwen2.5 + "
+   "qwen3.6 + …). The 9 re-run models aren't committed, so they run fresh with the "
+   "`num_ctx` fix. Symlinked to Drive so it survives Colab disconnects.")
 code(r"""
-!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results3
-# seed the Drive folder with the cloud results committed in the repo (no-clobber)
-!cp -n offline_eval/results3/*.json /content/drive/MyDrive/ai-tutor-eval-results3/ 2>/dev/null || true
-!rm -rf offline_eval/results3 && ln -s /content/drive/MyDrive/ai-tutor-eval-results3 offline_eval/results3
-!ls offline_eval/results3/
+!mkdir -p /content/drive/MyDrive/ai-tutor-eval-results3b
+# seed the NEW results3b folder from the committed PRIOR results (results3) so the
+# combined board stays complete; the 9 qwen3/qwen3.5 re-run models aren't committed
+# → not seeded → they run fresh with the num_ctx fix.
+!cp -n offline_eval/results3/*.json /content/drive/MyDrive/ai-tutor-eval-results3b/ 2>/dev/null || true
+!rm -rf offline_eval/results3b && ln -s /content/drive/MyDrive/ai-tutor-eval-results3b offline_eval/results3b
+!ls offline_eval/results3b/
 """)
 
-md("## Cell 8 — OSS Qwen + Gemma matrix + seed configs\n"
-   "**This run: the small Qwen3.5 + Qwen3 dense line** (all <14B → free-T4 tier). "
-   "Everything already evaluated (qwen2.5, gemma3, the XL tier) is commented out; "
-   "their results stay on the board (seeded from the committed `results3/*.json` + "
-   "your Drive). All Qwen3-family models are tool-capable, so they run cleanly. "
+md("## Cell 8 — Qwen3 / Qwen3.5 re-run matrix + seed configs\n"
+   "**This run: the small Qwen3.5 + Qwen3 dense line** (all <14B → free-T4 tier), "
+   "re-run with the `num_ctx` fix. All Qwen3-family models are tool-capable and now "
+   "get a 24K context window, so the `<think>` trace + answer fit. "
    "~15–40 min each; **resume-safe** (done models are skipped).")
 code(r"""
 open('offline_eval/models.txt', 'w').write('''\
@@ -224,13 +221,12 @@ _df('BEFORE cleanup')
 _df('AFTER cleanup')
 """)
 
-md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~20–40 min/model on T4)\n"
-   "`RESULTS_DIR=…/results3` puts these on the new board (Gemini + Qwen-MaaS + OSS). "
-   "`CLEANUP_MODELS=1` deletes each model's weights from disk **right after** it's "
-   "scored, so peak disk ≈ one model at a time and it never fills up (results are "
-   "already on Drive, so a re-run still skips done models).")
+md("## Cell 9 — run the sweep (pulls + scores each model; resume-safe; ~15–25 min/model on T4)\n"
+   "`RESULTS_DIR=…/results3b` writes to the fresh folder. `CLEANUP_MODELS=1` deletes "
+   "each model's weights from disk **right after** it's scored, so peak disk ≈ one "
+   "model at a time (results are already on Drive, so a re-run skips done models).")
 code(r"""
-!RESULTS_DIR=$PWD/offline_eval/results3 SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
+!RESULTS_DIR=$PWD/offline_eval/results3b SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 bash offline_eval/run_matrix.sh
 """)
 
 md("## Cell 9b — reclaim disk AFTER the sweep (final backstop)\n"
@@ -245,30 +241,29 @@ import subprocess
 print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
 """)
 
-md("## Cell 10 — combined results3 leaderboard (cloud + OSS Qwen/Gemma; run anytime)")
+md("## Cell 10 — combined results3b leaderboard (20 prior + 9 re-run Qwen3/3.5; run anytime)")
 code(r"""
-!RESULTS_DIR=$PWD/offline_eval/results3 python offline_eval/aggregate.py
+!RESULTS_DIR=$PWD/offline_eval/results3b python offline_eval/aggregate.py
 """)
 
 md(rf"""
 ## After a Colab disconnect (free tier: ~90 min idle / ~12 h max)
-Re-run **Cells 1–8**, then **Cell 9** again. Because results live on Drive (Cell 7),
+Re-run **Cells 1–8b**, then **Cell 9** again. Because results live on Drive (Cell 7),
 `run_matrix.sh` **skips already-scored models** and continues.
 
 To pick up new commits on the branch, just re-run **Cell 2** (it re-clones).
 
 **Tips:** keep the tab active (free Colab kills idle sessions); a model interrupted
 mid-run restarts (resume only skips *completed* models); each model is also bound on
-the Anthropic judge calls, so plan 1–3 models per session.
+the Anthropic judge calls, so plan a few models per session.
 
 To pull these results back to your laptop: copy the JSONs from
-`MyDrive/ai-tutor-eval-results3/` into the repo's `offline_eval/results3/` and run
-`RESULTS_DIR=offline_eval/results3 python offline_eval/aggregate.py`.
+`MyDrive/ai-tutor-eval-results3b/` into the repo's `offline_eval/results3b/` and run
+`RESULTS_DIR=offline_eval/results3b python offline_eval/aggregate.py`.
 
-**If a Qwen model leaks tool calls as text** (the engine's text-tool-call recovery
-should now catch `record_answer(...)`): set `OLLAMA_DEBUG_RAW=1` before Cell 9, then
-check `offline_eval/results3/qwen2.5_14b.log` for an `[OllamaToolLeak]` line and
-share it — the parser can then be extended to match that exact format.
+**Sanity check the fix worked:** after a model runs, its `results3b/<model>.log` should
+show `[OllamaTools] response: ... blocks=['tool_use', ...]` (or `['text']`) — **not**
+`blocks=[]`. Empty blocks = still truncating (raise `num_ctx` further).
 """)
 
 nb = {

@@ -56,6 +56,7 @@ class ModelProfile:
     top_p: float | None = None
     top_k: int | None = None
     presence_penalty: float | None = None
+    num_ctx: int | None = None         # Ollama context window (prompt+generation). None → client sizes it to num_predict+headroom (Ollama's 4096 default truncates reasoning models mid-<think>).
     extra_body: dict | None = None     # provider thinking toggle, e.g. {"chat_template_kwargs": {"thinking": False}}
     prompt_strategy: str = "default"   # 'default' | 'persona_suppress' | 'no_system_no_fewshot'
     prompt_format: str = "xml"         # 'xml' (default, Claude/Grok/GLM/Kimi/DeepSeek) | 'markdown' (Gemini/Qwen)
@@ -76,6 +77,8 @@ class ModelProfile:
             out["top_k"] = self.top_k
         if self.presence_penalty is not None:
             out["presence_penalty"] = self.presence_penalty
+        if self.num_ctx is not None:
+            out["num_ctx"] = self.num_ctx
         if self.extra_body:
             out["extra_body"] = dict(self.extra_body)
         return out
