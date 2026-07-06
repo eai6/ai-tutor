@@ -43,6 +43,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DATASET_ROOT = REPO_ROOT / 'evals' / 'dataset'
 RUNS_ROOT = REPO_ROOT / 'evals' / 'runs'
 
+# Multi-turn scenarios default to Sonnet 4.6, not the Haiku DEFAULT_RUBRIC_JUDGE.
+# Judging a whole 20-40 turn session is a harder, longer-context task than the
+# single-turn eval, and the Haiku-vs-Sonnet A/B (2026-07-06, offline_eval/
+# judge_ab.py) found Haiku too lenient: pass 7/8 vs Sonnet 2/8, Cohen's kappa
+# 0.09 (~chance), and it missed a real tutor self-contradiction that Sonnet
+# caught. A scenario can still override via its own `rubric_judge` block.
+# Single-turn keeps Haiku (llm_rubric.DEFAULT_RUBRIC_JUDGE) for continuity with
+# the frozen Eval 2 board.
+MULTI_TURN_RUBRIC_JUDGE = {
+    'provider': 'anthropic',
+    'model': 'claude-sonnet-4-6',
+    'temperature': 0.0,
+    'max_tokens': 4096,
+}
+
 # Set by the fixture extractor. See evals/fixtures/extract.py.
 EVAL_INSTITUTION_PK = 999001
 EVAL_USER_PK = 999001
@@ -550,7 +565,7 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
             transcript=[{'role': t['role'], 'content': t['content']}
                         for t in transcript_payload],
             pass_threshold=scenario.pass_threshold,
-            judge_config=scenario.rubric_judge or None,
+            judge_config=scenario.rubric_judge or MULTI_TURN_RUBRIC_JUDGE,
         )
         rubric_payload = asdict(rubric_result)
         rubric_passed = rubric_result.passed and not rubric_result.error

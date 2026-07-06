@@ -246,9 +246,13 @@ difference is the judge). Result:
   not. So Haiku is not merely stricter — it **misses real coherence/mistake
   errors** over long transcripts.
 
-**Conclusion: Haiku is too lenient for the multi-turn gate.** Recommend Sonnet 4.6
-as the multi-turn rubric judge (keep Haiku overridable / as an optional cheap
-pre-filter). Single-turn Eval 2 (frozen) keeps Haiku; comparability note applies.
+**Conclusion: Haiku is too lenient for the multi-turn gate.** **Wired (2026-07-06):**
+`runner.MULTI_TURN_RUBRIC_JUDGE = claude-sonnet-4-6` is the multi-turn default
+(`_run_multi_turn` uses `scenario.rubric_judge or MULTI_TURN_RUBRIC_JUDGE`); a
+scenario can still override. Single-turn keeps Haiku (`llm_rubric.DEFAULT_RUBRIC_JUDGE`)
+for continuity with the frozen Eval 2 board. Each run's per-scenario `rubric_result`
+records the judge model, so the sweep is self-auditing. ~$18 judge cost for the full
+15-model sweep. (Cross-vendor podium check remains an option, not yet wired.)
 
 ## 8. Cross-references
 
