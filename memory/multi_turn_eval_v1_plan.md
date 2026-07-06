@@ -271,6 +271,22 @@ records the judge model, so the sweep is self-auditing. ~$18 judge cost for the 
   or skipping 72b. **Open decision before the sweep:** run all 30 scenarios per OSS
   model, or a balanced subset, to bound Colab wall-clock.
 
+## 7f. Anthropic benchmark tier (2026-07-06)
+
+Adding an Anthropic tier as a ceiling/reference for the multi-turn board.
+**Key discovery:** the production incumbent tutor is **`claude-sonnet-4-6`** —
+which is *also* the multi-turn judge — so benchmarking the incumbent would be
+Sonnet self-grading. Decision (user): **exclude the Sonnet incumbent**; benchmark
+**claude-opus-4-8** (ceiling) + **claude-haiku-4-5** (cheap tier, comparable to the
+small Qwen models), judged by the same Sonnet 4.6 rubric judge. That is a
+same-vendor (Anthropic judge / Anthropic tutor) pairing → treat these two scores
+as an **approximate ceiling with a mild favourable-bias caveat**, not like-for-like
+vs the Sonnet-judged Gemini/Qwen numbers. Anthropic tutors run the native
+production path (base template, native tool-calling; the Gemini pose-fix /
+tool_choice are non-Anthropic-only, so the incumbent behaviour is unchanged).
+Config: `offline_eval/cloud_models_anthropic.txt`. Runs AFTER the Gemini/Qwen
+sweep (shared SQLite dev DB), into the same `multi_turn_results/`.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.

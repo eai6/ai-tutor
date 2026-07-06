@@ -1,0 +1,13 @@
+# Anthropic benchmark tier for the multi-turn eval (Improved Eval 3). Format: spec  safe
+# Runs the PRODUCTION native Anthropic path (base _BLOCK_0_TEMPLATE, native
+# tool-calling — no Gemini pose-fix / tool_choice, which are non-Anthropic only).
+# Incumbent (claude-sonnet-4-6) is DELIBERATELY EXCLUDED: it's the multi-turn
+# judge, so judging it would be self-grading. These two are judged by the same
+# Sonnet 4.6 rubric judge as the rest of the sweep — a same-vendor (Anthropic
+# judge / Anthropic tutor) pairing, so treat their scores as an approximate
+# ceiling with a mild favourable-bias caveat, not a like-for-like number.
+# Run AFTER the Gemini/Qwen sweep finishes (shared SQLite dev DB):
+#   RESULTS_DIR=offline_eval/multi_turn_results MODE="--multi-turn" \
+#   CLOUD_MODELS_FILE=offline_eval/cloud_models_anthropic.txt bash offline_eval/run_cloud.sh
+anthropic/claude-opus-4-8                  claude-opus-4-8
+anthropic/claude-haiku-4-5-20251001        claude-haiku-4-5
