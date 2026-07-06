@@ -1,0 +1,10 @@
+# Multi-turn sweep — top-15 cloud rows (4 Gemini + 2 Qwen-MaaS). Format: spec  safe  region
+# Used by: MODE="--multi-turn" CLOUD_MODELS_FILE=offline_eval/cloud_models_mt.txt \
+#          RESULTS_DIR=offline_eval/multi_turn_results bash offline_eval/run_cloud.sh
+# The 9 OSS Qwen models run on Colab via run_matrix.sh (see colab_eval.ipynb).
+google/gemini-2.5-flash                                          gemini-2.5-flash
+google/gemini-3.5-flash                                          gemini-3.5-flash
+google/gemini-3.1-pro-preview                                    gemini-3.1-pro
+google/gemini-2.5-pro                                            gemini-2.5-pro
+vertex_model_garden/qwen/qwen3-next-80b-a3b-instruct-maas        qwen3-next-80b-instruct       global
+vertex_model_garden/qwen/qwen3-next-80b-a3b-thinking-maas        qwen3-next-80b-thinking       global

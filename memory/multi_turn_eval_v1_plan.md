@@ -254,6 +254,23 @@ for continuity with the frozen Eval 2 board. Each run's per-scenario `rubric_res
 records the judge model, so the sweep is self-auditing. ~$18 judge cost for the full
 15-model sweep. (Cross-vendor podium check remains an option, not yet wired.)
 
+## 7e. Sweep prep done (no-cost), sweep NOT started (2026-07-06)
+
+- **Colab fixture verified** (the flagged risk): `evals/fixtures/lessons.json` has
+  all 4 lessons with LessonSteps (1137/1138=10, 1463/1464=5) + exit tickets + 416
+  exit-ticket questions; `institution.json` seeds the active `student_sim` config
+  (Haiku). Judge (Sonnet) + grader cascade resolve in-memory from the `.env` keys.
+  → multi-turn traversal works on Colab.
+- **`cloud_models_mt.txt`** (6 API rows: 4 Gemini + 2 Qwen-MaaS) + **regenerated
+  `colab_eval.ipynb`** (9 OSS Qwen, A100, `--multi-turn`, Sonnet judge, writes to
+  `multi_turn_results/`, resume-safe, small→large order).
+- **Runtime caveat (important):** multi-turn is ~15-25× heavier than single-turn
+  (30 scenarios × up to 24 turns × tutor+student+judge). Small/MoE OSS models are
+  hours-scale; large dense (27b/32b/**72b**) can be many hours each. The sweep needs
+  several A100 sessions; consider running small→large and possibly a scenario subset
+  or skipping 72b. **Open decision before the sweep:** run all 30 scenarios per OSS
+  model, or a balanced subset, to bound Colab wall-clock.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.
