@@ -2,16 +2,18 @@
 # The tooling (*.py / *.sh / *.md / models.txt / colab_eval.ipynb) IS committed.
 # Model weights, run outputs, logs, and caches stay local. Result JSONs are
 # ignored by default but a curated set is force-added (git add -f) so the
-# leaderboard is reproducible — see FINDINGS_offline_model_eval.md.
+# leaderboard is reproducible — see single_turn_results/FINDINGS_offline_model_eval.md.
 ollama_models/
-results/
-results2/
-results2_md/
 runs/
 *.log
 *.jsonl
 __pycache__/
-# results2/ holds the improved (per-family-tuned) board; its JSONs are
-# force-added (git add -f) like results/. results2_md/ + cloud_models_md.txt are
-# the Markdown-vs-XML experiment scratch — local only.
+# Single-turn archives (moved under single_turn_results/ on 2026-07-06). Their
+# result JSONs are force-added (git add -f) so the leaderboard stays
+# reproducible; results2_md/ is the Markdown-vs-XML experiment scratch (local).
+single_turn_results/results/
+single_turn_results/results2/
+single_turn_results/results2_md/
 cloud_models_md.txt
+# multi_turn_results/ (Improved Eval 3): JSONs are tracked like results3/ was
+# (not ignored); only *.log inside is ignored by the rule above.

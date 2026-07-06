@@ -18,7 +18,7 @@ set -uo pipefail
 ROOT="/home/daniel/Documents/work/Nyansapo/web/ai-tutor"
 cd "$ROOT"
 PY="$ROOT/venv/bin/python"
-RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/results}"
+RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/single_turn_results/results}"
 MODELS_FILE="${MODELS_FILE:-$ROOT/offline_eval/models.txt}"
 MODE="${MODE:---single-turn}"
 export OLLAMA_MODELS="${OLLAMA_MODELS:-$ROOT/offline_eval/ollama_models}"
