@@ -50,6 +50,23 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("No scenarios matched."))
             return
 
+        # Make the tutor engine explicit + loud. This eval targets the
+        # production simple_tutor engine; if the legacy ConversationalTutor is
+        # active (SIMPLE_TUTOR_ENGINE set to a falsy value) the scores are for
+        # the wrong engine — warn rather than silently mislead.
+        import os as _os
+        from apps.tutoring import simple_tutor as _st
+        engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
+        flag = _os.environ.get('SIMPLE_TUTOR_ENGINE', '<unset → default on>')
+        banner = f">> Tutor engine: {engine_name}  (SIMPLE_TUTOR_ENGINE={flag})"
+        if engine_name == 'simple_tutor':
+            self.stdout.write(self.style.SUCCESS(banner))
+        else:
+            self.stdout.write(self.style.ERROR(
+                banner + "  ← WARNING: LEGACY engine, NOT simple_tutor. Unset "
+                "SIMPLE_TUTOR_ENGINE (or set it to 1) to evaluate the production engine."
+            ))
+
         self.stdout.write(
             self.style.SUCCESS(f"\n=== Running {len(scenarios)} scenario(s) ===\n")
         )

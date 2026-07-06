@@ -150,6 +150,10 @@ class RunResult:
     failed: int
     errored: int
     results: list[ScenarioResult] = field(default_factory=list)
+    # Which tutor engine actually ran the sessions — 'simple_tutor' (the
+    # production engine, the target of this eval) or 'conversational_tutor'
+    # (legacy). Recorded so a run can never silently score the wrong engine.
+    engine: str = ''
 
 
 # ---------------------------------------------------------------------------
@@ -609,6 +613,8 @@ def run(scenarios: list[Scenario]) -> RunResult:
                 error=f"{type(exc).__name__}: {str(exc)[:200]}",
             ))
     finished = dt.datetime.now(dt.timezone.utc)
+    from apps.tutoring import simple_tutor as _st
+    engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
     return RunResult(
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
@@ -618,6 +624,7 @@ def run(scenarios: list[Scenario]) -> RunResult:
         failed=sum(1 for r in results if not r.passed and not r.error),
         errored=sum(1 for r in results if r.error),
         results=results,
+        engine=engine_name,
     )
 
 
