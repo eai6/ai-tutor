@@ -401,9 +401,17 @@ def _build_trajectory_prompt(
     )
     return (
         f"FULL TUTORING SESSION TRANSCRIPT:\n{conv_str}\n\n"
-        f"RUBRIC ITEMS (judge whether each was satisfied ACROSS the session):\n"
-        f"{rubric_str}\n\n"
-        f"Return JSON."
+        f"RUBRIC ITEMS — judge each across the WHOLE session:\n{rubric_str}\n\n"
+        "For each item: consider every tutor turn where the item is relevant "
+        "(e.g. an 'if the student made a mistake' item applies only on turns "
+        "where the student actually erred; a 'reveals the answer' item applies "
+        "only while a question is unresolved). Score how well the tutor "
+        "satisfied the item on those relevant turns overall — 1.0 if it held on "
+        "every relevant turn, lower if it lapsed on some. If the item never "
+        "became relevant anywhere in the session, return \"n/a\" for it (n/a is "
+        "excluded from scoring — it neither helps nor hurts). Do not judge a "
+        "single turn in isolation.\n\n"
+        "Return JSON."
     )
 
 
