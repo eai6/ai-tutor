@@ -229,6 +229,27 @@ Two-part fix (Gemini-family only; **Anthropic base + Qwen template byte-identica
 Pre-existing unrelated test debt: `IsEnabledTest.{test_default_off,test_off_falsy}`
 fail on a clean tree (stale — the engine default flipped to ON); not touched here.
 
+## 7d. Judge A/B — Haiku vs Sonnet (2026-07-06)
+
+`offline_eval/judge_ab.py` scored 8 fixed gemini-2.5-flash transcripts (all 6
+personas × both subjects) with Haiku 4.5 and Sonnet 4.6 (transcript held fixed →
+difference is the judge). Result:
+
+- Haiku mean-of-means **0.772**, pass **7/8**; Sonnet **0.588**, pass **2/8**.
+- mean |Δ| 0.18, max 0.30; Pearson r 0.77; **pass/fail concordance 3/8 (38%),
+  Cohen's κ 0.09** (≈ chance). **5/8 sessions: Haiku PASS / Sonnet FAIL.**
+- Divergence concentrated on the hard cross-turn items: coherence Δ0.37,
+  mistake-recognition Δ0.30, guidance Δ0.26; surface items agree (tone/no-reveal Δ0.12).
+- **Grounded spot-check** (non_responder, Haiku 0.86 vs Sonnet 0.56): the tutor
+  told the student "Not quite" to "360" (the correct sum) then admitted "you're
+  right that it's 360°" — a real self-contradiction. Sonnet caught it; Haiku did
+  not. So Haiku is not merely stricter — it **misses real coherence/mistake
+  errors** over long transcripts.
+
+**Conclusion: Haiku is too lenient for the multi-turn gate.** Recommend Sonnet 4.6
+as the multi-turn rubric judge (keep Haiku overridable / as an optional cheap
+pre-filter). Single-turn Eval 2 (frozen) keeps Haiku; comparability note applies.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.
