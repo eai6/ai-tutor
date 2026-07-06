@@ -245,9 +245,25 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     #          now composes the student-facing reply knowing the verdict.
     #          This eliminates "tool-call-only" empty bubbles and stops
     #          the model from guess-confirming a verdict before grading.
+    # Eval-only (Gemini): force the pose_question tool on POSE turns where a
+    # question is expected. gemini-2.5-flash under AUTO function-calling writes
+    # questions as prose instead of calling pose_question, so no gradable slot
+    # is created → the student's next answer has nothing to grade → the session
+    # deadlocks/stalls. Forcing tool_choice=pose_question (→ Gemini mode=ANY)
+    # guarantees the slot. Gated to: the gemini family (None in production and
+    # for other families), POSE mode (never GRADE / REMEDIATION), and an
+    # answer/engagement intent — conversational turns (clarification / pushback /
+    # off_topic) still respond in text. Gemini can emit teaching text alongside
+    # the forced call, so this doesn't suppress explanations.
+    call1_tool_choice = None
+    if (_family == 'gemini' and mode == 'POSE'
+            and student_intent not in ('clarification', 'pushback', 'off_topic')):
+        call1_tool_choice = {'type': 'tool', 'name': 'pose_question'}
+
     messages: list = [{'role': 'user', 'content': user_input}]
     response = _call_llm(
         system_blocks=system_blocks, tools=tools, messages=messages,
+        tool_choice=call1_tool_choice,
     )
     if response is None:
         _persist_student_turn(session, user_input, step)
@@ -692,9 +708,17 @@ def _call_llm(
     system_blocks: list,
     tools: list,
     messages: list,
+    tool_choice: dict | None = None,
 ):
     """Call Anthropic with the simple-tutor prompt + tools + the messages
     array. Returns the raw Anthropic response, or None on any error.
+
+    ``tool_choice`` is an optional Anthropic-shaped tool-choice value
+    (e.g. ``{"type": "tool", "name": "pose_question"}``). It is None in
+    production (the Anthropic call is byte-identical) and set only by the
+    eval path for non-Anthropic families that need a tool call forced —
+    the cross-provider clients translate it to their native shape
+    (Gemini ``function_calling_config mode=ANY``, OpenAI ``tool_choice``).
 
     Uses ``ModelConfig.get_for('tutoring')`` so the model is configurable
     via the dashboard. Defaults to Claude Opus 4.7 per the prod config.
@@ -774,12 +798,16 @@ def _call_llm(
             return None
         try:
             client = anthropic.Anthropic(api_key=api_key)
+            # tool_choice omitted entirely when None so the production
+            # Anthropic call is byte-identical (default is auto).
+            extra = {'tool_choice': tool_choice} if tool_choice else {}
             return client.messages.create(
                 model=model_name,
                 max_tokens=max_tokens,
                 system=effective_blocks,
                 tools=tools,
                 messages=messages,
+                **extra,
             )
         except Exception as exc:
             msg = str(exc).strip().replace('\n', ' ')[:200]
@@ -813,6 +841,7 @@ def _call_llm(
             tools=tools,
             max_tokens=max_tokens,
             sampling=sampling,
+            tool_choice=tool_choice,
         )
     except Exception as exc:
         msg = str(exc).strip().replace('\n', ' ')[:200]

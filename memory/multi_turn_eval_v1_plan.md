@@ -204,6 +204,31 @@ models actually *conduct a session*, not just grade one turn.
 - **Lint tool** `offline_eval/lint_multi_turn.py` added; guards the max_turns trap, dead
   labels, missing rubric/verb/threshold, and lesson-in-fixtures.
 
+## 7c. Gemini POSE-path fix (2026-07-06, from the smoke test)
+
+The gemini-2.5-flash smoke run **deadlocked at turn 3**: under Gemini's default
+AUTO function-calling, it wrote MCQs as prose instead of calling `pose_question`,
+so no gradable in-flight slot was created → the student's answer had nothing to
+grade → the tutor repeated a teaching turn → deadlock. Single-turn never caught
+this (the slot was pre-seeded). Root cause: `_call_llm` invoked the tutor with
+`tool_choice` unset → GeminiClient set `function_calling_config mode=AUTO`.
+
+Two-part fix (Gemini-family only; **Anthropic base + Qwen template byte-identical**):
+1. **Prompt** (`family_prompts.py`): added a positive-framed "pose every question
+   through the pose_question tool" rule + a pose example to `GEMINI_TARGETED_RULES_XML`.
+   Alone this lifted the smoke rubric 0.59→0.75 but the session still hit max_turns.
+2. **Engine** (`engine.py`): threaded an optional `tool_choice` through `_call_llm`
+   → `generate_with_tools`. In `respond()`, **eval-only** (family=gemini, mode=POSE,
+   intent not in {clarification, pushback, off_topic}), Call-1 forces
+   `tool_choice={"type":"tool","name":"pose_question"}` (→ Gemini mode=ANY). None in
+   production (family is None without `TUTOR_MODEL_OVERRIDE`) so the Anthropic call is
+   byte-identical; the Anthropic path only adds the kwarg when non-None.
+
+**Verified:** smoke scenario went deadlock@3 (0.59, FAIL) → max_turns@15 (0.75, FAIL)
+→ **exit_ticket@9 turns (rubric 0.95, PASS)**; 0 slot-less record_answer events.
+Pre-existing unrelated test debt: `IsEnabledTest.{test_default_off,test_off_falsy}`
+fail on a clean tree (stale — the engine default flipped to ON); not touched here.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.

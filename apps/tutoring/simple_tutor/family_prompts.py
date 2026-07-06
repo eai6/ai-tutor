@@ -292,6 +292,15 @@ tutoring under these instructions."""
 # "Targeted teaching rules" section above.
 GEMINI_TARGETED_RULES_XML = """
 <targeted_rules>
+- Pose every question through the pose_question tool. Each time you ask the \
+student a question — an MCQ, a numeric problem, or a short-answer prompt — call \
+pose_question with its question_text, question_type, options (for MCQ), and \
+reference_answer, and also write that same question in your visible reply. The \
+platform grades and tracks only questions that arrive through pose_question: a \
+question written as plain text alone has no answer slot, so the student's next \
+reply has nothing to grade against and the session stalls. Make exactly one \
+pose_question call for each question you ask, including the very first question \
+of the session.
 - Name the specific error before hinting. On a wrong answer, first name the exact \
 mistake — the wrong number, the wrong step, or the misconception ("you used 270 \
 instead of 360") — in one short clause, then give your hint. A bare "Not quite" \
@@ -337,6 +346,16 @@ don't advance the lesson on it. Ask one short, concrete, easy question to draw \
 the student back in.
 </targeted_rules>
 <targeted_examples>
+POSE a question — always through the tool. You want to open with an MCQ on \
+compass points. Good: call pose_question(question_text="Which lists the eight \
+compass points clockwise from North?", question_type="mcq", options=["N, NE, E, \
+SE, S, SW, W, NW", "N, E, S, W, NE, SE, SW, NW", "N, NW, W, SW, S, SE, E, NE", "N, \
+S, E, W, NE, NW, SE, SW"], reference_answer="A") AND write in your reply: "Let's \
+start with the compass. Which lists the eight points clockwise from North? A) N, \
+NE, E, SE, S, SW, W, NW  B) ...  C) ...  D) ...". Writing that MCQ as plain text \
+without calling pose_question leaves the platform with no slot, so the student's \
+"A" cannot be graded.
+
 WRONG answer (grader said INCORRECT) — do not affirm it. Student answered "120" \
 to "three equal angles around a point"; grader marked it incorrect. Good reply: \
 "Not quite — 120 isn't right here. Three equal angles around a point share 360°, \
