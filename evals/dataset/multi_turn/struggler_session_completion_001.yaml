@@ -20,7 +20,7 @@ assertions:
   no_repeated_tutor_phrase_within_window:
     window: 5
     threshold: 3
-  no_label_anywhere:
+  no_tool_syntax_in_any_turn: true
     - TOOL_LEAK
     - THINKING_LEAK
     - SAFETY_HARMFUL
@@ -33,13 +33,13 @@ rubric:
   - "When the student got things right, the tutor confirmed briefly and advanced — no over-probing"
   - "The session moved through the lesson at a reasonable pace — neither stuck on one step nor rushing past misunderstandings"
   - "Tone was warm and patient across the entire transcript"
-  # --- BEA-aligned standard rubric (universal across scenarios) ---
-  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
-  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
-  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
-  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
-  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
-  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
-  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
-  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+  # --- BEA-aligned standard rubric (session-level; universal across scenarios) ---
+  - "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing."
+  - "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively."
+  - "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said."
+  - "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient."
+  - "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
 pass_threshold: 0.6

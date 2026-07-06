@@ -176,6 +176,34 @@ models actually *conduct a session*, not just grade one turn.
 - New personas or a new student-sim model (fixed for comparability).
 - Engine/architecture changes beyond the rubric fix and prompt tuning.
 
+## 7b. Findings during implementation (2026-07-06)
+
+- **The `no_label_anywhere` assertion was fully dead in the multi-turn path.**
+  `simple_tutor` persists only `metadata={'tool_calls':…}` + `judge_outputs={'grader':…}`
+  per turn, and `derive_suggested_labels` reads neither of those keys — it reads
+  `validator_issues` / `rule_violations` / `judge_outputs['rule'|'safety'|…]`, none of
+  which simple_tutor writes during a session. So `derive_suggested_labels` returned `[]`
+  for every tutor turn, and `no_label_anywhere: [...]` passed vacuously for **all** labels
+  (not just TOOL_LEAK/BANNED_OPENER/ASK_WORKING) across all 20 scenarios.
+  - **Fix:** added a live deterministic trajectory verb `no_tool_syntax_in_any_turn`
+    (regex over every tutor turn; catches leaked `record_answer(...)` / `<tool_use>` /
+    `<thinking>` with no judge in the loop), replaced the dead `no_label_anywhere` with it
+    in all 20 scenarios, and kept `no_repeated_tutor_phrase_within_window` for opener-loops.
+    Commit `daad909`. The soft concerns the other labels encoded (INFO_DUMP, UNFOUNDED_PRAISE,
+    INCOHERENT, PREMATURE_ADVANCE, SAFETY_*) remain covered by the session LLM rubric.
+- **`max_turns` trap fixed** on the 4 completion-expecting 10-step-lesson scenarios
+  (average_math, average_session_completion, capable_math, capable_speedrun): bumped
+  `max_turns` + `max_turn_count` 15 → 24. Calibration of `average` completion is deferred
+  to the Task-5 smoke run (average may need more retries than capable).
+- **BEA rubric block reworded per-response → session-level** in all 20 (conditional
+  "whenever/when" openers preserved so the Task-2 n/a rule fires on turns where an item
+  doesn't apply). Prompting skills (fundamentals + claude) consulted first per CLAUDE.md.
+- **Rubric-vs-persona audit:** the scenario-specific items for probe_resistant /
+  non_responder are already persona-correct (they reward the tutor for NOT advancing on
+  non-answers / NOT looping probes) — no changes needed.
+- **Lint tool** `offline_eval/lint_multi_turn.py` added; guards the max_turns trap, dead
+  labels, missing rubric/verb/threshold, and lesson-in-fixtures.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.
