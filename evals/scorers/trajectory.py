@@ -55,6 +55,24 @@ def _tutor_utterances(sim: SimResult) -> list[str]:
     return [t.content for t in sim.transcript if t.role == 'tutor']
 
 
+# Tool-call / thinking syntax that must never appear in a student-facing turn.
+# Targets the *function-call* and *XML-tag* forms specifically so ordinary
+# prose ("record your answer below") does not false-positive:
+#   - record_answer( / pose_question( / advance_step( / record_exit_ticket_answer(
+#   - <tool_use> / <thinking> / <function_call> tags (open or close)
+#   - the tool kwargs extracted_answer= / reference_answer= / question_type=
+# This is the live replacement for the dead `no_label_anywhere: [TOOL_LEAK]`
+# assertion (derive_suggested_labels never emits TOOL_LEAK for simple_tutor
+# turns, so that assertion passed vacuously).
+_TOOL_SYNTAX_RE = re.compile(
+    r'(?i)('
+    r'\b(?:record_answer|pose_question|advance_step|record_exit_ticket_answer)\s*\('
+    r'|</?\s*(?:tool_use|thinking|function_call|tool_call)\b'
+    r'|\b(?:extracted_answer|reference_answer|question_type)\s*='
+    r')'
+)
+
+
 # ---------------------------------------------------------------------------
 # Verb handlers
 # ---------------------------------------------------------------------------
@@ -153,11 +171,38 @@ def _verb_no_label_anywhere(expected, sim, per_turn_labels) -> AssertionResult:
     )
 
 
+def _verb_no_tool_syntax_in_any_turn(expected, sim, per_turn_labels) -> AssertionResult:
+    """No tutor turn may leak tool-call / thinking syntax into its visible reply.
+
+    ``expected: true`` (the typical case) asserts ABSENCE — the session passes
+    when no tutor turn matches ``_TOOL_SYNTAX_RE``. ``expected: false`` inverts
+    it (only useful for a negative-control test). This is a deterministic,
+    always-live check: it fires with no judge in the loop, unlike the old
+    label-based assertion.
+    """
+    want_absent = bool(expected)
+    hits: list[tuple[int, str]] = []
+    for i, u in enumerate(_tutor_utterances(sim)):
+        m = _TOOL_SYNTAX_RE.search(u or '')
+        if m:
+            hits.append((i, m.group(0).strip()))
+    leaked = bool(hits)
+    return AssertionResult(
+        'no_tool_syntax_in_any_turn',
+        passed=(not leaked) if want_absent else leaked,
+        detail=(
+            f"tool/thinking syntax leaked on tutor turns: {hits[:5]}" if leaked
+            else "no tool/thinking syntax in any tutor turn"
+        ),
+    )
+
+
 _HANDLERS: dict[str, Callable] = {
     'expected_reason':                       _verb_expected_reason,
     'max_turn_count':                        _verb_max_turn_count,
     'no_repeated_tutor_phrase_within_window': _verb_no_repeated_tutor_phrase_within_window,
     'no_label_anywhere':                     _verb_no_label_anywhere,
+    'no_tool_syntax_in_any_turn':            _verb_no_tool_syntax_in_any_turn,
 }
 
 
