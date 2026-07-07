@@ -66,7 +66,12 @@ def summarize(path):
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(RESULTS, '*.json')))
+    # Skip underscore-prefixed scratch files (e.g. judge-A/B caches) — they are
+    # not run-result blobs and would crash summarize() (a list, not a dict).
+    files = sorted(
+        f for f in glob.glob(os.path.join(RESULTS, '*.json'))
+        if not os.path.basename(f).startswith('_')
+    )
     if not files:
         print(f"No results in {RESULTS}. Run offline_eval/run_matrix.sh first.")
         return

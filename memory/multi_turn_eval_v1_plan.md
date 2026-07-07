@@ -287,6 +287,32 @@ tool_choice are non-Anthropic-only, so the incumbent behaviour is unchanged).
 Config: `offline_eval/cloud_models_anthropic.txt`. Runs AFTER the Gemini/Qwen
 sweep (shared SQLite dev DB), into the same `multi_turn_results/`.
 
+## 7g. Results — API tier + Anthropic ceiling (2026-07-07)
+
+Sonnet-4.6-judged, `simple_tutor` engine, 30 scenarios each, 0 judge failures across
+all 210 sessions. qwen3-next-80b-thinking skipped (impractically slow, ~33 min/scenario).
+
+| model | rate | rubric | completed (exit_ticket) | single→multi |
+|---|---|---|---|---|
+| claude-opus-4-8 † | 100% | 0.91 | 24/30 | —→100% |
+| claude-haiku-4-5 † | 67% | 0.70 | 22/30 | —→67% |
+| gemini-3.5-flash | 63% | 0.70 | 20/30 | 87→63 |
+| gemini-3.1-pro | 50% | 0.64 | 14/30 | 82→50 |
+| gemini-2.5-flash | 47% | 0.60 | 18/30 | 90→47 |
+| gemini-2.5-pro | 43% | 0.61 | 14/30 | 80→43 |
+| qwen3-next-80b-instruct | 30% | 0.57 | **0/30** | 98→30 |
+
+† same-vendor caveat (Sonnet judges Anthropic tutors) — approximate ceiling.
+
+Findings: (1) every non-Anthropic model drops hard from single-turn — grading one
+turn ≠ conducting a session. (2) **Even Anthropic's cheap tier (Haiku 67%) beats the
+best non-Anthropic (gemini-3.5-flash 63%).** (3) **qwen3-next-80b-instruct, the
+single-turn champion (98%), completes 0/30 sessions** — it over-affirms ("Exactly,
+you've got it") without grading/advancing → 9 deadlocks. A genuine multi-turn
+conducting failure, not a tool_choice artifact. (4) The Gemini pose-fix works —
+Gemini deadlocks 0–1/model. OSS Qwen (Colab) still pending. Judge fix worked: 0
+rubric errors. Also fixed aggregate.py to skip `_*` scratch files.
+
 ## 8. Cross-references
 
 - Single-turn engine + family-prompt work: `apps/tutoring/simple_tutor/{engine,family_prompts,prompts}.py`.
