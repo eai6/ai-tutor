@@ -94,9 +94,34 @@ code(r"""
 # The Ollama installer is now zstd-compressed; the Colab VM lacks zstd, so install
 # it first (otherwise the installer aborts and `ollama` is never created).
 !apt-get -qq install -y zstd || (apt-get -qq update && apt-get -qq install -y zstd)
-!curl -fsSL https://ollama.com/install.sh | sh
-import subprocess, time, shutil
-assert shutil.which('ollama'), "ollama did not install — check the install output above (zstd?)"
+import subprocess, time, shutil, os
+# Robust install: the official installer pulls the binary from github releases,
+# which intermittently times out on Colab VMs. Retry it, then fall back to the
+# standalone linux binary straight from ollama.com (no github).
+def _has_ollama():
+    return shutil.which('ollama') is not None
+def _install_ollama():
+    if _has_ollama():
+        return True
+    for i in range(1, 4):
+        print(f'[ollama] install.sh attempt {i}', flush=True)
+        subprocess.run('curl -fsSL https://ollama.com/install.sh | sh', shell=True)
+        if _has_ollama():
+            return True
+        time.sleep(5)
+    for i in range(1, 4):
+        print(f'[ollama] direct-binary attempt {i} (ollama.com)', flush=True)
+        subprocess.run('curl -fL --retry 5 --retry-all-errors --connect-timeout 30 '
+                       '-o /tmp/ollama.tgz https://ollama.com/download/ollama-linux-amd64.tgz',
+                       shell=True)
+        if os.path.exists('/tmp/ollama.tgz') and os.path.getsize('/tmp/ollama.tgz') > 1_000_000:
+            subprocess.run('tar -C /usr -xzf /tmp/ollama.tgz', shell=True)
+            if _has_ollama():
+                return True
+        time.sleep(5)
+    return False
+assert _install_ollama(), ("ollama install failed — Colab couldn't reach ollama.com/github. "
+                           "Try Runtime -> Disconnect and delete runtime, then start fresh.")
 subprocess.Popen(['ollama', 'serve'],
                  stdout=open('/content/ollama.log', 'w'),
                  stderr=subprocess.STDOUT)
