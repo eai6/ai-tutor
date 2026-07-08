@@ -64,6 +64,32 @@ def latest_attempt(student: User, lesson: Lesson) -> Optional[ExitTicketAttempt]
 best_attempt = latest_attempt
 
 
+def answer_rows(attempt: Optional[ExitTicketAttempt]) -> List[Dict]:
+    """Normalize ExitTicketAttempt.answers to a flat list of per-question dicts.
+
+    Two formats exist in production:
+      - legacy list (retired conversational_tutor engine):
+        [{concept_tag, correct, selected, ...}, ...]
+      - dict (simple_tutor since 2026-05-26 / diagnostic pretest):
+        {'per_question': [...], ...}
+
+    Returns [] for anything else; drops non-dict entries. Summative
+    attempts nest rows under answers['result']['per_question'] with
+    different keys, but summatives have lesson=None so no lesson-scoped
+    consumer reads them — deliberately not handled here.
+    """
+    answers = attempt.answers if attempt is not None else None
+    if isinstance(answers, list):
+        rows = answers
+    elif isinstance(answers, dict):
+        rows = answers.get("per_question") or []
+        if not isinstance(rows, list):
+            rows = []
+    else:
+        rows = []
+    return [r for r in rows if isinstance(r, dict)]
+
+
 def per_concept_breakdown(attempt: ExitTicketAttempt) -> List[Dict]:
     """Compute per-concept competency from a single attempt's `answers`.
 
@@ -73,7 +99,7 @@ def per_concept_breakdown(attempt: ExitTicketAttempt) -> List[Dict]:
     Returns a list of dicts sorted by pct ascending (weakest first):
       [{ "concept": str, "correct": int, "total": int, "pct": float }, ...]
     """
-    answers = attempt.answers or []
+    answers = answer_rows(attempt)
     by_concept: Dict[str, Dict[str, int]] = {}
     for a in answers:
         tag = (a.get("concept_tag") or "").strip() or "(untagged)"
@@ -142,7 +168,7 @@ def competency_snapshot(student: User, lesson: Lesson) -> Dict:
             "attempt_id": attempt.id,
             "completed_at": attempt.completed_at.isoformat() if attempt.completed_at else None,
             "score": attempt.score,
-            "total": len(attempt.answers or []),
+            "total": len(answer_rows(attempt)),
             "passed": attempt.passed,
         }
         snapshot["best_attempt"] = attempt_payload  # back-compat alias

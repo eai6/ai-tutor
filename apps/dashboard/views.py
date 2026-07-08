@@ -2321,7 +2321,7 @@ def lesson_session_report(request, lesson_id):
     # (which is intentionally fine-grained for tutor scaffolding but
     # never the cross-attempt aggregation key — see
     # apps/tutoring/competency_tracker.py:103-110).
-    from apps.tutoring.competency import best_attempt
+    from apps.tutoring.competency import answer_rows, best_attempt
     objectives_data = []
     for eo_text in teaching_steps:
         eo_norm = _norm_tag(eo_text)
@@ -2334,9 +2334,7 @@ def lesson_session_report(request, lesson_id):
             attempt = best_attempt(student, lesson)
             if not attempt or not attempt.answers:
                 continue
-            for ans in (attempt.answers if isinstance(attempt.answers, list) else []):
-                if not isinstance(ans, dict):
-                    continue
+            for ans in answer_rows(attempt):
                 if not ans.get('correct'):
                     continue
                 ans_tag_norm = _norm_tag(ans.get('concept_tag', ''))
@@ -2373,18 +2371,12 @@ def lesson_session_report(request, lesson_id):
         achieved_count = 0
         weak_objectives = []
         student_attempt = best_attempt(student, lesson)
-        student_rows = (
-            student_attempt.answers
-            if student_attempt and isinstance(student_attempt.answers, list)
-            else []
-        )
+        student_rows = answer_rows(student_attempt)
         for eo_text in teaching_steps:
             eo_norm = _norm_tag(eo_text)
             is_primary = bool(eo_norm) and eo_norm == primary_obj_norm
             eo_achieved = False
             for ans in student_rows:
-                if not isinstance(ans, dict):
-                    continue
                 if not ans.get('correct'):
                     continue
                 ans_tag_norm = _norm_tag(ans.get('concept_tag', ''))
@@ -7975,6 +7967,7 @@ def session_chat_history(request, session_id):
 @staff_required
 def session_exit_review(request, session_id):
     """Review a student's exit ticket: each question with their answer vs the correct answer."""
+    from apps.tutoring.competency import answer_rows
     from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
 
     institution = request.staff_ctx['institution']
@@ -8001,7 +7994,7 @@ def session_exit_review(request, session_id):
     q_map = {q.id: q for q in ExitTicketQuestion.objects.filter(id__in=selected_ids)}
     ordered_questions = [q_map[qid] for qid in selected_ids if qid in q_map]
 
-    stored_answers = latest.answers if isinstance(latest.answers, list) else []
+    stored_answers = answer_rows(latest)
 
     def _mcq_letter(q, raw):
         """Best-effort: render the student's MCQ selection as a letter (A-D)."""
