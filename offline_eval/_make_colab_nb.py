@@ -38,11 +38,19 @@ ticket), not single graded turns. Same harness as the laptop cloud run:
 - **Engine** = `simple_tutor` (the production engine; `run_eval` prints a banner
   confirming it and errors on the legacy engine).
 
-**Models (Cell 8), ordered small → large** so cheap results land first:
-`qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b`, `qwen3:14b`, `qwen3:30b-a3b`,
-`qwen3.6:27b`, `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`. Each auto-tunes to
-its family profile (Qwen → Markdown Block-0, temp 0.7 / top_p 0.8 / top_k 20,
-num_ctx 24K so `<think>` + answer fit).
+**Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 9
+OSS Qwen models are split into 3 **disjoint** groups; pick this tab's group in the
+**Cell 7b** dropdown. Every tab writes per-model JSONs into the **same** Drive
+folder, so no two tabs score the same model and the board merges automatically:
+
+- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b` *(small; this is what the
+  original full-list tab is already grinding through — only start a group1 tab if
+  you are NOT already running that original sweep, or it'll double up)*
+- **group2** — `qwen3:14b`, `qwen3:30b-a3b`, `qwen3.6:27b`
+- **group3** — `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`
+
+Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7 /
+top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit).
 
 **Output → `offline_eval/multi_turn_results/`** (symlinked to Drive, resume-safe).
 
@@ -55,7 +63,9 @@ num_ctx 24K so `<think>` + answer fit).
 > even skip the 72b if it's not worth the wall-clock.
 
 **Before you start**
-1. Runtime → **Change runtime type → A100 GPU** (High-RAM). 72b q4 (~47 GB) needs the 80 GB A100.
+1. Runtime → **Change runtime type** → pick the GPU for THIS tab's group (High-RAM):
+   **group1** T4/L4 ok · **group2** L4 or A100 · **group3** **A100 80 GB or H100**
+   (72b q4 ~47 GB + 32b/35b need the big card — T4/L4 can't fit the 72b).
 2. Add these **Colab Secrets** (🔑 sidebar), each *Notebook access ON*:
    - `GH_TOKEN` — GitHub **classic** PAT with **`repo`** scope (you're a collaborator on `{REPO}`).
    - `ANTHROPIC_API_KEY` — **required** (student-sim Haiku + judge Sonnet).
@@ -168,23 +178,59 @@ code(rf"""
 !ls -la offline_eval/multi_turn_results/
 """)
 
-md("## Cell 8 — multi-turn model matrix (top-15 OSS Qwen) + seed configs\n"
-   "Ordered **small → large** so cheap results land first. The big dense models "
-   "(27b/32b/72b) are the slow tail — you can stop before them and still have a "
-   "full small/MoE board. `~15-40 min` each for the small ones; **hours** for 72b.")
+md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
+   "Set `GROUP` in the dropdown (right side in Colab) to `group1`, `group2`, or "
+   "`group3`. Each group is a **disjoint** set of 3 models; every tab writes to the "
+   "same Drive folder so the board merges. Re-run this cell whenever you change it.\n"
+   "\n"
+   "- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b`  *(== the original "
+   "full-list tab; skip if that's already running)*\n"
+   "- **group2** — `qwen3:14b`, `qwen3:30b-a3b`, `qwen3.6:27b`\n"
+   "- **group3** — `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`")
 code(r"""
-open('offline_eval/models.txt', 'w').write('''\
-# ============ Multi-turn Eval 3 — top-15 OSS Qwen (A100), small -> large =========
-qwen3.5:4b           big
-qwen3:4b             big
-qwen3.5:9b           big
-qwen3:14b            big
-qwen3:30b-a3b        xl     # Qwen3 30B MoE (3B active) — fast for its size
-qwen3.6:27b          xl     # Qwen3.6 dense 27B
-qwen3.6:35b-a3b      xl     # Qwen3.6 35B MoE (3B active)
-qwen2.5:32b          xl
-qwen2.5:72b          xl     # q4 ~47GB — needs the 80GB A100; SLOWEST, run last
-''')
+GROUP = "group2"  #@param ["group1", "group2", "group3"]
+print("This tab will evaluate group:", GROUP)
+""")
+
+md("## Cell 8 — write THIS tab's matrix (from GROUP) + seed configs\n"
+   "Writes only the 3 models for the group picked in **Cell 7b** into `models.txt`, "
+   "then prints the per-family sampling each will use. `run_matrix.sh` (Cell 9) reads "
+   "this file. Resume-safe: any model already scored on Drive is skipped.")
+code(r"""
+# Master registry (tag -> tier, note) + the 3 disjoint groups. Cell 7b's GROUP
+# picks which 3 models THIS tab writes into models.txt. Groups partition the 9
+# OSS Qwen models so parallel Colab tabs never score the same model.
+MODELS = {
+    'qwen3.5:4b':      ('big', ''),
+    'qwen3:4b':        ('big', ''),
+    'qwen3.5:9b':      ('big', ''),
+    'qwen3:14b':       ('big', ''),
+    'qwen3:30b-a3b':   ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
+    'qwen3.6:27b':     ('xl',  'Qwen3.6 dense 27B'),
+    'qwen3.6:35b-a3b': ('xl',  'Qwen3.6 35B MoE (3B active)'),
+    'qwen2.5:32b':     ('xl',  ''),
+    'qwen2.5:72b':     ('xl',  'q4 ~47GB — needs an 80GB A100/H100; SLOWEST'),
+}
+GROUPS = {
+    'group1': ['qwen3.5:4b', 'qwen3:4b', 'qwen3.5:9b'],
+    'group2': ['qwen3:14b', 'qwen3:30b-a3b', 'qwen3.6:27b'],
+    'group3': ['qwen3.6:35b-a3b', 'qwen2.5:32b', 'qwen2.5:72b'],
+}
+GROUP = globals().get('GROUP')
+if GROUP is None:
+    raise SystemExit("Run Cell 7b first to pick GROUP (group1/group2/group3).")
+assert GROUP in GROUPS, f"GROUP must be one of {list(GROUPS)}, got {GROUP!r}"
+
+lines = [f"# Multi-turn Eval 3 — {GROUP} (this tab)"]
+for tag in GROUPS[GROUP]:
+    tier, note = MODELS[tag]
+    lines.append(f"{tag:<20} {tier}" + (f"     # {note}" if note else ""))
+open('offline_eval/models.txt', 'w').write("\n".join(lines) + "\n")
+print(f">> {GROUP}: this tab will evaluate")
+for tag in GROUPS[GROUP]:
+    print("   -", tag)
+print()
+
 !python offline_eval/seed_ollama_configs.py
 # Show the per-family sampling each model will use (from apps/llm/model_profiles).
 import django, os
