@@ -469,6 +469,29 @@ def handle_record_answer(
             'error': 'no in-flight question — student input was not an answer',
         }
 
+    # Instrumentation only (no behaviour change): a STALE slot is one the tutor
+    # has spoken past — it posed the question, then produced one or more further
+    # replies without the student answering it. Grading the student's answer
+    # against a question two tutor turns old is how a correct answer gets marked
+    # wrong, and it is the one branch of the desync cascade the logs could not
+    # previously distinguish from a healthy grade. Measure it before changing
+    # anything: `grep 'grading a STALE slot'` over the next sweep tells us
+    # whether this is real or rare.
+    if in_flight.posed_at_turn_id:
+        try:
+            tutor_turns_since = session.turns.filter(
+                role='tutor', id__gt=in_flight.posed_at_turn_id,
+            ).count()
+        except Exception:
+            tutor_turns_since = 0
+        if tutor_turns_since >= 1:
+            logger.warning(
+                "[simple_tutor] grading a STALE slot session=%s "
+                "tutor_turns_since_posed=%d question=%r extracted=%r",
+                session.pk, tutor_turns_since,
+                (in_flight.question_text or '')[:60], extracted[:40],
+            )
+
     # Build the transient question surface the grader expects.
     question = _TransientQuestion(
         question_text=in_flight.question_text,

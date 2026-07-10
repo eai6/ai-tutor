@@ -224,8 +224,17 @@ _FAMILY_PATTERNS_RAW: list[tuple[str, ModelProfile]] = [
     (r"qwen3", ModelProfile(
         family="qwen", mode="instruct", max_tokens=_MT_INSTRUCT,
         temperature=0.7, top_p=0.8, top_k=20)),
+    # qwen2/2.5 are non-thinking dense instruct models. In the Eval-3 sweep
+    # they never exceeded 497 output tokens (p99 = 351), so the old 1024 cap
+    # never truncated them. It DID starve their context: num_predict feeds
+    # Ollama's num_ctx = max(8192, num_predict + 8192), giving qwen2.5 a
+    # 9216-token window against qwen3's 24192 while its prompt peaked at 7126.
+    # 4096 restores comfortable headroom (8x the observed maximum, and a
+    # 12288-token window) WITHOUT the 2.6x KV-cache blow-up that _MT_INSTRUCT
+    # would cause: on qwen2.5:72b a 24192 window costs ~7.9 GB of KV on top of
+    # ~40 GB of q4 weights, which risks OOM on anything below an 80 GB card.
     (r"qwen2|qwen2\.5|qwen", ModelProfile(
-        family="qwen", mode="instruct", max_tokens=1024,
+        family="qwen", mode="instruct", max_tokens=4096,
         temperature=0.7, top_p=0.8, top_k=20)),
 
     # DeepSeek: r1 before the chat models.

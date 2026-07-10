@@ -353,6 +353,30 @@ def _maybe_parse_text_tool_call(text: str):
             idx = b + 1
 
 
+def _resolve_recovered_tool_name(raw: str, tools: list | None) -> str | None:
+    """Map a tool name recovered from free text onto a real tool, or None.
+
+    ``_maybe_parse_text_tool_call`` accepts any ``{"name": ..., "arguments": ...}``
+    object, so a model echoing its own schema template produced the literal
+    placeholder ``tool_name``; others emitted ``requestFigure`` (camelCase) and
+    ``" record_answer"`` (whitespace-padded). Those reached the engine and were
+    dispatched as unknown tools. Validate against the tools actually offered.
+    """
+    known = {t.get('name') for t in (tools or []) if t.get('name')}
+    if not known:
+        return None
+    name = str(raw or '').strip()
+    if name in known:
+        return name
+    snake = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+    if snake in known:
+        return snake
+    logger.warning(
+        "[ToolRecovery] discarding text-parsed tool call with unknown name %r", raw,
+    )
+    return None
+
+
 def _maybe_parse_text_call_syntax(text: str, tools: list | None):
     """If ``text`` contains a Python-style call to one of the engine's tools —
     e.g. ``pose_question("...")`` or ``advance_step()`` — return a
@@ -480,8 +504,11 @@ def _recover_text_tool_call(blocks, tools):
               or _maybe_parse_text_tool_call(text))
     if not parsed or not parsed.get('name'):
         return blocks
+    name = _resolve_recovered_tool_name(parsed.get('name', ''), tools)
+    if not name:
+        return blocks
     return [AdaptedToolUseBlock(
-        name=parsed.get('name', ''),
+        name=name,
         input=parsed.get('arguments') or {},
         id='recovered_tool_0',
     )]
@@ -530,9 +557,13 @@ def _adapt_ollama_response(
             # parser to match. (See _maybe_parse_text_call_syntax / _tool_call.)
             logger.warning("[OllamaToolLeak] unparsed content for %s: %r",
                            model_name, text[:800])
-        if parsed is not None:
+        recovered_name = (
+            _resolve_recovered_tool_name(parsed.get('name', ''), tools)
+            if parsed is not None else None
+        )
+        if recovered_name:
             blocks.append(AdaptedToolUseBlock(
-                name=parsed.get('name', ''),
+                name=recovered_name,
                 input=parsed.get('arguments') or {},
                 id="ollama_tool_0",
             ))
@@ -1154,6 +1185,25 @@ class OllamaClient(BaseLLMClient):
         ollama_messages = [{'role': 'system', 'content': system_prompt}]
         ollama_messages.extend(self._translate_messages_for_ollama(messages))
 
+        # tool_choice: Ollama's /api/chat has no portable forced-tool field, so
+        # we cannot honour it. Say so out loud rather than dropping it silently
+        # — the engine relies on forcing to guarantee a gradable question slot,
+        # and a silent no-op is what let every local Qwen model narrate its
+        # questions as prose through the whole Eval-3 sweep. The engine's
+        # pose-repair path is the compensating mechanism. Set
+        # OLLAMA_FORWARD_TOOL_CHOICE=1 to forward it anyway on builds that
+        # accept it.
+        if tool_choice:
+            if os.environ.get('OLLAMA_FORWARD_TOOL_CHOICE') == '1':
+                logger.info("[OllamaTools] forwarding tool_choice=%s (opt-in)", tool_choice)
+            else:
+                logger.warning(
+                    "[OllamaTools] tool_choice=%s requested but NOT forwarded — "
+                    "Ollama has no portable forced-tool field; the engine's "
+                    "pose-repair path compensates", tool_choice,
+                )
+                tool_choice = None
+
         api_base = self.config.api_base or "http://localhost:11434"
         url = f"{api_base}/api/chat"
         # Eval-only per-family sampling (apps/llm/model_profiles); production
@@ -1190,6 +1240,15 @@ class OllamaClient(BaseLLMClient):
             'stream': False,
             'options': options,
         }
+        if tool_choice:
+            # OpenAI-shaped; only reached under OLLAMA_FORWARD_TOOL_CHOICE=1.
+            if isinstance(tool_choice, dict) and tool_choice.get('name'):
+                payload['tool_choice'] = {
+                    'type': 'function',
+                    'function': {'name': tool_choice['name']},
+                }
+            elif isinstance(tool_choice, str):
+                payload['tool_choice'] = tool_choice
         logger.info(
             "[OllamaTools] llm_call: messages=%d system_chars=%d tools=%d model=%s",
             len(ollama_messages), len(system_prompt or ''),

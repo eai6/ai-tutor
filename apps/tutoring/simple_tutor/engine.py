@@ -34,9 +34,140 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
+
+# The five server-side tools the tutor may call. Anything else is a parse
+# artifact: the text-recovery parser in apps/llm/client.py has produced
+# ' record_answer' (padded), 'requestFigure' (camelCase) and a literal
+# 'tool_name' placeholder. Normalise what we can, reject the rest loudly.
+_KNOWN_TOOLS = frozenset({
+    'pose_question', 'record_answer', 'request_figure',
+    'redirect_off_topic', 'advance_step',
+})
+
+# How many times one tool may be dispatched in a single turn.
+#
+# pose_question: handle_pose_question REPLACES the InFlightQuestion row on
+#   every call, so an unbounded dispatch lets a model that emits parallel pose
+#   calls desynchronise the slot from the question the student actually read:
+#   they answer question #1 and the grader scores it against question #N.
+#   gemini-3.1-pro emitted 139 pose calls in a single turn and graded only 33%
+#   of answers correct, against Anthropic's 87% on identical scenarios.
+# record_answer: each call grades and bumps attempt_count, and a correct
+#   verdict clears the slot — so duplicates inflate the hint ladder and the
+#   later calls land on an empty slot. Forcing a tool call (below) makes
+#   parallel duplicates more likely, so cap it before turning forcing on.
+# Tools not listed here are uncapped (request_figure, advance_step,
+# redirect_off_topic are idempotent enough not to need it).
+MAX_CALLS_PER_TURN = {'pose_question': 1, 'record_answer': 1}
+
+# Families exempt from the forced-tool overrides. Anthropic complies natively
+# (93% of GRADE turns, 100% of POSE turns on opus) and is the benchmark
+# control — forcing it would move the control underneath the experiment.
+# ``None`` (production, no model profile) is exempt by construction.
+_FORCE_POSE_EXEMPT_FAMILIES = frozenset({'anthropic'})
+
+# Student intents that are conversation, not answering. A forced tool call on
+# these turns would talk over the student's question.
+_NON_POSING_INTENTS = frozenset({'clarification', 'pushback', 'off_topic'})
+
+# The only tools a forced GRADE turn may choose between. Forcing a *named*
+# tool (tool_choice={'type':'tool','name':'record_answer'}) suppresses every
+# other tool on that call, which would kill the combined turn — grade the old
+# answer AND pose the next question — that best predicts pass rate (opus does
+# it on 71% of turns). So we force "some tool" (tool_choice=any / required)
+# and narrow the tool list instead, which is portable across providers:
+# OpenAI's "required" cannot be restricted to a subset, but a short tools list
+# achieves the same thing. Without this the model could satisfy "required" by
+# calling advance_step and skip a lesson step.
+#
+# Narrowing costs nothing: Call 2 is issued with the FULL tool list, so a model
+# that wants a figure can still request one after the verdict is in hand.
+_GRADE_FORCED_TOOLS = ('record_answer', 'pose_question')
+
+_DUPLICATE_SKIP_REASON = {
+    'pose_question': (
+        'duplicate pose_question in one turn — only the first question is '
+        'registered; ask exactly one question per reply'
+    ),
+    'record_answer': (
+        'duplicate record_answer in one turn — the first call already graded '
+        "the student's answer; grade each answer once"
+    ),
+}
+
+
+def _normalise_tool_name(raw: Any) -> str:
+    """Map a model-emitted tool name onto a known tool, or return it unchanged
+    so the caller can reject it. Handles whitespace padding and camelCase."""
+    name = str(raw or '').strip()
+    if name in _KNOWN_TOOLS:
+        return name
+    snake = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+    return snake if snake in _KNOWN_TOOLS else name
+
+
+def _should_force_pose(family: str | None, mode: str, student_intent: str | None) -> bool:
+    """Whether Call 1 should force the pose_question tool this turn.
+
+    Eval-only: ``family`` is None in production (no TUTOR_MODEL_OVERRIDE →
+    no model profile), so production behaviour is unchanged.
+
+    Was hard-gated to ``family == 'gemini'``. The Eval-3 sweep showed every
+    Qwen model has the identical pathology the Gemini gate was written for —
+    questions narrated as prose create no gradable slot, so the student's next
+    answer has nothing to grade and the session stalls. POSE compliance was
+    85-100% for Gemini (forced) against 3-67% for Qwen (unforced). Extend the
+    remedy to every non-Anthropic family (RC-2).
+    """
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return False
+    if mode != 'POSE':
+        return False
+    return (student_intent or '') not in _NON_POSING_INTENTS
+
+
+def _plan_call1(tools: list, force_pose: bool, force_grade: bool) -> tuple[list, dict | None]:
+    """Choose Call 1's tool list and tool_choice.
+
+    - forced POSE  → full tool list, force the named pose_question.
+    - forced GRADE → narrowed list, force "some tool" (``any``) so the model
+      may emit record_answer AND pose_question in one reply. A named force
+      would forbid the combined turn.
+    - neither (production, Anthropic) → the call is byte-identical to before.
+    """
+    if force_pose:
+        return tools, {'type': 'tool', 'name': 'pose_question'}
+    if force_grade:
+        narrowed = [t for t in (tools or []) if t.get('name') in _GRADE_FORCED_TOOLS]
+        return (narrowed or tools), {'type': 'any'}
+    return tools, None
+
+
+def _should_force_grade(family: str | None, mode: str, student_intent: str | None) -> bool:
+    """Whether Call 1 should force a tool call on a GRADE turn.
+
+    Eval-only, same gating as _should_force_pose. GRADE mode means only that a
+    question is in flight — NOT that the student answered it. So this forces
+    "call one of {record_answer, pose_question}", never a specific tool, and
+    the non-Anthropic prompts instruct the model to pass an empty
+    extracted_answer when the student's message was not an answer.
+    handle_record_answer returns early on an empty answer without touching the
+    slot, the verdict or attempt_count, so the escape hatch is side-effect free.
+
+    Why it matters: qwen2.5:72b entered GRADE mode 354 times with the question
+    already registered and called record_answer on only 109 of them. The other
+    245 turns recorded no verdict, so no step advanced and the tutor re-asked
+    until the session deadlocked (Eval-3 bottleneck analysis, RC-1).
+    """
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return False
+    if 'GRADE' not in (mode or ''):     # 'GRADE' and 'REMEDIATION+GRADE'
+        return False
+    return (student_intent or '') not in _NON_POSING_INTENTS
 
 if TYPE_CHECKING:
     from apps.tutoring.models import TutorSession
@@ -245,24 +376,21 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     #          now composes the student-facing reply knowing the verdict.
     #          This eliminates "tool-call-only" empty bubbles and stops
     #          the model from guess-confirming a verdict before grading.
-    # Eval-only (Gemini): force the pose_question tool on POSE turns where a
-    # question is expected. gemini-2.5-flash under AUTO function-calling writes
-    # questions as prose instead of calling pose_question, so no gradable slot
-    # is created → the student's next answer has nothing to grade → the session
-    # deadlocks/stalls. Forcing tool_choice=pose_question (→ Gemini mode=ANY)
-    # guarantees the slot. Gated to: the gemini family (None in production and
-    # for other families), POSE mode (never GRADE / REMEDIATION), and an
-    # answer/engagement intent — conversational turns (clarification / pushback /
-    # off_topic) still respond in text. Gemini can emit teaching text alongside
-    # the forced call, so this doesn't suppress explanations.
-    call1_tool_choice = None
-    if (_family == 'gemini' and mode == 'POSE'
-            and student_intent not in ('clarification', 'pushback', 'off_topic')):
-        call1_tool_choice = {'type': 'tool', 'name': 'pose_question'}
+    # Eval-only: force the pose_question tool on POSE turns where a question is
+    # expected. A model under AUTO function-calling that writes its question as
+    # prose creates no gradable slot → the student's next answer has nothing to
+    # grade → the session deadlocks/stalls. Forcing tool_choice=pose_question
+    # (→ Gemini mode=ANY, OpenAI/Vertex tool_choice=function) guarantees the
+    # slot. See _should_force_pose: every non-Anthropic family, POSE mode only,
+    # answering intents only. Production (family None) is untouched. Models can
+    # emit teaching text alongside the forced call, so explanations survive.
+    force_pose = _should_force_pose(_family, mode, student_intent)
+    force_grade = not force_pose and _should_force_grade(_family, mode, student_intent)
+    call1_tools, call1_tool_choice = _plan_call1(tools, force_pose, force_grade)
 
     messages: list = [{'role': 'user', 'content': user_input}]
     response = _call_llm(
-        system_blocks=system_blocks, tools=tools, messages=messages,
+        system_blocks=system_blocks, tools=call1_tools, messages=messages,
         tool_choice=call1_tool_choice,
     )
     if response is None:
@@ -284,35 +412,30 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         figure_catalog=figure_catalog,
     )
 
+    # ─── 5b. Which forced tool did Call 1 skip? ───────────────────
+    # tool_choice forcing only lands on providers whose client forwards it.
+    # OllamaClient does not ("accepted for signature parity but NOT
+    # forwarded"), so every local open-weight model narrated its questions as
+    # prose: qwen3.5:4b called pose_question on 3% of its POSE turns and never
+    # once reached an exit ticket. The repair rides on Call 2 rather than
+    # costing a call of its own — see _run_second_call.
+    missing_tool = _missing_forced_tool(force_pose, force_grade, tool_results)
+
     # ─── 6. Call 2 — feed tool_results back so the model writes
-    #              the student-facing reply WITH the verdict in hand.
-    text_reply = text_reply_1
-    used_two_call = False
-    tool_use_blocks = _extract_tool_use_blocks(response)
-    if tool_use_blocks:
-        tool_result_content = _build_tool_result_content(
-            tool_use_blocks, tool_results,
-        )
-        if tool_result_content:
-            messages.append({'role': 'assistant', 'content': response.content})
-            messages.append({'role': 'user', 'content': tool_result_content})
-            response2 = _call_llm(
-                system_blocks=system_blocks, tools=tools, messages=messages,
-            )
-            if response2 is not None:
-                used_two_call = True
-                text_reply_2, extra_tool_results, _ = _dispatch_tools(
-                    session=session,
-                    response=response2,
-                    figure_catalog=figure_catalog,
-                )
-                # Call 2 is meant to produce text; if it also chose to
-                # call a tool, accept the side effects but use only the
-                # accumulated text. (No third call — keeps latency
-                # bounded; tool calls in call 2 are uncommon.)
-                tool_results.extend(extra_tool_results)
-                if text_reply_2:
-                    text_reply = text_reply_2
+    #              the student-facing reply WITH the verdict in hand,
+    #              and register whatever Call 1 skipped.
+    text_reply, used_two_call = _run_second_call(
+        session=session,
+        system_blocks=system_blocks,
+        tools=tools,
+        messages=messages,
+        response=response,
+        text_reply_1=text_reply_1,
+        tool_results=tool_results,
+        figure_catalog=figure_catalog,
+        missing_tool=missing_tool,
+        user_input=user_input,
+    )
 
     if not text_reply:
         # Last-resort: neither call produced text. Give a neutral
@@ -471,6 +594,20 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
         if just:
             parts.insert(4, f"Grader justification: {just}")
         return "\n".join(p for p in parts if p)
+
+    if (tool_name == 'record_answer'
+            and not result.get('recorded')
+            and result.get('error', '').startswith('extracted_answer is empty')):
+        # The escape hatch for a forced GRADE turn: the model judged that the
+        # student's message was not an answer. Nothing was graded, the slot and
+        # attempt_count are untouched, and the question stays in flight.
+        return (
+            "NOT AN ANSWER. You reported that the student's message was not an "
+            "answer to the question in flight, so nothing was graded and the "
+            "question is still open. Respond to what they actually said — "
+            "answer their clarification, or acknowledge their hesitation — and "
+            "then re-anchor them to the question, which remains unanswered."
+        )
 
     if (tool_name == 'record_answer'
             and not result.get('recorded')
@@ -768,6 +905,21 @@ def _call_llm(
 
     max_tokens = profile.max_tokens if profile else 1024
     sampling = profile.sampling_dict() if profile else None
+    # Eval-only temperature override, so the sampling A/B is a env-var flip
+    # rather than a code edit. The Qwen profiles run at 0.7 (Qwen's recommended
+    # chat sampling) while production clamps TUTORING to [0.1, 0.3]; that
+    # confound is called out in the Eval-3 analysis (RC-6). Never applies in
+    # production, where `profile` is None.
+    if profile is not None and sampling is not None:
+        _temp_override = os.getenv('TUTOR_EVAL_TEMPERATURE', '').strip()
+        if _temp_override:
+            try:
+                sampling = {**sampling, 'temperature': float(_temp_override)}
+            except ValueError:
+                logger.warning(
+                    "_call_llm: bad TUTOR_EVAL_TEMPERATURE=%r — ignoring",
+                    _temp_override,
+                )
     effective_blocks = system_blocks
     if profile is not None:
         try:
@@ -857,6 +1009,153 @@ def _call_llm(
 # ============================================================================
 
 
+def _pose_was_registered(tool_results: list[dict]) -> bool:
+    """True when this turn actually wrote the in-flight question slot."""
+    return any(
+        tr.get('tool') == 'pose_question' and (tr.get('result') or {}).get('posed')
+        for tr in (tool_results or [])
+    )
+
+
+def _tool_was_called(tool_results: list[dict], name: str) -> bool:
+    """True when the model called ``name`` at all this turn, whatever the
+    result. A record_answer that deliberately passed an empty answer ("the
+    student did not answer") counts as called — the model made the judgement,
+    which is all the repair path is trying to elicit."""
+    return any(tr.get('tool') == name for tr in (tool_results or []))
+
+
+# Repair instruction. Positive framing throughout: Google documents that
+# open-ended negatives ("do not…") make Gemini over-index and degrade its
+# arithmetic and logic, and the same phrasing is what the Qwen markdown
+# template already uses.
+_POSE_REPAIR_INSTRUCTION = (
+    "Register the question you just asked so the platform can grade the "
+    "student's reply. Call pose_question once, with the exact question you "
+    "wrote, its question_type, its options when it is multiple choice, and "
+    "its reference_answer.\n\n"
+    "The question you wrote was:\n{assistant_text}"
+)
+
+
+_RECORD_REPAIR_INSTRUCTION = (
+    "Submit the student's answer for grading. Call record_answer once, with "
+    "their answer exactly as they wrote it. If their message was not an "
+    "answer to the question — a clarification, a request for help, or "
+    "hesitation — call record_answer with an empty extracted_answer, and the "
+    "platform will record nothing.\n\n"
+    "The student wrote:\n{user_input}"
+)
+
+
+def _missing_forced_tool(force_pose: bool, force_grade: bool, tool_results: list) -> str | None:
+    """The forced tool Call 1 was asked for but did not deliver, if any."""
+    if force_pose and not _pose_was_registered(tool_results):
+        return 'pose_question'
+    if force_grade and not _tool_was_called(tool_results, 'record_answer'):
+        return 'record_answer'
+    return None
+
+
+def _repair_instruction(missing_tool: str, user_input: str, assistant_text: str) -> str:
+    if missing_tool == 'pose_question':
+        return _POSE_REPAIR_INSTRUCTION.format(
+            assistant_text=(assistant_text or '').strip()[:1500])
+    return _RECORD_REPAIR_INSTRUCTION.format(
+        user_input=str(user_input or '').strip()[:1500])
+
+
+def _plan_call2(tools: list, missing_tool: str | None) -> tuple[list, dict | None]:
+    """Choose Call 2's tool list and tool_choice.
+
+    With nothing missing, Call 2 is exactly what it always was: full tool list,
+    no forcing. When Call 1 skipped a forced tool, Call 2 does double duty — it
+    composes the student-facing reply AND registers what was missed. Only the
+    missing tool is exposed, so any tool call it makes is the one we need, which
+    is what lets Ollama (which cannot honour tool_choice) be repaired at all.
+    """
+    if not missing_tool:
+        return tools, None
+    only = [t for t in (tools or []) if t.get('name') == missing_tool]
+    return (only or tools), {'type': 'tool', 'name': missing_tool}
+
+
+def _run_second_call(
+    *, session, system_blocks, tools, messages, response, text_reply_1,
+    tool_results, figure_catalog, missing_tool, user_input,
+) -> tuple[str, bool]:
+    """Issue Call 2, folding in the repair when Call 1 skipped a forced tool.
+
+    Returns ``(text_reply, used_two_call)`` and extends ``tool_results`` with
+    anything Call 2 dispatched.
+
+    Cost note: a compliant turn already makes two calls (opus does so on 95% of
+    turns). The models that skip the protocol make ONE call, so folding the
+    repair into Call 2 means a repaired turn costs exactly what a correct turn
+    always cost — never three. Previously the repair was a separate call.
+    """
+    tool_use_blocks = _extract_tool_use_blocks(response)
+    tool_result_content = (
+        _build_tool_result_content(tool_use_blocks, tool_results)
+        if tool_use_blocks else []
+    )
+    if not tool_result_content and not missing_tool:
+        # Nothing to feed back and nothing to repair — no second call, exactly
+        # as before. This is the production/Anthropic path when Call 1 wrote a
+        # plain conversational reply.
+        return text_reply_1, False
+
+    if tool_result_content:
+        messages.append({'role': 'assistant', 'content': response.content})
+        user_blocks = list(tool_result_content)
+        if missing_tool:
+            # Ride along in the SAME user message — Gemini requires strict
+            # user/model alternation, so a second consecutive user turn would
+            # be rejected.
+            user_blocks.append({
+                'type': 'text',
+                'text': _repair_instruction(missing_tool, user_input, text_reply_1),
+            })
+        messages.append({'role': 'user', 'content': user_blocks})
+    else:
+        # Call 1 emitted no tool at all, so there would have been no Call 2.
+        # This call IS the repair: the turn still costs exactly two calls.
+        messages.append({'role': 'assistant', 'content': text_reply_1 or '(no reply)'})
+        messages.append({
+            'role': 'user',
+            'content': _repair_instruction(missing_tool, user_input, text_reply_1),
+        })
+
+    if missing_tool:
+        logger.info(
+            "[simple_tutor] call2_repair: Call 1 skipped %s — folding the "
+            "repair into Call 2 (no extra call)", missing_tool,
+        )
+
+    call2_tools, call2_tool_choice = _plan_call2(tools, missing_tool)
+    response2 = _call_llm(
+        system_blocks=system_blocks, tools=call2_tools, messages=messages,
+        tool_choice=call2_tool_choice,
+    )
+    if response2 is None:
+        return text_reply_1, False
+
+    text_reply_2, extra_tool_results, _ = _dispatch_tools(
+        session=session, response=response2, figure_catalog=figure_catalog,
+    )
+    # Call 2 is meant to produce text; if it also chose to call a tool, accept
+    # the side effects but use only the accumulated text. (No third call —
+    # keeps latency bounded.)
+    tool_results.extend(extra_tool_results)
+    if missing_tool and not _tool_was_called(extra_tool_results, missing_tool):
+        logger.warning(
+            "[simple_tutor] call2_repair: model still declined to call %s — "
+            "this turn leaves no %s", missing_tool,
+            'gradable slot' if missing_tool == 'pose_question' else 'verdict',
+        )
+    return (text_reply_2 or text_reply_1), True
+
+
 def _dispatch_tools(*, session, response, figure_catalog):
     """Walk Anthropic response content. For each text block, accumulate
     the reply. For each tool_use block, dispatch to the right handler.
@@ -903,11 +1202,36 @@ def _dispatch_tools(*, session, response, figure_catalog):
     )
 
     tool_results: list[dict] = []
+    dispatched: dict[str, int] = {}
     for _idx, block in sorted_blocks:
-        name = getattr(block, 'name', '')
+        name = _normalise_tool_name(getattr(block, 'name', ''))
         params = getattr(block, 'input', None) or {}
         if not isinstance(params, dict):
             params = {}
+
+        # Per-tool cap. A duplicate is NOT dispatched, but it still gets a
+        # tool_result so every tool_use block stays paired (Anthropic rejects
+        # an unpaired tool_use in the Call-2 message).
+        cap = MAX_CALLS_PER_TURN.get(name)
+        if cap is not None and dispatched.get(name, 0) >= cap:
+            logger.warning(
+                "_dispatch_tools: dropped duplicate %s (#%d this turn) — "
+                "only the first call in a turn takes effect",
+                name, dispatched[name] + 1,
+            )
+            dispatched[name] += 1
+            tool_results.append({
+                'tool': name,
+                'result': {
+                    'posed': False,
+                    'recorded': False,
+                    'skipped': True,
+                    'skip_reason': _DUPLICATE_SKIP_REASON.get(
+                        name, f'duplicate {name} in one turn — only the first takes effect'),
+                },
+                '_block': block,
+            })
+            continue
 
         try:
             if name == 'pose_question':
@@ -953,6 +1277,14 @@ def _dispatch_tools(*, session, response, figure_catalog):
                     session, reason=str(params.get('reason', '')),
                 )
             else:
+                # Never silently no-op: an unknown name means either the model
+                # invented a tool or the text-recovery parser mis-extracted one
+                # (e.g. the literal placeholder 'tool_name'). Both are bugs we
+                # want counted in the sweep logs.
+                logger.warning(
+                    "_dispatch_tools: unknown tool %r (raw=%r) — not dispatched",
+                    name, getattr(block, 'name', ''),
+                )
                 result = {'error': f'unknown tool {name!r}'}
         except Exception as exc:
             # Handlers should not raise, but if one does, log + continue
@@ -963,6 +1295,7 @@ def _dispatch_tools(*, session, response, figure_catalog):
             )
             result = {'error': f'handler exception {type(exc).__name__}'}
 
+        dispatched[name] = dispatched.get(name, 0) + 1
         tool_results.append({'tool': name, 'result': result, '_block': block})
 
     return text_reply, tool_results, llm_called_record_answer
