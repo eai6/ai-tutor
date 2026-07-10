@@ -5,8 +5,7 @@ description: >
 persona: probe_resistant
 subject: math
 lesson_id: 1137
-tags: [multi_turn, banned_opener, repetition, math, probe_resistant]
-
+tags: [multi_turn, banned_opener, repetition, math, probe_resistant, core15]
 mode: multi_turn
 max_turns: 12
 

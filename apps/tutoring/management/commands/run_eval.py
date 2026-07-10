@@ -29,8 +29,17 @@ class Command(BaseCommand):
                             help='Run only single_turn scenarios (skip multi_turn).')
         parser.add_argument('--multi-turn', action='store_true',
                             help='Run only multi_turn scenarios.')
+        parser.add_argument('--subset', default=None,
+                            help='Only run scenarios carrying this tag. Use '
+                                 '"core15" for the stratified 15-scenario '
+                                 'multi-turn subset: it holds all 6 personas, '
+                                 'both subjects, all 4 lessons and the 6/12/15/24 '
+                                 'turn-budget extremes, and reproduces the '
+                                 'full-30 model ranking (Spearman 0.97) at half '
+                                 'the wall-clock. Combines with --multi-turn.')
 
-    def handle(self, *args, smoke, scenario, single_turn, multi_turn, **kwargs) -> None:
+    def handle(self, *args, smoke, scenario, single_turn, multi_turn, subset,
+               **kwargs) -> None:
         if single_turn and multi_turn:
             raise CommandError("Pass at most one of --single-turn / --multi-turn.")
         # Import inside handle so Django app loading completes first.
@@ -46,8 +55,12 @@ class Command(BaseCommand):
         elif multi_turn:
             scenarios = [s for s in scenarios if s.mode == 'multi_turn']
 
+        if subset:
+            scenarios = [s for s in scenarios if subset in s.tags]
+
         if not scenarios:
-            self.stdout.write(self.style.WARNING("No scenarios matched."))
+            hint = f" for subset={subset!r}" if subset else ""
+            self.stdout.write(self.style.WARNING(f"No scenarios matched{hint}."))
             return
 
         # Make the tutor engine explicit + loud. This eval targets the

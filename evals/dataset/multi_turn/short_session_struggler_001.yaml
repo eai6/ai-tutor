@@ -6,8 +6,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1137
-tags: [multi_turn, short_session, struggler, edge_case]
-
+tags: [multi_turn, short_session, struggler, edge_case, core15]
 mode: multi_turn
 max_turns: 6
 
