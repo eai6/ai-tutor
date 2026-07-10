@@ -3,7 +3,7 @@ MULTI-TURN evaluation (Improved Eval 3) of the top-15 OSS Qwen models on an A100
 
 Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5;
 judge = Anthropic Sonnet 4.6 (multi-turn default, per the Haiku-vs-Sonnet A/B).
-Results land in offline_eval/multi_turn_results/ (persisted to Drive).
+Results land in offline_eval/multi_turn_results/<SWEEP>/ (persisted to Drive).
 
 Run: python offline_eval/_make_colab_nb.py
 """
@@ -13,6 +13,19 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multi-turn'    # Drive folder that persists results
+SWEEP = 'sweep2'                             # results subfolder — one per sweep
+SUBSET = 'core15'                            # stratified 15-scenario subset (~half the wall-clock)
+RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
+
+# Read the subset straight off the dataset so the notebook can never drift from
+# the YAML tags. Used by Cell 10b, which must filter sweep 1 by scenario id (its
+# stored rows predate the tag).
+_ROOT = Path(__file__).resolve().parents[1]
+CORE15_IDS = sorted(
+    p.stem for p in (_ROOT / 'evals' / 'dataset' / 'multi_turn').glob('*.yaml')
+    if f'{SUBSET}]' in p.read_text() or f'{SUBSET},' in p.read_text()
+)
+assert len(CORE15_IDS) == 15, f'expected 15 {SUBSET} scenarios, found {len(CORE15_IDS)}'
 
 cells = []
 
@@ -43,24 +56,41 @@ OSS Qwen models are split into 3 **disjoint** groups; pick this tab's group in t
 **Cell 7b** dropdown. Every tab writes per-model JSONs into the **same** Drive
 folder, so no two tabs score the same model and the board merges automatically:
 
-- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b` *(small; this is what the
-  original full-list tab is already grinding through — only start a group1 tab if
-  you are NOT already running that original sweep, or it'll double up)*
+- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b` *(small)*
 - **group2** — `qwen3:14b`, `qwen3:30b-a3b`, `qwen3.6:27b`
 - **group3** — `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`
 
 Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7 /
 top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit).
 
-**Output → `offline_eval/multi_turn_results/`** (symlinked to Drive, resume-safe).
+## What changed since sweep 1
 
-> ⚠️ **Runtime: multi-turn is ~15-25× heavier than single-turn.** Each model runs
-> ~30 scenarios × up to ~24 turns × (tutor + student + judge) calls. The **small +
-> MoE** models (4b/9b/14b/30b-a3b/35b-a3b) are hours-scale; the **large dense**
-> ones (27b/32b/**72b**) can take **many hours each** — reasoning models also emit
-> long `<think>` traces. Plan **several A100 sessions**; the run is **resume-safe**
-> (finished models are skipped, results live on Drive), so you can stop/restart and
-> even skip the 72b if it's not worth the wall-clock.
+**1. This sweep runs the `{SUBSET}` subset — 15 scenarios, not 30.** They are a
+stratified sample of the full set: all 6 personas, both subjects, all 4 lessons,
+and the 6/12/15/24-turn budget extremes. Re-scoring sweep 1's 14 models on just
+these 15 reproduces the full-30 ranking (Spearman **0.97**, bootstrap 0.95±0.04)
+for **~50% of the wall-clock**.
+
+**2. The engine's tool protocol was repaired.** Sweep 1 was largely measuring
+tool-protocol compliance rather than teaching: duplicate `pose_question` calls
+were overwriting the graded question (gemini-3.1-pro emitted 139 in one turn),
+`tool_choice` forcing was hard-gated to Gemini, and Ollama silently dropped it.
+All fixed. A model that skips the protocol is now repaired on the turn's existing
+second call, so a repaired turn costs no more than a correct one.
+
+**3. Results are versioned per sweep.** Sweep 1 lives in
+`multi_turn_results/sweep1/`; this run writes to **`multi_turn_results/{SWEEP}/`**.
+Compare like with like: score sweep 1 on `{SUBSET}` before reading any delta.
+
+**Output → `{RESULTS}/`** (symlinked to Drive, resume-safe).
+
+> ⚠️ **Runtime.** Each model runs 15 scenarios × up to ~24 turns × (tutor +
+> student + judge) calls. The **small + MoE** models (4b/9b/14b/30b-a3b/35b-a3b)
+> are hours-scale; the **large dense** ones (27b/32b/**72b**) are slower — though
+> note sweep 1 showed the 72b generates only ~161 tokens per call while the
+> reasoning models emit thousands, so the 4b/35b models dominate wall-clock, not
+> the 72b. The run is **resume-safe** (finished models are skipped, results live
+> on Drive), so you can stop/restart freely.
 
 **Before you start**
 1. Runtime → **Change runtime type** → pick the GPU for THIS tab's group (High-RAM):
@@ -168,14 +198,19 @@ code(r"""
 """)
 
 md("## Cell 7 — persist results to Drive (symlink → survives disconnects)\n"
-   f"Writes into a **new** `{DRIVE_FOLDER}/` on Drive, symlinked to "
-   "`offline_eval/multi_turn_results/`. No seeding from the single-turn board — "
-   "this is a fresh multi-turn run. Resume-safe: a reconnect re-symlinks the same "
-   "Drive folder and `run_matrix.sh` skips already-scored models.")
+   f"Symlinks **only `{RESULTS}/`** to `{DRIVE_FOLDER}/{SWEEP}/` on Drive. The rest of "
+   "`multi_turn_results/` stays as cloned, so sweep 1's per-scenario JSONs remain on "
+   "disk for the Cell-10b baseline. Resume-safe: a reconnect re-symlinks the same Drive "
+   f"folder and `run_matrix.sh` skips models that already have a JSON in `{SWEEP}/`.")
 code(rf"""
-!mkdir -p /content/drive/MyDrive/{DRIVE_FOLDER}
-!rm -rf offline_eval/multi_turn_results && ln -s /content/drive/MyDrive/{DRIVE_FOLDER} offline_eval/multi_turn_results
-!ls -la offline_eval/multi_turn_results/
+!mkdir -p /content/drive/MyDrive/{DRIVE_FOLDER}/{SWEEP}
+!rm -rf {RESULTS} && ln -s /content/drive/MyDrive/{DRIVE_FOLDER}/{SWEEP} {RESULTS}
+import os, glob
+print('this sweep writes to:', os.path.realpath('{RESULTS}'))
+done = sorted(os.path.basename(p)[:-5] for p in glob.glob('{RESULTS}/*.json'))
+print('already scored in {SWEEP}:', done or '(none yet)')
+print('sweep-1 JSONs available for the Cell-10b baseline:',
+      len(glob.glob('offline_eval/multi_turn_results/sweep1/*.json')))
 """)
 
 md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
@@ -271,14 +306,19 @@ _df('AFTER cleanup')
 """)
 
 md("## Cell 9 — run the MULTI-TURN sweep (pulls + scores each model; resume-safe)\n"
-   "`MODE=--multi-turn` runs full sessions. `RESULTS_DIR=…/multi_turn_results` writes "
-   "to Drive. `CLEANUP_MODELS=1` deletes each model's weights right after it's scored "
-   "so peak disk ≈ one model at a time. **Expect hours** — the run tolerates "
-   "disconnects (done models are skipped on restart). `run_eval` prints a "
-   "`>> Tutor engine: simple_tutor` banner at the top of each model — confirm it.")
-code(r"""
-!RESULTS_DIR=$PWD/offline_eval/multi_turn_results SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 \
-  MODE="--multi-turn" bash offline_eval/run_matrix.sh
+   f"`MODE=\"--multi-turn --subset {SUBSET}\"` runs full sessions on the 15-scenario "
+   f"stratified subset. `RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
+   "deletes each model's weights right after it's scored so peak disk ≈ one model at a "
+   "time. The run tolerates disconnects (done models are skipped on restart).\n\n"
+   "**Sanity-check the first model's output before walking away:**\n"
+   "- `>> Tutor engine: simple_tutor` — not the legacy engine.\n"
+   f"- `=== Running 15 scenario(s) ===` — the `{SUBSET}` filter took effect. If it says "
+   "30, the branch is stale: re-run Cell 2.\n"
+   "- No `dropped duplicate pose_question` storms, and few `record_answer without "
+   "in-flight question` lines — those are the sweep-1 defects the fixes target.")
+code(rf"""
+!RESULTS_DIR=$PWD/{RESULTS} SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 \
+  MODE="--multi-turn --subset {SUBSET}" bash offline_eval/run_matrix.sh
 """)
 
 md("## Cell 9b — reclaim disk AFTER the sweep (final backstop)\n"
@@ -293,9 +333,40 @@ import subprocess
 print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
 """)
 
-md("## Cell 10 — multi-turn leaderboard (run anytime; scores whatever is on Drive)")
-code(r"""
-!RESULTS_DIR=$PWD/offline_eval/multi_turn_results python offline_eval/aggregate.py
+md(f"## Cell 10 — multi-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
+   "Pass rates here are out of **15**, so they are NOT comparable to sweep 1's out-of-30 "
+   "numbers. Cell 10b prints the apples-to-apples baseline.")
+code(rf"""
+!RESULTS_DIR=$PWD/{RESULTS} python offline_eval/aggregate.py
+""")
+
+md(f"## Cell 10b — sweep-1 baseline on the same 15 scenarios (apples-to-apples)\n"
+   f"Re-scores sweep 1's stored per-scenario results restricted to the `{SUBSET}` ids, so "
+   "you can read the delta the engine fixes actually produced. Filters by **scenario id**, "
+   f"not by tag: sweep 1 ran before the `{SUBSET}` tag existed, so its stored rows do not "
+   "carry it. Needs `sweep1/` on Drive; otherwise skip — this cell is diagnostic only.")
+code(rf"""
+import json, glob, os
+CORE15 = {CORE15_IDS!r}
+SUB = 'offline_eval/multi_turn_results/sweep1'
+paths = [p for p in sorted(glob.glob(f'{{SUB}}/*.json'))
+         if not os.path.basename(p).startswith('_')]
+if not paths:
+    print('sweep1/ not present on this VM — skip (diagnostic only)')
+else:
+    rows = []
+    for p in paths:
+        m = os.path.basename(p)[:-5]
+        R = json.load(open(p))['results']
+        sub = [r for r in R if r['scenario_id'] in CORE15]
+        if len(sub) != 15:
+            print(f'  !! {{m}}: only {{len(sub)}}/15 core15 scenarios present — skipping')
+            continue
+        rows.append((m, 100*sum(r['passed'] for r in sub)/15))
+    print(f'{{"MODEL":<26}} {{"sweep1 @ core15":>16}}')
+    print('-'*44)
+    for m, rate in sorted(rows, key=lambda r: -r[1]):
+        print(f'{{m:<26}} {{rate:>14.0f}}%  ({{round(rate*15/100)}}/15)')
 """)
 
 md(rf"""
@@ -309,17 +380,29 @@ If the 27b/32b/**72b** dense models are too slow for your session budget, just s
 you'll still have a complete small/MoE board, and you can resume the big ones in a
 later session (or skip 72b entirely by commenting it out in Cell 8).
 
-To pull results back to your laptop: copy the JSONs from
-`MyDrive/{DRIVE_FOLDER}/` into the repo's `offline_eval/multi_turn_results/` and run
-`RESULTS_DIR=offline_eval/multi_turn_results python offline_eval/aggregate.py`.
+To pull results back to your laptop: copy the JSONs + logs from
+`MyDrive/{DRIVE_FOLDER}/{SWEEP}/` into the repo's `{RESULTS}/` and run
+`RESULTS_DIR={RESULTS} python offline_eval/aggregate.py`.
 
 **Sanity checks per model:**
 - The `run_eval` banner reads `>> Tutor engine: simple_tutor` (NOT conversational_tutor).
-- `multi_turn_results/<model>.log` shows sessions reaching `exit_ticket` / `completed`
+- It reports `=== Running 15 scenario(s) ===`. If it says 30, the clone is stale —
+  the `{SUBSET}` tags are missing. Re-run **Cell 2**.
+- `{SWEEP}/<model>.log` shows sessions reaching `exit_ticket` / `completed`
   (not all `deadlock`); each scored session's `rubric_result.model` is
   `claude-sonnet-4-6`.
 - Reasoning models: `[OllamaTools] response: ... blocks=['tool_use', ...]` (or `['text']`),
   **not** `blocks=[]` (empty = num_ctx still truncating).
+
+**New in sweep 2 — the fixes should show up in the logs:**
+- `dropped duplicate pose_question` — the cap firing. A few is fine; a storm means a
+  model is spamming parallel calls (that was gemini-3.1-pro's 139-per-turn bug).
+- `record_answer without in-flight question` — should be **rare**. In sweep 1 this hit
+  90% of qwen3.5:4b's grading attempts.
+- `call2_repair: Call 1 skipped …` — the repair riding on the second call. Expected on
+  Ollama models, which cannot honour forced tool choice.
+- `grading a STALE slot` — new diagnostic. Grep it afterwards; it tells us whether
+  stale-question grading is a real problem or a rare one.
 """)
 
 nb = {
