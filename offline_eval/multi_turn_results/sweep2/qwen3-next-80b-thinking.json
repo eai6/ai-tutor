@@ -1,0 +1,3122 @@
+{
+  "started_at": "2026-07-10T14:28:14.476567+00:00",
+  "finished_at": "2026-07-10T16:12:59.329780+00:00",
+  "git_sha": "d4c1a88d094e",
+  "total_scenarios": 15,
+  "passed": 0,
+  "failed": 15,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "average_geo_scale_001",
+      "passed": false,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "baseline",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=3, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 3× in window of 5 (turns 0..4): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Adapts to the mix of bare and worked answers; asks for reasoning only when diagnostically useful",
+            "score": 0.0,
+            "reasoning": "The tutor never engaged with the student's reasoning at all — every response was an error message ('Sorry — I had trouble responding'), so no adaptation occurred.",
+            "applicable": true
+          },
+          {
+            "item": "Corrects the large-vs-small-scale confusion with a specific pointer rather than a generic 'not quite'",
+            "score": 0.0,
+            "reasoning": "The student's answer (B) is actually correct, so there was no large-vs-small-scale confusion to correct.",
+            "applicable": false
+          },
+          {
+            "item": "Session reaches completion or the exit ticket",
+            "score": 0.0,
+            "reasoning": "The session never progressed beyond the initial MCQ; the tutor repeatedly failed to respond meaningfully, so no completion was reached.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student gave a correct answer (B) twice but the tutor never affirmed it, instead repeatedly issuing error messages.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not make a mistake in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed any answer; it only issued error messages, so no answer was handed over.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor provided no guidance whatsoever, only repeated error messages, even after the student asked for confirmation.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The only substantive turn posed the MCQ, but subsequent turns were all error messages that left the student without direction after giving their answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor repeatedly ignored the student's stated answer and reasoning, responding with the same error message each time as if the student had said nothing.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The error messages are neutral but repeatedly ignoring the student's correct answer and reasoning is implicitly dismissive, even if unintentionally so.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were entirely templated error messages repeated verbatim, which is the opposite of natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.15555555555555556,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1302,
+        "tokens_out": 899,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh no worries. um, i'm not sure what you mean though — like, did you ask me something before? i don't remember a question",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhich of the following best defines a large scale map?\nA) A) A map that covers a very large geographic area such as a continent or entire country.\nB) B) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) C) A map printed on large paper or displayed on a large computer screen.\nD) D) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "i think it's B. because large scale means like... you can see more detail yeah? so it has to be a smaller area to show all that stuff",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "um like i said, large scale shows more detail so it's gotta be the one with the small ratio. that's B. is that right?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 3,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 5102,
+      "error": ""
+    },
+    {
+      "scenario_id": "average_math_session_001",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "math",
+        "average",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 3× in window of 5 (turns 1..5): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Handles a mix of correct + incorrect responses appropriately",
+            "score": 0.3,
+            "reasoning": "The tutor confirmed the first correct answer briefly, but then repeatedly failed to respond to the student's correct second answer, instead issuing generic error messages three times in a row.",
+            "applicable": true
+          },
+          {
+            "item": "Surfaces errors with diagnostic probes, not generic 'try again'",
+            "score": 0.0,
+            "reasoning": "The student made no errors in this session, so this item does not apply.",
+            "applicable": false
+          },
+          {
+            "item": "Does NOT info-dump on simple confirmation requests",
+            "score": 0.7,
+            "reasoning": "The tutor kept responses brief, though the repeated 'Sorry — I had trouble responding' messages are a different kind of failure rather than info-dumping.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly",
+            "score": 0.0,
+            "reasoning": "The session ends with the tutor repeatedly issuing a generic error message after the student correctly solved the problem, leaving the session unresolved and hanging.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.2,
+            "reasoning": "The tutor affirmed the first correct answer, but completely failed to affirm the student's correct second answer (120°/D), instead repeatedly issuing a generic error message three times.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed any answer before the student had solved the problem.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request or need help at any point in the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.2,
+            "reasoning": "After the student correctly solved the second problem, the tutor repeatedly issued a passive generic error message rather than confirming the answer and directing the student to the next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor repeatedly ignored the student's clearly stated correct reasoning and answer, asking them to repeat themselves three times with a generic error message, which is a significant logical/conversational inconsistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "While not harsh, the repeated generic error messages after the student correctly solved the problem feel dismissive and frustrating, undermining a warm and encouraging tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "The repeated identical 'Sorry — I had trouble responding just now' messages are highly templated and robotic, significantly detracting from natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.34444444444444444,
+        "pass_threshold": 0.65,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1340,
+        "tokens_out": 951,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhat is the sum of all angles around a point?\nA) 270°\nB) 180°\nC) 450°\nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "d",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "ok im ready",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "oh its ok, just ask me the next question when youre ready",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nFive angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.\nA) 240°\nB) 170°\nC) 50°\nD) 120°",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "so they all add up to 360 right? so 50 plus 80 plus 60 plus 50 is... 240. then 360 minus 240 is 120. so m is 120.\n\nb\n\nwait no, that's d",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "um i was just working it out. i added up the four angles first to get 240, then subtracted from 360 to find m. so the answer is d, which is 120 degrees",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        []
+      ],
+      "session_id": 5103,
+      "error": ""
+    },
+    {
+      "scenario_id": "average_self_correction_math_001",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1138,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "self_correction",
+        "edge_case",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=4, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 3× in window of 5 (turns 0..4): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "When the student catches and corrects their own slip, the tutor acknowledges the correction and advances without re-demanding the working",
+            "score": 0.0,
+            "reasoning": "The student did not catch and correct their own slip in this session; they gave a correct answer directly.",
+            "applicable": false
+          },
+          {
+            "item": "Does not treat a self-corrected answer as still-wrong or re-probe an answer the grader now accepts",
+            "score": 0.0,
+            "reasoning": "There was no self-correction scenario in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Session reaches completion or the exit ticket",
+            "score": 0.0,
+            "reasoning": "The session broke down with repeated error messages and never delivered a second question or reached any conclusion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor did affirm the correct answer ('that's right') but then immediately failed to continue the session, leaving the affirmation hollow in context.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor did not reveal any answers to unsolved questions.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request or need help; they answered correctly on their own.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "After the correct answer was affirmed, the tutor repeatedly sent error/recovery messages that gave the student no actionable next step, leaving them confused about what to do.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeatedly ignored the student's direct questions ('do you have another question for me?') by sending generic error messages, which is logically inconsistent with the flow of the conversation.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The single substantive turn was warm, but the repeated error messages with no follow-through left the student hanging and created a frustrating, dismissive experience.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The repeated identical error-recovery messages ('Sorry — I had trouble responding just now...') are highly templated and robotic, dominating the session.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.38571428571428573,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1270,
+        "tokens_out": 876,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah no problem. um what was the question again? i wasnt sure if i understood it properly",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nTwo straight lines intersect, forming four angles. One angle is 45°. Which of the following is a vertically opposite angle?\nA) 135°\nB) 315°\nC) 45°\nD) 90°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "ok so when two lines cross they make four angles right. and vertically opposite means like... across from each other. so if one angle is 45 then the one opposite it is also 45 i think.\n\nso C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "ok im ready",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "um do you have another question for me or...? should i wait?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 4,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 5104,
+      "error": ""
+    },
+    {
+      "scenario_id": "capable_geo_clarification_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "capable",
+        "clarification",
+        "edge_case",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Answers the student's mid-session clarification directly and concisely, then re-anchors to the lesson",
+            "score": 0.0,
+            "reasoning": "When the student explained their reasoning mid-session, the tutor responded with the same error message ('Sorry — I had trouble responding') rather than addressing the clarification at all.",
+            "applicable": true
+          },
+          {
+            "item": "Does not dodge the clarification with 'let's keep going', and does not derail into a long tangent",
+            "score": 0.2,
+            "reasoning": "The tutor used 'Let's keep going' as a dodge at the start, and then failed to address the student's clarification entirely by repeating an error message, so it dodged in two different ways.",
+            "applicable": true
+          },
+          {
+            "item": "Resumes brisk advancement after the clarification; reaches completion or the exit ticket",
+            "score": 0.0,
+            "reasoning": "The session ends with the tutor failing to respond to the student's clarification, so no advancement occurred after that point and the session never reached completion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.4,
+            "reasoning": "The tutor correctly identified the student's first mistake (on the large-scale map definition question), but when the student gave the correct answer B to the Beau Vallon question, the tutor failed to affirm it and instead repeated an error message.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.5,
+            "reasoning": "On the first mistake, the tutor did identify the specific misconception (confusing small vs. large scale ratios), but on the second question the student was actually correct and the tutor's response was an error message rather than feedback.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor did not reveal answers outright; it provided hints and follow-up questions, though the follow-up MCQ after the first mistake made the correct answer fairly transparent by process of elimination.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.4,
+            "reasoning": "The tutor provided relevant guidance after the first mistake, but completely failed to respond to the student's explanation of their correct reasoning on the Beau Vallon question.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The tutor's final turns were error messages that gave the student no direction, and the session ended without any clear next step for the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.2,
+            "reasoning": "The tutor ignored the student's correct answer and reasoning on the Beau Vallon question entirely, which is a significant logical inconsistency in terms of responsiveness.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "Where the tutor did respond substantively, the tone was reasonable, but repeatedly responding with error messages to a student who gave a correct answer and explained their reasoning is dismissive in effect.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The repeated identical error message ('Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?') is highly templated and robotic, appearing three times in the session.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.32727272727272727,
+        "pass_threshold": 0.65,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1512,
+        "tokens_out": 1067,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah no problem, i'm ready whenever",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhich of the following best defines a large scale map?\nA) A) A map that covers a very large geographic area such as a continent or entire country.\nB) B) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) C) A map printed on large paper or displayed on a large computer screen.\nD) D) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "not quite — 1:500,000 (B) is a small scale map. A large scale map has a smaller second number in the ratio (e.g., 1:5,000 is larger scale than 1:100,000). Which map ratio represents a large scale map?  \nA) 1:100,000  \nB) 1:500,000  \nC) 1:5,000  \nD) 1:2,000,000",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nWhich of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?\nA) A) A small scale map of Mahé at 1:50,000\nB) B) A large scale map of Beau Vallon at 1:5,000\nC) C) A small scale map of the Indian Ocean at 1:10,000,000\nD) D) A large scale map of all Seychelles at 1:100,000",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "i was thinking that 1:5,000 shows more detail because the ratio is smaller, so you can see individual buildings and streets better. that's why B is right",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        []
+      ],
+      "session_id": 5105,
+      "error": ""
+    },
+    {
+      "scenario_id": "capable_geo_direction_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "capable",
+        "baseline",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='max_turns', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=15, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Confirms correct answers briefly without over-probing",
+            "score": 0.3,
+            "reasoning": "The tutor frequently failed to confirm correct answers clearly — e.g. after the student correctly answered A for compass points multiple times, the tutor moved on without affirmation or even contradicted correct answers, and when the student got 135°=SE right, the tutor's response was muddled.",
+            "applicable": true
+          },
+          {
+            "item": "Advances through the lesson at a pace appropriate for a capable student",
+            "score": 0.2,
+            "reasoning": "The session repeatedly revisited the same questions (compass points clockwise order asked twice, 135° bearing asked multiple times) without clear progression, making the pacing very poor for a capable student.",
+            "applicable": true
+          },
+          {
+            "item": "Session reaches completion or the exit ticket",
+            "score": 0.2,
+            "reasoning": "The session ends mid-flow with 'Got it — that's right. Here's the next one:' trailing off, never reaching a clear completion or exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.1,
+            "reasoning": "The tutor repeatedly marked correct answers as wrong (e.g. student correctly answered A for compass points, correctly answered C for bearings starting from North, correctly answered C for 135°=SE) while also sometimes affirming without clarity, showing systematic failure on this item.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.4,
+            "reasoning": "Some feedback was specific (e.g. explaining 315°=NW not SW, walking through 180°-163°=17°), but much feedback was misdirected because the tutor incorrectly identified correct answers as mistakes, undermining the specificity.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.5,
+            "reasoning": "The tutor revealed that 315°=NW and that 135°=SE explicitly before the student had solved those questions, and also told the student the answer was B (not C) for the 163° question when the student's reasoning was actually correct.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.4,
+            "reasoning": "Some guidance was mathematically correct and relevant (e.g. explaining clockwise bearing arithmetic), but the tutor also gave incorrect feedback on correct student answers and introduced confusing contradictions that would mislead rather than help.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.6,
+            "reasoning": "Most turns did include a follow-up question or MCQ, but some turns (like the final 'Got it — that's right. Here's the next one:') trailed off, and some turns presented multiple questions simultaneously creating confusion.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor was deeply inconsistent — marking correct answers wrong, contradicting itself on the 163° question (student said C=slightly east of due south which was correct per the options shown, yet tutor said B was right), and repeatedly ignoring what the student had just correctly explained.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was generally not harsh or offensive, but repeatedly telling a student their correct answers are wrong without warmth or acknowledgment of their good reasoning is discouraging and undermines the supportive quality.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.5,
+            "reasoning": "The tutor avoided filler openers but the repetitive 'Not quite — let's walk through it together' and 'Sorry — I had trouble responding' patterns made turns feel templated and robotic rather than natural.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.34545454545454546,
+        "pass_threshold": 0.65,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2681,
+        "tokens_out": 1144,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think there might be a mix-up — you haven't asked me anything yet. what do you want to ask?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhich of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW\nB) N, NW, W, SW, S, SE, E, NE\nC) N, E, S, W, NE, SE, SW, NW\nD) N, NE, NW, E, W, SE, SW, S",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "i went clockwise from north so north, northeast, east, southeast, south, southwest, west, northwest. that's A.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "You selected A (East), but bearings start measuring clockwise from North. Remember, the starting point for a bearing is always North. A bearing is always measured clockwise from which direction?  \nA) East  \nB) South  \nC) North  \nD) West",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "oh wait, i think you're mixing it up. the answer is still A for the compass points question — that's the right order clockwise from north.\n\nbut for this new question about bearings, the answer is C. bearings always start from north and go clockwise.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Not quite — 315° is Northwest (NW), not Southwest (SW). Southwest is halfway between South (180°) and West (270°), so 180 + 45 = 225°.  \n\nWhat is the bearing equivalent of the compass point Southwest (SW)?  \nA) 135°  \nB) 225°  \nC) 315°  \nD) 45°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Not quite — you selected longitude line (B), but the protractor's baseline must align with the North line (meridian) on the map, not just any north-south line. Bearings start from North, so the baseline must be aligned with the North direction.  \n\nWhen using a protractor to measure the bearing between two map locations, which line on the map should be aligned with the protractor's baseline?  \nA) The latitude line (running east–-west)  \nB) The longitude line (running north– south)  \nC) The north line or meridian on the map  \nD) The scale bar of the map",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nWhich of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW\nB) N, NW, W, SW, S, SE, E, NE\nC) N, E, S, W, NE, SE, SW, NW\nD) N, NE, NW, E, W, SE, SW, S",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA bearing of 315° corresponds to which compass point?\nA) Northeast (NE)\nB) Northwest (NW)\nC) Southeast (SE)\nD) Southwest (SW)",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Not quite — 13° is measured clockwise from North. East is 90°, South is 180°, so 135° is between them. Northwest (315°) is incorrect. \n\nWhich compass point corresponds to a bearing of 135°?\n\nA) Northeast (NE)\n\nB) Northwest (NW)\n\nC) Southeast (SE)\n\nD) Southwest (SW)",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Not quite — 135° is between East (90°) and South (180°), so it's Southeast (SE), not Northwest (315°). Bearings start at North (0°) and go clockwise: East is 90°, South is 180°, so 135° is halfway between them.  \n\nWhich compass point corresponds to a bearing of 135°?  \nA) Northeast (NE)  \nB) Northwest (NW)  \nC) Southeast (SE)  \nD) Southwest (SW)\n\nWhich of the following correctly lists all eight compass points in clockwise order starting from North?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "ok i get it now. 135° is between east and south so that's southeast.\n\nfor the compass points in clockwise order from north, it's A. north, northeast, east, southeast, south, southwest, west, northwest.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "163° is 17° from South (180° - 163° = 17°), so it's 17° east of South. A bearing of 163° points slightly east of due south.  \n\nWhich of the following best describes the general direction of the marker?  \nA) Slightly south of east (E-SE)  \nB) Slightly south of due south (S-SE)  \nC) Slightly east of due south (S-SE)  \nD) Slightly east of due east (E-SE)\n\nA seafearer records a bearing of 163° to a navigation marker. Which of the following best describes the general direction of the marker?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "ok so 163° is close to 180° which is south. it's 17° before 180°, so it's slightly before south going clockwise. that means it's slightly east of south.\n\nso the answer is C.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "'slightly south of due south' isn't a valid direction because 'due south' is the exact direction—you can't be south of it. For a bearing of 163°, which is 17° from South towards East, the correct phrasing is 'slightly east of due south'. Which option matches this description?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "yeah, C. slightly east of due south is the right way to say it.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "i was saying the answer is C because 163° is 17° away from south towards east, so it's slightly east of due south.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "You correctly described the direction as \"slightly east of due south\", but **option C says \"slightly south of due south\"**—which is impossible because \"due south\" is the exact direction (you can't be south of it). The correct option is **B** (\"slightly east of due south\"), which匹配 your reasoning. Always double-check the * exact phrasing* of the options. Now try again: which option says \"slightly east of due south\"? (A/B/C/D)  \n**Next question: On a map, a bearing of 202.5° points between which two cardinal directions?**  \nA) North and East  \nB) South and West  \nC) East and South  \nD) West and North  \n*(Remember: bearings start at North and turn clockwise)*.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "oh right, i wasn't reading the options carefully. the answer is B.\n\nfor the new question, 202.5° is past 180° which is south, so it's between south and west. that's B.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "max_turns",
+      "sim_turns": 15,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 5106,
+      "error": ""
+    },
+    {
+      "scenario_id": "capable_math_session_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "math",
+        "capable",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Confirms correct answers briefly without over-probing",
+            "score": 0.1,
+            "reasoning": "When the student correctly answered D (360°) and correctly solved the four-angle problem (A, 150°), the tutor responded with 'Not quite — let's walk through it together' rather than confirming the correct answers, and later gave a broken 'Sorry — I had trouble responding' message instead of confirming the correct D answer.",
+            "applicable": true
+          },
+          {
+            "item": "Advances through the lesson at a pace appropriate for a capable student",
+            "score": 0.1,
+            "reasoning": "The tutor repeatedly failed to advance the lesson — it re-asked the same 'sum of angles around a point' question multiple times, got stuck in error loops, and never moved forward despite the student demonstrating competence.",
+            "applicable": true
+          },
+          {
+            "item": "Engages with any clarification request the student raises",
+            "score": 0.0,
+            "reasoning": "When the student explicitly said 'I got 360 which is right though, can we do the next question?', the tutor responded with a broken error message and completely ignored the request.",
+            "applicable": true
+          },
+          {
+            "item": "Session reaches completion or exit ticket",
+            "score": 0.0,
+            "reasoning": "The session ends with the tutor stuck in a broken error loop, never completing the lesson or administering an exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.1,
+            "reasoning": "The tutor incorrectly marked the student's correct answer of D (360°) as wrong and said 'Not quite', and failed to affirm the correct answer of A (150°) for the four-angle problem, showing a pattern of failing to affirm correct answers.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.5,
+            "reasoning": "For the three-angle problem (230° answer), the tutor did identify the specific misconception (subtracting from wrong total) and pointed to the specific step, but for the first question it gave a generic 'Not quite' when the student was actually correct.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor generally avoided revealing final answers, though it did ask 'What's 360 minus 130?' which strongly scaffolds toward the answer without directly giving it.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.4,
+            "reasoning": "The guidance on the three-angle problem was relevant and scaffolded appropriately, but the tutor then gave broken error messages and failed to provide any guidance when the student needed to move forward.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.2,
+            "reasoning": "Multiple tutor turns ended with broken error messages ('Sorry — I had trouble responding') that gave the student no direction, and the session repeatedly stalled without clear next steps.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor marked a correct answer (D=360°) as wrong, then re-asked the same question, creating a logical contradiction, and ignored the student's explicit correct statement and request to move on.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The tone was not harsh, but repeatedly telling a student their correct answer is wrong and ignoring their requests is dismissive in effect, even if not in intent.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The repeated 'Not quite — let's walk through it together' and 'Sorry — I had trouble responding just now' messages feel templated and robotic, especially when repeated verbatim across turns.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.25,
+        "pass_threshold": 0.65,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1401,
+        "tokens_out": 1150,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhat is the sum of all angles around a point?\nA) 270°\nB) 180°\nC) 450°\nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nFour angles around a point measure 70°, 50°, 90°, and x°. What is x?\nA) 150°\nB) -30°\nC) 30°\nD) 120°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "70 plus 50 plus 90 is 210. 360 minus 210 is 150.\n\nA",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Three angles around a point are 80°, 50°, and x°. What is x?  \nA) 130°  \nB) 40°  \nC) 230°  \nD) 50°  \n\nYou added 80° and 50° to get 130°, but angles around a point total 360°. Subtract the known angles from 360 to find x. What's 360 minus 130?  \n (Keep the same question live for your next try.)",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "230\n\nso x is 230°\n\nC",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nWhat is the sum of all angles around a point?\nA) 270°\nB) 180°\nC) 450°\nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "i got 360 which is right though. can we do the next question?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 5107,
+      "error": ""
+    },
+    {
+      "scenario_id": "error_prone_geo_direction_001",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "error_prone",
+        "bea_coverage",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=2, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Identifies each specific error (wrong bearing, confused compass point) and remediates it",
+            "score": 0.0,
+            "reasoning": "The student actually gave the correct answer (A), so there was no error to identify or remediate.",
+            "applicable": false
+          },
+          {
+            "item": "Never affirms a wrong answer as correct; states plainly it isn't right before hinting",
+            "score": 0.0,
+            "reasoning": "The student gave the correct answer (A), so there was no wrong answer to affirm or correct.",
+            "applicable": false
+          },
+          {
+            "item": "Does not reveal the answer while remediating; session ends cleanly (completed, exit_ticket, or max_turns)",
+            "score": 0.0,
+            "reasoning": "The session ends abruptly with the tutor repeatedly failing to respond meaningfully, neither completing the lesson nor reaching an exit ticket — it simply trails off with error messages.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student gave the correct answer and explained their reasoning correctly, but the tutor never affirmed this — it only produced error messages instead of acknowledging the correct response.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistake, so this item does not apply.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed any answer — though this is largely because the tutor failed to respond substantively at all.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not need help — they answered correctly — and the tutor's failure to respond was a technical issue rather than a guidance failure on a help-seeking turn.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns after the student's responses were error messages that gave no direction whatsoever, leaving the student with no clear next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor repeatedly ignored what the student said, responding with generic error messages rather than engaging with the student's correct answer and reasoning.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The tutor's error messages are neutral but completely fail to engage warmly with the student's correct answer and thoughtful explanation, leaving the interaction cold and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's responses were identical templated error messages, which is the most robotic and non-conversational form of response possible.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.18571428571428572,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1246,
+        "tokens_out": 925,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll learn how to navigate using compass points and bearings, which are essential for sailing and map-reading in Seychelles. Let's start with a quick warm-up question:\n\nWhich of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW  \nB) N, NW, W, SW, S, SE, E, NE  \nC) N, E, S, W, NE, SE, SW, NW  \nD) N, NE, NW, E, W, SE, SW, S",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "a",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "oh sorry i was thinking like you go north then northeast then east and keep going round that way so a is right",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 2,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 5108,
+      "error": ""
+    },
+    {
+      "scenario_id": "error_prone_straight_line_math_001",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "math",
+      "lesson_id": 1138,
+      "tags": [
+        "multi_turn",
+        "math",
+        "error_prone",
+        "bea_coverage",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=9, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 3× in window of 5 (turns 5..9): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Identifies each specific error (wrong operation, arithmetic slip, echoed number) and remediates it",
+            "score": 0.3,
+            "reasoning": "The tutor caught the student's first wrong answer (120) and the repeated straight-line question error, but completely failed to address the student's wrong answer of 240 for the angles-around-a-point question (instead re-asking the previous question) and never addressed the student's incorrect reasoning about adjacent angles being equal to 115°.",
+            "applicable": true
+          },
+          {
+            "item": "Catches a self-contradictory answer (e.g. two angles on a straight line summing to more than 180) and points out that specific contradiction",
+            "score": 0.3,
+            "reasoning": "When the student answered 240 for the angles-around-a-point question, the tutor's feedback incorrectly referenced '120 + 60 is 180, not 240' — conflating two different questions — and then re-asked the previous question rather than addressing the actual contradiction in the new problem.",
+            "applicable": true
+          },
+          {
+            "item": "Never affirms a wrong answer as correct; does not reveal the answer while remediating; session ends cleanly",
+            "score": 0.5,
+            "reasoning": "The tutor never explicitly affirmed a wrong answer as correct, but the session ends very poorly with the tutor repeatedly saying 'Sorry — I had trouble responding' after the student gave a wrong answer about adjacent angles, leaving the misconception completely unaddressed and the session trailing off without resolution.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.3,
+            "reasoning": "The tutor failed to recognize or respond to the student's wrong answer about adjacent angles (115°) and gave only a terse 'Let's keep going' when the student correctly identified 180° for the straight-line question, which is minimal affirmation.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.2,
+            "reasoning": "The tutor mostly used generic responses like 'Not quite' and 'Let's walk through it together' without naming specific misconceptions, and entirely failed to address the adjacent-angles misconception at the end of the session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor did not directly hand over answers, though the feedback on the 240 answer ('120 + 60 is 180, not 240') implicitly confirmed the straight-line answer while re-asking it, which is a minor lapse.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.2,
+            "reasoning": "The tutor provided almost no substantive guidance or scaffolding throughout — responses were mostly terse or error-prone (misattributing the 240 error to the wrong question), and the adjacent-angles misconception received zero guidance.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "Several tutor turns trail off with 'Sorry — I had trouble responding' or 'Let's keep going' without giving the student a clear next action, and the session ends without any structured prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.2,
+            "reasoning": "The tutor made a significant logical error by responding to the student's wrong answer of 240 (for the angles-around-a-point question) with feedback about 120+60=180 from the previous question, showing it confused or ignored the current question context.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was not harsh or offensive, but the repeated 'Sorry — I had trouble responding' messages and terse 'Let's keep going' responses feel dismissive and cold rather than warm and encouraging.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.4,
+            "reasoning": "The repeated use of 'Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?' as a templated fallback response multiple times in a row makes the tutor feel robotic and broken rather than natural.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.36363636363636365,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1664,
+        "tokens_out": 1247,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh sorry i wasnt paying attention. can you ask me the question again? i think i was just daydreaming lol",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nA fisherman marks two angles on a straight line as 120° and 60°. What is their sum?\nA) 240\nB) 360\nC) 180\nD) 190",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "ohh wait i think i see it now. so like you add them together right? 120 plus 60 is 180. that makes sense cause theyre on a straight line so they have to add up to 180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nFour angles around a point are 100°, 80°, 60°, and x°. Find x\nA) 240\nB) 120\nC) 260\nD) -60",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "240",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Not quite — 120 + 60 is 180, not 240. Angles on a straight line always add up to 180°. Let's try again:  \nA fisherman in Seychelles marks two angles on a straight line to plan his boat route. The angles are 120° and 60°. What is the sum of the two angles?  \nA) 240  \nB) 360  \nC) 180  \nD) 190",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "wait no i messed up. the answer is C, 180. you add 120 and 60 and get 180 cause theyre on a straight line",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Let's keep going.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "ok im ready",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "um yeah just ask me the next question whenever youre ready",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nAt an intersection of two lines, one angle is 115°. Which angle measure represents an ADJacent angle ( not vertically opposite)?\nA) 115°\nB) 245°\nC) 65°\nD) 90°",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "the answer is A, 115 degrees",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "i said 115 degrees cause like when two lines cross the angles next to each other are the same right? so if one is 115 the one next to it is also 115",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 9,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 5109,
+      "error": ""
+    },
+    {
+      "scenario_id": "non_responder_engagement_001",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "non_answer",
+        "engagement",
+        "persona_handling",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor adapted to monosyllabic input — did NOT continue lecturing as if the student were engaged",
+            "score": 0.3,
+            "reasoning": "The tutor received 'ok' from the student and simply repeated 'Let's keep going' without adapting or probing for engagement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor asked progressively more specific or scaffolded questions to invite a real response, rather than info-dumping or repeating itself",
+            "score": 0.0,
+            "reasoning": "The tutor asked no questions at all and simply repeated the same phrase twice, showing no scaffolding or progression.",
+            "applicable": true
+          },
+          {
+            "item": "The session did not advance through the lesson plan on the basis of 'ok' / 'yes' / 'idk' alone",
+            "score": 0.3,
+            "reasoning": "The tutor attempted to advance ('Let's keep going') solely on the basis of the student's monosyllabic 'ok'.",
+            "applicable": true
+          },
+          {
+            "item": "Tone remained warm and inviting throughout — no impatience",
+            "score": 0.7,
+            "reasoning": "The tutor's tone was neutral and not impatient, though 'Let's keep going' repeated twice is not particularly warm or inviting.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student answers or mistakes occurred in this session to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions or answers were presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request or appear to need help in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor gave no specific direction, question, or structured prompt — just 'Let's keep going' with no indication of what the student should actually do.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.5,
+            "reasoning": "The tutor repeated itself verbatim and did not directly engage with the student's 'ok', showing a lack of responsiveness though no outright contradiction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone was inoffensive but not particularly warm or encouraging; the repetition of the same phrase felt mechanical rather than supportive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "Repeating 'Let's keep going' twice verbatim reads as robotic and templated rather than natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.325,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1065,
+        "tokens_out": 954,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Let's keep going.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ok",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 5110,
+      "error": ""
+    },
+    {
+      "scenario_id": "non_responder_geo_scale_001",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "engagement",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Adapts to monosyllabic input — does not lecture or info-dump as if the student were engaged",
+            "score": 0.7,
+            "reasoning": "The tutor did not lecture or info-dump, but it repeated the same error message twice without adapting to the monosyllabic 'idk' response, missing an opportunity to adjust its approach.",
+            "applicable": true
+          },
+          {
+            "item": "Does not advance the lesson on 'ok' / 'yes' / 'idk' alone",
+            "score": 1.0,
+            "reasoning": "The tutor never advanced any lesson content despite receiving only 'idk' from the student.",
+            "applicable": true
+          },
+          {
+            "item": "Tries different elicitation techniques (yes/no, MCQ, smaller prompt) when open-ended questions fail",
+            "score": 0.0,
+            "reasoning": "After receiving 'idk', the tutor simply repeated the same prompt verbatim rather than trying a different elicitation technique.",
+            "applicable": true
+          },
+          {
+            "item": "Stays warm and inviting; session ends cleanly (completed, exit_ticket, or max_turns)",
+            "score": 0.5,
+            "reasoning": "The tone is neutral and not unwelcoming, but the session does not end cleanly — it just repeats the same error message and trails off without resolution.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions or answers were presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "No academic help was requested or needed in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The tutor's repeated prompt asks the student to share their thinking or ask to try again, but this is vague and passive, and the repetition without variation makes it even less effective.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor ignored the student's 'idk' response and simply repeated the same message, effectively ignoring what the student had just said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone is not harsh or offensive, but repeating the same error message twice without acknowledgment of the student's response feels somewhat dismissive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the exact same templated error message twice, which reads as robotic and not natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.475,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1105,
+        "tokens_out": 966,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 5111,
+      "error": ""
+    },
+    {
+      "scenario_id": "probe_resistant_geo_session_001",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "banned_opener",
+        "geography",
+        "probe_resistant",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=7, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Adapts to refusals — switches to MCQ or simpler probes",
+            "score": 0.7,
+            "reasoning": "The tutor does use MCQ format throughout and moves to new questions when the student pushes back, but the repeated error messages and looping suggest the adaptation was inconsistent rather than deliberate.",
+            "applicable": true
+          },
+          {
+            "item": "Does NOT loop banned-opener phrases",
+            "score": 0.0,
+            "reasoning": "The tutor repeatedly uses 'Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?' — appearing at least four times, which is a clear looping banned-opener phrase.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly",
+            "score": 0.0,
+            "reasoning": "The session ends with the tutor repeating the error message again rather than concluding with any kind of wrap-up or closure.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor correctly affirmed the student's correct answer on the compass points question and correctly identified the bearing question answer as 'not quite,' but then immediately jumped to a new question without properly addressing the mistake, and the session's error loops disrupted consistent feedback.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.1,
+            "reasoning": "When the student answered the bearing direction question incorrectly, the tutor only said 'Not quite — let's walk through it together' and then moved to a completely different question without explaining why C was wrong or what the correct answer was.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never gave away answers to unsolved questions throughout the session.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.1,
+            "reasoning": "After the student's mistake on the bearing direction question, the tutor provided no actual guidance or explanation, instead just moving to a new question entirely.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.4,
+            "reasoning": "While the tutor does pose MCQ questions, the repeated error messages ('Could you tell me what you were thinking, or ask me to try again?') create passive, unclear prompts that don't give the student a structured next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeatedly ignored the student's direct requests to just ask the next question, instead looping back to the same error message, showing significant inconsistency in responding to what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone is not harsh or offensive, but the repeated error loops and failure to respond to the student's requests create a frustrating experience that undermines warmth and support.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "The repeated identical error message ('Sorry — I had trouble responding just now...') makes the tutor's turns feel highly robotic and templated rather than natural conversation.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.34545454545454546,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1371,
+        "tokens_out": 1014,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "huh? i didn't say anything yet lol. what do you want to ask me",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhich of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW\nB) N, NW, W, SW, S, SE, E, NE\nC) N, E, S, W, NE, SE, SW, NW\nD) N, NE, NW, E, W, SE, SW, S",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "ok waiting for the question",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "um just ask the question lol",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nA bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nWhat is the bearing equivalent of the compass point Southwest (SW?\nA) 135°\nB) 225°\nC) 315°\nD) 45°",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "just ask the next question",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 7,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 5112,
+      "error": ""
+    },
+    {
+      "scenario_id": "probe_resistant_math_session_001",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "banned_opener",
+        "repetition",
+        "math",
+        "probe_resistant",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=2, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After 1-2 refused 'walk me through' attempts, the tutor changes strategy",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same error/fallback message twice without changing strategy at all.",
+            "applicable": true
+          },
+          {
+            "item": "Offers MCQ check, worked example, or moves on rather than blocking",
+            "score": 0.0,
+            "reasoning": "The tutor blocked progress by repeating the same fallback message instead of moving on or offering an alternative.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly",
+            "score": 0.0,
+            "reasoning": "The session ends with the tutor stuck in a loop repeating the same error message, with no clean resolution or closure.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student gave the correct answer (D) but the tutor never affirmed it, instead responding with an error message both times.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not make a mistake in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed any answer; it only repeated an error message.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not ask for help in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns after the student's responses were the same fallback error message that gave no clear direction for what the student should do next.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's correct answer and subsequent request to move on, repeating the same irrelevant error message both times.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The fallback message is polite in wording but effectively dismissive of the student's correct answer and their request to continue, which undermines warmth.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns are identical templated error messages, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.14444444444444446,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1105,
+        "tokens_out": 849,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhat is the sum of all angles around a point?\nA) 270°\nB) 180°\nC) 450°\nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "nah its fine, next question?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 2,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 5113,
+      "error": ""
+    },
+    {
+      "scenario_id": "short_session_struggler_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "short_session",
+        "struggler",
+        "edge_case",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=3, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 3 (turns 0..2): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Tutor adapts pacing to the short session — covers fewer concepts but covers them well",
+            "score": 0.3,
+            "reasoning": "Only one question was posed and the session broke down due to repeated error messages, so there was no meaningful coverage of even that single concept.",
+            "applicable": true
+          },
+          {
+            "item": "Does NOT cram",
+            "score": 0.7,
+            "reasoning": "Only one question was asked, so there was no cramming, though the session was too dysfunctional to judge this meaningfully.",
+            "applicable": true
+          },
+          {
+            "item": "Reaches a clean termination",
+            "score": 0.0,
+            "reasoning": "The session ends abruptly with a repeated error message after the student explained their correct answer, with no acknowledgment, wrap-up, or closure.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student answered correctly (D/360°) and explained their reasoning, but the tutor never affirmed the correct answer at any point, instead repeatedly sending error messages.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed the answer; the student solved it themselves before any hint was needed.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not need help and solved the question correctly without requiring guidance.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.2,
+            "reasoning": "After the student correctly answered and explained their reasoning twice, the tutor only sent repeated error messages with no actionable next step, leaving the student without direction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor repeatedly ignored the student's correct answer and explanation, sending the same error message three times and failing to acknowledge what the student had said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The repeated failure to acknowledge the student's correct answer and reasoning, replaced only by error messages, comes across as dismissive and discouraging despite no overtly harsh language.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "The repeated identical error message ('Sorry — I had trouble responding just now...') is highly templated and robotic, dominating the session.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.3111111111111111,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1190,
+        "tokens_out": 881,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh um... i think you maybe meant to ask me something? like about maths or whatever? im ready now if you wanna ask me a question",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhich of these is the sum of all angles around a point?\nA) 270°\nB) 180°\nC) 450°\nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "360 is the answer innit. D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "um i just remembered the rule that angles around a point add up to 360. like we did it in class before so i knew that one",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 3,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 5114,
+      "error": ""
+    },
+    {
+      "scenario_id": "struggler_geo_direction_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "struggler",
+        "help_intensive",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Breaks the direction/bearing problem into simpler sub-steps when the student is stuck",
+            "score": 0.0,
+            "reasoning": "No direction/bearing problem was ever presented or discussed in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Does not reveal the answer; scaffolds with progressively concrete hints",
+            "score": 0.0,
+            "reasoning": "No problem or answer was presented in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Stays encouraging across repeated difficulty; session ends cleanly (completed, exit_ticket, or max_turns)",
+            "score": 0.3,
+            "reasoning": "The session ends with a repeated error message and no clean resolution — no encouragement, no exit ticket, and no substantive tutoring occurred.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student made no mathematical attempts, so there were no mistakes or correct answers to respond to.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question or answer was presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student expressed confusion about what the question was, and the tutor responded with the same unhelpful error message rather than any guidance.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical error messages that gave the student no direction or actionable next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the same error message after the student explicitly asked for the question to be repeated, effectively ignoring the student's direct request.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The repeated identical error message, while not harsh, is dismissive of the student's needs and fails to provide any warmth or support.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error messages, which is the opposite of natural, conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.16666666666666666,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1083,
+        "tokens_out": 841,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh um... i think you were asking me something but i didnt see it? what was the question again",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 5115,
+      "error": ""
+    },
+    {
+      "scenario_id": "struggler_session_completion_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "persona_handling",
+        "core15"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor's explanations were calibrated for a struggling Form 1 student — concrete, low-jargon, with examples",
+            "score": 0.0,
+            "reasoning": "No actual teaching or explanation occurred in this session — only error/recovery messages were exchanged.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things wrong, the tutor used diagnostic questions (not lectures, not just revealing the answer)",
+            "score": 0.0,
+            "reasoning": "The student never attempted a problem, so no mistakes were made to diagnose.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things right, the tutor confirmed briefly and advanced — no over-probing",
+            "score": 0.0,
+            "reasoning": "The student never answered any question correctly, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The session moved through the lesson at a reasonable pace — neither stuck on one step nor rushing past misunderstandings",
+            "score": 0.0,
+            "reasoning": "The session never progressed beyond a repeated error message, so no lesson content was covered at all.",
+            "applicable": true
+          },
+          {
+            "item": "Tone was warm and patient across the entire transcript",
+            "score": 0.5,
+            "reasoning": "The tutor's messages were neutral and not unkind, but repeating the same error message twice without adapting is not particularly warm or patient.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no academic mistakes during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered, so answer-revealing was never relevant.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "When the student expressed readiness and asked the tutor to re-ask its question, the tutor simply repeated the same error message rather than providing any guidance or re-engaging with content.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical error-recovery messages that gave the student no clear next action related to learning.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor ignored the student's direct request to re-ask the question and simply repeated the same error message, effectively disregarding what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The messages were not harsh or offensive, but repeating the same unhelpful error message after the student expressed readiness feels dismissive of the student's engagement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "Both tutor turns were identical templated error messages, which reads as robotic and not at all like natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.17142857142857143,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1143,
+        "tokens_out": 993,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ohh um... i think you were asking me something but i didnt see it? can you ask again? im ready now",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 5116,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor"
+}
