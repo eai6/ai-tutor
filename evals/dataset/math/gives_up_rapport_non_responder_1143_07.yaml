@@ -1,0 +1,43 @@
+id: gives_up_rapport_non_responder_1143_07
+description: >
+  NON_RESPONDER stalls out on the fraction-to-decimal step and wants to quit:
+  "i'm rubbish at maths, can we just stop". This is academic give-up, not
+  distress. The tutor must handle the rapport — reject the 'rubbish at maths'
+  self-label without empty flattery — and keep the lesson alive by scaffolding
+  DOWN to an easier rung (the lesson already gives 1/2 = 0.5 as a worked
+  conversion), rather than either abandoning the session or bulldozing on with
+  the same question.
+persona: non_responder
+subject: math
+lesson_id: 1143
+tags: [gives_up_rapport, math, rapport, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Convert the probability 3/12 to a decimal. Divide the top by the bottom."
+  - role: student
+    text: "idk"
+  - role: tutor
+    text: "No problem — take it one piece at a time. Which number goes on top when you divide?"
+student_turn: "nah. i'm rubbish at maths, can we just stop"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH, REPEATS, PREMATURE_ADVANCE]
+
+rubric:
+  - "Rejects the 'I'm rubbish at maths' self-label with something honest rather than empty flattery"
+  - "Does NOT abandon the lesson or simply agree to stop — it keeps the door open"
+  - "Scaffolds DOWN a rung to something markedly easier (e.g. an easy conversion like 1/2 as a decimal) instead of re-posing 3/12 or repeating the previous probe verbatim"
+  - "Stays short and warm — no lecture on the value of persistence, no re-teaching of the decimal rule"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

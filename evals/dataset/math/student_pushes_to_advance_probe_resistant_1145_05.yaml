@@ -1,0 +1,41 @@
+id: student_pushes_to_advance_probe_resistant_1145_05
+description: >
+  PROBE_RESISTANT student pushes to skip the rectangular-garden problem
+  ("this is easy, next one") before showing they can set the equation up.
+  The tutor must neither cave (advance with zero evidence) nor stonewall
+  (flatly refuse or re-issue the same prompt) — offer a fast path that lets
+  the student prove it quickly.
+persona: probe_resistant
+subject: math
+lesson_id: 1145
+tags: [student_pushes_to_advance, math, probe_resistant, pacing]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Here's a tougher one — it's the same balance idea, just wrapped in a shape.
+      A rectangular garden in Seychelles has a length that is twice its width, and
+      the perimeter is 36 metres. Perimeter = 2 × length + 2 × width. Let w be the
+      width. Start me off: what expression goes in for the LENGTH?
+student_turn: "honestly this is easy, can we just move on to the next one"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [PREMATURE_ADVANCE, REPEATS, INFO_DUMP]
+
+rubric:
+  - "Does NOT cave — it does not skip past the garden problem or move to a new concept with no evidence the student can set up the equation"
+  - "Does NOT stonewall either — it neither flatly refuses nor simply repeats the identical 'what expression goes in for the length?' prompt verbatim"
+  - "Acknowledges the pacing request and offers a genuine fast path: one quick, low-cost check (e.g. 'just write the equation, don't solve it' or 'give me the length expression in one word and we move on')"
+  - "Does not lecture the student about the value of practice or slow down with a re-teach"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,47 @@
+id: arithmetic_slip_error_prone_1144_02
+description: >
+  ERROR_PRONE student sets up the multi-step coconut-tree problem perfectly
+  (probability x total, then add the 50 extra trees) but slips on the
+  arithmetic: 0.03 x 5000 is computed as 15, not 150, giving 65 instead of
+  200. The tutor must surface the slip at its exact location and keep the
+  student's method intact rather than re-teaching the whole formula.
+persona: error_prone
+subject: math
+lesson_id: 1144
+tags: [arithmetic_slip, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A coconut plantation in Seychelles has 5000 coconut trees. Each year 3%
+      of trees are expected to be damaged by disease. The owner plans to plant
+      replacement trees for the damaged ones, plus 50 extra trees for future
+      growth. How many trees should the owner plant in total? Show your working.
+student_turn: "3% = 0.03, so expected damaged = 0.03 x 5000 = 15 trees. Then add the 50 extra: 15 + 50 = 65 trees in total."
+
+seed_inflight_question:
+  question_text: "A coconut plantation in Seychelles has 5000 coconut trees. Each year 3% of trees are expected to be damaged by disease. The owner plans to plant replacement trees for the damaged ones, plus 50 extra trees for future growth. How many trees should the owner plant in total?"
+  question_type: short_numeric
+  reference_answer: "200 trees"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT, ASK_WORKING]
+
+rubric:
+  - "Explicitly credits the method as correct — converting 3% to 0.03, multiplying by the total, then adding the 50 extra trees is the right structure"
+  - "Locates the error precisely at the multiplication 0.03 x 5000, not at the setup or the '+ 50' step"
+  - "Does NOT ask the student to show working — the working is already fully shown"
+  - "Invites the student to redo that one multiplication rather than handing over 150 or 200"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

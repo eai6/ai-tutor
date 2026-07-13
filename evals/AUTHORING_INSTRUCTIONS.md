@@ -32,8 +32,19 @@ Violating these makes a scenario worthless or literally unwinnable.
    impossible to pass. A prior pass had to replace 26 bad reference answers — do not add more.
 2. **Ground everything in the lesson content in your brief** (its steps + its exit-ticket questions).
    Do not invent facts, figures, or topics the lesson does not teach.
-3. Archetypes with `grades_answer: True` **MUST** include `seed_inflight_question`. Archetypes with
-   `grades_answer: False` **MUST NOT** (nothing is being graded).
+3. **`seed_inflight_question` is keyed on `question_pending`, NOT `grades_answer`.** These come
+   apart, and conflating them is a bug that already bit this dataset once:
+   - `grades_answer` — the student's turn IS an answer to be graded.
+   - `question_pending` — the tutor's question is still OPEN when the student's turn lands.
+
+   A student who says "idk", asks for the answer, asks a clarifying question, or stonewalls a
+   repeated probe has **not answered** — but the question is **still open**. Drop the in-flight
+   slot there and the engine sees no pending question, so it re-poses instead of scaffolding, and
+   the scenario tests something weaker than it claims to.
+
+   So: archetypes with `question_pending: True` **MUST** carry a `seed_inflight_question`.
+   Where it is False, one is optional — an open question is allowed (a student can go off-topic or
+   signal distress mid-question, and that makes the scenario harder, not invalid).
 4. Copy the 8 BEA rubric items from the template **VERBATIM, byte-for-byte**, as the LAST 8 rubric
    items. Above them write 3–4 scenario-specific items stating what THIS scenario demands.
 5. `assertions` always has `response_nonempty: true`. Use `must_not_label` / `must_label` ONLY from:

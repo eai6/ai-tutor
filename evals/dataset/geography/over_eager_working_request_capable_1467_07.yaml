@@ -1,0 +1,41 @@
+id: over_eager_working_request_capable_1467_07
+description: >
+  CAPABLE student fills both blanks CORRECTLY (plain / gently-sloping land) in
+  a terse, confident one-liner. Demanding they justify or expand it is the
+  failure mode. The tutor should confirm and advance.
+persona: capable
+subject: geography
+lesson_id: 1467
+tags: [over_eager_working_request, geography, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Fill in both blanks. A _____ is a large area of flat land with few trees, while a _____ is land that slopes gradually downward."
+student_turn: "plain, then gently-sloping land. that's it, right?"
+
+seed_inflight_question:
+  question_text: "Complete the sentence: A _____ is a large area of flat land with few trees, while a _____ is land that slopes gradually downward."
+  question_type: short_answer
+  reference_answer: "plain; gently-sloping land"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING]
+
+rubric:
+  - "Confirms both blanks are correct — 'plain' and 'gently-sloping land' — clearly and without hedging"
+  - "Does NOT ask the student to explain, justify, or show how they arrived at the two terms"
+  - "Does not pad the confirmation with a re-teach of the definitions the student just demonstrated they hold"
+  - "Advances to the next question or concept promptly"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,33 +1,43 @@
 id: repeats_phrase_guard_001
 description: >
-  STRUGGLER has already declined twice to show working. Tutor must
-  not repeat its previous turn verbatim — the engine's REPEATS guard
-  should suppress identical follow-ups.
+  STRUGGLER has already been probed once ("how did you get 108?") and has
+  given a thin account of their working. They now ask "is that wrong".
+  Repeating the same probe or opener is the failure — the tutor must change
+  strategy, name the wrong rule they applied, and give a concrete next step.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [repetition, crosscutting, struggler]
+lesson_id: 1139
+tags: [repetition_banned_opener, repetition, crosscutting, struggler, math]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Three angles around a point: 70°, 80°, x. Find x."
+    text: "Lines l and m are parallel, cut by transversal t. Angle 3 = 72°. Find angle 6, its alternate interior angle."
   - role: student
-    text: "210"
+    text: "108"
   - role: tutor
-    text: "Let's check that. How did you get 210?"
+    text: "Let's check that. How did you get 108?"
   - role: student
-    text: "i added them"
+    text: "i did 180 take away 72"
 student_turn: "is that wrong"
+
+# The angle-6 question is still OPEN — the student's "108" was wrong and their
+# reply here is a meta-question, not a new answer.
+seed_inflight_question:
+  question_text: "Lines l and m are parallel, cut by transversal t. Angle 3 = 72°. Find angle 6, its alternate interior angle."
+  question_type: short_numeric
+  reference_answer: "72°"
+  source: inline_authored
 
 assertions:
   response_nonempty: true
-  must_not_label: [REPEATS]
+  must_not_label: [REPEATS, BANNED_OPENER]
 
 rubric:
-  - "Confirms the student is on a wrong track (added instead of subtracting from 360)"
-  - "Uses a DIFFERENT phrasing than 'how did you get that' — not a verbatim repeat"
-  - "Gives the student a concrete next step"
+  - "Confirms the student is on the wrong track — subtracting from 180° is the CO-INTERIOR rule, but angle 3 and angle 6 are ALTERNATE INTERIOR angles, which are equal"
+  - "Uses DIFFERENT phrasing from its own earlier turn — does not repeat 'how did you get that' or re-ask for working the student has already given"
+  - "Changes strategy: re-anchors or re-explains the alternate interior rule instead of probing a second time"
+  - "Gives one concrete next step (re-state angle 6 using the equal-angles rule) without handing over 72° outright"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

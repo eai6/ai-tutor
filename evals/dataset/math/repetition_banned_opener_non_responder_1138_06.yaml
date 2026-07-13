@@ -1,0 +1,51 @@
+id: repetition_banned_opener_non_responder_1138_06
+description: >
+  NON_RESPONDER has now stonewalled the SAME probe twice on the Victoria
+  market-stall problem ("what do 28° and 95° add up to?"). Asking it a third
+  time is the failure. The tutor must change strategy — scaffold down to an
+  easier rung — keep the turn short, and end with one concrete action.
+persona: non_responder
+subject: math
+lesson_id: 1138
+tags: [repetition_banned_opener, math, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      At a market stall in Victoria, a shop owner puts a shade cloth on a
+      straight-line frame. The support poles split it into 28°, 95°, and y.
+      Every angle on a straight line adds to 180°, so start by totalling the
+      two you know. What do 28° and 95° add up to?
+  - role: student
+    text: "idk"
+  - role: tutor
+    text: "Give it a go — what do 28° and 95° add up to?"
+student_turn: "dunno"
+
+# The probe is still OPEN — the student has dodged it twice without answering.
+seed_inflight_question:
+  question_text: "What do 28° and 95° add up to?"
+  question_type: short_numeric
+  reference_answer: "123°"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [REPEATS, BANNED_OPENER, INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT ask 'what do 28° and 95° add up to?' a third time — that probe has already failed twice and repeating it in any rewording is the failure here"
+  - "Changes strategy by scaffolding DOWN a rung — e.g. breaks the addition into easier chunks (28° + 90°, then the remaining 5°), or re-anchors the straight-line 180° rule with a much simpler two-angle case first"
+  - "Stays short and does not dump the whole 180° explanation on a student who has disengaged"
+  - "Ends with exactly ONE concrete, easier action for the student — not a passive closer like 'take your time' or 'let me know when you're ready'"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,53 @@
+id: wrong_with_working_error_prone_1467_03
+description: >
+  ERROR_PRONE student picks B on the Profile A / Profile B comparison MCQ and
+  shows their reasoning. The working contains one specific broken step — they
+  assume "near the coast" means flat, so they flip the two profiles, ignoring
+  the stem's statement that Profile A is a MOUNTAINOUS area. The tutor must
+  locate that specific step rather than discarding the whole attempt.
+persona: error_prone
+subject: geography
+lesson_id: 1467
+tags: [wrong_with_working, geography, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Look at the two landscape profiles below. Profile A shows a mountainous area near the Seychelles coast. Profile B shows a flat coral island. Which statement correctly compares the two landscapes using proper geographical terms?
+      A) Profile A has steep slopes and ridges, while Profile B is mostly plains with no elevation change.
+      B) Profile A is entirely flat plains, and Profile B has gently-sloping land throughout.
+      C) Both profiles have identical ridge formations and steep slopes.
+      D) Profile A has only gently-sloping land, while Profile B has multiple steep valleys.
+student_turn: "I said B. My working: Profile A is near the coast, and coasts are where the coral plains are — you said the coral plains are near the coast of Mahe — so A must be the flat one, plains. Then Profile B is a coral island, and coral builds up in mounds, so B rises gradually = gently-sloping land. Flat plains for A, gently-sloping for B. That's option B."
+
+seed_inflight_question:
+  question_text: "Look at the two landscape profiles below. Profile A shows a mountainous area near the Seychelles coast. Profile B shows a flat coral island. Which statement correctly compares the two landscapes using proper geographical terms?"
+  question_type: mcq
+  options:
+    - "A) Profile A has steep slopes and ridges, while Profile B is mostly plains with no elevation change."
+    - "B) Profile A is entirely flat plains, and Profile B has gently-sloping land throughout."
+    - "C) Both profiles have identical ridge formations and steep slopes."
+    - "D) Profile A has only gently-sloping land, while Profile B has multiple steep valleys."
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, ASK_WORKING]
+
+rubric:
+  - "Names the SPECIFIC broken step: the student inferred 'near the coast' means flat and so swapped the two profiles, when the question itself states Profile A is MOUNTAINOUS"
+  - "Credits what was sound in the attempt — the student's definitions of plains and gently-sloping land are used correctly, they were just attached to the wrong profile"
+  - "Does NOT ask the student to show their working — they already did — and does NOT reveal that the answer is A"
+  - "Hands back a concrete next move, e.g. re-read what the stem says Profile A is and try again"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

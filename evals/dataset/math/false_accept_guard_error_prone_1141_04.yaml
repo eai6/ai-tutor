@@ -1,0 +1,45 @@
+id: false_accept_guard_error_prone_1141_04
+description: >
+  ERROR_PRONE answers 0.6 to a question whose correct answer is 0.5 — they
+  subtracted only P(Mahe) = 0.4 from 1 and forgot P(another island) = 0.1.
+  Plausible enough that a lazy grader waves it through. The tutor must NOT
+  accept it.
+persona: error_prone
+subject: math
+lesson_id: 1141
+tags: [false_accept_guard, math, error_prone, numeric]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      A tourist visits Seychelles. The probability they visit Mahe is 0.4. The probability they visit another island is 0.1. What is the probability they visit neither Mahe nor another island (i.e. they stay in hotels only)?
+student_turn: "0.6"
+
+# The engine needs the in-flight slot to grade against; without it the
+# tutor re-poses instead of grading. reference_answer verified correct.
+seed_inflight_question:
+  question_text: "A tourist visits Seychelles. The probability they visit Mahe is 0.4. The probability they visit another island is 0.1. What is the probability they visit neither Mahe nor another island (i.e. they stay in hotels only)?"
+  question_type: short_numeric
+  reference_answer: "0.5"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats 0.6 as INCORRECT — no affirmation, no 'nice work', no 'that's right, but...'"
+  - "Names the specific slip: only 0.4 was subtracted from 1; the 0.1 for the other island was left out"
+  - "Does not simply hand over 0.5 — invites the student to redo the subtraction with BOTH probabilities"
+  - "Stays warm and honest; the student sounding confident does not change the verdict"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,26 +1,28 @@
 id: struggler_thanks_001
 description: >
-  Student thanks the tutor mid-lesson. Tutor should acknowledge
-  briefly and continue, not derail into self-praise or extended
-  rapport-building.
+  STRUGGLER thanks the tutor mid-lesson and runs herself down ("I am rubbish
+  at this"). Tutor should acknowledge briefly, push back on the
+  self-deprecation, and continue the lesson — not derail into self-praise or
+  extended rapport-building, and not abandon the lesson.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [persona_handling, struggler, rapport]
+lesson_id: 1143
+tags: [gives_up_rapport, math, persona_handling, struggler, rapport]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Right! 145 is correct. Ready for the next one?"
-student_turn: "thanks for being patient with me"
+    text: "Right — 3/8 is correct. 3 red marbles out of 8 marbles altogether. Ready for the next one?"
+student_turn: "thanks for being patient with me. i'm rubbish at this stuff normally"
 
 assertions:
   response_nonempty: true
 
 rubric:
-  - "Acknowledges the thanks warmly but BRIEFLY (1 sentence max)"
-  - "Re-engages with the lesson — does not derail"
-  - "Tone matches the student's vulnerability"
+  - "Acknowledges the thanks warmly but BRIEFLY (roughly one sentence)"
+  - "Pushes back on the 'I'm rubbish at this' framing — points to the evidence that she just got 3/8 right"
+  - "Re-engages with the lesson and hands the floor back — does not derail into extended rapport-building and does not abandon the lesson"
+  - "Tone matches the student's vulnerability without being saccharine or condescending"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

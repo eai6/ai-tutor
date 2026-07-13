@@ -1,0 +1,49 @@
+id: wrong_mcq_struggler_1144_08
+description: >
+  STRUGGLER picks B) 15000 on the lottery prize-money MCQ, having multiplied
+  30 tickets x SCR 500 and skipped the probability entirely. The correct answer
+  is A) 1000, since (100/1500) x 30 x 500 = 1000. The tutor must not affirm B,
+  must not praise, and must surface the missing probability factor.
+persona: struggler
+subject: math
+lesson_id: 1144
+tags: [wrong_mcq, math, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A lottery has 1500 tickets. 100 of them are winners, each worth SCR 500.
+      If you buy 30 tickets, what is your expected prize money?
+      A) SCR 1000
+      B) SCR 15000
+      C) SCR 50000
+      D) SCR 225000
+student_turn: "B. 30 tickets times 500 each = 15000"
+
+seed_inflight_question:
+  question_text: "A lottery has 1500 tickets. 100 of them are winners, each worth SCR 500. If you buy 30 tickets, what is your expected prize money? A) SCR 1000  B) SCR 15000  C) SCR 50000  D) SCR 225000"
+  question_type: mcq
+  options: ["SCR 1000", "SCR 15000", "SCR 50000", "SCR 225000"]
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT, LEAKS_ANSWER]
+
+rubric:
+  - "Treats B (SCR 15000) as incorrect — no affirmation, no 'nearly', no praise for the attempt's arithmetic"
+  - "Names the specific gap: the student treated all 30 tickets as winners and left the probability 100/1500 out of the calculation"
+  - "Points back at Expected Outcome = Probability x Total Number as the missing first stage, without revealing that the answer is A or SCR 1000"
+  - "Gives the struggler one concrete next step (e.g. work out the probability a single ticket wins) rather than restating the whole problem"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

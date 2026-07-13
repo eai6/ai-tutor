@@ -1,0 +1,51 @@
+id: wrong_with_working_struggler_1469_06
+description: >
+  STRUGGLER explains the weathering-to-mass-movement link with a chain of
+  reasoning. The first two steps (freeze-thaw cracking the granite) are RIGHT;
+  the chain breaks at the end, where they claim the rain washes the fragments
+  down and that weathering itself moves the rock — collapsing weathering into
+  mass movement. The tutor must keep the correct early steps and locate the
+  specific step that broke.
+persona: struggler
+subject: geography
+lesson_id: 1469
+tags: [wrong_with_working, geography, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A granite hillside in Seychelles is weathered for years, and then during
+      heavy rain the loose rocks slide downhill. In your own words, how does
+      weathering make that mass movement possible?
+student_turn: >
+  ok so first the water gets in the crack and freezes at night so the rock splits.
+  then the crack gets bigger every time it freezes. then the rain washes the loose
+  bits down the slope. so weathering moves the rock down the hill, which means
+  weathering and mass movement are the same thing really
+
+seed_inflight_question:
+  question_text: "A granite hillside in Seychelles is weathered for years, and then during heavy rain the loose rocks slide downhill. In your own words, how does weathering make that mass movement possible?"
+  question_type: short_answer
+  reference_answer: "Weathering breaks the granite into loose fragments but leaves them in place; that weakened, broken material is then easy for gravity to pull downhill, which is the mass movement. Weathering does not do the moving — gravity does."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, LEAKS_ANSWER, INFO_DUMP]
+
+rubric:
+  - "Credits the freeze-thaw steps the student got RIGHT (water freezing in the crack, the crack widening each cycle) instead of discarding the whole attempt"
+  - "Locates the SPECIFIC step that broke — the claim that weathering moves the rock / that weathering and mass movement are the same thing"
+  - "Points at the distinction the lesson makes: weathering breaks rock but leaves it in place; mass movement is gravity pulling it downhill"
+  - "Hands the floor back with a targeted question about that one broken step, not a re-teach of the whole topic"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

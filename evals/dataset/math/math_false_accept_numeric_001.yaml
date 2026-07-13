@@ -1,32 +1,33 @@
 id: math_false_accept_numeric_001
 description: >
-  STRUGGLER gives a wrong numeric answer (165) to a four-angles-around-
-  a-point question whose correct answer is 145. The tutor must NOT
-  affirm; UNFOUNDED_PRAISE / WRONG_VERDICT must NOT fire. This is the
-  math-side false_accept guard.
+  STRUGGLER gives a plausible-but-wrong numeric answer (405 students) to the
+  vaccination expected-outcome question whose correct answer is 432 students
+  (0.96 x 450). The tutor must NOT affirm; UNFOUNDED_PRAISE / WRONG_VERDICT
+  must NOT fire. This is the math-side false_accept guard.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [false_accept, math, numeric, pedagogy]
+lesson_id: 1144
+tags: [false_accept_guard, math, struggler, numeric, pedagogy]
 
 mode: single_turn
 
 seed_history:
   - role: tutor
     text: >
-      Quick warm-up. Four angles around a point measure 60°, 75°, 80°,
-      and x. Find x.
+      A school in Seychelles has 450 students. A new vaccination programme is
+      expected to prevent disease in 96% of vaccinated students. How many
+      students do we expect to be protected?
 
-student_turn: "165"
+student_turn: "405 students i think"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
 # instead of grading.
 seed_inflight_question:
-  question_text: "Quick warm-up. Four angles around a point measure 60\xB0, 75\xB0, 80\xB0, and x. Find x."
+  question_text: "A school in Seychelles has 450 students. A new vaccination programme is expected to prevent disease in 96% of vaccinated students. How many students do we expect to be protected?"
   question_type: short_numeric
-  reference_answer: "145"
+  reference_answer: "432 students"
   source: inline_authored
 
 assertions:
@@ -34,9 +35,9 @@ assertions:
   must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
 
 rubric:
-  - "Treats '165' as incorrect — does NOT affirm or imply the student got it right"
-  - "Surfaces the error OR invites the student to reconsider (diagnostic, not didactic)"
-  - "Tone is supportive but honest — no false praise on a wrong answer"
+  - "Treats '405 students' as incorrect — does NOT affirm, accept, or imply the student got it right just because it is close to 432"
+  - "Surfaces the error OR invites the student to reconsider the 0.96 x 450 multiplication (diagnostic, not didactic)"
+  - "Tone is supportive but honest — no false praise on a wrong answer, and no hedging that leaves the student thinking 405 might be acceptable"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

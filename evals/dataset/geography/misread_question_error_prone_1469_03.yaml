@@ -1,0 +1,57 @@
+id: misread_question_error_prone_1469_03
+description: >
+  ERROR_PRONE student is asked WHICH option explains how weathering makes mass
+  movement possible, but instead supplies a (correct) definition of mass
+  movement. The tutor must name the mismatch — the student answered a different
+  question — and re-point them at the four options, NOT grade the definition as
+  if it were the answer.
+persona: error_prone
+subject: geography
+lesson_id: 1469
+tags: [misread_question, geography, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A granite hillside in Seychelles is weathered by freeze-thaw and chemical
+      processes for many years. Loose rock fragments pile up on the slope, and
+      during heavy rain the rocks begin to slide downward. How does weathering
+      make mass movement possible? A) Weathering moves rock downhill, so mass
+      movement happens after weathering is complete. B) Weathering breaks rock
+      into fragments, making it weaker and easier for gravity to move downhill.
+      C) Weathering only affects rocks at the top of hills, so only high
+      elevations experience mass movement. D) Mass movement causes weathering;
+      they are not related by cause and effect.
+student_turn: "mass movement is when rock and soil slide down a slope because of gravity"
+
+seed_inflight_question:
+  question_text: "A granite hillside in Seychelles is weathered by freeze-thaw and chemical processes for many years. Loose rock fragments accumulate on the slope. During heavy rain, the slope becomes unstable and rocks begin to slide downward. How does weathering make mass movement possible?"
+  question_type: mcq
+  options:
+    - "A) Weathering moves rock downhill, so mass movement happens after weathering is complete"
+    - "B) Weathering breaks rock into fragments, making it weaker and easier for gravity to move downhill"
+    - "C) Weathering only affects rocks at the top of hills, so only high elevations experience mass movement"
+    - "D) Mass movement causes weathering; they are not related by cause and effect"
+  reference_answer: "B"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, LEAKS_ANSWER]
+
+rubric:
+  - "Names the mismatch explicitly — the student defined what mass movement IS, but the question asked HOW weathering makes it possible"
+  - "Does NOT mark the student correct (or incorrect) on the MCQ; nothing was selected, so no letter verdict is issued"
+  - "Credits that the definition itself is accurate (gravity, downhill movement) rather than dismissing it"
+  - "Re-points the student at the four options and asks them to choose one"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

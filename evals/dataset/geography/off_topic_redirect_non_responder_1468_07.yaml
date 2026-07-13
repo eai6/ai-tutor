@@ -1,0 +1,48 @@
+id: off_topic_redirect_non_responder_1468_07
+description: >
+  NON_RESPONDER drifts off-topic for a SECOND consecutive turn — first
+  asking about football, now about the tutor itself — instead of
+  answering the box-shaped channel question. This is the point at which
+  the tutor should redirect warmly but firmly back to the lesson, not
+  get drawn into the chat and not scold.
+persona: non_responder
+subject: geography
+lesson_id: 1468
+tags: [off_topic_redirect, geography, non_responder]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      In the lower course the river is wider and flatter, and the banks
+      may be reinforced by human structures. Which of the three shapes —
+      V-shaped, U-shaped or box-shaped — fits a channel like that?
+  - role: student
+    text: "did u watch the match last night"
+  - role: tutor
+    text: >
+      Let's park the football for now and stay with the river. Wider,
+      flatter, reinforced banks — which of the three shapes fits?
+
+student_turn: "are u a real teacher or just a robot lol"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [OFF_TOPIC]
+
+rubric:
+  - "Acknowledges the aside in one short, friendly beat — does not get drawn into a conversation about football or about what the tutor is"
+  - "Redirects back to the lesson on this turn (this is the second consecutive off-topic turn) — clearly, but without scolding or expressing impatience"
+  - "Re-poses the actual channel-shape question about the wide, flat, reinforced lower-course channel so the student has one concrete thing to answer"
+  - "Does not drift into curriculum-irrelevant content or answer the off-topic question at length"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

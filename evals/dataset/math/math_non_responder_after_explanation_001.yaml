@@ -1,27 +1,28 @@
 id: math_non_responder_after_explanation_001
 description: >
-  NON_RESPONDER replies "yeah" after the tutor explained a concept.
-  The tutor must NOT info-dump again; treat "yeah" as a non-answer
-  and probe with a SHORT specific question.
+  NON_RESPONDER replies "yeah" after the tutor explained the probability
+  formula. The tutor must NOT info-dump the formula again; treat "yeah" as a
+  non-answer and scaffold DOWN a rung with a SHORT specific question.
 persona: non_responder
 subject: math
-lesson_id: 1137
-tags: [non_answer, math, engagement, non_responder]
+lesson_id: 1143
+tags: [idk_non_answer, math, engagement, non_responder]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Angles around a point always sum to 360°. So if three angles are 90°, 100°, and x, we can find x by subtracting from 360. Does that make sense?"
+    text: "Probability is a fraction: favourable outcomes divided by total possible outcomes. In the market raffle there are 20 tickets in the jar and 5 of them win a mango, so the probability is 5 out of 20. Write that probability as a fraction in its simplest form."
 student_turn: "yeah"
 
-# Simple_tutor needs the in-flight slot to grade against. Without
-# it, the engine refuses to evaluate the student's answer — it
-# can't find a posed question in its persisted state and re-poses
-# instead of grading.
+# The tutor's question is still OPEN — "yeah" dodged it rather than answering.
+# Without the in-flight slot the engine re-poses instead of scaffolding down.
+# (The seeded question deliberately asks for something checkable rather than
+# "does that make sense?": a yes/no check would let the grader score "yeah" as
+# a CORRECT answer and advance — the exact failure this scenario tests for.)
 seed_inflight_question:
-  question_text: "Angles around a point always sum to 360\xB0. So if three angles are 90\xB0, 100\xB0, and x, we can find x by subtracting from 360. Does that make sense?"
+  question_text: "In the market raffle there are 20 tickets in the jar and 5 of them win a mango, so the probability is 5 out of 20. Write that probability as a fraction in its simplest form."
   question_type: short_answer
-  reference_answer: "yes"
+  reference_answer: "1/4 — 5/20 simplifies to 1/4 (divide numerator and denominator by 5)."
   source: inline_authored
 
 assertions:
@@ -29,9 +30,10 @@ assertions:
   must_not_label: [INFO_DUMP, MULTI_PARAGRAPH, PREMATURE_ADVANCE]
 
 rubric:
-  - "Treats 'yeah' as a non-answer (passive acknowledgement) rather than confirmation of understanding"
-  - "Asks a SHORT specific check question (e.g., 'so if 90 + 100 + x = 360, what's x?')"
-  - "Does NOT advance to a new concept and does NOT re-explain the same content"
+  - "Treats 'yeah' as a non-answer (passive acknowledgement) rather than as confirmation of understanding"
+  - "Scaffolds DOWN a rung with a SHORT specific check question (e.g. 'in that jar, how many tickets are there in total?' or 'which number is the favourable count, 5 or 20?')"
+  - "Does NOT re-explain the probability formula and does NOT dump the lesson content again"
+  - "Does NOT advance to a new concept on the strength of 'yeah'"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

@@ -1,27 +1,30 @@
 id: error_prone_misreads_001
 description: >
-  ERROR_PRONE persona produces a wrong answer with confidently
-  wrong reasoning (used 270 as the rule instead of 360). Tutor
-  must surface the specific misconception, not just say 'wrong'.
+  ERROR_PRONE persona is asked to CALCULATE the second co-interior angle
+  but answers a different question — they describe what co-interior angles
+  ARE. The statement is itself true, so a careless tutor either praises it
+  as correct or marks it flatly wrong. The tutor must name the MISMATCH:
+  this answers "what are co-interior angles?", not "what does the other one
+  measure?", and re-pose the actual question.
 persona: error_prone
 subject: math
-lesson_id: 1137
-tags: [diagnostic, error_prone, math]
+lesson_id: 1139
+tags: [misread_question, diagnostic, error_prone, math]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Three angles around a point: 100°, 80°, x. Find x."
-student_turn: "90, because 270 - 180 = 90"
+    text: "Lines l and m are parallel, cut by transversal t. One co-interior angle measures 110°. What does the other co-interior angle measure?"
+student_turn: "they're on the same side of the transversal and both between the two parallel lines"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
 # instead of grading.
 seed_inflight_question:
-  question_text: "Three angles around a point: 100\xB0, 80\xB0, x. Find x."
-  question_type: short_answer
-  reference_answer: "180"
+  question_text: "Lines l and m are parallel, cut by transversal t. One co-interior angle measures 110°. What does the other co-interior angle measure?"
+  question_type: short_numeric
+  reference_answer: "70°"
   source: inline_authored
 
 assertions:
@@ -29,10 +32,10 @@ assertions:
   must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
 
 rubric:
-  - "Treats '90' as incorrect"
-  - "Surfaces the SPECIFIC misconception (used 270 instead of 360)"
-  - "Reminds the student of the correct sum without revealing x outright"
-  - "Asks the student to retry with the correct rule"
+  - "Names the MISMATCH: the student has described WHERE co-interior angles sit, but the question asked for the MEASURE of the second angle — it does not simply grade the description as right or wrong"
+  - "Does not praise the description as though it answered the question, and does not call the student flatly wrong (their description of co-interior angles is in fact accurate)"
+  - "Reminds the student that co-interior angles are supplementary — they add to 180° — without performing the subtraction for them"
+  - "Re-poses the actual question: the measure of the second co-interior angle when one is 110°"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

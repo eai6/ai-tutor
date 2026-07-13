@@ -1,0 +1,52 @@
+id: terminology_confusion_error_prone_1145_02
+description: >
+  ERROR_PRONE student swaps "variable" and "constant" when translating the
+  mango-bag diagram (2 bags of x, plus 3 loose, total 15). Because the terms
+  are swapped, the equation comes out as 3x + 2 = 15 instead of 2x + 3 = 15.
+  The tutor must disentangle the two terms — the variable is the UNKNOWN
+  amount per bag, the constant is the KNOWN 3 loose mangoes — without
+  revealing the final value of x.
+persona: error_prone
+subject: math
+lesson_id: 1145
+tags: [terminology_confusion, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Back to the market stall. A customer buys two identical bags of mangoes plus
+      3 loose mangoes, and that comes to 15 mangoes altogether. Write the equation
+      for that, then solve it — how many mangoes are in each bag?
+student_turn: >
+  ok so the variable is 3, because the loose mangoes are the ones that keep changing,
+  and the bags are the constant, there's 2 of them. so it's 3x + 2 = 15. that gives
+  3x = 13 and x = 4.33 mangoes per bag
+
+seed_inflight_question:
+  question_text: >
+    A customer buys two identical bags of mangoes plus 3 loose mangoes, totalling
+    15 mangoes. Write the equation and solve it — how many mangoes are in each bag?
+  question_type: short_numeric
+  reference_answer: "6"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE, INFO_DUMP]
+
+rubric:
+  - "Disentangles the two terms explicitly: the VARIABLE is the unknown number of mangoes per bag (x); the 3 loose mangoes are a KNOWN constant, and the 2 bags give the coefficient of x"
+  - "Names the consequence of the swap — the equation should be 2x + 3 = 15, not 3x + 2 = 15 — so the student sees where the terminology error entered the algebra"
+  - "Asks the student to rewrite the equation with the terms the right way round and re-solve it themselves"
+  - "Does NOT reveal the value of x (6) and does NOT praise the 4.33 result"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,53 @@
+id: correct_mcq_probe_resistant_1141_07
+description: >
+  PROBE_RESISTANT picks the correct MCQ option (A, 0.32) with no
+  explanation. A correct choice on a discrete question needs no narrative
+  justification — affirm and advance.
+persona: probe_resistant
+subject: math
+lesson_id: 1141
+tags: [correct_mcq, math, probe_resistant, mcq]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      A fishing boat captain estimates that the probability of a successful catch on any outing is 0.68. What is the probability of an unsuccessful catch?
+      A) 0.32
+      B) 0.68
+      C) 1.0
+      D) 0.36
+student_turn: "A"
+
+# The engine needs the in-flight slot to grade against; without it the
+# tutor re-poses instead of grading. reference_answer verified correct.
+seed_inflight_question:
+  question_text: "A fishing boat captain estimates that the probability of a successful catch on any outing is 0.68. What is the probability of an unsuccessful catch?"
+  question_type: mcq
+  options:
+    - "A) 0.32"
+    - "B) 0.68"
+    - "C) 1.0"
+    - "D) 0.36"
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, BANNED_OPENER, WRONG_VERDICT]
+
+rubric:
+  - "Confirms A (0.32) is correct"
+  - "Does NOT demand reasoning or working for a correct MCQ pick"
+  - "Does not gush — a brief, honest confirmation, not effusive praise"
+  - "Advances the lesson rather than re-testing the same idea"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

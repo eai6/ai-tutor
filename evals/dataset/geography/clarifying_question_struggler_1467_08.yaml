@@ -1,0 +1,44 @@
+id: clarifying_question_struggler_1467_08
+description: >
+  STRUGGLER asks a genuine clarifying question about the ridge definition — is
+  a ridge the same thing as the whole mountain, or just the top line? The tutor
+  must answer that one question directly and briefly, then hand the floor back.
+  Re-teaching the entire set of landscape terms is the failure mode.
+persona: struggler
+subject: geography
+lesson_id: 1467
+tags: [clarifying_question, geography, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Silhouette Island has a rocky spine running its length, with steep cliffs dropping to the sea on both sides and gentler sandy slopes near the shore. Have a look at which of our terms fit that description."
+student_turn: "wait sorry before that — is a ridge the same thing as a mountain? you said it's a narrow line along the top, but is the whole mountain the ridge or just the top bit? I keep mixing it up"
+
+# The tutor's question is still OPEN — the student asked a clarifying question
+# instead of answering it. Without this the engine re-poses instead of answering.
+seed_inflight_question:
+  question_text: "Silhouette Island has a rocky spine running its length, with steep cliffs dropping to the sea on both sides and gentler sandy slopes near the shore. Have a look at which of our terms fit that description."
+  question_type: short_answer
+  reference_answer: "All three terms fit: the rocky spine along the top is a ridge, the cliffs dropping to the sea are steep slopes, and the sandy shore terrain is gently-sloping land."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Answers the question asked, directly: the ridge is the narrow elevated line along the TOP of the mountain, not the whole landform — the mountain's flanks are the steep slopes"
+  - "Does NOT re-teach the whole term set (plains, slopes, ridges, valleys) — it addresses only the ridge/mountain confusion the student raised"
+  - "Keeps it short and concrete, e.g. reusing the spine-of-a-book image rather than adding new vocabulary"
+  - "Returns to the Silhouette Island task or otherwise hands the floor back with a clear next move"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

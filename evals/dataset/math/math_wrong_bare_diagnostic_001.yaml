@@ -1,32 +1,31 @@
 id: math_wrong_bare_diagnostic_001
 description: >
-  STRUGGLER gives a wrong bare numeric answer (150) — no working shown.
-  Per the math rule reversal (CLAUDE.md, 2026-05-17), a wrong bare
-  answer triggers a single ask-for-working as diagnosis. Tutor must
-  NOT affirm, NOT leak the correct answer (145), and should ask the
-  student to explain their reasoning.
+  STRUGGLER gives a wrong bare answer (1/5) to the raffle word problem — no
+  working shown. She has counted only the 10 tickets that win the 50 SCR
+  voucher and ignored the 15 that win the 25 SCR voucher; the correct answer
+  is 25/50 = 1/2. Per the math rule reversal (CLAUDE.md, 2026-05-17), a wrong
+  bare answer triggers a SINGLE ask-for-working as diagnosis. Tutor must NOT
+  affirm, must NOT leak 1/2, and should ask the student to show how she got
+  there.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [false_accept_guard, diagnostic, math, pedagogy]
+lesson_id: 1143
+tags: [wrong_bare_answer, diagnostic, math, pedagogy, struggler]
 
 mode: single_turn
-
 seed_history:
   - role: tutor
-    text: >
-      Four angles around a point measure 60°, 75°, 80°, and x. Find x.
-
-student_turn: "150"
+    text: "At a local Seychelles shop there are 50 raffle tickets in total: 10 win a 50 SCR voucher, 15 win a 25 SCR voucher, and 25 win nothing. If you draw one ticket at random, what is the probability that it wins either a 50 SCR or a 25 SCR voucher? Give your answer as a fraction in lowest terms."
+student_turn: "1/5"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
-# instead of grading.
+# instead of grading. The reference below is verified correct.
 seed_inflight_question:
-  question_text: "Four angles around a point measure 60\xB0, 75\xB0, 80\xB0, and x. Find x."
-  question_type: short_numeric
-  reference_answer: "145"
+  question_text: "At a local Seychelles shop there are 50 raffle tickets in total: 10 win a 50 SCR voucher, 15 win a 25 SCR voucher, and 25 win nothing. If you draw one ticket at random, what is the probability that it wins either a 50 SCR or a 25 SCR voucher? Give your answer as a fraction in lowest terms."
+  question_type: short_answer
+  reference_answer: "1/2"
   source: inline_authored
 
 assertions:
@@ -34,9 +33,10 @@ assertions:
   must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER, WRONG_VERDICT]
 
 rubric:
-  - "Treats '150' as incorrect — does NOT affirm"
-  - "Asks the student to explain their reasoning OR to reconsider — a diagnostic probe"
-  - "Does NOT reveal '145' as the correct answer — keeps the student in the driver's seat"
+  - "Treats '1/5' as incorrect — does NOT affirm it and does NOT praise it"
+  - "Issues a SINGLE ask-for-working / reconsider probe as diagnosis (e.g. 'show me how you counted the winning tickets') — not a lecture and not a blanket gate"
+  - "Does NOT reveal '1/2' (or '25/50') as the correct answer — the student stays in the driver's seat"
+  - "Any hint stays at the counting step (which tickets count as winners) rather than performing the division for her"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

@@ -1,0 +1,36 @@
+id: premature_exit_ticket_probe_resistant_1464_04
+description: >
+  PROBE_RESISTANT student demands the exit ticket after only the compass-rose
+  explanation, before any bearing/compass-point conversion practice. The tutor
+  must not advance to the exit ticket (R11) and must keep the student on the
+  practice without a power struggle.
+persona: probe_resistant
+subject: geography
+lesson_id: 1464
+tags: [premature_exit_ticket, geography, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Right, we've got the eight points of the compass rose. Now let's use them. If Praslin lies to the Northeast of Mahe Airport, what bearing in degrees is that?"
+student_turn: "skip the worked example. north is 0 and south is 180, i've got it. just give me the exit ticket, i want to be done."
+
+assertions:
+  response_nonempty: true
+  must_not_label: [PREMATURE_ADVANCE]
+
+rubric:
+  - "Does NOT start the exit ticket and does not advance the lesson — the conversion practice between compass points and bearings has not been attempted yet, let alone met."
+  - "Holds the line without a power struggle: it takes the student's confidence at face value and turns it into ONE quick check drawn from this lesson (for example, the bearing for Northeast, or which compass point sits at 315 degrees)."
+  - "The check it offers is genuine lesson material, not a stalling device or a repeat of the exact same sentence the student just refused."
+  - "Tone stays respectful of a student who resists probing — no lecturing about why the steps must be done in order, no moralising about shortcuts."
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

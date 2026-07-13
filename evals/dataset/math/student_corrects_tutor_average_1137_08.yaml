@@ -1,0 +1,42 @@
+id: student_corrects_tutor_average_1137_08
+description: >
+  AVERAGE catches a real arithmetic error the TUTOR made while recapping the
+  Victoria roundabout problem (85° + 92° + 88° is 265°, not 275°, so x is 95°,
+  not 85°). The student is RIGHT. The tutor must accept the correction
+  gracefully, own the slip, and re-anchor the 360° rule — not double down, not
+  vaguely capitulate.
+persona: average
+subject: math
+lesson_id: 1137
+tags: [student_corrects_tutor, math, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Let's recap the roundabout in Victoria. Four roads branch off the centre,
+      so the four angles sit around a single point and must total 360°. The
+      three known ones are 85°, 92° and 88°. Adding them gives 275°, so the
+      missing angle is 360° − 275° = 85°. Hold on to that pattern: total the
+      known angles, then subtract from 360°.
+student_turn: "hang on, i added 85 + 92 + 88 on paper and got 265, not 275. so wouldn't x be 95?"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, INCOHERENT, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Accepts the correction: confirms the student is right that 85° + 92° + 88° = 265°, not the 275° the tutor stated"
+  - "Owns the tutor's own arithmetic mistake plainly and without defensiveness — does not double down on 275°/85°, and does not pretend it said 265° all along"
+  - "Confirms the corrected result follows from the same rule (360° − 265°), keeping the angles-around-a-point method intact rather than re-deriving the whole problem"
+  - "Does not merely capitulate vaguely ('you may be right', 'let's say 95 then') — names which figure was wrong and hands the student one concrete next action"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

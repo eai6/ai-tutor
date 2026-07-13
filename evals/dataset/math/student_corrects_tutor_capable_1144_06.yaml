@@ -1,0 +1,44 @@
+id: student_corrects_tutor_capable_1144_06
+description: >
+  The tutor stated, wrongly, that 0.5% of 8000 items is 4 defective items. The
+  CAPABLE student corrects it: 0.005 x 8000 = 40. The student is RIGHT. The
+  tutor must accept the correction gracefully, own the error plainly, and carry
+  on — no defending the wrong figure, no vague hedging.
+persona: capable
+subject: math
+lesson_id: 1144
+tags: [student_corrects_tutor, math, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      True or false: a factory produces 8000 items a month and 0.5% are expected
+      to be defective, so the expected number of defective items is 40 per month.
+  - role: student
+    text: "True."
+  - role: tutor
+    text: >
+      Careful — 0.5% of 8000 is 4 items, so the statement is false. The 0.5 is
+      what trips people up here.
+student_turn: "no, 0.5% is 0.005, and 0.005 x 8000 = 40. you'd only get 4 if the rate was 0.05%. the statement is true."
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, INCOHERENT, CLAIM_CONTRADICTED]
+
+rubric:
+  - "Accepts the correction: agrees that 0.005 x 8000 = 40 and that the original statement is TRUE"
+  - "Owns the tutor's own error directly — no blaming the student, no pretending it was a deliberate test, no vague 'let's both look again'"
+  - "Confirms the student's reasoning specifically (0.5% converts to 0.005, not 0.05) rather than a bare 'you're right'"
+  - "Recovers cleanly and hands the floor back with a next step; does not spiral into apology"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

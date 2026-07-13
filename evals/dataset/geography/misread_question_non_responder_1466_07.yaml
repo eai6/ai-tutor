@@ -1,0 +1,43 @@
+id: misread_question_non_responder_1466_07
+description: >
+  The question is a TRUE/FALSE about whether the road distance exceeds the
+  straight-line distance. The NON_RESPONDER student instead reports a ground
+  distance in kilometres — answering a conversion question nobody asked. The
+  tutor must name the mismatch and re-anchor the student on the true/false
+  claim, rather than grading the number they volunteered.
+persona: non_responder
+subject: geography
+lesson_id: 1466
+tags: [misread_question, geography, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Last one on this. The delivery route by road, traced with string, measures 8 cm; the scale is 1 cm = 2 km. The straight line from warehouse to house is only 3 cm on the map. True or false: the actual road distance the driver must travel is longer than the straight-line distance?"
+student_turn: "16 km i guess"
+
+seed_inflight_question:
+  question_text: "A delivery route on a map goes from the warehouse to the customer's house by road, following a curved path that measures 8 cm when traced with a string. The scale is 1 cm = 2 km. The straight-line distance (as the crow flies) from warehouse to house is only 3 cm on the map. True or False: The actual road distance the delivery driver must travel is longer than the straight-line distance."
+  question_type: short_answer
+  reference_answer: "True"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, PREMATURE_ADVANCE, LEAKS_ANSWER]
+
+rubric:
+  - "Names the mismatch: the question asked for true or false, and the student gave a distance in kilometres instead"
+  - "Does NOT grade '16 km' as if it were the answer to the question posed — neither marking it right nor marking it wrong on the true/false claim"
+  - "Notes that the 16 km figure is a useful piece of the picture (it is the road distance) and points the student at the comparison they still have to make against the 3 cm straight line"
+  - "Re-poses the true/false decision plainly, giving this low-engagement student an easy, concrete handle to answer"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,42 @@
+id: correct_with_working_struggler_1467_05
+description: >
+  STRUGGLER answers the Silhouette Island true/false question CORRECTLY (True)
+  and, unusually for them, walks through how each of the three terms maps onto
+  a feature. The tutor must affirm the SPECIFIC reasoning — not just say
+  "correct" — and then advance.
+persona: struggler
+subject: geography
+lesson_id: 1467
+tags: [correct_with_working, geography, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Silhouette Island (a real island in Seychelles) has a distinctive shape with a rocky spine running its length and steep cliffs dropping to the sea on both sides. Lower elevations near the shore have gentler, sandy slopes. True or False: Silhouette Island can be accurately described as having a ridge, steep slopes, and gently-sloping land."
+student_turn: "um I think True? because the rocky spine running down the length is the ridge — like the spine of a book you said — and the cliffs dropping straight to the sea are the steep slopes. and then the sandy bit near the shore rises slowly so that's the gently-sloping land. so all three are in there. is that right"
+
+seed_inflight_question:
+  question_text: "Silhouette Island (a real island in Seychelles) has a distinctive shape with a rocky spine running its length and steep cliffs dropping to the sea on both sides. Lower elevations near the shore have gentler, sandy slopes. True or False: Silhouette Island can be accurately described as having a ridge, steep slopes, and gently-sloping land."
+  question_type: short_answer
+  reference_answer: "True"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, WRONG_VERDICT]
+
+rubric:
+  - "Confirms True is correct, clearly and without hedging, despite the student's tentative 'um I think'"
+  - "Affirms the SPECIFIC mapping the student made — rocky spine to ridge, cliffs to steep slopes, sandy shore to gently-sloping land — rather than a generic 'well done'"
+  - "Does NOT ask for working; the student already supplied it"
+  - "Moves the lesson forward to the next step or question rather than dwelling on a question already mastered"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

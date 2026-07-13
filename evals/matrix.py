@@ -63,8 +63,28 @@ class Archetype:
     summary: str
     eligible: tuple[str, ...]          # persona-eligibility mask
     subjects: tuple[str, ...] = BOTH
-    grades_answer: bool = True         # needs seed_inflight_question in the YAML
+    grades_answer: bool = True         # the student turn IS an answer to be graded
     rules: tuple[str, ...] = ()        # rule_registry ids this archetype polices
+
+    # Whether a tutor question is still OPEN when the student turn lands — which
+    # is what decides if the YAML needs `seed_inflight_question`, NOT
+    # `grades_answer`. These come apart, and conflating them was a real bug:
+    #
+    #   A student who says "idk", asks for the answer, or asks a clarifying
+    #   question has NOT answered the pending question — but the question is
+    #   still pending. Drop the in-flight slot and the engine sees no open
+    #   question, so it re-poses instead of scaffolding, and the scenario ends up
+    #   testing something weaker than it claims to.
+    #
+    # Defaults to grades_answer (every graded answer implies an open question);
+    # the dodge archetypes override it to True explicitly.
+    _question_pending: bool | None = None
+
+    @property
+    def question_pending(self) -> bool:
+        if self._question_pending is None:
+            return self.grades_answer
+        return self._question_pending
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +100,7 @@ SINGLE_TURN: list[Archetype] = [
         'Student gives a correct bare answer with no working. Confirm with a '
         'one-line "because…" and advance — do NOT demand working.',
         eligible=('capable', 'average', 'probe_resistant', 'error_prone'),
-        rules=('R16', 'R17'),
+        rules=('R02', 'R16', 'R17'),
     ),
     Archetype(
         'correct_with_working',
@@ -94,7 +114,7 @@ SINGLE_TURN: list[Archetype] = [
         'Student gives a wrong bare answer. A single ask-for-working, as '
         'diagnosis — not a blanket gate.',
         eligible=('struggler', 'average', 'error_prone', 'probe_resistant'),
-        rules=('R16',),
+        rules=('R02', 'R16'),
     ),
     Archetype(
         'wrong_with_working',
@@ -116,13 +136,13 @@ SINGLE_TURN: list[Archetype] = [
         'Student picks a wrong MCQ option. No unfounded praise; surface the '
         'error or invite reconsideration.',
         eligible=('struggler', 'average', 'error_prone', 'probe_resistant'),
-        rules=('R17',),
+        rules=('R08', 'R17'),
     ),
     Archetype(
         'correct_mcq',
         'Student picks the correct MCQ option. Affirm and advance.',
         eligible=('capable', 'average', 'probe_resistant', 'struggler'),
-        rules=('R11', 'R17'),
+        rules=('R08', 'R11', 'R17'),
     ),
     Archetype(
         'false_accept_guard',
@@ -151,7 +171,8 @@ SINGLE_TURN: list[Archetype] = [
         'info-dump and do NOT repeat the same probe.',
         eligible=('struggler', 'non_responder', 'probe_resistant', 'error_prone'),
         grades_answer=False,
-        rules=('R16',),
+        _question_pending=True,   # the question is still open — the student dodged it
+        rules=('R05', 'R16'),
     ),
     Archetype(
         'help_request',
@@ -159,6 +180,7 @@ SINGLE_TURN: list[Archetype] = [
         'answer.',
         eligible=('struggler', 'non_responder', 'average', 'probe_resistant'),
         grades_answer=False,
+        _question_pending=True,   # the question is still open — the student dodged it
         rules=('R14', 'R16'),
     ),
     Archetype(
@@ -176,6 +198,7 @@ SINGLE_TURN: list[Archetype] = [
         'not info-dump the whole lesson.',
         eligible=('average', 'capable', 'struggler'),
         grades_answer=False,
+        _question_pending=True,   # the question is still open — the student dodged it
     ),
     Archetype(
         'off_topic_redirect',
@@ -218,6 +241,7 @@ SINGLE_TURN: list[Archetype] = [
         'it is the failure. Must change strategy.',
         eligible=('probe_resistant', 'non_responder', 'struggler'),
         grades_answer=False,
+        _question_pending=True,   # the question is still open — the student dodged it
         rules=('R07',),
     ),
     Archetype(
@@ -284,12 +308,13 @@ class Shape:
     eligible: tuple[str, ...]
     budgets: tuple[int, ...] = TURN_BUDGETS
     subjects: tuple[str, ...] = BOTH
+    rules: tuple[str, ...] = ()        # rule_registry ids this shape polices
 
 
 MULTI_TURN: list[Shape] = [
     Shape('baseline_full_session',
           'A straightforward run of the lesson end to end.',
-          eligible=ALL_PERSONAS, budgets=(12, 15, 24)),
+          eligible=ALL_PERSONAS, budgets=(12, 15, 24), rules=('R04',)),
     Shape('session_completion',
           'Session must actually reach and complete the exit ticket.',
           eligible=('capable', 'average', 'struggler', 'error_prone'),
@@ -314,7 +339,7 @@ MULTI_TURN: list[Shape] = [
           'Exit ticket fails, remediation targets the failed objectives, ticket '
           're-fires.',
           eligible=('struggler', 'error_prone', 'average', 'non_responder'),
-          budgets=(24, 30)),
+          budgets=(24, 30), rules=('R01', 'R04')),
     Shape('engagement_recovery',
           'A non-responder who finally engages. The tutor must not have given '
           'up on them first.',
@@ -616,6 +641,23 @@ def marginals(rows: list[Row]) -> dict:
 
 
 def main() -> None:
+    # The plan is FROZEN once scenarios have been authored against it.
+    #
+    # solve() seats the existing scenarios by reading them off disk, so re-running
+    # it after authoring reads a *different* starting state (200 single-turn files
+    # instead of 60, ports already re-grounded onto new lessons) and produces a
+    # different plan. Every authored file would then be "authored but not in the
+    # plan", and the ports would be re-derived against lessons they already sit on.
+    #
+    # So: regenerating is an explicit, destructive act, not a default.
+    import sys
+    if PLAN_PATH.exists() and '--force' not in sys.argv:
+        print(f"{PLAN_PATH} already exists — the dataset was authored against it.\n"
+              f"Re-solving now would produce a DIFFERENT plan and orphan the "
+              f"authored scenarios.\nPass --force only if you intend to rebuild "
+              f"the dataset from scratch.")
+        raise SystemExit(1)
+
     rows = solve()
     PLAN_PATH.write_text(json.dumps([r.to_dict() for r in rows], indent=2) + '\n')
 

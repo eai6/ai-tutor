@@ -1,0 +1,54 @@
+id: correct_mcq_capable_1145_06
+description: >
+  CAPABLE student picks the correct MCQ option (D, 10 boats) on the fishery
+  equation 50x + 400 = 900. Tutor must affirm crisply and advance — no demand
+  for working, no effusive praise, no re-teaching the balance rule.
+persona: capable
+subject: math
+lesson_id: 1145
+tags: [correct_mcq, math, capable, mcq, advance]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Seychelles fishery records show: total catch = 50x + 400, where x is the number
+      of boats. If the total catch is 900, how many boats are there?
+      A) 18 boats
+      B) 26 boats
+      C) 450 boats
+      D) 10 boats
+student_turn: "D"
+
+seed_inflight_question:
+  question_text: >
+    A Seychelles fishery's records show: total catch = 50x + 400, where x is the
+    number of boats. If total = 900, how many boats?
+  question_type: mcq
+  options:
+    - "A) 18 boats"
+    - "B) 26 boats"
+    - "C) 450 boats"
+    - "D) 10 boats"
+  reference_answer: "D"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, BANNED_OPENER, WRONG_VERDICT, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Confirms 'D' (10 boats) is correct"
+  - "Does NOT ask this capable student to show working or justify a correct MCQ pick"
+  - "Keeps the affirmation brief — no gushing praise, no re-explanation of subtracting 400 and dividing by 50"
+  - "Advances: poses the next question or a harder extension (e.g. a geometric diagram equation) rather than lingering on this one"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

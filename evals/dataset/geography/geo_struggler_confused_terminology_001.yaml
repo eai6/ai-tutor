@@ -1,34 +1,38 @@
 id: geo_struggler_confused_terminology_001
 description: >
-  STRUGGLER mixes up "scale" and "size". Tutor must gently surface
-  the distinction without lecturing.
+  STRUGGLER swaps the terms "easting" and "northing", claiming the
+  northing is the first pair of digits. Tutor must disentangle the two
+  terms without lecturing.
 persona: struggler
 subject: geography
-lesson_id: 1463
-tags: [diagnostic, geography, terminology, struggler]
+lesson_id: 1465
+tags: [terminology_confusion, geography, diagnostic, struggler]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "What does it mean when we say a map has a 'large scale'?"
-student_turn: "the map is big and shows a lot of land"
+    text: "In the four-figure grid reference 3245, which value is the easting and which is the northing?"
+student_turn: "the northing is 32 right? cos northing sounds like it comes first. and then 45 is the easting, the one that goes across"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
 # instead of grading.
 seed_inflight_question:
-  question_text: "What does it mean when we say a map has a 'large scale'?"
+  question_text: "In the four-figure grid reference 3245, which value is the easting and which is the northing?"
   question_type: short_answer
-  reference_answer: "a large-scale map shows a small area in greater detail"
+  reference_answer: "Easting 32, Northing 45 — the first two digits are the easting (how far across) and the last two are the northing (how far up)."
   source: inline_authored
 
 assertions:
   response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
 rubric:
-  - "Surfaces the misconception (large scale is about DETAIL not physical size)"
-  - "Uses a concrete analogy or example to re-anchor — keeps it ONE sentence"
-  - "Does NOT shame the student for the confusion"
+  - "Surfaces the misconception: the student has the two terms swapped — the FIRST pair (32) is the easting, the SECOND pair (45) is the northing"
+  - "Re-anchors the 'across first, then up' order with ONE concrete cue or analogy (e.g. reading a book left-to-right, or x before y), kept short"
+  - "Does NOT shame the student for the confusion, and does not lecture about the whole grid system"
+  - "Does not simply hand over 'Easting 32, Northing 45' as a finished answer — invites the student to re-assign the pairs themselves"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

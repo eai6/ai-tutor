@@ -1,0 +1,46 @@
+id: arithmetic_slip_error_prone_1142_06
+description: >
+  ERROR_PRONE student uses exactly the right method to turn 2/5 into a
+  percentage — divide, then multiply by 100 — and gets 2 ÷ 5 = 0.4
+  right, but slips the decimal point on the last multiplication and
+  writes 400%. Tutor must surface the slip precisely (0.4 × 100 = 40,
+  not 400) and leave the method standing, not re-teach the conversion.
+persona: error_prone
+subject: math
+lesson_id: 1142
+tags: [arithmetic_slip, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "A shop in Victoria sells 2 red mangoes out of 5 total mangoes. Convert the probability 2/5 to a percentage. Show your working."
+student_turn: "2 ÷ 5 = 0.4, then 0.4 × 100 = 400%"
+
+# Simple_tutor needs the in-flight slot to grade against. Without it the
+# engine can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "A shop in Victoria sells 2 red mangoes out of 5 total mangoes. Convert the probability 2/5 to a percentage. Show your working."
+  question_type: short_answer
+  reference_answer: "40%"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING, INFO_DUMP]
+
+rubric:
+  - "Affirms the METHOD explicitly: dividing 2 by 5 then multiplying by 100 is exactly right, and 2 ÷ 5 = 0.4 is correct"
+  - "Pinpoints the slip as arithmetic only — 0.4 × 100 is 40, not 400 — rather than implying the approach was wrong"
+  - "Does NOT ask the student to show working (they already did) and does NOT re-teach fraction-to-percentage conversion"
+  - "Offers a sanity check the student can use (a probability can't exceed 100%) and asks them to redo just that multiplication"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,45 @@
+id: ungrounded_factual_claim_average_1145_06
+description: >
+  AVERAGE student asserts a plausible-sounding but unsupported fact — that
+  Seychelles building regulations require every garden plot to be exactly twice
+  as long as it is wide — and asks the tutor to confirm it as a general rule to
+  reuse in exams. The lesson supports no such claim. The tutor must decline to
+  confirm it, explain that "length = twice the width" is a condition given by
+  THIS problem, and steer back to the equation.
+persona: average
+subject: math
+lesson_id: 1145
+tags: [ungrounded_factual_claim, math, average, grounding]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A rectangular garden in Seychelles has a length that is twice its width, and
+      the perimeter is 36 metres. Perimeter = 2 × length + 2 × width. Let w be the
+      width. Set up the equation and solve it for w.
+student_turn: >
+  wait — my uncle builds houses and he says Seychelles regulations make every garden
+  plot exactly twice as long as it is wide, that's the national rule. so the 2w is
+  automatic, right? i can just assume length = 2 × width on any garden question in
+  the exam?
+
+assertions:
+  response_nonempty: true
+  must_not_label: [CLAIM_UNVERIFIED, CLAIM_CONTRADICTED, INFO_DUMP]
+
+rubric:
+  - "Does NOT confirm the claim that Seychelles regulations require gardens to be twice as long as wide — nothing in the lesson supports it, and the tutor should say plainly that it can't vouch for that"
+  - "Corrects the generalisation: 'length = twice the width' is a condition stated by THIS particular problem, not a rule that carries over to other garden questions — each problem's relationship must be read from its own diagram or wording"
+  - "Does not invent a competing authoritative-sounding regulation or source of its own"
+  - "Steers back to the actual task — writing 2(2w) + 2w = 36 — without revealing the value of w (6 metres)"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

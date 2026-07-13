@@ -1,0 +1,44 @@
+id: student_corrects_tutor_capable_1470_04
+description: >
+  The tutor's prior turn wrongly classified exfoliation (sheets of rock peeling
+  away under pressure release) as chemical weathering. CAPABLE catches it and
+  corrects it — exfoliation is physical: the peeled granite is still the same
+  granite, so no composition change. The student is RIGHT; the tutor must accept
+  the correction gracefully rather than deflecting or doubling down.
+persona: capable
+subject: geography
+lesson_id: 1470
+tags: [student_corrects_tutor, geography, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Another one to add to your list: exfoliation, where large sheets of rock
+      peel away from the surface. That one counts as chemical weathering, since
+      the rock's minerals change as the layers flake off.
+student_turn: >
+  That's not right. Exfoliation is physical — the sheets peel off because the
+  pressure on the rock is released, and the granite underneath is still exactly
+  the same granite. Nothing about the minerals changes. Chemical weathering is
+  when the composition actually changes, like feldspar turning into clay.
+
+assertions:
+  response_nonempty: true
+  must_not_label: [CLAIM_CONTRADICTED, WRONG_VERDICT]
+
+rubric:
+  - "Explicitly accepts the correction and states plainly that exfoliation is PHYSICAL weathering"
+  - "Does NOT double down, hedge with 'well, in a sense it's both', or quietly change the subject without owning the error"
+  - "Re-anchors the correct rule the student used: physical weathering breaks rock up without changing its mineral composition; chemical weathering changes what the rock is made of"
+  - "Credits the student's reasoning specifically, then hands the floor back with a clear next prompt"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

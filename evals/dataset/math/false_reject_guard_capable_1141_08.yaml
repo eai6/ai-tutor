@@ -1,0 +1,44 @@
+id: false_reject_guard_capable_1141_08
+description: >
+  CAPABLE student answers '3/10', which is exactly 0.3 — the correct
+  complement of 0.7. The unusual format (fraction, not decimal) must NOT be
+  rejected.
+persona: capable
+subject: math
+lesson_id: 1141
+tags: [false_reject_guard, math, capable, format]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      A crab is caught with probability 0.7. What is the probability the crab is NOT caught?
+student_turn: "3/10"
+
+# The engine needs the in-flight slot to grade against; without it the
+# tutor re-poses instead of grading. reference_answer verified correct.
+seed_inflight_question:
+  question_text: "A crab is caught with probability 0.7. What is the probability the crab is NOT caught?"
+  question_type: short_numeric
+  reference_answer: "0.3"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING]
+
+rubric:
+  - "Accepts 3/10 as CORRECT — it is exactly 0.3, the complement of 0.7"
+  - "Does NOT mark it wrong, hedge, or imply a decimal was required"
+  - "At most notes in passing that 3/10 and 0.3 are the same value; does not turn the format into a correction"
+  - "Advances the lesson promptly, as befits a capable student"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,24 +1,37 @@
 id: banned_opener_loop_guard_001
 description: >
-  Tutor used "walk me through your steps" already. Student still
-  hasn't shown working. Tutor must NOT repeat the same banned-opener
-  phrase a second time.
+  Tutor already used "walk me through your steps" once on the fishing-nets
+  expected-outcome question. The PROBE_RESISTANT student still won't show
+  working. The tutor must NOT repeat the same banned-opener phrase a second
+  time — it must change strategy.
 persona: probe_resistant
 subject: math
-lesson_id: 1137
-tags: [banned_opener, repetition, crosscutting]
+lesson_id: 1144
+tags: [repetition_banned_opener, math, probe_resistant, crosscutting]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Three angles around a point: 90°, 100°, x. Find x."
+    text: >
+      A fishing company in Seychelles has 200 fishing nets. Experience shows
+      12% of nets get damaged by storms in a season. How many nets do you
+      expect to be damaged?
   - role: student
-    text: "170"
+    text: "2400"
   - role: tutor
     text: "Can you walk me through your steps?"
   - role: student
-    text: "i just know"
+    text: "i just did it in my head"
 student_turn: "do i have to explain"
+
+# The nets question is still OPEN — 2400 was wrong and was never resolved, and
+# the student is now stonewalling the working-request. Without the in-flight
+# slot the engine re-poses instead of changing strategy.
+seed_inflight_question:
+  question_text: "A fishing company in Seychelles has 200 fishing nets. Experience shows 12% of nets get damaged by storms in a season. How many nets do you expect to be damaged?"
+  question_type: short_numeric
+  reference_answer: "24 nets — 12% becomes 0.12, and 0.12 x 200 = 24. (The student's 2400 came from multiplying by 12 instead of 0.12.)"
+  source: inline_authored
 
 assertions:
   response_nonempty: true
@@ -26,8 +39,8 @@ assertions:
 
 rubric:
   - "Does NOT repeat the working-request banned phrase a second time"
-  - "Tries a different angle — offers a check option, simplifies the question, or moves on"
-  - "Stays non-confrontational"
+  - "Tries a different angle — e.g. asks what 12% is as a decimal, offers a check option, or simplifies the question — instead of re-demanding working"
+  - "Stays non-confrontational and does not concede that 2400 is right"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

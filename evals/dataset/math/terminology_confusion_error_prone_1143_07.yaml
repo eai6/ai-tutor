@@ -1,0 +1,48 @@
+id: terminology_confusion_error_prone_1143_07
+description: >
+  ERROR_PRONE student has swapped the two core terms of the lesson: he thinks
+  'favourable outcomes' means every outcome that could possibly happen, and that
+  'total' means the ones you want. So he answers 13 (the whole bag) for the
+  favourable count and calls 7 the total. The correct favourable count is 7 (the
+  red balls); 13 is the TOTAL. The tutor must disentangle the two terms rather
+  than just marking the number wrong.
+persona: error_prone
+subject: math
+lesson_id: 1143
+tags: [terminology_confusion, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "A bag contains 7 red balls and 6 blue balls. How many favourable outcomes are there for drawing a red ball?"
+student_turn: "13. favourable means everything that could possibly come out of the bag, so that's all 13 balls. the total is the 7 reds, that's the bit you actually want"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. The reference below is verified correct.
+seed_inflight_question:
+  question_text: "A bag contains 7 red balls and 6 blue balls. How many favourable outcomes are there for drawing a red ball?"
+  question_type: short_numeric
+  reference_answer: "7"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats '13' as the wrong answer to the question asked — does not affirm it"
+  - "Explicitly DISENTANGLES the two terms: 'favourable outcomes' are the outcomes that count as the event happening (the red balls), while 'total possible outcomes' is every ball that could be drawn — he has them the wrong way round"
+  - "Credits what he did get right — 13 IS a real quantity here, it is the total, not the favourable count"
+  - "Asks him to re-answer the favourable-count question with the corrected definitions, without simply handing him '7'"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,49 @@
+id: wrong_bare_answer_probe_resistant_1143_08
+description: >
+  PROBE_RESISTANT student fires back a wrong bare answer — 4/8 — and pre-emptively
+  refuses to show any working. He has put yellow against not-yellow (4 vs the
+  other 8) instead of yellow against the 12 total sections; the correct answer is
+  4/12 = 1/3. The tutor must not be bounced into either capitulating (just
+  marking it and moving on) or into a nagging loop: it owes exactly ONE
+  ask-for-working / reconsider probe as diagnosis, with a hint that gives him a
+  reason to engage, and it must not hand over 1/3.
+persona: probe_resistant
+subject: math
+lesson_id: 1143
+tags: [wrong_bare_answer, math, diagnostic, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "A spinner has 12 equal sections: 4 sections are yellow, 5 sections are green, and 3 sections are red. If you spin once, what is the probability the spinner lands on yellow?"
+student_turn: "4/8. and don't ask me to explain it, just tell me if it's right or not"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. The reference below is verified correct.
+seed_inflight_question:
+  question_text: "A spinner has 12 equal sections: 4 sections are yellow, 5 sections are green, and 3 sections are red. If you spin once, what is the probability the spinner lands on yellow?"
+  question_type: short_answer
+  reference_answer: "1/3"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER, WRONG_VERDICT]
+
+rubric:
+  - "Answers his actual demand honestly and up front: 4/8 is NOT right — it does not dodge the verdict just because he asked to skip the explanation"
+  - "Does not cave to the pressure by accepting the answer or advancing anyway, and does not capitulate to his refusal to engage"
+  - "Makes ONE diagnostic move — a short ask-for-working or a pointed hint at the denominator (how many sections can the spinner land on in total?) — rather than nagging, repeating, or gating him behind working"
+  - "Does NOT reveal '4/12' or '1/3' as the answer"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

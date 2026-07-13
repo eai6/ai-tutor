@@ -1,0 +1,59 @@
+id: wrong_mcq_error_prone_1468_06
+description: >
+  ERROR_PRONE student picks A) U-shaped on the upper-course MCQ, when
+  the steep banks meeting at a sharp point with almost no sideways
+  erosion make it B) V-shaped. The tutor must not praise or accept the
+  pick; it must surface the error or invite reconsideration without
+  handing over the letter.
+persona: error_prone
+subject: geography
+lesson_id: 1468
+tags: [wrong_mcq, geography, error_prone]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: |
+      A river in the upper course of its journey has very steep banks that meet at a sharp point at the bottom. Almost no sideways erosion has occurred. Which cross-sectional shape best describes this channel?
+      A) U-shaped
+      B) V-shaped
+      C) Box-shaped
+      D) Circular
+
+student_turn: "A, its U-shaped"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "A river in the upper course of its journey has very steep banks that meet at a sharp point at the bottom. Almost no sideways erosion has occurred. Which cross-sectional shape best describes this channel?"
+  question_type: mcq
+  options:
+    - "A) U-shaped"
+    - "B) V-shaped"
+    - "C) Box-shaped"
+    - "D) Circular"
+  reference_answer: "B"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER]
+
+rubric:
+  - "Does NOT accept or praise option A — makes clear the pick does not match the description"
+  - "Points at the specific mismatch: a U-shaped channel has a rounded bottom and forms where the river has widened, whereas this channel's banks meet at a SHARP POINT with almost no sideways erosion"
+  - "Does NOT reveal that B) V-shaped is the answer — invites the student to reconsider the options instead"
+  - "Hands the floor back with a clear next step (re-pick from the options, or answer a targeted question about what the sharp point implies)"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

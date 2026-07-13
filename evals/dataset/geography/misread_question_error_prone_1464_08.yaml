@@ -1,0 +1,46 @@
+id: misread_question_error_prone_1464_08
+description: >
+  ERROR_PRONE student is asked True/False on whether a boat on a bearing of 315
+  degrees is travelling northwesterly (answer: True). Instead they compute the
+  RETURN bearing back to Victoria (135, SE) and answer 'false' on that basis —
+  a different question. The tutor must name the mismatch, not just mark it wrong.
+persona: error_prone
+subject: geography
+lesson_id: 1464
+tags: [misread_question, geography, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Here's the map task. A fishing boat leaves Victoria Harbour on Mahe and travels on a bearing of 315 degrees. True or False: the boat is travelling in a northwesterly direction?"
+student_turn: "false. to get back to victoria the boat would be on 315 - 180 = 135, and 135 is southeast, so its southeast not northwest."
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "A fishing boat leaves Victoria Harbour on Mahe and travels on a bearing of 315 degrees. True or False: the boat is travelling in a northwesterly direction."
+  question_type: short_answer
+  reference_answer: "True — a bearing of 315 degrees is Northwest (NW), so the boat is travelling northwesterly."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, LEAKS_ANSWER]
+
+rubric:
+  - "Names the mismatch: the student has worked out the RETURN bearing from the boat back to Victoria (135 degrees, Southeast), not the direction the boat is actually travelling on its bearing of 315 degrees."
+  - "Does not treat the 135/Southeast reasoning as an attempt at the posed True/False question — it is the answer to a different question, and the response says so."
+  - "Redirects the student to the one thing the question asks: which compass point sits at 315 degrees on the rose (R16 — a hint, not a verdict handed over)."
+  - "Does not simply state 'True' — the student is given the chance to re-decide once the mismatch is clear."
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

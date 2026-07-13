@@ -18,8 +18,13 @@ python manage.py run_eval --smoke
 # Run a specific scenario by id.
 python manage.py run_eval --scenario math_correct_advance_001
 
-# Run the full suite (~80 scenarios, ~30–90 min wall-clock).
+# Run the full suite (400 scenarios — expensive; the 200 multi-turn sessions dominate).
 python manage.py run_eval
+
+# Day-to-day: a seeded random sample. Same seed + same dataset = the same draw, so
+# every model you compare sees the same scenarios. This replaces the old `core15`.
+python manage.py run_eval --multi-turn --sample 60 --seed 0
+python manage.py run_eval --single-turn --sample 50 --seed 0
 
 # Target the simple_tutor engine (going forward, all evaluations use simple_tutor).
 SIMPLE_TUTOR_ENGINE=1 python manage.py run_eval
@@ -53,15 +58,28 @@ evals/
 │   ├── extract.py           — parse prod_content_dump.sql → Django fixtures
 │   ├── institution.json     — eval Institution + sim-bot User + ModelConfigs
 │   └── lessons.json         — frozen Course → Unit → Lesson → LessonStep + ExitTickets
-├── dataset/                 — 80+ scenario YAMLs (the dataset)
-│   ├── math/                — math-specific failure modes (16)
-│   ├── geography/           — geography parallels (10)
-│   ├── multi_turn/          — full-session trajectory scenarios (20)
-│   ├── crosscutting/        — safety / figure_ref / tool_leak / coherence / etc. (24)
-│   ├── format/              — format rule guards (3)
-│   ├── pedagogy/            — over-eager-working / diagnostic guards (2)
-│   ├── personas/            — one signature behavioural test per persona (5)
+├── matrix.py                — the 400-row allocation: persona × lesson × archetype, solved
+│                              deterministically BEFORE any content is written
+├── gen_multi_turn.py        — generates the 200 multi-turn YAMLs from 12 shape templates
+├── authoring_brief.py       — per-lesson brief (real content + assigned rows) for scenario authors
+├── lint_dataset.py          — structure + groundedness + balance checks
+├── test_dataset_balance.py  — the same checks as a pytest gate
+├── dataset_plan.json        — the solved plan (generated; do not hand-edit)
+├── dataset/                 — 400 scenario YAMLs (the dataset)
+│   ├── math/                — single-turn, math (86)
+│   ├── geography/           — single-turn, geography (80)
+│   ├── multi_turn/          — full-session trajectory scenarios (200)
+│   ├── crosscutting/        — single-turn, legacy grouping (24)
+│   ├── format/              — single-turn, legacy grouping (3)
+│   ├── pedagogy/            — single-turn, legacy grouping (2)
+│   ├── personas/            — single-turn, legacy grouping (5)
 │   └── smoke/               — plumbing check (1; excluded from full runs)
+│
+│   NOTE: the directory a single-turn scenario lives in is now organisational
+│   only. The archetype it tests is carried by the plan (dataset_plan.json), not
+│   by its folder — the old math/geography/crosscutting/format split was a mixed
+│   taxonomy (some by subject, some by failure mode) and no longer means anything
+│   the runner or scorer reads. Discovery is a recursive glob.
 └── runs/                    — gitignored — per-run JSON result blobs
 ```
 
@@ -92,10 +110,21 @@ Going forward, evaluations are run against the **simple_tutor** engine (`apps/tu
 - ✅ **Phase 5** — `evals/report.py --diff <prev>` for run-over-run comparison.
 - ✅ **Phase 6** — dataset growth to 80 scenarios across the full persona × situation matrix.
 - ✅ **Phase 7** — BEA-aligned standard rubric appended to every scenario; `must_end_with_action` moved from assertion to rubric layer.
+- ✅ **Phase 8** (2026-07-13) — dataset to **400** (200 single-turn + 200 multi-turn) on **16
+  lessons**, balanced by construction across persona × lesson × archetype; `core15` deleted in
+  favour of `--sample N --seed S`. See `memory/eval_dataset_400_plan.md`.
 
 ## Known limitations
 
 - **Cost estimator**: `apps/llm/cost_estimator.py` from the simulator plan hasn't shipped; the harness reports tokens but not USD.
-- **Lesson coverage**: 4 frozen lessons (2 math + 2 geography). Failure categories that need richer fixtures (figure_mismatch, bank_authoring) remain partially covered.
+- **Lesson coverage**: 16 frozen lessons (8 math + 8 geography).
+- **Cost**: a full 400-scenario run is expensive, and the 200 multi-turn sessions dominate it
+  (~40x the old core15 subset). Use `--sample N --seed S` for day-to-day runs — the draw is
+  seeded, so every model sees the same scenarios — and reserve the full set for publication.
+- **No prior sweep is comparable**: sweep 1/2 ran a different dataset on different lessons.
+  Sweep 3 is a new baseline.
+- **Known defective lesson content**: six of the 16 lessons ship items whose stored answer is
+  wrong or self-contradictory. The dataset routes around them; the curriculum still needs
+  fixing. See `memory/lesson_content_defects_2026-07-13.md`.
 
 See `memory/eval_harness_plan.md` for the original design plan, and `AI_Tutor_Eval_Harness.docx` (regenerated by `scripts/build_eval_doc.py`) for the comprehensive standalone explainer.

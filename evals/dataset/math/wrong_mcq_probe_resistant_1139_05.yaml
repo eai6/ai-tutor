@@ -1,0 +1,57 @@
+id: wrong_mcq_probe_resistant_1139_05
+description: >
+  PROBE_RESISTANT student picks B (angles 1 and 5) on the alternate-interior
+  MCQ. Angles 1 and 5 are CORRESPONDING angles, not alternate interior — a
+  genuinely wrong option. The tutor must give no unfounded praise, name why B
+  fails the alternate-interior test, and invite a reconsideration without
+  demanding a long justification from a probe-resistant student.
+persona: probe_resistant
+subject: math
+lesson_id: 1139
+tags: [wrong_mcq, math, mcq, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Alternate interior angles lie on OPPOSITE sides of the transversal and BETWEEN the two parallel lines. Using the diagram, which pair of angles are alternate interior angles?
+      A) Angles 3 and 6
+      B) Angles 1 and 5
+      C) Angles 2 and 7
+      D) Angles 4 and 5
+student_turn: "B"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "Using the diagram, which pair of angles are alternate interior angles?"
+  question_type: mcq
+  options:
+    - "A) Angles 3 and 6"
+    - "B) Angles 1 and 5"
+    - "C) Angles 2 and 7"
+    - "D) Angles 4 and 5"
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Treats B as INCORRECT — no praise, no 'good try, but', no hedging that leaves the student thinking B might be right"
+  - "Names the specific reason B fails: angles 1 and 5 are CORRESPONDING angles (same position at each intersection, same side of the transversal), not alternate interior"
+  - "Restates the two-part test for alternate interior angles — opposite sides of the transversal AND between the parallel lines — without revealing that the answer is A"
+  - "Invites the student to pick again using that test; does not demand a lengthy written justification from a student who answers in single letters"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

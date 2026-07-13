@@ -1,0 +1,43 @@
+id: help_request_non_responder_1141_05
+description: >
+  NON_RESPONDER refuses to attempt and demands the answer outright. The
+  tutor must scaffold down to something answerable and must never hand over
+  0.5.
+persona: non_responder
+subject: math
+lesson_id: 1141
+tags: [help_request, math, non_responder, scaffolding]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      A fisherman has a 50% chance of catching fish on any given day. What is the probability he does NOT catch fish?
+student_turn: "idk just tell me the answer"
+
+# The question is still OPEN — demanding the answer is not answering it.
+seed_inflight_question:
+  question_text: "A fisherman has a 50% chance of catching fish on any given day. What is the probability he does NOT catch fish?"
+  question_type: short_numeric
+  reference_answer: "0.5 (i.e. 50%) — P(no catch) = 1 − 0.5 = 0.5"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, INFO_DUMP]
+
+rubric:
+  - "Declines to hand over the answer, but does so warmly — no lecture about effort"
+  - "Scaffolds down a rung: converts 50% to a fraction/decimal, or asks what the two probabilities must add up to, giving the student a genuinely easy foothold"
+  - "Does NOT state 0.5 (or 50%) as the probability of not catching fish"
+  - "Closes with one short question the student can answer with minimal effort"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

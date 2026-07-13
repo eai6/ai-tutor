@@ -1,0 +1,54 @@
+id: correct_mcq_probe_resistant_1470_02
+description: >
+  PROBE_RESISTANT picks the correct option (A) on the biological-weathering MCQ
+  with a bare letter and no justification. A correct MCQ pick on a discrete
+  question does not need narrative working — the tutor must affirm it and move
+  the lesson on, not demand an explanation.
+persona: probe_resistant
+subject: geography
+lesson_id: 1470
+tags: [correct_mcq, geography, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: |
+      Roots and burrows force rocks apart; lichens make weak acids that eat away
+      at the surface. Which of these is a biological weathering agent that
+      physically wedges rocks apart?
+      A) Tree roots growing into cracks and expanding
+      B) Rainwater dissolving rock minerals
+      C) Temperature changes causing rock expansion
+      D) Wind carrying sand that scratches rock surfaces
+student_turn: "A"
+
+seed_inflight_question:
+  question_text: "Which of these is a biological weathering agent that physically wedges rocks apart?"
+  question_type: mcq
+  options:
+    - "A) Tree roots growing into cracks and expanding"
+    - "B) Rainwater dissolving rock minerals"
+    - "C) Temperature changes causing rock expansion"
+    - "D) Wind carrying sand that scratches rock surfaces"
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, BANNED_OPENER, WRONG_VERDICT]
+
+rubric:
+  - "Confirms 'A' (tree roots growing into cracks) is correct"
+  - "Does NOT demand reasoning, working, or an explanation for a correct MCQ pick"
+  - "May add at most a one-line 'because' — roots are living and wedge the crack open mechanically — then advances"
+  - "Moves the lesson forward with a concrete next prompt rather than lingering on the answered question"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

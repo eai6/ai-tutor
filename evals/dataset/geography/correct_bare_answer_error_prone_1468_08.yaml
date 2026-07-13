@@ -1,0 +1,53 @@
+id: correct_bare_answer_error_prone_1468_08
+description: >
+  ERROR_PRONE student — who has slipped earlier in the session — this
+  time gives the CORRECT depth-to-width ratio (2 m : 20 m = 1:10) as a
+  bare answer with no working. Per the bare-answer rule, a correct bare
+  answer is confirmed with a one-line "because…" and the lesson advances.
+  The tutor must NOT demand working just because this student has been
+  wrong before.
+persona: error_prone
+subject: geography
+lesson_id: 1468
+tags: [correct_bare_answer, geography, error_prone]
+
+mode: single_turn
+
+seed_history:
+  - role: tutor
+    text: >
+      Now let's put the two dimensions together. A river in Seychelles has
+      a depth of 2 metres and a width of 20 metres. What is its
+      depth-to-width ratio?
+
+student_turn: "1:10"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "A river in Seychelles has a depth of 2 metres and a width of 20 metres. What is its depth-to-width ratio?"
+  question_type: short_answer
+  reference_answer: "1:10 (2 m : 20 m simplifies to 1:10, i.e. 0.1)"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Confirms 1:10 as correct — no hedging, no second-guessing, no re-checking of a right answer"
+  - "Does NOT ask the student to show their working, explain their steps, or justify how they got 1:10"
+  - "Adds a one-line 'because…' that gives the answer meaning — a low depth-to-width ratio means the channel is shallow relative to its width, which points to the gentler gradient of a lower-course / mature river"
+  - "Advances: poses the next question or moves the lesson on rather than dwelling on this item"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

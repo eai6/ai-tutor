@@ -1,0 +1,43 @@
+id: correct_mcq_probe_resistant_1466_05
+description: >
+  PROBE_RESISTANT student picks B) 15 km — the correct option for a scale bar
+  where 2 cm = 5 km, applied to a 6 cm measurement — and flatly refuses to
+  explain the reasoning. The tutor must affirm the correct pick and advance;
+  it must NOT keep pushing for working the student has already declined to
+  give on an item they clearly have.
+persona: probe_resistant
+subject: geography
+lesson_id: 1466
+tags: [correct_mcq, geography, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Here's a scale bar where 2 cm stands for 5 km. If you measure 6 cm on that map, what ground distance does it represent: A) 7.5 km, B) 15 km, C) 10 km, or D) 20 km?"
+student_turn: "B. and no, I'm not writing out the steps, it's obvious."
+
+seed_inflight_question:
+  question_text: "If a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?"
+  question_type: mcq
+  options: ["A) 7.5 km", "B) 15 km", "C) 10 km", "D) 20 km"]
+  reference_answer: "B"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, WRONG_VERDICT, BANNED_OPENER, REPEATS]
+
+rubric:
+  - "Confirms B) 15 km is correct, clearly and without hedging"
+  - "Accepts the refusal gracefully — does NOT demand the working, re-ask 'but how did you get it?', or pressure the student to justify a correct answer"
+  - "May state the reasoning in one line itself (2 cm = 5 km, so 1 cm = 2.5 km, so 6 cm = 15 km) rather than extracting it from the student, then advances to the next idea"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,50 @@
+id: correct_with_working_average_1470_08
+description: >
+  AVERAGE classifies the Anse Royale boulder as physical weathering and shows the
+  reasoning — unchanged pale grey interior means the minerals are the same, the
+  fragments at its base mean it was broken up mechanically. Correct, with working.
+  The tutor must affirm the SPECIFIC reasoning (not generic praise) and advance.
+persona: average
+subject: geography
+lesson_id: 1470
+tags: [correct_with_working, geography, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A granite boulder at Anse Royale has rounded edges and broken fragments
+      lying at its base, and when you look at a freshly broken piece the inside
+      is still the same pale grey granite. Which type of weathering does this
+      show, and how do you know?
+student_turn: >
+  Physical weathering. I checked the colour first — the inside is still pale grey
+  granite, so the minerals haven't turned into anything else. And there are
+  broken fragments at the bottom, so the rock has just been broken into smaller
+  pieces of the same stuff. That's mechanical, not chemical.
+
+seed_inflight_question:
+  question_text: "A granite boulder at Anse Royale has rounded edges and broken fragments lying at its base, and a freshly broken piece is still the same pale grey granite inside. Which type of weathering does this show, and how do you know?"
+  question_type: short_answer
+  reference_answer: "Physical weathering — the rock has been broken into smaller pieces but the mineral composition is unchanged (the interior is still the same pale grey granite), which is mechanical breakdown, not chemical alteration."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, WRONG_VERDICT, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Confirms 'physical weathering' is correct without hedging or second-guessing"
+  - "Affirms the SPECIFIC reasoning the student used — unchanged pale grey interior means unchanged mineral composition; fragments at the base mean mechanical break-up — rather than generic praise like 'great job'"
+  - "Does NOT ask for more working or re-derive the answer for a student who already showed it"
+  - "Advances to the next concept with a clear, concrete prompt"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

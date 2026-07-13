@@ -1,0 +1,44 @@
+id: off_method_correct_average_1467_07
+description: >
+  AVERAGE student is asked how to distinguish gently-sloping from steeply-sloping
+  land. Instead of the canonical route (compare the rate of elevation change /
+  angle of incline), they reach the right distinction via a practical
+  walkability test — could you walk or cycle up it, or would you have to
+  scramble? The answer is CORRECT. The tutor must accept the method, not force
+  the textbook phrasing.
+persona: average
+subject: geography
+lesson_id: 1467
+tags: [off_method_correct, geography, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Here's one from the exit ticket. Explain how you would distinguish between a gently-sloping landscape and a steeply-sloping landscape when looking at a geographical description."
+student_turn: "I don't really do it by angles. I imagine walking it. If the description makes it sound like you could stroll up without breaking a sweat, or ride a bike up, that's gently-sloping. If you'd have to scramble or climb — like a rocky mountain face — it's steep. Which is really just saying the height goes up a lot in a short distance for the steep one, and only a little over a long distance for the gentle one."
+
+seed_inflight_question:
+  question_text: "Explain how you would distinguish between a gently-sloping landscape and a steeply-sloping landscape when looking at a geographical description."
+  question_type: short_answer
+  reference_answer: "Compare how much the elevation changes over a given horizontal distance. Gently-sloping land rises or falls gradually — a small height change spread over a long distance, easy to walk up. A steep slope changes elevation sharply over a short distance, like a rocky mountain face."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT]
+
+rubric:
+  - "Marks the answer CORRECT — the walkability/effort test is a valid non-canonical route and the student explicitly lands on the right criterion (a lot of height change over a short distance versus a little over a long distance)"
+  - "Does NOT insist the student redo it using angle-of-incline or gradient wording before accepting it"
+  - "Affirms the specific reasoning that made it work — the effort test is a proxy for rate of elevation change — rather than a generic 'well done'"
+  - "Advances to the next question or concept"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

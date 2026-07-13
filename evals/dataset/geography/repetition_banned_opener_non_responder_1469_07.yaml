@@ -1,0 +1,54 @@
+id: repetition_banned_opener_non_responder_1469_07
+description: >
+  The seeded history already contains the tutor's probe — "what do you notice
+  about the rock surfaces around you?" — asked twice, and the NON_RESPONDER has
+  stonewalled both times. Asking it a third time (or re-opening with the same
+  framing) is the failure. The tutor must change strategy entirely.
+persona: non_responder
+subject: geography
+lesson_id: 1469
+tags: [repetition_banned_opener, geography, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Welcome! Seychelles' granite boulders are slowly breaking down — cracked
+      and crumbled by sun, rain, and waves. That breaking down is called
+      weathering. As you look at the rocks around you, what do you notice about
+      their surfaces?
+  - role: student
+    text: "nothing"
+  - role: tutor
+    text: >
+      Have another look — what do you notice about the rock surfaces around you?
+      Any cracks, any rough patches?
+student_turn: "k"
+
+# The tutor's probe is still OPEN — the student stonewalled it twice rather than
+# answering. Without this the engine sees no pending question and re-poses it.
+seed_inflight_question:
+  question_text: "Have another look — what do you notice about the rock surfaces around you? Any cracks, any rough patches?"
+  question_type: short_answer
+  reference_answer: "The granite surfaces show cracks, rough or flaking patches, and crumbling grains — signs the rock is breaking apart into smaller pieces while staying in place, which is weathering."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [REPEATS, BANNED_OPENER, INFO_DUMP]
+
+rubric:
+  - "Does NOT ask 'what do you notice about the rock surfaces' a third time, or any near-restatement of that same probe"
+  - "Changes strategy — e.g. offers a binary/two-option choice, states one concrete observation and asks the student to agree or disagree, or moves to a different entry point into weathering"
+  - "Stays brief and non-confrontational; no guilt-tripping about the non-answers"
+  - "Ends with a low-cost prompt the student can answer in a word"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

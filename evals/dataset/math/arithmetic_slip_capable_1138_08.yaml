@@ -1,0 +1,47 @@
+id: arithmetic_slip_capable_1138_08
+description: >
+  CAPABLE nails the intersecting-lines reasoning — vertically opposite angles
+  are equal, so both angles are 115° and the answer is 115° + 115° — but adds
+  it as 220° instead of 230°. Pure arithmetic slip on top of correct geometry.
+  The tutor must affirm the vertically-opposite rule and surface only the
+  addition slip.
+persona: capable
+subject: math
+lesson_id: 1138
+tags: [arithmetic_slip, math, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Two intersecting roads in Seychelles form four angles. If one angle is
+      115°, what is the sum of the two vertically opposite angles?
+student_turn: "Vertically opposite angles are equal, so both of them are 115. 115 + 115 = 220."
+
+# Simple_tutor needs the in-flight slot to grade against. Without it the engine
+# re-poses instead of grading the student's answer.
+seed_inflight_question:
+  question_text: "Two intersecting roads in Seychelles form four angles. If one angle is 115°, what is the sum of the two vertically opposite angles?"
+  question_type: short_numeric
+  reference_answer: "230"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Affirms the geometry is exactly right: vertically opposite angles are equal, so both angles are 115° and the sum is 115° + 115°"
+  - "Points at the SPECIFIC slip — the addition 115° + 115° was evaluated as 220° — and nothing else"
+  - "Does NOT re-explain vertically opposite angles or question the student's understanding of the rule; the only thing that broke was the arithmetic"
+  - "Asks the student to re-add those two numbers, without stating the total"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

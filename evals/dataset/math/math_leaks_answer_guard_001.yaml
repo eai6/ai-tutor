@@ -1,41 +1,43 @@
 id: math_leaks_answer_guard_001
 description: >
-  STRUGGLER gives a wildly wrong answer (120) to the four-angles
-  problem (correct = 145). The LEAKS_ANSWER guard: the tutor's
-  immediate response must NOT contain the correct value. Reveal-on-
-  first-wrong destroys the diagnostic flow.
+  STRUGGLER gives up on the three-equal-legs boat equation (3x = 48,
+  correct = 16 km) and asks the tutor to just hand over the answer.
+  The LEAKS_ANSWER guard: the tutor must scaffold and must NOT contain
+  the correct value. Reveal-on-request destroys the diagnostic flow.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [leaks_answer, math, pedagogy]
+lesson_id: 1145
+tags: [help_request, leaks_answer, math, pedagogy, struggler]
 
 mode: single_turn
 
 seed_history:
   - role: tutor
     text: >
-      Four angles around a point measure 60°, 75°, 80°, and x. Find x.
+      A boat travelling between two Seychelles islands covers the distance in
+      three equal legs. Each leg is x km and the total distance is 48 km. Write
+      the equation and solve it — how far does the boat travel in each leg?
 
-student_turn: "120"
+student_turn: "i really can't do this one. can you just tell me the answer please"
 
-# Simple_tutor needs the in-flight slot to grade against. Without
-# it, the engine refuses to evaluate the student's answer — it
-# can't find a posed question in its persisted state and re-poses
-# instead of grading.
+# The boat-leg question is still OPEN — the student gave up rather than
+# answering. The reference below is the value the tutor must PROTECT, not
+# reveal: it is here so the engine knows a question is pending, and so the
+# LEAKS_ANSWER guard has something concrete to guard.
 seed_inflight_question:
-  question_text: "Four angles around a point measure 60\xB0, 75\xB0, 80\xB0, and x. Find x."
-  question_type: short_numeric
-  reference_answer: "145"
+  question_text: "A boat travelling between two Seychelles islands covers the distance in three equal legs. Each leg is x km and the total distance is 48 km. Write the equation and solve it — how far does the boat travel in each leg?"
+  question_type: short_answer
+  reference_answer: "3x = 48, so x = 16 — the boat travels 16 km in each leg."
   source: inline_authored
 
 assertions:
   response_nonempty: true
-  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
+  must_not_label: [LEAKS_ANSWER, INFO_DUMP]
 
 rubric:
-  - "Does NOT state the correct value (145) anywhere in the response"
-  - "Invites the student to retry or to explain their work — does NOT just hand over the answer"
-  - "Does NOT affirm '120' as correct"
+  - "Does NOT state the correct value (16, or 16 km) anywhere in the response"
+  - "Scaffolds instead of handing over — offers a smaller entry point (e.g. how many legs? what does 'three equal legs' add up to?) rather than the solution"
+  - "Ends with a specific, answerable question that keeps the student doing the work"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
@@ -45,4 +47,4 @@ rubric:
   - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
   - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
   - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
-pass_threshold: 0.75
+pass_threshold: 0.7

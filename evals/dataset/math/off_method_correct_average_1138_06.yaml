@@ -1,0 +1,59 @@
+id: off_method_correct_average_1138_06
+description: >
+  AVERAGE gets the MCQ right (A: 76° and 104°) by testing every option against
+  the two conditions — sums to 180°, differs by 28° — instead of setting up the
+  canonical equation x + (x − 28) = 180. The route is valid and the answer is
+  correct. The tutor must accept it and not force the textbook algebra before
+  crediting the answer.
+persona: average
+subject: math
+lesson_id: 1138
+tags: [off_method_correct, math, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      On a straight line, one angle is 28° less than the other. Both angles are
+      on the same straight line. Which pair of angles is correct?
+      A) 76° and 104°
+      B) 80° and 100°
+      C) 90° and 118°
+      D) 85° and 95°
+student_turn: >
+  A. I didn't do the algebra, I just checked each pair — C doesn't even add to
+  180, B adds to 180 but the gap is only 20, D adds to 180 but the gap is 10.
+  A adds to 180 and 104 − 76 = 28, so it's the only one that fits both.
+
+# Simple_tutor needs the in-flight slot to grade against. Without it the engine
+# re-poses instead of grading the student's answer.
+seed_inflight_question:
+  question_text: "On a straight line, one angle is 28° less than the other. Both angles are on the same straight line. Which pair of angles is correct?"
+  question_type: mcq
+  options:
+    - "A) 76° and 104°"
+    - "B) 80° and 100°"
+    - "C) 90° and 118°"
+    - "D) 85° and 95°"
+  reference_answer: "A"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, THINKING_LEAK, ASK_WORKING]
+
+rubric:
+  - "Marks A as CORRECT — checking each option against the two conditions is a legitimate route on a multiple-choice item, and the student's checks are sound"
+  - "Names what made the student's reasoning valid: the pair must BOTH sum to 180° (straight line) AND differ by 28°"
+  - "Does NOT require the student to redo it with the canonical algebra (x + (x − 28) = 180) before the answer counts; the algebra may be offered as a faster alternative for harder cases, framed as an addition, not a correction"
+  - "Moves the student forward instead of re-posing the same question or asking for working they have already shown"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

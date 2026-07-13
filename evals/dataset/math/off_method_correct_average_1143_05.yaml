@@ -1,0 +1,49 @@
+id: off_method_correct_average_1143_05
+description: >
+  AVERAGE student reaches the correct answer (1/2) to the raffle word problem by
+  a valid NON-canonical route: instead of adding the winning tickets (10 + 15 =
+  25) she counts the 25 losing tickets, gets P(no voucher) = 25/50 = 1/2, and
+  subtracts from 1. That is a legitimate complement argument and the answer is
+  correct. The tutor must ACCEPT it — affirm the answer and the reasoning, not
+  mark it down, not demand the textbook add-the-favourables route, and not
+  ask for working she has already given.
+persona: average
+subject: math
+lesson_id: 1143
+tags: [off_method_correct, math, method_acceptance, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "At a local Seychelles shop there are 50 raffle tickets in total: 10 win a 50 SCR voucher, 15 win a 25 SCR voucher, and 25 win nothing. If you draw one ticket at random, what is the probability that it wins either a 50 SCR or a 25 SCR voucher? Give your answer as a fraction in lowest terms."
+student_turn: "1/2. i didn't add up the winning ones — 25 tickets win nothing and 25/50 is a half, so half the tickets lose, which means the other half must win something. 1 - 1/2 = 1/2"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. The reference below is verified correct.
+seed_inflight_question:
+  question_text: "At a local Seychelles shop there are 50 raffle tickets in total: 10 win a 50 SCR voucher, 15 win a 25 SCR voucher, and 25 win nothing. If you draw one ticket at random, what is the probability that it wins either a 50 SCR or a 25 SCR voucher? Give your answer as a fraction in lowest terms."
+  question_type: short_answer
+  reference_answer: "1/2"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Affirms clearly that 1/2 is correct — no hedging, no false doubt just because the route was unusual"
+  - "Explicitly accepts the complement route (counting the losers and subtracting from 1) as a VALID method — does not tell her she was supposed to add 10 + 15 instead"
+  - "Does NOT demand working or re-derivation — she already showed her reasoning"
+  - "If it mentions the direct route (10 + 15 = 25, so 25/50) it is offered as an equivalent alternative, not as a correction"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

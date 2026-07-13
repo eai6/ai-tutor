@@ -1,0 +1,43 @@
+id: student_pushes_to_advance_capable_1138_07
+description: >
+  CAPABLE interrupts the "common mistakes" explanation (180° line vs 360° point;
+  ALL angles on the line must be summed) and asks to skip ahead to the quiz. The
+  student's summary is only half the point — they have not shown they handle the
+  three-and-four-angle case. The tutor must neither cave and jump ahead nor
+  stonewall and re-lecture: it should honour the pace with one quick check that
+  doubles as the bridge to the next step.
+persona: capable
+subject: math
+lesson_id: 1138
+tags: [student_pushes_to_advance, math, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      One warning before we go further. Students mix up two rules: angles on a
+      straight line sum to 180°, while angles around a point sum to 360°. The
+      other trap is thinking the 180° rule only applies to two angles — if a
+      straight line is split into three or four angles, you still add them ALL
+      and set the total to 180°.
+student_turn: "yeah yeah I've got it — 180 for a line, 360 for a point. can we just skip to the quiz? this is going slow."
+
+assertions:
+  response_nonempty: true
+  must_not_label: [PREMATURE_ADVANCE, INFO_DUMP, MULTI_PARAGRAPH, REPEATS]
+
+rubric:
+  - "Acknowledges the student's pace and confidence without either caving (jumping straight to the quiz with no check) or stonewalling (refusing and re-delivering the same explanation)"
+  - "Notes that the half they summarised (180° line vs 360° point) is right, but that the second trap — a line split into THREE or FOUR angles still totalling 180° — is the piece not yet demonstrated"
+  - "Turns the push into forward motion: poses ONE quick check on the multi-angle straight-line case (e.g. three angles on a line) and signals that clearing it means moving on"
+  - "Does NOT re-explain the whole rule at length or lecture the student about pacing"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,51 @@
+id: wrong_with_working_error_prone_1145_08
+description: >
+  ERROR_PRONE student mis-translates the triangle diagram: reads "the third side
+  is twice the first side" as the number 2 rather than the expression 2x, giving
+  x + 8 + 2 = 32 and x = 22. Every step AFTER the setup is arithmetically sound.
+  The tutor must locate that one broken translation step, keep the rest of the
+  attempt, and send the student back to re-solve — without revealing x = 8.
+persona: error_prone
+subject: math
+lesson_id: 1145
+tags: [wrong_with_working, math, error_prone, translation_error]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A diagram shows a triangle: one side is x, another side is 8 units, and the
+      third side is twice the first side. The perimeter is 32 units. Write the
+      equation, solve for x, then verify the three sides add to 32.
+student_turn: >
+  the three sides are x, 8 and 2, and perimeter means you add all the sides.
+  so x + 8 + 2 = 32, which is x + 10 = 32, so x = 32 - 10 = 22 units
+
+seed_inflight_question:
+  question_text: >
+    A diagram shows two sides of a triangle: one side is x, the other is 8 units, and
+    the third is twice the first side. If the perimeter is 32 units, solve for x and
+    verify that all three sides add up to 32.
+  question_type: short_numeric
+  reference_answer: "8"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Keeps what the student got right — perimeter as the sum of all three sides is correct, and the algebra after the setup (x + 10 = 32 → x = 22) is executed correctly given their equation"
+  - "Locates the SPECIFIC broken step: the third side is 'twice the FIRST SIDE', and the first side is x — so the third side is the expression 2x, not the number 2. The student substituted a constant where a term in x belongs"
+  - "Asks the student to rewrite the equation with 2x as the third side, collect like terms, and solve it themselves"
+  - "Does NOT state x = 8 and does NOT throw away the whole attempt with a generic 'not quite, try again'"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

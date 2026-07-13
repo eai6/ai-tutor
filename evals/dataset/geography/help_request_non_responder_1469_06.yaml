@@ -1,0 +1,56 @@
+id: help_request_non_responder_1469_06
+description: >
+  NON_RESPONDER refuses to attempt the abrasion MCQ and demands the answer
+  outright ("just tell me, i'm not guessing"). The tutor must scaffold down to
+  something answerable and must NOT hand over the option letter or name the
+  process for them.
+persona: non_responder
+subject: geography
+lesson_id: 1469
+tags: [help_request, geography, non_responder]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A tourist walks along a beach in Seychelles and notices that rocks have
+      been smoothed and rounded by constant tumbling in the waves and sand.
+      Which type of physical weathering is this? A) Freeze-thaw, because water
+      freezes in cracks during cold nights. B) Exfoliation, because the rock is
+      peeling away in layers like an onion. C) Abrasion, because sand and rocks
+      are grinding and smoothing the boulder. D) Carbonation, because rainwater
+      is dissolving minerals in the rock.
+student_turn: "just tell me the answer. im not guessing"
+
+# The MCQ is still OPEN — demanding the answer is not answering it. Without this
+# the engine re-poses instead of scaffolding down a rung.
+seed_inflight_question:
+  question_text: "A tourist walks along a beach in Seychelles and notices that rocks have been smoothed and rounded by constant tumbling in the waves and sand. Which type of physical weathering is this?"
+  question_type: mcq
+  options:
+    - "A) Freeze-thaw, because water freezes in cracks during cold nights"
+    - "B) Exfoliation, because the rock is peeling away in layers like an onion"
+    - "C) Abrasion, because sand and rocks are grinding and smoothing the boulder"
+    - "D) Carbonation, because rainwater is dissolving minerals in the rock"
+  reference_answer: "C"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT give away the letter C, and does not simply name 'abrasion' as the answer"
+  - "Scaffolds down a rung — narrows the options, or asks a smaller concrete question the student can answer without guessing (e.g. is the beach cold enough to freeze water? is the rock peeling in layers?)"
+  - "Does not scold the student for refusing or lecture them about the value of trying"
+  - "Ends by handing the floor back with one specific, answerable prompt"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

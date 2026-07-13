@@ -1,0 +1,52 @@
+id: wrong_with_working_error_prone_1145_04
+description: >
+  ERROR_PRONE student sets up the coconut-box equation correctly (3x + 5 = 20)
+  but breaks the balance rule when clearing the constant — adds 5 to both sides
+  instead of subtracting, getting 3x = 25 and x = 8.33. The tutor must keep the
+  correct setup, locate the ONE broken step, and hand the corrected step back
+  without revealing x.
+persona: error_prone
+subject: math
+lesson_id: 1145
+tags: [wrong_with_working, math, error_prone, balance_rule]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A diagram shows three identical boxes of coconuts plus 5 loose coconuts,
+      totalling 20 coconuts. Write the equation and solve for the number of
+      coconuts in each box — show your steps.
+student_turn: >
+  3 boxes so 3x, plus the 5 loose ones: 3x + 5 = 20.
+  then i move the 5 over: 3x = 20 + 5 = 25.
+  divide by 3: x = 25/3 = 8.33 coconuts in each box
+
+seed_inflight_question:
+  question_text: >
+    A diagram shows three identical boxes of coconuts plus 5 loose coconuts,
+    totalling 20 coconuts. Write the equation and solve for the number of coconuts
+    in each box.
+  question_type: short_numeric
+  reference_answer: "5"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Affirms the part that was right: reading the diagram as 3x + 5 = 20 is a correct translation, and dividing by 3 at the end is the correct final operation"
+  - "Locates the SPECIFIC broken step — the line '3x = 20 + 5'. To undo '+ 5' you SUBTRACT 5 from BOTH sides, so the right-hand side should be 20 − 5, not 20 + 5"
+  - "Ties it back to the balance rule from the lesson (whatever you do to one side, do to the other) rather than issuing a generic 'not quite, try again'"
+  - "Asks the student to redo that one line and finish the solve themselves; does NOT reveal that x = 5 and does NOT discard the whole attempt"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,38 @@
+id: student_pushes_to_advance_probe_resistant_1467_04
+description: >
+  PROBE_RESISTANT student pushes to skip ahead mid-concept — the tutor has just
+  re-stated the ridge and valley definitions before the Silhouette Island task,
+  and the student says they already know it and wants the next question. The
+  tutor must neither cave (skip the check entirely) nor stonewall (refuse and
+  re-lecture); it should fold the check into a single quick prompt and keep
+  moving.
+persona: probe_resistant
+subject: geography
+lesson_id: 1467
+tags: [student_pushes_to_advance, geography, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Before we look at a real island, let's lock the last two terms in. A ridge is the narrow, elevated line running along a mountain top — the spine of a book. A valley is the low area between two higher slopes — the space between your cupped hands. Those two are the ones students most often swap."
+student_turn: "yeah yeah I know all this already, plains slopes ridges valleys. can we just go to the next question"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT cave — it does not simply skip ahead with no check that ridge and valley are actually held"
+  - "Does NOT stonewall — it does not refuse to advance, and it does not re-explain the ridge/valley definitions the student just said they know"
+  - "Honours the student's pace by folding the check into ONE quick prompt and then moving on"
+  - "Stays warm and non-defensive about being told to hurry up"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

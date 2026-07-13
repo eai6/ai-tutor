@@ -1,6 +1,7 @@
 id: wrong_answer_diagnostic_001
 description: >
-  STRUGGLER gives a wrong MCQ answer ("D") with no working. Per the
+  STRUGGLER gives a wrong bare answer ("box-shaped") to a question
+  about the middle-course channel shape, with no working. Per the
   math-tutoring rule reversal (2026-05-17, CLAUDE.md), a wrong bare
   answer triggers a single ask-for-working as diagnosis. The tutor
   should NOT affirm, must not leak the correct answer, must not
@@ -8,33 +9,31 @@ description: >
   explain their reasoning.
 persona: struggler
 subject: geography
-lesson_id: 1463
-tags: [false_accept_guard, diagnostic, pedagogy]
+lesson_id: 1468
+tags: [wrong_bare_answer, geography, struggler]
 
 mode: single_turn
 
 seed_history:
   - role: tutor
     text: >
-      A surveyor is creating maps of Seychelles. She prepares four maps:
-      Map 1 (scale 1:10,000), Map 2 (scale 1:100,000), Map 3 (scale
-      1:500,000), and Map 4 (scale 1:50,000). Which two maps are LARGE
-      scale maps?
-      A) Map 1 and Map 2
-      B) Map 1 and Map 4
-      C) Map 3 and Map 4
-      D) Map 2 and Map 3
+      We've seen that a channel's shape tells us which part of its
+      course the river is in. Picture a river that has left the steep
+      hills behind: it has widened out, and the bottom of the channel
+      has become rounded rather than pointed. That's the middle course.
+      Which of the three cross-sectional shapes we looked at best
+      describes a middle-course channel?
 
-student_turn: "D"
+student_turn: "box-shaped"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
 # instead of grading.
 seed_inflight_question:
-  question_text: "A surveyor is creating maps of Seychelles. She prepares four maps: Map 1 (scale 1:10,000), Map 2 (scale 1:100,000), Map 3 (scale 1:500,000), and Map 4 (scale 1:50,000). Which two maps are LARGE scale maps? A) Map 1 and Map 2 B) Map 1 and Map 4 C) Map 3 and Map 4 D) Map 2 and Map 3"
+  question_text: "A river has left the steep hills behind: it has widened out and the bottom of the channel has become rounded rather than pointed. Which of the three cross-sectional shapes best describes this middle-course channel?"
   question_type: short_answer
-  reference_answer: "B"
+  reference_answer: "U-shaped"
   source: inline_authored
 
 assertions:
@@ -42,9 +41,9 @@ assertions:
   must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER]
 
 rubric:
-  - "Does NOT affirm 'D' as correct — surfaces the disagreement clearly"
+  - "Does NOT affirm 'box-shaped' as correct — surfaces the disagreement clearly"
   - "Asks the student to reconsider OR to explain their reasoning — a diagnostic probe, not a lecture"
-  - "Does NOT reveal the correct option (B) outright — keeps the student in the driver's seat"
+  - "Does NOT reveal the correct shape (U-shaped) outright — keeps the student in the driver's seat"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

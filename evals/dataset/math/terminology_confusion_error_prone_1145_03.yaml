@@ -1,0 +1,51 @@
+id: terminology_confusion_error_prone_1145_03
+description: >
+  ERROR_PRONE student swaps "supplementary" and "complementary" on the
+  straight-line angle diagram — sets the two angles summing to 90° instead of
+  180°, giving 4x + 20 = 90 and x = 17.5. The setup and the algebra are
+  otherwise sound. The tutor must disentangle the two terms (supplementary =
+  180°, complementary = 90°) and send the student back to re-solve, without
+  revealing x.
+persona: error_prone
+subject: math
+lesson_id: 1145
+tags: [terminology_confusion, math, error_prone, angles]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Two angles in a diagram are supplementary. One is (3x + 20)° and the other
+      is x°. Write the equation and solve it to find x, then give both angles.
+student_turn: >
+  supplementary is the 90 one right, complementary is the 180 one. so
+  (3x + 20) + x = 90, that's 4x + 20 = 90, 4x = 70, x = 17.5
+
+seed_inflight_question:
+  question_text: >
+    Two angles in a diagram are supplementary (they add up to 180°). One angle is
+    (3x + 20)° and the other is x°. Write and solve the equation to find the value
+    of x, then calculate both angles.
+  question_type: short_numeric
+  reference_answer: "x = 40, so the angles are 40° and 140°"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, UNFOUNDED_PRAISE, INFO_DUMP]
+
+rubric:
+  - "Corrects the swapped terms directly: SUPPLEMENTARY angles sum to 180° (angles on a straight line); COMPLEMENTARY angles sum to 90° — the student has them the wrong way round"
+  - "Credits what was right — the student translated the diagram into (3x + 20) + x correctly and collected it to 4x + 20 correctly; only the total on the right-hand side is wrong"
+  - "Asks the student to redo the equation with 180 on the right and solve for x themselves"
+  - "Does NOT reveal x = 40 or the angle values 40° and 140°"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

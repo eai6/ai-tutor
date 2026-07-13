@@ -1,47 +1,47 @@
 id: math_probe_resistant_mcq_001
 description: >
-  PROBE_RESISTANT picks correct MCQ option without explanation. Tutor
-  must not demand explanation — a correct MCQ on a discrete question
-  doesn't need narrative justification.
+  PROBE_RESISTANT picks the correct MCQ option ("A") for 3x + 20 = 95
+  without explanation. Tutor must not demand explanation — a correct
+  MCQ on a discrete question doesn't need narrative justification.
 persona: probe_resistant
 subject: math
-lesson_id: 1137
-tags: [persona_handling, math, mcq, probe_resistant, bare_answer]
+lesson_id: 1145
+tags: [correct_mcq, math, mcq, probe_resistant, bare_answer]
 
 mode: single_turn
 seed_history:
   - role: tutor
     text: |
-      Quick check. Angles around a point sum to which value?
-      A) 90°
-      B) 180°
-      C) 270°
-      D) 360°
-student_turn: "D"
+      Quick check on the balance rule before we go back to diagrams. Solve: 3x + 20 = 95
+      A) 25
+      B) 38.3333
+      C) 11.6667
+      D) -25
+student_turn: "A"
 
 # Simple_tutor needs the in-flight slot to grade against. Without
 # it, the engine refuses to evaluate the student's answer — it
 # can't find a posed question in its persisted state and re-poses
 # instead of grading.
 seed_inflight_question:
-  question_text: "Quick check. Angles around a point sum to which value?"
+  question_text: "Solve: 3x + 20 = 95"
   question_type: mcq
   options:
-    - "A) 90\xB0"
-    - "B) 180\xB0"
-    - "C) 270\xB0"
-    - "D) 360\xB0"
-  reference_answer: "D"
+    - "A) 25"
+    - "B) 38.3333"
+    - "C) 11.6667"
+    - "D) -25"
+  reference_answer: "A"
   source: inline_authored
 
 assertions:
   response_nonempty: true
-  must_not_label: [ASK_WORKING, BANNED_OPENER]
+  must_not_label: [ASK_WORKING, BANNED_OPENER, WRONG_VERDICT]
 
 rubric:
-  - "Confirms 'D' (360°) is correct"
-  - "Does NOT demand reasoning from a correct MCQ answer"
-  - "Advances to the next concept"
+  - "Confirms 'A' (x = 25) is correct"
+  - "Does NOT demand reasoning or working from a correct MCQ answer"
+  - "Advances — returns to the diagram equations or poses the next question"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

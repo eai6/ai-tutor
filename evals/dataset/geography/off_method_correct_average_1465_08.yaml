@@ -1,0 +1,41 @@
+id: off_method_correct_average_1465_08
+description: >
+  AVERAGE student gets the right answer (10 grid squares apart, due north) by
+  sketching the grid and counting squares, instead of subtracting the
+  northings. Tutor must accept the method, not force the textbook route.
+persona: average
+subject: geography
+lesson_id: 1465
+tags: [off_method_correct, geography, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Two beaches in Seychelles have grid references 2345 and 2355. Describe where they are relative to each other, and how many grid squares apart they are."
+student_turn: "I couldn't do it in my head so I drew the grid on squared paper. I put a dot in square 2345, then a dot in 2355, and counted the squares between them going up — 10 squares. I never had to move left or right at all, so the 2355 beach is straight above the other one, i.e. due north. 10 squares apart, straight north."
+
+seed_inflight_question:
+  question_text: "Two beaches in Seychelles have grid references 2345 and 2355. Describe where they are relative to each other, and how many grid squares apart they are."
+  question_type: short_answer
+  reference_answer: "Both have the same easting (23), so they lie in the same column; the northings are 45 and 55, so beach 2355 is 10 grid squares directly north of beach 2345."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING, INFO_DUMP]
+
+rubric:
+  - "Confirms the answer is correct: 10 grid squares apart, with 2355 directly north of 2345"
+  - "Accepts sketching-and-counting as a valid route — does not mark it down, call it inefficient in a discouraging way, or treat it as not really answering"
+  - "Does NOT require the student to redo it with the canonical method (same easting 23, subtract northings 55 − 45 = 10) before moving on; if it mentions the shortcut at all, it is offered as an option, not a correction"
+  - "Advances the lesson rather than re-teaching what the student has just demonstrated"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

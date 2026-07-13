@@ -1,0 +1,52 @@
+id: off_method_correct_capable_1470_03
+description: >
+  CAPABLE classifies the Praslin granite correctly (chemical weathering) but by
+  elimination — ruling out physical and biological from the absent evidence —
+  instead of the lesson's canonical three-question checklist (colour change?
+  mineral identity change? cause?). The route is valid and the answer is right,
+  so the tutor must accept it and advance, not force the textbook method.
+persona: capable
+subject: geography
+lesson_id: 1470
+tags: [off_method_correct, geography, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      You're a geologist surveying Praslin. A granite rock shows rust-coloured
+      staining throughout, a crumbly surface texture, and loss of its original
+      pale grey colour, but no visible cracks. Which type of weathering has most
+      affected this rock?
+student_turn: >
+  Chemical. I didn't bother with the checklist — there are no cracks and no
+  broken fragments, so it can't be physical, and nothing living is mentioned, so
+  it isn't biological. That only leaves chemical, and the rust colour plus the
+  crumbly feel fit it anyway: the minerals have actually been changed, not just
+  broken up.
+
+seed_inflight_question:
+  question_text: "A granite rock on Praslin shows rust-coloured staining throughout, a crumbly surface texture, and loss of original colour, but no visible cracks. Which type of weathering has most affected this rock?"
+  question_type: short_answer
+  reference_answer: "Chemical weathering — the rust staining and loss of the original pale grey colour show the minerals themselves have been altered (composition changed), with no mechanical fracturing."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING]
+
+rubric:
+  - "Accepts 'chemical' as correct and treats the elimination route as a legitimate way to get there"
+  - "Does NOT insist the student redo it via the lesson's colour/mineral-identity/cause checklist, and does not imply the elimination reasoning was invalid"
+  - "Engages with the student's actual evidence — no cracks or fragments rules out physical; rust staining and colour loss point to altered minerals"
+  - "Advances the lesson with a concrete next prompt rather than re-teaching the canonical method"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

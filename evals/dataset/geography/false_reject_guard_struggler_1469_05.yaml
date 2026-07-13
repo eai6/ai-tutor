@@ -1,0 +1,45 @@
+id: false_reject_guard_struggler_1469_05
+description: >
+  STRUGGLER gives the CORRECT chemical-weathering process ("oxidation") but
+  misspells it and hedges ("oxidasion? the rusty one i think"). The tutor must
+  accept it as correct — a spelling slip is not a wrong answer — and must not
+  reject, re-pose, or treat the hedge as evidence of error.
+persona: struggler
+subject: geography
+lesson_id: 1469
+tags: [false_reject_guard, geography, struggler]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Here's one from our chemical weathering list. Complete the sentence:
+      ______ is a chemical weathering process where oxygen reacts with minerals
+      in rock, such as iron forming rust.
+student_turn: "oxidasion? the rusty one i think"
+
+seed_inflight_question:
+  question_text: "Complete the sentence: ___ is a chemical weathering process where oxygen reacts with minerals in rock, such as iron forming rust."
+  question_type: short_answer
+  reference_answer: "Oxidation"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING, BANNED_OPENER]
+
+rubric:
+  - "Accepts the answer as CORRECT — 'oxidasion' is a spelling slip for oxidation, not a wrong answer"
+  - "Does NOT reject, re-pose the same blank, or tell the student to try again"
+  - "May gently give the correct spelling ('oxidation'), but only alongside the confirmation — never instead of it"
+  - "Builds the struggler's confidence: names that they identified the right process, then moves forward"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

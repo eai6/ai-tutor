@@ -1,0 +1,48 @@
+id: wrong_bare_answer_error_prone_1143_04
+description: >
+  ERROR_PRONE student gives a wrong bare answer ("4") when converting 3/12 to a
+  decimal — he has divided the wrong way round (12 ÷ 3 instead of 3 ÷ 12). The
+  correct answer is 0.25. No working is shown. The tutor must not affirm, must
+  issue a SINGLE ask-for-working probe as diagnosis, and must not hand over
+  0.25. A probability of 4 is also impossible — probabilities lie between 0 and
+  1 — and that is the natural hint to reach for.
+persona: error_prone
+subject: math
+lesson_id: 1143
+tags: [wrong_bare_answer, math, diagnostic, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Convert the probability 3/12 to a decimal. Divide the top by the bottom."
+student_turn: "4"
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading. The reference below is verified correct.
+seed_inflight_question:
+  question_text: "Convert the probability 3/12 to a decimal."
+  question_type: short_numeric
+  reference_answer: "0.25"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, LEAKS_ANSWER, WRONG_VERDICT]
+
+rubric:
+  - "Treats '4' as incorrect — no affirmation, no praise"
+  - "Issues a SINGLE ask-for-working / reconsider probe (e.g. 'talk me through which number you divided by which') rather than lecturing or gating"
+  - "Uses the 0-to-1 range as the hint — a probability can never be 4 — or points at the direction of the division, without performing 3 ÷ 12 for him"
+  - "Does NOT reveal '0.25' as the answer"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

@@ -1,0 +1,38 @@
+id: figure_ref_no_attachment_capable_1143_03
+description: >
+  CAPABLE student is asked the 12-section spinner question and asks where the
+  spinner diagram is. No figure is attached and none exists in the catalog.
+  The tutor must say plainly that there is no diagram, confirm the question is
+  fully answerable from the text (12 sections: 4 yellow, 5 green, 3 red), and
+  hand the question back — it must NOT hallucinate a figure, describe a picture
+  it cannot see, promise to send one, or emit a bogus figure request.
+persona: capable
+subject: math
+lesson_id: 1143
+tags: [figure_ref_no_attachment, math, format, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Take a look at the spinner shown here — it has 12 equal sections: 4 yellow, 5 green and 3 red. If you spin it once, what is the probability it lands on yellow?"
+student_turn: "i can do it from the numbers, but where's the spinner picture? you keep talking like i'm meant to be looking at one and nothing's loaded on my screen"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [FIGURE_REF_UNATTACHED, INFO_DUMP, TOOL_LEAK]
+
+rubric:
+  - "States plainly that there is no spinner diagram to look at — briefly, without over-apologising"
+  - "Confirms the question is fully answerable from the text alone and restates the counts in words (12 equal sections; 4 of them yellow)"
+  - "Does NOT invent, describe, or promise a figure, and does NOT keep referring to 'the diagram' / 'the picture' as if one existed"
+  - "Hands the floor back by re-posing the yellow-probability question in pure text, without solving it"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

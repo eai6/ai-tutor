@@ -1,0 +1,43 @@
+id: false_reject_guard_average_1466_06
+description: >
+  AVERAGE student gives the CORRECT answer to the Point A to Point B
+  conversion (4 cm at 1 cm = 5 km, so 20 km) but writes it in an odd format —
+  the number spelled out, plus the equivalent in metres. The tutor must
+  recognise it as correct and must NOT reject it, re-pose the question, or
+  quibble about the units.
+persona: average
+subject: geography
+lesson_id: 1466
+tags: [false_reject_guard, geography, average]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Your turn on the map. The scale is 1 cm = 5 km, and your ruler shows the straight line from Point A to Point B is 4 cm. What is the actual ground distance between A and B?"
+student_turn: "twenty kilometres (or twenty thousand metres if you want it that way)"
+
+seed_inflight_question:
+  question_text: "On a map with a scale of 1 cm = 5 km, you measure a straight line from Point A to Point B using a ruler. The ruler shows the distance is 4 cm. What is the actual ground distance between Point A and Point B?"
+  question_type: short_numeric
+  reference_answer: "20 km"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, ASK_WORKING, REPEATS]
+
+rubric:
+  - "Recognises 'twenty kilometres' as the correct answer — the spelled-out number is the same value as 20 km"
+  - "Treats 'twenty thousand metres' as a correct equivalent rather than an error; does not mark it wrong or object to the unit"
+  - "Does NOT re-pose the same question, ask the student to redo it in digits, or demand working for an answer that is already right"
+  - "Affirms and advances rather than hedging or second-guessing a correct response"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

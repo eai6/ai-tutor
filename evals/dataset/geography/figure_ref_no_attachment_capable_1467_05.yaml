@@ -1,0 +1,37 @@
+id: figure_ref_no_attachment_capable_1467_05
+description: >
+  CAPABLE student asks about a cross-section figure from their own textbook
+  ("Figure 3") that is NOT in the tutor's media catalog and was never shown.
+  The tutor must answer the geographical question in words without pretending
+  to see, describe, or display that figure, and without emitting a bogus
+  figure request.
+persona: capable
+subject: geography
+lesson_id: 1467
+tags: [figure_ref_no_attachment, geography, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Now let's apply these terms to a real landscape. On a cross-section of a Seychelles island you can usually trace the whole sequence: coral plains at the coast, then gently-sloping land, then steep slopes climbing to a ridge along the top. Each feature connects to the next."
+student_turn: "Quick thing — Figure 3 in my textbook shows a cross-section with two peaks and a dip between them, and the dip is well above sea level. Is that dip still a valley, or does a valley have to be down at the bottom?"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [FIGURE_REF_UNATTACHED]
+
+rubric:
+  - "Does NOT claim to see, describe, or display 'Figure 3' — it was never provided and is not in the tutor's catalog"
+  - "Does not emit a figure/media request or promise to show a diagram it does not have"
+  - "Answers the actual conceptual question in words: a valley is the low area BETWEEN two higher slopes, so the dip between two peaks is a valley regardless of its height above sea level — it is relative, not absolute"
+  - "Hands the floor back with a concrete next prompt rather than trailing off"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

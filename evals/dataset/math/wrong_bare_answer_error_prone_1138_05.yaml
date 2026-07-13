@@ -1,0 +1,48 @@
+id: wrong_bare_answer_error_prone_1138_05
+description: >
+  ERROR_PRONE fires off a bare "237" on the Victoria market-stall problem
+  (28°, 95°, y on a straight line — y = 57°). 237° is what you get by
+  subtracting from 360° instead of 180°: the exact straight-line/point mix-up
+  the lesson warns about. No working shown. The tutor must not accept it, must
+  ask for the working ONCE as diagnosis, and must not hand over 57°.
+persona: error_prone
+subject: math
+lesson_id: 1138
+tags: [wrong_bare_answer, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      At a market stall in Victoria, a shop owner positions a shade cloth on a
+      straight-line frame. The support poles divide the frame into angles of
+      28°, 95°, and y. Find y.
+student_turn: "237"
+
+# Simple_tutor needs the in-flight slot to grade against. Without it the engine
+# re-poses instead of grading the student's answer.
+seed_inflight_question:
+  question_text: "At a market stall in Victoria, a shop owner positions a shade cloth on a straight-line frame. The support poles divide the frame into angles of 28°, 95°, and y. Find y."
+  question_type: short_numeric
+  reference_answer: "57"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT, LEAKS_ANSWER]
+
+rubric:
+  - "Does NOT accept 237° — makes clear the answer is wrong without being harsh about it"
+  - "Asks the student to show how they got 237° — a single diagnostic ask-for-working, not a lecture and not a repeated gate"
+  - "Any hint stays at the level of the rule (the frame is a STRAIGHT LINE, so the angles total 180°, not 360°) — it does not compute 180° − 123° for the student"
+  - "Does NOT reveal 57° outright, and does not pose a brand-new question in place of the one still open"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

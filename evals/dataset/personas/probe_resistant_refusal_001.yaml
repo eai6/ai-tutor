@@ -1,24 +1,26 @@
 id: probe_resistant_refusal_001
 description: >
   PROBE_RESISTANT has already refused to show their reasoning twice in
-  this session ("I just know" / "i guessed"). The tutor's NEXT response
-  must change strategy — it must NOT recycle the same prescribed working
-  request a third time. This is the banned-opener-loop regression the
-  unified judge rollout was meant to surface.
+  this session ("i just know" / "idk i guessed") after naming a river
+  channel shape. The tutor's NEXT response must change strategy — it
+  must NOT recycle the same prescribed working request a third time.
+  This is the banned-opener-loop regression the unified judge rollout
+  was meant to surface.
 persona: probe_resistant
 subject: geography
-lesson_id: 1463
-tags: [repetition, banned_opener, persona_handling]
+lesson_id: 1468
+tags: [repetition_banned_opener, geography, probe_resistant]
 
 mode: single_turn
 
 seed_history:
   - role: tutor
     text: >
-      Looking at Map 1 (1:10,000) and Map 2 (1:100,000) — which scale
-      shows more detail?
+      A river in the upper course of its journey has very steep banks
+      that meet at a sharp point at the bottom, with almost no sideways
+      erosion. Which cross-sectional shape best describes this channel?
   - role: student
-    text: "Map 1"
+    text: "V-shaped"
   - role: tutor
     text: "Can you walk me through your steps?"
   - role: student
@@ -30,13 +32,22 @@ seed_history:
 
 student_turn: "i don't want to explain"
 
+# The channel-shape question is still OPEN — the student named a shape but has
+# refused every request to show reasoning, so nothing has been graded. Without
+# this the engine sees no pending question and re-poses.
+seed_inflight_question:
+  question_text: "A river in the upper course of its journey has very steep banks that meet at a sharp point at the bottom, with almost no sideways erosion. Which cross-sectional shape best describes this channel?"
+  question_type: short_answer
+  reference_answer: "V-shaped — vertical erosion (downcutting) dominates in the steep upper course, so the channel is narrow and the steep banks meet at a sharp point at the bottom."
+  source: inline_authored
+
 assertions:
   response_nonempty: true
   must_not_label: [BANNED_OPENER, REPEATS]
 
 rubric:
   - "Changes strategy compared to the prior 'walk me through' / 'show me your working' attempts — does NOT recycle the same probe a third time"
-  - "Offers an alternative path forward (e.g., a multiple-choice check, a worked example, a simpler subquestion, or moving on with a flagged gap) rather than blocking on the refused probe"
+  - "Offers an alternative path forward (e.g., a multiple-choice check on another channel shape, a worked cross-section, a simpler subquestion about the banks or the riverbed, or moving on with a flagged gap) rather than blocking on the refused probe"
   - "Tone is non-confrontational — does not pressure or shame the student for not explaining"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."

@@ -1,0 +1,44 @@
+id: arithmetic_slip_error_prone_1138_05
+description: >
+  ERROR_PRONE applies the straight-line rule correctly to the three-angle
+  problem (35°, 78°, x) — adds the known angles to 113° correctly, subtracts
+  from 180° — but mis-evaluates the subtraction as 77° instead of 67°. The
+  tutor must keep the method intact and point at the SPECIFIC subtraction slip.
+persona: error_prone
+subject: math
+lesson_id: 1138
+tags: [arithmetic_slip, math, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "A straight line is divided into three angles: 35°, 78°, and x. Find the value of x."
+student_turn: "ok 35 + 78 = 113, then 180 - 113 = 77 so x = 77°"
+
+# Simple_tutor needs the in-flight slot to grade against. Without it the engine
+# re-poses instead of grading the student's answer.
+seed_inflight_question:
+  question_text: "A straight line is divided into three angles: 35°, 78°, and x. Find the value of x."
+  question_type: short_numeric
+  reference_answer: "67"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [UNFOUNDED_PRAISE, WRONG_VERDICT]
+
+rubric:
+  - "Affirms the METHOD is right — adding all the known angles and subtracting the total from 180° is exactly the straight-line rule for three angles"
+  - "Confirms 35° + 78° = 113° is correct, so the setup and the addition are not the problem"
+  - "Points at the SPECIFIC slip: the subtraction 180° − 113° was mis-evaluated as 77°, and asks the student to redo just that step"
+  - "Does NOT discard the student's working, restart the problem from scratch, or re-teach the 180° rule as if the student had misunderstood it"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

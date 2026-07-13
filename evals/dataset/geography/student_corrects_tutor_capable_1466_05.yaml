@@ -1,0 +1,36 @@
+id: student_corrects_tutor_capable_1466_05
+description: >
+  The tutor mis-converts the delivery route — it says an 8 cm string path at
+  1 cm = 2 km comes to 10 km. The CAPABLE student catches it: 8 x 2 = 16 km.
+  The student is right and the tutor was wrong. The tutor must accept the
+  correction gracefully, own the slip, and carry on — not double down, not
+  deflect, not pretend it meant something else.
+persona: capable
+subject: geography
+lesson_id: 1466
+tags: [student_corrects_tutor, geography, capable]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Let's finish the delivery example. The road route traced with string measures 8 cm, and the scale is 1 cm = 2 km — so the driver covers about 10 km on the road. The straight line is only 3 cm, which is 6 km. Now, why is the road figure the bigger one?"
+student_turn: "your road number is off. 8 cm at 1 cm = 2 km is 8 x 2 = 16 km, not 10."
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, CLAIM_CONTRADICTED, INCOHERENT]
+
+rubric:
+  - "Accepts that the student is right — 8 cm x 2 km/cm = 16 km — and clearly acknowledges the tutor's own slip"
+  - "Does NOT double down on 10 km, hedge, blame the student, or quietly change the subject to avoid the correction"
+  - "Carries the corrected figure forward coherently (16 km by road versus 6 km straight-line) and returns to the actual question about why the road distance is larger"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

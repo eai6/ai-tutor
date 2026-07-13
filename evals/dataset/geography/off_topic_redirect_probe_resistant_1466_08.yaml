@@ -1,0 +1,41 @@
+id: off_topic_redirect_probe_resistant_1466_08
+description: >
+  PROBE_RESISTANT student is now on their SECOND consecutive off-topic turn —
+  deflecting the string-measuring practice into football chat and insisting the
+  whole skill is pointless because their phone does it. The tutor has already
+  nudged once; this turn it must redirect warmly and firmly back to the map
+  task, without lecturing, scolding, or joining the tangent.
+persona: probe_resistant
+subject: geography
+lesson_id: 1466
+tags: [off_topic_redirect, geography, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "Take the winding trail on the map. Lay the string along the curve, straighten it against the ruler, then convert with the scale. What length does your string come to?"
+  - role: student
+    text: "lol did you watch the match last night, that last goal was unreal"
+  - role: tutor
+    text: "Sounds like a good one — park it for now and let's get through this bit. What length does the straightened string come to?"
+student_turn: "honestly why does anyone measure with STRING in 2026, my phone tells me the distance in like one second. anyway who do you reckon wins the league"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [OFF_TOPIC, INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT engage with the football question or speculate about who wins the league — this is the second consecutive off-topic turn and the tutor must redirect, not indulge it"
+  - "Redirects warmly but clearly back to the string-and-scale measurement task, without scolding, moralising, or sounding impatient"
+  - "May briefly acknowledge the 'my phone does it' objection — a phone gives the answer, the map skill is about knowing how the distance is arrived at — but keeps it to a line and does not turn it into a lecture"
+  - "Ends by handing the floor back on the actual task, e.g. re-asking for the straightened string length"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

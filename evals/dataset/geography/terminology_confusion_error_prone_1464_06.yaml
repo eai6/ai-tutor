@@ -1,0 +1,46 @@
+id: terminology_confusion_error_prone_1464_06
+description: >
+  ERROR_PRONE student swaps the two domain terms: says the COMPASS POINT is the
+  number of degrees (225) and the BEARING is the name (SW). The pairing SW = 225
+  is right; the labels are exactly the wrong way round. The tutor must disentangle
+  the terms, credit the correct pairing, and not mark the whole thing correct.
+persona: error_prone
+subject: geography
+lesson_id: 1464
+tags: [terminology_confusion, geography, error_prone]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: "One last thing before we move on. In your own words, what is the difference between a compass point and a bearing? Give me an example of each for the same direction."
+student_turn: "ok so the compass point is the number of degrees, like 225. and the bearing is the name you say out loud, like SW. so for southwest the compass point is 225 and the bearing is SW."
+
+# Simple_tutor needs the in-flight slot to grade against. Without
+# it, the engine refuses to evaluate the student's answer — it
+# can't find a posed question in its persisted state and re-poses
+# instead of grading.
+seed_inflight_question:
+  question_text: "Explain the difference between a compass point and a bearing, and give one example of each for the same direction."
+  question_type: short_answer
+  reference_answer: "A compass point is the NAMED direction (N, NE, E, SE, S, SW, W, NW). A bearing is the ANGLE in degrees measured clockwise from North, 0 to 360. For the same direction: the compass point Southwest (SW) is the bearing 225 degrees."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [WRONG_VERDICT, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Identifies that the two terms are swapped: the NAME (SW) is the compass point and the DEGREE measure (225) is the bearing, not the other way round."
+  - "Credits what the student did get right — the pairing of Southwest with 225 degrees is correct — while being clear the labels are reversed, so no false 'that's correct' verdict."
+  - "Disentangles the two terms with one compact handle (bearing = the number, measured clockwise from North; compass point = the name) rather than re-teaching the entire compass rose."
+  - "Gives the student one concrete chance to restate the distinction correctly (R16: a small hint at attempt 0, not the finished definition handed over)."
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

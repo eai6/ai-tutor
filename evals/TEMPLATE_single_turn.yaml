@@ -27,7 +27,7 @@ student_turn: "<what the student says>"
 # corrupts the grader and makes false-accept scenarios unwinnable.
 seed_inflight_question:
   question_text: "<the question posed>"
-  question_type: <short_answer|short_numeric|multiple_choice>
+  question_type: <short_answer|short_numeric|mcq>   # mcq ALSO requires an `options:` list of >=2
   reference_answer: "<the CORRECT answer>"
   source: inline_authored
 

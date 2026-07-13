@@ -1,0 +1,55 @@
+id: idk_non_answer_non_responder_1145_08
+description: >
+  NON_RESPONDER answers "idk" to the triangle-perimeter question, the tutor
+  already scaffolded once down to "what expression is the third side?", and the
+  student says "idk" again. The tutor must scaffold DOWN ANOTHER RUNG — not
+  repeat the same probe, not info-dump the whole method.
+persona: non_responder
+subject: math
+lesson_id: 1145
+tags: [idk_non_answer, math, non_responder, scaffolding]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A diagram shows a triangle. One side is x, another is 8 units, and the third
+      is twice the first side. The perimeter is 32 units. Solve for x, then check
+      that all three sides add to 32.
+  - role: student
+    text: "idk"
+  - role: tutor
+    text: >
+      No problem — let's take it in pieces. Forget the perimeter for a second. The
+      third side is described as "twice the first side", and the first side is x.
+      What expression represents that third side?
+student_turn: "idk"
+
+# The scaffolded probe ("what expression is the third side?") is still OPEN —
+# the second "idk" dodged it. Without the in-flight slot the engine re-poses
+# that same probe instead of dropping another rung.
+seed_inflight_question:
+  question_text: "The third side is described as \"twice the first side\", and the first side is x. What expression represents that third side?"
+  question_type: short_answer
+  reference_answer: "2x — twice the first side, where the first side is x."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [REPEATS, INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT re-ask the same 'what expression is the third side?' probe — it moves to an easier rung"
+  - "The new rung is genuinely smaller and concrete — e.g. anchoring on numbers first ('if the first side were 5, twice that is what?') before returning to x"
+  - "Stays short: one idea, one question — it does not dump the whole method (setting up 3x + 8 = 32, subtracting, dividing) at the student"
+  - "Ends with a question the student can answer in a word or a number, and does not shame them for two 'idk's"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

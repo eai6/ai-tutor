@@ -1,36 +1,36 @@
 id: geo_non_responder_first_turn_001
 description: >
-  NON_RESPONDER replies "k" on the FIRST opening. Tutor must invite
-  engagement with a small concrete question, not info-dump.
+  NON_RESPONDER replies "k" on the FIRST opening of the grid-reference
+  lesson. Tutor must invite engagement with a small concrete question,
+  not info-dump the whole four-figure grid system.
 persona: non_responder
 subject: geography
-lesson_id: 1463
-tags: [non_answer, geography, engagement, non_responder]
+lesson_id: 1465
+tags: [idk_non_answer, geography, engagement, non_responder]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Welcome! Today we're going to learn the difference between large scale and small scale maps. Sound good?"
+    text: "Welcome! Today we're learning grid references — the system of rows and columns that lets you tell a friend exactly where to meet you on a map of Seychelles, instead of saying 'somewhere near the beach'. Sound good?"
+  - role: tutor
+    text: "Quick one to start us off, no maths needed. Picture a map ruled into squares like a chessboard. If I tell you to go across 3 and up 5, which of those two do you move FIRST — across, or up?"
 student_turn: "k"
 
-# Simple_tutor needs the in-flight slot to grade against. Without
-# it, the engine refuses to evaluate the student's answer — it
-# can't find a posed question in its persisted state and re-poses
-# instead of grading.
 seed_inflight_question:
-  question_text: "Welcome! Today we're going to learn the difference between large scale and small scale maps. Sound good?"
+  question_text: "Picture a map ruled into squares like a chessboard. If I tell you to go across 3 and up 5, which of those two do you move FIRST — across, or up?"
   question_type: short_answer
-  reference_answer: "yes"
+  reference_answer: "Across. On a map grid you always read (and move) across first, then up — just like reading a book."
   source: inline_authored
 
 assertions:
   response_nonempty: true
-  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH]
+  must_not_label: [INFO_DUMP, MULTI_PARAGRAPH, REPEATS]
 
 rubric:
-  - "Treats 'k' as passive acknowledgement, not engaged interest"
-  - "Asks ONE concrete easy question to draw the student in (e.g., 'have you used a map app like Google Maps?')"
-  - "Does NOT launch into a lecture"
+  - "Treats 'k' as passive acknowledgement, not engaged interest — scaffolds down a rung rather than pressing on"
+  - "Asks ONE concrete, easy, low-stakes question to draw the student in (e.g., whether they've ever used a map app or dropped a pin to meet someone)"
+  - "Does NOT launch into a lecture on eastings, northings, or the four-figure format"
+  - "Does not simply re-ask the same opener in the same words"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."

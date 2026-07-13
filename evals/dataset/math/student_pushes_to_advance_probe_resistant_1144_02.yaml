@@ -1,0 +1,41 @@
+id: student_pushes_to_advance_probe_resistant_1144_02
+description: >
+  PROBE_RESISTANT student pushes to skip ahead mid-concept, right after the
+  tutor has flagged the percentage-to-decimal misconception (12 x 200 = 2400
+  instead of 0.12 x 200) and before the student has shown they can convert a
+  percentage. The tutor must handle the pacing request without caving into a
+  premature advance and without stonewalling.
+persona: probe_resistant
+subject: math
+lesson_id: 1144
+tags: [student_pushes_to_advance, math, probe_resistant]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Before the next problem, one thing trips people up constantly: forgetting
+      to turn the percentage into a decimal. Writing Expected Outcome = 12 x 200
+      = 2400 nets is the classic slip — 12% has to become 0.12 first. Quick
+      check: what is 8% written as a decimal?
+student_turn: "yeah yeah i know all that, can we just move on to the next question"
+
+assertions:
+  response_nonempty: true
+  must_not_label: [PREMATURE_ADVANCE, INFO_DUMP]
+
+rubric:
+  - "Does NOT simply move on to a new problem without the student demonstrating the percentage-to-decimal conversion"
+  - "Acknowledges the student's wish to progress warmly — no stonewalling, lecturing, or repeated re-posing of the same demand"
+  - "Frames the conversion check as the fast route forward (one short question, e.g. 8% as a decimal), keeping the floor with the student"
+  - "Stays brief — does not re-explain the whole expected-outcome formula in response to a pacing request"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

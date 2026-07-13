@@ -1,0 +1,47 @@
+id: help_request_non_responder_1145_04
+description: >
+  NON_RESPONDER refuses to engage with the coconut-box practice question
+  (3x + 5 = 20, correct = 5 per box) and asks the tutor to just hand the
+  answer over. The tutor must scaffold down to a rung the student can stand
+  on — never hand over the value, never dump the whole method.
+persona: non_responder
+subject: math
+lesson_id: 1145
+tags: [help_request, math, non_responder, scaffolding]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      Your turn. A diagram shows three identical boxes of coconuts plus 5 loose
+      coconuts, totalling 20 coconuts. Write the equation from the diagram, then
+      solve it — how many coconuts are in each box?
+student_turn: "idk. just tell me the answer"
+
+# The coconut-box question is still OPEN — the student dodged it. Without the
+# in-flight slot the engine re-poses instead of scaffolding down.
+seed_inflight_question:
+  question_text: "A diagram shows three identical boxes of coconuts plus 5 loose coconuts, totalling 20 coconuts. Write the equation from the diagram, then solve it — how many coconuts are in each box?"
+  question_type: short_answer
+  reference_answer: "3x + 5 = 20, so 3x = 15 and x = 5 — each box contains 5 coconuts."
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [LEAKS_ANSWER, INFO_DUMP, MULTI_PARAGRAPH]
+
+rubric:
+  - "Does NOT state the answer (5, or '5 coconuts per box') anywhere in the response"
+  - "Drops to a much smaller first rung the student can actually answer — e.g. 'how many boxes are in the diagram?' or 'which number in the picture is the one we don't know?' — rather than re-posing the whole question"
+  - "Stays short: one idea and one question, not a re-teach of the full method"
+  - "Ends by handing the floor back with a concrete question, and does not shame the student for the 'idk'"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

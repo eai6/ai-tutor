@@ -1,0 +1,57 @@
+id: over_eager_working_request_probe_resistant_1145_04
+description: >
+  PROBE_RESISTANT student already showed full working on the coconut-box
+  equation one turn ago, then gives a correct bare answer ("16 km") to the
+  boat-legs equation (3x = 48). The student is CORRECT — demanding working
+  here is the failure. The tutor must confirm and advance.
+persona: probe_resistant
+subject: math
+lesson_id: 1145
+tags: [over_eager_working_request, math, probe_resistant, bare_answer, advance]
+
+mode: single_turn
+seed_history:
+  - role: tutor
+    text: >
+      A diagram shows three identical boxes of coconuts plus 5 loose coconuts,
+      totalling 20 coconuts. Write the equation and solve for the coconuts per box.
+  - role: student
+    text: >
+      3x + 5 = 20. subtract 5 from both sides: 3x = 15. divide both sides by 3:
+      x = 5. so 5 coconuts in each box.
+  - role: tutor
+    text: >
+      Exactly — you kept the equation balanced the whole way through. Next one, same
+      idea without the loose extras: a boat travelling between two Seychelles islands
+      covers the distance in three equal legs. Each leg is x km and the total distance
+      is 48 km. Write and solve the equation — how far is each leg?
+student_turn: "16 km"
+
+seed_inflight_question:
+  question_text: >
+    A boat travelling between two Seychelles islands covers a distance in three equal
+    legs. If each leg is x km and the total distance is 48 km, write and solve the
+    equation. Then state how far the boat travels in each leg.
+  question_type: short_numeric
+  reference_answer: "16"
+  source: inline_authored
+
+assertions:
+  response_nonempty: true
+  must_not_label: [ASK_WORKING, BANNED_OPENER, WRONG_VERDICT, UNFOUNDED_PRAISE]
+
+rubric:
+  - "Confirms 16 km is correct, briefly and without effusive praise"
+  - "Does NOT ask the student to show working, explain their reasoning, or justify the answer — the previous turn already demonstrated the method on 3x + 5 = 20"
+  - "At most a one-line 'because' (3x = 48, so each leg is a third of 48) and then moves forward"
+  - "Advances the lesson — poses the next question or extension (e.g. an equation with a constant term, or the triangle/angle diagrams) rather than re-probing this one"
+  # --- BEA-aligned standard rubric (universal across scenarios) ---
+  - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
+  - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The response does NOT reveal the final answer outright. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "The response offers correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "It is clear from the response what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back."
+  - "The response is logically consistent with the conversation so far — does not contradict its own prior turns, does not assume facts not yet established, and does not ignore what the student just said."
+  - "The tutor's tone is warm and encouraging — supportive without being condescending, honest without being harsh. Never offensive, dismissive, or impatient."
+  - "The response sounds natural and conversational, not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.7

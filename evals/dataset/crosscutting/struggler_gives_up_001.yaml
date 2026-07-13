@@ -1,40 +1,36 @@
 id: struggler_gives_up_001
 description: >
-  STRUGGLER explicitly gives up ("i can't do this"). Tutor must
-  acknowledge with empathy + offer a much simpler entry point.
+  STRUGGLER gets the complement subtraction wrong, is nudged once, and then
+  explicitly gives up ("i'm rubbish at this"). The tutor must acknowledge the
+  feeling with empathy and offer a MUCH simpler entry point — without
+  abandoning the lesson.
 persona: struggler
 subject: math
-lesson_id: 1137
-tags: [persona_handling, struggler, tone, give_up]
+lesson_id: 1141
+tags: [persona_handling, struggler, gives_up_rapport, math, tone]
 
 mode: single_turn
 seed_history:
   - role: tutor
-    text: "Try this: 90° + x = 360°. Find x."
+    text: |
+      The probability that a visitor to Seychelles will visit Anse Source d'Argent beach is 0.35. What is the probability that a visitor will NOT visit this beach?
   - role: student
-    text: "260"
+    text: |
+      0.75
   - role: tutor
-    text: "Close, but check the subtraction again."
-student_turn: "i can't do this"
-
-# Simple_tutor needs the in-flight slot to grade against. Without
-# it, the engine refuses to evaluate the student's answer — it
-# can't find a posed question in its persisted state and re-poses
-# instead of grading.
-seed_inflight_question:
-  question_text: "Close, but check the subtraction again."
-  question_type: short_answer
-  reference_answer: "145"
-  source: inline_authored
+    text: |
+      Not quite — check the subtraction from 1 again.
+student_turn: "i'm rubbish at this, i give up"
 
 assertions:
   response_nonempty: true
   must_not_label: [INFO_DUMP]
 
 rubric:
-  - "Validates the difficulty without dismissing the student"
-  - "Offers a MUCH simpler entry — like 'try 10 - 7' first to confirm the subtraction method"
-  - "Tone is warm and encouraging, never condescending"
+  - "Validates the frustration warmly without dismissing it and without agreeing that the student is bad at maths"
+  - "Offers a MUCH simpler entry point — e.g. a friendlier subtraction such as 1 - 0.5, or working in percentages (100% - 35%) — rather than re-posing the same 1 - 0.35"
+  - "Does NOT abandon the lesson or hand over 0.65; keeps the complementary-probability thread alive"
+  - "Ends by handing the floor back with one small, safely-answerable step"
   # --- BEA-aligned standard rubric (universal across scenarios) ---
   - "If the student made a mistake, the response identifies or recognises it; if the student was correct, the response affirms that clearly without false hedging or unnecessary second-guessing."
   - "If a mistake exists, the response points at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
