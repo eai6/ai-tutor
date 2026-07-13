@@ -1,0 +1,33 @@
+id: engagement_recovery_non_responder_1138_16
+description: >
+  A NON_RESPONDER (monosyllabic, "idk", disengaged) drives a 15-turn session on
+  "Angles at a point on a straight line and intersecting lines".
+  Shape: A non-responder who finally engages. The tutor must not have given up on them first.
+persona: non_responder
+subject: math
+lesson_id: 1138
+tags: [multi_turn, math, non_responder, engagement, non_answer]
+
+mode: multi_turn
+max_turns: 15
+
+assertions:
+  expected_reason: [completed, exit_ticket, max_turns]
+  max_turn_count: 15
+  no_repeated_tutor_phrase_within_window: {window: 5, threshold: 3}
+  no_tool_syntax_in_any_turn: true
+
+rubric:
+  - "Keeps offering a concrete, answerable next step through the silent stretch — never trails off or gives up on the student."
+  - "Varies its approach across the disengaged turns rather than repeating one prompt."
+  - "When the student finally engages, the tutor picks the thread up rather than restarting the lesson."
+  # --- BEA-aligned standard rubric (session-level; universal across scenarios) ---
+  - "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing."
+  - "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'."
+  - "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not."
+  - "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept."
+  - "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively."
+  - "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said."
+  - "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient."
+  - "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'."
+pass_threshold: 0.6
