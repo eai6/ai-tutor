@@ -1,9 +1,9 @@
 """Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for the
-MULTI-TURN evaluation (Improved Eval 3) of the top-15 OSS Qwen models on an A100.
+SINGLE-TURN evaluation (sweep 3) of the top-15 OSS Qwen models on an A100.
 
 Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5;
-judge = Anthropic Sonnet 4.6 (multi-turn default, per the Haiku-vs-Sonnet A/B).
-Results land in offline_eval/multi_turn_results/<SWEEP>/ (persisted to Drive).
+judge = Anthropic Haiku 4.5 @ temp 0 (evals/scorers/llm_rubric.py default).
+Results land in offline_eval/single_turn_results/<SWEEP>/ (persisted to Drive).
 
 Run: python offline_eval/_make_colab_nb.py
 """
@@ -12,30 +12,29 @@ from pathlib import Path
 
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
-DRIVE_FOLDER = 'ai-tutor-eval-multi-turn'    # Drive folder that persists results
+DRIVE_FOLDER = 'ai-tutor-eval-single-turn'   # Drive folder that persists results
 SWEEP = 'sweep3'                             # results subfolder — one per sweep
 
-# The multi-turn set is now 200 scenarios. A full 200-scenario run per model is
-# ~13x sweep 1 and hours-scale even for the small models, so the Colab sweep
-# draws a reproducible SAMPLE. Same seed + same dataset = the same draw for every
-# model, so cross-model comparison stays valid.
+# The single-turn set is 200 scenarios, balanced across 6 personas x 16 lessons x
+# 26 archetypes. This sweep runs the FULL 200 -- not a sample -- so the OSS models
+# are scored on exactly the same scenarios as the Gemini / Vertex Model Garden
+# models in the laptop sweep (single_turn_results/sweep3/). Same denominator, same
+# scenarios, one combined leaderboard.
 #
-# This replaces the old hardcoded `core15` subset. The difference is not
-# cosmetic: core15 was hand-picked to reproduce a known ranking, and its n=15
-# could not resolve a model gap below ~36pp. A seeded random draw is unbiased,
-# and at n=60 the resolvable gap drops to ~18pp.
-#
-# Set SAMPLE = None for a full 200-scenario publication run.
-SAMPLE = 60
+# Set SAMPLE to an int (with SEED) to cut wall-clock; the draw is seeded so every
+# model still sees the same scenarios. But a sampled OSS run is NOT comparable to
+# the full-200 cloud run, so only do that for a quick directional read.
+SAMPLE = None
 SEED = 0
-RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
+RESULTS = f'offline_eval/single_turn_results/{SWEEP}'
 
 _ROOT = Path(__file__).resolve().parents[1]
-_MT = sorted((_ROOT / 'evals' / 'dataset' / 'multi_turn').glob('*.yaml'))
-assert len(_MT) == 200, f'expected 200 multi-turn scenarios, found {len(_MT)}'
+_ST = [p for p in (_ROOT / 'evals' / 'dataset').rglob('*.yaml')
+       if 'smoke' not in p.parts and 'multi_turn' not in p.parts]
+assert len(_ST) == 200, f'expected 200 single-turn scenarios, found {len(_ST)}'
 
-MODE = '--multi-turn' if SAMPLE is None else f'--multi-turn --sample {SAMPLE} --seed {SEED}'
-N_SCENARIOS = len(_MT) if SAMPLE is None else SAMPLE
+MODE = '--single-turn' if SAMPLE is None else f'--single-turn --sample {SAMPLE} --seed {SEED}'
+N_SCENARIOS = len(_ST) if SAMPLE is None else SAMPLE
 
 cells = []
 
@@ -49,15 +48,17 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — **Multi-turn Eval (Improved Eval 3)** · top-15 OSS Qwen · Colab **A100**
+# AI Tutor — **Single-turn Eval (sweep 3)** · top-15 OSS Qwen · Colab **A100**
 
-Full **multi-turn** sessions (opening → pose → teach → grade → advance → exit
-ticket), not single graded turns. Same harness as the laptop cloud run:
+**Single graded turns**: each scenario seeds a conversation and one student
+utterance; the model produces the next tutor turn, which is then scored. Same
+harness, same 200 scenarios, and the same judge as the laptop cloud sweep — so the
+OSS models here land on **one leaderboard** with the Gemini / Vertex Model Garden
+models.
 
 - **Tutor** = OSS Qwen via Ollama (swapped per model with `TUTOR_MODEL_OVERRIDE`).
-- **Student-sim** = Anthropic **Haiku 4.5** (fixed persona player).
-- **Judge** = Anthropic **Sonnet 4.6** (multi-turn default — the Haiku-vs-Sonnet
-  A/B found Haiku too lenient on whole-session judging).
+- **Judge** = Anthropic **Haiku 4.5** @ temp 0 (`evals/scorers/llm_rubric.py`
+  default — identical to the cloud sweep, so scores are comparable).
 - **Engine** = `simple_tutor` (the production engine; `run_eval` prints a banner
   confirming it and errors on the legacy engine).
 
@@ -75,37 +76,37 @@ top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit).
 
 ## What changed since sweep 2
 
-**1. The dataset was rebuilt. Sweep 3 is a NEW BASELINE — sweep 1 and sweep 2
-numbers are not comparable to it.** The multi-turn set went 30 → **200
-scenarios**, the single-turn set 60 → 200, `core15` was deleted, and the content
-was re-grounded on **16 lessons** (up from 4). Both the denominator and the
-content changed, so there is no honest delta to compute against the earlier
-sweeps. Do not try; start the trend line here.
+**1. The dataset was rebuilt. Sweep 3 is a NEW BASELINE — the old 60-scenario
+single-turn numbers are not comparable to it.** The single-turn set went 60 →
+**200 scenarios**, re-grounded on **16 lessons** (up from 4), and balanced by
+construction across 6 personas × 16 lessons × 26 situation archetypes. Both the
+denominator and the content changed, so there is no honest delta against the
+earlier board. Start the trend line here.
 
-**2. Why the dataset grew.** At n=15, two models had to differ by ~36pp before the
-benchmark could tell them apart — sweep 2's "gemini-2.5-flash net flat, +3/−3
-churn" was noise, not a finding. At n=200 the resolvable gap is ~10pp. The old set
-was also badly skewed: 8 of 24 persona×lesson cells were empty and `error_prone`
-had a single single-turn scenario.
+**2. Why the dataset grew.** The old set was badly skewed — 8 of 24 persona×lesson
+cells were empty, and `error_prone` had exactly ONE single-turn scenario, so any
+per-persona claim drawn from it was unsupported. Two of four lessons carried 85% of
+the content. On top of that, at n=60 two models had to differ by ~18pp before the
+benchmark could tell them apart; at n=200 that drops to ~10pp.
 
-**3. This run SAMPLES.** `--sample {SAMPLE} --seed {SEED}` draws {N_SCENARIOS} of the
-200 multi-turn scenarios. The draw is seeded, so **every model sees the same
-{N_SCENARIOS} scenarios** and cross-model comparison holds. Unlike `core15`, the draw
-is random rather than hand-picked to reproduce a known ranking. Set `SAMPLE =
-None` in `_make_colab_nb.py` for a full 200-scenario publication run.
+**3. This run scores the FULL 200 — no sampling.** That is deliberate: the
+Gemini / Vertex Model Garden models are being scored on the same 200 scenarios in
+the laptop sweep, so the OSS results merge into **one leaderboard** with the same
+denominator. (`SAMPLE` in `_make_colab_nb.py` can cut wall-clock, but a sampled OSS
+run is not comparable to the full-200 cloud run.)
 
 **4. Results are versioned per sweep.** This run writes to
-**`multi_turn_results/{SWEEP}/`**.
+**`single_turn_results/{SWEEP}/`** — the SAME folder the cloud sweep writes to, so
+`aggregate.py` boards them together.
 
 **Output → `{RESULTS}/`** (symlinked to Drive, resume-safe).
 
-> ⚠️ **Runtime.** Each model runs 15 scenarios × up to ~24 turns × (tutor +
-> student + judge) calls. The **small + MoE** models (4b/9b/14b/30b-a3b/35b-a3b)
-> are hours-scale; the **large dense** ones (27b/32b/**72b**) are slower — though
-> note sweep 1 showed the 72b generates only ~161 tokens per call while the
-> reasoning models emit thousands, so the 4b/35b models dominate wall-clock, not
-> the 72b. The run is **resume-safe** (finished models are skipped, results live
-> on Drive), so you can stop/restart freely.
+> ⚠️ **Runtime.** Each model runs 200 scenarios × (2 tutor calls + judge). Single
+> turns are far cheaper than full sessions — no student-sim, no 24-turn
+> trajectories — but 200 scenarios is 3.3x the old 60, so budget accordingly. The
+> reasoning models (which emit thousands of `<think>` tokens per call) dominate
+> wall-clock, not the big dense ones. The run is **resume-safe** (finished models
+> are skipped, results live on Drive), so you can stop/restart freely.
 
 **Before you start**
 1. Runtime → **Change runtime type** → pick the GPU for THIS tab's group (High-RAM):
@@ -113,7 +114,7 @@ None` in `_make_colab_nb.py` for a full 200-scenario publication run.
    (72b q4 ~47 GB + 32b/35b need the big card — T4/L4 can't fit the 72b).
 2. Add these **Colab Secrets** (🔑 sidebar), each *Notebook access ON*:
    - `GH_TOKEN` — GitHub **classic** PAT with **`repo`** scope (you're a collaborator on `{REPO}`).
-   - `ANTHROPIC_API_KEY` — **required** (student-sim Haiku + judge Sonnet).
+   - `ANTHROPIC_API_KEY` — **required** (rubric judge, Haiku 4.5 @ temp 0).
    - `GOOGLE_API_KEY` + `OPENAI_API_KEY` — keep both so the cross-vendor **grader**
      cascade (Gemini→OpenAI→Haiku, self-excluding) matches the laptop runs.
 """)
@@ -190,7 +191,7 @@ else:
 
 md("## Cell 5 — **required** — write .env from Colab Secrets\n"
    "`.env` isn't in the repo (gitignored). Keep **all three** keys: ANTHROPIC drives "
-   "the student-sim (Haiku) **and** the judge (Sonnet); GOOGLE/OPENAI feed the "
+   "the rubric judge (Haiku 4.5); GOOGLE/OPENAI feed the "
    "cross-vendor grader cascade so scores match the laptop runs.")
 code(r"""
 from google.colab import userdata
@@ -204,7 +205,7 @@ print('.env written')
 
 md("## Cell 6 — fresh DB + eval fixtures\n"
    "`lessons.json` carries the 4 eval lessons with their **LessonSteps + exit "
-   "tickets** (1137/1138 = 10 steps, 1463/1464 = 5) — multi-turn traverses every "
+   "tickets** (16 lessons: 8 math x 10 steps, 8 geography x 5) — the scenarios ground "
    "step, so this fixture is required. `institution.json` seeds the active "
    "`student_sim` ModelConfig (Haiku).")
 code(r"""
@@ -214,7 +215,7 @@ code(r"""
 
 md("## Cell 7 — persist results to Drive (symlink → survives disconnects)\n"
    f"Symlinks **only `{RESULTS}/`** to `{DRIVE_FOLDER}/{SWEEP}/` on Drive. The rest of "
-   "`multi_turn_results/` stays as cloned, so sweep 1's per-scenario JSONs remain on "
+   "`single_turn_results/` stays as cloned, so the old 60-scenario board remains on "
    "disk for the Cell-10b baseline. Resume-safe: a reconnect re-symlinks the same Drive "
    f"folder and `run_matrix.sh` skips models that already have a JSON in `{SWEEP}/`.")
 code(rf"""
@@ -225,7 +226,7 @@ print('this sweep writes to:', os.path.realpath('{RESULTS}'))
 done = sorted(os.path.basename(p)[:-5] for p in glob.glob('{RESULTS}/*.json'))
 print('already scored in {SWEEP}:', done or '(none yet)')
 print('sweep-1 JSONs available for the Cell-10b baseline:',
-      len(glob.glob('offline_eval/multi_turn_results/sweep1/*.json')))
+      len(glob.glob('offline_eval/single_turn_results/results/*.json')))
 """)
 
 md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
@@ -271,7 +272,7 @@ if GROUP is None:
     raise SystemExit("Run Cell 7b first to pick GROUP (group1/group2/group3).")
 assert GROUP in GROUPS, f"GROUP must be one of {list(GROUPS)}, got {GROUP!r}"
 
-lines = [f"# Multi-turn Eval 3 — {GROUP} (this tab)"]
+lines = [f"# Single-turn Eval (sweep 3) — {GROUP} (this tab)"]
 for tag in GROUPS[GROUP]:
     tier, note = MODELS[tag]
     lines.append(f"{tag:<20} {tier}" + (f"     # {note}" if note else ""))
@@ -320,9 +321,9 @@ _df('BEFORE cleanup')
 _df('AFTER cleanup')
 """)
 
-md("## Cell 9 — run the MULTI-TURN sweep (pulls + scores each model; resume-safe)\n"
-   f"`MODE=\"{MODE}\"` runs full sessions on {N_SCENARIOS} of the 200 multi-turn "
-   f"scenarios. `RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
+md("## Cell 9 — run the SINGLE-TURN sweep (pulls + scores each model; resume-safe)\n"
+   f"`MODE=\"{MODE}\"` scores all {N_SCENARIOS} single-turn scenarios. "
+   f"`RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
    "deletes each model's weights right after it's scored so peak disk ≈ one model at a "
    "time. The run tolerates disconnects (done models are skipped on restart).\n\n"
    "**Sanity-check the first model's output before walking away:**\n"
@@ -351,7 +352,7 @@ import subprocess
 print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
 """)
 
-md(f"## Cell 10 — multi-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
+md(f"## Cell 10 — single-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
    f"Pass rates are out of **{N_SCENARIOS}**. Every model was scored on the same seeded "
    "draw, so the models are comparable to EACH OTHER. They are **not** comparable to "
    "sweep 1 or sweep 2 — those ran a different dataset on different lessons.")
