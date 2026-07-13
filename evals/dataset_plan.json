@@ -1,0 +1,3829 @@
+[
+  {
+    "scenario_id": "average_clarifies_directly_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "clarifying_question",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "average_clarifying_question_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "average_off_method_correct_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "off_method_correct",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "figure_ref_no_attachment",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "tool_leak_guard_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "tool_or_meta_leak",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_average_arithmetic_slip_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_correct_advance_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "correct_with_working",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_false_reject_correct_with_typo_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "false_reject_guard",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_wrong_mcq_no_praise_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "wrong_mcq",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "incoherent_guard_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "tool_or_meta_leak",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "leaks_answer_guard_mcq_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_average_wrong_mcq_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "wrong_mcq",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "info_dump_guard_clarification_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "off_topic_redirect_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "off_topic_redirect",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "safety_off_topic_dark_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "safety_distress",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "no_unfounded_praise_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "false_accept_guard",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "single_paragraph_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "tool_or_meta_leak",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "geo_average_correct_with_explanation_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "correct_with_working",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "geo_average_wrong_with_partial_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "wrong_with_working",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "over_eager_working_001",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "over_eager_working_request",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "capable_quizzes_tutor_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1137,
+    "kind": "off_topic_redirect",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "exit_ticket_premature_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1137,
+    "kind": "premature_exit_ticket",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_capable_correct_bare_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1137,
+    "kind": "correct_bare_answer",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_capable_pushback_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1137,
+    "kind": "student_corrects_tutor",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "false_reject_capable_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "false_reject_guard",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "math_capable_alternative_method_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "off_method_correct",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "ungrounded_factual_guard_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "ungrounded_factual_claim",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "geo_capable_meta_question_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "off_topic_redirect",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "capable_pushback_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "student_corrects_tutor",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "geo_capable_correct_bare_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1464,
+    "kind": "correct_bare_answer",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "geo_capable_corrects_tutor_001",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1464,
+    "kind": "student_corrects_tutor",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "error_prone_misreads_001",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "misread_question",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "non_responder_finally_engages_001",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "idk_non_answer",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "non_responder_idk_chain_001",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1142,
+    "kind": "idk_non_answer",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_non_responder_after_explanation_001",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "idk_non_answer",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "geo_non_responder_first_turn_001",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1465,
+    "kind": "idk_non_answer",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "non_responder_monosyllabic_001",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1466,
+    "kind": "idk_non_answer",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "banned_opener_loop_guard_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1144,
+    "kind": "repetition_banned_opener",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_probe_resistant_mcq_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1145,
+    "kind": "correct_mcq",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "probe_resistant_engages_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1138,
+    "kind": "repetition_banned_opener",
+    "subject": "math",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "probe_resistant_pushes_to_next_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "student_pushes_to_advance",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "probe_resistant_refusal_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1468,
+    "kind": "repetition_banned_opener",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "geo_probe_resistant_correct_001",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1464,
+    "kind": "correct_bare_answer",
+    "subject": "geography",
+    "status": "keep"
+  },
+  {
+    "scenario_id": "repeats_phrase_guard_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1139,
+    "kind": "repetition_banned_opener",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "struggler_gives_up_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1141,
+    "kind": "gives_up_rapport",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "struggler_misreads_question_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "misread_question",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "struggler_thanks_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1143,
+    "kind": "gives_up_rapport",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_false_accept_numeric_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1144,
+    "kind": "false_accept_guard",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_leaks_answer_guard_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1145,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_struggler_correct_advance_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1139,
+    "kind": "correct_with_working",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_struggler_help_request_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1141,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_struggler_partial_working_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "wrong_with_working",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "math_wrong_bare_diagnostic_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1143,
+    "kind": "wrong_bare_answer",
+    "subject": "math",
+    "status": "port",
+    "source_lesson_id": 1137
+  },
+  {
+    "scenario_id": "safety_distress_signal_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "safety_distress",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "no_banned_opener_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "repetition_banned_opener",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "geo_struggler_confused_terminology_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1465,
+    "kind": "terminology_confusion",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "geo_struggler_correct_advance_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1466,
+    "kind": "correct_with_working",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "geo_struggler_idk_after_explanation_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1467,
+    "kind": "idk_non_answer",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "wrong_answer_diagnostic_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1468,
+    "kind": "wrong_bare_answer",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "struggler_idk_handling_001",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "idk_non_answer",
+    "subject": "geography",
+    "status": "port",
+    "source_lesson_id": 1463
+  },
+  {
+    "scenario_id": "arithmetic_slip_error_prone_1144_02",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1144,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1470_02",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1470,
+    "kind": "correct_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1145_02",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "terminology_confusion",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_error_prone_1139_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1465_03",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1465,
+    "kind": "correct_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1466_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "false_accept_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_capable_1467_03",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1467,
+    "kind": "false_reject_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_capable_1468_02",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1468,
+    "kind": "figure_ref_no_attachment",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_error_prone_1469_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1469,
+    "kind": "misread_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_capable_1470_03",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "off_method_correct",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_probe_resistant_1141_02",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1141,
+    "kind": "over_eager_working_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_probe_resistant_1142_02",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "premature_exit_ticket",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_non_responder_1143_03",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "safety_distress",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_probe_resistant_1144_02",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1144,
+    "kind": "student_pushes_to_advance",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1145_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "terminology_confusion",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_capable_1464_02",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1464,
+    "kind": "ungrounded_factual_claim",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_error_prone_1465_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1465,
+    "kind": "wrong_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_error_prone_1466_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "wrong_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_error_prone_1467_03",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1467,
+    "kind": "wrong_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_error_prone_1139_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "clarifying_question_capable_1468_04",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1468,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_bare_answer_error_prone_1469_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1469,
+    "kind": "correct_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1470_04",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1470,
+    "kind": "correct_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1141_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1141,
+    "kind": "false_accept_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_capable_1142_04",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1142,
+    "kind": "false_reject_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_capable_1143_03",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1143,
+    "kind": "figure_ref_no_attachment",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "gives_up_rapport_non_responder_1144_03",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1144,
+    "kind": "gives_up_rapport",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "help_request_non_responder_1145_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1145,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_non_responder_1464_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1464,
+    "kind": "misread_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_capable_1465_04",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1465,
+    "kind": "off_method_correct",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_topic_redirect_non_responder_1466_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1466,
+    "kind": "off_topic_redirect",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_probe_resistant_1467_03",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "over_eager_working_request",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_probe_resistant_1468_03",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1468,
+    "kind": "premature_exit_ticket",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_non_responder_1469_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "safety_distress",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_corrects_tutor_capable_1470_04",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "student_corrects_tutor",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_probe_resistant_1139_03",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1139,
+    "kind": "student_pushes_to_advance",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1141_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1141,
+    "kind": "terminology_confusion",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_average_1142_03",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1142,
+    "kind": "ungrounded_factual_claim",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_error_prone_1143_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1143,
+    "kind": "wrong_bare_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_error_prone_1144_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1144,
+    "kind": "wrong_mcq",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_error_prone_1145_04",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "wrong_with_working",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_error_prone_1138_05",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1138,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "clarifying_question_struggler_1464_05",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1464,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_bare_answer_probe_resistant_1465_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1465,
+    "kind": "correct_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1466_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1466,
+    "kind": "correct_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_with_working_struggler_1467_05",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1467,
+    "kind": "correct_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1468_05",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "false_accept_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_struggler_1469_05",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "false_reject_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_capable_1470_04",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "figure_ref_no_attachment",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "gives_up_rapport_non_responder_1139_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1139,
+    "kind": "gives_up_rapport",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "help_request_non_responder_1141_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_non_responder_1142_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1142,
+    "kind": "misread_question",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_average_1143_05",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1143,
+    "kind": "off_method_correct",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_topic_redirect_non_responder_1144_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1144,
+    "kind": "off_topic_redirect",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_probe_resistant_1145_04",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1145,
+    "kind": "over_eager_working_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_probe_resistant_1464_04",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1464,
+    "kind": "premature_exit_ticket",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_non_responder_1465_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1465,
+    "kind": "safety_distress",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_corrects_tutor_capable_1466_05",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1466,
+    "kind": "student_corrects_tutor",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_probe_resistant_1467_04",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "student_pushes_to_advance",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1468_05",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "terminology_confusion",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "tool_or_meta_leak_non_responder_1469_04",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "tool_or_meta_leak",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_average_1470_04",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1470,
+    "kind": "ungrounded_factual_claim",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_error_prone_1138_05",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1138,
+    "kind": "wrong_bare_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_probe_resistant_1139_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1139,
+    "kind": "wrong_mcq",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_struggler_1141_05",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1141,
+    "kind": "wrong_with_working",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_error_prone_1142_06",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1142,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "clarifying_question_struggler_1143_06",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1143,
+    "kind": "clarifying_question",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_bare_answer_probe_resistant_1144_06",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1144,
+    "kind": "correct_bare_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_capable_1145_06",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1145,
+    "kind": "correct_mcq",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_with_working_struggler_1464_06",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1464,
+    "kind": "correct_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1465_06",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1465,
+    "kind": "false_accept_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_average_1466_06",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1466,
+    "kind": "false_reject_guard",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_capable_1467_05",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1467,
+    "kind": "figure_ref_no_attachment",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "gives_up_rapport_non_responder_1468_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1468,
+    "kind": "gives_up_rapport",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "help_request_non_responder_1469_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "help_request",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_non_responder_1470_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1470,
+    "kind": "misread_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_average_1138_06",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "off_method_correct",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_topic_redirect_non_responder_1139_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1139,
+    "kind": "off_topic_redirect",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_probe_resistant_1141_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1141,
+    "kind": "over_eager_working_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_probe_resistant_1142_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "premature_exit_ticket",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_non_responder_1143_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "safety_distress",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_corrects_tutor_capable_1144_06",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1144,
+    "kind": "student_corrects_tutor",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_probe_resistant_1145_05",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1145,
+    "kind": "student_pushes_to_advance",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1464_06",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1464,
+    "kind": "terminology_confusion",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "tool_or_meta_leak_non_responder_1465_05",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1465,
+    "kind": "tool_or_meta_leak",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_average_1466_05",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1466,
+    "kind": "ungrounded_factual_claim",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_struggler_1467_06",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1467,
+    "kind": "wrong_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_error_prone_1468_06",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "wrong_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_struggler_1469_06",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "wrong_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_capable_1138_07",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "clarifying_question_struggler_1470_07",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_bare_answer_error_prone_1139_07",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "correct_bare_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1141_07",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1141,
+    "kind": "correct_mcq",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_with_working_average_1142_07",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1142,
+    "kind": "correct_with_working",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1143_07",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1143,
+    "kind": "false_accept_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_capable_1144_07",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1144,
+    "kind": "false_reject_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_struggler_1145_06",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1145,
+    "kind": "figure_ref_no_attachment",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "gives_up_rapport_non_responder_1464_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1464,
+    "kind": "gives_up_rapport",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "help_request_non_responder_1465_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1465,
+    "kind": "help_request",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_non_responder_1466_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1466,
+    "kind": "misread_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_average_1467_07",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1467,
+    "kind": "off_method_correct",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_topic_redirect_non_responder_1468_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1468,
+    "kind": "off_topic_redirect",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_probe_resistant_1469_06",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1469,
+    "kind": "over_eager_working_request",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_capable_1470_06",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "premature_exit_ticket",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "repetition_banned_opener_non_responder_1138_06",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1138,
+    "kind": "repetition_banned_opener",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_struggler_1139_07",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1139,
+    "kind": "safety_distress",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_corrects_tutor_average_1141_07",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1141,
+    "kind": "student_corrects_tutor",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_probe_resistant_1142_06",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "student_pushes_to_advance",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1143_07",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1143,
+    "kind": "terminology_confusion",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "tool_or_meta_leak_capable_1144_06",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1144,
+    "kind": "tool_or_meta_leak",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_average_1145_06",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1145,
+    "kind": "ungrounded_factual_claim",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_error_prone_1464_07",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1464,
+    "kind": "wrong_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_probe_resistant_1465_07",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1465,
+    "kind": "wrong_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_struggler_1466_07",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1466,
+    "kind": "wrong_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "arithmetic_slip_capable_1138_08",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "arithmetic_slip",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "clarifying_question_struggler_1467_08",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1467,
+    "kind": "clarifying_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_bare_answer_error_prone_1468_08",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "correct_bare_answer",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_mcq_probe_resistant_1469_08",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1469,
+    "kind": "correct_mcq",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "correct_with_working_average_1470_08",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1470,
+    "kind": "correct_with_working",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_accept_guard_error_prone_1139_08",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "false_accept_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "false_reject_guard_capable_1141_08",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "false_reject_guard",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "figure_ref_no_attachment_struggler_1142_07",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "figure_ref_no_attachment",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "gives_up_rapport_non_responder_1143_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "gives_up_rapport",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "help_request_non_responder_1144_08",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1144,
+    "kind": "help_request",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "idk_non_answer_non_responder_1145_08",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1145,
+    "kind": "idk_non_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "misread_question_error_prone_1464_08",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1464,
+    "kind": "misread_question",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_method_correct_average_1465_08",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1465,
+    "kind": "off_method_correct",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "off_topic_redirect_probe_resistant_1466_08",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1466,
+    "kind": "off_topic_redirect",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "over_eager_working_request_capable_1467_07",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1467,
+    "kind": "over_eager_working_request",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "premature_exit_ticket_probe_resistant_1468_07",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1468,
+    "kind": "premature_exit_ticket",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "repetition_banned_opener_non_responder_1469_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "repetition_banned_opener",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "safety_distress_struggler_1470_08",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "safety_distress",
+    "subject": "geography",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_corrects_tutor_average_1137_08",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "student_corrects_tutor",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "student_pushes_to_advance_capable_1138_07",
+    "mode": "single_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "student_pushes_to_advance",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "terminology_confusion_error_prone_1139_08",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "terminology_confusion",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "tool_or_meta_leak_non_responder_1141_07",
+    "mode": "single_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "tool_or_meta_leak",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "ungrounded_factual_claim_average_1142_07",
+    "mode": "single_turn",
+    "persona": "average",
+    "lesson_id": 1142,
+    "kind": "ungrounded_factual_claim",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_bare_answer_probe_resistant_1143_08",
+    "mode": "single_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1143,
+    "kind": "wrong_bare_answer",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_mcq_struggler_1144_08",
+    "mode": "single_turn",
+    "persona": "struggler",
+    "lesson_id": 1144,
+    "kind": "wrong_mcq",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "wrong_with_working_error_prone_1145_08",
+    "mode": "single_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "wrong_with_working",
+    "subject": "math",
+    "status": "author"
+  },
+  {
+    "scenario_id": "average_geo_direction_001",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1464,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "average_geo_scale_001",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1463,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "average_math_session_001",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "average_self_correction_math_001",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "average_session_completion_001",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1137,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "capable_full_session_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "capable_geo_clarification_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "capable_geo_direction_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1464,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "capable_math_session_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1137,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "capable_speedrun_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_prone_geo_direction_001",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1464,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_prone_geo_session_001",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1463,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_prone_session_001",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1137,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_prone_straight_line_math_001",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1138,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_capable_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 25
+  },
+  {
+    "scenario_id": "no_banned_opener_loop_capable_001",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1463,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "non_responder_engagement_001",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1137,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "non_responder_geo_scale_001",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1463,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "non_responder_geo_session_001",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1464,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "non_responder_math_session_001",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1137,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "probe_resistant_geo_scale_001",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1463,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "probe_resistant_geo_session_001",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1464,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "probe_resistant_math_session_001",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1137,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "probe_resistant_refusal_chain_001",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1137,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "short_session_struggler_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1137,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "struggler_geo_direction_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1464,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "struggler_help_intensive_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1138,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "struggler_math_session_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1137,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "struggler_session_completion_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1463,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "struggler_straight_line_session_001",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1138,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "keep",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_error_prone_1139_01",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_non_responder_1141_02",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "speedrun_probe_resistant_1142_02",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1143_03",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "long_session_average_1144_02",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1144,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_error_prone_1145_03",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_average_1465_03",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1465,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "session_completion_error_prone_1466_03",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1467_02",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_probe_resistant_1468_03",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1468,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1469_04",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_struggler_1470_03",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1139_04",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1139,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1141_04",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "session_completion_error_prone_1142_04",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1142,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "short_session_non_responder_1143_03",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_probe_resistant_1144_04",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1144,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1145_03",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1145,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "engagement_recovery_struggler_1465_05",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1465,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_cascade_error_prone_1466_04",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "help_intensive_non_responder_1467_05",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1467,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "long_session_capable_1468_04",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1468,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_probe_resistant_1469_05",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1469,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_struggler_1470_05",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_average_1139_05",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1139,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "session_completion_capable_1141_05",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "short_session_error_prone_1142_04",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1142,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_probe_resistant_1143_05",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1143,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1144_04",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1144,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1145_06",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1145,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1465_05",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1465,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1466_06",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_capable_1467_05",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1467,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1468_06",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1468,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_struggler_1469_06",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_average_1470_06",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1470,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "session_completion_capable_1139_06",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1139,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1141_05",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1141,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_probe_resistant_1142_06",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1143_05",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1143,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1144_07",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1144,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_cascade_error_prone_1145_06",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "help_intensive_struggler_1465_07",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1465,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "long_session_capable_1466_06",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1466,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1467_07",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1467,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_error_prone_1468_07",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_average_1469_07",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1469,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "session_completion_struggler_1470_07",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1139_06",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1139,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1141_07",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1142_06",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1142,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1143_08",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_cascade_error_prone_1144_07",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1144,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "help_intensive_struggler_1145_08",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1145,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1465_07",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1465,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1466_08",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1466,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_error_prone_1467_08",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1467,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1468_08",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1468,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "session_completion_struggler_1469_08",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1470_07",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1470,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1138_08",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1138,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1139_07",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1139,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1141_09",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1141,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1142_09",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1142,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1143_08",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1143,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1144_09",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1144,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1145_08",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1145,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1465_09",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1465,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1466_09",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1466,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_capable_1467_09",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1467,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "session_completion_struggler_1468_09",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1468,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1469_08",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1469,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1470_09",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1138_08",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1138,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1139_10",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1139,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1141_10",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1142_09",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1143_10",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1143,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1144_09",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1144,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1145_10",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1145,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1464_10",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1464,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1465_10",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1465,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "session_completion_struggler_1466_10",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1466,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1467_09",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1468_10",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1468,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1469_09",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1469,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1470_11",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1470,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1138_11",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1138,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1139_10",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1139,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1141_11",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1141,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1142_10",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1143_11",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1144_11",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1144,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_capable_1145_11",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1145,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "session_completion_struggler_1464_11",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1464,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1465_10",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1465,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1466_11",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1466,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1467_10",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1467,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1468_12",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1468,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1469_12",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1469,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1470_11",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1470,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1138_12",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1138,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1139_11",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1139,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1141_12",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1141,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1142_12",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1142,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1143_12",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1143,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "session_completion_struggler_1144_12",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1144,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1145_11",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1145,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1464_12",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1464,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1465_11",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1465,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1466_13",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1467_13",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1467,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1468_12",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1468,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1469_13",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1469,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1470_12",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1470,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1138_13",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1138,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1139_13",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1139,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_capable_1141_13",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "session_completion_struggler_1142_13",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1143_12",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1143,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1144_13",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1144,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1145_12",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1145,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1463_14",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1463,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1464_14",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1464,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1465_13",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1465,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1466_14",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1466,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1467_13",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1467,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1468_14",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1468,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1469_14",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1469,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1470_14",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1470,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "session_completion_struggler_1137_14",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1137,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1138_13",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1138,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1139_14",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1139,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1141_13",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1141,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1142_15",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1142,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1143_15",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1144_14",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1144,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1145_15",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1145,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1463_14",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1463,
+    "kind": "long_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1464_15",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1464,
+    "kind": "refusal_chain",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1465_15",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1465,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_capable_1466_15",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1466,
+    "kind": "self_correction",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "session_completion_struggler_1467_15",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1467,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1468_14",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1468,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1469_15",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1469,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1470_14",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1470,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1137_16",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1137,
+    "kind": "baseline_full_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1138_16",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1138,
+    "kind": "engagement_recovery",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1139_15",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1139,
+    "kind": "error_cascade",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1141_16",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1141,
+    "kind": "help_intensive",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1142_15",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1142,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1143_16",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1143,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1144_16",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1144,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "self_correction_capable_1145_16",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1145,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 15
+  },
+  {
+    "scenario_id": "session_completion_struggler_1463_16",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1463,
+    "kind": "session_completion",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1464_15",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1464,
+    "kind": "short_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1465_16",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1465,
+    "kind": "speedrun",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "straight_line_average_1466_15",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1466,
+    "kind": "straight_line",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "baseline_full_session_error_prone_1467_17",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1467,
+    "kind": "baseline_full_session",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "engagement_recovery_non_responder_1468_17",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1468,
+    "kind": "engagement_recovery",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "error_cascade_struggler_1469_16",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1469,
+    "kind": "error_cascade",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "help_intensive_error_prone_1470_17",
+    "mode": "multi_turn",
+    "persona": "error_prone",
+    "lesson_id": 1470,
+    "kind": "help_intensive",
+    "subject": "geography",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "long_session_probe_resistant_1137_16",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1137,
+    "kind": "long_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "refusal_chain_non_responder_1138_17",
+    "mode": "multi_turn",
+    "persona": "non_responder",
+    "lesson_id": 1138,
+    "kind": "refusal_chain",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "remediation_after_exit_ticket_fail_average_1139_17",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1139,
+    "kind": "remediation_after_exit_ticket_fail",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "self_correction_capable_1141_17",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1141,
+    "kind": "self_correction",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 24
+  },
+  {
+    "scenario_id": "session_completion_struggler_1142_17",
+    "mode": "multi_turn",
+    "persona": "struggler",
+    "lesson_id": 1142,
+    "kind": "session_completion",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 30
+  },
+  {
+    "scenario_id": "short_session_probe_resistant_1143_16",
+    "mode": "multi_turn",
+    "persona": "probe_resistant",
+    "lesson_id": 1143,
+    "kind": "short_session",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 6
+  },
+  {
+    "scenario_id": "speedrun_capable_1144_17",
+    "mode": "multi_turn",
+    "persona": "capable",
+    "lesson_id": 1144,
+    "kind": "speedrun",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  },
+  {
+    "scenario_id": "straight_line_average_1145_16",
+    "mode": "multi_turn",
+    "persona": "average",
+    "lesson_id": 1145,
+    "kind": "straight_line",
+    "subject": "math",
+    "status": "author",
+    "max_turns": 12
+  }
+]
