@@ -9,7 +9,7 @@ description: >
 persona: struggler
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, baseline, persona_handling, core15]
+tags: [multi_turn, baseline, persona_handling]
 mode: multi_turn
 max_turns: 15
 

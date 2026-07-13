@@ -13,19 +13,29 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multi-turn'    # Drive folder that persists results
-SWEEP = 'sweep2'                             # results subfolder — one per sweep
-SUBSET = 'core15'                            # stratified 15-scenario subset (~half the wall-clock)
+SWEEP = 'sweep3'                             # results subfolder — one per sweep
+
+# The multi-turn set is now 200 scenarios. A full 200-scenario run per model is
+# ~13x sweep 1 and hours-scale even for the small models, so the Colab sweep
+# draws a reproducible SAMPLE. Same seed + same dataset = the same draw for every
+# model, so cross-model comparison stays valid.
+#
+# This replaces the old hardcoded `core15` subset. The difference is not
+# cosmetic: core15 was hand-picked to reproduce a known ranking, and its n=15
+# could not resolve a model gap below ~36pp. A seeded random draw is unbiased,
+# and at n=60 the resolvable gap drops to ~18pp.
+#
+# Set SAMPLE = None for a full 200-scenario publication run.
+SAMPLE = 60
+SEED = 0
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 
-# Read the subset straight off the dataset so the notebook can never drift from
-# the YAML tags. Used by Cell 10b, which must filter sweep 1 by scenario id (its
-# stored rows predate the tag).
 _ROOT = Path(__file__).resolve().parents[1]
-CORE15_IDS = sorted(
-    p.stem for p in (_ROOT / 'evals' / 'dataset' / 'multi_turn').glob('*.yaml')
-    if f'{SUBSET}]' in p.read_text() or f'{SUBSET},' in p.read_text()
-)
-assert len(CORE15_IDS) == 15, f'expected 15 {SUBSET} scenarios, found {len(CORE15_IDS)}'
+_MT = sorted((_ROOT / 'evals' / 'dataset' / 'multi_turn').glob('*.yaml'))
+assert len(_MT) == 200, f'expected 200 multi-turn scenarios, found {len(_MT)}'
+
+MODE = '--multi-turn' if SAMPLE is None else f'--multi-turn --sample {SAMPLE} --seed {SEED}'
+N_SCENARIOS = len(_MT) if SAMPLE is None else SAMPLE
 
 cells = []
 
@@ -63,24 +73,29 @@ folder, so no two tabs score the same model and the board merges automatically:
 Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7 /
 top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit).
 
-## What changed since sweep 1
+## What changed since sweep 2
 
-**1. This sweep runs the `{SUBSET}` subset — 15 scenarios, not 30.** They are a
-stratified sample of the full set: all 6 personas, both subjects, all 4 lessons,
-and the 6/12/15/24-turn budget extremes. Re-scoring sweep 1's 14 models on just
-these 15 reproduces the full-30 ranking (Spearman **0.97**, bootstrap 0.95±0.04)
-for **~50% of the wall-clock**.
+**1. The dataset was rebuilt. Sweep 3 is a NEW BASELINE — sweep 1 and sweep 2
+numbers are not comparable to it.** The multi-turn set went 30 → **200
+scenarios**, the single-turn set 60 → 200, `core15` was deleted, and the content
+was re-grounded on **16 lessons** (up from 4). Both the denominator and the
+content changed, so there is no honest delta to compute against the earlier
+sweeps. Do not try; start the trend line here.
 
-**2. The engine's tool protocol was repaired.** Sweep 1 was largely measuring
-tool-protocol compliance rather than teaching: duplicate `pose_question` calls
-were overwriting the graded question (gemini-3.1-pro emitted 139 in one turn),
-`tool_choice` forcing was hard-gated to Gemini, and Ollama silently dropped it.
-All fixed. A model that skips the protocol is now repaired on the turn's existing
-second call, so a repaired turn costs no more than a correct one.
+**2. Why the dataset grew.** At n=15, two models had to differ by ~36pp before the
+benchmark could tell them apart — sweep 2's "gemini-2.5-flash net flat, +3/−3
+churn" was noise, not a finding. At n=200 the resolvable gap is ~10pp. The old set
+was also badly skewed: 8 of 24 persona×lesson cells were empty and `error_prone`
+had a single single-turn scenario.
 
-**3. Results are versioned per sweep.** Sweep 1 lives in
-`multi_turn_results/sweep1/`; this run writes to **`multi_turn_results/{SWEEP}/`**.
-Compare like with like: score sweep 1 on `{SUBSET}` before reading any delta.
+**3. This run SAMPLES.** `--sample {SAMPLE} --seed {SEED}` draws {N_SCENARIOS} of the
+200 multi-turn scenarios. The draw is seeded, so **every model sees the same
+{N_SCENARIOS} scenarios** and cross-model comparison holds. Unlike `core15`, the draw
+is random rather than hand-picked to reproduce a known ranking. Set `SAMPLE =
+None` in `_make_colab_nb.py` for a full 200-scenario publication run.
+
+**4. Results are versioned per sweep.** This run writes to
+**`multi_turn_results/{SWEEP}/`**.
 
 **Output → `{RESULTS}/`** (symlinked to Drive, resume-safe).
 
@@ -306,19 +321,22 @@ _df('AFTER cleanup')
 """)
 
 md("## Cell 9 — run the MULTI-TURN sweep (pulls + scores each model; resume-safe)\n"
-   f"`MODE=\"--multi-turn --subset {SUBSET}\"` runs full sessions on the 15-scenario "
-   f"stratified subset. `RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
+   f"`MODE=\"{MODE}\"` runs full sessions on {N_SCENARIOS} of the 200 multi-turn "
+   f"scenarios. `RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
    "deletes each model's weights right after it's scored so peak disk ≈ one model at a "
    "time. The run tolerates disconnects (done models are skipped on restart).\n\n"
    "**Sanity-check the first model's output before walking away:**\n"
    "- `>> Tutor engine: simple_tutor` — not the legacy engine.\n"
-   f"- `=== Running 15 scenario(s) ===` — the `{SUBSET}` filter took effect. If it says "
-   "30, the branch is stale: re-run Cell 2.\n"
+   f"- `>> SAMPLED RUN: {N_SCENARIOS} of 200 scenarios (seed={SEED})` — the draw took "
+   "effect. If it says 200, `SAMPLE` is None and you are doing a full publication run "
+   "(expect ~3x the wall-clock).\n"
+   f"- `=== Running {N_SCENARIOS} scenario(s) ===`. If the count is wrong, the branch is "
+   "stale: re-run Cell 2.\n"
    "- No `dropped duplicate pose_question` storms, and few `record_answer without "
-   "in-flight question` lines — those are the sweep-1 defects the fixes target.")
+   "in-flight question` lines.")
 code(rf"""
 !RESULTS_DIR=$PWD/{RESULTS} SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 \
-  MODE="--multi-turn --subset {SUBSET}" bash offline_eval/run_matrix.sh
+  MODE="{MODE}" bash offline_eval/run_matrix.sh
 """)
 
 md("## Cell 9b — reclaim disk AFTER the sweep (final backstop)\n"
@@ -334,39 +352,44 @@ print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
 """)
 
 md(f"## Cell 10 — multi-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
-   "Pass rates here are out of **15**, so they are NOT comparable to sweep 1's out-of-30 "
-   "numbers. Cell 10b prints the apples-to-apples baseline.")
+   f"Pass rates are out of **{N_SCENARIOS}**. Every model was scored on the same seeded "
+   "draw, so the models are comparable to EACH OTHER. They are **not** comparable to "
+   "sweep 1 or sweep 2 — those ran a different dataset on different lessons.")
 code(rf"""
 !RESULTS_DIR=$PWD/{RESULTS} python offline_eval/aggregate.py
 """)
 
-md(f"## Cell 10b — sweep-1 baseline on the same 15 scenarios (apples-to-apples)\n"
-   f"Re-scores sweep 1's stored per-scenario results restricted to the `{SUBSET}` ids, so "
-   "you can read the delta the engine fixes actually produced. Filters by **scenario id**, "
-   f"not by tag: sweep 1 ran before the `{SUBSET}` tag existed, so its stored rows do not "
-   "carry it. Needs `sweep1/` on Drive; otherwise skip — this cell is diagnostic only.")
+md("## Cell 10b — error bars\n"
+   "A pass rate without an interval invites over-reading. At "
+   f"n={N_SCENARIOS} the standard error at p≈0.5 is ±{50/(N_SCENARIOS**0.5):.1f}pp, so two models "
+   f"must differ by roughly {1.96*(2**0.5)*50/(N_SCENARIOS**0.5):.0f}pp before the gap means anything. "
+   "This cell prints a Wilson 95% interval per model — read the intervals, not the "
+   "point estimates.")
 code(rf"""
-import json, glob, os
-CORE15 = {CORE15_IDS!r}
-SUB = 'offline_eval/multi_turn_results/sweep1'
-paths = [p for p in sorted(glob.glob(f'{{SUB}}/*.json'))
+import json, glob, os, math
+
+def wilson(k, n, z=1.96):
+    if n == 0: return (0.0, 0.0)
+    p = k / n
+    d = 1 + z*z/n
+    c = p + z*z/(2*n)
+    s = z * math.sqrt(p*(1-p)/n + z*z/(4*n*n))
+    return (100*(c - s)/d, 100*(c + s)/d)
+
+paths = [p for p in sorted(glob.glob('{RESULTS}/*.json'))
          if not os.path.basename(p).startswith('_')]
-if not paths:
-    print('sweep1/ not present on this VM — skip (diagnostic only)')
-else:
-    rows = []
-    for p in paths:
-        m = os.path.basename(p)[:-5]
-        R = json.load(open(p))['results']
-        sub = [r for r in R if r['scenario_id'] in CORE15]
-        if len(sub) != 15:
-            print(f'  !! {{m}}: only {{len(sub)}}/15 core15 scenarios present — skipping')
-            continue
-        rows.append((m, 100*sum(r['passed'] for r in sub)/15))
-    print(f'{{"MODEL":<26}} {{"sweep1 @ core15":>16}}')
-    print('-'*44)
-    for m, rate in sorted(rows, key=lambda r: -r[1]):
-        print(f'{{m:<26}} {{rate:>14.0f}}%  ({{round(rate*15/100)}}/15)')
+rows = []
+for p in paths:
+    m = os.path.basename(p)[:-5]
+    R = json.load(open(p))['results']
+    k, n = sum(bool(r['passed']) for r in R), len(R)
+    lo, hi = wilson(k, n)
+    rows.append((m, k, n, 100*k/n, lo, hi))
+
+print(f'{{"MODEL":<28}} {{"PASS":>9}}  {{"RATE":>6}}   95% CI')
+print('-'*66)
+for m, k, n, rate, lo, hi in sorted(rows, key=lambda r: -r[3]):
+    print(f'{{m:<28}} {{k:>4}}/{{n:<4}} {{rate:>5.0f}}%   [{{lo:>4.0f}}, {{hi:>4.0f}}]')
 """)
 
 md(rf"""
@@ -386,8 +409,8 @@ To pull results back to your laptop: copy the JSONs + logs from
 
 **Sanity checks per model:**
 - The `run_eval` banner reads `>> Tutor engine: simple_tutor` (NOT conversational_tutor).
-- It reports `=== Running 15 scenario(s) ===`. If it says 30, the clone is stale —
-  the `{SUBSET}` tags are missing. Re-run **Cell 2**.
+- It reports `=== Running {N_SCENARIOS} scenario(s) ===`. If the count is wrong, the clone
+  is stale — re-run **Cell 2**.
 - `{SWEEP}/<model>.log` shows sessions reaching `exit_ticket` / `completed`
   (not all `deadlock`); each scored session's `rubric_result.model` is
   `claude-sonnet-4-6`.

@@ -8,7 +8,7 @@ description: >
 persona: non_responder
 subject: math
 lesson_id: 1137
-tags: [multi_turn, non_answer, engagement, persona_handling, core15]
+tags: [multi_turn, non_answer, engagement, persona_handling]
 mode: multi_turn
 max_turns: 12
 

@@ -30,18 +30,27 @@ class Command(BaseCommand):
         parser.add_argument('--multi-turn', action='store_true',
                             help='Run only multi_turn scenarios.')
         parser.add_argument('--subset', default=None,
-                            help='Only run scenarios carrying this tag. Use '
-                                 '"core15" for the stratified 15-scenario '
-                                 'multi-turn subset: it holds all 6 personas, '
-                                 'both subjects, all 4 lessons and the 6/12/15/24 '
-                                 'turn-budget extremes, and reproduces the '
-                                 'full-30 model ranking (Spearman 0.97) at half '
-                                 'the wall-clock. Combines with --multi-turn.')
+                            help='Only run scenarios carrying this tag. '
+                                 'Combines with --single-turn / --multi-turn.')
+        parser.add_argument('--sample', type=int, default=None,
+                            help='Run a random sample of N scenarios instead of '
+                                 'the full set, drawn AFTER the other filters. '
+                                 'Use with --seed for a reproducible draw. This '
+                                 'replaces the old hardcoded "core15" subset: a '
+                                 'fixed blessed subset silently becomes the '
+                                 'benchmark, and its 15 scenarios could not '
+                                 'resolve a model difference below ~36pp. Sample '
+                                 'to cut wall-clock; run the full set to publish.')
+        parser.add_argument('--seed', type=int, default=0,
+                            help='Seed for --sample (default: 0). Same seed + '
+                                 'same dataset = same draw.')
 
     def handle(self, *args, smoke, scenario, single_turn, multi_turn, subset,
-               **kwargs) -> None:
+               sample, seed, **kwargs) -> None:
         if single_turn and multi_turn:
             raise CommandError("Pass at most one of --single-turn / --multi-turn.")
+        if sample is not None and sample < 1:
+            raise CommandError("--sample must be >= 1.")
         # Import inside handle so Django app loading completes first.
         from evals.runner import discover_scenarios, run, write_run
 
@@ -62,6 +71,19 @@ class Command(BaseCommand):
             hint = f" for subset={subset!r}" if subset else ""
             self.stdout.write(self.style.WARNING(f"No scenarios matched{hint}."))
             return
+
+        # Sample AFTER filtering, and sort first so the draw does not depend on
+        # filesystem ordering. A sampled run is a sampled run — say so loudly, or
+        # a partial score gets read as a full one.
+        if sample is not None and sample < len(scenarios):
+            import random
+            population = sorted(scenarios, key=lambda s: s.id)
+            scenarios = random.Random(seed).sample(population, sample)
+            scenarios.sort(key=lambda s: s.id)
+            self.stdout.write(self.style.WARNING(
+                f">> SAMPLED RUN: {sample} of {len(population)} scenarios "
+                f"(seed={seed}). Scores are NOT comparable to a full run."
+            ))
 
         # Make the tutor engine explicit + loud. This eval targets the
         # production simple_tutor engine; if the legacy ConversationalTutor is

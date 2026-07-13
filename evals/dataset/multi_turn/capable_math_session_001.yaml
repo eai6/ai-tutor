@@ -5,7 +5,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1137
-tags: [multi_turn, baseline, math, capable, core15]
+tags: [multi_turn, baseline, math, capable]
 mode: multi_turn
 max_turns: 24
 assertions:

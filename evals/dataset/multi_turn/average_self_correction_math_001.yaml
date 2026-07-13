@@ -4,7 +4,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1138
-tags: [multi_turn, math, average, self_correction, edge_case, core15]
+tags: [multi_turn, math, average, self_correction, edge_case]
 mode: multi_turn
 max_turns: 24
 
