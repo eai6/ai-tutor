@@ -169,6 +169,73 @@ def _should_force_grade(family: str | None, mode: str, student_intent: str | Non
         return False
     return (student_intent or '') not in _NON_POSING_INTENTS
 
+
+# ── B2: adaptive forcing gate ────────────────────────────────────────────────
+# _should_force_pose / _should_force_grade above answer "do we EXPECT a tool
+# this turn?" — they do not, on their own, decide whether to constrain Call 1.
+# Blanket forcing (force Call 1 whenever we expect a tool) is what made
+# gemini-3.1-pro spray pose_question 139x in one turn and collapse to 3/15 in
+# sweep 2: forcing guarantees a call, not a CORRECT one, and strong tool-users
+# were never the ones missing calls. The gate below runs Call 1 UNFORCED for a
+# model until it is actually seen to skip an expected tool; the existing Call-2
+# repair catches that first miss in the same turn, and the miss is latched so
+# every later turn pre-forces. Net effect: compliant models (the strong Geminis)
+# run free and never spray; non-compliant models get forced from their second
+# turn on. Toggle SIMPLE_TUTOR_ADAPTIVE_FORCING=0 restores blanket forcing so a
+# sweep can isolate this variable (report §12/§13).
+def _adaptive_forcing_enabled() -> bool:
+    return os.getenv('SIMPLE_TUTOR_ADAPTIVE_FORCING', '1').strip() != '0'
+
+
+def _session_forcing_misses(session) -> int:
+    es = getattr(session, 'engine_state', None) or {}
+    if not isinstance(es, dict):
+        return 0
+    forcing = es.get('forcing')
+    if not isinstance(forcing, dict):
+        return 0
+    try:
+        return int(forcing.get('misses') or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _adaptive_force_now(session, expected: bool) -> bool:
+    """Whether Call 1 should actually constrain tool_choice this turn.
+
+    ``expected`` is the output of _should_force_pose/_should_force_grade. With
+    adaptive forcing off, we force whenever a tool is expected (pre-B2 blanket
+    behaviour). With it on, we only force once this session has been seen to
+    skip an expected tool at least once.
+    """
+    if not expected:
+        return False
+    if not _adaptive_forcing_enabled():
+        return True
+    return _session_forcing_misses(session) >= 1
+
+
+def _record_forcing_miss(session) -> None:
+    """Latch that the model skipped an expected tool on an unforced Call 1, so
+    subsequent turns pre-force. Mirrors the guarded read-copy-mutate-save idiom
+    used elsewhere for engine_state (isinstance guard included)."""
+    es = getattr(session, 'engine_state', None) or {}
+    if not isinstance(es, dict):
+        es = {}
+    forcing = es.get('forcing')
+    if not isinstance(forcing, dict):
+        forcing = {}
+    forcing['misses'] = int(forcing.get('misses') or 0) + 1
+    es['forcing'] = forcing
+    session.engine_state = es
+    try:
+        session.save(update_fields=['engine_state'])
+    except Exception:
+        # Never let a bookkeeping save break the turn (no-block design).
+        logger.warning("[simple_tutor] could not persist forcing miss "
+                       "session=%s", getattr(session, 'pk', None))
+
+
 if TYPE_CHECKING:
     from apps.tutoring.models import TutorSession
 
@@ -266,7 +333,7 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         failure, returns ``_FALLBACK_REPLY`` content.
     """
     from apps.tutoring.simple_tutor.tools import (
-        build_question_pool, maybe_advance_step,
+        autograde_bare_answer_if_clear, build_question_pool, maybe_advance_step,
     )
     from apps.tutoring.simple_tutor.state import (
         build_recent_window, step_summary_log,
@@ -384,8 +451,14 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # slot. See _should_force_pose: every non-Anthropic family, POSE mode only,
     # answering intents only. Production (family None) is untouched. Models can
     # emit teaching text alongside the forced call, so explanations survive.
-    force_pose = _should_force_pose(_family, mode, student_intent)
-    force_grade = not force_pose and _should_force_grade(_family, mode, student_intent)
+    # B2 adaptive gate: _should_force_* answer "do we EXPECT a tool this turn?";
+    # the gate decides whether to actually constrain Call 1. Compliant models run
+    # Call 1 unforced until the session is seen to skip an expected tool once.
+    want_pose = _should_force_pose(_family, mode, student_intent)
+    want_grade = not want_pose and _should_force_grade(_family, mode, student_intent)
+    gate_open = _adaptive_force_now(session, want_pose or want_grade)
+    force_pose = want_pose and gate_open
+    force_grade = want_grade and gate_open
     call1_tools, call1_tool_choice = _plan_call1(tools, force_pose, force_grade)
 
     messages: list = [{'role': 'user', 'content': user_input}]
@@ -419,7 +492,10 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # prose: qwen3.5:4b called pose_question on 3% of its POSE turns and never
     # once reached an exit ticket. The repair rides on Call 2 rather than
     # costing a call of its own — see _run_second_call.
-    missing_tool = _missing_forced_tool(force_pose, force_grade, tool_results)
+    # Detect a miss against the EXPECTATION (want_*), not merely when we forced —
+    # so an unforced Call 1 that skipped an expected tool is still repaired by
+    # Call 2, and the skip is latched below to pre-force the rest of the session.
+    missing_tool = _missing_forced_tool(want_pose, want_grade, tool_results)
 
     # ─── 6. Call 2 — feed tool_results back so the model writes
     #              the student-facing reply WITH the verdict in hand,
@@ -436,6 +512,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         missing_tool=missing_tool,
         user_input=user_input,
     )
+
+    # B2: latch a Call-1 skip (whether or not Call 2 repaired it). The skip
+    # itself is the compliance signal — a model that needed the repair once is
+    # pre-forced from here on, so it does not narrate a question into a dead slot
+    # again. Compliant models never reach here and keep running free.
+    # B3: an empty-slot grade is evidence of a missed pose on a prior turn, so it
+    # feeds the same gate — force pose from here on to stop the recurrence.
+    if missing_tool or _graded_empty_slot(tool_results):
+        _record_forcing_miss(session)
 
     if not text_reply:
         # Last-resort: neither call produced text. Give a neutral
@@ -465,6 +550,23 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # turn so the chat thread starts with the tutor's greeting.
     if not _is_opening:
         _persist_student_turn(session, user_input, step)
+
+    # ─── 8b. B1 bare-answer safety net ────────────────────────────
+    # If the student clearly answered correctly but the model never called
+    # record_answer, grade it server-side (deterministic tiers only) so the step
+    # still advances. Appended before the tutor turn is persisted so the verdict
+    # lands in judge_outputs['grader'] exactly like a model-issued grade. Skipped
+    # on the synthetic opening turn (no student answer yet).
+    if not _is_opening:
+        autograded = autograde_bare_answer_if_clear(
+            session,
+            student_answer=user_input,
+            student_intent=student_intent,
+            already_recorded=_tool_was_called(tool_results, 'record_answer'),
+        )
+        if autograded is not None:
+            tool_results.append(autograded)
+
     _persist_tutor_turn(session, text_reply, step, tool_results)
 
     # ─── 9. Server auto-advance (safety net) ──────────────────────
@@ -1023,6 +1125,23 @@ def _tool_was_called(tool_results: list[dict], name: str) -> bool:
     student did not answer") counts as called — the model made the judgement,
     which is all the repair path is trying to elicit."""
     return any(tr.get('tool') == name for tr in (tool_results or []))
+
+
+def _graded_empty_slot(tool_results: list[dict]) -> bool:
+    """B3: True when the model called record_answer but no question was in
+    flight. That only happens when it posed a question as prose on a PRIOR turn
+    without calling pose_question — so there is no stored reference to grade
+    against, and reconstructing one risks grading against the wrong question.
+    The safe, root-cause fix is to treat it as a missed pose and let the B2
+    adaptive gate force pose_question from here on (which guarantees a slot and
+    stops the empty-slot grade recurring). We do NOT fabricate a reference."""
+    for tr in tool_results or []:
+        if tr.get('tool') != 'record_answer':
+            continue
+        result = tr.get('result') or {}
+        if not result.get('recorded') and 'in-flight' in str(result.get('error', '')):
+            return True
+    return False
 
 
 # Repair instruction. Positive framing throughout: Google documents that

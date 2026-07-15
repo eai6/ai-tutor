@@ -782,6 +782,97 @@ def handle_advance_step(
 # ============================================================================
 
 
+# B1 — server-authoritative "clearly-correct bare answer" safety net.
+#
+# The old auto_grade_if_missed net (removed 2026-05-26) recorded a verdict for
+# EVERY missed record_answer, so conversational continuations ("yes let's go
+# deeper") got graded as answers and polluted the graded set. This replacement
+# is deliberately narrow: it records ONLY when the student's own message
+# DETERMINISTICALLY matches the in-flight reference (mcq letter / numeric value).
+# A non-answer cannot match an MCQ letter or a numeric reference, so the failure
+# mode that got the old net pulled cannot recur. This is what makes "one missed
+# tool call non-fatal" (report B1): the student answered correctly, the model
+# forgot to call record_answer, and the step still advances.
+#
+# Deterministic tiers only — never an LLM verifier call in a safety net (cost +
+# the "clearly correct" bar). Toggle SIMPLE_TUTOR_AUTOGRADE_BARE=0 disables it so
+# a sweep can isolate this variable.
+_AUTOGRADE_QTYPES = frozenset({'mcq', 'math', 'numeric', 'short_numeric'})
+_AUTOGRADE_DET_TIERS = frozenset({'mcq', 'math'})
+_AUTOGRADE_SKIP_INTENTS = frozenset(
+    {'clarification', 'pushback', 'off_topic', 'non_engagement'}
+)
+
+
+def autograde_bare_answer_if_clear(
+    session: 'TutorSession',
+    *,
+    student_answer: str,
+    student_intent: str | None,
+    already_recorded: bool,
+) -> dict | None:
+    """Grade a clearly-correct bare answer the model forgot to submit.
+
+    Returns a ``record_answer``-shaped tool_result entry (so the caller can
+    append it to ``tool_results`` before persistence, and the verdict lands in
+    ``judge_outputs['grader']`` exactly like a real record_answer) — or ``None``
+    when nothing should be recorded.
+    """
+    import os
+
+    if os.getenv('SIMPLE_TUTOR_AUTOGRADE_BARE', '1').strip() == '0':
+        return None
+    if already_recorded:
+        return None
+    if (student_intent or '') in _AUTOGRADE_SKIP_INTENTS:
+        return None
+
+    answer = (student_answer or '').strip()
+    if not answer:
+        return None
+
+    from apps.tutoring.models import InFlightQuestion
+    from apps.tutoring.simple_tutor.grader import grade_answer
+
+    in_flight = InFlightQuestion.objects.filter(session=session).first()
+    if in_flight is None or in_flight.question_type not in _AUTOGRADE_QTYPES:
+        return None
+
+    # Pre-grade against the reference. Only a clean deterministic CORRECT
+    # verdict is allowed to record — INCORRECT / uncertain is left to the LLM's
+    # hint ladder, unchanged.
+    question = _TransientQuestion(
+        question_text=in_flight.question_text,
+        question_type=in_flight.question_type,
+        reference_answer=in_flight.reference_answer,
+        options=in_flight.options or [],
+    )
+    try:
+        result = grade_answer(question=question, student_answer=answer)
+    except Exception as exc:
+        logger.warning(
+            "autograde_bare_answer: grader raised %s (session=%s) — skipping",
+            type(exc).__name__, session.pk,
+        )
+        return None
+
+    if result.verdict.value != 'correct' or result.tier not in _AUTOGRADE_DET_TIERS:
+        return None
+
+    # It IS clearly correct. Route through the real handler so the slot clears
+    # and the result dict is byte-identical to a model-issued record_answer.
+    recorded = handle_record_answer(session, extracted_answer=answer)
+    if not recorded.get('recorded'):
+        return None
+
+    logger.info(
+        "[simple_tutor] autograded a clearly-correct bare answer session=%s "
+        "qtype=%s tier=%s ext=%r (model skipped record_answer)",
+        session.pk, in_flight.question_type, result.tier, answer[:40],
+    )
+    return {'tool': 'record_answer', 'result': recorded, 'autograded': True}
+
+
 DEFAULT_COMPETENCE_THRESHOLD = 1   # number of CORRECT verdicts to call it
 
 

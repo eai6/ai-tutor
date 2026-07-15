@@ -201,6 +201,12 @@ def _adapt_openai_response(response, *, model_name: str = '', tools: list | None
 
         msg = getattr(choice, 'message', None)
         text_content = getattr(msg, 'content', None) if msg else None
+        # B4: reasoning-channel tool call (thinking models populate this when
+        # `content` is empty). Recovered below.
+        reasoning = (
+            getattr(msg, 'reasoning_content', None)
+            or getattr(msg, 'reasoning', None) or ''
+        ) if msg else ''
         if text_content:
             blocks.append(AdaptedTextBlock(text=text_content))
         tool_calls = (
@@ -221,8 +227,11 @@ def _adapt_openai_response(response, *, model_name: str = '', tools: list | None
                 name=name,
                 input=args,
             ))
+    else:
+        reasoning = ''
 
     blocks = _recover_text_tool_call(blocks, tools)
+    blocks = _recover_reasoning_tool_call(blocks, reasoning, tools)
     usage = AdaptedUsage()
     usage_obj = getattr(response, 'usage', None)
     if usage_obj is not None:
@@ -269,7 +278,10 @@ def _adapt_openai_dict(data: dict, *, model_name: str = '', tools: list | None =
         elif finish == 'content_filter':
             stop_reason = 'stop_sequence'
         msg = choice.get('message') or {}
-        text = msg.get('content')  # NB: ignore reasoning_content
+        text = msg.get('content')
+        # B4: kept for reasoning-channel tool-call recovery below (thinking
+        # models put the call here when `content` is empty).
+        reasoning = msg.get('reasoning_content') or msg.get('reasoning') or ''
         if text:
             blocks.append(AdaptedTextBlock(text=text))
         for i, tc in enumerate(msg.get('tool_calls') or []):
@@ -284,7 +296,10 @@ def _adapt_openai_dict(data: dict, *, model_name: str = '', tools: list | None =
                 name=fn.get('name') or '',
                 input=args,
             ))
+    else:
+        reasoning = ''
     blocks = _recover_text_tool_call(blocks, tools)
+    blocks = _recover_reasoning_tool_call(blocks, reasoning, tools)
     usage_obj = (data or {}).get('usage') or {}
     usage = AdaptedUsage(
         input_tokens=usage_obj.get('prompt_tokens', 0) or 0,
@@ -512,6 +527,42 @@ def _recover_text_tool_call(blocks, tools):
         input=parsed.get('arguments') or {},
         id='recovered_tool_0',
     )]
+
+
+def _recover_reasoning_tool_call(blocks, reasoning, tools):
+    """B4: salvage a tool call a thinking model emitted inside its reasoning
+    channel.
+
+    Some reasoning models (e.g. qwen3-next-80b-thinking on Vertex MaaS) return
+    their tool call inside ``reasoning_content`` — a channel the standard OpenAI
+    response shape carries OUTSIDE ``content``, which the adapters otherwise
+    ignore. When ``content`` produced no tool call, the whole turn is lost: in
+    sweep 2 this deadlocked qwen3-next-80b-thinking 14/15. This reuses the same
+    text-call parser on the reasoning text and, if it finds a call, keeps that
+    tool_use block plus any genuine visible text. The raw reasoning is never
+    surfaced to the student — only a recovered tool_use block is added.
+
+    No-op unless enabled, ``tools`` given, reasoning present, and no structured
+    tool_use already exists. Toggle SIMPLE_TUTOR_THINKING_RECOVERY=0 disables it
+    so a sweep can isolate this variable.
+    """
+    if os.getenv('SIMPLE_TUTOR_THINKING_RECOVERY', '1').strip() == '0':
+        return blocks
+    if not tools or not reasoning or not str(reasoning).strip():
+        return blocks
+    if any(getattr(b, 'type', '') == 'tool_use' for b in blocks):
+        return blocks
+    recovered = _recover_text_tool_call([AdaptedTextBlock(text=str(reasoning))], tools)
+    tool_blocks = [b for b in recovered if getattr(b, 'type', '') == 'tool_use']
+    if not tool_blocks:
+        return blocks
+    logger.info(
+        "[llm] recovered %s from the reasoning channel — thinking model emitted "
+        "the tool call outside `content`",
+        [getattr(b, 'name', '?') for b in tool_blocks],
+    )
+    text_blocks = [b for b in blocks if getattr(b, 'type', '') == 'text']
+    return text_blocks + tool_blocks
 
 
 def _adapt_ollama_response(

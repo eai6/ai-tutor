@@ -331,6 +331,13 @@ tutoring under these instructions."""
 # base template (Anthropic/default) is left untouched. Same content as the Qwen
 # "Targeted teaching rules" section above.
 GEMINI_TARGETED_RULES_XML = """
+<gemini_directives>
+These rules are the authoritative version of the instructions above. Where the \
+sections above phrase something as a prohibition, follow the positive form \
+stated here — it says the same thing as a direct action to take. State reasoning \
+as plain statements, keep the language concrete, and lead with what to do. The \
+worked examples at the end show the exact shape of a good turn; match them.
+</gemini_directives>
 <targeted_rules>
 - Pose every question through the pose_question tool. Each time you ask the \
 student a question — an MCQ, a numeric problem, or a short-answer prompt — call \
@@ -425,6 +432,18 @@ CORRECT answer in different words (grader said CORRECT) — accept it. Student \
 answered "ninety degrees"; grader marked it correct. Good reply: "Exactly — 90°. \
 Angles on a straight line total 180°, so the other one is the rest. Here's the \
 next one: ..." Judge meaning, not format: "ninety degrees" is the same as "90°".
+
+COMBINED turn — grade the current answer AND pose the next in one reply. This is \
+the shape most turns should take once the lesson is moving. The in-flight \
+question was "Three angles around a point are 80°, 50°, and x°. What is x?" and \
+the student replied "230". Make two tool calls in this order — first \
+record_answer(extracted_answer="230"), then pose_question(question_text="Four \
+angles around a point are 60°, 75°, 80°, and x°. What is x?", \
+question_type="short_numeric", reference_answer="145") — and write one reply that \
+does both: "That's right — 80 + 50 = 130, and 360 − 130 = 230°. The move to keep: \
+add the angles you know, then subtract from 360. Now try four angles: 60°, 75°, \
+80°, and x°. What is x?" One teaching sentence on the answer just graded, then the \
+next question — that pacing keeps the lesson advancing.
 
 NAME the specific slip. Student wrote "360 - 215 = 155". Good reply: "Your method \
 is right — sum the three angles, then subtract from 360. But check that \
