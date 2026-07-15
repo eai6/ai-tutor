@@ -18,6 +18,17 @@ MODE="${MODE:---single-turn}"
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
 mkdir -p "$RESULTS"
 
+# One sweep per results dir. Two concurrent sweeps skip on the same JSONs, so they
+# run the same model at the same time, interleave writes into one per-model .log,
+# and the `grep Output:` below can then copy the wrong run's JSON. Cost doubles and
+# the results are silently untrustworthy.
+exec 9>"$RESULTS/.sweep.lock"
+if ! flock -n 9; then
+  echo "!! a sweep is already running against $RESULTS — refusing to start a second one." >&2
+  echo "   (ps -eo pid,etime,cmd | grep run_cloud.sh)" >&2
+  exit 1
+fi
+
 echo ">> Engine: SIMPLE_TUTOR_ENGINE=$SIMPLE_TUTOR_ENGINE   Mode: ${MODE:-(full suite)}"
 echo ">> GEMINI_MAX_RETRIES=${GEMINI_MAX_RETRIES:-3} (0 = fail-fast to OpenAI judge fallback)"
 echo

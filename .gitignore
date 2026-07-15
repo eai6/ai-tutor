@@ -64,3 +64,7 @@ ab-test-reports-*/
 # lesson content + may include institution-scoped data. Loaded into the
 # Dockerized Postgres at test time; not tracked.
 prod_content_dump.sql
+
+# Eval sweep runtime artifacts (per-model run logs + the flock lockfile)
+offline_eval/**/.sweep.lock
+offline_eval/**/*.log
