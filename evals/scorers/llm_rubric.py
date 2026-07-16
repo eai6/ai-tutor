@@ -391,16 +391,53 @@ def _build_user_prompt(
     )
 
 
+# How each simulated-session end-reason should be described to the judge. Without
+# this, the transcript simply STOPS (e.g. at the exit-ticket hand-off) and the
+# judge misreads a successful ending as an abrupt cutoff — penalising "terminates
+# cleanly" and scoring exit-ticket/remediation items as failures rather than n/a.
+# The sim deliberately ends the tutoring phase at the exit-ticket hand-off; the
+# graded quiz + any remediation happen AFTER the transcript and are not captured.
+_END_REASON_NOTE = {
+    'exit_ticket': (
+        "The tutoring phase ended SUCCESSFULLY — the tutor guided the student "
+        "through the taught steps and reached the exit-ticket hand-off. The "
+        "transcript intentionally ENDS at that hand-off: the graded quiz (and any "
+        "remediation that would follow a failed quiz) is administered separately "
+        "and is NOT part of this transcript. Reaching the exit ticket is a clean, "
+        "successful termination. Any rubric item about administering, grading, or "
+        "re-firing the exit ticket, or about post-quiz remediation, never became "
+        "relevant here — return \"n/a\" for it, do not penalise it."
+    ),
+    'completed': (
+        "The session completed cleanly (the tutor brought the lesson to a proper "
+        "close). This is a clean, successful termination."
+    ),
+    'max_turns': (
+        "The session ran OUT OF TURNS before reaching the exit ticket — the lesson "
+        "did not finish. This is not a clean termination."
+    ),
+    'deadlock': (
+        "The engine detected the tutor and student STUCK IN A LOOP and stopped the "
+        "session. This is a failed, unclean termination."
+    ),
+    'error': "The session ended with an internal error.",
+}
+
+
 def _build_trajectory_prompt(
     transcript: list[dict], rubric_items: list[str],
+    end_reason: str | None = None,
 ) -> str:
     """Variant prompt for whole-session evaluation (multi-turn scenarios)."""
     conv_str = _format_conversation(transcript)
     rubric_str = '\n'.join(
         f"{i+1}. {item}" for i, item in enumerate(rubric_items)
     )
+    outcome = _END_REASON_NOTE.get((end_reason or '').strip())
+    outcome_block = f"HOW THIS SESSION ENDED:\n{outcome}\n\n" if outcome else ""
     return (
         f"FULL TUTORING SESSION TRANSCRIPT:\n{conv_str}\n\n"
+        f"{outcome_block}"
         f"RUBRIC ITEMS — judge each across the WHOLE session:\n{rubric_str}\n\n"
         "For each item: consider every tutor turn where the item is relevant "
         "(e.g. an 'if the student made a mistake' item applies only on turns "
@@ -579,6 +616,7 @@ def score_trajectory(
     transcript: list[dict],
     pass_threshold: float,
     judge_config: dict[str, Any] | None = None,
+    end_reason: str | None = None,
 ) -> RubricResult:
     """Score an entire session transcript against a rubric.
 
@@ -612,7 +650,7 @@ def score_trajectory(
         result.error = f"client init failed: {type(exc).__name__}: {exc}"
         return result
 
-    user_prompt = _build_trajectory_prompt(transcript, rubric_items)
+    user_prompt = _build_trajectory_prompt(transcript, rubric_items, end_reason)
     return _call_and_parse(
         client, user_prompt, rubric_items, max_tokens, temperature, result,
     )

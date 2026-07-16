@@ -566,6 +566,7 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
                         for t in transcript_payload],
             pass_threshold=scenario.pass_threshold,
             judge_config=scenario.rubric_judge or MULTI_TURN_RUBRIC_JUDGE,
+            end_reason=sim.reason,
         )
         rubric_payload = asdict(rubric_result)
         rubric_passed = rubric_result.passed and not rubric_result.error
