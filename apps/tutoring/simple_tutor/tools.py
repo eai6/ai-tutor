@@ -48,6 +48,95 @@ if TYPE_CHECKING:
 DEFAULT_STEP_TURN_CAP = 8
 
 
+# ── Anti-repetition (breaks the content-repetition deadlock) ─────────────────
+# The multi-turn fix-check surfaced a failure mode the protocol fixes don't
+# touch: a model resolves a question, then re-poses the SAME question — the
+# student answers it again ("wait, that's the same question, right?"), the tutor
+# re-poses again, and the session deadlocks without the lesson advancing
+# (qwen3-next-80b-instruct deadlocked 5/5 this way). This is the REPEATS failure
+# mode, not a tool-protocol one. Guard: remember questions graded CORRECT, and
+# when the model poses an EXACT re-ask of one, force the lesson forward after two
+# in a row so the loop cannot persist. Exact-normalised match only — a genuinely
+# new-but-similar question ("now try FOUR angles") must NOT trip this.
+# Toggle SIMPLE_TUTOR_ANTIREPEAT=0 disables it (sweep isolation).
+_ANSWERED_CORRECT_CAP = 40      # remember at most this many resolved questions
+_REPEAT_STREAK_TO_ADVANCE = 2   # force-advance after this many exact re-asks in a row
+
+
+def _norm_q(text: str) -> str:
+    """Normalise a question stem for exact-repeat comparison: lowercase, drop
+    non-alphanumerics, collapse whitespace. Deliberately strict — it must match
+    a verbatim re-ask but not a reworded or numerically-different question."""
+    import re
+    return re.sub(r'[^a-z0-9]+', ' ', (text or '').lower()).strip()
+
+
+def _antirepeat_enabled() -> bool:
+    import os
+    return os.getenv('SIMPLE_TUTOR_ANTIREPEAT', '1').strip() != '0'
+
+
+def _record_answered_correct(session: 'TutorSession', question_text: str) -> None:
+    """Remember a question the student just answered correctly, so a later exact
+    re-ask can be detected. Guarded read-copy-mutate-save on engine_state."""
+    key = _norm_q(question_text)
+    if not key:
+        return
+    es = getattr(session, 'engine_state', None) or {}
+    if not isinstance(es, dict):
+        es = {}
+    answered = es.get('answered_correct')
+    if not isinstance(answered, list):
+        answered = []
+    if key not in answered:
+        answered.append(key)
+    es['answered_correct'] = answered[-_ANSWERED_CORRECT_CAP:]
+    # A fresh correct answer ends any repeat streak.
+    es['repeat_pose_streak'] = 0
+    session.engine_state = es
+    try:
+        session.save(update_fields=['engine_state'])
+    except Exception:
+        logger.warning("[simple_tutor] could not persist answered_correct "
+                       "session=%s", getattr(session, 'pk', None))
+
+
+def _note_pose_repetition(session: 'TutorSession', question_text: str) -> bool:
+    """Called on every pose. Returns True and sets a pending-advance flag when the
+    model has now re-asked an already-correct question _REPEAT_STREAK_TO_ADVANCE
+    times in a row — the signal to force the lesson forward. Returns False for a
+    normal (non-repeat) pose, and resets the streak."""
+    if not _antirepeat_enabled():
+        return False
+    es = getattr(session, 'engine_state', None) or {}
+    if not isinstance(es, dict):
+        return False
+    answered = es.get('answered_correct')
+    is_repeat = isinstance(answered, list) and _norm_q(question_text) in answered
+    streak = int(es.get('repeat_pose_streak') or 0)
+    force = False
+    if is_repeat:
+        streak += 1
+        logger.info(
+            "[simple_tutor] repeat_pose session=%s streak=%d question=%r "
+            "(already answered correctly)",
+            session.pk, streak, (question_text or '')[:60],
+        )
+        if streak >= _REPEAT_STREAK_TO_ADVANCE:
+            force = True
+            es['_repeat_force_advance'] = True
+            streak = 0   # consumed
+    else:
+        streak = 0
+    es['repeat_pose_streak'] = streak
+    session.engine_state = es
+    try:
+        session.save(update_fields=['engine_state'])
+    except Exception:
+        pass
+    return force
+
+
 # ============================================================================
 # build_question_pool — gather context questions for the system prompt
 # ============================================================================
@@ -393,11 +482,18 @@ def handle_pose_question(
         posed_at_turn_id=posed_at_turn_id,
     )
 
+    # Anti-repetition: register the slot as normal (so the turn always has a
+    # gradable question — never a dangling turn), but if this is a repeat re-ask
+    # of an already-correct question, flag the lesson to move forward. The slot
+    # stays valid; the step just advances underneath, which walks the session out
+    # of the loop instead of letting it deadlock.
+    repeat_force_advance = _note_pose_repetition(session, qtext)
+
     logger.info(
         "[simple_tutor] posed session=%s type=%s source=%s "
-        "catalog_id=%s mismatch=%s",
+        "catalog_id=%s mismatch=%s repeat_advance=%s",
         session.pk, qtype, src,
-        catalog_question_id, catalog_mismatch,
+        catalog_question_id, catalog_mismatch, repeat_force_advance,
     )
 
     return {
@@ -405,6 +501,7 @@ def handle_pose_question(
         'question_type': qtype,
         'source': src,
         'catalog_mismatch': catalog_mismatch,
+        'repeat_force_advance': repeat_force_advance,
     }
 
 
@@ -526,6 +623,9 @@ def handle_record_answer(
     }
 
     if verdict == 'correct':
+        # Remember this stem BEFORE deleting the slot, so an exact re-ask on a
+        # later turn is detectable (anti-repetition).
+        _record_answered_correct(session, in_flight.question_text)
         # Slot is resolved — clear it. The hint ladder + analytics
         # state is preserved in the grader result + session turns.
         in_flight.delete()
@@ -923,24 +1023,38 @@ def maybe_advance_step(
         return False
 
     forced = False
+    forced_reason = None
 
-    # Trigger 1 — competence demonstrated. Threshold is per-call (LOW
-    # default of 1 correct verdict; engine/caller can raise per-step).
-    correct_count = _current_step_correct_verdict_count(session)
-    if correct_count >= competence_threshold:
-        pass   # advance
-    else:
-        # Trigger 2 — soft turn cap. Count student turns on the CURRENT
-        # step via the SessionTurn.step FK.
-        try:
-            this_step_turns = session.turns.filter(
-                step=current_step, role='student',
-            ).count()
-        except Exception:
-            return False
-        if this_step_turns < turn_cap:
-            return False
+    # Trigger 0 — repetition. The model re-asked an already-correct question
+    # _REPEAT_STREAK_TO_ADVANCE times in a row (flag set by _note_pose_repetition).
+    # Move the lesson forward regardless of competence/turn-cap so the session
+    # walks out of the loop instead of deadlocking. Pop the flag here so it fires
+    # once per streak.
+    es0 = getattr(session, 'engine_state', None) or {}
+    repeat_force = isinstance(es0, dict) and es0.pop('_repeat_force_advance', False)
+    if repeat_force:
+        session.engine_state = es0   # keep the popped flag out of the DB
         forced = True
+        forced_reason = 'repetition (re-asked an already-correct question)'
+    else:
+        # Trigger 1 — competence demonstrated. Threshold is per-call (LOW
+        # default of 1 correct verdict; engine/caller can raise per-step).
+        correct_count = _current_step_correct_verdict_count(session)
+        if correct_count >= competence_threshold:
+            pass   # advance
+        else:
+            # Trigger 2 — soft turn cap. Count student turns on the CURRENT
+            # step via the SessionTurn.step FK.
+            try:
+                this_step_turns = session.turns.filter(
+                    step=current_step, role='student',
+                ).count()
+            except Exception:
+                return False
+            if this_step_turns < turn_cap:
+                return False
+            forced = True
+            forced_reason = f'turn_cap={turn_cap} exceeded'
 
     # Compute next step index
     next_idx = current_idx + 1
@@ -959,7 +1073,7 @@ def maybe_advance_step(
         forced_log = es.get('forced_advances') or []
         forced_log.append({
             'from_step_index': current_idx,
-            'reason': f'turn_cap={turn_cap} exceeded',
+            'reason': forced_reason,
         })
         es['forced_advances'] = forced_log[-20:]
         session.engine_state = es
