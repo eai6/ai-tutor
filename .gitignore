@@ -68,3 +68,7 @@ prod_content_dump.sql
 # Eval sweep runtime artifacts (per-model run logs + the flock lockfile)
 offline_eval/**/.sweep.lock
 offline_eval/**/*.log
+.claude/loop.md
+
+# Generated review output (regenerate with build_viewer.py / export_review_data.py)
+offline_eval/experiment_review/

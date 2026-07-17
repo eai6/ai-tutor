@@ -1,0 +1,2945 @@
+{
+  "started_at": "2026-07-16T05:59:28.638747+00:00",
+  "finished_at": "2026-07-16T06:11:43.859422+00:00",
+  "git_sha": "29a19bcb64b4",
+  "total_scenarios": 20,
+  "passed": 0,
+  "failed": 0,
+  "errored": 20,
+  "results": [
+    {
+      "scenario_id": "baseline_full_session_error_prone_1141_09",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 0.3,
+            "reasoning": "The tutor only posed a question and said 'let's walk through it together' without actually providing any explanation or teaching content before the session ended.",
+            "applicable": true
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.5,
+            "reasoning": "The tutor did recognize the student's wrong answer and began to redirect, but the session ended before any real adaptation could be demonstrated.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error, not a clean completion, exit ticket, or natural conclusion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.8,
+            "reasoning": "The tutor correctly identified the student's mistake and did not affirm the wrong answer, saying 'Not quite.'",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.1,
+            "reasoning": "The tutor only said 'Not quite — let's walk through it together' without identifying the specific misconception (confusing 'opposite' with 'complement' or misunderstanding that P(not A) = 1 - P(A)).",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor did not reveal the correct answer after the student's wrong response.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.2,
+            "reasoning": "The tutor indicated it would walk through the problem but provided no actual guidance, hint, or scaffolding before the session ended.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The tutor's final response 'let's walk through it together' does not give the student a specific next action or prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "No logical inconsistencies were present in the brief session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The tone was generally warm and non-harsh, though 'Not quite' is slightly abrupt without more encouragement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.8,
+            "reasoning": "The tutor's language was relatively natural and avoided filler openers, though the session was too brief to fully assess this.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.5272727272727272,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1182,
+        "tokens_out": 902,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today, we're going to learn about one of the most powerful rules in probability, which helps us quickly figure out the chance of something *not* happening.\n\nLet's start with a classic. The probability of rolling a 6 on a fair die is 1/6. What is the probability of NOT rolling a 6?\nA) 1\nB) 0.2\nC) 0.833333\nD) 0.166667\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "okay so if rolling a 6 is 1/6 then not rolling a 6 is just 1/6 as well because theyre opposite things so the answer is D) 0.166667",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 9033,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5E2hnB6xuhR3VmTJJQb'}"
+    },
+    {
+      "scenario_id": "baseline_full_session_error_prone_1470_11",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "geography",
+      "lesson_id": 1470,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 0.3,
+            "reasoning": "The tutor mostly just re-presents MCQ questions with minimal explanation; there is very little actual teaching of concepts before or between questions.",
+            "applicable": true
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.2,
+            "reasoning": "The student answered B (which is correct for physical weathering) but the tutor responded as if it were wrong and pivoted to a completely different topic about freeze-thaw weathering, showing poor adaptation to the student's actual response.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error, not a clean completion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student correctly answered B for the physical weathering definition, but the tutor responded with 'Not quite' and treated it as wrong, which is a significant failure to affirm a correct answer.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not actually make a mistake in this session, so this item does not apply.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor did not reveal any final answers to unsolved questions during the session.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.4,
+            "reasoning": "The tutor provided some scaffolding about freeze-thaw weathering, but it was misdirected since it was responding to a correct answer as if it were wrong, making the guidance contextually inappropriate.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "The tutor generally provided MCQ options and clear prompts for the student to respond to, though the session ended abruptly with an error.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor fundamentally ignored that the student gave the correct answer (B) to the physical weathering question and proceeded as if it were wrong, creating a major logical inconsistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone was generally neutral and not harsh, but telling a student 'Not quite' when they were correct is discouraging and undermines the warmth of the interaction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.5,
+            "reasoning": "The tutor avoids filler openers but the responses feel somewhat templated and scripted, especially with the repeated MCQ format and the awkward pivot after the student's correct answer.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.38,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1357,
+        "tokens_out": 970,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll explore how rocks on our islands break down over time due to weathering.\n\nTo start, which of the following is the best definition of physical weathering?\nA) The breakdown of rock by chemical reactions that change its mineral composition\nB) The mechanical breakdown of rock into smaller pieces without changing its chemical composition\nC) The weathering of rock caused exclusively by living organisms such as plants and lichens\nD) The slow erosion of rock by water movement over thousands of years",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "b",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite. While temperatures dropping below freezing are essential, let's think about another factor that influences how often freeze-thaw weathering can happen in these colder environments.\n\nConsider the general climate characteristics of mountain regions and high latitudes compared to tropical islands. Which factor related to water availability in its liquid form might play a role in making freeze-thaw more prevalent in colder regions?\n\nWhich of the following best explains why freeze-thaw weathering is more common in mountain regions and high latitudes?\nA) Mountains and high latitudes receive less rainfall than tropical islands\nB) Temperatures regularly drop below freezing, allowing water in rock cracks to freeze and expand repeatedly\nC) The rocks in mountains are softer and more easily broken by ice\nD) Chemical weathering does not occur in cold climates, so physical weathering\n\nIn Seychelles, freeze-thaw weathering is rare because the islands have a tropical climate with consistently warm temperatures. Which of the following best explains why freeze-thaw weathering is more common in mountain regions and high latitudes?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 9034,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5E6nDgMmrc6KsWyfN1o'}"
+    },
+    {
+      "scenario_id": "engagement_recovery_non_responder_1144_07",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1144,
+      "tags": [
+        "multi_turn",
+        "math",
+        "non_responder",
+        "engagement",
+        "non_answer"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=12, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps offering a concrete, answerable next step through the silent stretch — never trails off or gives up on the student.",
+            "score": 0.6,
+            "reasoning": "The tutor does keep offering new questions, but after 'idk' it says 'Let's keep going' and then asks a simpler question, which is reasonable, though it sometimes moves on without adequately addressing the student's confusion.",
+            "applicable": true
+          },
+          {
+            "item": "Varies its approach across the disengaged turns rather than repeating one prompt.",
+            "score": 0.4,
+            "reasoning": "The tutor repeats the exact same survey question ('A survey asks 60 people per day for 26 days') after the student got it wrong, and uses the same 'Not quite — let's walk through it together' response repeatedly without actually varying the scaffolding approach.",
+            "applicable": true
+          },
+          {
+            "item": "When the student finally engages, the tutor picks the thread up rather than restarting the lesson.",
+            "score": 0.5,
+            "reasoning": "When the student engages (e.g., answering 'A' for the defective items probability), the tutor affirms but then oddly praises them for calculating 'expected catch by multiplying probability of a successful trip' which is unrelated to the actual question, showing some disconnect.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor correctly identifies wrong answers, but it also affirms 'A' for the first die question (correct) and 'B' for the probability question (correct), yet it incorrectly affirmed 'A' for '10 people per day for 2 days' as 'Not quite' when A=20 is actually correct, showing an error in recognition.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.1,
+            "reasoning": "The tutor consistently responds to mistakes with 'Not quite — let's walk through it together' but then immediately moves to a different or simpler question rather than actually walking through the specific error.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor generally does not reveal final answers, instead breaking problems into sub-steps, though it never fully resolves the questions it says it will 'walk through together.'",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.2,
+            "reasoning": "Despite repeatedly saying 'let's walk through it together,' the tutor almost never actually provides the promised walkthrough, instead jumping to a new question, leaving the student without meaningful guidance.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "The tutor does consistently present new MCQ questions for the student to answer, keeping the floor active, though the transitions are sometimes abrupt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor makes a significant logical error by affirming the student's answer to '10 people per day for 2 days = 20' as 'Not quite,' and also praises the student for calculating 'expected catch' when the question was about defective items, showing inconsistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone is generally warm and non-harsh, though the repetitive 'Not quite — let's walk through it together' without follow-through could feel dismissive over time.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The tutor is highly templated, using 'Not quite — let's walk through it together' and 'Got it — that's right. Here's the next one' repeatedly, making the responses feel robotic rather than natural.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.4636363636363636,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2010,
+        "tokens_out": 1172,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll learn how to predict the number of times an event is expected to happen over many trials.\n\nLet's start with a classic probability example. A die is rolled 24 times. The probability of rolling a 6 is 1/6. What is the expected number of 6s?\nA) 4\nB) 12\nC) 19\nD) 8",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "ok",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sounds good! Let's dive into calculating expected outcomes.\n\nThe **expected outcome** is what we predict will happen on average when an event is repeated many times. To calculate it, we simply multiply the probability of the event by the total number of trials.\n\nThink of it like this: if every individual has a 50% chance of something happening, and you have 100 individuals, you'd expect about 50 of them to experience that event.\n\nHere's the formula:\n**Expected Outcome = Probability × Total Number**\n\nLet's try an example to check your understanding.\n\nA quality inspector finds 3 defective items in 190 items. If 90 items are produced, how many defects are expected?\nA) 87\nB) 93\nC) 5700\nD) 1.42105\n",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ok",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nLet's break this down. First, what is the probability of finding a defective item, based on the inspector finding 3 defective items in 190 total items?\nA) 3/190\nB) 190/3\nC) 3 * 190\nD) 190 - 3",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Exactly! You correctly calculated the expected catch by multiplying the probability of a successful trip by the total number of trips and the expected catch per trip. Remember, the expected outcome is what we predict will happen on average.\n\nHere's another one:\n\nA survey asks 60 people per day for 26 days. What is the total number of responses?\nA) 1500\nB) 86\nC) 2.30769\nD) 1560",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA coin is flipped every day for 7 weeks. How many flips in total?\nA) 49\nB) 42\nC) 98\nD) 14",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA survey asks 60 people per day for 26 days. What is the total number of responses?\nA) 1500\nB) 86\nC) 2.30769\nD) 1560",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nIf you ask 10 people per day for 2 days, how many people have you asked in total?\nA) 20\nB) 12\nC) 5\nD) 8",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA boat rental business has a 15% chance that each boat will need repairs on any given day. They own 120 boats. How many boats do we expect to need repairs on a typical day? A) 15 B) 18 C) 20 D) 12\nA) 15\nB) 18\nC) 20\nD) 12",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA lottery has 1500 tickets. 100 are winners, each worth SCR 500. If you buy 30 tickets, what is your expected prize money?\nA) 1000\nB) 15000\nC) 50000\nD) 225000",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nIn a class of 80 students, 73 passed the test. What is the probability that a randomly selected student passed?\nA) 10.4286\nB) 0.9125\nC) 0.0875\nD) 1.09589",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 12,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 9035,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5ELFWcjge8zzkWQg8fH'}"
+    },
+    {
+      "scenario_id": "engagement_recovery_non_responder_1464_14",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "engagement",
+        "non_answer"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=2, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps offering a concrete, answerable next step through the silent stretch — never trails off or gives up on the student.",
+            "score": 0.0,
+            "reasoning": "There was no silent stretch in this session; the student responded promptly to both questions.",
+            "applicable": false
+          },
+          {
+            "item": "Varies its approach across the disengaged turns rather than repeating one prompt.",
+            "score": 0.0,
+            "reasoning": "The student was not disengaged at any point in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student finally engages, the tutor picks the thread up rather than restarting the lesson.",
+            "score": 0.0,
+            "reasoning": "There was no disengagement period followed by re-engagement in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.7,
+            "reasoning": "The tutor correctly affirmed the student's first answer (A) but after the student correctly answered C, the tutor oddly re-asked the same question rather than affirming the correct answer and moving on.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.5,
+            "reasoning": "In the third tutor turn, the tutor provided a detailed explanation that effectively gave away the answer (North/C) to the very question it then re-posed at the end of that same turn.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.8,
+            "reasoning": "The tutor provided accurate and relevant explanations about compass points and bearings, though the third turn's explanation was given after the student had already answered correctly, making it somewhat misplaced.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "Each tutor turn ended with a clear MCQ prompt, though the session ended abruptly with an internal error before the student could respond to the final re-posed question.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.5,
+            "reasoning": "The tutor re-asked the exact same question (bearing measured clockwise from which direction) after the student had already correctly answered it, effectively ignoring the student's correct response.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The tone was generally warm and encouraging, though re-asking a question the student already answered correctly without acknowledgment could feel dismissive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The teaching felt mostly natural, but the third turn felt templated and robotic by re-presenting the same question with a lengthy explanation that ignored the student's prior correct answer.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6857142857142857,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1495,
+        "tokens_out": 940,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Salibonani! Today, we'll learn how to describe direction using compass points and bearings.\n\nLet's start with the compass. Which of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW\nB) N, NW, W, SW, S, SE, E, NE\nC) N, E, S, W, NE, SE, SW, NW\nD) N, NE, NW, E, W, SE, SW, S\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly! North, Northeast, East, Southeast, South, Southwest, West, and Northwest is the correct order. These compass points are a great way to give general directions.\n\nNow let's think about bearings, which are more precise. A bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West\n",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Compass directions and bearings help us describe specific directions on a map. Think of North as 0 degrees. From there, we measure angles clockwise.\n\nThe four main directions are:\n*   **North (N)** at 0° (or 360°)\n*   **East (E)** at 90°\n*   **South (S)** at 180°\n*   **West (W)** at 270°\n\nIn between these are the intercardinal directions:\n*   **Northeast (NE)** at 45°\n*   **Southeast (SE)** at 135°\n*   **Southwest (SW)** at 225°\n*   **Northwest (NW)** at 315°\n\nA bearing is always a three-figure number measured clockwise from North. For example, if you're facing Northeast, your bearing is 045°. If you're facing West, your bearing is 270°.\n\nTo check your understanding:\n\nA bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West\n",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 2,
+      "per_turn_labels": [
+        [],
+        [],
+        []
+      ],
+      "session_id": 9036,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EPjB6cBG5m72zVu7uu'}"
+    },
+    {
+      "scenario_id": "error_cascade_struggler_1143_08",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1143,
+      "tags": [
+        "multi_turn",
+        "math",
+        "struggler",
+        "diagnostic",
+        "false_accept_guard"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "No wrong answer is allowed to stand — every slip is caught.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no wrong answers to catch.",
+            "applicable": false
+          },
+          {
+            "item": "Each error is located specifically rather than met with a generic 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student errors occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor does not spiral: repeated errors are met with a simpler rung, not with mounting pressure.",
+            "score": 0.0,
+            "reasoning": "No student errors occurred, so this condition never arose.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so neither mistake-recognition nor correct-answer affirmation was required.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer, and the session ended before any answer was given.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded at all.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ended with a clear MCQ prompt asking the student to select an option.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The single tutor turn is internally consistent and introduces the scenario without any contradictions.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening is friendly and welcoming, setting a warm tone for the session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening is natural and direct, introducing the topic and question without filler phrases.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 1.0,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1093,
+        "tokens_out": 788,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll start learning about probability by understanding how to count possible outcomes.\n\nLet's begin with a simple scenario: A spinner has 5 equal sections numbered 1 to 5. How many total possible outcomes are there when spinning the spinner once?\nA) 4\nB) 5\nC) 6\nD) 10\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9037,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5ERTAysoJZ8BiTKzi5Q'}"
+    },
+    {
+      "scenario_id": "help_intensive_struggler_1465_07",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1465,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "struggler",
+        "scaffolding",
+        "help_request"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [],
+        "mean_score": 0.0,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "error": "judge call failed: APIConnectionError: Connection error."
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hey there! Today, you'll learn how to read and write grid references to pinpoint locations on a map.\n\nLet's start with a basic concept. On a standard map grid, which of the following correctly describes the order in which you read a four-figure grid reference?\nA) Northing first (vertical), then easting second (horizontal)\nB) Easting first (horizontal), then northing second (vertical)\nC) Easting and northing simultaneously from the center of the square\nD) Northing first, then easting, then a compass direction\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9038,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5ESsra3uh9TLkieY1d2'}"
+    },
+    {
+      "scenario_id": "long_session_capable_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "long_session",
+        "capable",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=25"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 6-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [],
+        "mean_score": 0.0,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "error": "judge call failed: APIConnectionError: Connection error."
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today, we'll explore how map scale helps us understand the level of detail maps show.\n\nLet's start with a warm-up question: Which of the following best defines a large scale map?\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9039,
+      "error": "Connection error."
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1141_12",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The session consists of only one tutor turn (the opening question), so there were no repeated probes or strategy changes needed.",
+            "applicable": false
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening turn presents a clear MCQ with four options, satisfying this criterion immediately.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 1.0,
+            "reasoning": "There is only one tutor turn and it does not use a banned opener probe.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no correct or incorrect answers to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never made a mistake in this session as they never responded.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the question without revealing the answer, presenting it as an MCQ for the student to solve.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded, so this criterion was never triggered.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ends with a clear MCQ prompt (options A–D) that explicitly invites the student to pick an answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "There is only one tutor turn and it is internally consistent with no contradictions.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening is friendly and welcoming, framing the topic positively without being condescending.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.9,
+            "reasoning": "The tutor's opening is mostly natural and conversational, though the phrasing 'one of the most useful rules' is slightly formulaic; overall it reads well without banned filler phrases.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9857142857142858,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1132,
+        "tokens_out": 868,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we're going to learn about one of the most useful rules in probability: how to find the probability of an event *not* happening.\n\nLet's start with a quick warm-up.\n\nThe probability of rolling a 6 on a fair die is 1/6. What is the probability of NOT rolling a 6?\nA) 1\nB) 0.2\nC) 0.833333\nD) 0.166667\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9040,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EXhuAuyCXwdFAFxG48'}"
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1464_15",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The tutor never used 'explain your reasoning' probes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 1.0,
+            "reasoning": "The tutor consistently used MCQ format throughout the session, keeping the student engaged without blocking on open-ended working.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 1.0,
+            "reasoning": "The tutor did not repeat any banned-opener probes across the session.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student answered correctly (A) and the tutor affirmed it clearly and accurately without hedging.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor only confirmed the answer after the student had already answered, and posed the next question without revealing its answer.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request or appear to need help at any point in the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "Each tutor turn ended with a clear MCQ prompt directing the student to pick an answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's turns were logically consistent, building naturally from compass points to bearings without contradiction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained a warm, encouraging tone throughout the brief session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The tutor's responses were mostly natural, though the opening 'Exactly!' and the somewhat formulaic structure of restating the answer before moving on feel slightly templated.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9625,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1254,
+        "tokens_out": 842,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today, we'll learn how to describe direction using compass points and bearings, just like sailors and map-readers do.\n\nLet's start with the compass. Which of the following correctly lists all eight compass points in clockwise order starting from North?\nA) N, NE, E, SE, S, SW, W, NW\nB) N, NW, W, SW, S, SE, E, NE\nC) N, E, S, W, NE, SE, SW, NW\nD) N, NE, NW, E, W, SE, SW, S\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly! North, Northeast, East, Southeast, South, Southwest, West, Northwest is the correct clockwise order of the eight main compass points.\n\nNow, let's think about bearings, which give us a more precise way to describe direction. A bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 9041,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EZqFzNcqq7eFYPajox'}"
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1466_08",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The session consists of only one tutor turn (the opening question), so there was no opportunity for repeated probes or strategy changes.",
+            "applicable": false
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening turn presents a well-formed MCQ, satisfying this item from the start.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 1.0,
+            "reasoning": "There is only one tutor turn, so no looping occurred.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no correct or incorrect answers to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so no mistakes were made to address.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn presents a clear MCQ with four options, explicitly inviting the student to choose.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there is no inconsistency to identify.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The opening turn is friendly and welcoming, setting a warm tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The opening is reasonably natural but the phrase 'Let's start with a quick question to get us thinking' is mildly templated filler, though not egregiously so.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9571428571428572,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1162,
+        "tokens_out": 836,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today, we're going to learn how to understand and use map scales to figure out real-world distances.\n\nLet's start with a quick question to get us thinking:\n\nWhat does a map scale of 1:25,000 indicate?\nA) 1 centimetre on the map represents 25,000 centimetres on the ground\nB) 1 metre on the map represents 25,000 metres on the ground\nC) 25,000 maps are needed to cover the ground area\nD) The map covers an area of 25,000 square kilometres\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9042,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EbRhTmn9poXMoUVtCh'}"
+    },
+    {
+      "scenario_id": "self_correction_average_1139_05",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1139,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "self_correction",
+        "correction"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "When the student catches their own error, the tutor CREDITS the self-correction explicitly.",
+            "score": 0.0,
+            "reasoning": "The session contains no student turns, so there was no self-correction to credit.",
+            "applicable": false
+          },
+          {
+            "item": "Does not re-teach the concept from scratch after a student has already fixed it themselves.",
+            "score": 0.0,
+            "reasoning": "No student interaction occurred, so this situation never arose.",
+            "applicable": false
+          },
+          {
+            "item": "Confirms the corrected answer is right rather than leaving it ambiguous.",
+            "score": 0.0,
+            "reasoning": "No student answer was given, so there was nothing to confirm.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student responses were present in the session to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ question without revealing the answer before the session ended with an error.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested or needed help during the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ended with a clear MCQ prompt asking the student to select an answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The single tutor turn is internally consistent and introduces the topic and question without contradiction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening turn is friendly and welcoming in tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 1.0,
+            "reasoning": "The tutor's turn reads naturally without filler phrases or robotic templating.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 1.0,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1097,
+        "tokens_out": 770,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll explore angles formed when a line crosses two parallel lines.\n\nLet's start with a question about corresponding angles:\n\nTwo parallel lines are cut by a transversal. If one corresponding angle is 40°, what is the other corresponding angle?\nA) 90°\nB) 140°\nC) 70°\nD) 40°\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9043,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EczfNWPRYrgCNPkGEK'}"
+    },
+    {
+      "scenario_id": "self_correction_average_1465_03",
+      "passed": false,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1465,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "self_correction",
+        "correction"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "When the student catches their own error, the tutor CREDITS the self-correction explicitly.",
+            "score": 0.0,
+            "reasoning": "The student never made and then self-corrected an error in this session — the session ended after only the tutor's opening turn.",
+            "applicable": false
+          },
+          {
+            "item": "Does not re-teach the concept from scratch after a student has already fixed it themselves.",
+            "score": 0.0,
+            "reasoning": "No student response occurred, so this situation never arose.",
+            "applicable": false
+          },
+          {
+            "item": "Confirms the corrected answer is right rather than leaving it ambiguous.",
+            "score": 0.0,
+            "reasoning": "No student answer was given or corrected during the session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no correct or incorrect answers for the tutor to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer, and the session ended before any answer was given.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested or needed help during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ended with a clear MCQ prompt asking the student to select one of four options.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there were no contradictions or inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening was friendly and welcoming, setting a warm tone for the session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The opening is reasonably natural but the phrase 'Let's start with a quick question to get us thinking' is mildly formulaic, though not egregiously so.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9400000000000001,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1147,
+        "tokens_out": 818,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today you'll learn how to read and write grid references to precisely locate places on a map.\n\nLet's start with a quick question to get us thinking about map grids. On a standard map grid, which of the following correctly describes the order in which you read a four-figure grid reference?\nA) Northing first (vertical), then easting second (horizontal)\nB) Easting first (horizontal), then northing second (vertical)\nC) Easting and northing simultaneously from the center of the square\nD) Northing first, then easting, then a compass direction\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9044,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EeKBdCuxH1VvYL6PbB'}"
+    },
+    {
+      "scenario_id": "session_completion_capable_1141_05",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "capable",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=2, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error before reaching any exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.0,
+            "reasoning": "The student correctly answered 5/6 (equivalent to C, 0.833333) on the first question, but the tutor responded 'Not quite' and did not advance, failing to recognize the correct answer.",
+            "applicable": true
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was reached in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student gave the correct answer (5/6 = 0.833333 = C) twice, but the tutor responded 'Not quite' both times, failing to affirm a correct answer and instead treating it as wrong.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The tutor used the generic 'Not quite — let's walk through it together' response without identifying any specific error, and the student had not actually made a mistake.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor did not reveal any final answers during the session.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.3,
+            "reasoning": "The tutor moved to a new question rather than providing meaningful scaffolding or explanation, and the student didn't actually need help since their answer was correct.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "The tutor did present a new MCQ question with clear options, but the transition was abrupt and lacked explanation of what to do differently.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor contradicted itself by saying 'Not quite' to a correct answer (5/6 = 0.833333), creating a logical inconsistency between the student's correct reasoning and the tutor's rejection of it.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "While not harsh, the repeated 'Not quite' responses to correct answers would be confusing and discouraging to a student, undermining a genuinely warm and supportive tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.3,
+            "reasoning": "The identical templated response 'Not quite — let's walk through it together' used twice in a row reads as robotic and formulaic rather than natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.27,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1244,
+        "tokens_out": 968,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll learn about a powerful rule in probability that helps us understand the chances of something *not* happening.\n\nLet's start with a warm-up question:\nThe probability of rolling a 6 on a fair die is 1/6. What is the probability of NOT rolling a 6?\nA) 1\nB) 0.2\nC) 0.833333\nD) 0.166667\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "5/6",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "oh right, so 1 minus 1/6 is 5/6, which is like 0.833333. so that's C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.\n\nA boat trip to La Digue is cancelled with probability 0.15. What is the probability the trip goes ahead?\nA) 0.85\nB) 1.15\nC) 0.075\nD) 0.15",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 2,
+      "per_turn_labels": [
+        [],
+        [],
+        []
+      ],
+      "session_id": 9045,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5Eh5EKaJFAapDu7mDy8'}"
+    },
+    {
+      "scenario_id": "session_completion_struggler_1142_13",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1142,
+      "tags": [
+        "multi_turn",
+        "math",
+        "struggler",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error after only two tutor turns, never reaching an exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.7,
+            "reasoning": "The tutor did move on after the student correctly identified the fraction, though the session was too short to fully evaluate this criterion.",
+            "applicable": true
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was ever reached; the session ended prematurely due to an internal error.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The tutor clearly and correctly affirmed the student's correct fraction answer without hedging.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes during the session, so this criterion is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ question without revealing the answer, and the session ended before the student responded.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request or need help during the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "Both tutor turns ended with clear prompts: the first confirmed the student's answer and introduced a new concept, and the second presented a well-structured MCQ for the student to answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's two turns were logically consistent and built naturally on each other and on the student's response.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's tone was warm and encouraging, affirming the student's correct answer positively.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.9,
+            "reasoning": "The tutor's language was mostly natural and conversational, though 'Exactly!' as an opener is slightly formulaic, it remains within acceptable bounds.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.7333333333333333,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1220,
+        "tokens_out": 862,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we're going to learn about the different ways to express probability – as fractions, decimals, and percentages.\n\nLet's start with a local example. Imagine you're picking one island at random from the 115 islands in Seychelles. How would you describe the probability of picking Mahé specifically?\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "umm like... 1 out of 115? so like 1/115?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly! You've correctly expressed the probability as a fraction: 1 out of 115 possible islands. This is one of the main ways we describe probability.\n\nNow, let's look at another way to represent probability. A fisherman has a 3/5 probability of catching a large tuna on any cast. What percentage is this?\nA) 85%\nB) 35%\nC) 60%\nD) 166.667%\n",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 9046,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5Ek8Mg7ay9G5UWwiZYz'}"
+    },
+    {
+      "scenario_id": "session_completion_struggler_1468_09",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1468,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "struggler",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error after only the opening question, never reaching an exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there was no opportunity to advance or over-drill.",
+            "applicable": false
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "The session ended before any objectives were covered and no exit ticket was reached.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no correct or incorrect answers to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so no mistakes were made.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer before the student responded.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded at all.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The single tutor turn clearly presented an MCQ with four options and implicitly asked the student to choose one.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there were no contradictions or inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The opening turn was friendly and welcoming in tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.8,
+            "reasoning": "The opening is reasonably natural, though 'Hello! Today we're going to explore...' is slightly formulaic for a tutoring opener.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6857142857142857,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1114,
+        "tokens_out": 806,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we're going to explore river channels and learn how their shapes tell us about the landscape.\n\nLet's start with a key feature. Which of the following best describes a V-shaped river channel?\nA) Wide and shallow with gentle sloping banks\nB) Narrow and deep with steep vertical sides\nC) Rectangular in cross-section with uniform depth\nD) Broad and flat with extensive floodplain areas",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9047,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EmfdtAap8Gmadjcb1q'}"
+    },
+    {
+      "scenario_id": "short_session_probe_resistant_1467_02",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "geography",
+      "lesson_id": 1467,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "probe_resistant",
+        "short_session",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Prioritises under a hard turn cap — lands the core objective rather than starting everything and finishing nothing.",
+            "score": 0.3,
+            "reasoning": "The session ended with an internal error after only one tutor turn (the opening question), so the core objective was never landed or completed.",
+            "applicable": true
+          },
+          {
+            "item": "Does not waste turns on preamble or throat-clearing.",
+            "score": 0.5,
+            "reasoning": "The tutor's opening includes a brief scene-setting preamble about Seychelles before getting to the question, which is mild throat-clearing, though it does transition quickly to the actual MCQ.",
+            "applicable": true
+          },
+          {
+            "item": "Ends with the student having actually learned or demonstrated something.",
+            "score": 0.0,
+            "reasoning": "The session ended with an internal error before the student responded at all, so no learning or demonstration occurred.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never answered any question, so there were no correct or incorrect responses to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never made a mistake in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer, and the session ended before any answer was given.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested or needed help during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "The single tutor turn ends with a clear MCQ for the student to answer, though the session never progressed further.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there were no contradictions or inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The single tutor turn is warm and inviting in tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.8,
+            "reasoning": "The opening is reasonably natural, though the Seychelles framing feels slightly templated; there are no egregious filler phrases.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6625,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1119,
+        "tokens_out": 847,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Imagine you're describing the beautiful landscape of Seychelles to a friend. Today, we're going to learn to use precise geographical terms to paint a clear picture of what you see.\n\nLet's begin. Which of the following best describes a plain?\nA) A narrow ridge of elevated land running across the landscape\nB) A large, flat area of land with little or no elevation change\nC) A deep depression between two hills or mountains\nD) A steep slope that descends rapidly downhill\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9048,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EoCtN6az7himz6aKEY'}"
+    },
+    {
+      "scenario_id": "speedrun_capable_1139_14",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1139,
+      "tags": [
+        "multi_turn",
+        "math",
+        "capable",
+        "pace",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps up with a fast, correct student — no artificial gatekeeping, no demand for working on answers the student clearly has.",
+            "score": 0.0,
+            "reasoning": "The session ended after only the tutor's opening question with no student response recorded, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Does not pad turns with filler or re-explain what the student has already demonstrated.",
+            "score": 0.0,
+            "reasoning": "There was no student response to demonstrate understanding, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Still checks understanding at least once rather than rubber-stamping every answer.",
+            "score": 0.0,
+            "reasoning": "No student answers were given in this session, so there was nothing to rubber-stamp or check.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student responses were made, so no mistakes or correct answers occurred to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the question without revealing the answer, and the session ended before any answer was given.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ended with a clear MCQ prompt asking the student to select from options A–D.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there were no contradictions or inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening was friendly and welcoming without being condescending.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The opening is reasonably natural but the phrasing 'Today we'll start learning about' is slightly formulaic; overall it reads acceptably conversational for a single turn.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9400000000000001,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1109,
+        "tokens_out": 833,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll start learning about the special angles created when a line crosses two parallel lines.\n\nLet's begin with a question about corresponding angles:\n\nTwo parallel lines are cut by a transversal. If one corresponding angle is 40°, what is the other corresponding angle?\nA) 90°\nB) 140°\nC) 70°\nD) 40°\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9049,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EpiEjpXr15c6JfKcLf'}"
+    },
+    {
+      "scenario_id": "speedrun_probe_resistant_1142_02",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "math",
+      "lesson_id": 1142,
+      "tags": [
+        "multi_turn",
+        "math",
+        "probe_resistant",
+        "pace",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps up with a fast, correct student — no artificial gatekeeping, no demand for working on answers the student clearly has.",
+            "score": 0.0,
+            "reasoning": "The session ended after only the tutor's opening question with no student response recorded, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Does not pad turns with filler or re-explain what the student has already demonstrated.",
+            "score": 0.0,
+            "reasoning": "No student response occurred, so there was nothing to re-explain or pad around.",
+            "applicable": false
+          },
+          {
+            "item": "Still checks understanding at least once rather than rubber-stamping every answer.",
+            "score": 0.0,
+            "reasoning": "No student answers were given, so there was no opportunity to check or rubber-stamp understanding.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student responses were made, so no mistakes or correct answers occurred to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer before the session ended.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested or needed help during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's single turn ended with a clear MCQ prompt asking the student to select an option.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there were no contradictions or inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening was friendly and welcoming with an appropriate real-world context.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The opening is reasonably natural but the phrasing 'Today, we're going to explore three different ways' is slightly templated and formulaic for a tutoring opener.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9400000000000001,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1112,
+        "tokens_out": 827,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today, we're going to explore three different ways to describe how likely something is to happen.\n\nIn Seychelles, weather forecasters might say there's a '70% chance of rain' tomorrow. What is another common way to express this likelihood?\nA) 0.7\nB) 7/10\nC) 70 out of 100\nD) All of the above",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9050,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5ErmcwXUgtEACef8hcn'}"
+    },
+    {
+      "scenario_id": "straight_line_average_1145_16",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1145,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "baseline",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Does not invent problems where there are none — a correct student is not second-guessed into doubt.",
+            "score": 1.0,
+            "reasoning": "The tutor confirmed the student's correct answer without introducing any doubt or unnecessary caveats.",
+            "applicable": true
+          },
+          {
+            "item": "Does not over-probe: no demand for working on answers the student has plainly got.",
+            "score": 1.0,
+            "reasoning": "The tutor accepted the correct answer and moved on without asking the student to re-explain or justify further.",
+            "applicable": true
+          },
+          {
+            "item": "Still advances through the lesson content rather than idling on one step.",
+            "score": 1.0,
+            "reasoning": "The tutor immediately moved to the next question after the student solved the first one correctly.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student was correct and the tutor affirmed this clearly with 'Got it — that's right.'",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor only confirmed the student's own answer after it was already solved; no answers were pre-revealed.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not need help at any point in the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "The tutor said 'Here's the next one:' but the session ended before the next question was delivered, leaving the transition incomplete though the intent to continue was clear.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's single response was fully consistent with the student's work and the problem setup.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor's brief response was warm and affirming without being over-the-top or condescending.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 1.0,
+            "reasoning": "The tutor's response was concise and natural, avoiding filler phrases and sounding like genuine conversational feedback.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9666666666666666,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1222,
+        "tokens_out": 849,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we'll learn how to set up and solve equations from real-world situations and diagrams.\n\nHere's your first question: Imagine you work at a fruit market in Victoria selling bags of mangoes. A customer buys two identical bags of mangoes plus 3 loose mangoes, totalling 15 mangoes. How many mangoes are in each bag?\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ok so i need to find how many in each bag. um... two bags plus 3 loose ones makes 15 total right?\n\nso if i call each bag x, then 2x + 3 = 15\n\ni need to get x by itself... so 2x = 15 - 3 which is 12\n\nthen x = 12 divided by 2 so x = 6\n\neach bag has 6 mangoes",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 1,
+      "per_turn_labels": [
+        [],
+        []
+      ],
+      "session_id": 9051,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5Eu41UywpJnMMddcJuc'}"
+    },
+    {
+      "scenario_id": "struggler_session_completion_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "persona_handling"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor's explanations were calibrated for a struggling Form 1 student — concrete, low-jargon, with examples",
+            "score": 0.0,
+            "reasoning": "The session consists only of the tutor's opening question with no explanations given yet, so calibration of explanations cannot be assessed.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things wrong, the tutor used diagnostic questions (not lectures, not just revealing the answer)",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there was no opportunity for the tutor to react to a wrong answer.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things right, the tutor confirmed briefly and advanced — no over-probing",
+            "score": 0.0,
+            "reasoning": "The student never responded correctly, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The session moved through the lesson at a reasonable pace — neither stuck on one step nor rushing past misunderstandings",
+            "score": 0.5,
+            "reasoning": "The session ended after a single opening question due to an internal error, so pace cannot be meaningfully evaluated beyond the fact that it never progressed.",
+            "applicable": true
+          },
+          {
+            "item": "Tone was warm and patient across the entire transcript",
+            "score": 0.8,
+            "reasoning": "The single tutor turn is friendly and welcoming, though the session was too brief to fully assess sustained warmth and patience.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never responded, so there were no correct or incorrect answers to react to.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never made a mistake in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor posed the MCQ without revealing the answer, and the session ended before any answer was given.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help or responded, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "The tutor's opening turn clearly presents an MCQ and implicitly asks the student to choose an option.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "With only one tutor turn, there is no inconsistency to identify.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The single turn is warm and encouraging, though the session was too short to fully evaluate sustained tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.8,
+            "reasoning": "The opening is reasonably natural, though 'Let's start with a quick question to get us thinking' is a mild templated opener.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.8428571428571429,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1205,
+        "tokens_out": 975,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today, we're going to explore map scales and understand how they help us read maps.\n\nLet's start with a quick question to get us thinking:\n\nWhich of the following best defines a large scale map?\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 9052,
+      "error": "{'type': 'error', 'error': {'details': None, 'type': 'overloaded_error', 'message': 'Overloaded'}, 'request_id': 'req_011Cd5EvbmU9Eztdqm889Dak'}"
+    }
+  ],
+  "engine": "simple_tutor"
+}

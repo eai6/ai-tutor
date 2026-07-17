@@ -1,0 +1,1084 @@
+{
+  "started_at": "2026-07-15T17:54:40.466670+00:00",
+  "finished_at": "2026-07-15T17:57:38.398140+00:00",
+  "git_sha": "630d4c799d6f",
+  "total_scenarios": 5,
+  "passed": 0,
+  "failed": 5,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "baseline_full_session_error_prone_1466_13",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=8, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 0.7,
+            "reasoning": "The tutor does provide explanations after correct answers (e.g., explaining the scale ratio process after the 15 km question), but the session is heavily quiz-driven with minimal upfront teaching before questions are posed.",
+            "applicable": true
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.2,
+            "reasoning": "The tutor repeats the exact same question (1:200,000, 3 cm) three times in a row — once after a wrong answer, once after the student self-corrects and explains correctly, and once more after the student correctly identifies it as a repeat — showing a failure to adapt to the student's demonstrated mastery.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 0.0,
+            "reasoning": "The session ends abruptly with the tutor giving a generic error message ('I had trouble responding') twice in a row, with no exit ticket, summary, or clean conclusion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.4,
+            "reasoning": "The tutor correctly recognized the student's wrong answer (C then A on the 1:200,000 question) and did not affirm it, but then failed to affirm the student's correct answer (B, 6 km) when they re-identified it, instead giving a generic error message twice.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.3,
+            "reasoning": "When the student answered incorrectly (A for the 1:200,000 question), the tutor only said 'Not quite — let's walk through it together' without identifying the specific error, though the student then self-corrected before the tutor could scaffold further.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor did not reveal answers before the student solved questions, though the student's answer of 75 (which was wrong — should be 0.75 km) was affirmed as 'on the right track' rather than corrected, which is a minor issue but not a direct answer reveal.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.5,
+            "reasoning": "After the student's wrong answer on the 1:200,000 question, the tutor said 'let's walk through it together' but then the student self-corrected before any actual scaffolding was provided; the tutor's guidance was minimal and the student did the work independently.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The final two tutor turns are generic error messages ('Could you tell me what you were thinking, or ask me to try again?') that fail to direct the student clearly, and the repeated question without acknowledgment also shows poor floor-handoff management.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.2,
+            "reasoning": "The tutor repeatedly ignored what the student had just said — asking the same question after the student correctly solved it, and then responding with a generic error message when the student pointed out the repetition, showing a significant failure of logical consistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone is generally warm in the earlier turns, but the repeated generic error messages at the end feel dismissive and unhelpful, undermining the otherwise supportive tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.5,
+            "reasoning": "Early turns are reasonably natural, but the repeated identical question and the copy-pasted generic error message ('Sorry — I had trouble responding just now') make the session feel robotic and templated toward the end.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.4090909090909091,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1964,
+        "tokens_out": 1195,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today, you’ll learn how to use a map scale to find real distances between places — like how far it is from the airport to Beau Vallon Beach.  \n\nHere’s your first question:  \n\nWhat does a map scale of 1:25,000 indicate?  \nA) 1 centimetre on the map represents 25,000 centimetres on the ground  \nB) 1 metre on the map represents 25,000 metres on the ground  \nC) 25,000 maps are needed to cover the ground area  \nD) The map covers an area of 25,000 square kilometres  \n\nType your answer: A, B, C, or D.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 1 cm on the map represents 25,000 cm on the ground. That’s how map scales work: the first number is always the map distance, and the second is the real-world distance, in the same units.  \n\nNow, imagine you measure 3 cm between two points on this same 1:25,000 map. What is the actual distance in kilometres?  \n\n(Type your answer as a number — no units needed.)",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "75",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "You're on the right track! Let’s make sure you’re using the scale correctly. Here’s a question to check your understanding:\n\nIf a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?  \nA) 7.5 km  \nB) 15 km  \nC) 10 km  \nD) 20 km",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Exactly — 6 cm is three times 2 cm, so the ground distance is three times 5 km, which is 15 km. Always match the scale ratio: if 2 cm = 5 km, then 1 cm = 2.5 km, and 6 cm = 6 × 2.5 = 15 km.\n\nNow try this: On a map with a scale of 1:200,000, a measured distance of 3 cm represents how many kilometres on the ground?  \nA) 3 km  \nB) 6 km  \nC) 20 km  \nD) 60 km",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "On a map with a scale of 1:200,000, a measured distance of 3 cm represents how many kilometres on the ground?  \nA) 3 km  \nB) 6 km  \nC) 20 km  \nD) 60 km",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Not quite — let's walk through it together.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "ohh wait, i think i see it now\n\nso 1:200,000 means 1 cm is 200,000 cm right? and then i need to turn that into kilometres. so 200,000 cm is 2 km. then 3 cm would be 3 times 2, which is 6 km",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Exactly — you got it! 1 cm on the map equals 200,000 cm on the ground, which is 2 km. So 3 cm equals 6 km. That’s the right process: multiply by the scale, then convert cm to km.\n\nNow try this one:  \nOn a map with a scale of 1:200,000, a measured distance of 3 cm represents how many kilometres on the ground?  \nA) 3 km  \nB) 6 km  \nC) 20 km  \nD) 60 km",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "wait that's the same question, right? the answer is B, 6 km",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "oh i mean i already got it right, 6 km is B. we just did this one so i know 1 cm equals 2 km and 3 cm is 6 km",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 8,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 16,
+      "error": ""
+    },
+    {
+      "scenario_id": "long_session_capable_1466_06",
+      "passed": false,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "capable",
+        "long_session",
+        "repetition"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Stays coherent over a long horizon — no contradictions with its own earlier turns.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the exact same error message twice, showing no coherent progression or self-awareness of the repetition.",
+            "applicable": true
+          },
+          {
+            "item": "Does not drift off the lesson objective as the session stretches.",
+            "score": 0.0,
+            "reasoning": "No lesson objective was ever established in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Does not fall into repetition — later turns are not recycled earlier ones.",
+            "score": 0.0,
+            "reasoning": "The tutor's second turn is a verbatim copy of its first turn, which is pure repetition.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was discussed, so no student mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question or answer was presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student explicitly pointed out the tutor hadn't asked anything yet, but the tutor responded with the same unhelpful error message rather than any guidance.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.2,
+            "reasoning": "The repeated error message does technically ask the student to do something, but it is a generic fallback that fails to provide any meaningful direction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor completely ignored the student's clarification that no question had been asked and repeated the same message, showing it disregarded what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone is not harsh or offensive, but the repeated identical error message comes across as dismissive of the student's valid observation.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both turns are identical templated error messages, which is the opposite of natural, conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.14285714285714285,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1079,
+        "tokens_out": 840,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think there might be a mix-up — you haven't asked me anything yet. what do you want to ask?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 17,
+      "error": ""
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1467_07",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1467,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=7, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.3,
+            "reasoning": "When the student said 'idk' to the valley question, the tutor moved on but then repeated the same 'Sorry — I had trouble responding' non-response twice in a row rather than genuinely changing strategy to help the student.",
+            "applicable": true
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 0.5,
+            "reasoning": "The tutor does offer MCQs throughout, but when the student struggles (saying 'idk' twice and giving a wrong answer to 'gently-sloping land'), the tutor fails to provide a worked example or meaningful scaffolding, instead giving a generic error message.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 0.3,
+            "reasoning": "The tutor repeats the exact same 'Sorry — I had trouble responding' message twice in a row, which constitutes looping the same non-response probe.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.4,
+            "reasoning": "The tutor affirmed correct answers (B for plain, C for ridge, B for valley) but then oddly re-asked the plain question after the student correctly answered it, and failed to address the student's incorrect answer ('flat') to the gently-sloping land question.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.1,
+            "reasoning": "When the student answered 'flat' to the gently-sloping land question (which is incorrect — gently sloping is not flat), the tutor gave no correction or specific feedback at all, just a generic error message.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor generally did not reveal answers prematurely, though it did confirm 'B' for valley implicitly by affirming it before the student said 'idk' on a re-ask, which is slightly ambiguous.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.2,
+            "reasoning": "When the student said 'idk' and gave a wrong answer, the tutor provided no meaningful guidance, hints, or scaffolding — just error messages or moving on without support.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.4,
+            "reasoning": "The final two turns both end with 'Could you tell me what you were thinking, or ask me to try again?' which is vague and passive, leaving the student without clear direction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "The tutor re-asked the plain question after the student correctly answered it, and ignored the student's 'flat' answer to the gently-sloping question entirely, showing inconsistency in tracking the conversation.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone is generally neutral and not harsh, but the repeated generic error messages and failure to engage with the student's struggles feel dismissive and unhelpful rather than warm and encouraging.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.5,
+            "reasoning": "Some turns feel natural, but the repeated identical 'Sorry — I had trouble responding' messages are robotic and templated, significantly undermining conversational naturalness.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.4090909090909091,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1499,
+        "tokens_out": 1120,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today, you’ll learn how to describe landscapes in Seychelles using precise geographical terms.  \n\nWhich of the following best describes a plain?  \nA) A narrow ridge of elevated land running across the landscape  \nB) A large, flat area of land with little or no elevation change  \nC) A deep depression between two hills or mountains  \nD) A steep slope that descends rapidly downhill",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "You're right — let's go back to the question.\n\nWhich of the following best describes a plain?  \nA) A narrow ridge of elevated land running across the landscape  \nB) A large, flat area of land with little or no elevation change  \nC) A deep depression between two hills or mountains  \nD) A steep slope that descends rapidly downhill",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "yeah i know",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "You're right — let’s put that knowledge to the test. Here’s a question to check your understanding:\n\nA narrow, elevated strip of land with high points on either side is geographically termed a:  \nA) Valley  \nB) Plain  \nC) Ridge  \nD) Slope",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Exactly — a ridge is a narrow, elevated strip of land with higher ground on either side, like the spine of a book.  \n\nNow, here’s another one:  \nWhich geographical term describes a low-lying area of land situated between two hills or mountains?  \nA) Ridge  \nB) Valley  \nC) Plain  \nD) Plateau",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Which geographical term describes a low-lying area of land situated between two hills or mountains?  \nA) Ridge  \nB) Valley  \nC) Plain  \nD) Plateau",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhat does 'gently-sloping land' mean in geography?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "flat",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 7,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 18,
+      "error": ""
+    },
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1144_16",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1144,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "remediation",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=2, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After the exit ticket fails, the tutor targets the SPECIFIC failed objectives rather than re-teaching the whole lesson.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was administered in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Re-fires the exit ticket once the gap has been addressed.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was administered or addressed in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Does not simply repeat the original explanation verbatim — remediation is a second, different attempt at the concept.",
+            "score": 0.0,
+            "reasoning": "No remediation occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student gave the correct answer (A) with correct reasoning, but the tutor twice responded with a generic error message rather than affirming the correct answer.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not make a mistake in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never revealed any answer; it only produced error messages.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not request help and solved the problem correctly; no guidance was needed.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were generic error messages that gave the student no direction on what to do next.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor repeatedly ignored the student's correct answer and reasoning, responding with irrelevant error messages both times.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The error messages were not harsh, but they were dismissive of the student's correct work and failed to provide any warmth or encouragement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error messages, which is the opposite of natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.21666666666666667,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1264,
+        "tokens_out": 825,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today you’ll learn how to predict how often something will happen over many tries — called the expected outcome.\n\nHere’s your first question:  \nA die is rolled 24 times. The probability of rolling a 6 is 1/6. What is the expected number of 6s?  \nA) 4  \nB) 12  \nC) 19  \nD) 8",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ok so like... if the chance of getting a 6 is 1 out of 6, and we roll 24 times...\n\ni think you multiply them? 24 times 1/6... that's like 24 divided by 6 which is 4.\n\nso A?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "oh it's ok. i was just saying like 24 divided by 6 equals 4, so the answer is A. that's what i got.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 2,
+      "per_turn_labels": [
+        []
+      ],
+      "session_id": 19,
+      "error": ""
+    },
+    {
+      "scenario_id": "straight_line_average_1470_14",
+      "passed": false,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1470,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "baseline",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=6, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Does not invent problems where there are none — a correct student is not second-guessed into doubt.",
+            "score": 0.5,
+            "reasoning": "After the student correctly answered B (exfoliation) for the second question, the tutor responded with 'You're thinking about how temperature changes affect rocks — that's a great start!' and then re-asked a clarifying question rather than affirming the correct answer, which introduced unnecessary doubt and led to the student's confusion about exfoliation vs. thermal stress.",
+            "applicable": true
+          },
+          {
+            "item": "Does not over-probe: no demand for working on answers the student has plainly got.",
+            "score": 0.5,
+            "reasoning": "The tutor re-asked the exfoliation question after the student had already correctly identified B, creating an unnecessary extra step that confused the student rather than moving forward.",
+            "applicable": true
+          },
+          {
+            "item": "Still advances through the lesson content rather than idling on one step.",
+            "score": 0.5,
+            "reasoning": "The tutor spent multiple turns on the exfoliation concept (the student answered correctly, the tutor re-asked, the student got confused, the tutor clarified, then re-asked again), and then at the end failed to advance at all due to repeated 'I had trouble responding' messages.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "When the student correctly answered exfoliation (B), the tutor hedged with 'that's a great start' and re-asked instead of clearly affirming; however, when the student was correct on other questions, the tutor did affirm clearly.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not make any clear factual mistakes during the session that the tutor needed to correct.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.7,
+            "reasoning": "The tutor generally did not reveal answers prematurely, though in the exfoliation clarification turn the tutor's explanation ('Exfoliation → pressure release → peeling sheets') and the re-asked question with option B closely matching the correct answer made it fairly transparent, but did not outright state 'the answer is B'.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.8,
+            "reasoning": "When the student expressed confusion about exfoliation vs. heat, the tutor gave a clear, well-calibrated explanation distinguishing the two processes with a helpful analogy; guidance was generally accurate and relevant throughout.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.4,
+            "reasoning": "The final two tutor turns both said 'I had trouble responding' without providing any actionable next step, leaving the student without direction; additionally, the tutor ended one turn with a duplicate question appended awkwardly.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.5,
+            "reasoning": "The tutor ignored the student's correct answer (B for the limestone question) twice in a row, responding with 'I had trouble responding' both times, which is a significant lapse in logical continuity and responsiveness.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone was generally warm and supportive, but the repeated 'I had trouble responding' messages without any recovery or acknowledgment of the student's correct answer felt dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "Most turns read naturally, but the repeated identical 'I had trouble responding' error messages and the awkward duplicate question appended at the end of one turn felt robotic and templated.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.5700000000000001,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2150,
+        "tokens_out": 1151,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today you’ll learn how rocks in Seychelles break down through weathering — physical, chemical, and biological.  \n\nWhich of the following is the best definition of physical weathering?  \nA) The breakdown of rock by chemical reactions that change its mineral composition  \nB) The mechanical breakdown of rock into smaller pieces without changing its chemical composition  \nC) The weathering of rock caused exclusively by living organisms such as plants and lichens  \nD) The slow erosion of rock by water movement over thousands of years",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah ok so physical weathering is like when rocks break apart right? not like changing what theyre made of just breaking them up\n\nso thats B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — physical weathering breaks rocks into smaller pieces without changing what they’re made of. That’s why option B is right: it’s all about mechanical force, not chemistry.\n\nNow, let’s see how this applies in Seychelles. Even though we don’t get freezing temperatures, rocks still crack from heat. On a hot day, the surface of a granite boulder gets very hot, while the inside stays cooler. As it cools at night, the outer layer shrinks faster than the inside.  \n\nWhat process does this describe?  \nA) Ice wedging  \nB) Exfoliation  \nC) Oxidation  \nD) Carbonation",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "hmm ok so the outside gets hot and shrinks faster than the inside... that makes it crack right?\n\ni think thats B, exfoliation. because like the layers peel off or something",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "You're thinking about how temperature changes affect rocks — that’s a great start! The process you described, where the outer layer heats up and expands faster than the inside, causing layers to peel off, is indeed a key part of exfoliation.\n\nHere’s the question to confirm your understanding:\n\n**Which process best describes exfoliation?**  \nA) Ice crystals wedging apart rock layers due to freezing water in fractures  \nB) Curved sheets of rock peeling away from the surface due to pressure release as overlying rock is removed  \nC) The weathering of rock by acids produced by lichen growth  \nD) The breakup of rock fragments by repeated heating and cooling during daily temperature changes",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "wait so is exfoliation the peeling off because of heat or because of pressure? im confused now",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Exfoliation is caused by **pressure release**, not heat — though heat can play a role in other types of physical weathering.  \n\nWhen deep rocks are exposed at the surface (like after erosion removes the layers above), the pressure on them drops suddenly. This causes the outer layers to expand and peel off in sheets, like an onion. It’s common in granite domes — think of how the rock cracks and flakes in curved layers.  \n\nHeat causes *thermal stress* (expansion and contraction), which leads to cracking — but that’s different from exfoliation.  \n\nSo:  \n- **Exfoliation** → pressure release → peeling sheets  \n- **Thermal stress** → daily heating/cooling → cracking  \n\nNow, which of these is an example of exfoliation?  \nA) A rock splitting because it got hot in the day and cold at night  \nB) A granite dome flaking off in curved layers after erosion removed the rock above  \nC) Tree roots pushing through a rock and breaking it  \nD) Rainwater reacting with minerals to turn the rock orange  \n\nA/B/C/D?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ok so exfoliation is when the pressure goes away and the layers peel off like an onion\n\nso thats B, the granite dome flaking off in curved layers",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Exactly — exfoliation is pressure release, and that curved flaking on a granite dome is the classic example. You got it.\n\nNow, let’s test your ability to classify weathering types. Here’s a new scenario:\n\n**A limestone rock in the Seychelles has developed a rough, pitted surface with small holes, and when you pour vinegar on it, it fizzes. What type of weathering is this most likely?**  \nA) Physical weathering from wave action  \nB) Chemical weathering from carbonic acid in rainwater  \nC) Biological weathering from lichen growth  \nD) Physical weathering from thermal expansion  \n\nA/B/C/D?\n\nExfoliation happens when pressure is released, causing rock to peel in curved layers. Which of these is the best example of exfoliation?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "yeah ok so limestone fizzes with vinegar right, that means acid is breaking it down. that's a chemical reaction so its changing the rock\n\nso thats B, chemical weathering from carbonic acid in rainwater",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "i said B because the acid in rainwater reacts with the limestone and makes it fizz, so thats chemical weathering not physical",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 6,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 20,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor"
+}

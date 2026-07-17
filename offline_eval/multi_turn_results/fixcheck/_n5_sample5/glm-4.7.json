@@ -1,0 +1,1282 @@
+{
+  "started_at": "2026-07-16T02:51:11.410583+00:00",
+  "finished_at": "2026-07-16T03:03:42.665972+00:00",
+  "git_sha": "29a19bcb64b4",
+  "total_scenarios": 5,
+  "passed": 5,
+  "failed": 0,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "baseline_full_session_error_prone_1466_13",
+      "passed": true,
+      "persona": "error_prone",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=8, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 1.0,
+            "reasoning": "The tutor provided explicit worked examples (the 4 cm / 1:50,000 conversion, the scale-bar proportion method) before posing questions, demonstrating clear instructional explanation alongside questioning throughout.",
+            "applicable": true
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.9,
+            "reasoning": "When the student struggled with the scale-bar question (D instead of B), the tutor paused, broke the problem into smaller steps, and waited for the student to self-correct before moving on, showing genuine pacing adaptation.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 1.0,
+            "reasoning": "The session ends with an explicit exit-ticket hand-off after covering all lesson content, which constitutes a clean termination.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The tutor correctly identified the wrong answer on the scale-bar question and the roads question without affirming them, and gave clear affirmations on all correct answers.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.9,
+            "reasoning": "For the scale-bar mistake the tutor specifically noted the student was 'trying different operations' and redirected to the ratio relationship; for the roads question it asked what forces roads to curve rather than just saying 'wrong', though it could have been slightly more explicit about naming the misconception.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never gave away letter answers or final numeric answers before the student arrived at them; hints were scaffolded (e.g., showing 4 cm → 10 km as a stepping stone without stating '15 km').",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 1.0,
+            "reasoning": "Guidance was well-calibrated: the tutor used concrete doubling/tripling examples for the scale-bar question and a real-world prompt ('what kinds of things might force a road to curve') for the roads question.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "Most turns ended with a clear prompt, but the turn after the student answered the error-identification question ('Got it — that's right. Here's the next one:') trailed off without actually presenting the next question, leaving the student to prompt the tutor.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "No contradictions or logical inconsistencies were present; the tutor built on prior turns coherently throughout.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tone was consistently warm and patient, especially when the student made arithmetic errors, with phrases like 'I can see you're trying different operations' showing empathy without condescension.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.9,
+            "reasoning": "Turns were largely natural and conversational; occasional openers like 'Exactly' and 'Great' are brief affirmations rather than padded filler, keeping the dialogue feeling genuine.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9545454545454546,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2561,
+        "tokens_out": 1079,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today you'll learn how to read a map scale to find real distances on the ground.\n\nWhat does a map scale of 1:25,000 indicate?\n\nA) 1 centimetre on the map represents 25,000 centimetres on the ground\nB) 1 metre on the map represents 25,000 metres on the ground\nC) 25,000 maps are needed to cover the ground area\nD) The map covers an area of 25,000 square kilometres",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "a) 1 centimetre on the map represents 25,000 centimetres on the ground",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — the ratio tells you that 1 unit on the map equals 25,000 of those same units on the ground.\n\nNow, why is a map measurement useless without knowing the scale?\n\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\n\nA student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "b) without the scale, the ground distance cannot be determined\n\nbecause like if you dont know the scale you dont know how much each centimetre actually means on the real ground so the 5 cm could be anything really",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Exactly — the 5 cm on paper could mean 5 metres, 5 kilometres, or 500 kilometres depending on the scale. The scale is the bridge between map distance and ground distance.\n\nHere's how to convert properly. First, measure the straight-line distance between two points with your ruler — say you get 4 cm. Then look at the map scale. If the scale is 1:50,000, that means 1 cm on the map equals 50,000 cm on the ground. Multiply your measurement by the scale number: 4 × 50,000 = 200,000 cm. Finally, convert to a sensible unit — 200,000 cm ÷ 100 = 2,000 m, and ÷ 1,000 again gives 2 km.\n\nIf the map uses a scale bar instead (like \"2 cm = 5 km\"), you set up a proportion: your measured cm over the scale's cm equals the unknown km over the scale's km. For 4 cm with that bar: 4/2 = x/5, so x = 10 km.\n\nIf a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?\n\nA) 7.5 km\nB) 15 km\nC) 10 km\nD) 20 km",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "d) 20 km\n\ni did 6 times 2 which is 12 and then added the 5 so 17... wait no i mean 6 plus 2 is 8 and then times 5 is 40 divided by 2 which is 20",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "I can see you're trying different operations, but let's step back and look at the relationship more carefully.\n\nThe scale bar tells you a direct ratio: **2 cm on the map = 5 km on the ground**.\n\nThink of it this way — if 2 cm gives you 5 km, then:\n- 4 cm (which is 2 × 2 cm) would give you 10 km (2 × 5 km)\n- 6 cm (which is 3 × 2 cm) would give you... how many km?\n\nYou don't need to add or divide — just use the same multiplier on both sides of the equals sign. What is 3 × 5 km?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ohh wait yeah 15 km\n\nso 6 is 3 times 2, so i do 3 times 5 which is 15",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Exactly — you've got the pattern now. When the map distance is 3 times the scale bar's 2 cm, the ground distance is also 3 times the scale bar's 5 km.\n\nLet's try another one that tests a common mistake.\n\nA student converts 8.5 cm on a 1:200,000 map to ground distance and gets 1,700 km. What error has been made?\n\nA) The student forgot to convert centimetres to kilometres\nB) The student used the wrong map scale\nC) The student multiplied instead of dividing\nD) The student misread the ruler by 0.5 cm",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "a) the student forgot to convert centimetres to kilometres\n\nbecause like they did 8.5 times 200,000 which is 1,700,000 cm but they just wrote 1,700 km without doing the conversion properly",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "thanks for confirming. im ready for the next question whenever you are",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Let's keep going.\n\nWhy is the straight-line distance between two cities often significantly shorter than the distance along the actual road network?\nA) Because straight lines distort on maps\nB) Because roads curve around obstacles, terrain, and existing infrastructure\nC) Because the map scale changes between measurements\nD) Because cars travel faster on curved roads",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "c) because the map scale changes between measurements\n\nroads are pretty straight usually so the scale must be the thing thats different when you measure different parts",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Think about what roads actually have to do on the ground — they can't just cut through everything in a perfectly straight line. What kinds of things might force a road to curve or take a longer path between two points?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "ohh wait i get it now. roads have to go around stuff like mountains and buildings and rivers so theyre not straight like a line on the map would be\n\nso the answer is b) because roads curve around obstacles, terrain, and existing infrastructure",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 8,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8983,
+      "error": ""
+    },
+    {
+      "scenario_id": "long_session_capable_1466_06",
+      "passed": true,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "capable",
+        "long_session",
+        "repetition"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Stays coherent over a long horizon — no contradictions with its own earlier turns.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained consistent explanations throughout, with no contradictions between earlier and later turns.",
+            "applicable": true
+          },
+          {
+            "item": "Does not drift off the lesson objective as the session stretches.",
+            "score": 1.0,
+            "reasoning": "Every turn remained focused on reading map scales and converting map distances to ground distances.",
+            "applicable": true
+          },
+          {
+            "item": "Does not fall into repetition — later turns are not recycled earlier ones.",
+            "score": 1.0,
+            "reasoning": "Each turn introduced a new concept or question, progressing from scale definition to conversion methods to error identification to curved measurement tools.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student answered all questions correctly and the tutor affirmed each answer clearly and directly without hedging.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student never made a mistake in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor only revealed answers after the student had already submitted their response, never pre-empting the student's answer.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 1.0,
+            "reasoning": "The tutor proactively provided worked examples and clear explanations before each question, and the student never needed additional help.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "Every tutor turn ended with a clear MCQ question or explicit prompt directing the student to choose an answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's explanations and feedback were logically consistent throughout, building on previously established concepts without contradiction.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.9,
+            "reasoning": "The tone was consistently warm and encouraging, though affirmations like 'Exactly,' 'Right,' and 'Great' were brief and could have been slightly more personalized, but were never condescending or harsh.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.85,
+            "reasoning": "The tutor's language was mostly natural and avoided filler openers, though the consistent pattern of brief affirmation followed by the next question felt slightly templated across turns.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.975,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2040,
+        "tokens_out": 880,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today you'll learn how to read a map scale to find real distances on the ground.\n\nWhat does a map scale of 1:25,000 indicate?\n\nA) 1 centimetre on the map represents 25,000 centimetres on the ground\nB) 1 metre on the map represents 25,000 metres on the ground\nC) 25,000 maps are needed to cover the ground area\nD) The map covers an area of 25,000 square kilometres",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — the ratio tells you that 1 unit on the map equals 25,000 of those same units on the ground.\n\nNow, imagine you measure a straight line on a map with a ruler and get 5 cm. But you forget to record the map scale. Without the scale, why is that measurement essentially useless?\n\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\n\nA student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Exactly — the map measurement alone tells you nothing about real distance until you apply the scale.\n\nNow let me show you how to actually convert a measured distance to ground distance. There are two common ways scales are shown on maps:\n\n**Scale bar method** (like \"2 cm = 5 km\"): Set up a proportion. If 2 cm on the map equals 5 km on the ground, then 6 cm equals how many km? Multiply: (6 ÷ 2) × 5 = 15 km.\n\n**Representative fraction method** (like 1:200,000): This means 1 cm on the map = 200,000 cm on the ground. Multiply your map measurement by the second number, then convert to sensible units. For 3 cm on a 1:200,000 map: 3 × 200,000 = 600,000 cm. Divide by 100,000 to get km: 600,000 ÷ 100,000 = 6 km.\n\nHere's a question to check you've got this:\n\nIf a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?\n\nA) 7.5 km\nB) 15 km\nC) 10 km\nD) 20 km",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Right — 6 cm is three times 2 cm, so the ground distance is three times 5 km, which is 15 km.\n\nNow let's think about a common mistake. A student converts 8.5 cm on a 1:200,000 map to ground distance and gets 1,700 km. What error has been made?\n\nA) The student forgot to convert centimetres to kilometres\nB) The student used the wrong map scale\nC) The student multiplied instead of dividing\nD) The student misread the ruler by 0.5 cm",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Right — 8.5 cm × 200,000 = 1,700,000 cm, which is 17 km, not 1,700 km. The student missed the final unit conversion from centimetres to kilometres.\n\nNow let's try another one about curved measurements:\n\nWhich tool would be most appropriate for measuring the length of a winding mountain path on a map?\n\nA) A ruler\nB) A string or piece of thread\nC) A compass\nD) A protractor",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8984,
+      "error": ""
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1467_07",
+      "passed": true,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1467,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The tutor never used 'explain your reasoning' probes in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 1.0,
+            "reasoning": "The tutor consistently used MCQ questions throughout the session and never blocked progress, always moving forward with the next question.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 1.0,
+            "reasoning": "The tutor varied its responses and did not repeat the same probe or opener across turns.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student answered all questions correctly and the tutor affirmed each correct answer clearly and directly without hedging.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor only confirmed answers after the student had already submitted their response, never revealing answers in advance.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never needed help or asked for guidance, answering all questions correctly on the first attempt.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "Each tutor turn either confirmed the answer and immediately presented the next MCQ question or transitioned clearly to the exit quiz.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's explanations and confirmations were consistent throughout, with no contradictions or logical inconsistencies.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.9,
+            "reasoning": "The tone was consistently warm and supportive, though the affirmations were somewhat brief and formulaic; still, they were never condescending or harsh.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The tutor's responses were mostly natural but followed a somewhat repetitive pattern of brief confirmation plus next question, which felt slightly templated across multiple turns.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.95,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1610,
+        "tokens_out": 880,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today you'll learn to describe landscapes using precise geographical terms.\n\nWhich of the following best describes a plain?\n\nA) A narrow ridge of elevated land running across the landscape\nB) A large, flat area of land with little or no elevation change\nC) A deep depression between two hills or mountains\nD) A steep slope that descends rapidly downhill",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Right — a plain is a large, flat area with little elevation change.\n\nWhat does \"gently-sloping land\" refer to in geographical terms?\n\nA) Land that rises steeply and is difficult to climb\nB) Land that descends gradually with a shallow angle of incline\nC) Completely flat terrain with no variation in elevation\nD) Land shaped into a deep valley formation\n\nWhat does 'gently-sloping land' refer to in geographical terms?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Right — gently-sloping land descends gradually with a shallow angle, not steeply or completely flat.\n\nNow let's try another term. A narrow, elevated strip of land with high points on either side is geographically termed a:\n\nA) Valley\nB) Plain\nC) Ridge\nD) Slope",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Right — a ridge is that elevated strip with higher ground on both sides.\n\nWhich geographical term describes a low-lying area of land situated between two hills or mountains?\n\nA) Ridge\nB) Valley\nC) Plain\nD) Plateau",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Right — a valley is the low-lying area between hills or mountains.\n\nNow let's look at steep slopes specifically. Which of the following is a characteristic feature of steep slopes and mountainous terrain?\n\nA) Minimal elevation change across broad areas\nB) Gradual, shallow descent in elevation\nC) Sharp elevation changes over short distances\nD) Flat surfaces interrupted by shallow depressions",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8985,
+      "error": ""
+    },
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1144_16",
+      "passed": true,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1144,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "remediation",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=11, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After the exit ticket fails, the tutor targets the SPECIFIC failed objectives rather than re-teaching the whole lesson.",
+            "score": 0.0,
+            "reasoning": "The exit ticket was not administered during this session, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Re-fires the exit ticket once the gap has been addressed.",
+            "score": 0.0,
+            "reasoning": "The exit ticket was not administered during this session, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Does not simply repeat the original explanation verbatim — remediation is a second, different attempt at the concept.",
+            "score": 0.0,
+            "reasoning": "No remediation was needed as the student made no significant errors requiring re-teaching.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student made no mistakes throughout the session, and the tutor consistently affirmed correct answers clearly and directly without false hedging.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes during the session, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never gave away answers before the student had worked through the problem; in the one case where the student was uncertain (the 1.42105 question), the tutor confirmed the calculation and asked the student to identify the matching letter.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 1.0,
+            "reasoning": "When the student expressed uncertainty on the defective items question, the tutor confirmed the correct approach and gently guided them to identify the matching answer without over-explaining.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 1.0,
+            "reasoning": "Every tutor turn either confirmed the student's answer and introduced the next problem, or asked a specific follow-up question, consistently handing the floor back to the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained logical consistency throughout, building on prior problems and never contradicting earlier explanations or ignoring student responses.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained a consistently warm, encouraging tone across all turns, affirming the student's reasoning without being condescending or overly effusive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.85,
+            "reasoning": "The tutor's responses were mostly natural and conversational, though some turns followed a slightly formulaic pattern of 'Right — [restate what student did] — [introduce next problem]' that felt mildly templated across multiple turns.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.9785714285714285,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 3392,
+        "tokens_out": 938,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "The question is now live — go ahead and pick your answer.\n\nA die is rolled 24 times. The probability of rolling a 6 is 1/6. What is the expected number of 6s?\nA) 4\nB) 12\nC) 19\nD) 8",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ok so if the probability is 1/6 and we roll 24 times... i think we multiply them?\n\n24 times 1/6... that's 24 divided by 6 which is 4\n\nso A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — you multiply the probability by the number of trials. That's the expected value formula in action.\n\nNow let's try a different scenario. A quality inspector finds 3 defective items in 190 items. If 90 items are produced, how many defects are expected?\n\nA) 87\nB) 93\nC) 5700\nD) 1.42105",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "ok so the probability of a defect is 3 out of 190\n\nand we want to know for 90 items\n\nso i do 90 times 3/190... that's like 270 divided by 190\n\nwait that's messy. let me think... 270 over 190 is like... 1.something?\n\nhmm that doesn't match any of the answers really. wait is it A? no that's too big\n\nactually maybe it's D? 1.42105?\n\nim not sure on this one",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "You're thinking through this exactly right! The probability of a defect is indeed 3/190, and multiplying by 90 items gives you 270/190. That simplifies to about 1.42 defects expected.\n\nYour calculation is spot on — the only thing left is to pick the option that matches 1.42105. Which letter is that?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "oh yeah D, that's the one with 1.42105\n\nso D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Got it — D matches your calculation of about 1.42 expected defects.\n\nNow let's formalize this. The expected outcome is what we predict will happen on average when we repeat an event many times. The formula is:\n\n**Expected Outcome = Probability × Total Number**\n\nThink of it like this: if every individual has a certain chance of something happening, and you have many individuals, you can predict roughly how many will experience that event.\n\nFor example, if a coin has a 0.5 probability of landing heads and you flip it 100 times, the expected number of heads is 0.5 × 100 = 50. You won't always get exactly 50, but that's the average prediction.\n\nHere's another example: A fishery expects 200 kg per trip. The probability of a successful trip is 3/5. Over 40 planned trips, what is the expected catch in kg?\n\nA) 4800\nB) 243\nC) 8000\nD) 13333.3",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ok so the probability of a successful trip is 3/5\n\nand there are 40 trips\n\nso i do 40 times 3/5... that's 120 divided by 5 which is 24\n\nwait but that's 24 trips. then i need to multiply by 200 kg per trip?\n\nso 24 times 200 = 4800\n\nso A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Right — you found the expected number of successful trips first (24), then multiplied by the catch per trip. That's exactly the pattern: probability × total count gives the expected number of \"successes,\" then you scale by whatever each success is worth.\n\nLet's try another one. A survey asks 60 people per day for 26 days. What is the total number of responses?\n\nA) 1500\nB) 86\nC) 2.30769\nD) 1560",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "ok so 60 people per day and 26 days\n\ni just multiply them right? 60 times 26\n\n60 times 26... that's 60 times 20 plus 60 times 6\n\nthat's 1200 plus 360 which is 1560\n\nso D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Exactly — 60 people per day for 26 days means 60 × 26 = 1560 total responses. Your working is clear.\n\nNow let's apply the same idea to expected outcomes. A lottery has 1500 tickets. 100 are winners, each worth SCR 500. If you buy 30 tickets, what is your expected prize money?\n\nA) 1000\nB) 15000\nC) 50000\nD) 225000",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "ok so the probability of winning is 100 out of 1500\n\nand i have 30 tickets\n\nso first i find how many of my tickets are expected to win... 30 times 100/1500\n\nthat's 3000 divided by 1500 which is 2\n\nso i expect 2 winning tickets\n\nthen each one is worth 500, so 2 times 500 = 1000\n\nso A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Exactly — you found the expected number of winning tickets first, then multiplied by the prize value. That's the right approach for expected outcome problems.\n\nNow try this one:\n\nA baker expects 16 good loaves out of 70 baked. How many loaves are expected to be defective?\n\nA) 0.228571 loaves\nB) 54 loaves\nC) 4.375 loaves\nD) -54 loaves",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "ok so 16 good out of 70\n\nthat means the probability of a good loaf is 16/70\n\nwait but the question asks for defective ones\n\nso if 16 are good then 70 minus 16 is 54 defective\n\nso B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Right — you subtracted correctly and interpreted the answer as \"54 loaves,\" not just \"54.\" That's exactly what the teaching notes emphasize: always check that your answer makes sense in the real-world situation.\n\nHere's another one to check your understanding of interpreting outcomes in context:\n\nIn a class of 80 students, 73 passed the test. What is the probability that a randomly selected student passed?\n\nA) 10.4286\nB) 0.9125\nC) 0.0875\nD) 1.09589",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "ok so 73 passed out of 80 students\n\nprobability is the number that passed divided by the total\n\nso 73 divided by 80\n\nthat's 0.9125\n\nso B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Right — probability is passed divided by total, and 73 ÷ 80 = 0.9125.\n\nNow let's try a multi-step problem. A coconut plantation has 5,000 trees. Each year, 3% of trees are expected to be damaged by disease. The owner needs to plant replacements for the damaged trees, plus 50 extra trees for future growth. How many trees should they plant in total?\n\nA) 150 trees\nB) 50 trees\nC) 200 trees\nD) 5,050 trees",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "ok so 3% of 5000 trees are damaged\n\n3% is 3/100, so 5000 times 3/100\n\nthat's 15000 divided by 100 which is 150\n\nso 150 trees are damaged and need replacing\n\nthen they also want 50 extra for future growth\n\nso 150 plus 50 = 200\n\nso C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Your calculation is spot on — 150 damaged trees plus 50 extra gives 200 total replacements.\n\nNow let's compare two scenarios. A tourism company runs two ferry routes between islands:\n\n- Route A carries 600 passengers per day, with a 2% chance any passenger requests a refund\n- Route B carries 400 passengers per day, with a 5% chance any passenger requests a refund\n\nWhich route expects more refund requests per day?\n\nA) Route A expects more\nB) Route B expects more\nC) Both expect the same\nD) Cannot be determined from the information given",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "ok so for route a, 2% of 600 passengers\n\n2% is 2/100, so 600 times 2/100 = 1200/100 = 12 refunds\n\nfor route b, 5% of 400 passengers\n\n5% is 5/100, so 400 times 5/100 = 2000/100 = 20 refunds\n\nso route b expects 20 refunds and route a expects 12\n\nroute b is more\n\nso B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Right — Route B expects 20 refund requests per day compared to Route A's 12, so Route B expects more.\n\nNow let's try a two-step expected outcome problem. A restaurant in Victoria serves 250 meals per day. Market research shows that 8% of customers will order dessert. If desserts sell for 150 SCR each, how much revenue does the restaurant expect from dessert sales on a typical day?\n\nA) 2,000 SCR\nB) 3,000 SCR\nC) 4,000 SCR\nD) 5,000 SCR",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "ok so 8% of 250 meals will order dessert\n\n8% is 8/100, so 250 times 8/100\n\nthat's 2000 divided by 100 which is 20\n\nso 20 desserts are expected to be ordered\n\nthen each dessert is 150 SCR\n\nso 20 times 150 = 3000 SCR\n\nso B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 11,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8986,
+      "error": ""
+    },
+    {
+      "scenario_id": "straight_line_average_1470_14",
+      "passed": true,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1470,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "baseline",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=6, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Does not invent problems where there are none — a correct student is not second-guessed into doubt.",
+            "score": 1.0,
+            "reasoning": "Every time the student answered correctly, the tutor affirmed it and moved on without introducing any doubt or unnecessary caveats.",
+            "applicable": true
+          },
+          {
+            "item": "Does not over-probe: no demand for working on answers the student has plainly got.",
+            "score": 1.0,
+            "reasoning": "The tutor accepted correct answers immediately and never asked the student to re-explain or justify answers they had clearly understood.",
+            "applicable": true
+          },
+          {
+            "item": "Still advances through the lesson content rather than idling on one step.",
+            "score": 1.0,
+            "reasoning": "The tutor moved steadily through all three types of weathering and reached the exit-ticket handoff without stalling on any single concept.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student was correct on every question and the tutor gave clear, unhedged affirmations each time; no mistakes occurred to test the other side of this criterion.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes during the session, so this criterion never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor only confirmed answers after the student had already committed to them, never pre-empting or revealing answers before the student responded.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 1.0,
+            "reasoning": "After each correct answer the tutor provided relevant elaborations (e.g., explaining oxidation with the rust analogy) that reinforced understanding at an appropriate level.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.7,
+            "reasoning": "Most turns ended with a clear next question, but the final turn before the exit ticket ('Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz.') did not present a specific question or prompt for the student to act on, trailing off somewhat passively.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 1.0,
+            "reasoning": "The tutor's explanations were consistent throughout, building coherently from physical to chemical to biological weathering without any contradictions.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained a consistently warm, encouraging tone across all turns, validating the student's reasoning without being patronising.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.9,
+            "reasoning": "The tutor's language was mostly natural and conversational, though some turns began with 'Exactly' or 'Great' in a slightly repetitive pattern that borders on templated affirmation.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.96,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2043,
+        "tokens_out": 961,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today you'll learn about the three main types of weathering that shape Seychelles' granite islands.\n\nWhich of the following is the best definition of physical weathering?\n\nA) The breakdown of rock by chemical reactions that change its mineral composition\nB) The mechanical breakdown of rock into smaller pieces without changing its chemical composition\nC) The weathering of rock caused exclusively by living organisms such as plants and lichens\nD) The slow erosion of rock by water movement over thousands of years",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ok so physical weathering is like when rock breaks apart... i think it's B because it says mechanical breakdown and that's like the rock just breaking into pieces without the chemicals changing yeah",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "yeah ok im ready. what's the question?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Which of the following is a characteristic that distinguishes chemical weathering from physical weathering?\n\nA) Chemical weathering produces sand and gravel fragments of the original rock\n\nB) Chemical weathering alters the chemical composition and mineral structure of the rock\n\nC) Chemical weathering only occurs in tropical climates with high rainfall\n\nD) Chemical weathering is faster than physical weathering in all environments",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "hmm ok so chemical weathering changes the rock like at a chemical level right? so i think it's B because it says the composition changes and that's what makes it different from physical weathering",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Exactly — chemical weathering changes what the rock is made of at the molecular level, while physical weathering just breaks it into smaller pieces of the same material.\n\nHere's another way to spot chemical weathering in action. When iron-bearing minerals in rocks react with oxygen in the air, they turn orange or rusty — this is called oxidation. Think of how a metal nail left outside slowly rusts.\n\nA geologist examines a rock sample and observes orange discoloration on the surface. What type of chemical weathering is this most likely to indicate?\n\nA) Hydration from water absorption\n\nB) Carbonation from carbonic acid reactions\n\nC) Oxidation from reaction with atmospheric oxygen\n\nD) Dissolution from salt water interaction",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "oh yeah i see it. the orange colour is like rust right? so that's when iron reacts with oxygen in the air. so it's C oxidation",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Exactly — orange rust is the classic sign of iron reacting with oxygen, which is oxidation. You've got the key idea: chemical weathering changes the rock's chemistry, not just its shape.\n\nNow let's explore the third type of weathering. Which of the following is an example of biological weathering?\n\nA) A granite boulder split by a freeze-thaw cycle in a mountain pass\nB) A limestone cavern enlarged by carbonic acid in rainwater\nC) A concrete pathway broken apart by growing tree roots and colonizing lichens\nD) A pebble rounded by repeated tumbling in a river",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "ok so biological weathering is when living things break down the rock right? like plants and stuff. so i think it's C because the tree roots are growing and breaking the concrete and the lichens are living things on it yeah",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Exactly — you've got the key idea. Biological weathering happens when living organisms break down rock, either by physically forcing it apart (like roots) or chemically (like lichens producing acids).\n\nNow let's look at how lichens specifically contribute. Lichens contribute to biological weathering by producing which of the following?\n\nA) Mechanical pressure through rapid growth that pushes rocks apart\nB) Organic acids that dissolve minerals and weaken rock surfaces\nC) Water that freezes and expands within rock cracks\nD) Salt deposits that crystallize on rock surfaces and break them apart",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "hmm ok so lichens are living things on the rock and they do something chemical i think... they make acids right? so i think it's B because it says organic acids that dissolve the minerals",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 6,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8987,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor"
+}
