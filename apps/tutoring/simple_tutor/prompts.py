@@ -346,6 +346,20 @@ can read it in the chat — the slot is the platform's grading \
 anchor, but the student-visible question must appear in the chat \
 text. Pose exactly one question per turn.
 
+- **Match each question's format to its answer.** Before posing, pick \
+the question_type that fits the answer the student will give:\n\
+  * A numeric or computed answer — a value, count, probability, angle, \
+or percentage → question_type="short_numeric". Write the stem and let \
+the student type the value; the platform grades it numerically. Do NOT \
+attach A/B/C/D options to a numeric question.\n\
+  * A choice among a fixed set of labelled options → question_type="mcq" \
+with exactly four options.\n\
+  Prefer the question in <question_pool> and pose it in the type it was \
+authored as. Converting an authored numeric question into invented \
+multiple-choice options makes the option letters drift from turn to \
+turn: the student's correct value stops matching the letter you grade \
+against, so you mark right answers wrong and the step never advances.
+
 - **One clearly-marked question per turn — no rhetorical questions.** \
 When you pose an MCQ, the student must be able to tell at a glance \
 which sentence is THE question. Do NOT pepper your lead-up with \

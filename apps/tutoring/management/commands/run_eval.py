@@ -51,6 +51,21 @@ class Command(BaseCommand):
             raise CommandError("Pass at most one of --single-turn / --multi-turn.")
         if sample is not None and sample < 1:
             raise CommandError("--sample must be >= 1.")
+
+        # Benchmark question-type policy. Production defaults to mcq-only
+        # (tools.py `_allowed_tutoring_types`), which FORCES the tutor to
+        # fabricate multiple-choice options for math's authored short_numeric
+        # questions and drops those questions from the pool — the root cause of
+        # the math underperformance + timeout bottleneck (see
+        # memory/math_mcq_fabrication_diagnosis.md). Enable `short_numeric` so
+        # the eval measures real math tutoring: it routes to the deterministic
+        # math grader (grader.py `_grade_math`), so step-advance still fires
+        # cleanly. `short_answer` stays OFF — its partial verdicts were the
+        # original reason mcq-only exists. setdefault so an explicit env override
+        # still wins; scoped to run_eval (production never invokes this command).
+        import os as _os
+        _os.environ.setdefault('TUTORING_QUESTION_TYPES', 'mcq,short_numeric')
+
         # Import inside handle so Django app loading completes first.
         from evals.runner import discover_scenarios, run, write_run
 
@@ -94,6 +109,8 @@ class Command(BaseCommand):
         engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
         flag = _os.environ.get('SIMPLE_TUTOR_ENGINE', '<unset → default on>')
         banner = f">> Tutor engine: {engine_name}  (SIMPLE_TUTOR_ENGINE={flag})"
+        from apps.tutoring.simple_tutor.tools import _allowed_tutoring_types
+        banner += f"  question_types={','.join(_allowed_tutoring_types())}"
         if engine_name == 'simple_tutor':
             self.stdout.write(self.style.SUCCESS(banner))
         else:
