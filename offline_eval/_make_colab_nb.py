@@ -1,9 +1,10 @@
 """Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for the
-SINGLE-TURN evaluation (sweep 3) of 13 OSS Qwen + Gemma models on an A100.
+MULTI-TURN evaluation of 13 OSS Qwen + Gemma models on Colab GPUs.
 
-Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5;
-judge = Anthropic Haiku 4.5 @ temp 0 (evals/scorers/llm_rubric.py default).
-Results land in offline_eval/single_turn_results/<SWEEP>/ (persisted to Drive).
+Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5
+persona player; judge = Anthropic Sonnet 4.6 @ temp 0 session-level rubric
+(evals/runner.py MULTI_TURN_RUBRIC_JUDGE).
+Results land in offline_eval/multi_turn_results/<SWEEP>/ (persisted to Drive).
 
 Run: python offline_eval/_make_colab_nb.py
 """
@@ -12,29 +13,27 @@ from pathlib import Path
 
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
-DRIVE_FOLDER = 'ai-tutor-eval-single-turn'   # Drive folder that persists results
-SWEEP = 'sweep3'                             # results subfolder — one per sweep
+DRIVE_FOLDER = 'ai-tutor-eval-multiturn'     # Drive folder that persists results
+SWEEP = 'oss13_mt'                           # results subfolder — one per sweep
 
-# The single-turn set is 200 scenarios, balanced across 6 personas x 16 lessons x
-# 26 archetypes. This sweep runs the FULL 200 -- not a sample -- so the OSS models
-# are scored on exactly the same scenarios as the Gemini / Vertex Model Garden
-# models in the laptop sweep (single_turn_results/sweep3/). Same denominator, same
-# scenarios, one combined leaderboard.
-#
-# Set SAMPLE to an int (with SEED) to cut wall-clock; the draw is seeded so every
-# model still sees the same scenarios. But a sampled OSS run is NOT comparable to
-# the full-200 cloud run, so only do that for a quick directional read.
-SAMPLE = None
-SEED = 0
-RESULTS = f'offline_eval/single_turn_results/{SWEEP}'
+# Multi-turn: each scenario is a FULL tutoring session (10-30 turns) driven by
+# the Anthropic-Haiku student simulator and scored by a Sonnet-4.6 session-level
+# rubric plus deterministic assertions. SAMPLE=20/SEED=5 is the fix-check
+# benchmark draw — the exact 20 scenarios the engine fix-cycle board
+# (gemini 18 / kimi 18 / qwen 17 of 20, cycles 0-11) was measured on, so the
+# OSS models land directly comparable to that board. Set SAMPLE=None for the
+# full 200-session publication run (~10x wall-clock and API cost).
+SAMPLE = 20
+SEED = 5
+RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 
 _ROOT = Path(__file__).resolve().parents[1]
-_ST = [p for p in (_ROOT / 'evals' / 'dataset').rglob('*.yaml')
-       if 'smoke' not in p.parts and 'multi_turn' not in p.parts]
-assert len(_ST) == 200, f'expected 200 single-turn scenarios, found {len(_ST)}'
+_MT = [p for p in (_ROOT / 'evals' / 'dataset' / 'multi_turn').rglob('*.yaml')
+       if 'smoke' not in p.parts]
+assert len(_MT) == 200, f'expected 200 multi-turn scenarios, found {len(_MT)}'
 
-MODE = '--single-turn' if SAMPLE is None else f'--single-turn --sample {SAMPLE} --seed {SEED}'
-N_SCENARIOS = len(_ST) if SAMPLE is None else SAMPLE
+MODE = '--multi-turn' if SAMPLE is None else f'--multi-turn --sample {SAMPLE} --seed {SEED}'
+N_SCENARIOS = len(_MT) if SAMPLE is None else SAMPLE
 
 cells = []
 
@@ -48,19 +47,25 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — **Single-turn Eval (sweep 3)** · OSS Qwen + Gemma · Colab **A100**
+# AI Tutor — **Multi-turn Eval** · OSS Qwen + Gemma · Colab GPU
 
-**Single graded turns**: each scenario seeds a conversation and one student
-utterance; the model produces the next tutor turn, which is then scored. Same
-harness, same 200 scenarios, and the same judge as the laptop cloud sweep — so the
-OSS models here land on **one leaderboard** with the Gemini / Vertex Model Garden
-models.
+**Full tutoring sessions**: each scenario drives a complete 10–30-turn session —
+an Anthropic-Haiku student simulator plays one of five personas (capable, average,
+struggler, error-prone, non-responder) against the OSS tutor, and the whole
+transcript is scored by deterministic assertions (turn budgets, repetition,
+tool-syntax leaks, expected end-state) plus a session-level rubric.
 
 - **Tutor** = OSS Qwen / Gemma via Ollama (swapped per model with `TUTOR_MODEL_OVERRIDE`).
-- **Judge** = Anthropic **Haiku 4.5** @ temp 0 (`evals/scorers/llm_rubric.py`
-  default — identical to the cloud sweep, so scores are comparable).
+- **Student sim** = Anthropic **Haiku 4.5** persona player (constant across models).
+- **Judge** = Anthropic **Sonnet 4.6** @ temp 0 session-level rubric
+  (`evals/runner.py` `MULTI_TURN_RUBRIC_JUDGE` — identical to the engine
+  fix-cycle sweeps, so scores are comparable).
 - **Engine** = `simple_tutor` (the production engine; `run_eval` prints a banner
   confirming it and errors on the legacy engine).
+- **Benchmark draw** = the same 20-scenario seed-5 sample the engine fix-cycle
+  board was measured on (gemini-2.5-flash 18/20 · kimi-k2-thinking 18/20 ·
+  qwen3-next-80b 17/20 at cycle 11) — the OSS numbers here read directly
+  against that board.
 
 **Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 13
 OSS Qwen + Gemma models are split into 3 **disjoint size groups**; pick this tab's
@@ -76,39 +81,30 @@ Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7
 top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit; Gemma runs the
 profile registered in `apps/llm/model_profiles`, or engine defaults if none).
 
-## What changed since sweep 2
+## Read this before budgeting a session
 
-**1. The dataset was rebuilt. Sweep 3 is a NEW BASELINE — the old 60-scenario
-single-turn numbers are not comparable to it.** The single-turn set went 60 →
-**200 scenarios**, re-grounded on **16 lessons** (up from 4), and balanced by
-construction across 6 personas × 16 lessons × 26 situation archetypes. Both the
-denominator and the content changed, so there is no honest delta against the
-earlier board. Start the trend line here.
+**Multi-turn is an order of magnitude heavier than single-turn.** Each scenario
+is a full session: every turn costs 1–2 tutor calls (Ollama, GPU-bound) plus a
+student-sim call and, at session end, one long-context Sonnet rubric call. On the
+cloud sweeps a 20-scenario leg took ≈40 min for a fast API model and 2.5–4 h for
+a slow thinking model; local Ollama inference speed will dominate here — expect
+the small models to clear a leg in well under an hour on a T4/L4 and the 27B+
+group to need a few hours on an A100.
 
-**2. Why the dataset grew.** The old set was badly skewed — 8 of 24 persona×lesson
-cells were empty, and `error_prone` had exactly ONE single-turn scenario, so any
-per-persona claim drawn from it was unsupported. Two of four lessons carried 85% of
-the content. On top of that, at n=60 two models had to differ by ~18pp before the
-benchmark could tell them apart; at n=200 that drops to ~10pp.
-
-**3. This run scores the FULL 200 — no sampling.** That is deliberate: the
-Gemini / Vertex Model Garden models are being scored on the same 200 scenarios in
-the laptop sweep, so the OSS results merge into **one leaderboard** with the same
-denominator. (`SAMPLE` in `_make_colab_nb.py` can cut wall-clock, but a sampled OSS
-run is not comparable to the full-200 cloud run.)
-
-**4. Results are versioned per sweep.** This run writes to
-**`single_turn_results/{SWEEP}/`** — the SAME folder the cloud sweep writes to, so
-`aggregate.py` boards them together.
+**Scores read against the engine fix-cycle board.** Same 20 scenarios, same
+seed, same student sim, same judge — the only variable is the tutor model. The
+engine's guard stack (forced tool calls, pose salvage, letter coherence,
+vocabulary scrub) is family-gated and active for Ollama models exactly as it was
+for the cloud OSS models.
 
 **Output → `{RESULTS}/`** (symlinked to Drive, resume-safe).
 
-> ⚠️ **Runtime.** Each model runs 200 scenarios × (2 tutor calls + judge). Single
-> turns are far cheaper than full sessions — no student-sim, no 24-turn
-> trajectories — but 200 scenarios is 3.3x the old 60, so budget accordingly. The
-> reasoning models (which emit thousands of `<think>` tokens per call) dominate
-> wall-clock, not the big dense ones. The run is **resume-safe** (finished models
-> are skipped, results live on Drive), so you can stop/restart freely.
+> ⚠️ **Runtime.** Each model runs {N_SCENARIOS} full sessions of 10–30 turns; every
+> turn is 1–2 Ollama tutor calls plus a Haiku student-sim call, and each session
+> ends with one long-context Sonnet rubric call. Thinking models (which emit
+> thousands of `<think>` tokens per turn) dominate wall-clock. The run is
+> **resume-safe** (finished models are skipped, results live on Drive), so you
+> can stop/restart freely.
 
 **Before you start**
 1. Runtime → **Change runtime type** → pick the GPU for THIS tab's group (High-RAM):
@@ -117,7 +113,7 @@ run is not comparable to the full-200 cloud run.)
    KV cache need more than a T4/L4 comfortably provides.
 2. Add these **Colab Secrets** (🔑 sidebar), each *Notebook access ON*:
    - `GH_TOKEN` — GitHub **classic** PAT with **`repo`** scope (you're a collaborator on `{REPO}`).
-   - `ANTHROPIC_API_KEY` — **required** (rubric judge, Haiku 4.5 @ temp 0).
+   - `ANTHROPIC_API_KEY` — **required** (student-sim Haiku 4.5 + Sonnet 4.6 session rubric judge).
    - `GOOGLE_API_KEY` + `OPENAI_API_KEY` — keep both so the cross-vendor **grader**
      cascade (Gemini→OpenAI→Haiku, self-excluding) matches the laptop runs.
 """)
@@ -217,9 +213,8 @@ code(r"""
 """)
 
 md("## Cell 7 — persist results to Drive (symlink → survives disconnects)\n"
-   f"Symlinks **only `{RESULTS}/`** to `{DRIVE_FOLDER}/{SWEEP}/` on Drive. The rest of "
-   "`single_turn_results/` stays as cloned, so the old 60-scenario board remains on "
-   "disk for the Cell-10b baseline. Resume-safe: a reconnect re-symlinks the same Drive "
+   f"Symlinks **only `{RESULTS}/`** to `{DRIVE_FOLDER}/{SWEEP}/` on Drive. "
+   "Resume-safe: a reconnect re-symlinks the same Drive "
    f"folder and `run_matrix.sh` skips models that already have a JSON in `{SWEEP}/`.")
 code(rf"""
 !mkdir -p /content/drive/MyDrive/{DRIVE_FOLDER}/{SWEEP}
@@ -228,8 +223,6 @@ import os, glob
 print('this sweep writes to:', os.path.realpath('{RESULTS}'))
 done = sorted(os.path.basename(p)[:-5] for p in glob.glob('{RESULTS}/*.json'))
 print('already scored in {SWEEP}:', done or '(none yet)')
-print('sweep-1 JSONs available for the Cell-10b baseline:',
-      len(glob.glob('offline_eval/single_turn_results/results/*.json')))
 """)
 
 md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
@@ -336,18 +329,17 @@ _df('BEFORE cleanup')
 _df('AFTER cleanup')
 """)
 
-md("## Cell 9 — run the SINGLE-TURN sweep (pulls + scores each model; resume-safe)\n"
-   f"`MODE=\"{MODE}\"` scores all {N_SCENARIOS} single-turn scenarios. "
+md("## Cell 9 — run the MULTI-TURN sweep (pulls + scores each model; resume-safe)\n"
+   f"`MODE=\"{MODE}\"` runs {N_SCENARIOS} full sessions per model. "
    f"`RESULTS_DIR=…/{SWEEP}` writes to Drive. `CLEANUP_MODELS=1` "
    "deletes each model's weights right after it's scored so peak disk ≈ one model at a "
    "time. The run tolerates disconnects (done models are skipped on restart).\n\n"
    "**Sanity-check the first model's output before walking away:**\n"
    "- `>> Tutor engine: simple_tutor` — not the legacy engine.\n"
-   f"- `>> SAMPLED RUN: {N_SCENARIOS} of 200 scenarios (seed={SEED})` — the draw took "
-   "effect. If it says 200, `SAMPLE` is None and you are doing a full publication run "
-   "(expect ~3x the wall-clock).\n"
-   f"- `=== Running {N_SCENARIOS} scenario(s) ===`. If the count is wrong, the branch is "
-   "stale: re-run Cell 2.\n"
+   f"- The runner reports {N_SCENARIOS} scenarios; if it reports 200, `SAMPLE` is None "
+   "and you are doing the full publication run (~10x wall-clock).\n"
+   "- Sessions end with `exit_ticket` / `completed` — a wall of `deadlock` on the "
+   "first model means something is wrong; stop and check the log.\n"
    "- No `dropped duplicate pose_question` storms, and few `record_answer without "
    "in-flight question` lines.")
 code(rf"""
@@ -367,10 +359,12 @@ import subprocess
 print(subprocess.run(['df','-h','/'],capture_output=True,text=True).stdout)
 """)
 
-md(f"## Cell 10 — single-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
-   f"Pass rates are out of **{N_SCENARIOS}**. Every model was scored on the same seeded "
-   "draw, so the models are comparable to EACH OTHER. They are **not** comparable to "
-   "sweep 1 or sweep 2 — those ran a different dataset on different lessons.")
+md(f"## Cell 10 — multi-turn leaderboard (run anytime; scores whatever is in `{SWEEP}/`)\n"
+   f"Pass rates are out of **{N_SCENARIOS}** sessions. Every model ran the same seeded "
+   "draw as the engine fix-cycle board, so these numbers read directly against "
+   "gemini-2.5-flash 18/20, kimi-k2-thinking 18/20, and qwen3-next-80b 17/20 "
+   "(cycle 11). An `errored` scenario is judge/sim infrastructure, not model "
+   "failure — re-run those before comparing.")
 code(rf"""
 !RESULTS_DIR=$PWD/{RESULTS} python offline_eval/aggregate.py
 """)
@@ -408,6 +402,27 @@ for m, k, n, rate, lo, hi in sorted(rows, key=lambda r: -r[3]):
     print(f'{{m:<28}} {{k:>4}}/{{n:<4}} {{rate:>5.0f}}%   [{{lo:>4.0f}}, {{hi:>4.0f}}]')
 """)
 
+md("## Cell 10c — session end-reasons (the multi-turn failure signature)\n"
+   "Pass rate alone hides HOW sessions end. `exit_ticket`/`completed` are clean; "
+   "`max_turns` = pacing; `deadlock` = the tutor repeated itself verbatim — the "
+   "classic weak-model failure the guard stack exists to prevent. `errored` is "
+   "infrastructure (judge/sim overload): re-run those scenarios before comparing.")
+code(rf"""
+import json, glob, os
+from collections import Counter
+print(f"{{'MODEL':<26}}{{'PASS':>8}}   SESSION END-REASONS")
+print('-' * 70)
+for f in sorted(glob.glob('{RESULTS}/*.json')):
+    name = os.path.basename(f)[:-5]
+    if name.startswith('_'):
+        continue
+    d = json.load(open(f))
+    ends = Counter(r.get('sim_reason') or ('errored' if r.get('error') else '?')
+                   for r in d['results'])
+    reasons = '  '.join(f"{{k}}:{{v}}" for k, v in ends.most_common())
+    print(f"{{name:<26}}{{d['passed']:>4}}/{{d['total_scenarios']:<3}}  {{reasons}}")
+""")
+
 md(rf"""
 ## After a Colab disconnect (A100 Pro: long sessions, but not infinite)
 Re-run **Cells 1–8b**, then **Cell 9** again. Because results live on Drive (Cell 7),
@@ -433,7 +448,7 @@ To pull results back to your laptop: copy the JSONs + logs from
 - Reasoning models: `[OllamaTools] response: ... blocks=['tool_use', ...]` (or `['text']`),
   **not** `blocks=[]` (empty = num_ctx still truncating).
 
-**New in sweep 2 — the fixes should show up in the logs:**
+**Log greps worth running per model (the guard stack should show up):**
 - `dropped duplicate pose_question` — the cap firing. A few is fine; a storm means a
   model is spamming parallel calls (that was gemini-3.1-pro's 139-per-turn bug).
 - `record_answer without in-flight question` — should be **rare**. In sweep 1 this hit
