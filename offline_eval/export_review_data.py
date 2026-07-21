@@ -38,6 +38,13 @@ RUNS = {
                          "n=20 seed-5: + transient-error retry + step+8 turn budgets."),
     "_cycle2":          ("12_cycle2_persona_budgets",
                          "n=20 seed-5: + persona-aware turn budgets (struggling personas step*3)."),
+
+    "_cycle3_3model":   ("13_cycle3_antidesync",
+                         "Anti-desync guard (block posing over an unanswered question); 3-model focus."),
+    "_cycle4":          ("14_cycle4_intentgate",
+                         "Intent-gated anti-desync (allow pivot on decline)."),
+    "_cycle5":          ("15_cycle5_prompt_tuning",
+                         "Per-model prompt tuning + a dedicated kimi variant."),
 }
 
 

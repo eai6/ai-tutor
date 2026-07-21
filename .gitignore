@@ -72,3 +72,6 @@ offline_eval/**/*.log
 
 # Generated review output (regenerate with build_viewer.py / export_review_data.py)
 offline_eval/experiment_review/
+
+# Generated deployable viewer (regenerate with build_viewer.py; deploy config is tracked)
+offline_eval/viewer_deploy/index.html

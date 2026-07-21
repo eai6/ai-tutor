@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from apps.llm.client import get_llm_client
+from apps.llm.client import get_llm_client, call_with_transient_retry
 from apps.llm.models import ModelConfig
 
 logger = logging.getLogger(__name__)
@@ -281,12 +281,12 @@ def score_pedagogical_dimensions(
     )
 
     try:
-        resp = client.generate(
+        resp = call_with_transient_retry(lambda: client.generate(
             messages=[{'role': 'user', 'content': user_prompt}],
             system_prompt=_DIMENSIONS_SYSTEM_PROMPT,
             max_tokens=max_tokens,
             temperature=temperature,
-        )
+        ), label='judge(dimensions)')
     except Exception as exc:
         result.error = f"judge call failed: {type(exc).__name__}: {exc}"
         return result
@@ -663,12 +663,12 @@ def _call_and_parse(
     """Shared judge-call + JSON parsing path. Mutates ``result`` and returns it."""
 
     try:
-        resp = client.generate(
+        resp = call_with_transient_retry(lambda: client.generate(
             messages=[{'role': 'user', 'content': user_prompt}],
             system_prompt=_SYSTEM_PROMPT,
             max_tokens=max_tokens,
             temperature=temperature,
-        )
+        ), label='judge(rubric)')
     except Exception as exc:
         result.error = f"judge call failed: {type(exc).__name__}: {exc}"
         return result

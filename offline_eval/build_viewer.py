@@ -13,7 +13,7 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "offline_eval", "multi_turn_results", "fixcheck")
-OUT = os.path.join(ROOT, "offline_eval", "experiment_review", "viewer.html")
+OUT = os.path.join(ROOT, "offline_eval", "viewer_deploy", "index.html")
 
 RUNS = [
     ("_prefix_colab", "00_prefix_colab"),
@@ -23,6 +23,9 @@ RUNS = [
     ("_cycle0_baseline", "10_cycle0_baseline"),
     ("_cycle1", "11_cycle1_retry+budget"),
     ("_cycle2", "12_cycle2_persona_budgets"),
+    ("_cycle3_3model", "13_cycle3_antidesync"),
+    ("_cycle4", "14_cycle4_intentgate"),
+    ("_cycle5", "15_cycle5_prompt_tuning"),
 ]
 
 

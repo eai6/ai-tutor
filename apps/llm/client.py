@@ -26,6 +26,51 @@ logger = logging.getLogger(__name__)
 from apps.llm.models import ModelConfig
 
 
+# ── Transient-error retry (shared by the student-sim + rubric judge) ──────────
+# An Anthropic 529 "Overloaded" or a Vertex 429 during a run must not wipe whole
+# sessions: retry with backoff, then re-raise so the caller's own error handling
+# still runs. The engine's tutor call has its own no-block variant of this in
+# apps/tutoring/simple_tutor/engine.py — the two detections should be consolidated
+# here when next touched. Toggle SIMPLE_TUTOR_TRANSIENT_RETRY=0 disables it.
+_TRANSIENT_BACKOFF = (2, 5, 12)
+
+
+def is_transient_error(exc: Exception) -> bool:
+    """Retryable cloud failure (rate limit / overload / 5xx / connection blip) vs.
+    a permanent error (400 / auth / schema) which must fail fast."""
+    name = type(exc).__name__.lower()
+    if any(k in name for k in ('ratelimit', 'internalserver', 'serviceunavailable',
+                               'apiconnection', 'apitimeout', 'timeout', 'overloaded')):
+        return True
+    for attr in ('status_code', 'code'):
+        try:
+            if int(getattr(exc, attr, None)) in (429, 500, 502, 503, 504, 529):
+                return True
+        except (TypeError, ValueError):
+            pass
+    msg = str(exc).lower()
+    return any(s in msg for s in (
+        '429', '503', '529', 'resource exhausted', 'overloaded', 'unavailable',
+        'please try again', 'rate limit', 'timed out', 'connection error'))
+
+
+def call_with_transient_retry(fn, *, label: str = 'llm', backoff=_TRANSIENT_BACKOFF):
+    """Call ``fn()``; retry transient failures with backoff; re-raise the last
+    exception on final failure (so existing try/except around the call fires)."""
+    retries = len(backoff) if os.getenv(
+        'SIMPLE_TUTOR_TRANSIENT_RETRY', '1').strip() != '0' else 0
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if is_transient_error(exc) and attempt < retries:
+                logger.warning("%s transient %s — retry %d/%d in %ds", label,
+                               type(exc).__name__, attempt + 1, retries, backoff[attempt])
+                time.sleep(backoff[attempt])
+                continue
+            raise
+
+
 @dataclass
 class LLMResponse:
     """Standardized response from any LLM provider."""

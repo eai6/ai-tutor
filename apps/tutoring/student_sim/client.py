@@ -14,7 +14,7 @@ from typing import Optional
 
 import logging
 
-from apps.llm.client import get_llm_client, LLMResponse
+from apps.llm.client import get_llm_client, LLMResponse, call_with_transient_retry
 from apps.llm.models import ModelConfig
 from apps.tutoring.student_sim.personas import Persona, get_persona
 
@@ -119,12 +119,12 @@ class StudentClient:
             tutor_msg = _EMPTY_USER_PLACEHOLDER
         self._history.append(StudentTurn(role='tutor', content=tutor_msg))
         messages = self._build_messages()
-        response = self.client.generate(
+        response = call_with_transient_retry(lambda: self.client.generate(
             messages=messages,
             system_prompt=self.persona.system_prompt,
             max_tokens=self.model_config.max_tokens,
             temperature=self.persona.temperature,
-        )
+        ), label='student_sim')
         reply = (response.content or '').strip()
         # Strip a leading "Student:" prefix if the model adds one despite
         # the system prompt telling it not to. Also strip surrounding
