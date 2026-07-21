@@ -163,20 +163,36 @@ def _extract_mcq_letter(student_answer: str) -> str | None:
     explicit "Option B" wins over a stray "I'm not sure between A or B"
     type sentence.
     """
+    return (
+        _extract_letter_forms(student_answer)
+        or _extract_positional_forms(student_answer)
+    )
+
+
+def _extract_letter_forms(student_answer: str) -> str | None:
+    """Strict letter-form patterns only ("B", "Option B", "B.")."""
     if not student_answer:
         return None
     text = student_answer.strip()
-    # 1. Letter-form patterns (most common, strict forms first)
     for pat in _LETTER_PATTERNS[:3]:
         m = pat.match(text)
         if m:
             return m.group(1).upper()
-    # 2. Numeric-form patterns
+    return None
+
+
+def _extract_positional_forms(student_answer: str) -> str | None:
+    """Positional ("2" → B) and last-ditch letter extraction. Runs AFTER
+    option-value matching in _grade_mcq: a bare number that is the VALUE
+    of an option must win over its positional reading."""
+    if not student_answer:
+        return None
+    text = student_answer.strip()
     for pat in _NUMERIC_PATTERNS:
         m = pat.match(text)
         if m:
             return _NUMERIC_TO_LETTER[m.group(1)]
-    # 3. Last-ditch: ANY A-D word in the text. Lower confidence — student
+    # Last-ditch: ANY A-D word in the text. Lower confidence — student
     # might have said "I'm between A or B" and we should bail.
     last_ditch = _LETTER_PATTERNS[3].findall(text)
     if len(last_ditch) == 1:
@@ -184,20 +200,56 @@ def _extract_mcq_letter(student_answer: str) -> str | None:
     return None
 
 
-def _extract_option_text_match(question, student_answer: str) -> str | None:
-    """If the student typed the FULL option text (or close to it),
-    return the matching letter.
-    """
-    if not student_answer:
+_OPT_PREFIX_RE = re.compile(r'^[A-Da-d][)\].:]\s*')
+_FRACTION_RE = re.compile(r'^(-?\d+(?:\.\d+)?)\s*/\s*(-?\d+(?:\.\d+)?)$')
+
+
+def _norm_option(s: str) -> str:
+    """Normalise an option (or answer) for comparison: strip a leading
+    letter label ("A) 11" → "11"), lowercase, collapse whitespace."""
+    s = _OPT_PREFIX_RE.sub('', (s or '').strip())
+    return ' '.join(s.lower().split()).rstrip('.')
+
+
+def _option_number(s: str) -> float | None:
+    """Parse an option/answer as a number when possible — tolerates °, %,
+    commas, and simple fractions."""
+    t = (s or '').strip().replace('°', '').replace('%', '').replace(',', '')
+    try:
+        return float(t)
+    except ValueError:
+        m = _FRACTION_RE.match(t)
+        if m and float(m.group(2)) != 0:
+            return float(m.group(1)) / float(m.group(2))
         return None
-    needle = student_answer.strip().lower()
+
+
+def _extract_option_text_match(question, student_answer: str) -> str | None:
+    """If the student's answer matches exactly ONE option — by normalised
+    text or by numeric value — return that option's letter.
+
+    The value branch is what breaks the "which letter?" nag loop
+    (cycle-7 sweeps: a student who computed the correct value 225 for an
+    MCQ was asked for the letter across six further turns). A value that
+    matches two options is ambiguous → None.
+    """
+    needle = _norm_option(student_answer)
     if not needle:
         return None
+    needle_num = _option_number(needle)
+    matches: list[str] = []
     for letter in ('A', 'B', 'C', 'D'):
-        opt = getattr(question, f'option_{letter.lower()}', '') or ''
-        if opt.strip() and opt.strip().lower() == needle:
-            return letter
-    return None
+        opt = _norm_option(getattr(question, f'option_{letter.lower()}', '') or '')
+        if not opt:
+            continue
+        if opt == needle:
+            matches.append(letter)
+            continue
+        if needle_num is not None:
+            opt_num = _option_number(opt)
+            if opt_num is not None and abs(opt_num - needle_num) < 1e-9:
+                matches.append(letter)
+    return matches[0] if len(matches) == 1 else None
 
 
 def _grade_mcq(question, student_answer: str) -> GradeResult:
@@ -227,10 +279,15 @@ def _grade_mcq(question, student_answer: str) -> GradeResult:
             justification='empty answer',
         )
 
-    # Try letter / numeric / option-text extraction.
+    # Extraction priority: strict letter forms ("B", "Option B") → unique
+    # option text/value match ("225" → the letter whose option is 225°) →
+    # positional forms ("2" → B). Value-before-positional matters: on
+    # numeric-option MCQs a bare number is the student's ANSWER, not an
+    # option index.
     extracted = (
-        _extract_mcq_letter(student_answer)
+        _extract_letter_forms(student_answer)
         or _extract_option_text_match(question, student_answer)
+        or _extract_positional_forms(student_answer)
     )
     if extracted is None:
         # Couldn't pull a letter out — most likely the student wrote

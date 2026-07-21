@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -461,6 +462,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     force_grade = want_grade and gate_open
     call1_tools, call1_tool_choice = _plan_call1(tools, force_pose, force_grade)
 
+    # Expose this turn's student intent to the pose handler's anti-desync guard:
+    # it blocks a premature pose only when the student ATTEMPTED an answer (the
+    # model should grade it, not pose over it). When the student DECLINED ("idk" →
+    # non_engagement) the tutor must be free to pivot to an easier question — else
+    # it gets trapped re-posing into a dead slot (the cycle-3 anti-desync deadlock).
+    _es_intent = getattr(session, 'engine_state', None)
+    if isinstance(_es_intent, dict):
+        _es_intent['_student_intent'] = student_intent
+
     messages: list = [{'role': 'user', 'content': user_input}]
     response = _call_llm(
         system_blocks=system_blocks, tools=call1_tools, messages=messages,
@@ -496,6 +506,12 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # so an unforced Call 1 that skipped an expected tool is still repaired by
     # Call 2, and the skip is latched below to pre-force the rest of the session.
     missing_tool = _missing_forced_tool(want_pose, want_grade, tool_results)
+    # Same-turn pose after a correct verdict (see _should_pose_next_after_
+    # correct): ride the Call-2 repair machinery so the next question is
+    # registered in the same turn it is asked.
+    if missing_tool is None and _should_pose_next_after_correct(
+            _family, mode, tool_results, step):
+        missing_tool = 'pose_question_next'
 
     # ─── 6. Call 2 — feed tool_results back so the model writes
     #              the student-facing reply WITH the verdict in hand,
@@ -522,10 +538,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     if missing_tool or _graded_empty_slot(tool_results):
         _record_forcing_miss(session)
 
+    # Deterministic backstop for leaked platform vocabulary ("POSE/TEACH
+    # mode", "in flight") — see _scrub_engine_vocab.
+    text_reply = _scrub_engine_vocab(text_reply or '')
+
     if not text_reply:
-        # Last-resort: neither call produced text. Give a neutral
-        # placeholder so the bubble isn't blank.
-        text_reply = _empty_reply_placeholder(tool_results)
+        # Last-resort: neither call produced usable text. Give a neutral
+        # placeholder so the bubble isn't blank; it renders the in-flight
+        # question when one exists.
+        text_reply = _empty_reply_placeholder(tool_results, session)
 
     # Defensive enforcement of the "include question stem in visible
     # text" contract. The prompt asks the LLM to render the stem +
@@ -536,6 +557,13 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # the miss and append from the slot. Caught in M12.8 E2E.
     text_reply = _ensure_posed_question_in_text(
         text_reply, tool_results, session,
+    )
+
+    # Deterministic net: a correct verdict must never end the turn with no
+    # question in flight (see _auto_pose_fallback).
+    text_reply = _auto_pose_fallback(
+        session=session, step=step, family=_family,
+        tool_results=tool_results, text_reply=text_reply,
     )
 
     logger.info(
@@ -633,6 +661,19 @@ def _build_tool_result_content(tool_use_blocks: list, tool_results: list) -> lis
     return out
 
 
+# Appended to every instruction-style tool result. Weaker models echo these
+# blocks verbatim into student-facing replies ("we're in POSE/TEACH mode",
+# "isn't currently in flight" — seen in the 2026-07-18 multi-turn sweep), so
+# every block now states its private status and what the visible reply should
+# talk about instead. _scrub_engine_vocab is the deterministic backstop.
+_PRIVATE_NOTE = (
+    "[Private platform notes — for you only. Write your reply in plain "
+    "teaching language about the lesson and the student's answer — the "
+    "words 'slot', 'mode', 'in flight', tool names, and grading mechanics "
+    "belong to the platform, not the conversation.]"
+)
+
+
 def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
     """Render a tool result as an instruction-laden block for Call 2.
 
@@ -641,6 +682,17 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
     its next reply must be ABOUT THIS QUESTION (not an older one in
     recent_turns).
     """
+    if tool_name == 'pose_question' and result.get('repeat_of_correct'):
+        return "\n".join([
+            "QUESTION NOT POSED — the student already answered this exact "
+            "question correctly earlier in the session, so asking it again "
+            "wastes their time.",
+            "Pose a different question from <question_pool> (or a fresh one "
+            "you author) with pose_question, or continue teaching the next "
+            "piece of content.",
+            _PRIVATE_NOTE,
+        ])
+
     if tool_name == 'pose_question' and result.get('posed'):
         # The platform has persisted the question to the slot. The
         # text reply must also CONTAIN the question stem (and A/B/C/D
@@ -664,6 +716,7 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
                 "The platform is using YOUR reference; double-check "
                 "you picked the right option."
             )
+        parts.append(_PRIVATE_NOTE)
         return "\n".join(parts)
 
     if tool_name == 'record_answer' and result.get('recorded'):
@@ -687,7 +740,10 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
                 "Compose your next reply ABOUT THIS EXACT QUESTION. "
                 "If incorrect, give a hint per the wrong-answer "
                 "ladder (1st/2nd/3rd+ attempts → progressively deeper "
-                "scaffolding, never reveal the reference). If correct, "
+                "scaffolding, never reveal the reference). A hint sets "
+                "up the next step the student should take; it performs "
+                "no intermediate or final computation and never states "
+                "the reference value or its option letter. If correct, "
                 "briefly acknowledge and either continue teaching or "
                 "call pose_question with the next question. Do NOT "
                 "reference older questions from <recent_turns>."
@@ -695,6 +751,7 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
         ]
         if just:
             parts.insert(4, f"Grader justification: {just}")
+        parts.append(_PRIVATE_NOTE)
         return "\n".join(p for p in parts if p)
 
     if (tool_name == 'record_answer'
@@ -708,18 +765,28 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
             "answer to the question in flight, so nothing was graded and the "
             "question is still open. Respond to what they actually said — "
             "answer their clarification, or acknowledge their hesitation — and "
-            "then re-anchor them to the question, which remains unanswered."
+            "then re-anchor them to the question, which remains unanswered.\n"
+            + _PRIVATE_NOTE
         )
 
     if (tool_name == 'record_answer'
             and not result.get('recorded')
             and result.get('error', '').startswith('no in-flight')):
+        # 2026-07-18 sweep: the old wording ("treat their message as a
+        # clarification") made models dismiss a correct answer to the
+        # question they themselves wrote as prose one turn earlier —
+        # students were told their answer didn't count. Engage with the
+        # answer instead; the pose that follows restores a gradable slot.
         return (
-            "NO IN-FLIGHT QUESTION. The student's message was not "
-            "interpreted as an answer because there's no question "
-            "currently posed. Treat their message as a clarification "
-            "or off-topic input, and respond conversationally. If you "
-            "want them to answer something, call pose_question first."
+            "NOTHING WAS GRADED — the platform has no registered question. "
+            "The student's message is most likely an answer to the question "
+            "you wrote in your previous turn (shown in <recent_turns>). "
+            "Read that question: if their message answers it, tell them "
+            "whether they got it right and why — you wrote the question, so "
+            "judge it yourself. Then call pose_question to register the "
+            "next question. If their message wasn't an answer, respond to "
+            "what they actually said.\n"
+            + _PRIVATE_NOTE
         )
 
     # Other tools / non-success results — JSON is fine.
@@ -727,11 +794,14 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
     return json.dumps(result, default=str)
 
 
-def _empty_reply_placeholder(tool_results: list) -> str:
+def _empty_reply_placeholder(tool_results: list, session) -> str:
     """When both LLM calls produce no text (very rare), surface a
     minimal acknowledgement so the chat bubble isn't blank.
 
-    If we have a grader verdict, briefly reflect it; otherwise stall.
+    If we have a grader verdict, briefly reflect it. When a question is
+    in flight, render it — the 2026-07-18 sweep showed the old
+    "Here's the next one:" placeholder with no question attached costs
+    two turns (student replies "ok im ready" to a promise of nothing).
     """
     verdict = None
     for tr in tool_results:
@@ -740,21 +810,134 @@ def _empty_reply_placeholder(tool_results: list) -> str:
             if r.get('recorded'):
                 verdict = r.get('verdict')
                 break
+    # Rotate phrasing deterministically on session length — cycle-7 judges
+    # flagged the fixed "Got it — that's right. Here's the next one:"
+    # repeated a dozen times per session as robotic/templated.
+    from apps.tutoring.models import InFlightQuestion, SessionTurn
+    idx = SessionTurn.objects.filter(session=session).count()
     if verdict == 'correct':
-        return "Got it — that's right. Here's the next one:"
-    if verdict == 'incorrect':
-        return "Not quite — let's walk through it together."
-    return "Let's keep going."
+        base = _ACKS_CORRECT[idx % len(_ACKS_CORRECT)]
+        lead = _LEADS_NEXT[idx % len(_LEADS_NEXT)]
+    elif verdict == 'incorrect':
+        base = _ACKS_INCORRECT[idx % len(_ACKS_INCORRECT)]
+        lead = "Here's the question again:"
+    else:
+        base = _ACKS_NEUTRAL[idx % len(_ACKS_NEUTRAL)]
+        lead = "Here's the question:"
+
+    slot = InFlightQuestion.objects.filter(session=session).first()
+    if slot is not None and (slot.question_text or '').strip():
+        return f"{base} {lead}\n\n{_render_slot_question(slot)}"
+    return base
+
+
+_ACKS_CORRECT = (
+    "Got it — that's right.",
+    "Correct — nice work.",
+    "Yes, exactly right.",
+    "That's it — well done.",
+)
+_ACKS_INCORRECT = (
+    "Not quite — let's walk through it together.",
+    "Not this time — have another look.",
+    "Close, but not quite — take it one step at a time.",
+)
+_LEADS_NEXT = (
+    "Here's the next one:",
+    "Try this one:",
+    "Next up:",
+    "Here's another:",
+)
+_ACKS_NEUTRAL = (
+    "Let's keep going.",
+    "Let's pick up where we left off.",
+    "Right — let's carry on, one step at a time.",
+)
+
+
+def _render_slot_question(slot) -> str:
+    """Render the in-flight slot as the student-visible question block:
+    the stem, plus lettered options for MCQ (unless the stem already
+    carries them)."""
+    stem = (slot.question_text or '').strip()
+    lines = [stem]
+    opt_lines = _render_slot_options(slot)
+    if opt_lines and not _contains_lettered_options(stem):
+        lines.extend(opt_lines)
+    return "\n".join(lines)
+
+
+def _render_slot_options(slot) -> list[str]:
+    """Lettered option lines for an MCQ slot, [] otherwise. Strips any
+    letter prefix already baked into the option text so options never
+    render double-lettered ("A) A) 11" — cycle-7 sweeps)."""
+    if (getattr(slot, 'question_type', '') or '') != 'mcq':
+        return []
+    from apps.tutoring.simple_tutor.grader import _OPT_PREFIX_RE
+    options = getattr(slot, 'options', None) or []
+    return [
+        f"{letter}) {_OPT_PREFIX_RE.sub('', str(opt).strip())}"
+        for letter, opt in zip(('A', 'B', 'C', 'D'), options)
+    ]
+
+
+# Lead-in phrases that mark the start of a posed question in prose.
+# Used only to locate a *divergent* trailing question for removal —
+# scoped to the last few paragraphs of a reply on turns where
+# pose_question fired but the visible text doesn't contain the slot stem.
+_QUESTION_LEADIN_RE = re.compile(
+    r"(?i)\b(now try|try this|here'?s (?:the |your |one )?(?:next|last|first)|"
+    r"next (?:question|one)|what'?s your answer|your turn|let'?s try|"
+    r"answer this|one more)\b"
+)
+
+# How many trailing paragraphs may be treated as the prose question.
+_PROSE_QUESTION_WINDOW = 4
+
+
+def _looks_like_question_para(p: str) -> bool:
+    return (
+        '?' in p
+        or _contains_lettered_options(p)
+        or bool(_QUESTION_LEADIN_RE.search(p))
+    )
+
+
+def _strip_trailing_prose_question(text: str) -> str:
+    """Remove the question the LLM wrote at the end of ``text``.
+
+    Called only when the visible text is known to pose a question that
+    DIVERGES from the graded slot (the 2026-07-18 sweep's dominant
+    failure: student answers the question they read, gets graded
+    against a different one). Scans the last _PROSE_QUESTION_WINDOW
+    paragraphs for the earliest question-looking paragraph and cuts
+    from there. When no question-looking paragraph is found the text
+    is returned unchanged (caller appends the slot question after it).
+    """
+    paras = text.split('\n\n')
+    start = max(0, len(paras) - _PROSE_QUESTION_WINDOW)
+    for i in range(start, len(paras)):
+        if _looks_like_question_para(paras[i]):
+            return '\n\n'.join(paras[:i]).rstrip()
+    return text
 
 
 def _ensure_posed_question_in_text(
     text_reply: str, tool_results: list, session,
 ) -> str:
-    """Defensive: when pose_question fired this turn but the LLM's
-    text reply doesn't actually contain the question stem, append the
-    stem (and options for MCQ) from the persisted InFlightQuestion
-    slot. The chat UI renders only the chat thread (not the slot), so
-    a missed stem leaves the student with nothing to answer.
+    """The slot is the single source of truth for the visible question.
+
+    When pose_question fired this turn, the student must see exactly
+    the question the platform will grade — the chat UI renders only
+    the chat thread, not the slot. Two failure modes are repaired:
+
+    - The LLM's reply omits the stem → append it (original behaviour,
+      caught in M12.8 E2E).
+    - The LLM's reply poses a DIFFERENT question than it registered →
+      strip the divergent prose question, then append the slot's. The
+      2026-07-18 multi-turn sweep showed this desync driving ignored
+      correct answers, 21-30-turn sessions, and both dominant failed
+      rubric items across three model families.
 
     Matching is loose — if the first 30 chars of the stem appear in
     the text reply (case-insensitive, whitespace-collapsed), assume
@@ -789,28 +972,109 @@ def _ensure_posed_question_in_text(
 
     needle = _norm(stem)[:30]
     if needle and needle in _norm(text_reply):
-        return text_reply  # LLM included the stem — nothing to do.
+        # Stem is visible. For MCQ, the options must be too — cycle-7
+        # kimi spent 8 turns asking for "the letter" of options the
+        # student had never seen.
+        opt_lines = _render_slot_options(slot)
+        if opt_lines and not _contains_lettered_options(text_reply):
+            return "\n".join([text_reply.rstrip(), ''] + opt_lines)
+        return text_reply
 
+    kept = _strip_trailing_prose_question(text_reply.rstrip())
     logger.info(
-        "[simple_tutor] appending missing stem session=%s slot_id=%s",
-        session.pk, slot.pk,
+        "[simple_tutor] rendering slot question session=%s slot_id=%s "
+        "stripped_divergent_prose=%s",
+        session.pk, slot.pk, len(kept) != len(text_reply.rstrip()),
     )
 
-    parts = [text_reply.rstrip(), '', stem]
-    # Only append the options block when the stem doesn't already
-    # have lettered options baked in AND the LLM's text reply doesn't
-    # already list them (some LLMs render options without the stem,
-    # which would cause double-render if we naively append).
-    needs_options = (
-        slot.question_type == InFlightQuestion.QuestionType.MCQ
-        and slot.options
-        and not _contains_lettered_options(stem)
-        and not _contains_lettered_options(text_reply)
-    )
-    if needs_options:
-        for letter, opt in zip(('A', 'B', 'C', 'D'), slot.options):
-            parts.append(f"{letter}) {opt}")
+    parts = [kept, '', _render_slot_question(slot)] if kept else \
+        [_render_slot_question(slot)]
     return "\n".join(parts).strip()
+
+
+# ── Engine-vocabulary scrub ──────────────────────────────────────────────────
+# The 2026-07-18 sweep showed mid-tier models echoing platform vocabulary
+# into student-facing replies ("we're in POSE/TEACH mode", "isn't currently
+# in flight", "(Keep the in-flight question live …)"). The prompt-side fix is
+# _PRIVATE_NOTE; this is the deterministic backstop: drop any sentence,
+# line, or parenthetical that names platform internals. Mirrors the media-
+# signal strip: sanitize before persisting, never rely on the model.
+_VOCAB_CI_RE = re.compile(
+    r"(?i)\bin[-\s]?flight\b|\bpose_question\b|\brecord_answer\b|"
+    r"pose\s*/\s*teach|\b(?:pose|grade|teach)\s+mode\b|\bquestion slot\b"
+)
+_VOCAB_CS_RE = re.compile(r"\b(?:POSE|GRADE|TEACH)\b")
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
+_PAREN_RE = re.compile(r'\([^()]*\)')
+# Narrated tool-call JSON: a key like "name": / "arguments": on a line, or a
+# line of pure structural JSON punctuation. Kimi narrates tool calls as
+# bracketed JSON blocks in its text; blocks naming advance_step etc. carry
+# no vocab word, escaped the vocab pass, and left orphan '[' bubbles.
+_TOOL_JSON_KEY_RE = re.compile(
+    r'"(?:name|arguments|extracted_answer|question_text|question_type|'
+    r'reference_answer|options|source)"\s*:'
+)
+
+
+def _is_tool_json_line(line: str) -> bool:
+    s = line.strip()
+    if not s:
+        return False
+    if _TOOL_JSON_KEY_RE.search(s):
+        return True
+    return bool(re.fullmatch(r'[\[\]{}",:\s]+', s))
+
+
+def _has_engine_vocab(s: str) -> bool:
+    return bool(_VOCAB_CI_RE.search(s) or _VOCAB_CS_RE.search(s))
+
+
+def _scrub_engine_vocab(text: str) -> str:
+    """Remove engine-internal vocabulary and narrated tool-JSON from a
+    student-facing reply.
+
+    Drops tool-JSON lines and offending parentheticals first, then
+    offending sentences line-by-line. Returns '' when nothing survives
+    (the caller falls back to the placeholder). Clean text passes
+    through byte-identical.
+    """
+    if not text:
+        return text
+    if any(_is_tool_json_line(ln) for ln in text.split('\n')):
+        text = '\n'.join(
+            ln for ln in text.split('\n') if not _is_tool_json_line(ln))
+        text = re.sub(r'\n{3,}', '\n\n', text).strip('\n')
+    if not _has_engine_vocab(text):
+        return text
+    text = _PAREN_RE.sub(
+        lambda m: '' if _has_engine_vocab(m.group(0)) else m.group(0), text,
+    )
+    out_lines = []
+    for line in text.split('\n'):
+        if not _has_engine_vocab(line):
+            out_lines.append(line)
+            continue
+        kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
+                if not _has_engine_vocab(s)]
+        out_lines.append(' '.join(kept).strip())
+    # Drop punctuation-only residue. A narrated tool-call block like
+    # "[\n{...pose_question...}\n]" loses its content lines to the vocab
+    # filter but keeps the bare brackets — which then repeat as the whole
+    # bubble and deadlock the session (kimi, cycle-7 sweep). A blank result
+    # falls through to the slot-aware placeholder instead.
+    out_lines = [ln for ln in out_lines
+                 if not ln.strip() or re.search(r'[A-Za-z0-9]', ln)]
+    result = '\n'.join(out_lines)
+    if not re.search(r'[A-Za-z0-9]', result):
+        result = ''
+    result = re.sub(r'[ \t]+\n', '\n', result)
+    result = re.sub(r'\n{3,}', '\n\n', result).strip('\n')
+    if result != text:
+        logger.info(
+            "[simple_tutor] scrubbed engine vocabulary from reply "
+            "(%d -> %d chars)", len(text), len(result),
+        )
+    return result
 
 
 def _contains_lettered_options(text: str) -> bool:
@@ -823,6 +1087,69 @@ def _contains_lettered_options(text: str) -> bool:
     has_a = bool(re.search(r'(?mi)^\s*A[\)\.]', text))
     has_b = bool(re.search(r'(?mi)^\s*B[\)\.]', text))
     return has_a and has_b
+
+
+def _auto_pose_fallback(
+    *, session, step, family, tool_results, text_reply,
+) -> str:
+    """Deterministic net for dangling correct-verdict turns (cycle 9).
+
+    When the verdict was CORRECT but the turn is ending with no in-flight
+    question — the model declined both the forced Call-2 pose and the
+    prose question — the student gets a dead acknowledgement bubble
+    ("That's it — well done.") and burns a turn answering "yeah". Pose
+    the next unused pool question server-side instead: catalog authority
+    for options and correct letter, rendered into the reply.
+
+    Eval-only gating mirrors the other repairs: production (family None)
+    and Anthropic are untouched.
+    """
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return text_reply
+    if step is None:
+        return text_reply
+    verdict_correct = any(
+        tr.get('tool') in ('record_answer', 'auto_grade_fallback')
+        and (tr.get('result') or {}).get('recorded')
+        and (tr.get('result') or {}).get('verdict') == 'correct'
+        for tr in (tool_results or [])
+    )
+    if not verdict_correct:
+        return text_reply
+    from apps.tutoring.models import InFlightQuestion
+    if InFlightQuestion.objects.filter(session=session).exists():
+        return text_reply
+    from apps.tutoring.simple_tutor.tools import (
+        build_question_pool, handle_pose_question,
+    )
+    pool = build_question_pool(session, max_questions=2)
+    for q in pool:
+        opts = [
+            str(getattr(q, f'option_{letter}', '') or '').strip()
+            for letter in 'abcd'
+        ]
+        opts = [o for o in opts if o]
+        result = handle_pose_question(
+            session,
+            question_text=getattr(q, 'question_text', '') or '',
+            question_type=getattr(q, 'question_type', '') or 'short_answer',
+            reference_answer=str(getattr(q, 'correct_answer', '') or ''),
+            source='catalog',
+            options=opts or None,
+        )
+        if result.get('posed'):
+            tool_results.append({'tool': 'auto_pose_fallback', 'result': result})
+            slot = InFlightQuestion.objects.filter(session=session).first()
+            logger.info(
+                "[simple_tutor] auto_pose_fallback posed pool question "
+                "session=%s type=%s", session.pk, result.get('question_type'),
+            )
+            rendered = _render_slot_question(slot) if slot else ''
+            base = (text_reply or '').rstrip()
+            if not rendered:
+                return text_reply
+            return f"{base}\n\n{rendered}" if base else rendered
+    return text_reply
 
 
 # ============================================================================
@@ -942,6 +1269,64 @@ def _system_blocks_to_text(system_blocks) -> str:
     return '\n\n'.join(parts)
 
 
+# ── Transient-error retry for the tutor call ─────────────────────────────────
+# _call_llm returns None on ANY exception, and the engine then serves
+# _FALLBACK_REPLY — which, repeated, deadlocks the session. In the multi-turn
+# fix-check that turned transient cloud rate-limits into failures: kimi-k2-thinking
+# deadlocked 12/20 purely on Vertex `429 Resource exhausted` (and a `503`), not on
+# any tutoring flaw. A 429/503/529 is transient — retry it with backoff instead of
+# collapsing the turn. Also hardens production against Anthropic overloads.
+# Toggle SIMPLE_TUTOR_TRANSIENT_RETRY=0 disables it.
+_TRANSIENT_BACKOFF = [2, 5, 12]   # seconds between retries (3 retries max)
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    """True for retryable cloud failures — rate limits, overloads, 5xx, connection
+    blips — as opposed to permanent errors (400 / auth / schema) which must fail
+    fast so we don't burn backoff on something that will never succeed."""
+    name = type(exc).__name__.lower()
+    if any(k in name for k in (
+        'ratelimit', 'internalserver', 'serviceunavailable', 'apiconnection',
+        'apitimeout', 'timeout', 'overloaded',
+    )):
+        return True
+    for attr in ('status_code', 'code'):
+        try:
+            if int(getattr(exc, attr, None)) in (429, 500, 502, 503, 504, 529):
+                return True
+        except (TypeError, ValueError):
+            pass
+    msg = str(exc).lower()
+    return any(s in msg for s in (
+        '429', '503', '529', 'resource exhausted', 'overloaded', 'unavailable',
+        'please try again', 'rate limit', 'timed out', 'connection error',
+    ))
+
+
+def _invoke_with_transient_retry(fn, *, label: str):
+    """Call ``fn()``; on a transient error retry with backoff, else return None.
+    Never raises (preserves _call_llm's no-block contract)."""
+    retries = len(_TRANSIENT_BACKOFF) if (
+        os.getenv('SIMPLE_TUTOR_TRANSIENT_RETRY', '1').strip() != '0') else 0
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            msg = str(exc).strip().replace('\n', ' ')[:160]
+            if _is_transient_error(exc) and attempt < retries:
+                delay = _TRANSIENT_BACKOFF[attempt]
+                logger.warning(
+                    "_call_llm: %s transient %s (%s) — retry %d/%d in %ds",
+                    label, type(exc).__name__, msg, attempt + 1, retries, delay,
+                )
+                time.sleep(delay)
+                continue
+            logger.warning("_call_llm: %s failed: %s: %s",
+                           label, type(exc).__name__, msg)
+            return None
+    return None
+
+
 def _call_llm(
     *,
     system_blocks: list,
@@ -1050,26 +1435,21 @@ def _call_llm(
         except ImportError:
             logger.warning("_call_llm: anthropic SDK not installed")
             return None
-        try:
-            client = anthropic.Anthropic(api_key=api_key)
-            # tool_choice omitted entirely when None so the production
-            # Anthropic call is byte-identical (default is auto).
-            extra = {'tool_choice': tool_choice} if tool_choice else {}
-            return client.messages.create(
+        client = anthropic.Anthropic(api_key=api_key)
+        # tool_choice omitted entirely when None so the production
+        # Anthropic call is byte-identical (default is auto).
+        extra = {'tool_choice': tool_choice} if tool_choice else {}
+        return _invoke_with_transient_retry(
+            lambda: client.messages.create(
                 model=model_name,
                 max_tokens=max_tokens,
                 system=effective_blocks,
                 tools=tools,
                 messages=messages,
                 **extra,
-            )
-        except Exception as exc:
-            msg = str(exc).strip().replace('\n', ' ')[:200]
-            logger.warning(
-                "_call_llm: Anthropic call failed: %s: %s",
-                type(exc).__name__, msg,
-            )
-            return None
+            ),
+            label='Anthropic',
+        )
 
     # Any other provider (OpenAI / Gemini / local Ollama): route through
     # the pluggable client factory's generate_with_tools(), which returns
@@ -1088,22 +1468,17 @@ def _call_llm(
             type(client).__name__,
         )
         return None
-    try:
-        return client.generate_with_tools(
+    return _invoke_with_transient_retry(
+        lambda: client.generate_with_tools(
             messages=messages,
             system_prompt=_system_blocks_to_text(effective_blocks),
             tools=tools,
             max_tokens=max_tokens,
             sampling=sampling,
             tool_choice=tool_choice,
-        )
-    except Exception as exc:
-        msg = str(exc).strip().replace('\n', ' ')[:200]
-        logger.warning(
-            "_call_llm: generate_with_tools(%s) failed: %s: %s",
-            provider, type(exc).__name__, msg,
-        )
-        return None
+        ),
+        label=f'generate_with_tools({provider})',
+    )
 
 
 # ============================================================================
@@ -1148,6 +1523,16 @@ def _graded_empty_slot(tool_results: list[dict]) -> bool:
 # open-ended negatives ("do not…") make Gemini over-index and degrade its
 # arithmetic and logic, and the same phrasing is what the Qwen markdown
 # template already uses.
+_POSE_NEXT_INSTRUCTION = (
+    "The answer was CORRECT and the graded question is now closed. Keep the "
+    "session moving in this same reply: briefly acknowledge, then ask the "
+    "next question — call pose_question to register it (question_text, "
+    "question_type, options for MCQ, reference_answer) and include the same "
+    "question in your visible text. Prefer an unused question from "
+    "<question_pool>."
+)
+
+
 _POSE_REPAIR_INSTRUCTION = (
     "Register the question you just asked so the platform can grade the "
     "student's reply. Call pose_question once, with the exact question you "
@@ -1177,11 +1562,60 @@ def _missing_forced_tool(force_pose: bool, force_grade: bool, tool_results: list
 
 
 def _repair_instruction(missing_tool: str, user_input: str, assistant_text: str) -> str:
+    if missing_tool == 'pose_question_next':
+        return _POSE_NEXT_INSTRUCTION
     if missing_tool == 'pose_question':
         return _POSE_REPAIR_INSTRUCTION.format(
             assistant_text=(assistant_text or '').strip()[:1500])
     return _RECORD_REPAIR_INSTRUCTION.format(
         user_input=str(user_input or '').strip()[:1500])
+
+
+def _missing_tool_name(missing_tool: str) -> str:
+    """The actual tool behind a repair token ('pose_question_next' rides on
+    pose_question)."""
+    return ('pose_question' if missing_tool.startswith('pose_question')
+            else missing_tool)
+
+
+def _should_pose_next_after_correct(
+    family: str | None, mode: str, tool_results: list, step,
+) -> bool:
+    """Whether Call 2 must register the next question this turn.
+
+    2026-07-20 smoke run after the desync fixes: on correct-verdict GRADE
+    turns qwen wrote the next question in prose with no pose_question call
+    (tools=['record_answer'] only). The next student answer then met an
+    empty slot, and the forced pose on THAT turn grabbed a different pool
+    question — the model then fabricated a re-grade of the student's answer
+    against it ("You just answered '60' to [the 75° question]"). Requiring
+    the pose in the same turn as the correct verdict kills the desync at its
+    source; _ensure_posed_question_in_text then aligns the visible text.
+
+    Eval-only gating mirrors _should_force_pose: production (family None)
+    and Anthropic are untouched. Skipped on the lesson's last step, where a
+    forced question could collide with the exit-ticket handoff.
+    """
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return False
+    if mode != 'GRADE':
+        return False
+    if _pose_was_registered(tool_results):
+        return False
+    verdict_correct = any(
+        tr.get('tool') == 'record_answer'
+        and (tr.get('result') or {}).get('recorded')
+        and (tr.get('result') or {}).get('verdict') == 'correct'
+        for tr in (tool_results or [])
+    )
+    if not verdict_correct:
+        return False
+    if step is None:
+        return False
+    from apps.curriculum.models import LessonStep
+    return LessonStep.objects.filter(
+        lesson=step.lesson, order_index__gt=step.order_index,
+    ).exists()
 
 
 def _plan_call2(tools: list, missing_tool: str | None) -> tuple[list, dict | None]:
@@ -1195,8 +1629,9 @@ def _plan_call2(tools: list, missing_tool: str | None) -> tuple[list, dict | Non
     """
     if not missing_tool:
         return tools, None
-    only = [t for t in (tools or []) if t.get('name') == missing_tool]
-    return (only or tools), {'type': 'tool', 'name': missing_tool}
+    name = _missing_tool_name(missing_tool)
+    only = [t for t in (tools or []) if t.get('name') == name]
+    return (only or tools), {'type': 'tool', 'name': name}
 
 
 def _run_second_call(
@@ -1266,25 +1701,81 @@ def _run_second_call(
     # the side effects but use only the accumulated text. (No third call —
     # keeps latency bounded.)
     tool_results.extend(extra_tool_results)
-    if missing_tool and not _tool_was_called(extra_tool_results, missing_tool):
+    if missing_tool and not _tool_was_called(
+            extra_tool_results, _missing_tool_name(missing_tool)):
         logger.warning(
             "[simple_tutor] call2_repair: model still declined to call %s — "
             "this turn leaves no %s", missing_tool,
-            'gradable slot' if missing_tool == 'pose_question' else 'verdict',
+            'verdict' if missing_tool == 'record_answer' else 'gradable slot',
         )
     return (text_reply_2 or text_reply_1), True
+
+
+def _norm_loose(s: str) -> str:
+    """Lowercase + collapse whitespace + strip markdown emphasis — the loose
+    matching used for stem comparisons."""
+    s = (s or '').lower()
+    for ch in ('*', '_', '`'):
+        s = s.replace(ch, '')
+    return ' '.join(s.split())
+
+
+def _pose_before_record(session, tool_use_blocks) -> bool:
+    """Whether pose_question should dispatch before record_answer.
+
+    True only for the late-registration case: no slot exists, and a posed
+    stem appears in the previous tutor turn's visible text — i.e. the model
+    is registering the question the student actually answered. See
+    _dispatch_tools' docstring for the full decision table.
+    """
+    has_pose = any(getattr(b, 'name', '') == 'pose_question'
+                   for b in tool_use_blocks)
+    has_record = any(getattr(b, 'name', '') == 'record_answer'
+                     for b in tool_use_blocks)
+    if not (has_pose and has_record):
+        return not has_record  # order is irrelevant with ≤1 of the pair
+    if getattr(session, 'pk', None) is None:
+        return True  # detached session (mocked-handler tests): legacy order
+    from apps.tutoring.models import InFlightQuestion, SessionTurn
+    if InFlightQuestion.objects.filter(session=session).exists():
+        return False  # grade the question the student saw, then re-pose
+    prev = (
+        SessionTurn.objects
+        .filter(session=session, role=SessionTurn.Role.TUTOR)
+        .order_by('-created_at', '-pk')
+        .values_list('content', flat=True)
+        .first()
+    ) or ''
+    prev_norm = _norm_loose(prev)
+    for b in tool_use_blocks:
+        if getattr(b, 'name', '') != 'pose_question':
+            continue
+        params = getattr(b, 'input', None) or {}
+        stem = _norm_loose(str(params.get('question_text') or ''))[:30]
+        if stem and stem in prev_norm:
+            return True  # late registration — grade against this pose
+    return False
 
 
 def _dispatch_tools(*, session, response, figure_catalog):
     """Walk Anthropic response content. For each text block, accumulate
     the reply. For each tool_use block, dispatch to the right handler.
 
-    M12 dispatch order: pose_question runs FIRST (it writes the
-    in-flight slot), so a same-turn record_answer can read the freshly
-    posed question. Anthropic returns content blocks in the order the
-    model produced them, but the model can interleave — we re-order
-    pose_question → record_answer → other to make the semantics
-    deterministic.
+    Dispatch order encodes WHICH question the student's message answers
+    (cycle-7 fix — the old unconditional pose-first order graded the
+    student's answer to the PREVIOUS visible question against a freshly
+    posed NEXT question they had never seen):
+
+    - A slot exists at dispatch time → the student saw that question.
+      record_answer runs FIRST (grades the existing slot); a same-turn
+      pose then replaces the slot with the next question.
+    - No slot, and a posed stem matches the previous tutor turn's text →
+      late registration of the question the model narrated as prose
+      (M12 repair flow). pose runs first so record grades it.
+    - No slot and the posed stem is fresh → the pose is the NEXT
+      question. record runs first, finds no slot, and returns the
+      no-in-flight result; the model self-judges in Call 2 instead of
+      grading against a question the student never saw.
 
     Returns:
         (text_reply, tool_results, llm_called_record_answer)
@@ -1306,15 +1797,14 @@ def _dispatch_tools(*, session, response, figure_catalog):
         elif btype == 'tool_use':
             tool_use_blocks.append(block)
 
-    # Sort: pose_question first, then record_answer, then everything
-    # else preserving original order. This way handle_record_answer
-    # always sees the slot the LLM just wrote in the same turn.
+    pose_first = _pose_before_record(session, tool_use_blocks)
+
     def _priority(blk) -> int:
         n = getattr(blk, 'name', '')
         if n == 'pose_question':
-            return 0
+            return 0 if pose_first else 1
         if n == 'record_answer':
-            return 1
+            return 1 if pose_first else 0
         return 2
     sorted_blocks = sorted(
         enumerate(tool_use_blocks), key=lambda iblk: (_priority(iblk[1]), iblk[0]),

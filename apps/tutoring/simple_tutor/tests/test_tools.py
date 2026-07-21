@@ -830,3 +830,278 @@ class CurrentStepCorrectVerdictCountTest(DjangoTestCase):
         )
         # Engine is on step 0 — no correct verdicts on step 0 yet.
         self.assertEqual(_current_step_correct_verdict_count(session), 0)
+
+
+class AntiDesyncGuardTest(DjangoTestCase):
+    """Cycle-3 guard: posing a new question while an UNANSWERED one is in flight
+    (attempt_count==0) is blocked (swapping the question out from under the
+    student); a pivot after a wrong attempt (attempt_count>=1) is allowed."""
+
+    def test_blocks_pose_when_student_answered(self):
+        # Student ATTEMPTED an answer this turn → block posing over it (grade first).
+        session, _ = _make_session()
+        session.engine_state = {'_student_intent': 'answer'}
+        _seed_in_flight(session, question_text='Q1?', question_type='short_numeric',
+                        reference_answer='8', attempt_count=0)
+        r = handle_pose_question(session, question_text='Q2?',
+                                 question_type='short_numeric', reference_answer='9',
+                                 source='inline_authored')
+        self.assertFalse(r['posed'])
+        self.assertTrue(r.get('premature'))
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_text, 'Q1?')      # prior kept, not swapped
+        self.assertEqual(slot.reference_answer, '8')
+
+    def test_allows_pivot_when_student_declined(self):
+        # Student DECLINED ("idk" → non_engagement) → allow the tutor to pivot,
+        # else it gets trapped re-posing into a dead slot (the deadlock this fixes).
+        session, _ = _make_session()
+        session.engine_state = {'_student_intent': 'non_engagement'}
+        _seed_in_flight(session, question_text='Q1?', question_type='short_numeric',
+                        reference_answer='8', attempt_count=0)
+        r = handle_pose_question(session, question_text='Q2 easier?',
+                                 question_type='short_numeric', reference_answer='9',
+                                 source='inline_authored')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_text, 'Q2 easier?')
+
+    def test_allows_pivot_after_wrong_attempt(self):
+        session, _ = _make_session()
+        _seed_in_flight(session, question_text='Q1?', question_type='short_numeric',
+                        reference_answer='8', attempt_count=1)
+        r = handle_pose_question(session, question_text='Q2 easier?',
+                                 question_type='short_numeric', reference_answer='9',
+                                 source='inline_authored')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_text, 'Q2 easier?')   # pivot replaced it
+
+    def test_toggle_off_allows_replacement(self):
+        import os
+        session, _ = _make_session()
+        _seed_in_flight(session, question_text='Q1?', question_type='short_numeric',
+                        reference_answer='8', attempt_count=0)
+        os.environ['SIMPLE_TUTOR_ANTIDESYNC'] = '0'
+        try:
+            r = handle_pose_question(session, question_text='Q2?',
+                                     question_type='short_numeric', reference_answer='9',
+                                     source='inline_authored')
+        finally:
+            os.environ.pop('SIMPLE_TUTOR_ANTIDESYNC', None)
+        self.assertTrue(r['posed'])
+
+
+class RepeatPoseRejectionTest(DjangoTestCase):
+    """B2 (2026-07-18 bottleneck fixes) — posing a question the student
+    already answered correctly is rejected once with corrective feedback;
+    an immediate re-pose of the same stem is accepted so a turn is never
+    left without a gradable slot (the existing force-advance backstop
+    then walks the lesson forward)."""
+
+    def _mark_answered_correct(self, session, stem):
+        from apps.tutoring.simple_tutor.tools import _norm_q
+        es = session.engine_state or {}
+        es['answered_correct'] = [_norm_q(stem)]
+        session.engine_state = es
+        session.save(update_fields=['engine_state'])
+
+    def test_first_reask_rejected_with_guidance(self):
+        session, _ = _make_session()
+        stem = 'A student has a 70% probability of passing. P(not passing)?'
+        self._mark_answered_correct(session, stem)
+        r = handle_pose_question(
+            session, question_text=stem, question_type='short_numeric',
+            reference_answer='0.3', source='inline_authored',
+        )
+        self.assertFalse(r['posed'])
+        self.assertIn('already answered', r['error'])
+        self.assertFalse(
+            InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_second_reask_of_same_stem_accepted(self):
+        session, _ = _make_session()
+        stem = 'A student has a 70% probability of passing. P(not passing)?'
+        self._mark_answered_correct(session, stem)
+        r1 = handle_pose_question(
+            session, question_text=stem, question_type='short_numeric',
+            reference_answer='0.3', source='inline_authored',
+        )
+        self.assertFalse(r1['posed'])
+        r2 = handle_pose_question(
+            session, question_text=stem, question_type='short_numeric',
+            reference_answer='0.3', source='inline_authored',
+        )
+        self.assertTrue(r2['posed'])
+        self.assertTrue(
+            InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_fresh_question_not_rejected(self):
+        session, _ = _make_session()
+        self._mark_answered_correct(session, 'Old question already right?')
+        r = handle_pose_question(
+            session, question_text='A brand new question?',
+            question_type='short_numeric',
+            reference_answer='5', source='inline_authored',
+        )
+        self.assertTrue(r['posed'])
+
+
+class PoseValidationCycle8Test(DjangoTestCase):
+    """Cycle-8: pose-time validation catches slots that can never grade
+    correctly (qwen deadlock: short_numeric slot with reference 'D' marked
+    the correct answer '4' wrong forever)."""
+
+    def test_short_numeric_with_letter_reference_rejected(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Expected number of 6s in 24 rolls?',
+            question_type='short_numeric', reference_answer='D',
+            source='inline_authored')
+        self.assertFalse(r['posed'])
+        self.assertIn('numeric', r['error'])
+
+    def test_short_numeric_accepts_numbers_fractions_percent(self):
+        for ref in ('0.3', '3/4', '25%', '225°', ' 12 '):
+            session, _ = _make_session()
+            r = handle_pose_question(
+                session, question_text='Q?', question_type='short_numeric',
+                reference_answer=ref, source='inline_authored')
+            self.assertTrue(r['posed'], f'rejected valid numeric ref {ref!r}')
+
+    def test_mcq_option_letter_prefixes_stripped_at_pose(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='How many hearts?', question_type='mcq',
+            options=['A) 11', 'B. 3.8', 'c: 31', '12'],
+            reference_answer='A', source='inline_authored')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.options, ['11', '3.8', '31', '12'])
+
+    def test_mcq_without_options_rejected(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Expected number of 6s in 24 rolls?',
+            question_type='mcq', options=[],
+            reference_answer='A', source='catalog')
+        self.assertFalse(r['posed'])
+        self.assertIn('options', r['error'])
+
+    def test_mcq_with_four_options_still_posed(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Q?', question_type='mcq',
+            options=['4', '6', '8', '10'],
+            reference_answer='A', source='inline_authored')
+        self.assertTrue(r['posed'])
+
+    # ── cycle-8b: salvage malformed poses instead of rejecting ──────────
+    # Kimi cannot self-correct from a rejection (its Call-2 text scrubs to
+    # empty), so a rejected pose became a slotless "Let's keep going."
+    # deadlock loop — 12 deadlocks in the first cycle-8 kimi leg.
+
+    def test_optionless_mcq_with_numeric_ref_salvaged_as_short_numeric(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Expected number of 6s in 24 rolls?',
+            question_type='mcq', options=[],
+            reference_answer='4', source='catalog')
+        self.assertTrue(r['posed'])
+        self.assertEqual(r['question_type'], 'short_numeric')
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_type, 'short_numeric')
+        self.assertEqual(slot.reference_answer, '4')
+
+    def test_optionless_mcq_with_text_ref_salvaged_as_short_answer(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Which direction is 225 degrees?',
+            question_type='mcq', options=[],
+            reference_answer='southwest', source='inline_authored')
+        self.assertTrue(r['posed'])
+        self.assertEqual(r['question_type'], 'short_answer')
+
+    def test_optionless_mcq_with_letter_ref_still_rejected(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Q?', question_type='mcq', options=[],
+            reference_answer='B', source='catalog')
+        self.assertFalse(r['posed'])
+
+    def test_short_numeric_with_letter_ref_and_options_salvaged_as_mcq(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='Expected number of 6s?',
+            question_type='short_numeric', options=['2', '3', '4', '6'],
+            reference_answer='C', source='catalog')
+        self.assertTrue(r['posed'])
+        self.assertEqual(r['question_type'], 'mcq')
+
+    def test_optionless_mcq_with_letter_ref_salvaged_from_catalog(self):
+        # The catalog question exists with options; the model posed its stem
+        # verbatim but dropped the options. Adopt them.
+        session, questions = _make_session()
+        q = questions[0]
+        r = handle_pose_question(
+            session, question_text=q.question_text,
+            question_type='mcq', options=[],
+            reference_answer='B', source='catalog')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_type, 'mcq')
+        self.assertEqual(slot.options, ['alpha', 'beta', 'gamma', 'delta'])
+
+
+class CatalogLetterCoherenceTest(DjangoTestCase):
+    """Cycle-9: the prompt's MCQ letter-rotation rule made models re-letter
+    catalog questions whose option order is fixed — the slot's reference
+    letter then disagreed with the displayed options, and correct answers
+    were graded wrong for entire sessions (Beau Vallon: correct B rejected
+    six times). For a catalog-stem match, the catalog's correct TEXT is
+    the authority; the reference letter is derived from where that text
+    sits in the options actually shown."""
+
+    def test_same_order_wrong_letter_overridden(self):
+        session, questions = _make_session()
+        q = questions[0]  # options alpha/beta/gamma/delta, correct B
+        r = handle_pose_question(
+            session, question_text=q.question_text, question_type='mcq',
+            options=['alpha', 'beta', 'gamma', 'delta'],
+            reference_answer='C', source='catalog')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'B')
+
+    def test_rotated_options_letter_follows_correct_text(self):
+        session, questions = _make_session()
+        q = questions[0]
+        r = handle_pose_question(
+            session, question_text=q.question_text, question_type='mcq',
+            options=['beta', 'alpha', 'delta', 'gamma'],
+            reference_answer='C', source='catalog')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'A')  # 'beta' sits at A
+
+    def test_authored_question_keeps_model_letter(self):
+        session, _ = _make_session()
+        r = handle_pose_question(
+            session, question_text='A question the catalog has never seen?',
+            question_type='mcq',
+            options=['x', 'y', 'z', 'w'],
+            reference_answer='C', source='inline_authored')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'C')
+
+    def test_salvaged_options_adopt_catalog_letter(self):
+        session, questions = _make_session()
+        q = questions[0]
+        r = handle_pose_question(
+            session, question_text=q.question_text, question_type='mcq',
+            options=[], reference_answer='D', source='catalog')
+        self.assertTrue(r['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.options, ['alpha', 'beta', 'gamma', 'delta'])
+        self.assertEqual(slot.reference_answer, 'B')

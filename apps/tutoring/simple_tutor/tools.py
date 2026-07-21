@@ -350,6 +350,34 @@ def _current_step_correct_verdict_count(session: 'TutorSession') -> int:
     return count
 
 
+def _catalog_match_for_stem(session, question_text: str):
+    """(options, correct_letter) of the catalog question whose stem exactly
+    matches ``question_text`` (normalised), within this session's lesson.
+    None when no unambiguous match. Used to salvage optionless MCQ poses
+    and to keep the reference letter coherent with the displayed options."""
+    from apps.tutoring.models import ExitTicketQuestion
+    key = _norm_q(question_text)
+    if not key:
+        return None
+    lesson = getattr(session, 'lesson', None)
+    if lesson is None:
+        return None
+    matches = []
+    qs = ExitTicketQuestion.objects.filter(
+        exit_ticket__lesson=lesson, question_type='mcq',
+    )
+    for q in qs:
+        if _norm_q(q.question_text or '') == key:
+            opts = [
+                (getattr(q, f'option_{letter}', '') or '').strip()
+                for letter in 'abcd'
+            ]
+            letter = (q.correct_answer or '').strip().upper()
+            if len([o for o in opts if o]) >= 2 and letter in 'ABCD':
+                matches.append((opts, letter))
+    return matches[0] if len(matches) == 1 else None
+
+
 # ============================================================================
 # handle_pose_question — LLM-called: "I want to ask this question next"
 # ============================================================================
@@ -410,15 +438,191 @@ def handle_pose_question(
         )
         src = 'inline_authored'
 
-    # Normalise options — must be a list of strings.
+    # Normalise options — must be a list of strings. Strip any leading
+    # letter label the model baked into the option text ("A) 11" → "11");
+    # the platform adds letters at render time, and stored prefixes caused
+    # double-lettered options ("A) A) 11") throughout the cycle-7 sweeps.
+    from apps.tutoring.simple_tutor.grader import _OPT_PREFIX_RE
     opts = options or []
     if not isinstance(opts, list):
         opts = []
-    opts = [str(o)[:300] for o in opts]
+    opts = [_OPT_PREFIX_RE.sub('', str(o).strip())[:300] for o in opts]
+
+    # ── Malformed-pose salvage (cycle 8) ─────────────────────────────
+    # Two malformed shapes recur: an MCQ posed without its options (can
+    # neither render choices nor grade a typed value — the "you picked D"
+    # hallucination), and a short_numeric slot with a letter reference
+    # (the correct value can never grade correct). Salvage them into the
+    # nearest valid slot instead of rejecting: models that cannot act on
+    # corrective feedback (kimi's Call-2 text scrubs to empty) turned
+    # every rejection into a slotless placeholder deadlock — 12 deadlocks
+    # in the first cycle-8 kimi leg. Reject only when nothing gradable
+    # can be built.
+    from apps.tutoring.simple_tutor.grader import _option_number
+    non_empty_opts = [o for o in opts if o.strip()]
+    is_letter_ref = len(ref) == 1 and ref.upper() in ('A', 'B', 'C', 'D')
+    if qtype == 'mcq' and len(non_empty_opts) < 2:
+        if is_letter_ref:
+            # Most common malformed shape: a catalog MCQ posed by stem with
+            # its options dropped. The options AND the correct letter live
+            # in the catalog — adopt both by exact-normalised stem match
+            # (adopting only the options while keeping the model's letter
+            # re-creates the letter/order mismatch).
+            cat = _catalog_match_for_stem(session, qtext)
+            if cat:
+                opts, ref = cat
+                logger.info(
+                    "[simple_tutor] pose salvaged: optionless mcq options+"
+                    "letter adopted from catalog session=%s", session.pk,
+                )
+            else:
+                logger.info(
+                    "[simple_tutor] pose rejected: optionless mcq with "
+                    "letter ref session=%s", session.pk,
+                )
+                return {
+                    'posed': False,
+                    'error': 'mcq requires its options — pass all four '
+                             'option texts in `options`, or pose as '
+                             'short_numeric/short_answer with the answer '
+                             'value as reference_answer',
+                    'question_type': qtype,
+                }
+        else:
+            qtype = ('short_numeric' if _option_number(ref) is not None
+                     else 'short_answer')
+            opts = []
+            logger.info(
+                "[simple_tutor] pose salvaged: optionless mcq -> %s "
+                "session=%s", qtype, session.pk,
+            )
+    elif qtype == 'mcq' and is_letter_ref and len(non_empty_opts) >= 2:
+        # Letter/text coherence (cycle 9): the prompt's letter-rotation
+        # discipline made models re-letter CATALOG questions whose option
+        # order is fixed — the slot's reference letter then pointed at the
+        # wrong option and correct answers were graded wrong all session
+        # (Beau Vallon: correct B rejected six times, kimi+qwen cycle 8b).
+        # For a catalog-stem match, the catalog's correct TEXT is the
+        # authority; the letter is derived from where that text sits in
+        # the options actually being shown.
+        cat = _catalog_match_for_stem(session, qtext)
+        if cat is not None:
+            from apps.tutoring.simple_tutor.grader import _norm_option
+            cat_opts, cat_letter = cat
+            correct_text = _norm_option(cat_opts['ABCD'.index(cat_letter)])
+            posed_norm = [_norm_option(o) for o in opts]
+            if correct_text and correct_text in posed_norm:
+                derived = 'ABCD'[posed_norm.index(correct_text)]
+                if derived != ref.upper():
+                    logger.info(
+                        "[simple_tutor] ref letter overridden %s -> %s "
+                        "(catalog text authority) session=%s",
+                        ref, derived, session.pk,
+                    )
+                    ref = derived
+            else:
+                # Posed options don't contain the catalog's correct answer
+                # at all — the option set is untrustworthy; use the
+                # catalog's options and letter wholesale.
+                logger.info(
+                    "[simple_tutor] posed options missing catalog answer — "
+                    "catalog options+letter adopted session=%s", session.pk,
+                )
+                opts, ref = cat_opts, cat_letter
+    elif qtype == 'short_numeric' and _option_number(ref) is None:
+        if is_letter_ref and len(non_empty_opts) >= 2:
+            qtype = 'mcq'
+            logger.info(
+                "[simple_tutor] pose salvaged: short_numeric with letter "
+                "ref + options -> mcq session=%s", session.pk,
+            )
+        else:
+            logger.info(
+                "[simple_tutor] pose rejected: short_numeric with "
+                "non-numeric reference %r session=%s", ref[:40], session.pk,
+            )
+            return {
+                'posed': False,
+                'error': 'short_numeric requires a numeric reference_answer '
+                         '— pass the numeric value itself (e.g. "0.3" or '
+                         '"3/4"), or pose the question as mcq with its '
+                         'options',
+                'question_type': qtype,
+            }
+
+    # Anti-repetition, stage 1 (2026-07-18 sweep): posing a question the
+    # student already answered correctly wastes a turn — the sweep showed the
+    # same stem re-asked up to 4x per session with correct answers each time.
+    # Reject the FIRST such pose with corrective feedback so Call 2 can pick a
+    # fresh question. A re-pose of the same stem after a rejection is accepted
+    # (the turn must never be left without a gradable slot when the model has
+    # nothing else to ask) — stage 2, _note_pose_repetition below, then
+    # force-advances the step out of the loop.
+    if _antirepeat_enabled():
+        _key = _norm_q(qtext)
+        _es = getattr(session, 'engine_state', None) or {}
+        _answered = _es.get('answered_correct') if isinstance(_es, dict) else None
+        if isinstance(_answered, list) and _key in _answered:
+            _rejected = _es.get('repeat_rejected_stems')
+            if not isinstance(_rejected, list):
+                _rejected = []
+            if _key not in _rejected:
+                _es['repeat_rejected_stems'] = (
+                    _rejected + [_key])[-_ANSWERED_CORRECT_CAP:]
+                session.engine_state = _es
+                try:
+                    session.save(update_fields=['engine_state'])
+                except Exception:
+                    pass
+                logger.info(
+                    "[simple_tutor] repeat_pose rejected session=%s "
+                    "question=%r (already answered correctly)",
+                    session.pk, qtext[:60],
+                )
+                return {
+                    'posed': False,
+                    'error': 'repeat_question: the student already answered '
+                             'this exact question correctly earlier in the '
+                             'session — pose a different question from the '
+                             'pool, or continue to the next piece of content',
+                    'repeat_of_correct': True,
+                    'question_type': qtype,
+                }
 
     # Replace any prior in-flight question (analytics-log the orphan).
     prior = InFlightQuestion.objects.filter(session=session).first()
     if prior is not None:
+        import os
+        # Anti-desync (cycle 3): a prior question with attempt_count==0 was shown
+        # to the student and NOT yet answered. Posing a new one now swaps the
+        # question out from under them — they answer what they read, the platform
+        # grades the swap, and the lesson stalls. gemini did this 161x in one
+        # cycle-2 sweep (55% of its poses), driving 8 of its timeouts. A prior
+        # with attempt_count>=1 means the student tried and a pivot to an easier
+        # item is legitimate, so only the never-attempted case is blocked.
+        # Toggle SIMPLE_TUTOR_ANTIDESYNC=0 disables it.
+        _es_i = getattr(session, 'engine_state', None) or {}
+        _intent = _es_i.get('_student_intent') if isinstance(_es_i, dict) else None
+        # Only block when the student ATTEMPTED an answer this turn (intent
+        # 'answer' / 'answer_or_other') — then the model should grade it, not pose
+        # over it. If they DECLINED ('idk' → non_engagement / clarification /
+        # off_topic), allow the tutor to pivot to a new question; blocking there
+        # traps it re-posing into a dead slot (the cycle-3 anti-desync deadlock).
+        if os.getenv('SIMPLE_TUTOR_ANTIDESYNC', '1').strip() != '0' \
+           and (prior.attempt_count or 0) == 0 \
+           and _intent in ('answer', 'answer_or_other'):
+            logger.info(
+                "[simple_tutor] premature_pose blocked session=%s — student "
+                "answered an in-flight question; grade it first", session.pk,
+            )
+            return {
+                'posed': False,
+                'error': 'premature_pose: the student answered a question already '
+                         'in flight — grade their answer to it before posing a new '
+                         'one',
+                'premature': True,
+                'question_type': prior.question_type,
+            }
         logger.info(
             "[simple_tutor] orphan_in_flight session=%s prior_type=%s "
             "attempts=%s — replaced before grading",

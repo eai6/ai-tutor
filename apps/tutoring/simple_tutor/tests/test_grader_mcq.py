@@ -279,3 +279,39 @@ class NeedsFollowupDefaultTest(TestCase):
         # moves on; clarification mode is the LLM's job, not the grader's.
         r = _grade_mcq(_mcq('B'), 'nonsense')
         self.assertFalse(r.needs_followup)
+
+
+class ValueToLetterCycle8Test(TestCase):
+    """Cycle-8: a bare value that uniquely matches one option grades as
+    that option's letter — kills the 8-turn 'which letter?' nag loop
+    (kimi refusal_chain: student computed 225, tutor demanded the letter
+    for six more turns)."""
+
+    def _q(self, opts, correct):
+        return SimpleNamespace(
+            option_a=opts[0], option_b=opts[1],
+            option_c=opts[2], option_d=opts[3],
+            correct_answer=correct,
+        )
+
+    def test_unique_value_match_grades_as_letter(self):
+        q = self._q(['180°', '225°', '270°', '315°'], 'B')
+        r = _grade_mcq(q, '225')
+        self.assertEqual(r.verdict, Verdict.CORRECT)
+
+    def test_value_match_beats_positional_numeric(self):
+        # '2' is the VALUE of option B here — must not be read as
+        # "option 2" (positionally also B, so make the value sit at D).
+        q = self._q(['4', '6', '10', '2'], 'D')
+        r = _grade_mcq(q, '2')
+        self.assertEqual(r.verdict, Verdict.CORRECT)
+
+    def test_positional_still_works_when_no_value_match(self):
+        q = self._q(['red', 'blue', 'green', 'yellow'], 'B')
+        r = _grade_mcq(q, 'option 2')
+        self.assertEqual(r.verdict, Verdict.CORRECT)
+
+    def test_prefixed_option_text_still_value_matches(self):
+        q = self._q(['A) 11', 'B) 3.8', 'C) 31', 'D) 12'], 'A')
+        r = _grade_mcq(q, '11')
+        self.assertEqual(r.verdict, Verdict.CORRECT)

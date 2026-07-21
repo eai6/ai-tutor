@@ -88,11 +88,12 @@ class IsEnabledTest(DjangoTestCase):
     flippable at runtime without process restart.
     """
 
-    def test_default_off(self):
-        # Default env (no SIMPLE_TUTOR_ENGINE) → off
+    def test_default_on(self):
+        # Default env (no SIMPLE_TUTOR_ENGINE) → on: simple_tutor is the
+        # default engine since da8b57f.
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop('SIMPLE_TUTOR_ENGINE', None)
-            self.assertFalse(simple_tutor.is_enabled())
+            self.assertTrue(simple_tutor.is_enabled())
 
     def test_on_truthy(self):
         for val in ('on', 'true', 'True', '1', 'yes', 'simple', 'enabled'):
@@ -103,7 +104,7 @@ class IsEnabledTest(DjangoTestCase):
                 )
 
     def test_off_falsy(self):
-        for val in ('', 'off', 'false', '0', 'no', 'disabled', 'v1', 'maybe'):
+        for val in ('off', 'false', '0', 'no', 'disabled', 'v1', 'legacy', 'old'):
             with patch.dict(os.environ, {'SIMPLE_TUTOR_ENGINE': val}):
                 self.assertFalse(
                     simple_tutor.is_enabled(),
