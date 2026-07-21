@@ -144,7 +144,10 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "of position-feel and don't just write the right "
                         "answer second. If the last 2 MCQs in "
                         "<recent_turns> had correct=B, deliberately use A, "
-                        "C, or D for this one."
+                        "C, or D for this one. Rotation applies ONLY to "
+                        "questions you author: for catalog questions, pass "
+                        "the catalog's option order and correct letter "
+                        "unchanged."
                     ),
                 },
                 "source": {
@@ -391,7 +394,12 @@ this one MUST NOT be B. Pick A, C, or D.\n\
   * The three distractors must be plausible (a common student \
 misconception, a near-miss numeric value, an option that's correct \
 in a different context). Distractors aren't filler; they're the \
-diagnostic signal of WHY a student got it wrong.
+diagnostic signal of WHY a student got it wrong.\n\
+  * **This rotation applies ONLY to questions you author yourself.** \
+For a question taken from <question_pool> (source=catalog), keep the \
+option order AND the correct letter exactly as authored — re-lettering \
+a catalog question makes the platform grade the student's correct \
+choice as wrong.
 
 - **Adapt to the 5E phase** shown in <current_step>:
     * Engage     — hook the student with a curiosity-piquing question \
@@ -1172,6 +1180,17 @@ def _render_in_flight_block(in_flight_question) -> str:
     if ref:
         parts.append(
             f'  <reference_answer>{_escape_xml(ref)}</reference_answer>'
+        )
+    if attempts >= 3:
+        # Cycle-8: without this, sessions ground 15+ turns re-scaffolding
+        # one hard question against a disengaged student. The anti-desync
+        # guard already permits replacing a question after a wrong attempt.
+        parts.append(
+            '  <pivot_guidance>This question has had '
+            f'{attempts} unsuccessful attempts. Stop re-explaining it. '
+            'Pivot now: call pose_question with a strictly simpler '
+            'question on the same skill (it replaces this one), or '
+            'continue to the next piece of content.</pivot_guidance>'
         )
     parts.append("</in_flight_question>")
     return "\n".join(parts)
