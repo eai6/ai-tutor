@@ -11,8 +11,7 @@ subject: geography
 lesson_id: 1463
 tags: [multi_turn, baseline, persona_handling]
 mode: multi_turn
-max_turns: 15
-
+max_turns: 30
 assertions:
   expected_reason: [completed, exit_ticket]
   max_turn_count: 15

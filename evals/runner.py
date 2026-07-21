@@ -169,6 +169,12 @@ class RunResult:
     # production engine, the target of this eval) or 'conversational_tutor'
     # (legacy). Recorded so a run can never silently score the wrong engine.
     engine: str = ''
+    # Which model powered the tutor — TUTOR_MODEL_OVERRIDE when a sweep set
+    # it, else the active tutoring ModelConfig. Without this, identifying
+    # which model produced a run means matching file sizes against
+    # offline_eval result files (as the 2026-07-18 bottleneck analysis had
+    # to). Empty string when neither source resolves.
+    tutor_model: str = ''
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +466,27 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
 # Orchestration
 # ---------------------------------------------------------------------------
 
+def _tutor_model_spec() -> str:
+    """Resolve which model powers the tutor for this run, for the run
+    header. Sweep runs set TUTOR_MODEL_OVERRIDE; otherwise fall back to
+    the active tutoring ModelConfig. Fail-soft — never blocks a run."""
+    import os
+    spec = (os.environ.get('TUTOR_MODEL_OVERRIDE') or '').strip()
+    if spec:
+        return spec
+    try:
+        from apps.llm.models import ModelConfig
+        cfg = ModelConfig.objects.filter(
+            purpose=ModelConfig.Purpose.TUTORING, is_active=True,
+        ).first()
+        if cfg is not None:
+            return f"{cfg.provider}/{cfg.model_name}"
+    except Exception:
+        logger.warning("could not resolve tutoring ModelConfig for run header",
+                       exc_info=True)
+    return ''
+
+
 def _git_sha() -> str:
     try:
         out = subprocess.check_output(
@@ -641,6 +668,7 @@ def run(scenarios: list[Scenario]) -> RunResult:
         errored=sum(1 for r in results if r.error),
         results=results,
         engine=engine_name,
+        tutor_model=_tutor_model_spec(),
     )
 
 

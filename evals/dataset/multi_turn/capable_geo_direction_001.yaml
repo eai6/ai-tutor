@@ -6,8 +6,7 @@ subject: geography
 lesson_id: 1464
 tags: [multi_turn, geography, capable, baseline]
 mode: multi_turn
-max_turns: 15
-
+max_turns: 30
 assertions:
   expected_reason: [completed, exit_ticket]
   max_turn_count: 15

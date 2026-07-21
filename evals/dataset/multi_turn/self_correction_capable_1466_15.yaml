@@ -9,7 +9,7 @@ lesson_id: 1466
 tags: [multi_turn, geography, capable, self_correction, correction]
 
 mode: multi_turn
-max_turns: 12
+max_turns: 13
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

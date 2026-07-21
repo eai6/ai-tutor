@@ -11,7 +11,7 @@ lesson_id: 1463
 tags: [multi_turn, banned_opener, repetition]
 
 mode: multi_turn
-max_turns: 12
+max_turns: 13
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

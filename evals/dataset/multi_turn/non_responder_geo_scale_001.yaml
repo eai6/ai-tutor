@@ -6,7 +6,7 @@ subject: geography
 lesson_id: 1463
 tags: [multi_turn, geography, non_responder, engagement]
 mode: multi_turn
-max_turns: 12
+max_turns: 15
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

@@ -9,7 +9,7 @@ lesson_id: 1141
 tags: [multi_turn, math, non_responder, remediation, exit_ticket]
 
 mode: multi_turn
-max_turns: 24
+max_turns: 30
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

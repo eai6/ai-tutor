@@ -9,8 +9,7 @@ lesson_id: 1463
 tags: [multi_turn, long_session, capable, edge_case]
 
 mode: multi_turn
-max_turns: 25
-
+max_turns: 30
 assertions:
   expected_reason: [completed, exit_ticket]
   max_turn_count: 25

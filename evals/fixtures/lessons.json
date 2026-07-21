@@ -1386,10 +1386,10 @@
             },
             {
               "reason": "formula_error",
-              "message": "answer formula '1 if p_return > 0.5 else 0' failed to evaluate with params {'p_return': 0.6000000000000001}",
+              "message": "answer formula '1 if p_return > 0.5 else 0' failed to evaluate with params {'p_return': 0.6}",
               "question_text": "A tourist returns to Seychelles with probability {p_return}. Which is more likely: they return or they don't return?",
               "sample_params": {
-                "p_return": 0.6000000000000001
+                "p_return": 0.6
               },
               "question_index": 13
             },
@@ -1510,10 +1510,10 @@
             },
             {
               "reason": "formula_error",
-              "message": "blank 1 formula '1 if p_pass > 0.5 else 0' failed to evaluate with params {'p_pass': 0.9000000000000001}",
+              "message": "blank 1 formula '1 if p_pass > 0.5 else 0' failed to evaluate with params {'p_pass': 0.9}",
               "question_text": "A student passes with probability {p_pass}. They fail with probability ___. If {p_pass} > 0.5, passing is ___ (more/less",
               "sample_params": {
-                "p_pass": 0.9000000000000001
+                "p_pass": 0.9
               },
               "question_index": 28
             },
@@ -1591,7 +1591,7 @@
             },
             {
               "reason": "distractor_collision_after_retry",
-              "message": "distractor 1 ('p_confirm - 0.1') equals correct answer 0.44999999999999996 for params {'p_confirm': 0.55}",
+              "message": "distractor 1 ('p_confirm - 0.1') equals correct answer 0.45 for params {'p_confirm': 0.55}",
               "question_text": "A hotel booking is confirmed with probability {p_confirm}. Express the probability of NOT being confirmed as a decimal.",
               "question_index": 36
             },
@@ -1872,10 +1872,10 @@
             },
             {
               "reason": "formula_error",
-              "message": "answer formula '1 if dec1 > (frac2 / denom2) else 2' failed to evaluate with params {'dec1': 0.6000000000000001, 'frac2': 5, 'denom2': 8}",
+              "message": "answer formula '1 if dec1 > (frac2 / denom2) else 2' failed to evaluate with params {'dec1': 0.6, 'frac2': 5, 'denom2': 8}",
               "question_text": "Event A has probability {dec1}, Event B has probability {frac2}/{denom2}. Which is more likely?",
               "sample_params": {
-                "dec1": 0.6000000000000001,
+                "dec1": 0.6,
                 "frac2": 5,
                 "denom2": 8
               },
@@ -2468,7 +2468,7 @@
             },
             {
               "reason": "distractor_collision",
-              "message": "two distractors yielded the same value ([0.6125, 0.6326530612244898, 0.6125]) for params {'total': 80, 'red': 31}",
+              "message": "two distractors yielded the same value ([0.6125, 0.632653, 0.6125]) for params {'total': 80, 'red': 31}",
               "question_text": "In a bag of {total} marbles, {red} are red. A marble is drawn randomly. What is the probability it is red?",
               "sample_params": {
                 "red": 31,
@@ -2557,7 +2557,7 @@
             },
             {
               "reason": "distractor_collision",
-              "message": "two distractors yielded the same value ([403.0, 403.0, 30.923076923076923]) for params {'total_tickets': 400, 'your_tickets': 31, 'win_prob_num': 1, 'win_prob_denom': 13}",
+              "message": "two distractors yielded the same value ([403.0, 403.0, 30.923077]) for params {'total_tickets': 400, 'your_tickets': 31, 'win_prob_num': 1, 'win_prob_denom': 13}",
               "question_text": "A raffle has {total_tickets} tickets. You buy {your_tickets} tickets. The probability of winning is {win_prob_num}/{win_",
               "sample_params": {
                 "win_prob_num": 1,
@@ -2633,7 +2633,7 @@
             },
             {
               "reason": "distractor_collision_after_retry",
-              "message": "distractor 0 ('favorable * buyers / 100') equals correct answer 5.3999999999999995 for params {'favorable': 6, 'total': 100, 'buyers': 90}",
+              "message": "distractor 0 ('favorable * buyers / 100') equals correct answer 5.4 for params {'favorable': 6, 'total': 100, 'buyers': 90}",
               "question_text": "A lottery has {favorable} winning tickets out of {total}. If {buyers} people buy tickets, how many winners are expected?",
               "question_index": 42
             },
@@ -11560,7 +11560,7 @@
       "concept_tag": "Know that probability of event is written/described using fractions decimals or percentages",
       "answer_data": {
         "unit": "%",
-        "computed": 33.33333333333333,
+        "computed": 33.3333333333,
         "keywords": [
           "33.3333"
         ],
@@ -11719,12 +11719,12 @@
     "pk": 30663,
     "fields": {
       "question_text": "A weather forecast states there is a 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?",
-      "option_a": "2",
-      "option_b": "4",
-      "option_c": "3",
-      "option_d": "1",
+      "option_a": "The fraction 4/5",
+      "option_b": "The decimal 0.8",
+      "option_c": "The whole number 80",
+      "option_d": "The percentage 80%",
       "correct_answer": "D",
-      "explanation": "Percentages are most intuitive for public communication. 80% is immediately understood. The answer is representation 1 (percentage).",
+      "explanation": "Percentages are the most intuitive form for public communication — 80% is immediately understood.",
       "difficulty": "medium",
       "order_index": "7",
       "image": "",
@@ -11827,12 +11827,12 @@
     "pk": 30665,
     "fields": {
       "question_text": "A lottery has a 1% chance of winning. What does this mean in practical terms?",
-      "option_a": "2",
-      "option_b": "3",
-      "option_c": "4",
-      "option_d": "1",
+      "option_a": "Every 100th ticket bought always wins",
+      "option_b": "Winning is guaranteed after buying 100 tickets",
+      "option_c": "About 1 in every 10 tickets wins on average",
+      "option_d": "About 1 in every 100 tickets wins on average",
       "correct_answer": "D",
-      "explanation": "1% means 1 out of every 100 tickets win. The answer is representation 1.",
+      "explanation": "A 1% probability means about 1 winner per 100 tickets on average — it does not guarantee a win.",
       "difficulty": "medium",
       "order_index": "9",
       "image": "",
@@ -12755,12 +12755,12 @@
     "pk": 30679,
     "fields": {
       "question_text": "A weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?",
-      "option_a": "2",
-      "option_b": "4",
-      "option_c": "1",
-      "option_d": "3",
+      "option_a": "The fraction 1/2",
+      "option_b": "The ratio 1:1",
+      "option_c": "The percentage 50%",
+      "option_d": "The decimal 0.5",
       "correct_answer": "C",
-      "explanation": "Percentages are commonly used in weather forecasts and public communications. 1 is the correct choice (percentage).",
+      "explanation": "Formal weather reports state the chance of rain as a percentage.",
       "difficulty": "medium",
       "order_index": "23",
       "image": "",
@@ -12985,12 +12985,12 @@
     "pk": 30683,
     "fields": {
       "question_text": "Order these probabilities from smallest to largest: 2/6, 1/7, 30%.",
-      "option_a": "1",
-      "option_b": "4",
-      "option_c": "2",
-      "option_d": "3",
+      "option_a": "1/7, 30%, 2/6",
+      "option_b": "2/6, 30%, 1/7",
+      "option_c": "30%, 1/7, 2/6",
+      "option_d": "1/7, 2/6, 30%",
       "correct_answer": "A",
-      "explanation": "Convert to decimals: 2/6, 1/7, 30% = 30/100. Order them to find the answer.",
+      "explanation": "As decimals: 1/7 ≈ 0.14, 30% = 0.30, 2/6 ≈ 0.33 — so 1/7 < 30% < 2/6.",
       "difficulty": "hard",
       "order_index": "27",
       "image": "",
@@ -13355,7 +13355,7 @@
       "answer_data": {
         "pairs": [
           {
-            "left": "0.30000000000000004",
+            "left": "0.3",
             "right": "30%"
           },
           {
@@ -13608,10 +13608,10 @@
     "pk": 49492,
     "fields": {
       "question_text": "Which statement is correct about angles?",
-      "option_a": "180",
-      "option_b": "90",
-      "option_c": "360",
-      "option_d": "270",
+      "option_a": "Angles on a straight line sum to 360°",
+      "option_b": "Angles around a point sum to 180°",
+      "option_c": "Angles around a point sum to 360°",
+      "option_d": "Vertically opposite angles always sum to 90°",
       "correct_answer": "C",
       "explanation": "Angles around a point sum to 360°; angles on a straight line sum to 180°.",
       "difficulty": "medium",
@@ -13662,13 +13662,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 31858,
     "fields": {
-      "question_text": "A circular garden has area 251.20000000000002 m². What is its diameter? (Use π ≈ 3.14)",
+      "question_text": "A circular garden has area 251.2 m². What is its diameter? (Use π ≈ 3.14)",
       "option_a": "17.89 m",
       "option_b": "31.7 m",
       "option_c": "8.94 m",
       "option_d": "80 m",
       "correct_answer": "A",
-      "explanation": "From A = πr², we get r = √(A ÷ π). Then d = 2r = 2√(251.20000000000002 ÷ 3.14) = 17.89 m m.",
+      "explanation": "From A = πr², we get r = √(A ÷ π). Then d = 2r = 2√(251.2 ÷ 3.14) = 17.89 m m.",
       "difficulty": "hard",
       "order_index": "0",
       "image": "",
@@ -13679,7 +13679,7 @@
         "unit": " m",
         "computed": 17.89,
         "parameters": {
-          "a": 251.20000000000002
+          "a": 251.2
         },
         "correct_letter": "A"
       },
@@ -13918,7 +13918,7 @@
         ],
         "computed": [
           70.0,
-          770.0000000000001
+          770.0
         ],
         "parameters": {
           "bill": 700,
@@ -14729,7 +14729,7 @@
       "concept_tag": "Calculate a percentage of a whole number using the formula (percentage ÷ 100) × whole value",
       "answer_data": {
         "unit": " SCR",
-        "computed": 550.8474576271187,
+        "computed": 550.8474576271,
         "parameters": {
           "rate": 18,
           "final_price": 650
@@ -14920,12 +14920,12 @@
     "pk": 31889,
     "fields": {
       "question_text": "Which statement correctly distinguishes a chord from a diameter?",
-      "option_a": "4",
-      "option_b": "2",
-      "option_c": "1",
-      "option_d": "3",
+      "option_a": "A diameter is any chord, and every chord passes through the centre",
+      "option_b": "A chord and a diameter are two names for the radius",
+      "option_c": "A chord joins any two points on the circle; a diameter is the chord that passes through the centre",
+      "option_d": "A chord is always longer than a diameter",
       "correct_answer": "C",
-      "explanation": "A chord is any line segment connecting two points on a circle. A diameter is a special chord that passes through the center. Answer: 1.",
+      "explanation": "A chord is any segment joining two points on a circle; the diameter is the special chord through the centre.",
       "difficulty": "medium",
       "order_index": "31",
       "image": "",
@@ -16086,13 +16086,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 31917,
     "fields": {
-      "question_text": "A crab is caught with probability 0.7000000000000001. Express as a decimal the probability the crab is NOT caught.",
+      "question_text": "A crab is caught with probability 0.7. Express as a decimal the probability the crab is NOT caught.",
       "option_a": "",
       "option_b": "",
       "option_c": "",
       "option_d": "",
       "correct_answer": "",
-      "explanation": "If P(caught) = 0.7000000000000001, then P(not caught) = 1 - 0.7000000000000001 = 0.3.",
+      "explanation": "If P(caught) = 0.7, then P(not caught) = 1 - 0.7 = 0.3.",
       "difficulty": "medium",
       "order_index": "59",
       "image": "",
@@ -16101,12 +16101,12 @@
       "concept_tag": "Identify the complement of an event in a practical situation",
       "answer_data": {
         "unit": null,
-        "computed": 0.29999999999999993,
+        "computed": 0.3,
         "keywords": [
           "0.3"
         ],
         "parameters": {
-          "p_catch": 0.7000000000000001
+          "p_catch": 0.7
         },
         "model_answer": "0.3"
       },
@@ -16300,12 +16300,12 @@
     "pk": 31922,
     "fields": {
       "question_text": "In a right-angled triangle, the two legs are 8 cm and 4 cm. Which statement is true?",
-      "option_a": "4",
-      "option_b": "12",
-      "option_c": "32",
-      "option_d": "10",
+      "option_a": "The hypotenuse is shorter than 8 cm",
+      "option_b": "The hypotenuse is longer than 8 cm but shorter than 12 cm",
+      "option_c": "The hypotenuse is exactly 12 cm",
+      "option_d": "The hypotenuse is exactly 32 cm",
       "correct_answer": "B",
-      "explanation": "The hypotenuse must be longer than the sum of the two legs is false — actually, the hypotenuse is longer than either leg alone. The sum of the legs is 8 + 4 = 12.",
+      "explanation": "The hypotenuse is √(8² + 4²) = √80 ≈ 8.9 cm — longer than either leg but shorter than the sum of the legs (12 cm).",
       "difficulty": "easy",
       "order_index": "64",
       "image": "",
@@ -16519,12 +16519,12 @@
     "pk": 31928,
     "fields": {
       "question_text": "Which expansion verifies that (3 + m)(4 + n) is the correct factorisation?",
-      "option_a": "19",
-      "option_b": "7",
-      "option_c": "12",
-      "option_d": "8",
+      "option_a": "12 + 7mn",
+      "option_b": "7 + 3n + 4m + mn",
+      "option_c": "12 + 3n + 4m + mn",
+      "option_d": "12 + 4n + 3m",
       "correct_answer": "C",
-      "explanation": "(3 + m)(4 + n) expands to 34 + 3n + 4m + mn. The constant term is 12.",
+      "explanation": "(3 + m)(4 + n) = 12 + 3n + 4m + mn; the constant term is 3 × 4 = 12.",
       "difficulty": "medium",
       "order_index": "70",
       "image": "",
@@ -17136,7 +17136,7 @@
       "concept_tag": "Identify the values of a, b, and c in a quadratic expression of the form x² + bx + c",
       "answer_data": {
         "unit": null,
-        "computed": 6.561552812808831,
+        "computed": 6.5615528128,
         "keywords": [
           "6.56155"
         ],
@@ -17246,7 +17246,7 @@
       "concept_tag": "Identify the hypotenuse and two legs in a right-angled triangle diagram",
       "answer_data": {
         "unit": " m",
-        "computed": 8.94427190999916,
+        "computed": 8.94427191,
         "keywords": [
           "8.94427"
         ],
@@ -17725,7 +17725,7 @@
         ],
         "computed": [
           1.15,
-          114.99999999999999
+          115.0
         ],
         "parameters": {
           "cost": 100,
@@ -18150,7 +18150,7 @@
       "concept_tag": "Identify the probability value from a given problem statement",
       "answer_data": {
         "unit": null,
-        "computed": 0.046153846153846156,
+        "computed": 0.0461538462,
         "parameters": {
           "total": 130,
           "defective": 6
@@ -18299,7 +18299,7 @@
       "concept_tag": "Identify the center of a circle from a diagram",
       "answer_data": {
         "unit": "",
-        "computed": 0.4166666666666667,
+        "computed": 0.4166666667,
         "keywords": [
           "0.416667"
         ],
@@ -18691,7 +18691,7 @@
       "concept_tag": "Identify whether a given algebraic expression is a difference of two squares",
       "answer_data": {
         "unit": null,
-        "computed": 6.324555320336759,
+        "computed": 6.3245553203,
         "parameters": {
           "b_sq": 40
         },
@@ -18833,7 +18833,7 @@
       "concept_tag": "Isolate a variable by adding or subtracting the same term from both sides of a formula",
       "answer_data": {
         "unit": "",
-        "computed": 0.9333333333333333,
+        "computed": 0.9333333333,
         "parameters": {
           "S": 30,
           "a": 2
@@ -19272,7 +19272,7 @@
       "concept_tag": "Calculate simple interest for a given principal, rate, and time period",
       "answer_data": {
         "unit": " SCR",
-        "computed": 2163.2000000000003,
+        "computed": 2163.2,
         "keywords": [
           "2163.2"
         ],
@@ -19615,7 +19615,7 @@
           "25"
         ],
         "computed": [
-          26.666666666666668,
+          26.6666666667,
           25.0
         ],
         "parameters": {
@@ -20487,13 +20487,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 32030,
     "fields": {
-      "question_text": "An island's population is 4500 people. After 10 years, it grows by a multiplier of 1.2000000000000002. What is the new population?",
+      "question_text": "An island's population is 4500 people. After 10 years, it grows by a multiplier of 1.2. What is the new population?",
       "option_a": "",
       "option_b": "",
       "option_c": "",
       "option_d": "",
       "correct_answer": "",
-      "explanation": "New population = 4500 × 1.2000000000000002 = 5400 people.",
+      "explanation": "New population = 4500 × 1.2 = 5400 people.",
       "difficulty": "easy",
       "order_index": "172",
       "image": "",
@@ -20502,12 +20502,12 @@
       "concept_tag": "Identify a multiplier as a number that increases or decreases another quantity by a given factor",
       "answer_data": {
         "unit": null,
-        "computed": 5400.000000000001,
+        "computed": 5400.0,
         "keywords": [
           "5400"
         ],
         "parameters": {
-          "m": 1.2000000000000002,
+          "m": 1.2,
           "pop": 4500
         },
         "model_answer": "5400"
@@ -21020,8 +21020,8 @@
           "9.69536"
         ],
         "computed": [
-          9.695359714832659,
-          9.695359714832659
+          9.6953597148,
+          9.6953597148
         ],
         "parameters": {
           "b_sq": 94
@@ -21488,7 +21488,7 @@
       "concept_tag": "Calculate a percentage of a whole number using the formula (percentage ÷ 100) × whole value",
       "answer_data": {
         "unit": " SCR",
-        "computed": 133.33333333333331,
+        "computed": 133.3333333333,
         "keywords": [
           "133.333"
         ],
@@ -21852,12 +21852,12 @@
     "pk": 32065,
     "fields": {
       "question_text": "In a right triangle, the legs measure 10 m and 7 m. Which statement is true?",
-      "option_a": "4",
-      "option_b": "1",
-      "option_c": "2",
-      "option_d": "3",
+      "option_a": "The hypotenuse is shorter than 7 m",
+      "option_b": "The hypotenuse is longer than 10 m",
+      "option_c": "The hypotenuse is exactly 17 m",
+      "option_d": "The hypotenuse is exactly 3 m",
       "correct_answer": "B",
-      "explanation": "The hypotenuse c = √(10² + 7²) is always longer than either leg.",
+      "explanation": "c = √(10² + 7²) = √149 ≈ 12.2 m — longer than either leg, but shorter than the sum of the legs (17 m).",
       "difficulty": "medium",
       "order_index": "207",
       "image": "",
@@ -22117,7 +22117,7 @@
       "concept_tag": "Identify the hypotenuse and two legs in a right-angled triangle diagram",
       "answer_data": {
         "unit": "",
-        "computed": 10.63014581273465,
+        "computed": 10.6301458127,
         "keywords": [
           "10.6301"
         ],
@@ -22459,7 +22459,7 @@
         ],
         "computed": [
           0.6,
-          833.3333333333334
+          833.3333333333
         ],
         "parameters": {
           "final_price": 500,
@@ -22537,7 +22537,7 @@
       "concept_tag": "Identify the hypotenuse and legs in a right-angled triangle from a diagram or description",
       "answer_data": {
         "unit": " cm",
-        "computed": 7.810249675906654,
+        "computed": 7.8102496759,
         "keywords": [
           "7.81025"
         ],
@@ -23826,12 +23826,12 @@
     "pk": 32096,
     "fields": {
       "question_text": "Which statement best describes the difference between simple and compound interest?",
-      "option_a": "1",
-      "option_b": "2",
-      "option_c": "4",
-      "option_d": "3",
+      "option_a": "Simple interest is paid only on the principal; compound interest is paid on the principal plus accumulated interest",
+      "option_b": "Simple interest grows faster than compound interest over long periods",
+      "option_c": "Compound interest is calculated only on the principal",
+      "option_d": "Both always give the same total return",
       "correct_answer": "A",
-      "explanation": "Simple interest is calculated only on the principal. Compound interest is calculated on the principal AND accumulated interest, earning 'interest on interest'. Over time, compound interest yields a higher total return. The difference grows larger as time increases.",
+      "explanation": "Simple interest is calculated only on the principal. Compound interest also earns interest on accumulated interest, so it grows faster over time.",
       "difficulty": "medium",
       "order_index": "238",
       "image": "",
@@ -24970,7 +24970,7 @@
       "concept_tag": "Identify the hypotenuse and two legs in a right-angled triangle diagram",
       "answer_data": {
         "unit": " m",
-        "computed": 10.816653826391969,
+        "computed": 10.8166538264,
         "keywords": [
           "10.8167"
         ],
@@ -26208,7 +26208,7 @@
       "answer_data": {
         "pairs": [
           {
-            "left": "0.30000000000000004",
+            "left": "0.3",
             "right": "30%"
           },
           {
@@ -27276,11 +27276,11 @@
     "model": "tutoring.exitticketquestion",
     "pk": 49514,
     "fields": {
-      "question_text": "Which statement is true? A) Angles on a straight line sum to 180°. B) Angles around a point sum to 180°. C) Three angles always sum to 360°. D) Two angles on a straight line are always equal.",
-      "option_a": "2",
-      "option_b": "1",
-      "option_c": "3",
-      "option_d": "4",
+      "question_text": "Which statement is true?",
+      "option_a": "Angles around a point sum to 180°",
+      "option_b": "Angles on a straight line sum to 180°",
+      "option_c": "Any three angles always sum to 360°",
+      "option_d": "Two angles on a straight line are always equal",
       "correct_answer": "B",
       "explanation": "Angles on a straight line sum to 180°. Angles around a point sum to 360°.",
       "difficulty": "medium",
@@ -27892,7 +27892,7 @@
       "concept_tag": "Calculate expected outcome when the total numbers and the probability are given",
       "answer_data": {
         "unit": null,
-        "computed": 0.16666666666666666,
+        "computed": 0.1666666667,
         "keywords": [
           "0.166667"
         ],
@@ -27988,7 +27988,7 @@
     "model": "tutoring.exitticketquestion",
     "pk": 30388,
     "fields": {
-      "question_text": "The probability of success is 5 and there are 90 trials. Calculate the expected outcome.",
+      "question_text": "The probability of success is 5/9 and there are 90 trials. Calculate the expected outcome.",
       "option_a": "",
       "option_b": "",
       "option_c": "",
@@ -28295,7 +28295,7 @@
       "concept_tag": "Calculate expected outcome when the total numbers and the probability are given",
       "answer_data": {
         "unit": null,
-        "computed": 1.4210526315789473,
+        "computed": 1.4210526316,
         "parameters": {
           "defective": 3,
           "batch_size": 190,
@@ -28638,7 +28638,7 @@
           "25"
         ],
         "computed": [
-          26.666666666666668,
+          26.6666666667,
           25.0
         ],
         "parameters": {
@@ -29522,7 +29522,7 @@
       "concept_tag": "Calculate expected outcome when the total numbers and the probability are given",
       "answer_data": {
         "unit": null,
-        "computed": -3.3333333333333286,
+        "computed": -3.3333333333,
         "keywords": [
           "-3.33333"
         ],
@@ -29807,7 +29807,7 @@
       "concept_tag": "Calculate expected outcome when the total numbers and the probability are given",
       "answer_data": {
         "unit": null,
-        "computed": 0.046153846153846156,
+        "computed": 0.0461538462,
         "parameters": {
           "total": 130,
           "defective": 6
@@ -32796,7 +32796,7 @@
       "concept_tag": "Calculate the probability of single events",
       "answer_data": {
         "unit": null,
-        "computed": 0.6666666666666666,
+        "computed": 0.6666666667,
         "keywords": [
           "0.666667"
         ],
@@ -32856,7 +32856,7 @@
       "concept_tag": "Calculate the probability of single events",
       "answer_data": {
         "unit": "%",
-        "computed": 33.33333333333333,
+        "computed": 33.3333333333,
         "keywords": [
           "33.3333"
         ],
@@ -33198,10 +33198,10 @@
     "pk": 30499,
     "fields": {
       "question_text": "Event X has a probability of 20%. Event Y has a probability of 80%. Which statement is correct?",
-      "option_a": "4",
-      "option_b": "2",
-      "option_c": "1",
-      "option_d": "3",
+      "option_a": "Event X is more likely than Event Y",
+      "option_b": "Both events are equally likely",
+      "option_c": "Event Y is more likely than Event X",
+      "option_d": "Event X is certain not to happen",
       "correct_answer": "C",
       "explanation": "Event Y (80%) is more likely than Event X (20%) because 80 > 20.",
       "difficulty": "hard",
@@ -34528,7 +34528,7 @@
       "concept_tag": "Calculate the probability of single events",
       "answer_data": {
         "unit": null,
-        "computed": 0.6666666666666666,
+        "computed": 0.6666666667,
         "parameters": {
           "num": 4,
           "denom": 6
@@ -34709,7 +34709,7 @@
       "concept_tag": "Know and use the fact P (event happening) + P (event not happening) = 1 [use practical situations]",
       "answer_data": {
         "unit": null,
-        "computed": 0.19999999999999996,
+        "computed": 0.2,
         "keywords": [
           "0.2"
         ],
@@ -34922,13 +34922,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 30527,
     "fields": {
-      "question_text": "A crab is caught with probability 0.7000000000000001. Express as a decimal the probability the crab is NOT caught.",
+      "question_text": "A crab is caught with probability 0.7. Express as a decimal the probability the crab is NOT caught.",
       "option_a": "",
       "option_b": "",
       "option_c": "",
       "option_d": "",
       "correct_answer": "",
-      "explanation": "If P(caught) = 0.7000000000000001, then P(not caught) = 1 - 0.7000000000000001 = 0.3.",
+      "explanation": "If P(caught) = 0.7, then P(not caught) = 1 - 0.7 = 0.3.",
       "difficulty": "medium",
       "order_index": "4",
       "image": "",
@@ -34937,12 +34937,12 @@
       "concept_tag": "Know and use the fact P (event happening) + P (event not happening) = 1 [use practical situations]",
       "answer_data": {
         "unit": null,
-        "computed": 0.29999999999999993,
+        "computed": 0.3,
         "keywords": [
           "0.3"
         ],
         "parameters": {
-          "p_catch": 0.7000000000000001
+          "p_catch": 0.7
         },
         "model_answer": "0.3"
       },
@@ -35059,7 +35059,7 @@
       "answer_data": {
         "pairs": [
           {
-            "left": "0.30000000000000004 and 0.30000000000000004",
+            "left": "0.3 and 0.3",
             "right": "0.6"
           },
           {
@@ -35071,7 +35071,7 @@
             "right": "0.8"
           },
           {
-            "left": "0.30000000000000004 and 0.1",
+            "left": "0.3 and 0.1",
             "right": "0.4"
           }
         ],
@@ -35132,7 +35132,7 @@
       "answer_data": {
         "pairs": [
           {
-            "left": "30 attempts, P(catch) = 0.30000000000000004",
+            "left": "30 attempts, P(catch) = 0.3",
             "right": "21"
           },
           {
@@ -35209,7 +35209,7 @@
             "right": "0.4"
           },
           {
-            "left": "P(not event) when P(event) = 0.7000000000000001",
+            "left": "P(not event) when P(event) = 0.7",
             "right": "0.3"
           },
           {
@@ -35256,13 +35256,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 30532,
     "fields": {
-      "question_text": "The probability that it rains tomorrow is 0.7000000000000001. What is the probability that it does NOT rain?",
+      "question_text": "The probability that it rains tomorrow is 0.7. What is the probability that it does NOT rain?",
       "option_a": "",
       "option_b": "",
       "option_c": "",
       "option_d": "",
       "correct_answer": "",
-      "explanation": "Using P(event) + P(not event) = 1, we have P(not rain) = 1 - 0.7000000000000001 = 0.3.",
+      "explanation": "Using P(event) + P(not event) = 1, we have P(not rain) = 1 - 0.7 = 0.3.",
       "difficulty": "easy",
       "order_index": "9",
       "image": "",
@@ -35271,12 +35271,12 @@
       "concept_tag": "Know and use the fact P (event happening) + P (event not happening) = 1 [use practical situations]",
       "answer_data": {
         "unit": null,
-        "computed": 0.29999999999999993,
+        "computed": 0.3,
         "keywords": [
           "0.3"
         ],
         "parameters": {
-          "p_rain": 0.7000000000000001
+          "p_rain": 0.7
         },
         "model_answer": "0.3"
       },
@@ -35601,7 +35601,7 @@
       "concept_tag": "Know and use the fact P (event happening) + P (event not happening) = 1 [use practical situations]",
       "answer_data": {
         "unit": null,
-        "computed": 0.8333333333333334,
+        "computed": 0.8333333333,
         "parameters": {},
         "correct_letter": "C"
       },
@@ -35683,13 +35683,13 @@
     "model": "tutoring.exitticketquestion",
     "pk": 30540,
     "fields": {
-      "question_text": "A boat trip to La Digue is cancelled with probability 0.15000000000000002. What is the probability the trip goes ahead?",
+      "question_text": "A boat trip to La Digue is cancelled with probability 0.15. What is the probability the trip goes ahead?",
       "option_a": "0.85",
       "option_b": "1.15",
       "option_c": "0.075",
       "option_d": "0.15",
       "correct_answer": "A",
-      "explanation": "P(trip goes ahead) = 1 - P(cancelled) = 1 - 0.15000000000000002 = 0.85.",
+      "explanation": "P(trip goes ahead) = 1 - P(cancelled) = 1 - 0.15 = 0.85.",
       "difficulty": "medium",
       "order_index": "17",
       "image": "",
@@ -35700,7 +35700,7 @@
         "unit": null,
         "computed": 0.85,
         "parameters": {
-          "p_cancel": 0.15000000000000002
+          "p_cancel": 0.15
         },
         "correct_letter": "A"
       },
@@ -35754,7 +35754,7 @@
       "concept_tag": "Know and use the fact P (event happening) + P (event not happening) = 1 [use practical situations]",
       "answer_data": {
         "unit": null,
-        "computed": 0.19999999999999996,
+        "computed": 0.2,
         "parameters": {
           "p_stable": 0.8
         },
@@ -35815,7 +35815,7 @@
         ],
         "computed": [
           0.7,
-          0.30000000000000004
+          0.3
         ],
         "parameters": {
           "p_a": 0.7
@@ -36142,7 +36142,7 @@
           "1"
         ],
         "computed": [
-          0.19999999999999996,
+          0.2,
           1.0
         ],
         "parameters": {
@@ -36275,7 +36275,7 @@
             "right": "0.4"
           },
           {
-            "left": "P(event) = 0.7000000000000001",
+            "left": "P(event) = 0.7",
             "right": "0.3"
           },
           {
@@ -36407,7 +36407,7 @@
       "answer_data": {
         "pairs": [
           {
-            "left": "P(rain) = 0.6000000000000001",
+            "left": "P(rain) = 0.6",
             "right": "0.4"
           },
           {
@@ -36481,7 +36481,7 @@
             "right": "0.6"
           },
           {
-            "left": "P(catch fish) = 0.6000000000000001",
+            "left": "P(catch fish) = 0.6",
             "right": "0.4"
           },
           {

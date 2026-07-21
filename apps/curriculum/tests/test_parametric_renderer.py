@@ -863,3 +863,28 @@ class TestValidateTemplate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSampleOneFloatNoise(unittest.TestCase):
+    """Step-grid sampling must not leak float noise into rendered stems.
+
+    min + k*step in binary floating point produced values like
+    0.7000000000000001, which rendered verbatim into student-visible
+    question text ("The probability that it rains tomorrow is
+    0.7000000000000001") — found across the eval fixtures in the
+    2026-07-18 multi-turn sweep."""
+
+    def test_step_grid_values_are_clean(self):
+        import random
+        from apps.curriculum.parametric_renderer import (
+            ParameterSpec, _sample_one,
+        )
+        spec = ParameterSpec(name='p', type='float', min=0.1, max=0.9,
+                             step=0.1)
+        rng = random.Random(0)
+        for _ in range(200):
+            v = _sample_one(spec, rng)
+            self.assertEqual(
+                v, round(v, 6),
+                f'float noise leaked from step grid: {v!r}',
+            )

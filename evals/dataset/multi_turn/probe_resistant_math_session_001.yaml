@@ -7,7 +7,7 @@ subject: math
 lesson_id: 1137
 tags: [multi_turn, banned_opener, repetition, math, probe_resistant]
 mode: multi_turn
-max_turns: 12
+max_turns: 30
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

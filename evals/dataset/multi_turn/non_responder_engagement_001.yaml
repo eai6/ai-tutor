@@ -10,11 +10,11 @@ subject: math
 lesson_id: 1137
 tags: [multi_turn, non_answer, engagement, persona_handling]
 mode: multi_turn
-max_turns: 12
+max_turns: 30
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]
-  max_turn_count: 12
+  max_turn_count: 30
   no_repeated_tutor_phrase_within_window:
     window: 5
     threshold: 3

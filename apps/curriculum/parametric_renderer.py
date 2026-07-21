@@ -350,7 +350,9 @@ def _sample_one(spec: ParameterSpec, rng: random.Random) -> float:
         v = rng.uniform(spec.min, spec.max)
     if spec.type == "int":
         return int(round(v))
-    return float(v)
+    # min + k*step in binary floating point yields values like
+    # 0.7000000000000001 that render verbatim into question text.
+    return round(float(v), 10)
 
 
 def _check_constraint(expr: str, params: Dict[str, float]) -> bool:

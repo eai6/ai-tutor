@@ -25,6 +25,7 @@ See memory/eval_dataset_400_plan.md.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -38,6 +39,22 @@ from evals.matrix import (
 
 DATASET_ROOT = Path(__file__).parent / 'dataset'
 TEMPLATE = Path(__file__).parent / 'TEMPLATE_single_turn.yaml'
+FIXTURES_LESSONS = Path(__file__).parent / 'fixtures' / 'lessons.json'
+
+# Broken catalog content poisons every session that draws it, and the tutor
+# gets blamed for the confusion. Two classes surfaced in the 2026-07-18
+# multi-turn sweep:
+#   * float-noise stems ("probability 0.7000000000000001") — template
+#     parameters rendered from raw float arithmetic;
+#   * statement-asking MCQs whose four options are bare integers — the
+#     option texts were lost at generation ("Which statement is true?"
+#     A) 2  B) 1  C) 3  D) 4), leaving the student nothing to choose from.
+_FLOAT_NOISE_RE = re.compile(r'\d\.\d{9,}')
+_STATEMENT_STEM_RE = re.compile(
+    r'(?i)which (?:statement|representation|expansion|description|'
+    r'explanation|interpretation|of the following statements)'
+    r'|what does this mean|in practical terms|order these'
+)
 
 # Judge labels a scenario may assert on. Anything else is a typo that would
 # silently never fire.
@@ -235,6 +252,62 @@ def lint() -> list[str]:
                           f"archetype and no session shape — a rule without a "
                           f"scenario is a process bug")
 
+    errors.extend(_lint_fixture_questions())
+
+    return errors
+
+
+def _lint_fixture_questions() -> list[str]:
+    """Content-quality checks on the lesson/question fixtures the multi-turn
+    scenarios run against (see the constants at the top for the two classes
+    caught in the 2026-07-18 sweep)."""
+    errors: list[str] = []
+    if not FIXTURES_LESSONS.exists():
+        return errors
+    for obj in json.loads(FIXTURES_LESSONS.read_text()):
+        if obj.get('model') != 'tutoring.exitticketquestion':
+            continue
+        f = obj.get('fields') or {}
+        label = (f"fixtures/lessons.json: exit_ticket={f.get('exit_ticket')} "
+                 f"order={f.get('order_index')}")
+        for key in ('question_text', 'option_a', 'option_b', 'option_c',
+                    'option_d', 'correct_answer', 'explanation'):
+            val = f.get(key)
+            if isinstance(val, str) and _FLOAT_NOISE_RE.search(val):
+                errors.append(
+                    f"{label}: float-noise in {key} "
+                    f"({_FLOAT_NOISE_RE.search(val).group(0)}) — round "
+                    f"template parameters before rendering")
+        stem = f.get('question_text') or ''
+        opts = [str(f.get(f'option_{letter}') or '').strip()
+                for letter in 'abcd']
+        if (all(opts) and all(re.fullmatch(r'\d+', o) for o in opts)
+                and _STATEMENT_STEM_RE.search(stem)):
+            errors.append(
+                f"{label}: statement-asking MCQ with bare-integer options "
+                f"{opts} — the option texts were lost at generation")
+        # A probability stated as a bare number > 1 is an impossible
+        # premise (cycle-10: "The probability of success is 5" — the
+        # template dropped its /9 denominator; the tutor rightly
+        # challenged the premise while the grader held the broken ref,
+        # deadlocking the session).
+        m = re.search(
+            r'(?i)probability[^.?]*?\bis\s+(\d+(?:\.\d+)?)(?![\d%/])',
+            stem,
+        )
+        if m and float(m.group(1)) > 1:
+            errors.append(
+                f"{label}: probability stated as {m.group(1)} (> 1) — "
+                f"impossible premise; check the template's parameter "
+                f"rendering (dropped denominator or percent sign)")
+        params = (f.get('answer_data') or {}).get('parameters') or {}
+        if (isinstance(params.get('p'), (int, float))
+                and isinstance(params.get('p_denom'), (int, float))
+                and f"{params['p']}/{params['p_denom']}" not in stem):
+            errors.append(
+                f"{label}: parameters carry p={params['p']} "
+                f"p_denom={params['p_denom']} but the stem does not show "
+                f"the fraction — the template dropped the denominator")
     return errors
 
 

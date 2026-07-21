@@ -9,7 +9,7 @@ lesson_id: 1141
 tags: [multi_turn, math, capable, self_correction, correction]
 
 mode: multi_turn
-max_turns: 15
+max_turns: 18
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]

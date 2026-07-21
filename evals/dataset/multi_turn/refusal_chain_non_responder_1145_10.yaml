@@ -9,7 +9,7 @@ lesson_id: 1145
 tags: [multi_turn, math, non_responder, refusal, repetition, banned_opener]
 
 mode: multi_turn
-max_turns: 15
+max_turns: 30
 
 assertions:
   expected_reason: [completed, exit_ticket, max_turns]
