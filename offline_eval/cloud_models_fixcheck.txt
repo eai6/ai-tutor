@@ -1,0 +1,5 @@
+vertex_model_garden/zai-org/glm-4.7-maas                      glm-4.7                    global
+google/gemini-2.5-flash                                       gemini-2.5-flash
+vertex_model_garden/moonshotai/kimi-k2-thinking-maas          kimi-k2-thinking           global
+vertex_model_garden/qwen/qwen3-next-80b-a3b-instruct-maas     qwen3-next-80b-instruct    global
+vertex_model_garden/deepseek-ai/deepseek-v3.1-maas            deepseek-v3.1              us-west2

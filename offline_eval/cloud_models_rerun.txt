@@ -1,0 +1,2 @@
+google/gemini-2.5-flash                                       gemini-2.5-flash
+vertex_model_garden/moonshotai/kimi-k2-thinking-maas          kimi-k2-thinking           global

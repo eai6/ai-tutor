@@ -1,0 +1,2 @@
+vertex_model_garden/moonshotai/kimi-k2-thinking-maas          kimi-k2-thinking           global
+vertex_model_garden/qwen/qwen3-next-80b-a3b-instruct-maas     qwen3-next-80b-instruct    global
