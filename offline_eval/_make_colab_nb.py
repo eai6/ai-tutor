@@ -1,5 +1,5 @@
 """Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for the
-SINGLE-TURN evaluation (sweep 3) of the top-15 OSS Qwen models on an A100.
+SINGLE-TURN evaluation (sweep 3) of 13 OSS Qwen + Gemma models on an A100.
 
 Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5;
 judge = Anthropic Haiku 4.5 @ temp 0 (evals/scorers/llm_rubric.py default).
@@ -48,7 +48,7 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — **Single-turn Eval (sweep 3)** · top-15 OSS Qwen · Colab **A100**
+# AI Tutor — **Single-turn Eval (sweep 3)** · OSS Qwen + Gemma · Colab **A100**
 
 **Single graded turns**: each scenario seeds a conversation and one student
 utterance; the model produces the next tutor turn, which is then scored. Same
@@ -56,23 +56,25 @@ harness, same 200 scenarios, and the same judge as the laptop cloud sweep — so
 OSS models here land on **one leaderboard** with the Gemini / Vertex Model Garden
 models.
 
-- **Tutor** = OSS Qwen via Ollama (swapped per model with `TUTOR_MODEL_OVERRIDE`).
+- **Tutor** = OSS Qwen / Gemma via Ollama (swapped per model with `TUTOR_MODEL_OVERRIDE`).
 - **Judge** = Anthropic **Haiku 4.5** @ temp 0 (`evals/scorers/llm_rubric.py`
   default — identical to the cloud sweep, so scores are comparable).
 - **Engine** = `simple_tutor` (the production engine; `run_eval` prints a banner
   confirming it and errors on the legacy engine).
 
-**Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 9
-OSS Qwen models are split into 3 **disjoint** groups; pick this tab's group in the
-**Cell 7b** dropdown. Every tab writes per-model JSONs into the **same** Drive
-folder, so no two tabs score the same model and the board merges automatically:
+**Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 13
+OSS Qwen + Gemma models are split into 3 **disjoint size groups**; pick this tab's
+group in the **Cell 7b** dropdown. Every tab writes per-model JSONs into the
+**same** Drive folder, so no two tabs score the same model and the board merges
+automatically:
 
-- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b` *(small)*
-- **group2** — `qwen3:14b`, `qwen3:30b-a3b`, `qwen3.6:27b`
-- **group3** — `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`
+- **group1 — small (≤4B)** — `gemma3:1b`, `gemma2:2b`, `qwen3:4b`, `qwen3.5:4b`, `gemma3:4b`
+- **group2 — medium (9–14B)** — `gemma2:9b`, `qwen3.5:9b`, `gemma3:12b`, `qwen3:14b`
+- **group3 — large (27B+)** — `gemma2:27b`, `gemma3:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
 
 Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7 /
-top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit).
+top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit; Gemma runs the
+profile registered in `apps/llm/model_profiles`, or engine defaults if none).
 
 ## What changed since sweep 2
 
@@ -110,8 +112,9 @@ run is not comparable to the full-200 cloud run.)
 
 **Before you start**
 1. Runtime → **Change runtime type** → pick the GPU for THIS tab's group (High-RAM):
-   **group1** T4/L4 ok · **group2** L4 or A100 · **group3** **A100 80 GB or H100**
-   (72b q4 ~47 GB + 32b/35b need the big card — T4/L4 can't fit the 72b).
+   **group1** (≤4B) T4/L4 ok · **group2** (9–14B) L4 or A100 · **group3** (27B+)
+   **A100 40 GB** — the 27b dense and 35b-a3b MoE q4 weights (~17–22 GB) plus
+   KV cache need more than a T4/L4 comfortably provides.
 2. Add these **Colab Secrets** (🔑 sidebar), each *Notebook access ON*:
    - `GH_TOKEN` — GitHub **classic** PAT with **`repo`** scope (you're a collaborator on `{REPO}`).
    - `ANTHROPIC_API_KEY` — **required** (rubric judge, Haiku 4.5 @ temp 0).
@@ -231,41 +234,53 @@ print('sweep-1 JSONs available for the Cell-10b baseline:',
 
 md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
    "Set `GROUP` in the dropdown (right side in Colab) to `group1`, `group2`, or "
-   "`group3`. Each group is a **disjoint** set of 3 models; every tab writes to the "
+   "`group3`. The groups are **disjoint, size-based** sets; every tab writes to the "
    "same Drive folder so the board merges. Re-run this cell whenever you change it.\n"
    "\n"
-   "- **group1** — `qwen3.5:4b`, `qwen3:4b`, `qwen3.5:9b`  *(== the original "
-   "full-list tab; skip if that's already running)*\n"
-   "- **group2** — `qwen3:14b`, `qwen3:30b-a3b`, `qwen3.6:27b`\n"
-   "- **group3** — `qwen3.6:35b-a3b`, `qwen2.5:32b`, `qwen2.5:72b`")
+   "- **group1 — small (≤4B)** — `gemma3:1b`, `gemma2:2b`, `qwen3:4b`, "
+   "`qwen3.5:4b`, `gemma3:4b`\n"
+   "- **group2 — medium (9–14B)** — `gemma2:9b`, `qwen3.5:9b`, `gemma3:12b`, "
+   "`qwen3:14b`\n"
+   "- **group3 — large (27B+)** — `gemma2:27b`, `gemma3:27b`, `qwen3:30b-a3b`, "
+   "`qwen3.6:35b-a3b`")
 code(r"""
 GROUP = "group2"  #@param ["group1", "group2", "group3"]
 print("This tab will evaluate group:", GROUP)
 """)
 
 md("## Cell 8 — write THIS tab's matrix (from GROUP) + seed configs\n"
-   "Writes only the 3 models for the group picked in **Cell 7b** into `models.txt`, "
+   "Writes only the models for the group picked in **Cell 7b** into `models.txt`, "
    "then prints the per-family sampling each will use. `run_matrix.sh` (Cell 9) reads "
    "this file. Resume-safe: any model already scored on Drive is skipped.")
 code(r"""
-# Master registry (tag -> tier, note) + the 3 disjoint groups. Cell 7b's GROUP
-# picks which 3 models THIS tab writes into models.txt. Groups partition the 9
-# OSS Qwen models so parallel Colab tabs never score the same model.
+# Master registry (tag -> tier, note) + the 3 disjoint size groups. Cell 7b's
+# GROUP picks which models THIS tab writes into models.txt. Groups partition
+# the 13 OSS Qwen + Gemma models so parallel Colab tabs never score the same
+# model. group1 = small (<=4B), group2 = medium (9-14B), group3 = large (27B+).
 MODELS = {
-    'qwen3.5:4b':      ('big', ''),
+    # ── small (≤4B) ──
+    'gemma3:1b':       ('big', ''),
+    'gemma2:2b':       ('big', ''),
     'qwen3:4b':        ('big', ''),
+    'qwen3.5:4b':      ('big', ''),
+    'gemma3:4b':       ('big', ''),
+    # ── medium (9–14B) ──
+    'gemma2:9b':       ('big', ''),
     'qwen3.5:9b':      ('big', ''),
+    'gemma3:12b':      ('big', ''),
     'qwen3:14b':       ('big', ''),
+    # ── large (27B+; MoE tags sized by total params) ──
+    'gemma2:27b':      ('xl',  'Gemma 2 dense 27B'),
+    'gemma3:27b':      ('xl',  'Gemma 3 dense 27B'),
     'qwen3:30b-a3b':   ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
-    'qwen3.6:27b':     ('xl',  'Qwen3.6 dense 27B'),
     'qwen3.6:35b-a3b': ('xl',  'Qwen3.6 35B MoE (3B active)'),
-    'qwen2.5:32b':     ('xl',  ''),
-    'qwen2.5:72b':     ('xl',  'q4 ~47GB — needs an 80GB A100/H100; SLOWEST'),
 }
 GROUPS = {
-    'group1': ['qwen3.5:4b', 'qwen3:4b', 'qwen3.5:9b'],
-    'group2': ['qwen3:14b', 'qwen3:30b-a3b', 'qwen3.6:27b'],
-    'group3': ['qwen3.6:35b-a3b', 'qwen2.5:32b', 'qwen2.5:72b'],
+    'group1': ['gemma3:1b', 'gemma2:2b', 'qwen3:4b', 'qwen3.5:4b',
+               'gemma3:4b'],
+    'group2': ['gemma2:9b', 'qwen3.5:9b', 'gemma3:12b', 'qwen3:14b'],
+    'group3': ['gemma2:27b', 'gemma3:27b', 'qwen3:30b-a3b',
+               'qwen3.6:35b-a3b'],
 }
 GROUP = globals().get('GROUP')
 if GROUP is None:
@@ -400,9 +415,9 @@ Re-run **Cells 1–8b**, then **Cell 9** again. Because results live on Drive (C
 on the branch, re-run **Cell 2** (it re-clones).
 
 **Strategy for the slow tail.** The small + MoE models finish first (Cell 8 order).
-If the 27b/32b/**72b** dense models are too slow for your session budget, just stop —
+If the 27b dense models are too slow for your session budget, just stop —
 you'll still have a complete small/MoE board, and you can resume the big ones in a
-later session (or skip 72b entirely by commenting it out in Cell 8).
+later session (or trim group3 by commenting models out in Cell 8).
 
 To pull results back to your laptop: copy the JSONs + logs from
 `MyDrive/{DRIVE_FOLDER}/{SWEEP}/` into the repo's `{RESULTS}/` and run
