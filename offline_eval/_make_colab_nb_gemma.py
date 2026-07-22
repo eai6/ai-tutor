@@ -19,7 +19,7 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
-SWEEP = 'gemma_probe5_v2'   # v2: 12b/27b only, after the XML tool-markup scrub fix (v1 = first smoke)
+SWEEP = 'gemma_probe5_v3'   # v3: after mid-reply polarity + option-set repeat fixes (v2 = post-scrub, v1 = first smoke)
 
 # 5-scenario seeded smoke (same convention as the first multi-turn fix-check
 # probe). NOT comparable to the 20-scenario seed-5 fixcheck board — a different
