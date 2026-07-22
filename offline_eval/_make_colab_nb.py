@@ -14,7 +14,7 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'     # Drive folder that persists results
-SWEEP = 'oss13_mt'                           # results subfolder — one per sweep
+SWEEP = 'oss13_mt_v2'                        # v2 = qwen re-validation after the OSS-sweep nets (v1 = pre-fix baseline)
 
 # Multi-turn: each scenario is a FULL tutoring session (10-30 turns) driven by
 # the Anthropic-Haiku student simulator and scored by a Sonnet-4.6 session-level
