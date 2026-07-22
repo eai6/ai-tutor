@@ -128,16 +128,20 @@ def _has_ollama():
 def _install_ollama():
     if _has_ollama():
         return True
+    # PINNED to 0.30.7 — the version the gemma3-tools tool templates were
+    # verified against locally (5/5 probe passes). Colab's un-pinned latest
+    # silently stopped parsing the repackaged template's tool calls: the same
+    # model emitted zero tool_calls on every probe.
     for i in range(1, 4):
-        print(f'[ollama] install.sh attempt {i}', flush=True)
-        subprocess.run('curl -fsSL https://ollama.com/install.sh | sh', shell=True)
+        print(f'[ollama] install.sh attempt {i} (pinned 0.30.7)', flush=True)
+        subprocess.run('curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.30.7 sh', shell=True)
         if _has_ollama():
             return True
         time.sleep(5)
     for i in range(1, 4):
-        print(f'[ollama] direct-binary attempt {i} (ollama.com)', flush=True)
+        print(f'[ollama] direct-binary attempt {i} (ollama.com, pinned)', flush=True)
         subprocess.run('curl -fL --retry 5 --retry-all-errors --connect-timeout 30 '
-                       '-o /tmp/ollama.tgz https://ollama.com/download/ollama-linux-amd64.tgz',
+                       '-o /tmp/ollama.tgz "https://ollama.com/download/ollama-linux-amd64.tgz?version=0.30.7"',
                        shell=True)
         if os.path.exists('/tmp/ollama.tgz') and os.path.getsize('/tmp/ollama.tgz') > 1_000_000:
             subprocess.run('tar -C /usr -xzf /tmp/ollama.tgz', shell=True)
@@ -151,7 +155,7 @@ subprocess.Popen(['ollama', 'serve'],
                  stderr=subprocess.STDOUT)
 for _ in range(30):
     if subprocess.run(['bash', '-c', 'ollama list'], capture_output=True).returncode == 0:
-        print('ollama ready'); break
+        subprocess.run(['ollama', '--version']); print('ollama ready'); break
     time.sleep(2)
 else:
     print('ollama NOT ready — check /content/ollama.log')
