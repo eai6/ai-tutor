@@ -19,7 +19,7 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
-SWEEP = 'gemma_probe5'
+SWEEP = 'gemma_probe5_v2'   # v2: 12b/27b only, after the XML tool-markup scrub fix (v1 = first smoke)
 
 # 5-scenario seeded smoke (same convention as the first multi-turn fix-check
 # probe). NOT comparable to the 20-scenario seed-5 fixcheck board — a different
@@ -30,9 +30,14 @@ SEED = 0
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 MODE = f'--multi-turn --sample {SAMPLE} --seed {SEED}'
 
+# All four sizes run for a complete v1->v2 comparison. v1 smoke context:
+# 1b went 0/5 (protocol collapse — 2 tool calls across 5 sessions) and 4b
+# 1/5 (27 reveal-filter redactions in 5 sessions); 12b's v1 assert failures
+# were an engine scrub gap (XML tool markup), fixed in bbde312 — expect its
+# v2 to recover; 27b was mechanically clean (5/5 exit tickets, 3/5 pass).
 MODELS = [
-    ('okamototk/gemma3-tools:1b',  'big', 'gemma3 1B, tool-enabled template'),
-    ('okamototk/gemma3-tools:4b',  'big', 'gemma3 4B, tool-enabled template'),
+    ('okamototk/gemma3-tools:1b',  'big', 'gemma3 1B'),
+    ('okamototk/gemma3-tools:4b',  'big', 'gemma3 4B'),
     ('okamototk/gemma3-tools:12b', 'big', 'gemma3 12B'),
     ('okamototk/gemma3-tools:27b', 'xl',  'gemma3 27B — largest; needs the big card'),
 ]
@@ -76,13 +81,10 @@ sessions cleanly through the engine?* before spending a full sweep on it.
 
 > ⚠️ This is a smoke, not a board: n={SAMPLE} on a different draw than the
 > 20-scenario fixcheck benchmark. Read END-REASONS and the logs, not the pass
-> rate. If sessions run clean, promote Gemma into `colab_eval.ipynb`'s full
-> sweep.
+> rate. Gemma is evaluated HERE, separately from the qwen sweep, by design.
 
 **Runtime**: one tab covers all four models sequentially (weights are removed
-after each model). **Pick an A100 (40 GB)** so the 27b fits; on a T4/L4, run
-anyway — the first three models complete and the 27b will just be slow or
-skippable.
+after each model). **Pick an A100 (40 GB)** so the 27b fits.
 
 **Before you start** — Colab Secrets (🔑 sidebar), each *Notebook access ON*:
 - `GH_TOKEN` — GitHub classic PAT with `repo` scope (collaborator on `{REPO}`).
