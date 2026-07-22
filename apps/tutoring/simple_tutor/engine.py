@@ -1033,11 +1033,20 @@ _TOOL_JSON_KEY_RE = re.compile(
 )
 
 
+# XML-convention tool markup (gemma_probe5: the okamototk template emits
+# <tool_call>…</tool_call>, and fragments leaked into student text). The tag
+# regex tolerates a missing closing '>' — the observed leaks were truncated.
+_XML_TOOL_TAG_RE = re.compile(r'</?tool_(?:call|response)>?', re.I)
+_FENCE_LINE_RE = re.compile(r'^\s*```[\w-]*\s*$')
+
+
 def _is_tool_json_line(line: str) -> bool:
     s = line.strip()
     if not s:
         return False
     if _TOOL_JSON_KEY_RE.search(s):
+        return True
+    if _FENCE_LINE_RE.match(s):
         return True
     return bool(re.fullmatch(r'[\[\]{}",:\s]+', s))
 
@@ -1057,6 +1066,10 @@ def _scrub_engine_vocab(text: str) -> str:
     """
     if not text:
         return text
+    if _XML_TOOL_TAG_RE.search(text):
+        # Strip the tags inline (prose on the same line survives); the
+        # call payload between them is caught by the vocab/JSON passes.
+        text = _XML_TOOL_TAG_RE.sub('', text)
     if any(_is_tool_json_line(ln) for ln in text.split('\n')):
         text = '\n'.join(
             ln for ln in text.split('\n') if not _is_tool_json_line(ln))

@@ -832,3 +832,35 @@ class GemmaFamilyProfileTest(SimpleTestCase):
         p = get_model_profile('local_ollama/gemma3:4b')
         self.assertIsNotNone(p)
         self.assertEqual(p.family, 'gemma')
+
+
+class ScrubXmlToolCallTest(SimpleTestCase):
+    """gemma_probe5 smoke: the okamototk template's XML tool convention
+    leaked '</tool_call>' fragments and fenced blocks into student-visible
+    text, auto-failing no_tool_syntax_in_any_turn in 4 of 5 gemma3:12b
+    sessions. The scrub only knew the JSON shape."""
+
+    def test_fenced_xml_tool_block_removed(self):
+        text = ("Let's check the answer.\n"
+                "```xml\n"
+                "<tool_call>\n"
+                'pose_question(question_text="What is 2 + 2?")\n'
+                "</tool_call>\n"
+                "```\n"
+                "What is 2 + 2?")
+        out = _scrub_engine_vocab(text)
+        self.assertNotIn('tool_call', out)
+        self.assertNotIn('```', out)
+        self.assertIn("Let's check the answer.", out)
+        self.assertIn('What is 2 + 2?', out)
+
+    def test_stray_tag_fragment_stripped_inline(self):
+        out = _scrub_engine_vocab("Good try!</tool_call> Let's move on.")
+        self.assertNotIn('tool_call', out)
+        self.assertIn('Good try!', out)
+        self.assertIn("Let's move on.", out)
+
+    def test_unclosed_tag_fragment_stripped(self):
+        out = _scrub_engine_vocab("Nice work.</tool_call")
+        self.assertNotIn('tool_call', out)
+        self.assertIn('Nice work.', out)
