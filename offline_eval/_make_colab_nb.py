@@ -136,6 +136,7 @@ md(f"## Cell 2 — clone the repo (branch `{BRANCH}`) using the GH_TOKEN classic
 code(rf"""
 from google.colab import userdata
 import subprocess, os
+os.chdir('/content')   # a re-run's cwd may be the about-to-be-deleted clone
 tok = (userdata.get('GH_TOKEN') or '').strip()   # strip stray spaces/newlines
 assert tok and ' ' not in tok, "GH_TOKEN missing or contains a space — re-save the secret with no whitespace"
 url = f"https://{{tok}}@github.com/{REPO}.git"
