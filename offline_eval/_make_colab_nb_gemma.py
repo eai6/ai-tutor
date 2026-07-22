@@ -19,14 +19,14 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
-SWEEP = 'gemma_probe5_v3'   # v3: after mid-reply polarity + option-set repeat fixes (v2 = post-scrub, v1 = first smoke)
+SWEEP = 'gemma20_mt'        # 20-scenario board run (probe5 v1-v3 were the 5-scenario smokes)
 
-# 5-scenario seeded smoke (same convention as the first multi-turn fix-check
-# probe). NOT comparable to the 20-scenario seed-5 fixcheck board — a different
-# draw and far too small for score claims. It answers: do sessions RUN, POSE,
-# GRADE, and END cleanly?
-SAMPLE = 5
-SEED = 0
+# 20-scenario board run on the fixcheck draw — directly comparable to the
+# engine cycle board (gemini 18 / kimi 18 / qwen 17 of 20) and the OSS qwen
+# sweeps. The 5-scenario smokes (probe5 v1-v3) validated the integration;
+# this run produces real Gemma numbers.
+SAMPLE = 20
+SEED = 5
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 MODE = f'--multi-turn --sample {SAMPLE} --seed {SEED}'
 
@@ -79,9 +79,13 @@ sessions cleanly through the engine?* before spending a full sweep on it.
 - **Cell 8c probes tool support first** — an incapable model is dropped in
   seconds, not 20 sessions.
 
-> ⚠️ This is a smoke, not a board: n={SAMPLE} on a different draw than the
-> 20-scenario fixcheck benchmark. Read END-REASONS and the logs, not the pass
-> rate. Gemma is evaluated HERE, separately from the qwen sweep, by design.
+> This is the **board run**: the same {SAMPLE}-scenario seed-{SEED} draw as the
+> engine fix-cycle board and the OSS qwen sweeps, so these numbers read directly
+> against gemini 18/20, kimi 18/20, qwen3-next-80b 17/20, and the qwen OSS
+> results. Gemma is evaluated here, separately from the qwen sweep, by design.
+> Expectation from the smokes: 1b and 4b will score at the bottom (kept for the
+> complete family record — comment them out of MODELS to save their ~40
+> sessions of sim/judge cost if the record isn't needed).
 
 **Runtime**: one tab covers all four models sequentially (weights are removed
 after each model). **Pick an A100 (40 GB)** so the 27b fits.

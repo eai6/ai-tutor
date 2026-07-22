@@ -904,3 +904,52 @@ class MidReplyPolarityTest(DjangoTestCase):
         self.assertEqual(
             _align_reply_polarity(session, text, self._results('incorrect')),
             text)
+
+
+class RetryRenderVariationTest(DjangoTestCase):
+    """gemma v3: legal hint-ladder re-renders of the SAME question read as
+    'recycled the compass question three times' to the judge because each
+    re-render is verbatim. From the second attempt on, the rendered
+    question carries a rotated retry framing so consecutive re-renders
+    differ."""
+
+    def _slot(self, session, attempts):
+        return InFlightQuestion.objects.create(
+            session=session, question_text='Which compass point is 225°?',
+            question_type='mcq', options=['N', 'SW', 'SE', 'W'],
+            reference_answer='B', source='inline_authored',
+            attempt_count=attempts)
+
+    def test_first_ask_renders_plain(self):
+        session, _ = _make_session()
+        slot = self._slot(session, 0)
+        out = _render_slot_question(slot)
+        self.assertTrue(out.startswith('Which compass point'))
+
+    def test_retry_render_varies(self):
+        session, _ = _make_session()
+        slot = self._slot(session, 2)
+        out = _render_slot_question(slot)
+        self.assertIn('Which compass point is 225°?', out)
+        self.assertFalse(out.startswith('Which compass point'))
+
+
+class AutoPoseAfterRejectTest(DjangoTestCase):
+    """gemma v3 completeness: a repeat-rejected pose on a turn with NO
+    correct verdict and no surviving slot must still end with a question
+    — extend the auto-pose net beyond correct-verdict turns."""
+
+    def test_fallback_fires_on_rejected_pose_without_verdict(self):
+        from apps.tutoring.simple_tutor.engine import _auto_pose_fallback
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session()
+        step = LessonStep.objects.filter(lesson=session.lesson).first()
+        results = [{'tool': 'pose_question',
+                    'result': {'posed': False, 'repeat_of_correct': True,
+                               'error': 'repeat_question: ...'}}]
+        out = _auto_pose_fallback(
+            session=session, step=step, family='gemma',
+            tool_results=results, text_reply='Let me think of another one.')
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        self.assertIsNotNone(slot)
+        self.assertIn(slot.question_text, out)

@@ -872,12 +872,24 @@ _ACKS_NEUTRAL = (
 )
 
 
+_RETRY_FRAMES = (
+    "Same question, fresh angle:",
+    "Let's take another run at it:",
+    "One more look at this one:",
+)
+
+
 def _render_slot_question(slot) -> str:
     """Render the in-flight slot as the student-visible question block:
     the stem, plus lettered options for MCQ (unless the stem already
-    carries them)."""
+    carries them). From the second attempt on, a rotated retry framing
+    is prefixed so legal hint-ladder re-renders don't read as verbatim
+    repetition (gemma v3: "recycled the compass question three times")."""
     stem = (slot.question_text or '').strip()
     lines = [stem]
+    attempts = int(getattr(slot, 'attempt_count', 0) or 0)
+    if attempts >= 2:
+        lines = [f"{_RETRY_FRAMES[attempts % len(_RETRY_FRAMES)]} {stem}"]
     opt_lines = _render_slot_options(slot)
     if opt_lines and not _contains_lettered_options(stem):
         lines.extend(opt_lines)
@@ -1350,7 +1362,13 @@ def _auto_pose_fallback(
         and (tr.get('result') or {}).get('verdict') == 'correct'
         for tr in (tool_results or [])
     )
-    if not verdict_correct:
+    pose_rejected = any(
+        tr.get('tool') == 'pose_question'
+        and not (tr.get('result') or {}).get('posed')
+        and (tr.get('result') or {}).get('repeat_of_correct')
+        for tr in (tool_results or [])
+    )
+    if not (verdict_correct or pose_rejected):
         return text_reply
     from apps.tutoring.models import InFlightQuestion
     if InFlightQuestion.objects.filter(session=session).exists():
