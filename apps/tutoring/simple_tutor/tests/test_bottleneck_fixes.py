@@ -864,3 +864,43 @@ class ScrubXmlToolCallTest(SimpleTestCase):
         out = _scrub_engine_vocab("Nice work.</tool_call")
         self.assertNotIn('tool_call', out)
         self.assertIn('Nice work.', out)
+
+
+class MidReplyPolarityTest(DjangoTestCase):
+    """gemma_probe5_v2: verdict contradictions escape the opener-level
+    aligner by sitting mid-reply — 27b said "That's right – 50 is
+    correct!" on an INCORRECT verdict (twice), and 12b told a correctly-
+    answering student they "selected A instead of B". Sentence-level pass."""
+
+    def _results(self, verdict):
+        return [{'tool': 'record_answer',
+                 'result': {'recorded': True, 'verdict': verdict}}]
+
+    def test_mid_reply_affirmation_dropped_on_incorrect(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        text = ("Let's look at this together. That’s right – 50 is "
+                "correct! Now think about what probability times total "
+                "gives you.")
+        out = _align_reply_polarity(session, text, self._results('incorrect'))
+        self.assertNotIn('50 is correct', out)
+        self.assertIn('probability times total', out)
+
+    def test_mid_reply_denial_dropped_on_correct(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        text = ("You got the calculation spot-on: 2 * 500 = 1000. "
+                "Looking at your working, you selected A instead of B as "
+                "the final answer. Keep going.")
+        out = _align_reply_polarity(session, text, self._results('correct'))
+        self.assertNotIn('instead of B', out)
+        self.assertIn('Keep going', out)
+
+    def test_consistent_mid_reply_untouched(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        text = ('Not quite yet. The correct approach starts from the total. '
+                'What do the two probabilities add up to?')
+        self.assertEqual(
+            _align_reply_polarity(session, text, self._results('incorrect')),
+            text)

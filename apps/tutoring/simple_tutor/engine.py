@@ -1171,6 +1171,17 @@ def _dedupe_reply(session, text_reply: str) -> str:
     return f"{line}\n\n{text_reply}"
 
 
+# Mid-reply verdict contradictions (gemma_probe5_v2): strong assertions of
+# the WRONG polarity anywhere in the reply — "That's right – 50 is correct!"
+# on an incorrect verdict; "you selected A instead of B" on a correct one.
+_MID_AFFIRM_RE = re.compile(
+    r"(?i)\b(?:that[’']?s right\b|(?:is|was|are) correct[.!]|"
+    r"exactly right\b|you[’']?re (?:right|correct)\b|spot[- ]on\b)")
+_MID_DENY_RE = re.compile(
+    r"(?i)\b(?:you (?:picked|selected|chose)\s+\S{1,16}\s+instead of\b|"
+    r"that[’']?s (?:not right|wrong|incorrect)\b|"
+    r"(?:isn[’']?t|is not|wasn[’']?t) (?:right|correct)\b)")
+
 _NEG_OPENER_RE = re.compile(
     r"^(?:not quite|that'?s not|not this time|incorrect|close, but|sorry|"
     r"hmm, not|no[,—: ])", re.I)
@@ -1192,25 +1203,47 @@ def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
     verdict = _turn_verdict(tool_results)
     if verdict not in ('correct', 'incorrect') or not text_reply:
         return text_reply
-    stripped = text_reply.lstrip()
+    out = text_reply
+    stripped = out.lstrip()
     if verdict == 'correct' and _NEG_OPENER_RE.match(stripped):
         acks = _ACKS_CORRECT
     elif verdict == 'incorrect' and _POS_OPENER_RE.match(stripped):
         acks = _ACKS_INCORRECT
     else:
-        return text_reply
-    m = _FIRST_SENTENCE_END_RE.search(stripped)
-    rest = stripped[m.end():].lstrip() if m else ''
-    from apps.tutoring.models import SessionTurn
-    idx = SessionTurn.objects.filter(session=session).count()
-    ack = acks[idx % len(acks)]
-    logger.info(
-        "[simple_tutor] polarity_align: %s opener replaced on %s verdict "
-        "session=%s",
-        'negative' if verdict == 'correct' else 'positive', verdict,
-        session.pk,
-    )
-    return f"{ack} {rest}".strip()
+        acks = None
+    if acks is not None:
+        m = _FIRST_SENTENCE_END_RE.search(stripped)
+        rest = stripped[m.end():].lstrip() if m else ''
+        from apps.tutoring.models import SessionTurn
+        idx = SessionTurn.objects.filter(session=session).count()
+        ack = acks[idx % len(acks)]
+        logger.info(
+            "[simple_tutor] polarity_align: %s opener replaced on %s "
+            "verdict session=%s",
+            'negative' if verdict == 'correct' else 'positive', verdict,
+            session.pk,
+        )
+        out = f"{ack} {rest}".strip()
+
+    # Sentence-level pass: contradictions that sit mid-reply.
+    pat = _MID_AFFIRM_RE if verdict == 'incorrect' else _MID_DENY_RE
+    if pat.search(out):
+        lines = []
+        for line in out.split('\n'):
+            if not pat.search(line):
+                lines.append(line)
+                continue
+            kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
+                    if not pat.search(s)]
+            lines.append(' '.join(kept).strip())
+        out = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines)).strip('\n')
+        logger.info(
+            "[simple_tutor] polarity_align: mid-reply %s dropped on %s "
+            "verdict session=%s",
+            'affirmation' if verdict == 'incorrect' else 'denial', verdict,
+            session.pk,
+        )
+    return out
 
 
 _ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)

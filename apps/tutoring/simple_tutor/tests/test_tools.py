@@ -1105,3 +1105,41 @@ class CatalogLetterCoherenceTest(DjangoTestCase):
         slot = InFlightQuestion.objects.get(session=session)
         self.assertEqual(slot.options, ['alpha', 'beta', 'gamma', 'delta'])
         self.assertEqual(slot.reference_answer, 'B')
+
+
+class OptionSetRepeatTest(DjangoTestCase):
+    """gemma_probe5_v2: 12b re-asked an already-correct MCQ three times
+    with reworded stems — the verbatim _norm_q guard never fired. An MCQ
+    with the SAME option set is the same question regardless of stem
+    wording; a variant with different options (changed numbers) is not."""
+
+    def _grade_correct(self, session, *, stem, options, ref):
+        handle_pose_question(
+            session, question_text=stem, question_type='mcq',
+            options=options, reference_answer=ref, source='inline_authored')
+        handle_record_answer(session, extracted_answer=ref)
+
+    def test_reworded_stem_same_options_rejected(self):
+        session, _ = _make_session()
+        opts = ['breaking rock without chemical change', 'dissolving by acid',
+                'plant root growth', 'oxidation of minerals']
+        self._grade_correct(
+            session, stem='What is physical weathering?', options=opts, ref='A')
+        r = handle_pose_question(
+            session, question_text='Which option best defines physical '
+            'weathering of rocks?', question_type='mcq',
+            options=list(opts), reference_answer='A',
+            source='inline_authored')
+        self.assertFalse(r['posed'])
+        self.assertIn('already answered', r['error'])
+
+    def test_different_options_still_allowed(self):
+        session, _ = _make_session()
+        self._grade_correct(
+            session, stem='Angles on a line: x + 120 = 180. x?',
+            options=['60', '90', '120', '180'], ref='A')
+        r = handle_pose_question(
+            session, question_text='Angles on a line: x + 140 = 180. x?',
+            question_type='mcq', options=['40', '90', '140', '180'],
+            reference_answer='A', source='inline_authored')
+        self.assertTrue(r['posed'])

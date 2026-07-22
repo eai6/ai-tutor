@@ -76,9 +76,25 @@ def _antirepeat_enabled() -> bool:
     return os.getenv('SIMPLE_TUTOR_ANTIREPEAT', '1').strip() != '0'
 
 
-def _record_answered_correct(session: 'TutorSession', question_text: str) -> None:
-    """Remember a question the student just answered correctly, so a later exact
-    re-ask can be detected. Guarded read-copy-mutate-save on engine_state."""
+def _norm_optset(options) -> str | None:
+    """Order-insensitive signature of an MCQ's option set. A re-ask with a
+    reworded stem but the SAME options is the same question (gemma_probe5_v2:
+    12b re-asked an answered MCQ three times, reworded past the verbatim
+    stem guard); a variant with changed numbers has different options and
+    stays allowed."""
+    from apps.tutoring.simple_tutor.grader import _norm_option
+    opts = [_norm_option(str(o)) for o in (options or []) if str(o).strip()]
+    if len(opts) < 2:
+        return None
+    return 'optset:' + '|'.join(sorted(opts))
+
+
+def _record_answered_correct(
+    session: 'TutorSession', question_text: str, options=None,
+) -> None:
+    """Remember a question the student just answered correctly, so a later
+    re-ask can be detected — by exact stem, and for MCQs by option set.
+    Guarded read-copy-mutate-save on engine_state."""
     key = _norm_q(question_text)
     if not key:
         return
@@ -90,6 +106,9 @@ def _record_answered_correct(session: 'TutorSession', question_text: str) -> Non
         answered = []
     if key not in answered:
         answered.append(key)
+    okey = _norm_optset(options)
+    if okey and okey not in answered:
+        answered.append(okey)
     es['answered_correct'] = answered[-_ANSWERED_CORRECT_CAP:]
     # A fresh correct answer ends any repeat streak.
     es['repeat_pose_streak'] = 0
@@ -101,7 +120,10 @@ def _record_answered_correct(session: 'TutorSession', question_text: str) -> Non
                        "session=%s", getattr(session, 'pk', None))
 
 
-def _note_pose_repetition(session: 'TutorSession', question_text: str) -> bool:
+def _note_pose_repetition(
+    session: 'TutorSession', question_text: str, options=None,
+    question_type: str = '',
+) -> bool:
     """Called on every pose. Returns True and sets a pending-advance flag when the
     model has now re-asked an already-correct question _REPEAT_STREAK_TO_ADVANCE
     times in a row — the signal to force the lesson forward. Returns False for a
@@ -112,7 +134,9 @@ def _note_pose_repetition(session: 'TutorSession', question_text: str) -> bool:
     if not isinstance(es, dict):
         return False
     answered = es.get('answered_correct')
-    is_repeat = isinstance(answered, list) and _norm_q(question_text) in answered
+    okey = _norm_optset(options) if question_type == 'mcq' else None
+    is_repeat = isinstance(answered, list) and (
+        _norm_q(question_text) in answered or (okey and okey in answered))
     streak = int(es.get('repeat_pose_streak') or 0)
     force = False
     if is_repeat:
@@ -560,15 +584,19 @@ def handle_pose_question(
     # force-advances the step out of the loop.
     if _antirepeat_enabled():
         _key = _norm_q(qtext)
+        _okey = _norm_optset(opts) if qtype == 'mcq' else None
         _es = getattr(session, 'engine_state', None) or {}
         _answered = _es.get('answered_correct') if isinstance(_es, dict) else None
-        if isinstance(_answered, list) and _key in _answered:
+        _hit = (isinstance(_answered, list)
+                and (_key in _answered or (_okey and _okey in _answered)))
+        if _hit:
+            _hitkey = _key if _key in _answered else _okey
             _rejected = _es.get('repeat_rejected_stems')
             if not isinstance(_rejected, list):
                 _rejected = []
-            if _key not in _rejected:
+            if _hitkey not in _rejected:
                 _es['repeat_rejected_stems'] = (
-                    _rejected + [_key])[-_ANSWERED_CORRECT_CAP:]
+                    _rejected + [_hitkey])[-_ANSWERED_CORRECT_CAP:]
                 session.engine_state = _es
                 try:
                     session.save(update_fields=['engine_state'])
@@ -691,7 +719,8 @@ def handle_pose_question(
     # of an already-correct question, flag the lesson to move forward. The slot
     # stays valid; the step just advances underneath, which walks the session out
     # of the loop instead of letting it deadlock.
-    repeat_force_advance = _note_pose_repetition(session, qtext)
+    repeat_force_advance = _note_pose_repetition(
+        session, qtext, options=opts, question_type=qtype)
 
     logger.info(
         "[simple_tutor] posed session=%s type=%s source=%s "
@@ -829,7 +858,10 @@ def handle_record_answer(
     if verdict == 'correct':
         # Remember this stem BEFORE deleting the slot, so an exact re-ask on a
         # later turn is detectable (anti-repetition).
-        _record_answered_correct(session, in_flight.question_text)
+        _record_answered_correct(
+            session, in_flight.question_text,
+            options=(in_flight.options
+                     if in_flight.question_type == 'mcq' else None))
         # Slot is resolved — clear it. The hint ladder + analytics
         # state is preserved in the grader result + session turns.
         in_flight.delete()
