@@ -73,9 +73,14 @@ group in the **Cell 7b** dropdown. Every tab writes per-model JSONs into the
 **same** Drive folder, so no two tabs score the same model and the board merges
 automatically:
 
-- **group1 — small (≤4B)** — `okamototk/gemma3-tools:1b`, `qwen3:4b`, `qwen3.5:4b`, `okamototk/gemma3-tools:4b`
-- **group2 — medium (9–14B)** — `qwen3.5:9b`, `okamototk/gemma3-tools:12b`, `qwen3:14b`
-- **group3 — large (27B+)** — `okamototk/gemma3-tools:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
+- **group1 — small (≤4B)** — `qwen3:4b`, `qwen3.5:4b`
+- **group2 — medium (9–14B)** — `qwen3.5:9b`, `qwen3:14b`
+- **group3 — large (27B+)** — `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
+
+**This run is the qwen re-validation** of the OSS-sweep engine nets (dedupe,
+verdict-polarity alignment, reveal filter, auto-grade fallback, extended
+retries). The Gemma entries are commented out in Cell 8 pending the
+`colab_eval_gemma.ipynb` smoke — uncomment them there once it's clean.
 
 Gemma runs through **`okamototk/gemma3-tools`** (community repackaging of the official
 gemma3 weights with a tool-enabled chat template) — stock Ollama gemma3/gemma2
@@ -242,12 +247,11 @@ md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
    "`group3`. The groups are **disjoint, size-based** sets; every tab writes to the "
    "same Drive folder so the board merges. Re-run this cell whenever you change it.\n"
    "\n"
-   "- **group1 — small (≤4B)** — `okamototk/gemma3-tools:1b`, `qwen3:4b`, "
-   "`qwen3.5:4b`, `okamototk/gemma3-tools:4b`\n"
-   "- **group2 — medium (9–14B)** — `qwen3.5:9b`, `okamototk/gemma3-tools:12b`, "
-   "`qwen3:14b`\n"
-   "- **group3 — large (27B+)** — `okamototk/gemma3-tools:27b`, `qwen3:30b-a3b`, "
-   "`qwen3.6:35b-a3b`")
+   "- **group1 — small (≤4B)** — `qwen3:4b`, `qwen3.5:4b`\n"
+   "- **group2 — medium (9–14B)** — `qwen3.5:9b`, `qwen3:14b`\n"
+   "- **group3 — large (27B+)** — `qwen3:30b-a3b`, `qwen3.6:35b-a3b`\n"
+   "\n"
+   "(Gemma lines are commented out in Cell 8 pending the gemma smoke.)")
 code(r"""
 GROUP = "group2"  #@param ["group1", "group2", "group3"]
 print("This tab will evaluate group:", GROUP)
@@ -268,27 +272,31 @@ code(r"""
 # the model sees a prompt, which zeroed all 7 Gemmas in the first oss13_mt
 # sweep). gemma2 has no tool-enabled repackaging and is dropped until one
 # exists. Cell 8c probes every model and drops any that cannot tool-call.
+# Gemma entries are COMMENTED OUT pending the colab_eval_gemma.ipynb smoke
+# (5-scenario go/no-go on the tool-enabled repackagings). Uncomment the
+# gemma lines in MODELS and GROUPS together once the smoke is clean.
 MODELS = {
     # ── small (≤4B) ──
-    'okamototk/gemma3-tools:1b':  ('big', 'gemma3 1B, tool-enabled template'),
+    # 'okamototk/gemma3-tools:1b':  ('big', 'gemma3 1B, tool-enabled template'),
     'qwen3:4b':               ('big', ''),
     'qwen3.5:4b':             ('big', ''),
-    'okamototk/gemma3-tools:4b':  ('big', 'gemma3 4B, tool-enabled template'),
+    # 'okamototk/gemma3-tools:4b':  ('big', 'gemma3 4B, tool-enabled template'),
     # ── medium (9–14B) ──
     'qwen3.5:9b':             ('big', ''),
-    'okamototk/gemma3-tools:12b': ('big', 'gemma3 12B, tool-enabled template'),
+    # 'okamototk/gemma3-tools:12b': ('big', 'gemma3 12B, tool-enabled template'),
     'qwen3:14b':              ('big', ''),
     # ── large (27B+; MoE tags sized by total params) ──
-    'okamototk/gemma3-tools:27b': ('xl',  'gemma3 27B, tool-enabled template'),
+    # 'okamototk/gemma3-tools:27b': ('xl',  'gemma3 27B, tool-enabled template'),
     'qwen3:30b-a3b':          ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
     'qwen3.6:35b-a3b':        ('xl',  'Qwen3.6 35B MoE (3B active)'),
 }
 GROUPS = {
-    'group1': ['okamototk/gemma3-tools:1b', 'qwen3:4b', 'qwen3.5:4b',
-               'okamototk/gemma3-tools:4b'],
-    'group2': ['qwen3.5:9b', 'okamototk/gemma3-tools:12b', 'qwen3:14b'],
-    'group3': ['okamototk/gemma3-tools:27b', 'qwen3:30b-a3b',
-               'qwen3.6:35b-a3b'],
+    'group1': [  # 'okamototk/gemma3-tools:1b', 'okamototk/gemma3-tools:4b',
+               'qwen3:4b', 'qwen3.5:4b'],
+    'group2': [  # 'okamototk/gemma3-tools:12b',
+               'qwen3.5:9b', 'qwen3:14b'],
+    'group3': [  # 'okamototk/gemma3-tools:27b',
+               'qwen3:30b-a3b', 'qwen3.6:35b-a3b'],
 }
 GROUP = globals().get('GROUP')
 if GROUP is None:
