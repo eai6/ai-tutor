@@ -3,11 +3,11 @@ the tool-enabled Gemma repackagings on 5 multi-turn scenarios.
 
 Purpose: the first oss13_mt sweep zeroed all 7 stock Gemmas on an Ollama
 template limitation (no tool role → HTTP 400 on every tools request). The
-orieg/gemma3-tools repackagings carry a tool-enabled template; this notebook
+okamototk/gemma3-tools repackagings carry a tool-enabled template; this notebook
 answers "does Gemma actually run and tutor through the engine now?" for a few
 dollars before committing to the full 20-scenario sweep.
 
-Tutor = orieg/gemma3-tools:{1b,4b,12b,27b} via Ollama; student-sim = Anthropic
+Tutor = okamototk/gemma3-tools:{1b,4b,12b,27b} via Ollama; student-sim = Anthropic
 Haiku 4.5; judge = Anthropic Sonnet 4.6 @ temp 0. Results land in
 offline_eval/multi_turn_results/gemma_probe5/ (persisted to Drive).
 
@@ -31,10 +31,10 @@ RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 MODE = f'--multi-turn --sample {SAMPLE} --seed {SEED}'
 
 MODELS = [
-    ('orieg/gemma3-tools:1b',  'big', 'gemma3 1B, tool-enabled template'),
-    ('orieg/gemma3-tools:4b',  'big', 'gemma3 4B — known tool-call bias; watch over-posing'),
-    ('orieg/gemma3-tools:12b', 'big', 'gemma3 12B'),
-    ('orieg/gemma3-tools:27b', 'xl',  'gemma3 27B QAT — largest; needs the big card'),
+    ('okamototk/gemma3-tools:1b',  'big', 'gemma3 1B, tool-enabled template'),
+    ('okamototk/gemma3-tools:4b',  'big', 'gemma3 4B, tool-enabled template'),
+    ('okamototk/gemma3-tools:12b', 'big', 'gemma3 12B'),
+    ('okamototk/gemma3-tools:27b', 'xl',  'gemma3 27B — largest; needs the big card'),
 ]
 
 cells = []
@@ -60,8 +60,8 @@ The first OSS sweep zeroed all seven stock Gemmas before the models saw a
 single prompt: Ollama's gemma templates have **no tool role**, so every
 `tools` request returned HTTP 400 and every session deadlocked at turn 1.
 This notebook smokes the **tool-enabled repackagings**
-([orieg/gemma3-tools](https://ollama.com/orieg/gemma3-tools) — official
-gemma3 QAT weights, tool-enabled chat template) on **{SAMPLE} multi-turn
+([okamototk/gemma3-tools](https://ollama.com/okamototk/gemma3-tools) — official
+gemma3 weights, tool-enabled chat template) on **{SAMPLE} multi-turn
 scenarios** per model, to answer *does Gemma run, pose, grade, and end
 sessions cleanly through the engine?* before spending a full sweep on it.
 

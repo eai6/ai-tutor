@@ -823,7 +823,7 @@ class GemmaFamilyProfileTest(SimpleTestCase):
 
     def test_gemma3_tools_tag_resolves(self):
         from apps.llm.model_profiles import get_model_profile
-        p = get_model_profile('local_ollama/orieg/gemma3-tools:12b')
+        p = get_model_profile('local_ollama/okamototk/gemma3-tools:12b')
         self.assertIsNotNone(p)
         self.assertEqual(p.family, 'gemma')
 

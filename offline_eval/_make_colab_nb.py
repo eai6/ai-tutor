@@ -73,12 +73,12 @@ group in the **Cell 7b** dropdown. Every tab writes per-model JSONs into the
 **same** Drive folder, so no two tabs score the same model and the board merges
 automatically:
 
-- **group1 — small (≤4B)** — `orieg/gemma3-tools:1b`, `qwen3:4b`, `qwen3.5:4b`, `orieg/gemma3-tools:4b`
-- **group2 — medium (9–14B)** — `qwen3.5:9b`, `orieg/gemma3-tools:12b`, `qwen3:14b`
-- **group3 — large (27B+)** — `orieg/gemma3-tools:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
+- **group1 — small (≤4B)** — `okamototk/gemma3-tools:1b`, `qwen3:4b`, `qwen3.5:4b`, `okamototk/gemma3-tools:4b`
+- **group2 — medium (9–14B)** — `qwen3.5:9b`, `okamototk/gemma3-tools:12b`, `qwen3:14b`
+- **group3 — large (27B+)** — `okamototk/gemma3-tools:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
 
-Gemma runs through **`orieg/gemma3-tools`** (community repackaging of the official
-gemma3 QAT weights with a tool-enabled chat template) — stock Ollama gemma3/gemma2
+Gemma runs through **`okamototk/gemma3-tools`** (community repackaging of the official
+gemma3 weights with a tool-enabled chat template) — stock Ollama gemma3/gemma2
 templates have no tool role, so every tools request 400s before the model sees a
 prompt; that zeroed all 7 Gemmas in the first sweep. gemma2 has no tool-enabled
 repackaging and is out until one exists. **Cell 8c probes every model** and drops
@@ -237,11 +237,11 @@ md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
    "`group3`. The groups are **disjoint, size-based** sets; every tab writes to the "
    "same Drive folder so the board merges. Re-run this cell whenever you change it.\n"
    "\n"
-   "- **group1 — small (≤4B)** — `orieg/gemma3-tools:1b`, `qwen3:4b`, "
-   "`qwen3.5:4b`, `orieg/gemma3-tools:4b`\n"
-   "- **group2 — medium (9–14B)** — `qwen3.5:9b`, `orieg/gemma3-tools:12b`, "
+   "- **group1 — small (≤4B)** — `okamototk/gemma3-tools:1b`, `qwen3:4b`, "
+   "`qwen3.5:4b`, `okamototk/gemma3-tools:4b`\n"
+   "- **group2 — medium (9–14B)** — `qwen3.5:9b`, `okamototk/gemma3-tools:12b`, "
    "`qwen3:14b`\n"
-   "- **group3 — large (27B+)** — `orieg/gemma3-tools:27b`, `qwen3:30b-a3b`, "
+   "- **group3 — large (27B+)** — `okamototk/gemma3-tools:27b`, `qwen3:30b-a3b`, "
    "`qwen3.6:35b-a3b`")
 code(r"""
 GROUP = "group2"  #@param ["group1", "group2", "group3"]
@@ -257,7 +257,7 @@ code(r"""
 # GROUP picks which models THIS tab writes into models.txt. Groups partition
 # the 10 OSS Qwen + Gemma models so parallel Colab tabs never score the same
 # model. group1 = small (<=4B), group2 = medium (9-14B), group3 = large (27B+).
-# Gemma runs via orieg/gemma3-tools — community repackagings of the official
+# Gemma runs via okamototk/gemma3-tools — community repackagings of the official
 # gemma3 QAT weights with a tool-enabled chat template (the stock ollama
 # gemma3/gemma2 templates have NO tool role: every tools request 400s before
 # the model sees a prompt, which zeroed all 7 Gemmas in the first oss13_mt
@@ -265,24 +265,24 @@ code(r"""
 # exists. Cell 8c probes every model and drops any that cannot tool-call.
 MODELS = {
     # ── small (≤4B) ──
-    'orieg/gemma3-tools:1b':  ('big', 'gemma3 1B, tool-enabled template'),
+    'okamototk/gemma3-tools:1b':  ('big', 'gemma3 1B, tool-enabled template'),
     'qwen3:4b':               ('big', ''),
     'qwen3.5:4b':             ('big', ''),
-    'orieg/gemma3-tools:4b':  ('big', 'gemma3 4B, tool-enabled template'),
+    'okamototk/gemma3-tools:4b':  ('big', 'gemma3 4B, tool-enabled template'),
     # ── medium (9–14B) ──
     'qwen3.5:9b':             ('big', ''),
-    'orieg/gemma3-tools:12b': ('big', 'gemma3 12B, tool-enabled template'),
+    'okamototk/gemma3-tools:12b': ('big', 'gemma3 12B, tool-enabled template'),
     'qwen3:14b':              ('big', ''),
     # ── large (27B+; MoE tags sized by total params) ──
-    'orieg/gemma3-tools:27b': ('xl',  'gemma3 27B QAT, tool-enabled template'),
+    'okamototk/gemma3-tools:27b': ('xl',  'gemma3 27B, tool-enabled template'),
     'qwen3:30b-a3b':          ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
     'qwen3.6:35b-a3b':        ('xl',  'Qwen3.6 35B MoE (3B active)'),
 }
 GROUPS = {
-    'group1': ['orieg/gemma3-tools:1b', 'qwen3:4b', 'qwen3.5:4b',
-               'orieg/gemma3-tools:4b'],
-    'group2': ['qwen3.5:9b', 'orieg/gemma3-tools:12b', 'qwen3:14b'],
-    'group3': ['orieg/gemma3-tools:27b', 'qwen3:30b-a3b',
+    'group1': ['okamototk/gemma3-tools:1b', 'qwen3:4b', 'qwen3.5:4b',
+               'okamototk/gemma3-tools:4b'],
+    'group2': ['qwen3.5:9b', 'okamototk/gemma3-tools:12b', 'qwen3:14b'],
+    'group3': ['okamototk/gemma3-tools:27b', 'qwen3:30b-a3b',
                'qwen3.6:35b-a3b'],
 }
 GROUP = globals().get('GROUP')
