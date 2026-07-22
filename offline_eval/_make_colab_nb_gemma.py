@@ -1,5 +1,5 @@
-"""Generate offline_eval/colab_eval_gemma.ipynb — a single-tab Colab smoke of
-the tool-enabled Gemma repackagings on 5 multi-turn scenarios.
+"""Generate offline_eval/colab_eval_gemma.ipynb — a single-tab Colab run of
+the tool-enabled Gemma repackagings (board run: 20 scenarios, fixcheck draw).
 
 Purpose: the first oss13_mt sweep zeroed all 7 stock Gemmas on an Ollama
 template limitation (no tool role → HTTP 400 on every tools request). The
@@ -9,7 +9,7 @@ dollars before committing to the full 20-scenario sweep.
 
 Tutor = okamototk/gemma3-tools:{1b,4b,12b,27b} via Ollama; student-sim = Anthropic
 Haiku 4.5; judge = Anthropic Sonnet 4.6 @ temp 0. Results land in
-offline_eval/multi_turn_results/gemma_probe5/ (persisted to Drive).
+offline_eval/multi_turn_results/<SWEEP>/ (persisted to Drive).
 
 Run: python offline_eval/_make_colab_nb_gemma.py
 """
@@ -59,16 +59,16 @@ model_list_md = '\n'.join(
     f'- `{tag}` — {note}' for tag, _tier, note in MODELS)
 
 md(rf"""
-# AI Tutor — **Gemma multi-turn smoke** · 5 scenarios · single tab
+# AI Tutor — **Gemma multi-turn board run** · {SAMPLE} scenarios · single tab
 
 The first OSS sweep zeroed all seven stock Gemmas before the models saw a
 single prompt: Ollama's gemma templates have **no tool role**, so every
 `tools` request returned HTTP 400 and every session deadlocked at turn 1.
-This notebook smokes the **tool-enabled repackagings**
+This notebook runs the **tool-enabled repackagings**
 ([okamototk/gemma3-tools](https://ollama.com/okamototk/gemma3-tools) — official
 gemma3 weights, tool-enabled chat template) on **{SAMPLE} multi-turn
-scenarios** per model, to answer *does Gemma run, pose, grade, and end
-sessions cleanly through the engine?* before spending a full sweep on it.
+scenarios** per model — the board run that produces real Gemma numbers,
+after the 5-scenario smokes (probe5 v1–v3) validated the integration.
 
 {model_list_md}
 
