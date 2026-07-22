@@ -814,3 +814,21 @@ class RetryLadderTest(SimpleTestCase):
     def test_engine_ladder_extended(self):
         from apps.tutoring.simple_tutor.engine import _TRANSIENT_BACKOFF
         self.assertGreaterEqual(max(_TRANSIENT_BACKOFF), 30)
+
+
+class GemmaFamilyProfileTest(SimpleTestCase):
+    """Option-3 Gemma enablement: the tool-enabled repackaging tags must
+    resolve to a 'gemma' family profile — with family=None the entire
+    eval guard stack (forcing, salvage, nets) is silently gated off."""
+
+    def test_gemma3_tools_tag_resolves(self):
+        from apps.llm.model_profiles import get_model_profile
+        p = get_model_profile('local_ollama/orieg/gemma3-tools:12b')
+        self.assertIsNotNone(p)
+        self.assertEqual(p.family, 'gemma')
+
+    def test_plain_gemma_tag_resolves(self):
+        from apps.llm.model_profiles import get_model_profile
+        p = get_model_profile('local_ollama/gemma3:4b')
+        self.assertIsNotNone(p)
+        self.assertEqual(p.family, 'gemma')

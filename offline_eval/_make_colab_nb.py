@@ -1,5 +1,5 @@
 """Generate offline_eval/colab_eval.ipynb — a ready-to-run Colab notebook for the
-MULTI-TURN evaluation of 13 OSS Qwen + Gemma models on Colab GPUs.
+MULTI-TURN evaluation of 10 OSS Qwen + Gemma models on Colab GPUs.
 
 Tutor = OSS via Ollama (swapped per model); student-sim = Anthropic Haiku 4.5
 persona player; judge = Anthropic Sonnet 4.6 @ temp 0 session-level rubric
@@ -67,15 +67,22 @@ tool-syntax leaks, expected end-state) plus a session-level rubric.
   qwen3-next-80b 17/20 at cycle 11) — the OSS numbers here read directly
   against that board.
 
-**Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 13
+**Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 10
 OSS Qwen + Gemma models are split into 3 **disjoint size groups**; pick this tab's
 group in the **Cell 7b** dropdown. Every tab writes per-model JSONs into the
 **same** Drive folder, so no two tabs score the same model and the board merges
 automatically:
 
-- **group1 — small (≤4B)** — `gemma3:1b`, `gemma2:2b`, `qwen3:4b`, `qwen3.5:4b`, `gemma3:4b`
-- **group2 — medium (9–14B)** — `gemma2:9b`, `qwen3.5:9b`, `gemma3:12b`, `qwen3:14b`
-- **group3 — large (27B+)** — `gemma2:27b`, `gemma3:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
+- **group1 — small (≤4B)** — `orieg/gemma3-tools:1b`, `qwen3:4b`, `qwen3.5:4b`, `orieg/gemma3-tools:4b`
+- **group2 — medium (9–14B)** — `qwen3.5:9b`, `orieg/gemma3-tools:12b`, `qwen3:14b`
+- **group3 — large (27B+)** — `orieg/gemma3-tools:27b`, `qwen3:30b-a3b`, `qwen3.6:35b-a3b`
+
+Gemma runs through **`orieg/gemma3-tools`** (community repackaging of the official
+gemma3 QAT weights with a tool-enabled chat template) — stock Ollama gemma3/gemma2
+templates have no tool role, so every tools request 400s before the model sees a
+prompt; that zeroed all 7 Gemmas in the first sweep. gemma2 has no tool-enabled
+repackaging and is out until one exists. **Cell 8c probes every model** and drops
+any that cannot tool-call, so an incapable model costs seconds, not 20 sessions.
 
 Each model auto-tunes to its family profile (Qwen → Markdown Block-0, temp 0.7 /
 top_p 0.8 / top_k 20, num_ctx 24K so `<think>` + answer fit; Gemma runs the
@@ -230,11 +237,11 @@ md("## Cell 7b — **pick this tab's model GROUP** (run one tab per group)\n"
    "`group3`. The groups are **disjoint, size-based** sets; every tab writes to the "
    "same Drive folder so the board merges. Re-run this cell whenever you change it.\n"
    "\n"
-   "- **group1 — small (≤4B)** — `gemma3:1b`, `gemma2:2b`, `qwen3:4b`, "
-   "`qwen3.5:4b`, `gemma3:4b`\n"
-   "- **group2 — medium (9–14B)** — `gemma2:9b`, `qwen3.5:9b`, `gemma3:12b`, "
+   "- **group1 — small (≤4B)** — `orieg/gemma3-tools:1b`, `qwen3:4b`, "
+   "`qwen3.5:4b`, `orieg/gemma3-tools:4b`\n"
+   "- **group2 — medium (9–14B)** — `qwen3.5:9b`, `orieg/gemma3-tools:12b`, "
    "`qwen3:14b`\n"
-   "- **group3 — large (27B+)** — `gemma2:27b`, `gemma3:27b`, `qwen3:30b-a3b`, "
+   "- **group3 — large (27B+)** — `orieg/gemma3-tools:27b`, `qwen3:30b-a3b`, "
    "`qwen3.6:35b-a3b`")
 code(r"""
 GROUP = "group2"  #@param ["group1", "group2", "group3"]
@@ -248,31 +255,34 @@ md("## Cell 8 — write THIS tab's matrix (from GROUP) + seed configs\n"
 code(r"""
 # Master registry (tag -> tier, note) + the 3 disjoint size groups. Cell 7b's
 # GROUP picks which models THIS tab writes into models.txt. Groups partition
-# the 13 OSS Qwen + Gemma models so parallel Colab tabs never score the same
+# the 10 OSS Qwen + Gemma models so parallel Colab tabs never score the same
 # model. group1 = small (<=4B), group2 = medium (9-14B), group3 = large (27B+).
+# Gemma runs via orieg/gemma3-tools — community repackagings of the official
+# gemma3 QAT weights with a tool-enabled chat template (the stock ollama
+# gemma3/gemma2 templates have NO tool role: every tools request 400s before
+# the model sees a prompt, which zeroed all 7 Gemmas in the first oss13_mt
+# sweep). gemma2 has no tool-enabled repackaging and is dropped until one
+# exists. Cell 8c probes every model and drops any that cannot tool-call.
 MODELS = {
     # ── small (≤4B) ──
-    'gemma3:1b':       ('big', ''),
-    'gemma2:2b':       ('big', ''),
-    'qwen3:4b':        ('big', ''),
-    'qwen3.5:4b':      ('big', ''),
-    'gemma3:4b':       ('big', ''),
+    'orieg/gemma3-tools:1b':  ('big', 'gemma3 1B, tool-enabled template'),
+    'qwen3:4b':               ('big', ''),
+    'qwen3.5:4b':             ('big', ''),
+    'orieg/gemma3-tools:4b':  ('big', 'gemma3 4B, tool-enabled template'),
     # ── medium (9–14B) ──
-    'gemma2:9b':       ('big', ''),
-    'qwen3.5:9b':      ('big', ''),
-    'gemma3:12b':      ('big', ''),
-    'qwen3:14b':       ('big', ''),
+    'qwen3.5:9b':             ('big', ''),
+    'orieg/gemma3-tools:12b': ('big', 'gemma3 12B, tool-enabled template'),
+    'qwen3:14b':              ('big', ''),
     # ── large (27B+; MoE tags sized by total params) ──
-    'gemma2:27b':      ('xl',  'Gemma 2 dense 27B'),
-    'gemma3:27b':      ('xl',  'Gemma 3 dense 27B'),
-    'qwen3:30b-a3b':   ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
-    'qwen3.6:35b-a3b': ('xl',  'Qwen3.6 35B MoE (3B active)'),
+    'orieg/gemma3-tools:27b': ('xl',  'gemma3 27B QAT, tool-enabled template'),
+    'qwen3:30b-a3b':          ('xl',  'Qwen3 30B MoE (3B active) — fast for its size'),
+    'qwen3.6:35b-a3b':        ('xl',  'Qwen3.6 35B MoE (3B active)'),
 }
 GROUPS = {
-    'group1': ['gemma3:1b', 'gemma2:2b', 'qwen3:4b', 'qwen3.5:4b',
-               'gemma3:4b'],
-    'group2': ['gemma2:9b', 'qwen3.5:9b', 'gemma3:12b', 'qwen3:14b'],
-    'group3': ['gemma2:27b', 'gemma3:27b', 'qwen3:30b-a3b',
+    'group1': ['orieg/gemma3-tools:1b', 'qwen3:4b', 'qwen3.5:4b',
+               'orieg/gemma3-tools:4b'],
+    'group2': ['qwen3.5:9b', 'orieg/gemma3-tools:12b', 'qwen3:14b'],
+    'group3': ['orieg/gemma3-tools:27b', 'qwen3:30b-a3b',
                'qwen3.6:35b-a3b'],
 }
 GROUP = globals().get('GROUP')
@@ -327,6 +337,52 @@ _df('BEFORE cleanup')
 !apt-get clean 2>/dev/null || true
 !rm -rf /root/.cache/huggingface /root/.cache/pip 2>/dev/null || true
 _df('AFTER cleanup')
+""")
+
+md("## Cell 8c — **tool-probe gate** (drops models that cannot tool-call)\n"
+   "The engine's protocol needs native tool calling; a model whose Ollama "
+   "template lacks a tool role 400s on every request and burns 20 dead "
+   "sessions (that zeroed all 7 stock Gemmas in the first sweep). This cell "
+   "pulls each of this tab's models, fires one probe tool-call, and REMOVES "
+   "any model that fails from `models.txt` — a failure costs seconds. "
+   "Weights stay cached for the sweep.")
+code(r"""
+import subprocess, sys
+
+kept, dropped = [], []
+lines = open('offline_eval/models.txt').read().splitlines()
+for line in lines:
+    bare = line.split('#')[0].split()
+    if not bare:
+        continue
+    tag = bare[0]
+    print(f'>> probing {tag} ...', flush=True)
+    pull = subprocess.run(['ollama', 'pull', tag], capture_output=True, text=True)
+    if pull.returncode != 0:
+        print(f'   PULL FAILED — dropped. ({pull.stderr.strip()[:120]})')
+        dropped.append((tag, 'pull failed'))
+        continue
+    probe = subprocess.run(
+        [sys.executable, 'offline_eval/_probe_ollama_tools.py', tag],
+        capture_output=True, text=True)
+    out = probe.stdout + probe.stderr
+    if 'TOOL-USE SUPPORTED' in out:
+        print('   tool-call OK')
+        kept.append(line)
+    else:
+        reason = 'HTTP 400 (no tool role in template)' if '400' in out else 'no tool_calls emitted'
+        print(f'   NO TOOL SUPPORT — dropped. ({reason})')
+        dropped.append((tag, reason))
+        subprocess.run(['ollama', 'rm', tag], capture_output=True)
+    subprocess.run(['ollama', 'stop', tag], capture_output=True)
+
+header = [l for l in lines if l.strip().startswith('#')]
+open('offline_eval/models.txt', 'w').write('\n'.join(header + kept) + '\n')
+print()
+print('will sweep:', [l.split()[0] for l in kept] or 'NOTHING')
+if dropped:
+    print('dropped   :', dropped)
+assert kept, 'Every model in this group failed the tool probe — nothing to sweep.'
 """)
 
 md("## Cell 9 — run the MULTI-TURN sweep (pulls + scores each model; resume-safe)\n"
