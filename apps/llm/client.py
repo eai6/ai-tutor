@@ -32,7 +32,9 @@ from apps.llm.models import ModelConfig
 # still runs. The engine's tutor call has its own no-block variant of this in
 # apps/tutoring/simple_tutor/engine.py — the two detections should be consolidated
 # here when next touched. Toggle SIMPLE_TUTOR_TRANSIENT_RETRY=0 disables it.
-_TRANSIENT_BACKOFF = (2, 5, 12)
+# Extended past 12s on 2026-07-22: the oss13_mt sweep lost 10 scenarios to an
+# Anthropic overload window that outlasted the short ladder.
+_TRANSIENT_BACKOFF = (2, 5, 12, 30, 60)
 
 
 def is_transient_error(exc: Exception) -> bool:

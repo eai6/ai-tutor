@@ -538,9 +538,23 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     if missing_tool or _graded_empty_slot(tool_results):
         _record_forcing_miss(session)
 
+    # Grade-side net: the student answered, a slot exists, and the model
+    # declined record_answer through both calls (see _auto_grade_fallback).
+    _auto_grade_fallback(
+        session=session, family=_family, student_intent=student_intent,
+        user_input=user_input, tool_results=tool_results,
+    )
+
     # Deterministic backstop for leaked platform vocabulary ("POSE/TEACH
     # mode", "in flight") — see _scrub_engine_vocab.
     text_reply = _scrub_engine_vocab(text_reply or '')
+
+    # OSS-sweep nets (eval families only): the reply's opening must agree
+    # with the grader's verdict, and an open question's reference must not
+    # leak into a wrong-answer hint.
+    if _family and _family not in _FORCE_POSE_EXEMPT_FAMILIES:
+        text_reply = _align_reply_polarity(session, text_reply, tool_results)
+        text_reply = _filter_reveals(session, text_reply, tool_results)
 
     if not text_reply:
         # Last-resort: neither call produced usable text. Give a neutral
@@ -565,6 +579,9 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         session=session, step=step, family=_family,
         tool_results=tool_results, text_reply=text_reply,
     )
+
+    # Last: never persist a reply identical to the previous tutor turn.
+    text_reply = _dedupe_reply(session, text_reply)
 
     logger.info(
         "[simple_tutor] two_call=%s text_chars=%s tools=%s",
@@ -1089,6 +1106,179 @@ def _contains_lettered_options(text: str) -> bool:
     return has_a and has_b
 
 
+def _turn_verdict(tool_results) -> str | None:
+    """The grading verdict recorded this turn, if any."""
+    for tr in tool_results or []:
+        if tr.get('tool') in ('record_answer', 'auto_grade_fallback'):
+            r = tr.get('result') or {}
+            if r.get('recorded'):
+                return r.get('verdict')
+    return None
+
+
+# ── OSS-sweep nets (2026-07-22 oss13_mt analysis) ────────────────────────────
+
+_VARIATION_LINES = (
+    "Let me put it another way.",
+    "One more time, from a different angle.",
+    "Let's take this a step at a time.",
+    "Here it is again — take your time.",
+)
+
+
+def _dedupe_reply(session, text_reply: str) -> str:
+    """Never persist a tutor reply identical (normalised) to the previous
+    tutor turn — qwen3:14b lost 6 sessions to verbatim repeats, which is
+    the student-sim's deadlock trigger and equally dead-endy for a real
+    student. A rotated re-engagement line varies the reply."""
+    if not text_reply:
+        return text_reply
+    from apps.tutoring.models import SessionTurn
+    prev = (
+        SessionTurn.objects
+        .filter(session=session, role=SessionTurn.Role.TUTOR)
+        .order_by('-created_at', '-pk')
+        .values_list('content', flat=True)
+        .first()
+    )
+    if not prev:
+        return text_reply
+
+    def _norm(s: str) -> str:
+        return ' '.join((s or '').lower().split()).rstrip('.!?')
+
+    if _norm(prev) != _norm(text_reply):
+        return text_reply
+    idx = SessionTurn.objects.filter(session=session).count()
+    line = _VARIATION_LINES[idx % len(_VARIATION_LINES)]
+    logger.info(
+        "[simple_tutor] dedupe_reply: varied a verbatim repeat session=%s",
+        session.pk,
+    )
+    return f"{line}\n\n{text_reply}"
+
+
+_NEG_OPENER_RE = re.compile(
+    r"^(?:not quite|that'?s not|not this time|incorrect|close, but|sorry|"
+    r"hmm, not|no[,—: ])", re.I)
+_POS_OPENER_RE = re.compile(
+    r"^(?:exactly|correct|that'?s (?:it|right)|great|well done|got it|"
+    r"perfect|spot on|yes[,!— ])", re.I)
+_FIRST_SENTENCE_END_RE = re.compile(r'[.!?](?:\s+|$)|\n')
+
+
+def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
+    """The reply's opening must agree with the grader's verdict.
+
+    The oss13_mt sweep's top rubric killer: models opened with "Not
+    quite" on graded-CORRECT answers and "Exactly!" on graded-WRONG ones,
+    then argued with their own verdicts for whole sessions. The verdict
+    is authoritative; when the opening contradicts it, the opening
+    sentence is replaced with a rotated verdict-consistent
+    acknowledgement."""
+    verdict = _turn_verdict(tool_results)
+    if verdict not in ('correct', 'incorrect') or not text_reply:
+        return text_reply
+    stripped = text_reply.lstrip()
+    if verdict == 'correct' and _NEG_OPENER_RE.match(stripped):
+        acks = _ACKS_CORRECT
+    elif verdict == 'incorrect' and _POS_OPENER_RE.match(stripped):
+        acks = _ACKS_INCORRECT
+    else:
+        return text_reply
+    m = _FIRST_SENTENCE_END_RE.search(stripped)
+    rest = stripped[m.end():].lstrip() if m else ''
+    from apps.tutoring.models import SessionTurn
+    idx = SessionTurn.objects.filter(session=session).count()
+    ack = acks[idx % len(acks)]
+    logger.info(
+        "[simple_tutor] polarity_align: %s opener replaced on %s verdict "
+        "session=%s",
+        'negative' if verdict == 'correct' else 'positive', verdict,
+        session.pk,
+    )
+    return f"{ack} {rest}".strip()
+
+
+_ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)
+
+
+def _filter_reveals(session, text_reply: str, tool_results) -> str:
+    """While a question is open after a wrong answer, the reply must not
+    state the reference (qwen3:14b printed "(Answer: A)" verbatim; others
+    said "option C is correct" mid-hint). The engine knows the reference,
+    so this is deterministically enforceable."""
+    if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
+        return text_reply
+    from apps.tutoring.models import InFlightQuestion
+    slot = InFlightQuestion.objects.filter(session=session).first()
+    if slot is None:
+        return text_reply
+    ref = (slot.reference_answer or '').strip()
+    if not ref:
+        return text_reply
+    out = _ANSWER_PAREN_RE.sub('', text_reply)
+    is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
+    if is_letter:
+        pat = re.compile(
+            rf'(?i)\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b'
+            rf'|\b{ref}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right)')
+    else:
+        ref_esc = re.escape(ref)
+        pat = re.compile(
+            rf'(?i)(?:answer|correct|equals|=|\bis)\W{{0,15}}{ref_esc}\b'
+            rf'|\b{ref_esc}\s*(?:is|was)\s*(?:the\s*)?'
+            rf'(?:correct|right|answer)')
+    lines_out = []
+    for line in out.split('\n'):
+        if not pat.search(line):
+            lines_out.append(line)
+            continue
+        kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
+                if not pat.search(s)]
+        lines_out.append(' '.join(kept).strip())
+    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines_out)).strip('\n')
+    if result != text_reply:
+        logger.info(
+            "[simple_tutor] reveal_filter: redacted reference leak "
+            "session=%s", session.pk,
+        )
+    return result
+
+
+def _auto_grade_fallback(
+    *, session, family, student_intent, user_input, tool_results,
+) -> None:
+    """Grade-side net mirroring _auto_pose_fallback: the student clearly
+    answered (intent='answer', strict), a slot exists, and the model
+    declined record_answer through Call 1 AND the forced Call-2 repair
+    (Ollama cannot honour tool_choice; qwen3.5:4b lost 12% of its answer
+    turns this way). Grade the raw student message server-side.
+
+    The pre-intent-classifier version of this fallback was removed in
+    2026-05 for over-firing on conversational continuations; the strict
+    intent gate is what makes it safe now. Eval families only."""
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return
+    if student_intent != 'answer':
+        return
+    for tr in tool_results or []:
+        if tr.get('tool') == 'record_answer':
+            return  # the model made a grading judgement — trust it
+    from apps.tutoring.models import InFlightQuestion
+    if not InFlightQuestion.objects.filter(session=session).exists():
+        return
+    from apps.tutoring.simple_tutor.tools import handle_record_answer
+    result = handle_record_answer(
+        session, extracted_answer=(user_input or '').strip()[:300])
+    if result.get('recorded'):
+        tool_results.append({'tool': 'auto_grade_fallback', 'result': result})
+        logger.info(
+            "[simple_tutor] auto_grade_fallback: graded raw answer "
+            "session=%s verdict=%s", session.pk, result.get('verdict'),
+        )
+
+
 def _auto_pose_fallback(
     *, session, step, family, tool_results, text_reply,
 ) -> str:
@@ -1277,7 +1467,9 @@ def _system_blocks_to_text(system_blocks) -> str:
 # any tutoring flaw. A 429/503/529 is transient — retry it with backoff instead of
 # collapsing the turn. Also hardens production against Anthropic overloads.
 # Toggle SIMPLE_TUTOR_TRANSIENT_RETRY=0 disables it.
-_TRANSIENT_BACKOFF = [2, 5, 12]   # seconds between retries (3 retries max)
+# Extended past 12s on 2026-07-22: the oss13_mt sweep lost 10 scenarios to an
+# Anthropic overload window that outlasted the short ladder.
+_TRANSIENT_BACKOFF = [2, 5, 12, 30, 60]
 
 
 def _is_transient_error(exc: Exception) -> bool:

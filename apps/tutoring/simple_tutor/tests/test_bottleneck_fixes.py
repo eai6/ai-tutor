@@ -606,3 +606,211 @@ class QwenVariantCycle10Test(SimpleTestCase):
         # templated opener the judge flags.
         b = self._qwen_block()
         self.assertNotIn('> No worries', b)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# OSS-sweep fixes — from the oss13_mt transcript analysis (2026-07-22)
+# ════════════════════════════════════════════════════════════════════════════
+
+
+class DedupeReplyTest(DjangoTestCase):
+    """BN1 — a tutor reply must never persist byte-identical (normalised)
+    to the previous tutor turn: qwen3:14b lost 6 sessions to verbatim
+    repeats, which is the student-sim's deadlock trigger and terrible UX."""
+
+    def _prev(self, session, content):
+        from apps.tutoring.models import SessionTurn
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR, content=content)
+
+    def test_identical_reply_is_varied(self):
+        from apps.tutoring.simple_tutor.engine import _dedupe_reply
+        session, _ = _make_session()
+        self._prev(session, 'What is 100% minus 90%?')
+        out = _dedupe_reply(session, 'What is 100% minus 90%?')
+        self.assertIn('What is 100% minus 90%?', out)
+        self.assertNotEqual(
+            out.lower().strip(), 'what is 100% minus 90%?')
+
+    def test_case_and_whitespace_variants_still_count_as_identical(self):
+        from apps.tutoring.simple_tutor.engine import _dedupe_reply
+        session, _ = _make_session()
+        self._prev(session, 'What  is 100% minus 90%? ')
+        out = _dedupe_reply(session, 'what is 100% minus 90%?')
+        self.assertNotEqual(' '.join(out.lower().split()).rstrip('.!?'),
+                            'what is 100% minus 90%?')
+
+    def test_different_reply_untouched(self):
+        from apps.tutoring.simple_tutor.engine import _dedupe_reply
+        session, _ = _make_session()
+        self._prev(session, 'What is 100% minus 90%?')
+        out = _dedupe_reply(session, 'Exactly — 10%. Next question:')
+        self.assertEqual(out, 'Exactly — 10%. Next question:')
+
+
+class PolarityAlignTest(DjangoTestCase):
+    """BN2 — the reply's opening must agree with the grader's verdict.
+    OSS models opened with 'Not quite' on graded-correct answers and
+    'Exactly!' on graded-wrong ones — the top rubric killer of the sweep."""
+
+    def _results(self, verdict):
+        return [{'tool': 'record_answer',
+                 'result': {'recorded': True, 'verdict': verdict}}]
+
+    def test_negative_opener_on_correct_verdict_replaced(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        out = _align_reply_polarity(
+            session,
+            "Not quite — let's look at that again. The complement rule says "
+            "the two probabilities add to 1.",
+            self._results('correct'))
+        self.assertNotIn('Not quite', out)
+        self.assertIn('complement rule', out)
+
+    def test_positive_opener_on_incorrect_verdict_replaced(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        out = _align_reply_polarity(
+            session,
+            'Exactly! Corresponding angles are equal. Now try the next one.',
+            self._results('incorrect'))
+        self.assertNotIn('Exactly!', out)
+        self.assertIn('Corresponding angles are equal', out)
+
+    def test_consistent_reply_untouched(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        text = 'Exactly — 10%. Here is the next one:'
+        self.assertEqual(
+            _align_reply_polarity(session, text, self._results('correct')),
+            text)
+
+    def test_no_verdict_untouched(self):
+        from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+        session, _ = _make_session()
+        text = "Not quite what we covered — let's recap."
+        self.assertEqual(_align_reply_polarity(session, text, []), text)
+
+
+class RevealFilterTest(DjangoTestCase):
+    """BN3 — while a question is open after a wrong answer, the reply must
+    not state the reference: qwen3:14b printed '(Answer: A)' verbatim."""
+
+    def _session_with_slot(self, *, ref, qtype='mcq'):
+        session, _ = _make_session()
+        InFlightQuestion.objects.create(
+            session=session, question_text='Which option?', question_type=qtype,
+            options=['w', 'x', 'y', 'z'] if qtype == 'mcq' else [],
+            reference_answer=ref, source='inline_authored', attempt_count=1)
+        return session
+
+    def _incorrect(self):
+        return [{'tool': 'record_answer',
+                 'result': {'recorded': True, 'verdict': 'incorrect'}}]
+
+    def test_literal_answer_marker_stripped(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session = self._session_with_slot(ref='A')
+        out = _filter_reveals(
+            session, "You're close — think about digit order. (Answer: A)",
+            self._incorrect())
+        self.assertNotIn('(Answer: A)', out)
+        self.assertIn('digit order', out)
+
+    def test_option_reveal_sentence_dropped(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session = self._session_with_slot(ref='C')
+        out = _filter_reveals(
+            session,
+            'Not quite. Option C is correct because rows come first. '
+            'Look at the options again — which one matches?',
+            self._incorrect())
+        self.assertNotIn('Option C is correct', out)
+        self.assertIn('which one matches', out)
+
+    def test_numeric_reference_reveal_dropped(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session = self._session_with_slot(ref='0.3', qtype='short_numeric')
+        out = _filter_reveals(
+            session,
+            'Think about the total. So the answer is 0.3. '
+            'What do you get when you subtract?',
+            self._incorrect())
+        self.assertNotIn('0.3', out)
+        self.assertIn('subtract', out)
+
+    def test_correct_verdict_untouched(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session = self._session_with_slot(ref='A')
+        results = [{'tool': 'record_answer',
+                    'result': {'recorded': True, 'verdict': 'correct'}}]
+        text = 'Exactly — A is right because rows come first.'
+        self.assertEqual(_filter_reveals(session, text, results), text)
+
+
+class AutoGradeFallbackTest(DjangoTestCase):
+    """BN4 — when the student clearly answered, a slot exists, and the
+    model declined record_answer through both calls (Ollama cannot honour
+    forced tool_choice; qwen3.5:4b lost 12% of its answer turns this way),
+    the engine grades the raw student message server-side. Strictly gated:
+    intent must be 'answer' (not answer_or_other) — the ungated version of
+    this fallback was removed in 2026-05 for over-firing, before the
+    intent classifier existed."""
+
+    def _slot(self, session):
+        return InFlightQuestion.objects.create(
+            session=session, question_text='P(not rain) if P(rain)=0.7?',
+            question_type='short_numeric', options=[],
+            reference_answer='0.3', source='inline_authored')
+
+    def test_grades_raw_answer_when_model_declined(self):
+        from apps.tutoring.simple_tutor.engine import _auto_grade_fallback
+        session, _ = _make_session()
+        self._slot(session)
+        results = []
+        _auto_grade_fallback(
+            session=session, family='qwen', student_intent='answer',
+            user_input='0.3', tool_results=results)
+        rec = next(r for r in results if r['tool'] == 'auto_grade_fallback')
+        self.assertTrue(rec['result'].get('recorded'))
+        self.assertEqual(rec['result'].get('verdict'), 'correct')
+        self.assertFalse(
+            InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_skipped_when_record_already_fired(self):
+        from apps.tutoring.simple_tutor.engine import _auto_grade_fallback
+        session, _ = _make_session()
+        self._slot(session)
+        results = [{'tool': 'record_answer',
+                    'result': {'recorded': True, 'verdict': 'incorrect'}}]
+        _auto_grade_fallback(
+            session=session, family='qwen', student_intent='answer',
+            user_input='0.3', tool_results=results)
+        self.assertFalse(
+            any(r['tool'] == 'auto_grade_fallback' for r in results))
+
+    def test_skipped_for_ambiguous_intent_and_production(self):
+        from apps.tutoring.simple_tutor.engine import _auto_grade_fallback
+        session, _ = _make_session()
+        self._slot(session)
+        for family, intent in ((None, 'answer'), ('qwen', 'answer_or_other'),
+                               ('anthropic', 'answer')):
+            results = []
+            _auto_grade_fallback(
+                session=session, family=family, student_intent=intent,
+                user_input='0.3', tool_results=results)
+            self.assertEqual(results, [], f'fired for {family}/{intent}')
+
+
+class RetryLadderTest(SimpleTestCase):
+    """BN6 — the [2, 5, 12]s ladder was not enough for the Anthropic
+    overload window that cost 10 scenarios; both ladders now reach 30s+."""
+
+    def test_client_ladder_extended(self):
+        from apps.llm.client import _TRANSIENT_BACKOFF
+        self.assertGreaterEqual(max(_TRANSIENT_BACKOFF), 30)
+
+    def test_engine_ladder_extended(self):
+        from apps.tutoring.simple_tutor.engine import _TRANSIENT_BACKOFF
+        self.assertGreaterEqual(max(_TRANSIENT_BACKOFF), 30)
