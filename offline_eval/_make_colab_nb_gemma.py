@@ -129,33 +129,44 @@ code(r"""
 # The Ollama installer is zstd-compressed; the Colab VM lacks zstd.
 !apt-get -qq install -y zstd || (apt-get -qq update && apt-get -qq install -y zstd)
 import subprocess, time, shutil, os
-def _has_ollama():
-    return shutil.which('ollama') is not None
+# PINNED to 0.30.7 — the version the gemma3-tools tool templates were verified
+# against (5/5 local probe passes); newer Ollama stopped parsing the repackaged
+# template's tool calls. The check is on the VERSION, not mere presence: a
+# reused Colab VM keeps its previously-installed binary across kernel
+# restarts, which silently skipped the pin and re-broke the probe.
+PIN = '0.30.7'
+def _pinned_ollama():
+    if shutil.which('ollama') is None:
+        return False
+    v = subprocess.run(['ollama', '--version'], capture_output=True, text=True)
+    return PIN in (v.stdout + v.stderr)
 def _install_ollama():
-    if _has_ollama():
+    if _pinned_ollama():
         return True
-    # PINNED to 0.30.7 — the version the gemma3-tools tool templates were
-    # verified against locally (5/5 probe passes). Colab's un-pinned latest
-    # silently stopped parsing the repackaged template's tool calls: the same
-    # model emitted zero tool_calls on every probe.
+    if shutil.which('ollama') is not None:
+        print('[ollama] wrong version present — removing before pinned install', flush=True)
+        subprocess.run('pkill -f "ollama serve" || true', shell=True)
+        subprocess.run('rm -f /usr/local/bin/ollama /usr/bin/ollama; '
+                       'rm -rf /usr/local/lib/ollama /usr/lib/ollama', shell=True)
     for i in range(1, 4):
-        print(f'[ollama] install.sh attempt {i} (pinned 0.30.7)', flush=True)
-        subprocess.run('curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.30.7 sh', shell=True)
-        if _has_ollama():
+        print(f'[ollama] install.sh attempt {i} (pinned {PIN})', flush=True)
+        subprocess.run(f'curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION={PIN} sh', shell=True)
+        if _pinned_ollama():
             return True
         time.sleep(5)
     for i in range(1, 4):
-        print(f'[ollama] direct-binary attempt {i} (ollama.com, pinned)', flush=True)
+        print(f'[ollama] github release attempt {i} (v{PIN})', flush=True)
         subprocess.run('curl -fL --retry 5 --retry-all-errors --connect-timeout 30 '
-                       '-o /tmp/ollama.tgz "https://ollama.com/download/ollama-linux-amd64.tgz?version=0.30.7"',
+                       f'-o /tmp/ollama.tgz https://github.com/ollama/ollama/releases/download/v{PIN}/ollama-linux-amd64.tgz',
                        shell=True)
         if os.path.exists('/tmp/ollama.tgz') and os.path.getsize('/tmp/ollama.tgz') > 1_000_000:
             subprocess.run('tar -C /usr -xzf /tmp/ollama.tgz', shell=True)
-            if _has_ollama():
+            if _pinned_ollama():
                 return True
         time.sleep(5)
     return False
-assert _install_ollama(), "ollama install failed — restart the runtime and retry"
+assert _install_ollama(), (f"pinned ollama {PIN} install failed — "
+                           "Disconnect and delete runtime, then retry")
 subprocess.Popen(['ollama', 'serve'],
                  stdout=open('/content/ollama.log', 'w'),
                  stderr=subprocess.STDOUT)
