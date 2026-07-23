@@ -19,7 +19,7 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
-SWEEP = 'gemma20_mt'        # 20-scenario board run (probe5 v1-v3 were the 5-scenario smokes)
+SWEEP = 'gemma20_mt_v2'     # v2: after hard-pivot/rotation/meta-scrub fixes (v1 = first board run)
 
 # 20-scenario board run on the fixcheck draw — directly comparable to the
 # engine cycle board (gemini 18 / kimi 18 / qwen 17 of 20) and the OSS qwen
