@@ -953,3 +953,82 @@ class AutoPoseAfterRejectTest(DjangoTestCase):
         slot = InFlightQuestion.objects.filter(session=session).first()
         self.assertIsNotNone(slot)
         self.assertIn(slot.question_text, out)
+
+
+class RotationParityTest(DjangoTestCase):
+    """GB2 (gemma20_mt): rotation indexes used the SessionTurn count, which
+    advances by 2 per exchange — a 4-entry tuple cycled only half its
+    variants, and 'One more time, from a different angle' repeated
+    verbatim, tripping the phrase-window assert. Rotations now use a
+    dedicated persisted counter."""
+
+    def test_consecutive_dedupes_cycle_all_variants(self):
+        from apps.tutoring.models import SessionTurn
+        from apps.tutoring.simple_tutor.engine import _dedupe_reply
+        session, _ = _make_session()
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR, content='Same Q?')
+        firsts = set()
+        for _ in range(4):
+            out = _dedupe_reply(session, 'Same Q?')
+            firsts.add(out.split('\n')[0])
+        self.assertEqual(len(firsts), 4, firsts)
+
+
+class HardPivotTest(DjangoTestCase):
+    """GB1 (gemma20_mt): the attempt>=3 pivot GUIDANCE was ignored by
+    gemma — a mis-authored slot (ref='100' vs answers in probability
+    form) collected 5 straight incorrect verdicts and burned sessions to
+    max_turns. At attempt >= 4 the engine force-replaces the stuck slot
+    with the next pool question."""
+
+    def _stuck_slot(self, session, attempts):
+        return InFlightQuestion.objects.create(
+            session=session, question_text='Sum of probabilities in percent?',
+            question_type='short_numeric', options=[],
+            reference_answer='100', source='inline_authored',
+            attempt_count=attempts)
+
+    def test_slot_replaced_at_four_attempts(self):
+        from apps.tutoring.simple_tutor.engine import _force_pivot_stuck_slot
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session()
+        step = LessonStep.objects.filter(lesson=session.lesson).first()
+        self._stuck_slot(session, 4)
+        out = _force_pivot_stuck_slot(
+            session=session, step=step, family='gemma',
+            tool_results=[], text_reply='Not quite — think percent.')
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertNotIn('percent', slot.question_text)
+        self.assertIn(slot.question_text, out)
+
+    def test_untouched_below_threshold_and_in_production(self):
+        from apps.tutoring.simple_tutor.engine import _force_pivot_stuck_slot
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session()
+        step = LessonStep.objects.filter(lesson=session.lesson).first()
+        self._stuck_slot(session, 2)
+        out = _force_pivot_stuck_slot(
+            session=session, step=step, family='gemma',
+            tool_results=[], text_reply='hint')
+        self.assertEqual(out, 'hint')
+        self.assertIn('percent',
+                      InFlightQuestion.objects.get(session=session).question_text)
+        InFlightQuestion.objects.filter(session=session).update(attempt_count=5)
+        out = _force_pivot_stuck_slot(
+            session=session, step=step, family=None,
+            tool_results=[], text_reply='hint')
+        self.assertEqual(out, 'hint')
+
+
+class ScrubToolCallMetaTest(SimpleTestCase):
+    """GB3 (gemma20_mt): 12b apologised at length 'about tool calls and
+    development' in student-visible text — the vocab filter knew the tool
+    NAMES but not the generic phrase."""
+
+    def test_tool_call_meta_sentence_dropped(self):
+        out = _scrub_engine_vocab(
+            'I apologize for the tool call confusion earlier. '
+            "Let's continue with the lesson.")
+        self.assertNotIn('tool call', out)
+        self.assertIn("Let's continue with the lesson.", out)

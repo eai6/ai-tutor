@@ -580,6 +580,12 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         tool_results=tool_results, text_reply=text_reply,
     )
 
+    # Hard pivot: no single stuck question may consume a session (GB1).
+    text_reply = _force_pivot_stuck_slot(
+        session=session, step=step, family=_family,
+        tool_results=tool_results, text_reply=text_reply,
+    )
+
     # Last: never persist a reply identical to the previous tutor turn.
     text_reply = _dedupe_reply(session, text_reply)
 
@@ -830,8 +836,8 @@ def _empty_reply_placeholder(tool_results: list, session) -> str:
     # Rotate phrasing deterministically on session length — cycle-7 judges
     # flagged the fixed "Got it — that's right. Here's the next one:"
     # repeated a dozen times per session as robotic/templated.
-    from apps.tutoring.models import InFlightQuestion, SessionTurn
-    idx = SessionTurn.objects.filter(session=session).count()
+    from apps.tutoring.models import InFlightQuestion
+    idx = _rotation_index(session, 'ack')
     if verdict == 'correct':
         base = _ACKS_CORRECT[idx % len(_ACKS_CORRECT)]
         lead = _LEADS_NEXT[idx % len(_LEADS_NEXT)]
@@ -1030,7 +1036,8 @@ def _ensure_posed_question_in_text(
 # signal strip: sanitize before persisting, never rely on the model.
 _VOCAB_CI_RE = re.compile(
     r"(?i)\bin[-\s]?flight\b|\bpose_question\b|\brecord_answer\b|"
-    r"pose\s*/\s*teach|\b(?:pose|grade|teach)\s+mode\b|\bquestion slot\b"
+    r"pose\s*/\s*teach|\b(?:pose|grade|teach)\s+mode\b|\bquestion slot\b|"
+    r"\btool[- ]calls?\b"
 )
 _VOCAB_CS_RE = re.compile(r"\b(?:POSE|GRADE|TEACH)\b")
 _SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
@@ -1143,6 +1150,29 @@ def _turn_verdict(tool_results) -> str | None:
 
 # ── OSS-sweep nets (2026-07-22 oss13_mt analysis) ────────────────────────────
 
+def _rotation_index(session, key: str) -> int:
+    """Dedicated persisted counter for phrase rotations. The old
+    SessionTurn-count index advanced by 2 per exchange, so 4-entry
+    tuples cycled only half their variants and 'One more time, from a
+    different angle' repeated verbatim (gemma20_mt, phrase-window
+    assert failures)."""
+    es = getattr(session, 'engine_state', None)
+    if not isinstance(es, dict):
+        return 0
+    rot = es.get('_rot')
+    if not isinstance(rot, dict):
+        rot = {}
+    idx = int(rot.get(key, -1)) + 1
+    rot[key] = idx
+    es['_rot'] = rot
+    session.engine_state = es
+    try:
+        session.save(update_fields=['engine_state'])
+    except Exception:
+        pass
+    return idx
+
+
 _VARIATION_LINES = (
     "Let me put it another way.",
     "One more time, from a different angle.",
@@ -1174,8 +1204,8 @@ def _dedupe_reply(session, text_reply: str) -> str:
 
     if _norm(prev) != _norm(text_reply):
         return text_reply
-    idx = SessionTurn.objects.filter(session=session).count()
-    line = _VARIATION_LINES[idx % len(_VARIATION_LINES)]
+    line = _VARIATION_LINES[
+        _rotation_index(session, 'dedupe') % len(_VARIATION_LINES)]
     logger.info(
         "[simple_tutor] dedupe_reply: varied a verbatim repeat session=%s",
         session.pk,
@@ -1226,9 +1256,7 @@ def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
     if acks is not None:
         m = _FIRST_SENTENCE_END_RE.search(stripped)
         rest = stripped[m.end():].lstrip() if m else ''
-        from apps.tutoring.models import SessionTurn
-        idx = SessionTurn.objects.filter(session=session).count()
-        ack = acks[idx % len(acks)]
+        ack = acks[_rotation_index(session, 'polarity') % len(acks)]
         logger.info(
             "[simple_tutor] polarity_align: %s opener replaced on %s "
             "verdict session=%s",
@@ -1403,6 +1431,66 @@ def _auto_pose_fallback(
             if not rendered:
                 return text_reply
             return f"{base}\n\n{rendered}" if base else rendered
+    return text_reply
+
+
+_PIVOT_ATTEMPTS = 4
+_PIVOT_BRIDGE = (
+    "Let's park that one for now and come at the skill from a different "
+    "problem:"
+)
+
+
+def _force_pivot_stuck_slot(
+    *, session, step, family, tool_results, text_reply,
+) -> str:
+    """Hard pivot for stuck slots (gemma20_mt GB1). The attempt>=3 pivot
+    GUIDANCE in the in-flight block is prompt-level and gemma ignored it —
+    a mis-authored slot (ref '100' vs answers in probability form)
+    collected five straight incorrect verdicts and burned sessions to
+    max_turns. At attempt >= _PIVOT_ATTEMPTS the engine replaces the
+    stuck slot with the next unused pool question and renders it, so no
+    single question can consume a session. Eval families only."""
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return text_reply
+    if step is None:
+        return text_reply
+    from apps.tutoring.models import InFlightQuestion
+    slot = InFlightQuestion.objects.filter(session=session).first()
+    if slot is None or int(slot.attempt_count or 0) < _PIVOT_ATTEMPTS:
+        return text_reply
+    from apps.tutoring.simple_tutor.tools import (
+        build_question_pool, handle_pose_question,
+    )
+    stuck_stem = (slot.question_text or '')[:60]
+    for q in build_question_pool(session, max_questions=2):
+        opts = [
+            str(getattr(q, f'option_{letter}', '') or '').strip()
+            for letter in 'abcd'
+        ]
+        opts = [o for o in opts if o]
+        result = handle_pose_question(
+            session,
+            question_text=getattr(q, 'question_text', '') or '',
+            question_type=getattr(q, 'question_type', '') or 'short_answer',
+            reference_answer=str(getattr(q, 'correct_answer', '') or ''),
+            source='catalog',
+            options=opts or None,
+        )
+        if result.get('posed'):
+            tool_results.append({'tool': 'auto_pivot', 'result': result})
+            new_slot = InFlightQuestion.objects.filter(session=session).first()
+            logger.info(
+                "[simple_tutor] auto_pivot: replaced stuck slot (%r, "
+                "attempts=%s) session=%s", stuck_stem, slot.attempt_count,
+                session.pk,
+            )
+            rendered = _render_slot_question(new_slot) if new_slot else ''
+            if not rendered:
+                return text_reply
+            base = (text_reply or '').rstrip()
+            return (f"{base}\n\n{_PIVOT_BRIDGE}\n\n{rendered}" if base
+                    else f"{_PIVOT_BRIDGE}\n\n{rendered}")
     return text_reply
 
 
