@@ -129,3 +129,50 @@ BN1–BN4 + BN6 implemented test-first (16 new tests; suite 507 green), all in
 Not implemented: BN5 (Gemma prompted-tool emulation — a sized feature
 decision for the owner). Validation requires a Colab re-run of the OSS
 models (the fixes ride the branch the notebook clones).
+
+---
+
+## Closing summary — the Gemma track (2026-07-23): evaluation discontinued
+
+The Gemma enablement effort ran six evaluations across two days: three
+5-scenario smokes (probe5 v1–v3) and two 20-scenario board runs
+(gemma20_mt, gemma20_mt_v2), with engine fixes between each round. The
+full arc, all on okamototk/gemma3-tools (the only repackaging that
+carries tools through Ollama; verified on the pinned 0.30.7 server):
+
+| Model | smoke v1 | smoke v2 | smoke v3 | board v1 | board v2 |
+|---|---|---|---|---|---|
+| 27b | 3/5 | 4/5 | 1/5 | **10/20** | 7/20 |
+| 12b | 1/5 | 1/5 | 3/5 | 7/20 | 4/20 |
+| 4b  | 1/5 | 0/5 | 1/5 | 1/20 | 2/20 |
+| 1b  | 0/5 | 0/5 | 0/5 | 0/20 | 0/20 |
+
+Reference at the same draw: qwen3.6:35b-a3b 17/20, qwen3:4b 20/20,
+gemini-2.5-flash / kimi-k2-thinking 18/20.
+
+**What the effort produced.** The track was not wasted — it surfaced and
+fixed real engine gaps that transferred to every family: the XML
+tool-markup scrub, the mid-reply polarity pass, MCQ option-set repeat
+detection, retry-frame variation, the reject-turn auto-pose, the hard
+pivot for stuck slots, and the rotation-parity fix all came out of Gemma
+transcripts and are now part of the guard stack. It also produced the
+tool-probe gate and the version-verified Ollama pin, which protect every
+future OSS sweep.
+
+**Why evaluation stops here.** Two independent board runs bracket
+gemma3-27b's true rate at roughly 35–50% — half the qwen result at the
+same weight class — and the last two fix rounds, which measurably moved
+qwen-class models, left Gemma flat-to-down (within the ±2–3 noise band).
+The failure mode is no longer any protocol gap the engine can net: the
+guard stack already carries ~4.5 auto-grade rescues per session for 27b,
+and the residual signature — distributed pacing grind, sessions burning
+to max_turns across DIFFERENT questions, ignored self-corrections — is
+model capability through this tool protocol, not integration. Further
+engine iteration on this track is demonstrably diminishing returns.
+
+**Decision: no further Gemma evaluation.** The family datum of record is
+gemma3-27b at 10/20 (board v1, best of two runs); 12b and below are
+floor. Revisit only on a materially new Gemma release, or if the vLLM
+serving experiment (option 2 of the original analysis) is ever wanted
+for its own sake. colab_eval_gemma.ipynb remains in the repo as the
+harness template for that eventuality.
