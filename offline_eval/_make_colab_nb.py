@@ -14,16 +14,16 @@ from pathlib import Path
 REPO = 'eai6/ai-tutor'                       # the repo you collaborate on (origin)
 BRANCH = 'pixeldesignlabs-dev-portuguese'
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'     # Drive folder that persists results
-SWEEP = 'oss13_mt_v2'                        # v2 = qwen re-validation after the OSS-sweep nets (v1 = pre-fix baseline)
+SWEEP = 'mt50'                               # 50-scenario board; cloud legs (run_cloud.sh) write to the same-named local folder for one merged leaderboard
 
 # Multi-turn: each scenario is a FULL tutoring session (10-30 turns) driven by
 # the Anthropic-Haiku student simulator and scored by a Sonnet-4.6 session-level
-# rubric plus deterministic assertions. SAMPLE=20/SEED=5 is the fix-check
-# benchmark draw — the exact 20 scenarios the engine fix-cycle board
-# (gemini 18 / kimi 18 / qwen 17 of 20, cycles 0-11) was measured on, so the
-# OSS models land directly comparable to that board. Set SAMPLE=None for the
-# full 200-session publication run (~10x wall-clock and API cost).
-SAMPLE = 20
+# rubric plus deterministic assertions. SAMPLE=50/SEED=5 is the mt50 board — a
+# NEW, larger seeded draw (a different set than the old 20-scenario fixcheck
+# draw; n=50 halves the confidence interval, ~±14pp -> ~±10pp at p=0.5). The
+# cloud legs (offline_eval/cloud_models_mt50.txt via run_cloud.sh) run the
+# SAME draw, so OSS + cloud land on one leaderboard. SAMPLE=None = full 200.
+SAMPLE = 50
 SEED = 5
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 
@@ -62,10 +62,11 @@ tool-syntax leaks, expected end-state) plus a session-level rubric.
   fix-cycle sweeps, so scores are comparable).
 - **Engine** = `simple_tutor` (the production engine; `run_eval` prints a banner
   confirming it and errors on the legacy engine).
-- **Benchmark draw** = the same 20-scenario seed-5 sample the engine fix-cycle
-  board was measured on (gemini-2.5-flash 18/20 · kimi-k2-thinking 18/20 ·
-  qwen3-next-80b 17/20 at cycle 11) — the OSS numbers here read directly
-  against that board.
+- **Benchmark draw** = the mt50 board: {SAMPLE} scenarios, seed {SEED}. A NEW
+  baseline — a different (larger) draw than the 20-scenario fixcheck board, so
+  compare only against other mt50 runs. The cloud fleet (Anthropic, Gemini,
+  Vertex Model Garden — `cloud_models_mt50.txt` via `run_cloud.sh`) runs the
+  same draw for one merged leaderboard.
 
 **Run one tab per GROUP (Colab Pro+ allows concurrent A100/H100 sessions).** The 10
 OSS Qwen + Gemma models are split into 3 **disjoint size groups**; pick this tab's
