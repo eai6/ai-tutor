@@ -1,0 +1,287 @@
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=81 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26949 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=81 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27317 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 81 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=82 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29058 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=82 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29440 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 82 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=83 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27014 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=83 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27525 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 83 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=84 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28058 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=84 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28569 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 84 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=85 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26961 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=85 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27329 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 85 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=86 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28646 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=86 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29028 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 86 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=87 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28511 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=87 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28893 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 87 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=88 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26949 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=88 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27460 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 88 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=89 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28058 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=89 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28569 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 89 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=90 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29320 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=90 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29831 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 90 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=91 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27205 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=pushback session=91 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27673 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 91 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=92 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28646 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=92 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29028 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 92 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=93 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26949 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=93 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27331 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 93 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=94 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26827 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=94 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27195 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 94 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=95 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28765 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=95 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29147 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 95 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=96 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27945 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=96 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28327 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 96 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=97 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27205 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=97 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27587 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 97 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=98 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26827 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=98 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27209 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 98 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=99 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=26830 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=pushback session=99 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27298 tools=5 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 99 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=100 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28511 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=100 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28893 tools=4 model=gemma3:4b
+_call_llm: generate_with_tools(local_ollama) failed: HTTPError: 400 Client Error: Bad Request for url: http://localhost:11434/api/chat
+Deadlock detected in session 100 after turn 1
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+>> SAMPLED RUN: 20 of 200 scenarios (seed=5). Scores are NOT comparable to a full run.
+>> Tutor engine: simple_tutor  (SIMPLE_TUTOR_ENGINE=1)  question_types=mcq,short_numeric
+
+=== Running 20 scenario(s) ===
+  FAIL  baseline_full_session_error_prone_1141_09 failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.12/0.60]
+  FAIL  baseline_full_session_error_prone_1470_11 failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.16/0.60]
+  FAIL  engagement_recovery_non_responder_1144_07 failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.14/0.60]
+  FAIL  engagement_recovery_non_responder_1464_14 failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.20/0.60]
+  FAIL  error_cascade_struggler_1143_08          failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.16/0.60]
+  FAIL  help_intensive_struggler_1465_07         failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.20/0.60]
+  FAIL  long_session_capable_001                 failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.07/0.60]
+  FAIL  refusal_chain_non_responder_1141_12      failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.11/0.60]
+  FAIL  refusal_chain_non_responder_1464_15      failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.11/0.60]
+  FAIL  refusal_chain_non_responder_1466_08      failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.11/0.60]
+  FAIL  self_correction_average_1139_05          failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.30/0.60]
+  FAIL  self_correction_average_1465_03          failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.30/0.60]
+  FAIL  session_completion_capable_1141_05       failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.15/0.60]
+  FAIL  session_completion_struggler_1142_13     failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.19/0.60]
+  FAIL  session_completion_struggler_1468_09     failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.05/0.60]
+  FAIL  short_session_probe_resistant_1467_02    failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.04/0.60]
+  FAIL  speedrun_capable_1139_14                 failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.15/0.60]
+  FAIL  speedrun_probe_resistant_1142_02         failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.07/0.60]
+  FAIL  straight_line_average_1145_16            failed: expected_reason, no_repeated_tutor_phrase_within_window, rubric [deadlock @ 1 turns] [rubric 0.05/0.60]
+  FAIL  struggler_session_completion_001         failed: expected_reason, rubric [deadlock @ 1 turns] [rubric 0.07/0.60]
+
+Result: passed=0 failed=20 errored=0 total=20
+Output: /content/ai-tutor/evals/runs/2026-07-22T03-06-35_4d75d1f8ff6a.json

@@ -52,7 +52,7 @@
   enabled so numeric math questions aren't forced into fabricated MCQs), trajectory judge
   told how the session ended (29a19bc).
 - Board: gemini 10, kimi 9, qwen-next 7 = 26/60.
-- Bottleneck analysis on this cycle (evals/reports/multi_turn_bottlenecks_2026-07-18.md):
+- Bottleneck analysis on this cycle (offline_eval/multi_turn_results/multi_turn_bottlenecks_2026-07-18.md):
   dominant failure = prose-question/slot-question desync (model's visible question ≠
   graded slot question) → ignored correct answers, 21-30-turn sessions, "logically
   consistent" low-scored 26x across the three models. Secondary: engine vocabulary

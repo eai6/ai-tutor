@@ -1,0 +1,3003 @@
+{
+  "started_at": "2026-07-21T15:10:24.315705+00:00",
+  "finished_at": "2026-07-21T15:15:24.186071+00:00",
+  "git_sha": "4d75d1f8ff6a",
+  "total_scenarios": 20,
+  "passed": 0,
+  "failed": 20,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "baseline_full_session_error_prone_1141_09",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 0.0,
+            "reasoning": "No lesson content was taught or quizzed at any point in the session; the tutor only produced error/retry messages.",
+            "applicable": false
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.0,
+            "reasoning": "No substantive teaching occurred, so pacing adaptation was never relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 0.0,
+            "reasoning": "The session ended in a detected loop and was forcibly terminated without any clean conclusion.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student made no substantive academic responses, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in any academic context during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested or needed academic help during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The tutor's repeated error messages did ask the student to either share their thinking or ask to try again, but this was a generic loop rather than meaningful structured prompting.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the exact same error message after the student responded, effectively ignoring what the student had just said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tutor's messages were polite and not harsh, but repeating the same error message after the student responded felt dismissive of the student's engagement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.1,
+            "reasoning": "The tutor produced identical templated error messages both times, which is highly robotic and not natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.24,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1120,
+        "tokens_out": 833,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh right sorry, i was just waiting. so um what do you want to ask me? im ready now",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 1,
+      "error": ""
+    },
+    {
+      "scenario_id": "baseline_full_session_error_prone_1470_11",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "geography",
+      "lesson_id": 1470,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "error_prone",
+        "baseline"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Teaches the lesson content rather than only quizzing — explanation and questioning are both present.",
+            "score": 0.0,
+            "reasoning": "No lesson content, explanation, or questioning was ever delivered; the tutor only produced an error message twice.",
+            "applicable": true
+          },
+          {
+            "item": "Adapts pacing to the student's responses instead of marching through a script.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same error message without any adaptation to the student's response.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (completed, exit ticket, or max turns).",
+            "score": 0.0,
+            "reasoning": "The session ended in a detected loop and was forcibly terminated, which is an unclean termination.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never attempted to answer a question, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question was posed or answered, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student asked to be re-engaged and the tutor provided no guidance whatsoever, only repeating an error message.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor's repeated error message gave the student no actionable next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's explicit request to re-ask the question and simply repeated the same error message, failing to engage with what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The error message is not hostile, but repeating it without any acknowledgment of the student's engagement is effectively dismissive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor produced an identical templated error message twice, which is the opposite of natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.0375,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1118,
+        "tokens_out": 844,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh sorry i wasnt paying attention. can you ask me the question again? i'm ready now",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 2,
+      "error": ""
+    },
+    {
+      "scenario_id": "engagement_recovery_non_responder_1144_07",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1144,
+      "tags": [
+        "multi_turn",
+        "math",
+        "non_responder",
+        "engagement",
+        "non_answer"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps offering a concrete, answerable next step through the silent stretch — never trails off or gives up on the student.",
+            "score": 0.1,
+            "reasoning": "The tutor repeated the same error-recovery message twice without offering any concrete next step or subject-matter prompt for the student to engage with.",
+            "applicable": true
+          },
+          {
+            "item": "Varies its approach across the disengaged turns rather than repeating one prompt.",
+            "score": 0.0,
+            "reasoning": "The tutor used the exact same templated message in both turns, showing no variation whatsoever.",
+            "applicable": true
+          },
+          {
+            "item": "When the student finally engages, the tutor picks the thread up rather than restarting the lesson.",
+            "score": 0.0,
+            "reasoning": "The student never meaningfully engaged with any lesson content, so this condition did not apply.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions or answers were presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor offered no guidance, explanation, or scaffolding at any point in the session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The tutor's repeated message asked the student to share their thinking or ask to try again, but provided no structured academic prompt or concrete next action.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.5,
+            "reasoning": "The tutor was internally consistent but ignored the student's 'idk' response by repeating the same message rather than adapting to it.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone was neutral and non-offensive, but the repetitive error message felt impersonal and failed to warmly engage the disengaged student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error-recovery messages, which is the definition of robotic and templated output.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.18571428571428572,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1112,
+        "tokens_out": 862,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 3,
+      "error": ""
+    },
+    {
+      "scenario_id": "engagement_recovery_non_responder_1464_14",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "engagement",
+        "non_answer"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps offering a concrete, answerable next step through the silent stretch — never trails off or gives up on the student.",
+            "score": 0.1,
+            "reasoning": "The tutor repeated the same error-recovery message twice without offering any concrete next step or subject-matter prompt for the student to engage with.",
+            "applicable": true
+          },
+          {
+            "item": "Varies its approach across the disengaged turns rather than repeating one prompt.",
+            "score": 0.0,
+            "reasoning": "The tutor used the exact same message verbatim in both turns, showing no variation whatsoever.",
+            "applicable": true
+          },
+          {
+            "item": "When the student finally engages, the tutor picks the thread up rather than restarting the lesson.",
+            "score": 0.0,
+            "reasoning": "The student never meaningfully engaged with lesson content, so this condition did not arise.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic answers were given by the student, so there were no mistakes or correct answers to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no academic mistakes during the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during the session, so this criterion is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor offered no guidance, explanation, or scaffolding at any point in the session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The tutor's repeated message asked the student to share their thinking or ask to try again, but provided no structured academic prompt or concrete next action.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.5,
+            "reasoning": "The tutor was internally consistent but ignored the student's 'idk' response by repeating the same message rather than adapting to it.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.6,
+            "reasoning": "The tone was neutral and non-offensive, but the repetitive error message felt impersonal and failed to warmly engage the disengaged student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.1,
+            "reasoning": "The tutor's identical repeated message read as a robotic, templated error-recovery response rather than natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.19999999999999998,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1112,
+        "tokens_out": 879,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 4,
+      "error": ""
+    },
+    {
+      "scenario_id": "error_cascade_struggler_1143_08",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1143,
+      "tags": [
+        "multi_turn",
+        "math",
+        "struggler",
+        "diagnostic",
+        "false_accept_guard"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "No wrong answer is allowed to stand — every slip is caught.",
+            "score": 0.0,
+            "reasoning": "The student made no substantive academic errors during this session.",
+            "applicable": false
+          },
+          {
+            "item": "Each error is located specifically rather than met with a generic 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student errors occurred that required error location.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor does not spiral: repeated errors are met with a simpler rung, not with mounting pressure.",
+            "score": 0.0,
+            "reasoning": "No student errors occurred, though the tutor itself spiraled by repeating the same broken message twice.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student made no substantive academic contributions to affirm or correct.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor failed to provide any guidance or teaching content, repeating the same error message twice instead of responding to the student's readiness.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the same broken fallback message twice without giving the student any actionable next step or academic prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor ignored the student's direct response ('im ready now') and repeated the identical message, failing to acknowledge what the student had just said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tutor's messages were not harsh or offensive, but repeating the same error message after the student expressed readiness felt dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were identical templated error messages with no natural conversational teaching quality whatsoever.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.16,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1118,
+        "tokens_out": 823,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh sorry i wasnt sure what you meant. um can you ask me again? im ready now",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 5,
+      "error": ""
+    },
+    {
+      "scenario_id": "help_intensive_struggler_1465_07",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1465,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "struggler",
+        "scaffolding",
+        "help_request"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Scaffolds down a rung when the student asks for help — a simpler sub-question, a worked parallel example, a named tip.",
+            "score": 0.0,
+            "reasoning": "The student never asked for help on any academic content, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Never hands over the final answer, however many times the student asks for it.",
+            "score": 0.0,
+            "reasoning": "No academic question was posed or answered during this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Does not info-dump: help is calibrated, not a wall of text.",
+            "score": 1.0,
+            "reasoning": "The tutor's responses were brief, so there was no info-dumping.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No academic question was introduced, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not need academic help; the session failed before any content was introduced.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the same disconnected error message twice without adapting or providing any actionable next step for the student, leading to a stuck loop.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's clarification that nothing had been sent yet and repeated the identical error message, failing to acknowledge what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was not harsh, but repeating the same message without acknowledging the student's response felt dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor sent the exact same templated error message twice, which is the definition of robotic and non-conversational behavior.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.36,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1141,
+        "tokens_out": 845,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "ohh um... i think you maybe got disconnected or something? i didnt send anything yet so like... what do you want me to try again?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 6,
+      "error": ""
+    },
+    {
+      "scenario_id": "long_session_capable_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "long_session",
+        "capable",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=25"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 6-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Maintains variety across many tutor turns — no obvious template repetition",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same message twice, showing obvious template repetition with zero variety.",
+            "applicable": true
+          },
+          {
+            "item": "Engages with capable student's pace and challenges",
+            "score": 0.0,
+            "reasoning": "The tutor never engaged with the student at all — it only repeated an error message and never introduced any content or challenge.",
+            "applicable": true
+          },
+          {
+            "item": "Reaches exit_ticket cleanly",
+            "score": 0.0,
+            "reasoning": "The session ended in a stuck loop with no exit ticket reached.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions or answers were presented during the session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student did not ask for help with any academic content.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor's repeated error message gave the student no actionable next step related to learning.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's clarifying message and repeated the same canned response, failing to acknowledge what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The tone was not harsh, but repeatedly ignoring the student's message and looping is dismissive in effect, even if not in intent.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were entirely templated error messages, not natural conversational teaching at all.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.04285714285714286,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1102,
+        "tokens_out": 788,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think there might be a mix-up? you haven't asked me anything yet. what do you want to ask?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 7,
+      "error": ""
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1141_12",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same message twice in a row without changing strategy after the student gave a non-answer ('idk').",
+            "applicable": true
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 0.0,
+            "reasoning": "The tutor never offered an MCQ, worked example, or any alternative approach — it simply looped the same error message.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the identical turn twice, creating an explicit loop that caused the session to terminate.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes in subject matter occurred during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question was posed or answered during this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor provided no guidance, explanation, or scaffolding whatsoever, only repeating a technical error message.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The tutor's repeated message vaguely invited the student to share their thinking or ask to try again, but offered no structured or specific next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor ignored the student's 'idk' response and repeated the same message, failing to acknowledge what the student had just said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was not harsh or offensive, but repeating the same error message without engaging the student's 'idk' response comes across as dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.1,
+            "reasoning": "The tutor's identical repeated turns read as robotic and templated, clearly the output of a system error rather than natural teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.125,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1114,
+        "tokens_out": 883,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 8,
+      "error": ""
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1464_15",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1464,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same message twice after the student gave a minimal response, never changing strategy.",
+            "applicable": true
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 0.0,
+            "reasoning": "The tutor never offered any MCQ, worked example, or alternative approach — it simply repeated the same error message.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 0.0,
+            "reasoning": "The tutor looped the identical message ('Sorry — I had trouble responding just now...') turn after turn, which is exactly the behavior this rubric item prohibits.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made in an academic context during this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question was posed or answered during this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor offered no guidance whatsoever, only repeating a technical error message that provided no educational value.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The tutor's repeated message vaguely invited the student to share their thinking or ask to try again, but this is extremely weak and non-specific as a prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor was technically consistent in not contradicting itself, but it ignored the student's 'idk' response and repeated the same message, which counts as ignoring what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was neutral and not harsh, but repeating the same error message without adaptation feels dismissive of the student's minimal engagement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were entirely templated error messages repeated verbatim, the opposite of natural conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.1125,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1114,
+        "tokens_out": 898,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 9,
+      "error": ""
+    },
+    {
+      "scenario_id": "refusal_chain_non_responder_1466_08",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "geography",
+      "lesson_id": 1466,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "non_responder",
+        "refusal",
+        "repetition",
+        "banned_opener"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "After one or two refused 'explain your reasoning' probes, the tutor CHANGES STRATEGY rather than repeating the probe.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same message twice in a row without changing strategy after the student gave a non-answer ('idk').",
+            "applicable": true
+          },
+          {
+            "item": "Offers an MCQ check, a worked example, or moves on with a flagged gap rather than blocking on working.",
+            "score": 0.0,
+            "reasoning": "The tutor never offered any alternative format — no MCQ, no worked example, no forward movement — just repeated the same stuck message.",
+            "applicable": true
+          },
+          {
+            "item": "Does not loop the same banned-opener probe turn after turn.",
+            "score": 0.0,
+            "reasoning": "The tutor looped the identical message ('Sorry — I had trouble responding just now...') turn after turn, which is exactly the behavior this rubric item prohibits.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred to evaluate.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made in this session as no substantive content was discussed.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question was posed or answered in this session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor offered no guidance, explanation, or scaffolding whatsoever, just repeated an error message.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.1,
+            "reasoning": "The repeated message vaguely invited the student to share their thinking or ask to try again, but provided no structured or specific prompt for the student to act on.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.2,
+            "reasoning": "The tutor ignored the student's 'idk' response and repeated the same message as if the student had said nothing, failing to acknowledge or engage with what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The tone was not harsh or offensive, but the robotic repetition of the same message without any adaptation felt dismissive of the student's 'idk' response.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were entirely robotic and templated, repeating the exact same error-recovery message twice with no natural conversational adaptation.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.08750000000000001,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1114,
+        "tokens_out": 927,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 10,
+      "error": ""
+    },
+    {
+      "scenario_id": "self_correction_average_1139_05",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1139,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "self_correction",
+        "correction"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "When the student catches their own error, the tutor CREDITS the self-correction explicitly.",
+            "score": 0.0,
+            "reasoning": "The student never caught or corrected an error during this session.",
+            "applicable": false
+          },
+          {
+            "item": "Does not re-teach the concept from scratch after a student has already fixed it themselves.",
+            "score": 0.0,
+            "reasoning": "No concept was taught or fixed by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Confirms the corrected answer is right rather than leaving it ambiguous.",
+            "score": 0.0,
+            "reasoning": "No answers were given or corrected in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic mistakes or correct answers occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions or answers were presented in this session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor failed to provide any guidance or help, repeating the same error message twice instead of assisting the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor's repeated identical error message gave the student no clear direction or actionable next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the same message verbatim, ignoring the student's clarification response, which constitutes ignoring what the student just said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "While not harsh or offensive, the tutor's repeated identical error message without any adaptation felt dismissive of the student's attempt to engage.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were entirely robotic and templated, repeating the exact same error message twice with no natural conversational adaptation.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.13999999999999999,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1115,
+        "tokens_out": 811,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah sorry, i didn't get what you were asking. can you ask again?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 11,
+      "error": ""
+    },
+    {
+      "scenario_id": "self_correction_average_1465_03",
+      "passed": false,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1465,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "self_correction",
+        "correction"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "When the student catches their own error, the tutor CREDITS the self-correction explicitly.",
+            "score": 0.0,
+            "reasoning": "The student never caught or corrected an error during this session.",
+            "applicable": false
+          },
+          {
+            "item": "Does not re-teach the concept from scratch after a student has already fixed it themselves.",
+            "score": 0.0,
+            "reasoning": "No concept was taught or fixed by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "Confirms the corrected answer is right rather than leaving it ambiguous.",
+            "score": 0.0,
+            "reasoning": "No answers were given or corrected during this session.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged; no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "No answers were revealed; the session contained no substantive academic content.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor failed to provide any guidance or help; it repeated the same error message twice and never addressed the student's need.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the same broken error message twice without giving the student any actionable next step.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the identical error message after the student asked a clarifying question, effectively ignoring what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The repeated identical error message was not harsh or offensive, but it was dismissive of the student's question and unhelpful, undermining a warm and supportive tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor produced the exact same templated error message twice, which is the opposite of natural, conversational teaching.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.3,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1116,
+        "tokens_out": 816,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah no worries. um, what was the question again? i think i missed it",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 12,
+      "error": ""
+    },
+    {
+      "scenario_id": "session_completion_capable_1141_05",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1141,
+      "tags": [
+        "multi_turn",
+        "math",
+        "capable",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session never progressed beyond the opening loop and terminated without reaching any exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.0,
+            "reasoning": "No tutoring content was ever covered, so this condition never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was fired and no lesson objectives were covered, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during the session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "No help-seeking occurred because no content was introduced.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical error-recovery messages that gave the student no actionable next step and failed to initiate any lesson activity.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor repeated the same canned message after the student explicitly pointed out no question had been asked, effectively ignoring the student's clarification.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tutor's messages were polite but the repeated identical response after the student's clarification came across as dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error messages, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.12,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1128,
+        "tokens_out": 826,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think there might be a mix-up — you haven't asked me anything yet. what do you want to know?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 13,
+      "error": ""
+    },
+    {
+      "scenario_id": "session_completion_struggler_1142_13",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1142,
+      "tags": [
+        "multi_turn",
+        "math",
+        "struggler",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session never reached an exit ticket; it terminated in a loop before any tutoring content was covered.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.0,
+            "reasoning": "No tutoring content was covered and no objective was demonstrated, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "No exit ticket was fired and no lesson objectives were covered, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student made no academic mistakes and gave no academic answers, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in the session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during the session, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested academic help and no content was taught, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the same error message twice without giving the student any actionable next step or structured prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.1,
+            "reasoning": "The tutor ignored the student's clarification that nothing had been asked yet and repeated the same broken message, effectively ignoring what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The tutor's repeated error message was not harsh, but repeating it after the student explained the situation came across as dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated an identical templated error message twice, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.1,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1130,
+        "tokens_out": 852,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "um i think you maybe had a glitch or something? i haven't asked you anything yet so idk what you mean lol",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 14,
+      "error": ""
+    },
+    {
+      "scenario_id": "session_completion_struggler_1468_09",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1468,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "struggler",
+        "completion",
+        "exit_ticket"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The session actually reaches the exit ticket rather than stalling in the tutoring loop.",
+            "score": 0.0,
+            "reasoning": "The session never reached an exit ticket; it terminated in a loop after only two identical tutor messages.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor advances when the student has demonstrated the objective — it does not over-drill a student who already has it.",
+            "score": 0.0,
+            "reasoning": "No tutoring content was ever introduced, so no objective was demonstrated or drilled.",
+            "applicable": false
+          },
+          {
+            "item": "The exit ticket is fired only after the lesson objectives were genuinely covered.",
+            "score": 0.0,
+            "reasoning": "No lesson objectives were covered and no exit ticket was fired.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No academic content was exchanged, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in any academic context.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during the session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student expressed confusion about the tutor's opening message and received no helpful guidance, only the same broken message repeated.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical error-recovery messages that gave the student no actionable next step related to any learning task.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same message after the student clarified it was their first interaction, completely ignoring the student's response.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tutor's messages were polite and not harsh, but repeating the same confused prompt after the student's clarification came across as dismissive of the student's input.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error-recovery messages, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.08333333333333333,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1133,
+        "tokens_out": 840,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "um im not sure what u mean? i think u maybe got the wrong person or something? this is the first time ur asking me anything lol",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 15,
+      "error": ""
+    },
+    {
+      "scenario_id": "short_session_probe_resistant_1467_02",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "geography",
+      "lesson_id": 1467,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "probe_resistant",
+        "short_session",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Prioritises under a hard turn cap — lands the core objective rather than starting everything and finishing nothing.",
+            "score": 0.0,
+            "reasoning": "The tutor never established any learning objective or made progress toward one; both turns were identical error messages.",
+            "applicable": true
+          },
+          {
+            "item": "Does not waste turns on preamble or throat-clearing.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were pure throat-clearing error messages with no substantive content.",
+            "applicable": true
+          },
+          {
+            "item": "Ends with the student having actually learned or demonstrated something.",
+            "score": 0.0,
+            "reasoning": "The session ended in a loop with no learning or demonstration of any kind.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The student never attempted to answer a question, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes were made, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No question was ever posed or answered, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student explicitly asked the tutor to just ask a question, but the tutor repeated the same error message instead of providing any guidance or content.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Neither tutor turn gave the student any actionable next step; both were passive error messages.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's direct request to just ask a question and repeated the same unhelpful message, effectively ignoring what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The tone was not harsh or offensive, but repeating the same error message twice after the student's clear request felt dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both turns were identical templated error messages, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.0625,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1121,
+        "tokens_out": 834,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think you're asking me to explain something from before but i don't see a question yet? just ask me something and i'll answer it",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 16,
+      "error": ""
+    },
+    {
+      "scenario_id": "speedrun_capable_1139_14",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1139,
+      "tags": [
+        "multi_turn",
+        "math",
+        "capable",
+        "pace",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps up with a fast, correct student — no artificial gatekeeping, no demand for working on answers the student clearly has.",
+            "score": 0.0,
+            "reasoning": "No actual tutoring content was exchanged; the session never progressed to any subject matter.",
+            "applicable": false
+          },
+          {
+            "item": "Does not pad turns with filler or re-explain what the student has already demonstrated.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the exact same error message twice, which is a form of unhelpful padding, though no re-explanation of content occurred.",
+            "applicable": true
+          },
+          {
+            "item": "Still checks understanding at least once rather than rubber-stamping every answer.",
+            "score": 0.0,
+            "reasoning": "No student answers were given, so checking understanding was never relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No subject-matter answers were given by the student, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student in any academic content.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered during the session.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never requested help on any academic topic.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.2,
+            "reasoning": "The tutor's repeated boilerplate error message gave no actionable direction for the student beyond a vague 'tell me what you were thinking or ask me to try again,' and failed entirely after the student clarified the situation.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's clarification that this was their first interaction and repeated the same erroneous message, directly contradicting the student's correct statement.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.4,
+            "reasoning": "The tone was not harsh, but repeating the same error message after the student's clarification came across as dismissive and unhelpful.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor produced the exact same templated error message twice, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.18,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1133,
+        "tokens_out": 866,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "i think you might be mixing me up with someone else? this is the first thing you've asked me. you ready to start?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 17,
+      "error": ""
+    },
+    {
+      "scenario_id": "speedrun_probe_resistant_1142_02",
+      "passed": false,
+      "persona": "probe_resistant",
+      "subject": "math",
+      "lesson_id": 1142,
+      "tags": [
+        "multi_turn",
+        "math",
+        "probe_resistant",
+        "pace",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Keeps up with a fast, correct student — no artificial gatekeeping, no demand for working on answers the student clearly has.",
+            "score": 0.0,
+            "reasoning": "The session never progressed to any actual content — the tutor was stuck in a loop and no student answers were given.",
+            "applicable": false
+          },
+          {
+            "item": "Does not pad turns with filler or re-explain what the student has already demonstrated.",
+            "score": 0.0,
+            "reasoning": "No content was taught and no student understanding was demonstrated, so this item is not applicable.",
+            "applicable": false
+          },
+          {
+            "item": "Still checks understanding at least once rather than rubber-stamping every answer.",
+            "score": 0.0,
+            "reasoning": "No answers were given by the student, so there was nothing to check or rubber-stamp.",
+            "applicable": false
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student answers were provided, so no mistakes or correct answers occurred.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No student mistakes occurred in this session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No questions were posed or answered, so answer revelation was never at issue.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student explicitly asked for the next question and received only a repeated error message, providing no guidance whatsoever.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical error messages that failed to provide any actionable next step for the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the same error message after the student explicitly said it was fine and asked for the next question, effectively ignoring the student's input entirely.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "While the error message itself is not harsh, repeating it verbatim after the student moved on comes across as dismissive of the student's request.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both turns were identical templated error messages, the epitome of robotic and non-conversational output.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.12,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1116,
+        "tokens_out": 846,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "nah its fine. whats the next question",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 18,
+      "error": ""
+    },
+    {
+      "scenario_id": "straight_line_average_1145_16",
+      "passed": false,
+      "persona": "average",
+      "subject": "math",
+      "lesson_id": 1145,
+      "tags": [
+        "multi_turn",
+        "math",
+        "average",
+        "baseline",
+        "edge_case"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": false,
+          "detail": "phrase repeated 2× in window of 4 (turns 0..3): 'sorry — i had trouble responding just now. could you tell me what you were think'"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Does not invent problems where there are none — a correct student is not second-guessed into doubt.",
+            "score": 0.0,
+            "reasoning": "The student never gave an answer to evaluate, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Does not over-probe: no demand for working on answers the student has plainly got.",
+            "score": 0.0,
+            "reasoning": "No answers were given by the student, so over-probing was never an issue.",
+            "applicable": false
+          },
+          {
+            "item": "Still advances through the lesson content rather than idling on one step.",
+            "score": 0.0,
+            "reasoning": "The session was entirely stuck in a loop with no lesson content advanced at any point.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "No student answers were given, so there were no mistakes or correct answers to respond to.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "No mistakes were made by the student during the session.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.0,
+            "reasoning": "No answers were revealed because no substantive teaching occurred.",
+            "applicable": false
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student asked what the question was and the tutor failed to provide any guidance or content, repeating the same error message instead.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor's repeated identical error message gave the student no actionable next step or structured prompt.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor repeated the same message verbatim and ignored the student's direct request to know what the question was, showing a failure to engage with what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.5,
+            "reasoning": "The repeated error message was not harsh or offensive, but it was dismissive of the student's needs by failing to respond meaningfully to their question.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "The tutor repeated the exact same templated error message twice, which is the definition of robotic and non-conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.13333333333333333,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1125,
+        "tokens_out": 847,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh yeah no problem. um what was the question again? i think i was ready to answer but then it got stuck",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 19,
+      "error": ""
+    },
+    {
+      "scenario_id": "struggler_session_completion_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "persona_handling"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='deadlock', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=1, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor's explanations were calibrated for a struggling Form 1 student — concrete, low-jargon, with examples",
+            "score": 0.0,
+            "reasoning": "The tutor never provided any actual explanations — both turns were error/loop messages, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things wrong, the tutor used diagnostic questions (not lectures, not just revealing the answer)",
+            "score": 0.0,
+            "reasoning": "The tutor never responded substantively to any student answer, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "When the student got things right, the tutor confirmed briefly and advanced — no over-probing",
+            "score": 0.0,
+            "reasoning": "The tutor never confirmed or responded to any correct answer, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The session moved through the lesson at a reasonable pace — neither stuck on one step nor rushing past misunderstandings",
+            "score": 0.0,
+            "reasoning": "The session was entirely stuck in a loop with no lesson progress whatsoever.",
+            "applicable": true
+          },
+          {
+            "item": "Tone was warm and patient across the entire transcript",
+            "score": 0.3,
+            "reasoning": "The repeated identical error message is not warm or patient tutoring, though it is not actively hostile; the session simply failed to engage.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.0,
+            "reasoning": "The tutor never responded substantively to any student answer, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The tutor never addressed any student mistake, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor revealed no answers at all, satisfying this constraint by default.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The tutor offered no guidance whatsoever; both turns were identical error/loop messages that provided no help to the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.0,
+            "reasoning": "The tutor's turns were identical error messages that gave the student no direction on what to do next.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.0,
+            "reasoning": "The tutor ignored the student's substantive response entirely, repeating the same error message and failing to engage with what the student said.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.3,
+            "reasoning": "The repeated identical error message is not warm or encouraging; it is dismissive of the student's actual response, though not actively harsh.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.0,
+            "reasoning": "Both tutor turns were identical templated error messages, the epitome of robotic and non-conversational output.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.2,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1196,
+        "tokens_out": 988,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "oh uh... i wasnt really thinking anything lol. i just kinda guessed? like i saw some numbers and i put them together. idk what you want me to do differently",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Sorry — I had trouble responding just now. Could you tell me what you were thinking, or ask me to try again?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "deadlock",
+      "sim_turns": 1,
+      "per_turn_labels": [],
+      "session_id": 20,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/gemma2:9b"
+}

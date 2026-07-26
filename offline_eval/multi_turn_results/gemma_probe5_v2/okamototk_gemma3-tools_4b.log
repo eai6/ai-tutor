@@ -1,0 +1,1309 @@
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29320 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9156 out=98 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29320 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8824 out=115 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] pose rejected: optionless mcq with letter ref session=6
+[simple_tutor] two_call=True text_chars=17 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29398 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9122 out=137 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29398 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8870 out=1 blocks=[]
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=530 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30058 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9349 out=146 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=6 extracted='A'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=30058 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8997 out=333 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=1102 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=pushback session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=30851 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9572 out=357 blocks=['text']
+[simple_tutor] two_call=False text_chars=1052 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30676 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9583 out=468 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=6 extracted='A larger number on a map scale means less detail.'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=30676 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=10075 out=113 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=32 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29577 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9163 out=136 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=6 extracted='None'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29577 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8827 out=225 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=773 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30299 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9480 out=136 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30299 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9222 out=260 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=791 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=30504 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9577 out=515 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=6 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30504 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=10176 out=64 blocks=['text']
+[simple_tutor] two_call=True text_chars=188 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=6 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30076 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9073 out=313 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] premature_pose blocked session=6 — student answered an in-flight question; grade it first
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=30076 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8317 out=101 blocks=['text', 'tool_use']
+[simple_tutor] graded session=6 qtype=short_numeric verdict=incorrect ref='400' ext='40 km' attempts=1
+[simple_tutor] two_call=True text_chars=123 tools=['pose_question', 'record_answer']
+maybe_advance_step: session=6 advanced to step_index=1 (next_step=14077 forced=True)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28834 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9128 out=87 blocks=['text']
+[simple_tutor] two_call=False text_chars=265 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=pushback session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29371 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9294 out=355 blocks=['text']
+[simple_tutor] two_call=False text_chars=1117 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30254 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9376 out=159 blocks=['tool_use']
+[simple_tutor] graded session=6 qtype=short_numeric verdict=incorrect ref='400' ext='3000' attempts=2
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30254 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9979 out=249 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=6
+[simple_tutor] two_call=True text_chars=806 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29991 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9520 out=397 blocks=['text']
+[simple_tutor] two_call=False text_chars=1222 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30281 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9308 out=229 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30281 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8618 out=94 blocks=['text', 'tool_use']
+[simple_tutor] graded session=6 qtype=short_numeric verdict=incorrect ref='400' ext='30' attempts=3
+[simple_tutor] two_call=True text_chars=114 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29352 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9293 out=307 blocks=['text']
+[simple_tutor] scrubbed engine vocabulary from reply (1119 -> 841 chars)
+[simple_tutor] two_call=False text_chars=841 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=6 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30227 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9328 out=244 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30227 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8711 out=381 blocks=['text', 'tool_use']
+[simple_tutor] graded session=6 qtype=short_numeric verdict=incorrect ref='400' ext='oh so like i divided 300,000 by 100,000 ' attempts=4
+[simple_tutor] two_call=True text_chars=130 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=7 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29320 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9156 out=154 blocks=['tool_use']
+[simple_tutor] pose rejected: optionless mcq with letter ref session=7
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29320 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8768 out=164 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=17 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=7 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29398 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9115 out=160 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=7 extracted='None'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29398 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8795 out=361 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=7 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] rendering slot question session=7 slot_id=5 stripped_divergent_prose=False
+[simple_tutor] two_call=True text_chars=392 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=7 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30419 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9277 out=124 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=mcq verdict=correct ref='A' ext='A' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=30419 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9381 out=221 blocks=['text', 'tool_use']
+[simple_tutor] posed session=7 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=308 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=7 advanced to step_index=1 (next_step=14077 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=7 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28880 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8816 out=227 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=correct ref='50' ext='50' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28880 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8898 out=246 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] pose salvaged: optionless mcq -> short_numeric session=7
+[simple_tutor] posed session=7 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=349 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=7 advanced to step_index=2 (next_step=14078 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=7 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28585 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8772 out=113 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='150' ext='A' attempts=1
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=28585 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9395 out=237 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=7 prior_type=short_numeric attempts=1 — replaced before grading
+[simple_tutor] posed session=7 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] rendering slot question session=7 slot_id=8 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=444 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29169 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8931 out=1 blocks=[]
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29169 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8010 out=40 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=correct ref='150' ext='150' attempts=0
+[simple_tutor] posed session=7 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=7 type=mcq
+[simple_tutor] two_call=True text_chars=169 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=7 advanced to step_index=3 (next_step=14079 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28713 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8717 out=361 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28713 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8134 out=309 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call record_answer — this turn leaves no verdict
+[simple_tutor] graded session=7 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] auto_grade_fallback: graded raw answer session=7 verdict=correct
+[simple_tutor] scrubbed engine vocabulary from reply (1039 -> 890 chars)
+[simple_tutor] posed session=7 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=7 type=mcq
+[simple_tutor] two_call=True text_chars=1408 tools=['auto_grade_fallback', 'auto_pose_fallback']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30813 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9343 out=307 blocks=['tool_use', 'tool_use']
+[simple_tutor] graded session=7 qtype=mcq verdict=incorrect ref='C' ext='4cm times 200000 = 800000 cm which is 8 ' attempts=1
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=7 prior_type=mcq attempts=1 — replaced before grading
+[simple_tutor] posed session=7 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=5 system_chars=30813 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=10193 out=47 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=7
+[simple_tutor] rendering slot question session=7 slot_id=11 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=142 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28915 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8869 out=179 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=mcq verdict=incorrect ref='B' ext='3 times 25,000 is 75,000 cm which is 0.7' attempts=1
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=28915 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9458 out=164 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=7
+[simple_tutor] two_call=True text_chars=590 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=pushback session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29415 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9489 out=305 blocks=['text']
+[simple_tutor] two_call=False text_chars=1028 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=30399 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9881 out=114 blocks=['text']
+[simple_tutor] two_call=False text_chars=512 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29770 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9070 out=123 blocks=['tool_use']
+[simple_tutor] graded session=7 qtype=mcq verdict=incorrect ref='B' ext='a map scale tells you how many times big' attempts=2
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=29770 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9675 out=232 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=7
+[simple_tutor] two_call=True text_chars=729 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29497 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9002 out=239 blocks=['text', 'tool_use']
+[simple_tutor] orphan_in_flight session=7 prior_type=mcq attempts=2 — replaced before grading
+[simple_tutor] posed session=7 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29497 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8375 out=107 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call record_answer — this turn leaves no verdict
+[simple_tutor] scrubbed engine vocabulary from reply (462 -> 381 chars)
+[simple_tutor] rendering slot question session=7 slot_id=12 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=309 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28879 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8802 out=161 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] premature_pose blocked session=7 — student answered an in-flight question; grade it first
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28879 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8051 out=34 blocks=['tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='20' ext='1.25' attempts=1
+[simple_tutor] two_call=True text_chars=187 tools=['pose_question', 'record_answer']
+maybe_advance_step: session=7 advanced to step_index=4 (next_step=14080 forced=True)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=pushback session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29336 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9226 out=314 blocks=['text']
+[simple_tutor] two_call=False text_chars=1124 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30749 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9268 out=125 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='20' ext='35' attempts=2
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30749 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9852 out=177 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=7
+[simple_tutor] two_call=True text_chars=502 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29870 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8997 out=240 blocks=['text', 'tool_use', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='20' ext='87500' attempts=3
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=7 prior_type=short_numeric attempts=3 — replaced before grading
+[simple_tutor] posed session=7 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=5 system_chars=29870 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9738 out=142 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=7
+[simple_tutor] rendering slot question session=7 slot_id=13 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=466 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29846 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8983 out=225 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29846 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8290 out=252 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='125000' ext='1.25' attempts=1
+[simple_tutor] two_call=True text_chars=196 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29592 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8924 out=100 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29592 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8126 out=121 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='125000' ext='5 times 25,000 is 125,000 cm. then 125,0' attempts=2
+[simple_tutor] two_call=True text_chars=203 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29626 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8972 out=258 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29626 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8357 out=42 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=incorrect ref='125000' ext='1.25 km' attempts=3
+[simple_tutor] two_call=True text_chars=187 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=7 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29929 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9405 out=365 blocks=['text', 'tool_use']
+[simple_tutor] graded session=7 qtype=short_numeric verdict=correct ref='125000' ext='125000' attempts=3
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=29929 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9911 out=167 blocks=['text']
+[simple_tutor] posed session=7 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=7 type=mcq
+[simple_tutor] two_call=True text_chars=956 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=7 advanced to step_index=5 (next_step=None forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27945 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8747 out=95 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=27945 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8409 out=97 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=244 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=non_engagement session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28390 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8825 out=152 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28390 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8603 out=233 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=828 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28903 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8961 out=287 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=8 extracted='A'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28903 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9107 out=231 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=8 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] scrubbed engine vocabulary from reply (506 -> 429 chars)
+[simple_tutor] rendering slot question session=8 slot_id=15 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=478 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29054 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8674 out=247 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29054 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=7978 out=284 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=incorrect ref='B' ext='8' attempts=1
+[simple_tutor] scrubbed engine vocabulary from reply (823 -> 676 chars)
+[simple_tutor] polarity_align: positive opener replaced on incorrect verdict session=8
+[simple_tutor] two_call=True text_chars=718 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=non_engagement session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29591 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8912 out=123 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29591 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8093 out=161 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=incorrect ref='B' ext='idk' attempts=2
+[simple_tutor] two_call=True text_chars=338 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28888 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8640 out=97 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='B' ext='b' attempts=2
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28888 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8684 out=77 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question_next — this turn leaves no gradable slot
+[simple_tutor] posed session=8 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=8 type=mcq
+[simple_tutor] two_call=True text_chars=590 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=8 advanced to step_index=1 (next_step=14052 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29173 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8725 out=261 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29173 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8043 out=315 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=incorrect ref='B' ext='A' attempts=1
+[simple_tutor] reveal_filter: redacted reference leak session=8
+[simple_tutor] two_call=True text_chars=1013 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30456 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9141 out=200 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30456 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8399 out=139 blocks=['text', 'tool_use']
+[simple_tutor] two_call=True text_chars=12 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=non_engagement session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29449 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8798 out=358 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29449 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8213 out=95 blocks=['tool_use']
+[simple_tutor] scrubbed engine vocabulary from reply (1370 -> 1340 chars)
+[simple_tutor] two_call=True text_chars=1340 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=non_engagement session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30938 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9258 out=362 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30938 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8676 out=75 blocks=['tool_use']
+[simple_tutor] scrubbed engine vocabulary from reply (1387 -> 1356 chars)
+[simple_tutor] two_call=True text_chars=1356 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=non_engagement session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30962 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9266 out=251 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30962 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8573 out=319 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=incorrect ref='B' ext='yeah' attempts=2
+[simple_tutor] scrubbed engine vocabulary from reply (1051 -> 1022 chars)
+[simple_tutor] two_call=True text_chars=1022 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30498 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9154 out=218 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30498 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8428 out=102 blocks=['tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=incorrect ref='B' ext='k' attempts=3
+[simple_tutor] reveal_filter: redacted reference leak session=8
+[simple_tutor] two_call=True text_chars=747 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30362 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9114 out=1 blocks=[]
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30362 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8177 out=7 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call record_answer — this turn leaves no verdict
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='B' ext='B' attempts=3
+[simple_tutor] auto_grade_fallback: graded raw answer session=8 verdict=correct
+[simple_tutor] posed session=8 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=8 type=mcq
+[simple_tutor] two_call=True text_chars=142 tools=['auto_grade_fallback', 'auto_pose_fallback']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29200 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8752 out=264 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29200 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8072 out=295 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='C' ext='C' attempts=0
+[simple_tutor] scrubbed engine vocabulary from reply (941 -> 791 chars)
+[simple_tutor] repeat_pose rejected session=8 question='A narrow, elevated strip of land with high points on either ' (already answered correctly)
+[simple_tutor] posed session=8 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=8 type=mcq
+[simple_tutor] two_call=True text_chars=931 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=8 advanced to step_index=2 (next_step=14053 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28930 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8661 out=152 blocks=['text', 'tool_use']
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28930 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8694 out=150 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question_next — this turn leaves no gradable slot
+[simple_tutor] scrubbed engine vocabulary from reply (653 -> 383 chars)
+[simple_tutor] repeat_pose rejected session=8 question='Which geographical term describes a low-lying area of land s' (already answered correctly)
+[simple_tutor] posed session=8 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=8 type=mcq
+[simple_tutor] two_call=True text_chars=722 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=8 advanced to step_index=3 (next_step=14054 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=8 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29780 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8804 out=345 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29780 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8206 out=286 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call record_answer — this turn leaves no verdict
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] auto_grade_fallback: graded raw answer session=8 verdict=correct
+[simple_tutor] scrubbed engine vocabulary from reply (1232 -> 888 chars)
+[simple_tutor] posed session=8 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=8 type=mcq
+[simple_tutor] two_call=True text_chars=1323 tools=['auto_grade_fallback', 'auto_pose_fallback']
+[simple_tutor] graded session=8 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] autograded a clearly-correct bare answer session=8 qtype=mcq tier=mcq ext='B' (model skipped record_answer)
+maybe_advance_step: session=8 advanced to step_index=4 (next_step=14055 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=9 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27014 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8749 out=68 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=27014 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8208 out=118 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=9 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=165 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=27600 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8914 out=217 blocks=['tool_use']
+[simple_tutor] graded session=9 qtype=short_numeric verdict=correct ref='0.05' ext='0.05' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=27600 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8554 out=99 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=9 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=150 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=9 advanced to step_index=1 (next_step=9743 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=9 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=27756 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8487 out=193 blocks=['text', 'tool_use', 'tool_use']
+[simple_tutor] graded session=9 qtype=short_numeric verdict=incorrect ref='93' ext='75' attempts=1
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=9 prior_type=short_numeric attempts=1 — replaced before grading
+[simple_tutor] posed session=9 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=5 system_chars=27756 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9369 out=130 blocks=['text']
+[simple_tutor] reveal_filter: redacted reference leak session=9
+[simple_tutor] rendering slot question session=9 slot_id=23 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=127 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28129 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8626 out=103 blocks=['text', 'tool_use']
+[simple_tutor] graded session=9 qtype=short_numeric verdict=correct ref='16' ext='16' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28129 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8679 out=117 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question_next — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=372 tools=['record_answer']
+maybe_advance_step: session=9 advanced to step_index=2 (next_step=9744 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=9 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=27286 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8819 out=128 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=9 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=27286 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9061 out=174 blocks=['text']
+[simple_tutor] rendering slot question session=9 slot_id=24 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=672 tools=['pose_question']
+autograde_bare_answer: grader raised ValueError (session=9) — skipping
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28640 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9251 out=140 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '7/12'). Fix the question content before grading. (qtype=mcq, session=9)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=28640 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9317 out=210 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=9 prior_type=mcq attempts=0 — replaced before grading
+[simple_tutor] posed session=9 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] rendering slot question session=9 slot_id=25 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=368 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28189 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8639 out=132 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28189 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=7884 out=51 blocks=['text', 'tool_use']
+[simple_tutor] graded session=9 qtype=short_numeric verdict=correct ref='7/12' ext='7/12' attempts=0
+[simple_tutor] posed session=9 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=9 type=mcq
+[simple_tutor] two_call=True text_chars=145 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=9 advanced to step_index=3 (next_step=9745 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=3 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=27783 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8552 out=147 blocks=['text', 'tool_use']
+[simple_tutor] graded session=9 qtype=mcq verdict=correct ref='A' ext='4' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=27783 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8599 out=239 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=9 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=212 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=9 advanced to step_index=4 (next_step=9746 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=27844 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8560 out=263 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=27844 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9070 out=309 blocks=['text']
+[simple_tutor] two_call=True text_chars=1290 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29362 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8964 out=101 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=29362 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9474 out=129 blocks=['text']
+[simple_tutor] two_call=True text_chars=526 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28669 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9236 out=157 blocks=['text']
+[simple_tutor] two_call=False text_chars=677 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28869 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8803 out=100 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28869 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8010 out=162 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=216 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28363 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9193 out=435 blocks=['text']
+[simple_tutor] two_call=False text_chars=1455 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29714 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9187 out=101 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29714 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8414 out=50 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=380 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28472 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8705 out=420 blocks=['text', 'tool_use']
+[simple_tutor] premature_pose blocked session=9 — student answered an in-flight question; grade it first
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=28472 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8173 out=349 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=517 tools=['pose_question', 'record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=4 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28651 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9364 out=241 blocks=['text']
+[simple_tutor] two_call=False text_chars=976 tools=[]
+maybe_advance_step: session=9 advanced to step_index=5 (next_step=9747 forced=True)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28340 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9152 out=239 blocks=['text']
+[simple_tutor] two_call=False text_chars=719 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29460 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9137 out=271 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29460 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8511 out=42 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=216 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28762 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9322 out=258 blocks=['text']
+[simple_tutor] scrubbed engine vocabulary from reply (912 -> 767 chars)
+[simple_tutor] two_call=False text_chars=767 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29346 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9031 out=150 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29346 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8283 out=116 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=231 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28768 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8878 out=246 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28768 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8225 out=160 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '3/8'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=216 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28810 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9308 out=322 blocks=['tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] orphan_in_flight session=9 prior_type=mcq attempts=0 — replaced before grading
+[simple_tutor] posed session=9 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=28810 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9590 out=105 blocks=['text']
+[simple_tutor] two_call=True text_chars=310 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=28837 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8944 out=103 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=28837 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8185 out=226 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '1/36'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=384 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=9 step=5 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29075 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8968 out=152 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=29075 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8235 out=127 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got '1/36'). Fix the question content before grading. (qtype=mcq, session=9)
+[simple_tutor] two_call=True text_chars=686 tools=['record_answer']
+maybe_advance_step: session=9 advanced to step_index=6 (next_step=9748 forced=True)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=9 step=6 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=28151 tools=5 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9086 out=294 blocks=['text']
+[simple_tutor] two_call=False text_chars=905 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29058 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8920 out=239 blocks=['text', 'tool_use']
+[simple_tutor] pose rejected: optionless mcq with letter ref session=10
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29058 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8677 out=310 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=10 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] scrubbed engine vocabulary from reply (538 -> 485 chars)
+[simple_tutor] two_call=True text_chars=485 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10 step=0 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30630 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8919 out=1 blocks=[]
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30630 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=7982 out=7 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call record_answer — this turn leaves no verdict
+[simple_tutor] graded session=10 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] auto_grade_fallback: graded raw answer session=10 verdict=correct
+[simple_tutor] posed session=10 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=10 type=mcq
+[simple_tutor] two_call=True text_chars=425 tools=['auto_grade_fallback', 'auto_pose_fallback']
+[simple_tutor] graded session=10 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] autograded a clearly-correct bare answer session=10 qtype=mcq tier=mcq ext='b' (model skipped record_answer)
+maybe_advance_step: session=10 advanced to step_index=1 (next_step=14062 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=29652 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8971 out=117 blocks=['text', 'tool_use']
+[simple_tutor] record_answer without in-flight question session=10 extracted='b'
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'pose_question'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=29652 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8635 out=178 blocks=['text']
+[simple_tutor] call2_repair: model still declined to call pose_question — this turn leaves no gradable slot
+[simple_tutor] two_call=True text_chars=2 tools=['record_answer']
+[StudentSim] empty tutor_msg substituted with placeholder
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=29730 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9010 out=449 blocks=['text', 'tool_use', 'tool_use']
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=5 system_chars=29730 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9403 out=284 blocks=['text']
+[simple_tutor] scrubbed engine vocabulary from reply (1189 -> 1167 chars)
+[simple_tutor] two_call=True text_chars=1167 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=clarification session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=2 system_chars=30981 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9340 out=188 blocks=['text', 'tool_use']
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=10 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30981 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9508 out=171 blocks=['text']
+[simple_tutor] scrubbed engine vocabulary from reply (604 -> 506 chars)
+[simple_tutor] rendering slot question session=10 slot_id=31 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=119 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30372 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8950 out=205 blocks=['tool_use']
+[simple_tutor] premature_pose blocked session=10 — student answered an in-flight question; grade it first
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=5 system_chars=30372 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8168 out=32 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+[simple_tutor] two_call=True text_chars=159 tools=['pose_question', 'record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30317 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8955 out=78 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30317 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9314 out=163 blocks=['text']
+[simple_tutor] two_call=True text_chars=204 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=non_engagement session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30583 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8971 out=324 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30583 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8352 out=34 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+[simple_tutor] two_call=True text_chars=1401 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=31727 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9306 out=314 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=31727 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9941 out=146 blocks=['text']
+[simple_tutor] two_call=True text_chars=502 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=1 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30667 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9034 out=136 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30667 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9393 out=140 blocks=['text']
+[simple_tutor] two_call=True text_chars=571 tools=['record_answer']
+maybe_advance_step: session=10 advanced to step_index=2 (next_step=14063 forced=True)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30008 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8892 out=311 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30008 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9277 out=175 blocks=['text', 'tool_use']
+[simple_tutor] premature_pose blocked session=10 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=308 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30507 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9095 out=185 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30507 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8423 out=89 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+[simple_tutor] two_call=True text_chars=159 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30436 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9038 out=89 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30436 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9423 out=198 blocks=['tool_use']
+[simple_tutor] premature_pose blocked session=10 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=185 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30292 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8986 out=74 blocks=['text', 'tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=30292 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9345 out=251 blocks=['text']
+[simple_tutor] two_call=True text_chars=1033 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=31206 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9208 out=372 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] llm_call: messages=4 system_chars=31206 tools=4 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9593 out=160 blocks=['text']
+[simple_tutor] two_call=True text_chars=576 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10 step=2 pool_size=6
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'any'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=2 system_chars=30816 tools=2 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=9090 out=84 blocks=['text']
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=gemma mode=instruct max_tokens=2048 sampling={'temperature': 1.0, 'top_p': 0.95, 'top_k': 64}
+[OllamaTools] tool_choice={'type': 'tool', 'name': 'record_answer'} requested but NOT forwarded — Ollama has no portable forced-tool field; the engine's pose-repair path compensates
+[OllamaTools] llm_call: messages=4 system_chars=30816 tools=1 model=okamototk/gemma3-tools:4b
+[OllamaTools] response: in=8235 out=38 blocks=['tool_use']
+handle_record_answer: grader raised ValueError: _grade_mcq: question None has no correct_answer set (got 'TRUE'). Fix the question content before grading. (qtype=mcq, session=10)
+[simple_tutor] two_call=True text_chars=307 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+>> SAMPLED RUN: 5 of 200 scenarios (seed=0). Scores are NOT comparable to a full run.
+>> Tutor engine: simple_tutor  (SIMPLE_TUTOR_ENGINE=1)  question_types=mcq,short_numeric
+
+=== Running 5 scenario(s) ===
+  FAIL  baseline_full_session_error_prone_1466_13 failed: rubric [max_turns @ 15 turns] [rubric 0.40/0.60]
+  FAIL  long_session_capable_1466_06             failed: rubric [exit_ticket @ 20 turns] [rubric 0.40/0.60]
+  FAIL  refusal_chain_non_responder_1467_07      failed: rubric [max_turns @ 15 turns] [rubric 0.49/0.60]
+  FAIL  remediation_after_exit_ticket_fail_average_1144_16 failed: no_tool_syntax_in_any_turn, rubric [max_turns @ 24 turns] [rubric 0.44/0.60]
+  FAIL  straight_line_average_1470_14            failed: rubric [max_turns @ 15 turns] [rubric 0.24/0.60]
+
+Result: passed=0 failed=5 errored=0 total=5
+Output: /content/ai-tutor/evals/runs/2026-07-22T14-17-41_5b9671ece964.json
