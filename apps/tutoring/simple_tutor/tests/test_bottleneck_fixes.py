@@ -1,6 +1,6 @@
 """Regression tests for the 2026-07-18 multi-turn eval bottleneck fixes.
 
-Failure classes (see evals/reports/multi_turn_bottlenecks_2026-07-18.md):
+Failure classes (see offline_eval/multi_turn_results/multi_turn_bottlenecks_2026-07-18.md):
 
 - B1: prose-question / slot-question divergence — the LLM's visible text
   poses one question while the InFlightQuestion slot holds another; the

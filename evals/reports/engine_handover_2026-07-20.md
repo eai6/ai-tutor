@@ -3,7 +3,7 @@
 Written for the incoming engine owner. Covers: how the engine works today, the
 guard/repair stack and why each piece exists, the evaluation infrastructure, the
 full fix-cycle history with results, and what's still open. Companion documents:
-`evals/reports/multi_turn_bottlenecks_2026-07-18.md` (the analysis that drove the
+`offline_eval/multi_turn_results/multi_turn_bottlenecks_2026-07-18.md` (the analysis that drove the
 latest fixes) and `offline_eval/multi_turn_results/fixcheck/_cycle_log.md` (per-cycle
 change log).
 
