@@ -76,3 +76,6 @@ offline_eval/experiment_review/
 
 # Generated deployable viewer (regenerate with build_viewer.py; deploy config is tracked)
 offline_eval/viewer_deploy/index.html
+
+# Terminal tutor client --debug session logs
+logs/

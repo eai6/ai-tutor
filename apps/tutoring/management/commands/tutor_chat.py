@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import sys
 import time
+from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.tutoring.cli import logs as cli_logs
 from apps.tutoring.cli import render
 from apps.tutoring.cli.session import (
     BootstrapError, bootstrap_session, last_tutor_turn, list_lessons,
@@ -33,6 +36,11 @@ from apps.tutoring.cli.session import (
 
 _QUIT = {'/quit', '/exit', '/q'}
 _HELP = {'/help', '/?'}
+
+
+def _log_dir() -> Path:
+    """Where --debug writes session logs. Gitignored."""
+    return Path(getattr(settings, 'BASE_DIR', '.')) / 'logs' / 'tutor_chat'
 
 
 class Command(BaseCommand):
@@ -77,9 +85,11 @@ class Command(BaseCommand):
                             help='Show wall-clock and tokens per turn.')
         parser.add_argument('--show-all', action='store_true',
                             help='Enable every --show-* flag.')
-        parser.add_argument('--plain', action='store_true',
-                            help='Conversation only — suppress the default '
-                                 'state/timing lines.')
+        parser.add_argument(
+            '--debug', action='store_true',
+            help='Show engine logs and all diagnostics, and save the whole '
+                 'session (conversation + logs) to logs/tutor_chat/.',
+        )
         # No --no-color here: BaseCommand already defines it (along with
         # --force-color), and redefining it is an argparse conflict.
 
@@ -87,23 +97,28 @@ class Command(BaseCommand):
         # Colour off when piped, so redirected output stays clean.
         colour = not opts.get('no_color') and sys.stdout.isatty()
 
+        # Logging is configured before anything else runs, so bootstrap and the
+        # first LLM call are already governed by it.
+        log_path = None
+        if opts['debug']:
+            log_path = cli_logs.start_debug_log(_log_dir())
+        else:
+            cli_logs.quiet()
+
         if opts['list_lessons']:
             self.stdout.write(render.format_lesson_table(list_lessons()))
             return
 
-        # Defaults: state + timing on, tools + judge opt-in. This is a
-        # development tool — where you are in the lesson and how long the turn
-        # took are the two things you always want. Tool calls are verbose enough
-        # to drown the conversation, so they stay behind a flag.
-        # --plain wins over everything; --show-all wins over the defaults.
-        if opts['plain']:
-            show = dict.fromkeys(('tools', 'judge', 'state', 'timing'), False)
-        elif opts['show_all']:
-            show = dict.fromkeys(('tools', 'judge', 'state', 'timing'), True)
-        elif any(opts[f'show_{k}'] for k in ('tools', 'judge', 'state', 'timing')):
-            show = {k: opts[f'show_{k}'] for k in ('tools', 'judge', 'state', 'timing')}
+        # Clean by default: tutor and student, nothing else. The engine's INFO
+        # commentary and the [step/tool/judge/timing] annotations are debugging
+        # instruments — useful when you are reading the machinery, noise when you
+        # are reading the pedagogy. --debug turns everything on at once;
+        # individual --show-* flags remain for narrower questions.
+        keys = ('tools', 'judge', 'state', 'timing')
+        if opts['debug'] or opts['show_all']:
+            show = dict.fromkeys(keys, True)
         else:
-            show = {'tools': False, 'judge': False, 'state': True, 'timing': True}
+            show = {k: opts[f'show_{k}'] for k in keys}
 
         try:
             lesson_id, note = resolve_lesson_id(opts['lesson'], opts['subject'])
@@ -115,6 +130,13 @@ class Command(BaseCommand):
 
         if note:
             self.stdout.write(render.paint(note, 'dim', colour=colour))
+        if log_path:
+            self.stdout.write(render.paint(
+                f"debug log: {log_path}", 'dim', colour=colour))
+        cli_logs.transcript.info(
+            "session=%s lesson=%s (%s)",
+            session.pk, session.lesson.pk, session.lesson.title,
+        )
 
         from apps.tutoring.simple_tutor.engine import (
             respond_for_view, start_for_view,
@@ -152,6 +174,7 @@ class Command(BaseCommand):
                 continue
 
             try:
+                cli_logs.transcript.info("STUDENT: %s", message)
                 t0 = time.time()
                 payload = respond_for_view(session, message)
                 self._emit(session, payload, time.time() - t0, show, colour)
@@ -176,6 +199,7 @@ class Command(BaseCommand):
     # -- output -----------------------------------------------------------
 
     def _emit(self, session, payload, elapsed, show, colour):
+        cli_logs.transcript.info("TUTOR: %s", payload.get('message') or '')
         self.stdout.write('\n' + render.format_reply(payload, colour=colour))
         if show['state']:
             self.stdout.write(render.format_state(payload, colour=colour))
