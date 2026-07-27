@@ -10,7 +10,7 @@ Idempotent. Run once before the matrix sweep:
     venv/bin/python offline_eval/seed_ollama_configs.py
 """
 import os, sys, django
-ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
@@ -31,7 +31,12 @@ def load_tags(path):
 
 def main():
     inst = Institution.objects.filter(pk=999001).first() or Institution.get_global()
-    tags = load_tags(os.path.join(ROOT, 'offline_eval', 'models.txt'))
+    # run_matrix.sh already honours MODELS_FILE and calls this script, so without
+    # reading it too a scoped sweep (e.g. a Jetson-only tag list) seeds the wrong
+    # rows — the full models.txt — and the scoped run silently resolves against them.
+    models_file = os.environ.get('MODELS_FILE') or os.path.join(
+        ROOT, 'offline_eval', 'models.txt')
+    tags = load_tags(models_file)
     created = updated = 0
     for tag in tags:
         obj, was_created = ModelConfig.objects.update_or_create(

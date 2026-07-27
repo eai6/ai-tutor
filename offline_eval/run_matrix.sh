@@ -15,9 +15,12 @@
 # Anthropic cost. CPU-only inference is slow — expect minutes per model.
 set -uo pipefail
 
-ROOT="/home/daniel/Documents/work/Nyansapo/web/ai-tutor"
+# AI_TUTOR_ROOT / PY let this run on a checkout other than the author's box
+# (e.g. the Jetson, where the live interpreter is .venv not venv). Defaults are
+# unchanged, so an existing workflow that sets neither behaves exactly as before.
+ROOT="${AI_TUTOR_ROOT:-/home/daniel/Documents/work/Nyansapo/web/ai-tutor}"
 cd "$ROOT"
-PY="$ROOT/venv/bin/python"
+PY="${PY:-$ROOT/venv/bin/python}"
 RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/single_turn_results/results}"
 MODELS_FILE="${MODELS_FILE:-$ROOT/offline_eval/models.txt}"
 MODE="${MODE:---single-turn}"

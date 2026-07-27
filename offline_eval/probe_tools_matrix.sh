@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pull + probe a broad set of OSS models for Ollama tool-calling support.
 # Prioritizes tool-use fine-tuned models. Writes a running results table.
-cd /home/daniel/Documents/work/Nyansapo/web/ai-tutor
-PY=venv/bin/python
+cd "${AI_TUTOR_ROOT:-/home/daniel/Documents/work/Nyansapo/web/ai-tutor}"
+PY="${PY:-venv/bin/python}"
 OUT=offline_eval/tool_probe_results.txt
 : > "$OUT"
 

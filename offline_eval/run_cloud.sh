@@ -9,9 +9,9 @@
 #   FORCE=1 bash offline_eval/run_cloud.sh                  # redo even if a JSON exists
 set -uo pipefail
 
-ROOT="/home/daniel/Documents/work/Nyansapo/web/ai-tutor"
+ROOT="${AI_TUTOR_ROOT:-/home/daniel/Documents/work/Nyansapo/web/ai-tutor}"
 cd "$ROOT"
-PY="$ROOT/venv/bin/python"
+PY="${PY:-$ROOT/venv/bin/python}"
 RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/single_turn_results/results}"
 MODELS_FILE="${CLOUD_MODELS_FILE:-$ROOT/offline_eval/cloud_models.txt}"
 MODE="${MODE:---single-turn}"

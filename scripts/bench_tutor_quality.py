@@ -158,6 +158,84 @@ POSE_QUESTION_TOOL = {
 VALID_SLOTS = set(range(5))
 
 
+def scenario_a_tools(real_schemas: bool = False) -> list[dict]:
+    """Scenario A's tool menu.
+
+    Default is the 2-property toy tool above. ``real_schemas=True`` swaps in
+    the production TOOL_SCHEMAS so the bench measures compliance under the
+    schema bulk the engine actually ships — pose_question alone carries 6
+    properties, a ~1,750-char tool description and ~2,200 chars of property
+    descriptions. Separating the two lets a sweep attribute a compliance drop
+    to schema size rather than to the model.
+    """
+    if not real_schemas:
+        return [POSE_QUESTION_TOOL]
+    from apps.tutoring.simple_tutor.prompts import TOOL_SCHEMAS
+    return [dict(t) for t in TOOL_SCHEMAS]
+
+
+# Required properties of the REAL pose_question schema, and the enums a
+# compliant call must respect. handle_pose_question silently coerces bad values
+# (tools.py:450-463) and never tells the model, so a bench that only checked
+# "did it call the tool" would score a coerced call as a success.
+_REAL_POSE_REQUIRED = ("question_text", "question_type", "reference_answer", "source")
+_REAL_POSE_ENUMS = {
+    "question_type": {"mcq", "short_numeric", "short_answer"},
+    "source": {"catalog", "inline_authored"},
+}
+
+
+def classify_arg_shape(args) -> str:
+    """Label the malformation shape of a tool call's arguments.
+
+    Measures the four failure modes the Ollama path is known to swallow, so a
+    sweep can say whether argument coercion (H4) is worth building:
+
+      double_stringified — args (or a nested field) arrived as a JSON string
+          instead of an object. engine.py:2162-2163 replaces any non-dict with
+          {}, so this becomes a silent argument-less call.
+      string_int         — an integer-typed field arrived as "12".
+          catalog_question_id is hard-dropped when non-int (engine.py:2196).
+      options_as_string  — options arrived as a string; tools.py:471-472
+          zeroes any non-list to [].
+      ok                 — none of the above.
+    """
+    if isinstance(args, str):
+        return "double_stringified"
+    if not isinstance(args, dict):
+        return "double_stringified"
+    for key in ("arguments", "parameters", "input"):
+        if isinstance(args.get(key), str) and args[key].strip().startswith("{"):
+            return "double_stringified"
+    if isinstance(args.get("options"), str):
+        return "options_as_string"
+    for key in ("slot", "catalog_question_id", "figure_id"):
+        if isinstance(args.get(key), str):
+            return "string_int"
+    return "ok"
+
+
+def check_real_pose_args(args: dict) -> tuple[bool, str]:
+    """Is this a compliant call against the REAL pose_question schema?
+
+    Returns (compliant, reason). Compliance means every required property is
+    present and non-empty AND the two enum-typed properties hold legal values —
+    i.e. the call would survive handle_pose_question without being silently
+    coerced or rejected.
+    """
+    if not isinstance(args, dict):
+        return False, "args not a dict"
+    missing = [k for k in _REAL_POSE_REQUIRED
+               if not str(args.get(k, "") or "").strip()]
+    if missing:
+        return False, f"missing {','.join(missing)}"
+    for key, allowed in _REAL_POSE_ENUMS.items():
+        val = str(args.get(key, "") or "").strip().lower()
+        if val not in allowed:
+            return False, f"{key}={val!r} not in enum"
+    return True, "ok"
+
+
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
@@ -174,6 +252,13 @@ class TrialResult:
     tool_slot: Optional[int] = None
     valid_slot: bool = False
     text_contains_question_mark: bool = False
+    # Scenario A under --real-schemas: which tool was picked, whether its
+    # arguments would survive handle_pose_question uncoerced, and the shape of
+    # any malformation. See classify_arg_shape / check_real_pose_args.
+    tool_name: Optional[str] = None
+    args_compliant: bool = False
+    args_reason: str = ""
+    arg_shape: str = ""
     # Scenario B
     sum_correct: bool = False
     fifth_correct: bool = False
@@ -368,10 +453,74 @@ def _run_b_generic(client, provider: str) -> TrialResult:
     )
 
 
+def _run_a_ollama(client, *, tools=None, sampling=None,
+                  max_tokens: int = 512) -> TrialResult:
+    """Scenario A against a local Ollama model.
+
+    Goes through OllamaClient.generate_with_tools so the trial exercises the
+    real adapter — including _adapt_ollama_response's text-recovery fallback
+    and the profile-driven num_ctx/think plumbing — rather than a bespoke
+    request that would miss exactly the behaviour under test.
+
+    ``sampling`` is the ModelProfile.sampling_dict() the engine would pass at
+    _call_llm; ``max_tokens`` is the profile's max_tokens. Together they decide
+    the derived num_ctx (client.py) and whether `think` is sent, which is the
+    axis a config A/B varies.
+    """
+    tools = tools or [POSE_QUESTION_TOOL]
+    t0 = time.perf_counter()
+    msg = client.generate_with_tools(
+        messages=[{"role": "user", "content": SCENARIO_A_USER}],
+        system_prompt=SCENARIO_A_SYSTEM,
+        tools=tools,
+        max_tokens=max_tokens,
+        sampling=sampling,
+    )
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    tool_called = False
+    tool_name = None
+    raw_args = None
+    text_excerpt = ""
+    for block in (msg.content or []):
+        btype = getattr(block, "type", None)
+        if btype == "tool_use":
+            tool_called = True
+            if tool_name is None:          # first call wins, mirroring dispatch
+                tool_name = getattr(block, "name", "") or None
+                raw_args = getattr(block, "input", None)
+        elif btype == "text":
+            text_excerpt += (getattr(block, "text", "") or "")
+
+    args = raw_args if isinstance(raw_args, dict) else {}
+    tool_slot = args.get("slot")
+    if tool_name == "pose_question" and "question_text" in args:
+        args_compliant, args_reason = check_real_pose_args(args)
+    else:
+        args_compliant = isinstance(tool_slot, int) and tool_slot in VALID_SLOTS
+        args_reason = "ok" if args_compliant else f"slot={tool_slot!r}"
+
+    return TrialResult(
+        latency_ms=elapsed_ms,
+        tokens_in=msg.usage.input_tokens,
+        tokens_out=msg.usage.output_tokens,
+        text_excerpt=text_excerpt[:200],
+        tool_called=tool_called,
+        tool_slot=tool_slot if isinstance(tool_slot, int) else None,
+        valid_slot=isinstance(tool_slot, int) and tool_slot in VALID_SLOTS,
+        text_contains_question_mark="?" in text_excerpt,
+        tool_name=tool_name,
+        args_compliant=args_compliant,
+        args_reason=args_reason,
+        arg_shape=classify_arg_shape(raw_args) if tool_called else "",
+    )
+
+
 SCENARIO_A_RUNNER = {
     "anthropic": _run_a_anthropic,
     "openai": _run_a_openai,
     "google": _run_a_google,
+    "local_ollama": _run_a_ollama,
 }
 
 

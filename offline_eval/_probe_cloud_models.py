@@ -5,7 +5,7 @@ sweep only runs valid IDs (a wrong id would waste a full 60-scenario run).
     venv/bin/python offline_eval/_probe_cloud_models.py
 """
 import os, sys, django
-ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()

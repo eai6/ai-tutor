@@ -11,7 +11,7 @@ import glob
 import os
 from collections import defaultdict
 
-ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 # RESULTS_DIR env override lets a re-run aggregate from an alternate folder
 # (e.g. single_turn_results/results2 for the per-family-tuned board, or
 # multi_turn_results/ for Improved Eval 3). Defaults to the single-turn board.

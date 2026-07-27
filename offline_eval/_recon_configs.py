@@ -1,6 +1,6 @@
 """Recon: print the active ModelConfig rows that matter for the offline eval."""
 import os, sys, django
-ROOT = '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
