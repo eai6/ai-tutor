@@ -1174,6 +1174,32 @@ def _ollama_model_footprint(api_base: str, model_name: str) -> tuple[int, dict, 
     return size, info, file_ctx
 
 
+def _ollama_model_is_loaded(api_base: str, model_name: str) -> bool:
+    """True when Ollama already has this model resident (`/api/ps`).
+
+    Deliberately NOT cached: residency changes over the life of a process as
+    OLLAMA_KEEP_ALIVE expires, and a stale "yes" would skip the fit check on a
+    model that had since been unloaded — the exact case the guard exists for.
+
+    Fail-soft returns False, which routes to the normal fit check rather than
+    waving a load through on a failed lookup.
+    """
+    import requests
+
+    candidates = {model_name}
+    if ':' not in model_name:
+        candidates.add(f'{model_name}:latest')
+    try:
+        resp = requests.get(f"{api_base}/api/ps", timeout=10)
+        resp.raise_for_status()
+        for m in resp.json().get('models') or []:
+            if m.get('name') in candidates or m.get('model') in candidates:
+                return True
+    except Exception as e:
+        logger.debug("[OllamaFit] /api/ps lookup failed for %s: %s", model_name, e)
+    return False
+
+
 def _ollama_kv_bytes(info: dict, num_ctx: int) -> float | None:
     """Projected KV-cache bytes at num_ctx, from GGUF architecture metadata."""
     arch = info.get('general.architecture')
@@ -1223,6 +1249,15 @@ def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -
     OLLAMA_FIT_GUARD=off.
     """
     if (os.environ.get('OLLAMA_FIT_GUARD') or '').lower() == 'off':
+        return
+    # Already-resident models need no new allocation, so the fit question does
+    # not apply to them. Checking this FIRST is not an optimisation — without
+    # it the guard breaks every multi-turn conversation: turn 1 loads the model,
+    # the model's own ~4 GB then makes MemAvailable look too small, and turn 2
+    # onwards is refused for memory the model itself is holding. Measured on the
+    # Jetson 2026-07-27 (1.4 GB "available" against a 4.0 GB projection, for a
+    # model that was already loaded and answering).
+    if _ollama_model_is_loaded(api_base, model_name):
         return
     try:
         with open('/proc/meminfo') as fh:
