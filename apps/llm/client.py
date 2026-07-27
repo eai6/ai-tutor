@@ -1109,10 +1109,190 @@ class AnthropicClient(BaseLLMClient):
                 time.sleep(wait)
 
 
+# Cache of Ollama /api/show payloads, keyed by model tag. The fit preflight
+# runs on every generate call and the architecture metadata never changes for a
+# given tag, so one fetch per tag per process is enough.
+_OLLAMA_MODEL_INFO_CACHE: dict[str, dict] = {}
+
+# Bytes per KV element by OLLAMA_KV_CACHE_TYPE. Ollama defaults to f16.
+_OLLAMA_KV_ELEM_BYTES = {'f16': 2.0, 'f32': 4.0, 'q8_0': 1.0, 'q4_0': 0.5}
+
+# Weights + KV is not the whole runner: llama.cpp also reserves compute buffers
+# and per-context scratch that the GGUF metadata does not describe. Measured on
+# qwen3-4b-jetson at num_ctx=16384, fully offloaded — `ollama ps` reported
+# 3.9 GB against a 3.45 GB weights+KV projection, a 0.45 GB shortfall (CUDA0
+# compute buffer 106 MiB + CUDA_Host 26 MiB + runtime overhead). Counted here
+# so the check errs toward refusing: a false refusal costs one eval cell, a
+# false pass costs the whole box.
+_OLLAMA_RUNTIME_OVERHEAD_BYTES = 512 * 1024 * 1024
+
+
+def _parse_modelfile_num_ctx(parameters: str) -> int | None:
+    """num_ctx baked into the tag's Modelfile, from /api/show `parameters`."""
+    for line in (parameters or '').splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == 'num_ctx':
+            try:
+                return int(parts[1])
+            except ValueError:
+                return None
+    return None
+
+
+def _ollama_model_footprint(api_base: str, model_name: str) -> tuple[int, dict, int | None] | None:
+    """Weight bytes, architecture metadata, and Modelfile num_ctx for a tag."""
+    if model_name in _OLLAMA_MODEL_INFO_CACHE:
+        entry = _OLLAMA_MODEL_INFO_CACHE[model_name]
+        return entry['size'], entry['info'], entry['num_ctx']
+    import requests                              # module-local, as elsewhere in this file
+    try:
+        show = requests.post(
+            f"{api_base}/api/show", json={'model': model_name}, timeout=20,
+        )
+        show.raise_for_status()
+        shown = show.json()
+        info = shown.get('model_info') or {}
+        file_ctx = _parse_modelfile_num_ctx(shown.get('parameters') or '')
+        tags = requests.get(f"{api_base}/api/tags", timeout=20)
+        tags.raise_for_status()
+        # /api/tags always reports the fully-qualified tag, so a bare name like
+        # "qwen3-4b-jetson" never matches the listed "qwen3-4b-jetson:latest".
+        # ModelConfig rows carry the bare form, so without this the lookup
+        # returns 0 bytes and the fit check silently passes on every model.
+        candidates = {model_name}
+        if ':' not in model_name:
+            candidates.add(f'{model_name}:latest')
+        size = 0
+        for m in tags.json().get('models') or []:
+            if m.get('name') in candidates or m.get('model') in candidates:
+                size = int(m.get('size') or 0)
+                break
+    except Exception as e:
+        logger.warning("[OllamaFit] could not read model metadata for %s: %s", model_name, e)
+        return None
+    _OLLAMA_MODEL_INFO_CACHE[model_name] = {'size': size, 'info': info, 'num_ctx': file_ctx}
+    return size, info, file_ctx
+
+
+def _ollama_kv_bytes(info: dict, num_ctx: int) -> float | None:
+    """Projected KV-cache bytes at num_ctx, from GGUF architecture metadata."""
+    arch = info.get('general.architecture')
+    if not arch:
+        return None
+    layers = info.get(f'{arch}.block_count')
+    kv_heads = info.get(f'{arch}.attention.head_count_kv')
+    if not layers or not kv_heads:
+        return None
+    if isinstance(kv_heads, list):          # per-layer GQA schedules
+        kv_heads = max(kv_heads)
+    k_len = info.get(f'{arch}.attention.key_length')
+    v_len = info.get(f'{arch}.attention.value_length')
+    if not k_len or not v_len:
+        # Fall back to the MHA identity: head_dim = embedding_length / head_count.
+        emb = info.get(f'{arch}.embedding_length')
+        heads = info.get(f'{arch}.attention.head_count')
+        if not emb or not heads:
+            return None
+        k_len = v_len = emb / heads
+    elem = _OLLAMA_KV_ELEM_BYTES.get(
+        (os.environ.get('OLLAMA_KV_CACHE_TYPE') or 'f16').lower(), 2.0,
+    )
+    # Parallel slots each get their own KV cache.
+    slots = max(1, int(os.environ.get('OLLAMA_NUM_PARALLEL') or 1))
+    return num_ctx * layers * kv_heads * (k_len + v_len) * elem * slots
+
+
+def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -> None:
+    """
+    Refuse to load an Ollama model that cannot fit in available memory.
+
+    WHY THIS IS A HARD FAILURE, not a warning. On a discrete GPU an oversized
+    model fails cleanly ("cannot allocate CUDA0 buffer"). On Jetson the GPU
+    allocates from the SAME pool as the CPU, so there is no separate limit to
+    hit — Ollama just consumes system RAM until the kernel is out. With
+    zram-backed swap the reclaim path then livelocks (zram needs RAM to
+    compress into), the CPU stops making progress, and the CCPLEX watchdog
+    resets the board: BCCPLEXWDT, no logs, no OOM kill, ~2 min of downtime.
+    Measured 2026-07-27 on an Orin Nano Super 8 GB.
+
+    Refusing costs one failed eval cell. Not refusing costs the whole box, and
+    takes any concurrent sweep results with it.
+
+    Fail-soft by design: any metadata we cannot read (non-Linux, older Ollama,
+    unknown architecture) logs a warning and allows the load. Kill-switch:
+    OLLAMA_FIT_GUARD=off.
+    """
+    if (os.environ.get('OLLAMA_FIT_GUARD') or '').lower() == 'off':
+        return
+    try:
+        with open('/proc/meminfo') as fh:
+            avail_kb = next(
+                int(ln.split()[1]) for ln in fh if ln.startswith('MemAvailable:')
+            )
+    except Exception:
+        return                                  # not Linux / no procfs — nothing to check
+    footprint = _ollama_model_footprint(api_base, model_name)
+    if footprint is None:
+        return
+    weights, info, file_ctx = footprint
+    # Precedence matches Ollama's: an explicit options.num_ctx wins, else the
+    # tag's Modelfile value, else Ollama's 4096 default. Assuming the default
+    # when a Modelfile pins a larger window under-counts KV by that ratio —
+    # measured 4x on qwen3-4b-jetson, which pins num_ctx 16384.
+    if num_ctx is None:
+        num_ctx = file_ctx or 4096
+    if not weights:
+        # Never silently pass: an unmeasurable model is exactly the case where
+        # a bad fit goes undetected and takes the box down.
+        logger.warning(
+            "[OllamaFit] no weight size reported for %s — fit NOT checked. "
+            "Confirm the tag is present in `ollama list`.", model_name,
+        )
+        return
+    kv = _ollama_kv_bytes(info, num_ctx)
+    available = avail_kb * 1024
+    projected = weights + (kv or 0) + _OLLAMA_RUNTIME_OVERHEAD_BYTES
+    gb = 1024 ** 3
+    detail = (
+        f"{model_name}: weights {weights / gb:.1f} GB"
+        + (f" + KV {kv / gb:.1f} GB @ num_ctx={num_ctx}" if kv else " (KV unknown)")
+        + f" + {_OLLAMA_RUNTIME_OVERHEAD_BYTES / gb:.1f} GB overhead"
+        + f" = {projected / gb:.1f} GB projected against {available / gb:.1f} GB available"
+    )
+    if projected > available:
+        raise MemoryError(
+            f"[OllamaFit] refusing to load — {detail}. Loading it would exhaust "
+            f"this box's unified memory pool and hang the kernel (BCCPLEXWDT "
+            f"watchdog reset), not raise a clean OOM. Options: pick a smaller "
+            f"tag, lower num_ctx in the model's MODEL_PROFILES entry, set "
+            f"OLLAMA_KV_CACHE_TYPE=q8_0, or free memory. Override with "
+            f"OLLAMA_FIT_GUARD=off if you know this box is bigger."
+        )
+    if kv is None:
+        # Some architectures report attention.head_count_kv as null (measured:
+        # the `qwen35` arch, Ollama 0.30.7), and without the GQA ratio the cache
+        # cannot be projected. Guessing would mean either false refusals (assume
+        # MHA) or false confidence (assume heavy GQA), so this check degrades to
+        # weights-only and says so. num_ctx must stay pinned in MODEL_PROFILES
+        # for these — that is the only thing bounding the cache.
+        logger.warning(
+            "[OllamaFit] KV cache NOT projected for %s (architecture reports no "
+            "head_count_kv) — checked weights only. Keep num_ctx pinned in "
+            "MODEL_PROFILES; an unpinned window is what OOMs this box.",
+            model_name,
+        )
+    # Within 15% of the ceiling the load itself may succeed while any other
+    # allocation on the box tips it over. Worth saying before it happens.
+    elif projected > available * 0.85:
+        logger.warning("[OllamaFit] tight fit — %s. Close other workloads.", detail)
+    else:
+        logger.info("[OllamaFit] ok — %s", detail)
+
+
 class OllamaClient(BaseLLMClient):
     """
     Client for local Ollama server.
-    
+
     Ollama runs locally and doesn't need an API key.
     Install: https://ollama.ai
     Pull a model: ollama pull llama3
@@ -1142,6 +1322,10 @@ class OllamaClient(BaseLLMClient):
         url = f"{api_base}/api/chat"
 
         resolved_temp = temperature if temperature is not None else self.config.temperature
+
+        # This path pins no num_ctx; let the preflight resolve the effective
+        # window from the tag's Modelfile (falling back to Ollama's default).
+        _ollama_fit_preflight(api_base, self.config.model_name, None)
 
         try:
             response = requests.post(
@@ -1338,6 +1522,15 @@ class OllamaClient(BaseLLMClient):
                 "this model runs on a memory-constrained box.",
                 self.config.model_name, options['num_ctx'], num_predict,
             )
+        # num_gpu = layers to offload. Left unset, Ollama autofits against FREE
+        # memory at load time, so the same model lands anywhere from 17/34 to
+        # 34/34 layers on GPU depending on what else happened to be running.
+        # Decode throughput tracks it almost linearly (measured on Jetson Orin
+        # Nano Super, qwen3.5:4b: 25/34 → 6.7 tok/s, 34/34 → 13.5 tok/s), so an
+        # unpinned value makes latency non-reproducible for reasons invisible
+        # from the app. Pin it in the profile on boxes where the fit is known.
+        if sampling.get('num_gpu') is not None:
+            options['num_gpu'] = sampling['num_gpu']
         if sampling.get('top_p') is not None:
             options['top_p'] = sampling['top_p']
         if sampling.get('top_k') is not None:
@@ -1383,6 +1576,7 @@ class OllamaClient(BaseLLMClient):
             len(ollama_messages), len(system_prompt or ''),
             len(ollama_tools), self.config.model_name,
         )
+        _ollama_fit_preflight(api_base, self.config.model_name, options['num_ctx'])
         try:
             response = requests.post(url, json=payload, timeout=600)
             response.raise_for_status()
@@ -1395,10 +1589,24 @@ class OllamaClient(BaseLLMClient):
         adapted = _adapt_ollama_response(
             data, model_name=self.config.model_name, tools=tools,
         )
+        # Ollama returns per-phase nanosecond timings on every response and we
+        # were discarding them, so every latency claim about this box had to be
+        # reconstructed from wall-clock curl probes — which is how a cold-start
+        # prefill got mistaken for a per-turn cache penalty. prefill and decode
+        # have completely different fixes (prompt size vs reply length), so a
+        # number that conflates them is worse than none.
+        _ns = 1_000_000_000
+        pd = (data.get('prompt_eval_duration') or 0) / _ns
+        ed = (data.get('eval_duration') or 0) / _ns
+        ld = (data.get('load_duration') or 0) / _ns
         logger.info(
-            "[OllamaTools] response: in=%d out=%d blocks=%s",
+            "[OllamaTools] response: in=%d out=%d blocks=%s "
+            "prefill=%.2fs(%.0f tok/s) decode=%.2fs(%.1f tok/s) load=%.2fs",
             adapted.usage.input_tokens, adapted.usage.output_tokens,
             [getattr(b, 'type', '?') for b in adapted.content],
+            pd, (adapted.usage.input_tokens / pd) if pd else 0.0,
+            ed, (adapted.usage.output_tokens / ed) if ed else 0.0,
+            ld,
         )
         return adapted
 

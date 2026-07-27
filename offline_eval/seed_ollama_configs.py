@@ -10,7 +10,11 @@ Idempotent. Run once before the matrix sweep:
     venv/bin/python offline_eval/seed_ollama_configs.py
 """
 import os, sys, django
-ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
+from pathlib import Path
+# Derive the repo root from this file's location, as the sibling offline_eval
+# scripts do. The previous hardcoded default pointed at one developer's machine
+# and made this script unrunnable anywhere else, including the Jetson.
+ROOT = os.environ.get('AI_TUTOR_ROOT') or str(Path(__file__).resolve().parent.parent)
 os.chdir(ROOT); sys.path.insert(0, ROOT)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
