@@ -49,6 +49,95 @@ _FALLBACK_PURPOSES = (
 )
 
 
+def _local_judge_provider(exclude_provider: Optional[str] = None):
+    """Single-provider judge chain pinned to the local Ollama model, or None.
+
+    WHY: on an offline box (the Jetson) the tutor runs on local Ollama while
+    the judge chain still resolved to Gemini → OpenAI → Haiku, so every judged
+    turn needed the network and spent API credit. A run that is local for the
+    tutor should be local end-to-end.
+
+    Trigger: ``JUDGE_MODEL_OVERRIDE`` when set, else ``TUTOR_MODEL_OVERRIDE``
+    when it names a ``local_ollama/`` spec. Set ``JUDGE_MODEL_OVERRIDE=off`` to
+    keep the cloud cascade while the tutor stays local.
+
+    The judge deliberately defaults to the SAME tag as the tutor rather than a
+    dedicated judge model. Ollama serves one model at a time under
+    ``OLLAMA_MAX_LOADED_MODELS=1``, so two different local tags would unload
+    and reload between the tutor call and the judge call on EVERY turn —
+    measured 30-45 s per load on the Orin, each one re-running the fit
+    preflight. Sharing the tag keeps it resident.
+
+    Purpose is forced to JUDGE so ``ModelConfig.effective_temperature`` pins
+    temperature to 0. That matters here specifically: the rows seeded by
+    ``offline_eval/seed_ollama_configs.py`` carry ``purpose='tutoring'``, which
+    would clamp to [0.1, 0.3] and quietly break the judge-consistency
+    invariant. The config is built unsaved rather than by mutating the seeded
+    row — nothing here should touch the database.
+
+    Fail-soft: anything unresolvable logs a warning and returns None, so the
+    caller falls through to the normal cloud chain.
+    """
+    import os
+
+    spec = (os.environ.get('JUDGE_MODEL_OVERRIDE') or '').strip()
+    if spec.lower() in ('off', 'none', 'cloud'):
+        return None
+    if not spec:
+        tutor_spec = (os.environ.get('TUTOR_MODEL_OVERRIDE') or '').strip()
+        if not tutor_spec.startswith('local_ollama/'):
+            return None
+        spec = tutor_spec
+
+    provider, _, model_name = spec.partition('/')
+    provider, model_name = provider.strip().lower(), model_name.strip()
+    if not provider or not model_name:
+        logger.warning("[LocalJudge] unparseable model spec %r — ignoring", spec)
+        return None
+    if exclude_provider and provider == exclude_provider:
+        # Cross-provider review is a correctness requirement for the content
+        # judges (a judge must not be the model that produced the artefact).
+        # Honour it rather than silently defeating it to stay local.
+        return None
+
+    from apps.llm.models import ModelConfig
+    from apps.llm.client import get_llm_client
+
+    try:
+        institution = None
+        try:
+            from apps.accounts.models import Institution
+            institution = Institution.get_global()
+        except Exception:
+            pass
+        config = ModelConfig(
+            institution=institution,
+            name=f"Local judge — {provider}/{model_name}",
+            provider=provider,
+            model_name=model_name,
+            api_key_env_var='',
+            api_base=('http://localhost:11434' if provider == 'local_ollama' else ''),
+            api_key_encrypted='',
+            max_tokens=2048,
+            temperature=0.0,
+            purpose=ModelConfig.Purpose.JUDGE,
+            is_active=False,
+        )
+        client = get_llm_client(config)
+    except Exception as exc:
+        logger.warning(
+            "[LocalJudge] could not build local judge client for %s: %s — "
+            "falling back to the cloud chain", spec, exc,
+        )
+        return None
+
+    logger.info("[LocalJudge] judging on %s (temperature %s)",
+                spec, config.effective_temperature)
+    return JudgeProvider(
+        name=provider, model_name=model_name, client=client, config=config,
+    )
+
+
 @dataclass
 class JudgeProvider:
     """One provider entry in a judge's fallback chain."""
@@ -131,6 +220,16 @@ def get_judge_provider_chain(
             client=client,
             config=force_model_config,
         )]
+
+    # Local-only run: judge on the same local model the tutor is using rather
+    # than reaching for the cloud cascade. Placed AFTER force_model_config so an
+    # explicit per-run pick still wins, and BEFORE the purpose walk so it
+    # short-circuits every judge. Returns a one-item chain deliberately — there
+    # is no second local vendor to fall back to, and silently falling through to
+    # Gemini would defeat the point of running offline.
+    local = _local_judge_provider(exclude_provider)
+    if local is not None:
+        return [local]
 
     seen_providers = set()
     chain: List[JudgeProvider] = []
