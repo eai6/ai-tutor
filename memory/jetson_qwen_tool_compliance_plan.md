@@ -131,6 +131,77 @@ field (`ok` | `double_stringified` | `string_int` | `options_as_string`).
   and the ladder stops.
 - Cell 2 ≫ cell 4 → schema bulk is a real cost; promote per-family schema slimming.
 
+### Rung 1 RESULTS (2026-07-27, n=10/cell, Ollama 0.30.7, Jetson Orin Nano Super)
+
+`offline_eval/rung1_config_ab.py`; raw cells in `offline_eval/jetson_rung1/`.
+
+| tag | config | schema | tool% | args_ok% | med ms | med out_tok |
+|---|---|---|---|---|---|---|
+| qwen3.5:4b | fallthrough | toy | 90 | 90 | 25392 | 210 |
+| qwen3.5:4b | **profiled** | toy | **100** | **100** | **3970** | **27** |
+| qwen3.5:4b | fallthrough | real | 90 | 80 | 46210 | 377 |
+| qwen3.5:4b | **profiled** | real | **100** | **100** | **14361** | **136** |
+| qwen3-4b-jetson | fallthrough | toy | 70 | 70 | 5743 | 50 |
+| qwen3-4b-jetson | profiled | toy | 30 | 30 | 4142 | 55 |
+| qwen3-4b-jetson | fallthrough | real | 40 | 40 | 12739 | 116 |
+| qwen3-4b-jetson | profiled | real | 30 | 30 | 7206 | 90 |
+
+**Finding 1 — the config effect is real and large, but it acts on verbosity, not
+on single-turn tool-call rate.** Within `qwen3.5:4b`, only the config varies:
+**6.4× faster on toy, 3.2× on real; output tokens 210→27 and 377→136.** No OOM
+at 24192 — free memory fell to 106 MB but the call completed. Tool-call rate
+moved 90→100%, which at n=10 is one trial and not significant.
+
+By the letter of the pre-registered decision rules ("cell 3 OOMs" or "cell 4
+≥90% while cell 3 ≤60%") **the artifact hypothesis is NOT confirmed on
+tool-call rate** — cell 3 was already at 90%. The config fix is nonetheless
+justified on the latency/verbosity result alone, which is unambiguous.
+
+**Finding 2 — the surprise. The mt50 winner barely calls the tool.**
+`qwen3-4b-jetson` (Qwen3-4B-Instruct-2507) emits a tool call on **17/40 trials
+(42%)** overall, and **10/20 (50%)** on the toy schema where there is no
+prompt/schema mismatch. `qwen3.5:4b` is **38/40 (95%)** and **19/20 (95%)**.
+Fisher p < 0.0001 — this gap is robust even at these n.
+
+The failure mode is exactly the one `client.py:1289-1291` names: it **narrates
+the question as prose** ("Here's a question about angles around a point:
+**Three angles…**") instead of calling `pose_question`. Its 88% on mt50 is
+therefore heavily net-assisted — the engine's pose-repair and
+`_ensure_posed_question_in_text` paths convert its prose into a registered slot.
+This is not contradicted by the log-derived 4.7% Call-2 repair rate: that
+denominator is *all* LLM calls, while this bench is a POSE turn every trial.
+
+**Finding 3 — the scope limit that matters most.** Rung 1 reproduces the
+*single-turn* ranking sweep3 already established (qwen3.5:4b 89% best,
+qwen3:4b 58% worst). It therefore **cannot settle the multi-turn 42%** — it
+measures the axis that was never in dispute. The genuine question, why a model
+that complies 95% of the time single-turn dies at the turn budget in session, is
+still open and needs the blocked multi-turn rung.
+
+**Caveats.**
+- n=10/cell is underpowered for within-tag tool-rate deltas (±29pp at 95%).
+  Only the cross-model gap and the latency/token medians are solid.
+- The `real` cells pair `SCENARIO_A_SYSTEM` (which instructs "call
+  pose_question with a **slot** index") with the real `TOOL_SCHEMAS`, which have
+  no `slot` property. Cross-model comparison should be read off the **toy** rows;
+  the config comparison is unaffected since only config varies within a tag.
+- `qwen3-4b-jetson` trends *worse* profiled than fallthrough (11/20 → 6/20
+  combined, p≈0.2 — not significant). Its profile predates this work; flagged to
+  re-check under the multi-turn rung rather than acted on.
+
+**Verdict.** Ship the config fix (done — large win, zero risk). **Model
+selection stays open.** H2 (forward `tool_choice`) is now the highest-value
+harness change and has measured headroom on *both* candidates — the incumbent
+skips the tool on half its pose turns while `tool_choice` is being discarded.
+
+### BLOCKERS on the multi-turn rungs
+1. No `ANTHROPIC_API_KEY` — the student simulator and judges run on Anthropic.
+2. `apps/tutoring/conversational_tutor.py:4187` has a backslash inside an
+   f-string, which needs Python ≥3.12; this box has only 3.10, so `evals/`
+   cannot even be collected. Pre-existing (commit `6d68a50`), unrelated to this
+   work, but it must be fixed or a 3.12 interpreter installed before any
+   multi-turn rung can run here.
+
 ### Portability (env-var override only)
 `ROOT="${AI_TUTOR_ROOT:-<existing>}"` across `run_matrix.sh:18`, `run_cloud.sh:12`,
 `aggregate.py:14`, `seed_ollama_configs.py:13`, `_validate_wiring.py:3`,
