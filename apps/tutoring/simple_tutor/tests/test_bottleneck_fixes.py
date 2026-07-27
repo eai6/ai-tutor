@@ -574,6 +574,58 @@ class AutoPoseFallbackTest(DjangoTestCase):
         self.assertFalse(
             InFlightQuestion.objects.filter(session=session).exists())
 
+    def test_optionless_mcq_rejection_also_triggers_fallback(self):
+        """A pose rejected for MISSING OPTIONS strands the turn identically.
+
+        Small models routinely write "A) … B) …" into the prose while calling
+        pose_question without `options`; handle_pose_question refuses it
+        (tools.py:504) because a letter reference with no option list cannot be
+        graded. Before this, the fallback only rescued `repeat_of_correct`
+        rejections, so the turn ended with no InFlightQuestion — the student
+        answered "B" against nothing, the letter never graded, and the question
+        was re-asked forever. Reproduced on qwen3-4b, geography lesson 1463,
+        2026-07-27: only full option text worked, never a letter.
+        """
+        from apps.tutoring.simple_tutor.engine import _auto_pose_fallback
+        from apps.tutoring.simple_tutor.tests.test_engine import _make_session
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session()
+        step = LessonStep.objects.filter(lesson=session.lesson).first()
+        rejected = [{'tool': 'pose_question',
+                     'result': {'posed': False,
+                                'error': 'mcq requires its options',
+                                'question_type': 'mcq'}}]
+        out = _auto_pose_fallback(
+            session=session, step=step, family='qwen',
+            tool_results=rejected, text_reply='Which map is best?')
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        self.assertIsNotNone(slot, "rejected pose must be rescued by the pool")
+        self.assertIn(slot.question_text, out)
+
+    def test_fallback_strips_the_models_diverging_prose_question(self):
+        """Only ONE question may survive, and it must be the graded one.
+
+        The catalog question goes into the slot and is what grading uses, so
+        leaving the model's own prose question in the reply asks the student two
+        questions and grades a different one — the desync
+        _strip_trailing_prose_question exists to repair.
+        """
+        from apps.tutoring.simple_tutor.engine import _auto_pose_fallback
+        from apps.tutoring.simple_tutor.tests.test_engine import _make_session
+        from apps.curriculum.models import LessonStep
+        session, _ = _make_session()
+        step = LessonStep.objects.filter(lesson=session.lesson).first()
+        prose_q = 'Which of the following best defines a large scale map?'
+        out = _auto_pose_fallback(
+            session=session, step=step, family='qwen',
+            tool_results=self._correct_results(),
+            text_reply=f"Exactly — well reasoned.\n\n{prose_q}")
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        self.assertIsNotNone(slot)
+        self.assertNotIn(prose_q, out)
+        self.assertIn(slot.question_text, out)
+        self.assertIn('Exactly — well reasoned.', out)
+
 
 class QwenVariantCycle10Test(SimpleTestCase):
     """Cycle-10 qwen prompt iteration — pins the rules added for the

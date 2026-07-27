@@ -1390,10 +1390,22 @@ def _auto_pose_fallback(
         and (tr.get('result') or {}).get('verdict') == 'correct'
         for tr in (tool_results or [])
     )
+    # ANY rejected pose, not just repeat_of_correct. The optionless-MCQ
+    # rejection (tools.py:504) leaves exactly the same dangling turn: small
+    # models routinely write "A) … B) … C) …" into the prose while calling
+    # pose_question without `options`, handle_pose_question refuses it because
+    # a letter reference with no option list cannot be graded, and the turn ends
+    # with no InFlightQuestion. The student then answers "B" against nothing —
+    # so the letter never grades, the step never advances, and the question is
+    # re-asked. Observed on qwen3-4b, geography lesson 1463, 2026-07-27:
+    # unanswerable by letter, only full option text worked.
+    #
+    # The catalog fallback below is the right repair for it — it supplies
+    # authoritative options AND the correct letter, which is precisely what the
+    # rejected pose lacked.
     pose_rejected = any(
         tr.get('tool') == 'pose_question'
         and not (tr.get('result') or {}).get('posed')
-        and (tr.get('result') or {}).get('repeat_of_correct')
         for tr in (tool_results or [])
     )
     if not (verdict_correct or pose_rejected):
@@ -1427,9 +1439,16 @@ def _auto_pose_fallback(
                 "session=%s type=%s", session.pk, result.get('question_type'),
             )
             rendered = _render_slot_question(slot) if slot else ''
-            base = (text_reply or '').rstrip()
             if not rendered:
                 return text_reply
+            # Strip the model's own prose question first. It diverges from the
+            # catalog question now in the slot, and the slot is what grading
+            # uses — leaving both asks the student two questions and grades only
+            # one. That desync is exactly what _strip_trailing_prose_question
+            # exists to repair (the 2026-07-18 sweep's dominant failure).
+            base = _strip_trailing_prose_question(
+                (text_reply or '').rstrip()
+            ).rstrip()
             return f"{base}\n\n{rendered}" if base else rendered
     return text_reply
 
