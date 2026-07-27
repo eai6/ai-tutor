@@ -55,6 +55,21 @@ OLLAMA_DEFAULTS = {
     'OLLAMA_MAX_LOADED_MODELS': '1',
 }
 
+# sentence-transformers phones home to huggingface.co on load even when the
+# model is cached locally. With no network that is not a graceful degradation:
+# measured 2026-07-27 with WiFi off, the load spent 20.6 s on DNS retries and
+# then raised RuntimeError, taking the grader's embedding gate (tier 1.5) down
+# with it and forcing every free-text answer onto the slower verifier-LLM tier.
+# The same load with these set succeeds from cache in 11.4 s.
+#
+# setdefault, so a machine WITHOUT the cache can still populate it by exporting
+# HF_HUB_OFFLINE=0 — offline mode turns a slow first download into an immediate
+# failure, which is wrong on a fresh checkout and right on this box.
+OFFLINE_DEFAULTS = {
+    'HF_HUB_OFFLINE': '1',
+    'TRANSFORMERS_OFFLINE': '1',
+}
+
 
 def _reexec_under_venv() -> None:
     """Re-run this script with the project venv's interpreter if needed.
@@ -106,7 +121,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT))
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     os.environ.setdefault('TUTOR_MODEL_OVERRIDE', DEFAULT_TUTOR_MODEL)
-    for key, value in OLLAMA_DEFAULTS.items():
+    for key, value in {**OLLAMA_DEFAULTS, **OFFLINE_DEFAULTS}.items():
         os.environ.setdefault(key, value)
 
     problem = _check_ollama()
@@ -114,9 +129,9 @@ def main() -> int:
         print(problem, file=sys.stderr)
         print(file=sys.stderr)
 
-    spec = os.environ['TUTOR_MODEL_OVERRIDE']
-    print(f"tutor model: {spec}", file=sys.stderr)
-
+    # The model is announced by tutor_chat's banner, not here — --model may
+    # override the default installed above, and printing it at this point would
+    # report the wrong one.
     from django.core.management import execute_from_command_line
 
     # Full passthrough, so every tutor_chat flag (--lesson, --list-lessons,

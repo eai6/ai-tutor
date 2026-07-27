@@ -20,6 +20,7 @@ Plan: memory/terminal_tutor_client_plan.md
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -36,6 +37,20 @@ from apps.tutoring.cli.session import (
 
 _QUIT = {'/quit', '/exit', '/q'}
 _HELP = {'/help', '/?'}
+
+# Friendly names for the local tags worth chatting against. Each maps to a spec
+# with an exact entry in apps/llm/model_profiles.py — that matters, because a
+# tag without one falls through to a CLOUD family profile and gets sized at
+# num_ctx=24192, the window that does not fit this box.
+#
+# qwen3:8b and qwen3.5:9b are deliberately absent: 4.9 GB and 6.1 GB of weights
+# against ~5.5 GB free. The fit preflight refuses them anyway, but offering them
+# here would invite the attempt.
+MODEL_ALIASES = {
+    'qwen3-4b': 'local_ollama/qwen3-4b-jetson',
+    'qwen3.5-4b': 'local_ollama/qwen3.5:4b',
+    'qwen3-4b-thinking': 'local_ollama/qwen3:4b',
+}
 
 
 def _log_dir() -> Path:
@@ -71,6 +86,18 @@ class Command(BaseCommand):
             '--student', default=None,
             help='Username to run as. Defaults to the eval fixture student.',
         )
+
+        model = parser.add_mutually_exclusive_group()
+        model.add_argument(
+            '--model', default=None,
+            help=f"Tutor model: an alias ({', '.join(MODEL_ALIASES)}) or a raw "
+                 f"provider/name spec. Defaults to qwen3-4b.",
+        )
+        for alias in MODEL_ALIASES:
+            model.add_argument(
+                f'--{alias}', dest='model', action='store_const', const=alias,
+                help=f'Shorthand for --model {alias}.',
+            )
         parser.add_argument(
             '--list-lessons', action='store_true',
             help='List lessons that have steps, then exit.',
@@ -110,6 +137,17 @@ class Command(BaseCommand):
             self.stdout.write(render.format_lesson_table(list_lessons()))
             return
 
+        # Set before the engine runs — model_profiles and ModelConfig.get_for
+        # both read TUTOR_MODEL_OVERRIDE from os.environ at call time, so this
+        # takes effect for every turn in the session. Overwrites rather than
+        # setdefault: chat.py has already installed its default, and an explicit
+        # --model must win over it.
+        if opts['model']:
+            os.environ['TUTOR_MODEL_OVERRIDE'] = MODEL_ALIASES.get(
+                opts['model'], opts['model'],
+            )
+        tutor_spec = os.environ.get('TUTOR_MODEL_OVERRIDE') or '(DB default)'
+
         # Clean by default: tutor, student, and the response time. The engine's
         # INFO commentary and the [step/tool/judge] annotations are debugging
         # instruments — useful when reading the machinery, noise when reading the
@@ -146,7 +184,7 @@ class Command(BaseCommand):
             respond_for_view, start_for_view,
         )
 
-        self._banner(session, colour)
+        self._banner(session, tutor_spec, colour)
 
         # Opening turn — the same warmup the browser fires on session start.
         try:
@@ -222,12 +260,16 @@ class Command(BaseCommand):
             if show['timing']:
                 self.stdout.write(render.format_timing(elapsed, turn, colour=colour))
 
-    def _banner(self, session, colour):
+    def _banner(self, session, tutor_spec, colour):
         lesson = session.lesson
         self.stdout.write(render.paint(
             f"session {session.pk} · lesson {lesson.pk} · {lesson.title}",
             'bold', colour=colour,
         ))
+        self.stdout.write(render.paint(
+            f"model {tutor_spec}", 'dim', colour=colour,
+        ))
+        cli_logs.transcript.info("model=%s", tutor_spec)
         self.stdout.write(render.paint(
             "/quit to end, /help for commands", 'dim', colour=colour,
         ))
