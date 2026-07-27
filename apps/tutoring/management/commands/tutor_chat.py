@@ -39,10 +39,25 @@ class Command(BaseCommand):
     help = "Chat with the tutor in the terminal, driving the real engine."
 
     def add_arguments(self, parser):
-        parser.add_argument(
+        # --lesson and the subject selectors answer the same question, so
+        # argparse rejects passing both rather than silently picking a winner.
+        picker = parser.add_mutually_exclusive_group()
+        picker.add_argument(
             '--lesson', type=int, default=None,
             help='Lesson id to tutor. Defaults to a lesson that has steps '
                  '(announced on start). Use --list-lessons to choose.',
+        )
+        picker.add_argument(
+            '--subject', default=None, choices=('math', 'geography', 'science'),
+            help='Pick a random lesson from this subject.',
+        )
+        picker.add_argument(
+            '--math', dest='subject', action='store_const', const='math',
+            help='Shorthand for --subject math.',
+        )
+        picker.add_argument(
+            '--geography', dest='subject', action='store_const', const='geography',
+            help='Shorthand for --subject geography.',
         )
         parser.add_argument(
             '--student', default=None,
@@ -91,18 +106,15 @@ class Command(BaseCommand):
             show = {'tools': False, 'judge': False, 'state': True, 'timing': True}
 
         try:
-            lesson_id, defaulted = resolve_lesson_id(opts['lesson'])
+            lesson_id, note = resolve_lesson_id(opts['lesson'], opts['subject'])
             session = bootstrap_session(
                 lesson_id, student_username=opts['student'],
             )
         except BootstrapError as exc:
             raise CommandError(str(exc))
 
-        if defaulted:
-            self.stdout.write(render.paint(
-                f"no --lesson given; defaulted to {lesson_id} "
-                f"(--list-lessons to choose another)", 'dim', colour=colour,
-            ))
+        if note:
+            self.stdout.write(render.paint(note, 'dim', colour=colour))
 
         from apps.tutoring.simple_tutor.engine import (
             respond_for_view, start_for_view,

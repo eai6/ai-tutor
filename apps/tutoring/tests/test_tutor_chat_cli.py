@@ -6,6 +6,34 @@ TTY, a database, or an LLM. Plan: memory/terminal_tutor_client_plan.md
 from django.test import SimpleTestCase
 
 from apps.tutoring.cli import render
+from apps.tutoring.cli.session import BootstrapError, subject_filter
+
+
+class SubjectFilterTest(SimpleTestCase):
+    """The filter must match subject_code OR subject_type.
+
+    Courses in this database are classified through different fields —
+    Mathematics S3 has subject_type='math' with subject_code empty, Mount Fleuri
+    Geography S3 has subject_code='geography' with subject_type empty. A filter
+    checking only one field returns nothing for half the catalogue, and the
+    failure looks like "no lessons found" rather than a bug.
+    """
+
+    def test_math_matches_both_classification_fields(self):
+        children = str(subject_filter('math'))
+        self.assertIn('subject_code', children)
+        self.assertIn('subject_type', children)
+
+    def test_geography_matches_subject_code(self):
+        self.assertIn('geography', str(subject_filter('geography')))
+
+    def test_unknown_subject_lists_the_known_ones(self):
+        with self.assertRaises(BootstrapError) as ctx:
+            subject_filter('astrology')
+        message = str(ctx.exception)
+        self.assertIn('astrology', message)
+        self.assertIn('math', message)
+        self.assertIn('geography', message)
 
 
 class RenderReplyTest(SimpleTestCase):

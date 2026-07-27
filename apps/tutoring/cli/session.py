@@ -63,21 +63,89 @@ def list_lessons(limit: int = 40) -> list[tuple[int, str, str]]:
     return out
 
 
-def resolve_lesson_id(explicit: int | None = None) -> tuple[int, bool]:
-    """Return ``(lesson_id, was_defaulted)``.
+def subject_filter(subject: str):
+    """Q filter selecting lessons belonging to ``subject``.
 
-    An explicit id is returned untouched — validation belongs to
+    Matches subject_code OR subject_type because courses in this database are
+    classified through different fields: Mathematics S3 carries
+    subject_type='math' with subject_code empty, while Mount Fleuri Geography S3
+    carries subject_code='geography' with subject_type empty. Checking only one
+    field silently returns nothing for half the catalogue.
+
+    Not a title heuristic — CLAUDE.md rules those out (the Course.is_math
+    MATH_KEYWORDS fallback is the anti-pattern). If a course matches neither
+    field it needs `python manage.py backfill_course_subjects`, not a regex here.
+    """
+    from django.db.models import Q
+
+    filters = {
+        'math': (
+            Q(unit__course__subject_code='mathematics')
+            | Q(unit__course__subject_type='math')
+        ),
+        'geography': Q(unit__course__subject_code='geography'),
+        'science': (
+            Q(unit__course__subject_code__in=('physics', 'chemistry', 'biology'))
+            | Q(unit__course__subject_type='science')
+        ),
+    }
+    try:
+        return filters[subject]
+    except KeyError:
+        raise BootstrapError(
+            f"Unknown subject {subject!r}. Known: {', '.join(sorted(filters))}."
+        )
+
+
+def resolve_lesson_id(
+    explicit: int | None = None,
+    subject: str | None = None,
+) -> tuple[int, str | None]:
+    """Return ``(lesson_id, note)``.
+
+    ``note`` is None when the caller asked for a specific lesson, otherwise a
+    one-line explanation of what was chosen and why — printed by the caller so
+    the selection is never silent. That matters most for ``--math`` /
+    ``--geography``, where the pick is random: the announced id is what lets you
+    reproduce an interesting session with ``--lesson <id>``.
+
+    An explicit id is returned untouched; validation belongs to
     ``bootstrap_session`` so the error message is the same either way.
     """
+    import random
+
     from django.db.models import Count
     from apps.curriculum.models import Lesson
 
     if explicit is not None:
-        return explicit, False
+        return explicit, None
 
     with_steps = Lesson.objects.annotate(n=Count('steps')).filter(n__gt=0)
+
+    if subject:
+        matching = list(
+            with_steps.filter(subject_filter(subject))
+            .distinct()
+            .values_list('pk', flat=True)
+        )
+        if not matching:
+            raise BootstrapError(
+                f"No {subject} lesson in this database has steps. Try "
+                f"--list-lessons, or run `python manage.py "
+                f"backfill_course_subjects` if the course exists but is "
+                f"unclassified."
+            )
+        chosen = int(random.choice(matching))
+        return chosen, (
+            f"random {subject} lesson: {chosen} "
+            f"(1 of {len(matching)}; --lesson {chosen} to repeat it)"
+        )
+
     if with_steps.filter(pk=PREFERRED_LESSON_ID).exists():
-        return PREFERRED_LESSON_ID, True
+        return PREFERRED_LESSON_ID, (
+            f"no --lesson given; defaulted to {PREFERRED_LESSON_ID} "
+            f"(--list-lessons, --math or --geography to choose another)"
+        )
 
     first = with_steps.order_by('pk').values_list('pk', flat=True).first()
     if first is None:
@@ -87,7 +155,7 @@ def resolve_lesson_id(explicit: int | None = None) -> tuple[int, bool]:
             "  python manage.py loaddata evals/fixtures/institution.json "
             "evals/fixtures/lessons.json"
         )
-    return int(first), True
+    return int(first), f"no --lesson given; defaulted to {first}"
 
 
 def bootstrap_session(
