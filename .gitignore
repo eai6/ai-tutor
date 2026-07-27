@@ -2,6 +2,7 @@
 # Local-only Google Cloud work-mode helper (isolated CLOUDSDK_CONFIG); see pdl-gcloud.sh
 /pdl-gcloud.sh
 venv
+.venv/
 azure
 notes.txt
 azure_app.py
