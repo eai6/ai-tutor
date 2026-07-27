@@ -20,7 +20,6 @@ from django.db import transaction
 
 from apps.accounts.models import Institution
 from apps.curriculum.models import Lesson
-from apps.tutoring.conversational_tutor import ConversationalTutor
 from apps.tutoring.models import TutorSession
 from apps.tutoring.student_sim.client import StudentClient
 
@@ -212,6 +211,12 @@ def simulate_session(
 
             tutor = _SimpleTutorAdapter(session)
         else:
+            # Imported here, not at module scope: this is the only use, and it
+            # runs only when SIMPLE_TUTOR_ENGINE is off. A module-level import
+            # made every simple_tutor eval load the legacy engine it does not
+            # use — enough to break `pytest evals/` at COLLECTION time whenever
+            # conversational_tutor.py cannot be parsed or imported.
+            from apps.tutoring.conversational_tutor import ConversationalTutor
             tutor = ConversationalTutor(session)
 
         # Tutor speaks first (mirrors production: views.py:820 calls .start()).
