@@ -398,8 +398,15 @@ class ModelConfig(models.Model):
         if existing is not None:
             return existing
 
+        # local_ollama needs no API key — it talks to a local server. Without
+        # this, a bare `TUTOR_MODEL_OVERRIDE=local_ollama/<model>` only resolved
+        # when a DB row had been pre-seeded (offline_eval/seed_ollama_configs.py),
+        # so on a fresh clone the documented override silently fell back to the
+        # DB-active config. Treat it as a keyless provider and default its
+        # api_base to the local server.
+        _NO_KEY_PROVIDERS = {'local_ollama'}
         env_var = cls._PROVIDER_API_KEY_ENV.get(provider)
-        if not env_var:
+        if not env_var and provider not in _NO_KEY_PROVIDERS:
             return None
 
         # Build an unsaved instance — never call .save() on this.
@@ -416,7 +423,8 @@ class ModelConfig(models.Model):
             name=f"Runtime override — {provider}/{model_name}",
             provider=provider,
             model_name=model_name,
-            api_key_env_var=env_var,
+            api_key_env_var=(env_var or ''),
+            api_base=('http://localhost:11434' if provider == 'local_ollama' else ''),
             api_key_encrypted='',
             max_tokens=2048,
             temperature=0.0,

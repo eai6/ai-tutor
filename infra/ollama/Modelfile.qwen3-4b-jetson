@@ -1,0 +1,34 @@
+# qwen3-4b-jetson — NVIDIA Jetson Orin (8 GB) tutor model
+#
+# Build:   ollama create qwen3-4b-jetson -f infra/ollama/Modelfile.qwen3-4b-jetson
+# Use:     TUTOR_MODEL_OVERRIDE=local_ollama/qwen3-4b-jetson
+#
+# Why a separate tag (not plain qwen3:4b-instruct): it gives the tutor a
+# DISTINCT TUTOR_MODEL_OVERRIDE spec so the exact-match profile in
+# apps/llm/model_profiles.py ("local_ollama/qwen3-4b-jetson") applies its
+# Jetson-safe knobs WITHOUT touching the committed Colab/cloud eval configs,
+# which run plain qwen3 at num_ctx=24192.
+#
+# Serve with: OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 (halves KV).
+
+# Qwen3-4B-Instruct-2507. NOT plain `qwen3:4b` — as of Ollama 0.30 that tag
+# resolves to Qwen3-4B-*Thinking*-2507, which is thinking-ONLY: its chat
+# template opens `<think>` unconditionally on the generation prompt, so there
+# is no way to get a direct answer out of it. Ollama's `think: false` does not
+# help — it disables the *parser*, not the thinking, so the reasoning monologue
+# lands in `message.content` instead of `message.thinking` and the real answer
+# gets truncated by num_predict. Qwen's `/no_think` soft switch is ignored too.
+# The instruct tag is a genuinely separate non-thinking checkpoint; use it.
+FROM qwen3:4b-instruct
+
+# Context capped for the 8 GB shared CPU/GPU budget. At the stock window the
+# qwen3-4b KV cache + 2.6 GB weights exceeds free memory and Ollama OOMs
+# ("cannot allocate CUDA0 buffer"). 16384 holds the tutor's Markdown system
+# prompt + tool schemas + a turn of output.
+PARAMETER num_ctx 16384
+
+# Qwen3-Instruct-2507's own recommended sampling (framework §3.3), which is
+# also the tag's baked-in default — restated here so the tag is self-describing.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20

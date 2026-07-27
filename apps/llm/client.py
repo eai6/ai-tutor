@@ -1338,6 +1338,24 @@ class OllamaClient(BaseLLMClient):
             'stream': False,
             'options': options,
         }
+        # Ollama's top-level `think` flag (distinct from `options`), set by a
+        # profile's ollama_think. The vLLM chat_template_kwargs toggle in
+        # extra_body is ignored by Ollama, so this is the only `think` lever
+        # here. Omitted entirely when None (model default).
+        #
+        # Caveat — it depends on the model's chat template, so verify per model
+        # (measured 2026-07-26, Ollama 0.30.7):
+        #   - Hybrid templates that gate on `Think` (qwen3:8b, qwen3.5:4b/9b)
+        #     pre-close the block as `<think>\n\n</think>` and honour it
+        #     correctly: thinking is empty and content is the direct answer.
+        #   - Templates that open `<think>` UNCONDITIONALLY (qwen3:4b, i.e.
+        #     Qwen3-4B-Thinking-2507) do not. There `think: false` only turns
+        #     off Ollama's thinking *parser*, so the model still reasons and the
+        #     monologue lands in message.content, pushing the real answer past
+        #     num_predict. For those, pick a non-thinking checkpoint instead —
+        #     see the local_ollama/qwen3-4b-jetson profile.
+        if sampling.get('think') is not None:
+            payload['think'] = bool(sampling['think'])
         if tool_choice:
             # OpenAI-shaped; only reached under OLLAMA_FORWARD_TOOL_CHOICE=1.
             if isinstance(tool_choice, dict) and tool_choice.get('name'):

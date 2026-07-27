@@ -58,6 +58,7 @@ class ModelProfile:
     presence_penalty: float | None = None
     num_ctx: int | None = None         # Ollama context window (prompt+generation). None → client sizes it to num_predict+headroom (Ollama's 4096 default truncates reasoning models mid-<think>).
     extra_body: dict | None = None     # provider thinking toggle, e.g. {"chat_template_kwargs": {"thinking": False}}
+    ollama_think: bool | None = None   # Ollama /api/chat top-level `think` flag (extra_body's chat_template_kwargs is vLLM-only; Ollama ignores it). None = don't send. False works on HYBRID templates that gate on Think (qwen3:8b, qwen3.5:4b/9b) but NOT where <think> opens unconditionally (qwen3:4b Thinking-2507) — there it only disables Ollama's parser and the monologue lands in content. Verify per model.
     prompt_strategy: str = "default"   # 'default' | 'persona_suppress' | 'no_system_no_fewshot'
     prompt_format: str = "xml"         # 'xml' (default, Claude/Grok/GLM/Kimi/DeepSeek) | 'markdown' (Gemini/Qwen)
     notes: str = ""
@@ -79,6 +80,8 @@ class ModelProfile:
             out["presence_penalty"] = self.presence_penalty
         if self.num_ctx is not None:
             out["num_ctx"] = self.num_ctx
+        if self.ollama_think is not None:
+            out["think"] = self.ollama_think
         if self.extra_body:
             out["extra_body"] = dict(self.extra_body)
         return out
@@ -170,6 +173,30 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "vertex_model_garden/qwen/qwen3-235b-a22b-instruct-2507-maas": ModelProfile(
         family="qwen", mode="instruct", max_tokens=_MT_INSTRUCT,
         temperature=0.7, top_p=0.8, top_k=20,
+    ),
+
+    # --- Local Ollama on NVIDIA Jetson Orin (8 GB shared CPU/GPU) ---
+    # DISTINCT spec from the cloud qwen3 profiles above so the committed
+    # Colab/cloud eval numbers (which run at num_ctx=24192) are untouched.
+    # This entry is used ONLY when TUTOR_MODEL_OVERRIDE=local_ollama/qwen3-4b-jetson
+    # (the Modelfile-tagged model in infra/ollama/). Two on-device constraints:
+    #   1. Instruct only. Enforced by the BASE MODEL, not a runtime flag: the tag
+    #      builds FROM qwen3:4b-instruct (Qwen3-4B-Instruct-2507). Plain `qwen3:4b`
+    #      is the Thinking-2507 checkpoint whose template opens `<think>`
+    #      unconditionally, and ollama_think=False does NOT suppress it — that
+    #      flag disables Ollama's thinking *parser*, so the monologue lands in
+    #      message.content and the answer gets truncated. Measured 2026-07-26 on
+    #      Ollama 0.30.7. Hence no ollama_think here. (The flag DOES work on the
+    #      hybrid qwen3:8b / qwen3.5 templates — this is a 4b-Thinking quirk.)
+    #   2. num_ctx capped to 16384 so the KV cache fits: at 24192 the qwen3-4b
+    #      KV (~3.6 GB f16) + 2.6 GB weights exceeds free memory and Ollama
+    #      OOMs ("cannot allocate CUDA0 buffer"). Pair with the server flags
+    #      OLLAMA_FLASH_ATTENTION=1 + OLLAMA_KV_CACHE_TYPE=q8_0 (halves KV).
+    "local_ollama/qwen3-4b-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384,
+        notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
     # --- xAI Grok (framework §3.2: suppress persona; penalties REJECTED on reasoning) ---
