@@ -682,7 +682,6 @@ def chat_tutor_interface(request, lesson_id):
 @require_http_methods(["POST"])
 def chat_start_session(request, lesson_id):
     """Start or resume a conversational tutoring session."""
-    from apps.tutoring.conversational_tutor import ConversationalTutor
     from apps.safety import RateLimiter, SafetyAuditLog
 
     # Check if student is suspended from tutor
@@ -785,6 +784,12 @@ def chat_start_session(request, lesson_id):
                 )
                 # Fall through to legacy resume on error.
 
+        # Imported at the use site, not at the top of the view: this is a
+        # fall-through path that simple_tutor normally never reaches, but a
+        # view-level import made every start request depend on the legacy
+        # module parsing. That coupling took out session start entirely on
+        # Python 3.10, where conversational_tutor.py does not compile.
+        from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         response = tutor.resume()
 
@@ -919,6 +924,7 @@ def chat_start_session(request, lesson_id):
                     status=500,
                 )
 
+        from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         response = tutor.start()
 
@@ -1007,7 +1013,6 @@ def chat_restart_session(request, lesson_id):
 def chat_respond(request, session_id):
     """Handle student message in conversational tutoring (streaming SSE)."""
     from django.http import StreamingHttpResponse
-    from apps.tutoring.conversational_tutor import ConversationalTutor
     from apps.safety import (
         ContentSafetyFilter, RateLimiter, SafetyAuditLog
     )
@@ -1229,8 +1234,6 @@ def chat_respond(request, session_id):
 @require_http_methods(["POST"])
 def chat_start_review(request, session_id):
     """Start a review session for a completed lesson."""
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-
     session = get_object_or_404(
         TutorSession,
         id=session_id,
@@ -1257,6 +1260,7 @@ def chat_start_review(request, session_id):
             )
             # Fall through to legacy review on error.
 
+    from apps.tutoring.conversational_tutor import ConversationalTutor
     tutor = ConversationalTutor(session)
     result = tutor.start_review()
 
@@ -1286,8 +1290,6 @@ def chat_difficulty_signal(request, session_id):
     chat UI can suppress re-displaying its literal text — the button
     click is the visual signal.
     """
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-
     session = get_object_or_404(
         TutorSession,
         id=session_id,
@@ -1329,6 +1331,7 @@ def chat_difficulty_signal(request, session_id):
 
     tutor_message = None
     try:
+        from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         result = tutor.respond(
             synthetic_text,
@@ -1411,8 +1414,6 @@ def chat_answer_bank_question(request, session_id):
         accepted but only persisted on the turn metadata for
         analytics.
     """
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-
     session = get_object_or_404(
         TutorSession, id=session_id, student=request.user,
     )
@@ -1550,6 +1551,7 @@ def chat_answer_bank_question(request, session_id):
 
     tutor_message = None
     try:
+        from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         # Pre-load the verdict on the engine so _grade_against_last_bank_question
         # doesn't re-grade against the synthetic turn's text.
@@ -1600,8 +1602,6 @@ def chat_answer_bank_question(request, session_id):
 @require_http_methods(["POST"])
 def chat_exit_ticket(request, session_id):
     """Submit exit ticket answers."""
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-
     session = get_object_or_404(
         TutorSession,
         id=session_id,
@@ -1646,6 +1646,7 @@ def chat_exit_ticket(request, session_id):
                 'is_complete': simple_resp.get('is_complete', False),
             })
 
+        from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
         response = tutor.submit_exit_ticket(answers)
 

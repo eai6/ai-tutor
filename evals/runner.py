@@ -29,7 +29,6 @@ from django.contrib.auth.models import User
 
 from apps.accounts.models import Institution
 from apps.curriculum.models import Lesson
-from apps.tutoring.conversational_tutor import ConversationalTutor
 from apps.tutoring.models import SessionTurn, TutorSession
 
 from evals.scorers import AssertionResult
@@ -342,6 +341,12 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
             out = _simple_respond(session, scenario.student_turn)
             tutor_text = (out.get('content') or '').strip()
         else:
+            # Imported here rather than at module scope: this is the only use,
+            # and it is reached only when simple_tutor is disabled. A top-level
+            # import coupled the whole eval harness to the legacy engine, so
+            # anything that stopped conversational_tutor.py importing took out
+            # `manage.py run_eval` and `pytest evals/` outright.
+            from apps.tutoring.conversational_tutor import ConversationalTutor
             tutor = ConversationalTutor(session)
             msg = tutor.respond(scenario.student_turn)
             tutor_text = (msg.content or '').strip()
