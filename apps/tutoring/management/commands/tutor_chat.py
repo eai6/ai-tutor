@@ -81,8 +81,9 @@ class Command(BaseCommand):
                             help='Show judge output persisted on the turn.')
         parser.add_argument('--show-state', action='store_true',
                             help='Show step position and grading verdict.')
-        parser.add_argument('--show-timing', action='store_true',
-                            help='Show wall-clock and tokens per turn.')
+        parser.add_argument('--no-timing', action='store_true',
+                            help='Hide the per-turn response time (shown by '
+                                 'default).')
         parser.add_argument('--show-all', action='store_true',
                             help='Enable every --show-* flag.')
         parser.add_argument(
@@ -109,16 +110,19 @@ class Command(BaseCommand):
             self.stdout.write(render.format_lesson_table(list_lessons()))
             return
 
-        # Clean by default: tutor and student, nothing else. The engine's INFO
-        # commentary and the [step/tool/judge/timing] annotations are debugging
-        # instruments — useful when you are reading the machinery, noise when you
-        # are reading the pedagogy. --debug turns everything on at once;
-        # individual --show-* flags remain for narrower questions.
+        # Clean by default: tutor, student, and the response time. The engine's
+        # INFO commentary and the [step/tool/judge] annotations are debugging
+        # instruments — useful when reading the machinery, noise when reading the
+        # pedagogy. Timing is the exception and stays on: turn latency is the
+        # headline number for a local model on this box (~19 s resident vs ~90 s
+        # cold), it is how you notice a reload or a slow path, and one dim
+        # bracket per turn does not intrude on the transcript.
         keys = ('tools', 'judge', 'state', 'timing')
         if opts['debug'] or opts['show_all']:
             show = dict.fromkeys(keys, True)
         else:
-            show = {k: opts[f'show_{k}'] for k in keys}
+            show = {k: opts.get(f'show_{k}', False) for k in keys}
+            show['timing'] = not opts['no_timing']
 
         try:
             lesson_id, note = resolve_lesson_id(opts['lesson'], opts['subject'])
@@ -199,7 +203,9 @@ class Command(BaseCommand):
     # -- output -----------------------------------------------------------
 
     def _emit(self, session, payload, elapsed, show, colour):
-        cli_logs.transcript.info("TUTOR: %s", payload.get('message') or '')
+        cli_logs.transcript.info(
+            "TUTOR (%.1fs): %s", elapsed, payload.get('message') or '',
+        )
         self.stdout.write('\n' + render.format_reply(payload, colour=colour))
         if show['state']:
             self.stdout.write(render.format_state(payload, colour=colour))
