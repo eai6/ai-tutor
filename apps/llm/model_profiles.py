@@ -199,6 +199,54 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
+    # --- Local Ollama, Qwen3.5 small series (0.8B/2B/4B/9B, released 2026-03-02) ---
+    # WHY THESE EXIST: without an exact key, get_model_profile() falls through to the
+    # generic r"qwen3" FAMILY_PATTERNS entry below, which is a CLOUD profile —
+    # max_tokens=_MT_INSTRUCT (16000) and no num_ctx. client.py then computes
+    # num_ctx = max(8192, 16000+8192) = 24192, the exact value the qwen3-4b-jetson
+    # comment above says OOMs an 8 GB Orin. That fallthrough is not hypothetical: it
+    # is how the whole Eval-3 sweep measured qwen3.5:4b, and it is the leading
+    # explanation for its 21/50 on mt50 against qwen3:4b's 44/50 while simultaneously
+    # topping the single-turn board at 178/200. Per-turn skill, no protocol endurance
+    # — the signature of a model run wrong, not a model that is bad. Tags are keyed
+    # with Ollama's ':' separator because that is what TUTOR_MODEL_OVERRIDE carries.
+    #
+    # ollama_think=False is correct HERE and not on qwen3-4b-jetson above: the
+    # Qwen3.5 templates are HYBRID and gate on `Think`, so Ollama pre-closes the
+    # block as `<think>\n\n</think>` and the flag genuinely suppresses reasoning.
+    # qwen3:4b (Thinking-2507) opens `<think>` unconditionally and ignores it.
+    # Sending it matters twice over on the Ollama path: a thinking model that emits
+    # its tool call into the reasoning channel has NO salvage there, because
+    # _adapt_ollama_response never calls _recover_reasoning_tool_call.
+    #
+    # 9b is profiled for correctness on a larger box only — it CANNOT run on the
+    # Jetson: 6.6 GB of Q4 weights against ~5.6 GB free, before any KV cache. That
+    # is the OOM, and no num_ctx setting fixes it.
+    "local_ollama/qwen3.5:4b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False,
+        notes="Jetson Orin 8GB. Hybrid template — think=False is honoured.",
+    ),
+    "local_ollama/qwen3.5:2b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False,
+        notes="Jetson Orin 8GB fallback if 4b is too slow (2.7 GB Q4 weights).",
+    ),
+    "local_ollama/qwen3.5:0.8b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False,
+        notes="1.0 GB Q4. Too small to tutor; profiled for intent-classifier use.",
+    ),
+    "local_ollama/qwen3.5:9b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False,
+        notes="Does NOT fit the Jetson (6.6 GB Q4 > free RAM). Larger boxes only.",
+    ),
+
     # --- xAI Grok (framework §3.2: suppress persona; penalties REJECTED on reasoning) ---
     "vertex_model_garden/xai/grok-4.1-fast-reasoning": ModelProfile(
         family="grok", mode="thinking", max_tokens=_MT_GROK_THINK,

@@ -834,6 +834,71 @@ class GemmaFamilyProfileTest(SimpleTestCase):
         self.assertEqual(p.family, 'gemma')
 
 
+class QwenLocalTagProfileTest(SimpleTestCase):
+    """The Qwen3.5 local tags must hit an EXACT MODEL_PROFILES entry, not the
+    generic r"qwen3" family pattern. The family pattern is a cloud profile
+    (max_tokens=16000, no num_ctx), which makes client.py derive
+    num_ctx = max(8192, 16000+8192) = 24192 — the window that OOMs an 8 GB
+    Jetson. The entire Eval-3 sweep measured qwen3.5:4b through that
+    fallthrough, and it is the leading explanation for its 21/50 on mt50
+    against 178/200 on the single-turn board."""
+
+    LOCAL_QWEN35_TAGS = (
+        'local_ollama/qwen3.5:4b',
+        'local_ollama/qwen3.5:2b',
+        'local_ollama/qwen3.5:0.8b',
+        'local_ollama/qwen3.5:9b',
+    )
+
+    def test_tags_pin_a_jetson_safe_context(self):
+        from apps.llm.model_profiles import get_model_profile
+        for spec in self.LOCAL_QWEN35_TAGS:
+            with self.subTest(spec=spec):
+                p = get_model_profile(spec)
+                self.assertIsNotNone(p)
+                self.assertEqual(p.family, 'qwen')
+                self.assertEqual(p.num_ctx, 16384)
+                self.assertEqual(p.max_tokens, 3072)
+
+    def test_tags_suppress_thinking(self):
+        """Qwen3.5 templates are hybrid and gate on `Think`, so Ollama's
+        top-level think flag genuinely suppresses reasoning. It must be sent:
+        _adapt_ollama_response never calls _recover_reasoning_tool_call, so a
+        tool call emitted into the reasoning channel has no salvage path."""
+        from apps.llm.model_profiles import get_model_profile
+        for spec in self.LOCAL_QWEN35_TAGS:
+            with self.subTest(spec=spec):
+                self.assertIs(get_model_profile(spec).sampling_dict()['think'], False)
+
+    def test_jetson_qwen3_entry_still_omits_think(self):
+        """qwen3:4b is Thinking-2507 — its template opens <think>
+        unconditionally and think=False disables only Ollama's PARSER, so the
+        monologue lands in content and truncates the answer. The flag must NOT
+        leak onto this entry."""
+        from apps.llm.model_profiles import get_model_profile
+        p = get_model_profile('local_ollama/qwen3-4b-jetson')
+        self.assertEqual(p.num_ctx, 16384)
+        self.assertIsNone(p.ollama_think)
+        self.assertNotIn('think', p.sampling_dict())
+
+    def test_cloud_qwen_fallthrough_unchanged(self):
+        """The committed Colab/cloud eval numbers run at num_ctx=24192 via the
+        family pattern. Adding exact local keys must not disturb it."""
+        from apps.llm.model_profiles import get_model_profile
+        p = get_model_profile('vertex_model_garden/qwen/qwen3-235b-a22b-instruct-2507-maas')
+        self.assertEqual(p.max_tokens, 16000)
+        self.assertIsNone(p.num_ctx)
+
+    def test_production_resolution_untouched(self):
+        from apps.llm.model_profiles import get_model_profile
+        self.assertIsNone(get_model_profile(None))
+        self.assertIsNone(get_model_profile(''))
+        p = get_model_profile('claude-opus-4-7')
+        self.assertIsNotNone(p)
+        self.assertEqual(p.family, 'anthropic')
+        self.assertIsNone(p.ollama_think)
+
+
 class ScrubXmlToolCallTest(SimpleTestCase):
     """gemma_probe5 smoke: the okamototk template's XML tool convention
     leaked '</tool_call>' fragments and fenced blocks into student-visible

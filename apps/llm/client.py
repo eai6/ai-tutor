@@ -1325,6 +1325,19 @@ class OllamaClient(BaseLLMClient):
             # may pin it via sampling['num_ctx'].
             'num_ctx': sampling.get('num_ctx') or max(8192, (num_predict or 2048) + 8192),
         }
+        # An unpinned num_ctx means no exact-spec profile matched and we fell
+        # through to a FAMILY_PATTERNS entry sized for cloud endpoints. On a
+        # memory-constrained box that is silently fatal — the derived window is
+        # what OOMs an 8 GB Jetson ("cannot allocate CUDA0 buffer"), and the
+        # whole Eval-3 sweep measured qwen3.5:4b that way without anyone
+        # noticing. Say it out loud rather than no-op'ing into an OOM.
+        if sampling.get('num_ctx') is None:
+            logger.warning(
+                "[OllamaTools] no num_ctx pinned for %s — derived %d from "
+                "num_predict=%s. Add an exact-spec entry to MODEL_PROFILES if "
+                "this model runs on a memory-constrained box.",
+                self.config.model_name, options['num_ctx'], num_predict,
+            )
         if sampling.get('top_p') is not None:
             options['top_p'] = sampling['top_p']
         if sampling.get('top_k') is not None:
