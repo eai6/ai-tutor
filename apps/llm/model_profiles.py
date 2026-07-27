@@ -57,6 +57,7 @@ class ModelProfile:
     top_k: int | None = None
     presence_penalty: float | None = None
     num_ctx: int | None = None         # Ollama context window (prompt+generation). None → client sizes it to num_predict+headroom (Ollama's 4096 default truncates reasoning models mid-<think>).
+    num_gpu: int | None = None         # Ollama layers to offload to GPU. None → Ollama's autofit, which sizes to FREE memory at load time and silently leaves layers on CPU (measured 2026-07-27: 17-31 of 34 depending on what else was running). Decode tracks this directly — 25/34 gave 6.7 tok/s, 34/34 gave 13.5. Set high (99) to force full offload on a box where the model is known to fit.
     extra_body: dict | None = None     # provider thinking toggle, e.g. {"chat_template_kwargs": {"thinking": False}}
     ollama_think: bool | None = None   # Ollama /api/chat top-level `think` flag (extra_body's chat_template_kwargs is vLLM-only; Ollama ignores it). None = don't send. False works on HYBRID templates that gate on Think (qwen3:8b, qwen3.5:4b/9b) but NOT where <think> opens unconditionally (qwen3:4b Thinking-2507) — there it only disables Ollama's parser and the monologue lands in content. Verify per model.
     prompt_strategy: str = "default"   # 'default' | 'persona_suppress' | 'no_system_no_fewshot'
@@ -80,6 +81,8 @@ class ModelProfile:
             out["presence_penalty"] = self.presence_penalty
         if self.num_ctx is not None:
             out["num_ctx"] = self.num_ctx
+        if self.num_gpu is not None:
+            out["num_gpu"] = self.num_gpu
         if self.ollama_think is not None:
             out["think"] = self.ollama_think
         if self.extra_body:
@@ -192,10 +195,12 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     #      KV (~3.6 GB f16) + 2.6 GB weights exceeds free memory and Ollama
     #      OOMs ("cannot allocate CUDA0 buffer"). Pair with the server flags
     #      OLLAMA_FLASH_ATTENTION=1 + OLLAMA_KV_CACHE_TYPE=q8_0 (halves KV).
+    #   3. num_gpu=99 for the same reason as qwen3.5:4b below — autofit was
+    #      silently leaving layers on CPU.
     "local_ollama/qwen3-4b-jetson": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
         temperature=0.7, top_p=0.8, top_k=20,
-        num_ctx=16384,
+        num_ctx=16384, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
@@ -222,10 +227,24 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # 9b is profiled for correctness on a larger box only — it CANNOT run on the
     # Jetson: 6.6 GB of Q4 weights against ~5.6 GB free, before any KV cache. That
     # is the OOM, and no num_ctx setting fixes it.
+    # num_gpu=99 forces all 34 layers onto the iGPU. Ollama's autofit was
+    # leaving 3-17 of them on CPU depending on free memory at load time, which
+    # cost 3.4x on decode (4.0 -> 13.5 tok/s) and made turn latency vary for
+    # reasons nothing in the app could see. 3.0 GB of weights + a q8_0 KV cache
+    # at num_ctx=16384 fits the Orin's 7.4 GB shared pool with room to spare;
+    # the 9b below does not, which is why it stays on autofit.
+    # max_tokens 3072 -> 1024 matches the production default (engine.py:1750),
+    # so the eval path stops running at 3x production's generation budget. It
+    # is an outer bound, not the length mechanism: measured output is 27-193
+    # tokens, so 1024 never binds on a well-behaved reply but still stops a
+    # runaway. Deliberately NOT set near the observed p90 (175) — a cap that
+    # bites truncates mid-sentence, which reads worse to a student than a reply
+    # that was merely long. The <reply_length> budget in prompts.py does the
+    # actual work.
     "local_ollama/qwen3.5:4b": ModelProfile(
-        family="qwen", mode="instruct", max_tokens=3072,
+        family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,
-        num_ctx=16384, ollama_think=False,
+        num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB. Hybrid template — think=False is honoured.",
     ),
     "local_ollama/qwen3.5:2b": ModelProfile(

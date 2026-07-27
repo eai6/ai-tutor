@@ -778,6 +778,23 @@ def build_system_prompt(
     if intent_text:
         dynamic_parts.append(intent_text)
 
+    # Length budget, rendered dead last — after the in-flight slot, after the
+    # intent block, immediately before the student's message.
+    #
+    # The family prompts have carried brevity guidance for a long time ("keep
+    # every reply short and calibrated — never info-dump") and the local 4B
+    # models ignore it. Two reasons, both textbook: it is phrased negatively
+    # ("never info-dump", "do NOT ... a wall of text") and it is unquantified
+    # ("short and calibrated"), and it sits ~8,000 tokens above the student
+    # turn in a prompt this size. Positive framing plus a countable limit plus
+    # last position is the standard fix for all three.
+    #
+    # This does NOT replace the family-prompt guidance — that still carries the
+    # pedagogy (affirm in one clause, one teaching sentence, name the slip).
+    # This is the arithmetic version of the same rule, restated where the model
+    # will actually still be attending to it.
+    dynamic_parts.append(_render_length_budget())
+
     if dynamic_parts:
         blocks.append({
             "type": "text",
@@ -1115,6 +1132,31 @@ _INTENT_GUIDANCE = {
         "respond conversationally."
     ),
 }
+
+
+def _render_length_budget() -> str:
+    """The per-turn reply-length budget, in sentences.
+
+    Sentences rather than tokens or words: the model cannot count its own
+    tokens, and word budgets ("under 60 words") drift because nothing in the
+    decode loop enforces them. Sentences are a unit the model can actually
+    track while generating, and they map onto the pedagogy the family prompts
+    already describe — an affirmation clause, a teaching sentence, the next
+    question.
+
+    Stated as what TO do. The family prompts already say what not to do and
+    the small local models read straight past it; see the call site.
+    """
+    return (
+        "<reply_length>\n"
+        "Write 2-3 sentences, then stop. That is the whole visible reply.\n"
+        "Budget them like this:\n"
+        "  1. One clause reacting to what the student just said.\n"
+        "  2. One sentence that teaches — the rule, the step, or the slip.\n"
+        "  3. The next question, if you are posing one.\n"
+        "A reply that runs past 3 sentences is too long, however good it is.\n"
+        "</reply_length>"
+    )
 
 
 def _render_message_intent_block(student_intent: str | None) -> str:
