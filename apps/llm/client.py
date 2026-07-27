@@ -1174,30 +1174,48 @@ def _ollama_model_footprint(api_base: str, model_name: str) -> tuple[int, dict, 
     return size, info, file_ctx
 
 
-def _ollama_model_is_loaded(api_base: str, model_name: str) -> bool:
-    """True when Ollama already has this model resident (`/api/ps`).
+def _ollama_resident(api_base: str) -> list[dict]:
+    """Models Ollama currently has loaded, from `/api/ps`.
 
     Deliberately NOT cached: residency changes over the life of a process as
-    OLLAMA_KEEP_ALIVE expires, and a stale "yes" would skip the fit check on a
+    OLLAMA_KEEP_ALIVE expires, and a stale answer would skip the fit check on a
     model that had since been unloaded — the exact case the guard exists for.
 
-    Fail-soft returns False, which routes to the normal fit check rather than
-    waving a load through on a failed lookup.
+    Fail-soft returns [], which routes to the plain fit check rather than waving
+    a load through on a failed lookup.
     """
     import requests
 
-    candidates = {model_name}
-    if ':' not in model_name:
-        candidates.add(f'{model_name}:latest')
     try:
         resp = requests.get(f"{api_base}/api/ps", timeout=10)
         resp.raise_for_status()
-        for m in resp.json().get('models') or []:
-            if m.get('name') in candidates or m.get('model') in candidates:
-                return True
+        return resp.json().get('models') or []
     except Exception as e:
-        logger.debug("[OllamaFit] /api/ps lookup failed for %s: %s", model_name, e)
-    return False
+        logger.debug("[OllamaFit] /api/ps lookup failed: %s", e)
+        return []
+
+
+def _ollama_evictable_bytes(resident: list[dict], model_name: str) -> int:
+    """Memory Ollama will reclaim by evicting to make room for ``model_name``.
+
+    Loading a model when OLLAMA_MAX_LOADED_MODELS is already satisfied evicts an
+    existing one, so that memory IS available to the incoming model even though
+    MemAvailable does not show it yet. Without this the guard blocks every model
+    SWAP: measured 2026-07-27 switching qwen3-4b-jetson (3.9 GB resident, 0.7 GB
+    free) to qwen3.5:4b — refused for 3.7 GB it was about to get back.
+
+    Only counted when OLLAMA_MAX_LOADED_MODELS is explicitly set and already
+    reached, because that is when eviction is guaranteed. Left unset, Ollama
+    sizes concurrency dynamically and may keep both resident, so assuming a
+    reclaim would be the dangerous direction to be wrong in.
+    """
+    try:
+        max_loaded = int(os.environ.get('OLLAMA_MAX_LOADED_MODELS') or 0)
+    except ValueError:
+        return 0
+    if max_loaded <= 0 or len(resident) < max_loaded:
+        return 0
+    return sum(int(m.get('size') or 0) for m in resident)
 
 
 def _ollama_kv_bytes(info: dict, num_ctx: int) -> float | None:
@@ -1257,7 +1275,11 @@ def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -
     # onwards is refused for memory the model itself is holding. Measured on the
     # Jetson 2026-07-27 (1.4 GB "available" against a 4.0 GB projection, for a
     # model that was already loaded and answering).
-    if _ollama_model_is_loaded(api_base, model_name):
+    resident = _ollama_resident(api_base)
+    _names = {model_name}
+    if ':' not in model_name:
+        _names.add(f'{model_name}:latest')
+    if any(m.get('name') in _names or m.get('model') in _names for m in resident):
         return
     try:
         with open('/proc/meminfo') as fh:
@@ -1285,7 +1307,8 @@ def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -
         )
         return
     kv = _ollama_kv_bytes(info, num_ctx)
-    available = avail_kb * 1024
+    evictable = _ollama_evictable_bytes(resident, model_name)
+    available = avail_kb * 1024 + evictable
     projected = weights + (kv or 0) + _OLLAMA_RUNTIME_OVERHEAD_BYTES
     gb = 1024 ** 3
     detail = (
@@ -1293,6 +1316,8 @@ def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -
         + (f" + KV {kv / gb:.1f} GB @ num_ctx={num_ctx}" if kv else " (KV unknown)")
         + f" + {_OLLAMA_RUNTIME_OVERHEAD_BYTES / gb:.1f} GB overhead"
         + f" = {projected / gb:.1f} GB projected against {available / gb:.1f} GB available"
+        + (f" ({evictable / gb:.1f} GB of it reclaimed by evicting the "
+           f"resident model)" if evictable else "")
     )
     if projected > available:
         raise MemoryError(
