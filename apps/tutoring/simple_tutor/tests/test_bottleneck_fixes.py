@@ -23,6 +23,7 @@ from apps.tutoring.simple_tutor.engine import (
     _empty_reply_placeholder,
     _ensure_posed_question_in_text,
     _format_tool_result_for_call2,
+    _is_transient_error,
     _render_slot_question,
     _scrub_engine_vocab,
 )
@@ -1097,3 +1098,51 @@ class ScrubToolCallMetaTest(SimpleTestCase):
             "Let's continue with the lesson.")
         self.assertNotIn('tool call', out)
         self.assertIn("Let's continue with the lesson.", out)
+
+
+class TransientErrorClassificationTest(SimpleTestCase):
+    """Local Ollama 500s must be retried like any other 5xx.
+
+    ``requests.HTTPError`` puts the status on ``exc.response.status_code``,
+    not ``exc.status_code`` — the attribute the classifier originally walked.
+    So every local 500 was classified permanent and skipped the backoff, and
+    because ``_invoke_with_transient_retry`` is fail-soft (returns None rather
+    than raising) the turn silently degraded to the placeholder reply with
+    nothing in the logs marking it as a retryable failure. Measured on the
+    Jetson 2026-07-27: six in one session.
+
+    Asserted through the real exception type rather than a stub, because the
+    bug was entirely in which attribute the real type exposes.
+    """
+
+    def _http_error(self, status):
+        import requests
+        resp = requests.Response()
+        resp.status_code = status
+        return requests.HTTPError(
+            f"{status} Server Error: Internal Server Error for url: "
+            "http://localhost:11434/api/chat",
+            response=resp,
+        )
+
+    def test_ollama_500_is_transient(self):
+        self.assertTrue(_is_transient_error(self._http_error(500)))
+
+    def test_other_5xx_are_transient(self):
+        for status in (502, 503, 504):
+            with self.subTest(status=status):
+                self.assertTrue(_is_transient_error(self._http_error(status)))
+
+    def test_client_errors_stay_permanent(self):
+        """400/401/404 must NOT retry — burning backoff on a schema or auth
+        error just delays the fallback path."""
+        for status in (400, 401, 404):
+            with self.subTest(status=status):
+                self.assertFalse(_is_transient_error(self._http_error(status)))
+
+    def test_bare_message_500_is_transient(self):
+        """Adapters that re-raise as a plain Exception lose the response
+        object; the message substring is the remaining signal."""
+        self.assertFalse(_is_transient_error(Exception('400 Bad Request')))
+        self.assertTrue(_is_transient_error(
+            Exception('500 Server Error: Internal Server Error for url: x')))

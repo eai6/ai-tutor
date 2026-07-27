@@ -1634,16 +1634,29 @@ def _is_transient_error(exc: Exception) -> bool:
         'apitimeout', 'timeout', 'overloaded',
     )):
         return True
+    # `requests.HTTPError` — the shape the Ollama adapter raises — carries the
+    # status on exc.response.status_code, NOT exc.status_code, so the local
+    # provider fell through every check here and its 500s were treated as
+    # permanent. Measured on the Jetson 2026-07-27: six 500s in one session,
+    # none retried, each silently degrading a turn to the placeholder reply.
     for attr in ('status_code', 'code'):
         try:
             if int(getattr(exc, attr, None)) in (429, 500, 502, 503, 504, 529):
                 return True
         except (TypeError, ValueError):
             pass
+    try:
+        if int(getattr(getattr(exc, 'response', None), 'status_code', None)) in (
+            429, 500, 502, 503, 504, 529,
+        ):
+            return True
+    except (TypeError, ValueError):
+        pass
     msg = str(exc).lower()
     return any(s in msg for s in (
-        '429', '503', '529', 'resource exhausted', 'overloaded', 'unavailable',
-        'please try again', 'rate limit', 'timed out', 'connection error',
+        '429', '500 server error', '502', '503', '529', 'resource exhausted',
+        'overloaded', 'unavailable', 'please try again', 'rate limit',
+        'timed out', 'connection error',
     ))
 
 
