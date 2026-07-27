@@ -6043,3 +6043,1397 @@ HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
 [simple_tutor] mode=POSE intent=answer_or_other session=10510 step=0 pool_size=6
 _call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
 [VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=398 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10510 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10510 qtype=mcq verdict=correct ref='A' ext='A' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=430 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10510 advanced to step_index=1 (next_step=14077 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10510 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10510 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10510 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=183 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10510 advanced to step_index=2 (next_step=14078 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10510 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10510 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=249 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10510 advanced to step_index=3 (next_step=14079 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10510 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10510 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=5 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=689 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10510 advanced to step_index=4 (next_step=14080 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10510 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10510 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10510 type=mcq source=catalog catalog_id=6 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=515 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10510 advanced to step_index=5 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10510 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10511 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=10511 type=mcq source=inline_authored catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=541 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10511 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] call2_repair: Call 1 skipped record_answer — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] repeat_pose rejected session=10511 question='Which of the following is the best definition of physical we' (already answered correctly)
+[simple_tutor] posed session=10511 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=10511 type=mcq
+[simple_tutor] two_call=True text_chars=1433 tools=['record_answer', 'auto_pose_fallback']
+maybe_advance_step: session=10511 advanced to step_index=1 (next_step=14062 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10511 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=10511 type=mcq source=inline_authored catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] repeat_pose rejected session=10511 question='Which of the following is a characteristic that distinguishe' (already answered correctly)
+[simple_tutor] repeat_pose rejected session=10511 question='In Seychelles, freeze-thaw weathering is rare because the is' (already answered correctly)
+[simple_tutor] two_call=True text_chars=22 tools=['record_answer', 'pose_question', 'record_answer']
+maybe_advance_step: session=10511 advanced to step_index=2 (next_step=14063 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10511 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10511 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=440 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10511 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] repeat_pose session=10511 streak=1 question='Which of the following is a characteristic that distinguishe' (already answered correctly)
+[simple_tutor] posed session=10511 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=570 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10511 advanced to step_index=3 (next_step=14064 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10511 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10511 type=mcq source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=352 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10511 advanced to step_index=4 (next_step=14065 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10511 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.405828 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10511 qtype=mcq verdict=correct ref='C' ext='C' attempts=0
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['pose_question'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] posed session=10511 type=mcq source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=905 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10511 advanced to step_index=5 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10511 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10512 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10512 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=314 tools=['pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='1' ext='1' attempts=0
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=169 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=1 (next_step=9773 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='12' ext='12' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=114 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=2 (next_step=9774 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='8' ext='8' attempts=0
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10512 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=125 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=3 (next_step=9775 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='0.38' ext='0.38' attempts=0
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10512 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=110 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=4 (next_step=9776 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='0.11' ext='0.11' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=170 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=5 (next_step=9777 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10512 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10512 qtype=short_numeric verdict=correct ref='65' ext='65%' attempts=0
+[simple_tutor] posed session=10512 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10512 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=97 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10512 advanced to step_index=6 (next_step=9778 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10513 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=177 tools=['request_figure', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='120' ext='120' attempts=0
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['record_answer'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=incorrect ref='140' ext='120' attempts=1
+[simple_tutor] two_call=True text_chars=511 tools=['record_answer', 'pose_question', 'record_answer']
+maybe_advance_step: session=10513 advanced to step_index=1 (next_step=9753 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='140' ext='140' attempts=1
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=6 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10513 slot_id=25138 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=93 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=2 (next_step=9754 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='75' ext='75' attempts=0
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10513 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=133 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=3 (next_step=9755 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='135' ext='135' attempts=0
+[simple_tutor] posed session=10513 type=mcq source=catalog catalog_id=4 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=258 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=4 (next_step=9756 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=370 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=5 (next_step=9757 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='70' ext='70' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=177 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=6 (next_step=9758 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='105' ext='105' attempts=0
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10513 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=150 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=7 (next_step=9759 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=7 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='72' ext='72' attempts=0
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=328 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=8 (next_step=9760 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=incorrect ref='120' ext='180' attempts=1
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=117 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=10513 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] scrubbed engine vocabulary from reply (215 -> 213 chars)
+[simple_tutor] two_call=False text_chars=213 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='120' ext='120' attempts=1
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10513 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=158 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=9 (next_step=9761 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10513 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10513 qtype=short_numeric verdict=correct ref='70' ext='70' attempts=0
+[simple_tutor] posed session=10513 type=mcq source=catalog catalog_id=4 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=269 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10513 advanced to step_index=10 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10513 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10514 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10514 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10514 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=139 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='0.25' ext='0.25 or 25%' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=4 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=163 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=1 (next_step=9743 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='16' ext='16' attempts=0
+[simple_tutor] posed session=10514 type=mcq source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=262 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=2 (next_step=9744 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=mcq verdict=correct ref='A' ext='A' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=120 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=3 (next_step=9745 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='50' ext='50' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10514 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=185 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=4 (next_step=9746 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=mcq verdict=correct ref='D' ext='D' attempts=0
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10514 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=177 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=5 (next_step=9747 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='7' ext='7' attempts=0
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10514 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=145 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=6 (next_step=9748 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='2.5' ext='2.5' attempts=0
+[simple_tutor] posed session=10514 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=409 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=7 (next_step=9749 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10514 step=7 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='200' ext='200' attempts=0
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['pose_question'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] premature_pose blocked session=10514 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=283 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=8 (next_step=9750 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=10514 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=179 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=incorrect ref='-3.33333' ext='+3.333' attempts=1
+[simple_tutor] orphan_in_flight session=10514 prior_type=short_numeric attempts=1 — replaced before grading
+[simple_tutor] posed session=10514 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10514 slot_id=25156 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=242 tools=['record_answer', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='3000' ext='3000' attempts=0
+[simple_tutor] posed session=10514 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10514 slot_id=25157 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=99 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=9 (next_step=9751 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10514 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10514 qtype=short_numeric verdict=correct ref='25' ext='25' attempts=0
+[simple_tutor] posed session=10514 type=mcq source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10514 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=146 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10514 advanced to step_index=10 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10514 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10515 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10515 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=163 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['record_answer'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='6' ext='6' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=232 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=1 (next_step=9803 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='5' ext='5' attempts=0
+[simple_tutor] posed session=10515 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=194 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=2 (next_step=9804 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=incorrect ref='C' ext='75' attempts=1
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=incorrect ref='C' ext='75' attempts=2
+[simple_tutor] two_call=True text_chars=264 tools=['record_answer', 'record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10515 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=correct ref='C' ext='C' attempts=2
+[simple_tutor] posed session=10515 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10515 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=154 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=3 (next_step=9805 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='28' ext='28' attempts=0
+[simple_tutor] posed session=10515 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10515 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=101 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=4 (next_step=9806 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='160' ext='160' attempts=0
+[simple_tutor] posed session=10515 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10515 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=154 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=5 (next_step=9807 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='270' ext='270' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=19 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=6 (next_step=9808 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10515 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10515 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=82 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='6' ext='6' attempts=0
+[simple_tutor] posed session=10515 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=incorrect ref='A' ext='6' attempts=1
+[simple_tutor] two_call=True text_chars=99 tools=['record_answer', 'pose_question', 'record_answer']
+maybe_advance_step: session=10515 advanced to step_index=7 (next_step=9809 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=7 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=correct ref='A' ext='A' attempts=1
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=10515 type=mcq
+[simple_tutor] two_call=True text_chars=175 tools=['record_answer', 'pose_question', 'auto_pose_fallback']
+maybe_advance_step: session=10515 advanced to step_index=8 (next_step=9810 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=mcq verdict=correct ref='A' ext='A' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=short_numeric source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=109 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10515 advanced to step_index=9 (next_step=9811 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10515 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10515 qtype=short_numeric verdict=correct ref='60' ext='60' attempts=0
+[simple_tutor] repeat_pose rejected session=10515 question='Two angles on a straight line are 20° and x°. What is x?' (already answered correctly)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10515 type=mcq source=catalog catalog_id=None mismatch=False repeat_advance=False
+[simple_tutor] auto_pose_fallback posed pool question session=10515 type=mcq
+[simple_tutor] two_call=True text_chars=333 tools=['record_answer', 'pose_question', 'auto_pose_fallback']
+maybe_advance_step: session=10515 advanced to step_index=10 (next_step=None forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10516 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=short_numeric source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10516 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=163 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='6' ext='6' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=92 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=1 (next_step=9803 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='160' ext='160' attempts=0
+[simple_tutor] pose salvaged: optionless mcq options+letter adopted from catalog session=10516
+[simple_tutor] posed session=10516 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10516 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=168 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=2 (next_step=9804 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10516 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=mcq verdict=correct ref='D' ext='D' attempts=0
+[simple_tutor] posed session=10516 type=mcq source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10516 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=137 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=3 (next_step=9805 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=mcq verdict=correct ref='C' ext='C' attempts=0
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=4 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10516 slot_id=25174 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=27 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=4 (next_step=9806 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='6' ext='6' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=120 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=5 (next_step=9807 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='10' ext='10' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=102 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=6 (next_step=9808 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='6' ext='6' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=89 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=7 (next_step=9809 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=7 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=mcq verdict=correct ref='A' ext='A' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=97 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=8 (next_step=9810 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='121' ext='121' attempts=0
+[simple_tutor] posed session=10516 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=152 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=9 (next_step=9811 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10516 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10516 qtype=short_numeric verdict=correct ref='30' ext='30' attempts=0
+[simple_tutor] posed session=10516 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=230 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10516 advanced to step_index=10 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10516 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10517 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10517 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10517 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=340 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10517 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10517 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10517 type=mcq source=catalog catalog_id=3 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=341 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10517 advanced to step_index=1 (next_step=14037 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10517 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10517 qtype=mcq verdict=correct ref='C' ext='c' attempts=0
+[simple_tutor] posed session=10517 type=mcq source=catalog catalog_id=5 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=543 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10517 advanced to step_index=2 (next_step=14038 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10517 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10517 qtype=mcq verdict=correct ref='B' ext='B' attempts=0
+[simple_tutor] posed session=10517 type=mcq source=catalog catalog_id=6 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10517 slot_id=25184 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=371 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10517 advanced to step_index=3 (next_step=14039 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10517 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.493661 seconds
+Retrying request to /chat/completions in 0.934023 seconds
+_call_llm: generate_with_tools(vertex_model_garden) transient APITimeoutError (Request timed out.) — retry 1/5 in 2s
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.427494 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10517 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] posed session=10517 type=mcq source=inline_authored catalog_id=6 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.451764 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10517 slot_id=25185 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=184 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10517 advanced to step_index=4 (next_step=14040 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10517 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10517 qtype=mcq verdict=correct ref='C' ext='c' attempts=0
+[simple_tutor] posed session=10517 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.456273 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10517 slot_id=25186 stripped_divergent_prose=False
+[simple_tutor] two_call=True text_chars=557 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10517 advanced to step_index=5 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10517 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10518 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10518 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10518 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=452 tools=['pose_question', 'pose_question']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10518 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10518 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10518 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=631 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10518 advanced to step_index=1 (next_step=14062 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10518 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10518 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] posed session=10518 type=mcq source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['pose_question'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] premature_pose blocked session=10518 — student answered an in-flight question; grade it first
+[simple_tutor] rendering slot question session=10518 slot_id=25189 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=381 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10518 advanced to step_index=2 (next_step=14063 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10518 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10518 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10518 type=mcq source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=458 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10518 advanced to step_index=3 (next_step=14064 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10518 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10518 qtype=mcq verdict=correct ref='B' ext='b' attempts=0
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10518 type=mcq source=catalog catalog_id=5 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=362 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10518 advanced to step_index=4 (next_step=14065 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10518 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.409046 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10518 qtype=mcq verdict=correct ref='C' ext='c' attempts=0
+[simple_tutor] posed session=10518 type=mcq source=inline_authored catalog_id=None mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.469815 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+handle_advance_step: session=10518 advanced to step_index=5 next_step=None reason=' all 6 weathering questions answered correctly in step 5'
+[simple_tutor] two_call=True text_chars=257 tools=['record_answer', 'pose_question', 'advance_step']
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10518 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10519 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] call2_repair: Call 1 skipped pose_question — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=188 tools=['pose_question', 'pose_question']
+Retrying request to /v1/messages in 0.455956 seconds
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=POSE intent=answer_or_other session=10519 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='150' ext='360 degrees' attempts=1
+[simple_tutor] two_call=True text_chars=136 tools=['pose_question', 'record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='150' ext='210' attempts=2
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=125 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=0 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='150' ext='150' attempts=2
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10519 type=mcq source=catalog catalog_id=1 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=113 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=1 (next_step=13722 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=1 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=mcq verdict=correct ref='D' ext='D' attempts=0
+[simple_tutor] repeat_pose rejected session=10519 question='Four angles around a point are 80°, 60°, 70°, and x°. What i' (already answered correctly)
+[simple_tutor] call2_repair: Call 1 skipped pose_question_next — folding the repair into Call 2 (no extra call)
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+[simple_tutor] two_call=True text_chars=91 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=2 (next_step=13723 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='150' ext='210' attempts=1
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=325 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer session=10519 step=2 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='150' ext='150' attempts=1
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='170' ext='150' attempts=1
+[simple_tutor] two_call=True text_chars=98 tools=['record_answer', 'pose_question', 'record_answer']
+maybe_advance_step: session=10519 advanced to step_index=3 (next_step=13724 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=3 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='170' ext='170' attempts=1
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10519 slot_id=25197 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=79 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=4 (next_step=13725 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=4 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='150' ext='150' attempts=0
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=119 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=5 (next_step=13726 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='120' ext='240' attempts=1
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=132 tools=['record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=5 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='120' ext='120' attempts=1
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=3 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+handle_pose_question: unsupported source='' — falling back to inline_authored
+[simple_tutor] premature_pose blocked session=10519 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=105 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=6 (next_step=13727 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=clarification session=10519 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=False text_chars=265 tools=[]
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=6 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='60' ext='60' attempts=0
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=4 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[llm] recovered ['record_answer'] from the reasoning channel — thinking model emitted the tool call outside `content`
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='50' ext='60' attempts=1
+[simple_tutor] rendering slot question session=10519 slot_id=25200 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=57 tools=['record_answer', 'pose_question', 'record_answer']
+maybe_advance_step: session=10519 advanced to step_index=7 (next_step=13728 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=7 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='50' ext='50' attempts=1
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=5 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] premature_pose blocked session=10519 — student answered an in-flight question; grade it first
+[simple_tutor] two_call=True text_chars=89 tools=['record_answer', 'pose_question', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=8 (next_step=13729 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=8 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='40' ext='40' attempts=0
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=1 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] two_call=True text_chars=283 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=9 (next_step=13730 forced=False)
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='95' ext='265' attempts=1
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+Retrying request to /chat/completions in 0.431811 seconds
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=incorrect ref='95' ext='265' attempts=2
+[simple_tutor] two_call=True text_chars=304 tools=['record_answer', 'record_answer']
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+[KB] storage backend=sqlite — vector ops are no-ops (SQLite local dev / CI)
+[simple_tutor] mode=GRADE intent=answer_or_other session=10519 step=9 pool_size=6
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] graded session=10519 qtype=short_numeric verdict=correct ref='95' ext='95' attempts=2
+[simple_tutor] posed session=10519 type=short_numeric source=catalog catalog_id=2 mismatch=False repeat_advance=False
+_call_llm: profile family=qwen mode=thinking max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+[VertexMaaSTools] llm_call: model=qwen/qwen3-next-80b-a3b-thinking-maas max_tokens=32768 sampling={'temperature': 0.6, 'top_p': 0.95, 'top_k': 20}
+HTTP Request: POST https://aiplatform.googleapis.com/v1/projects/ai-tutor-499714/locations/global/endpoints/openapi/chat/completions "HTTP/1.1 200 OK"
+[simple_tutor] rendering slot question session=10519 slot_id=25203 stripped_divergent_prose=True
+[simple_tutor] two_call=True text_chars=81 tools=['record_answer', 'pose_question']
+maybe_advance_step: session=10519 advanced to step_index=10 (next_step=None forced=False)
+[simple_tutor] cleared orphan pose at exit-ticket handoff session=10519 deleted=(1, {'tutoring.InFlightQuestion': 1})
+HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+  PASS  average_geo_direction_001                trajectory ok [exit_ticket @ 6 turns] [rubric 0.82/0.60]
+  PASS  average_geo_scale_001                    trajectory ok [exit_ticket @ 7 turns] [rubric 0.90/0.60]
+  PASS  average_self_correction_math_001         trajectory ok [exit_ticket @ 12 turns] [rubric 0.83/0.60]
+  PASS  baseline_full_session_error_prone_1141_09 trajectory ok [exit_ticket @ 16 turns] [rubric 0.79/0.60]
+  PASS  baseline_full_session_error_prone_1470_11 trajectory ok [exit_ticket @ 12 turns] [rubric 0.90/0.60]
+  PASS  capable_speedrun_001                     trajectory ok [exit_ticket @ 11 turns] [rubric 0.92/0.65]
+  FAIL  engagement_recovery_non_responder_1144_07 failed: max_turn_count [exit_ticket @ 19 turns] [rubric 0.72/0.60]
+  PASS  engagement_recovery_non_responder_1464_14 trajectory ok [exit_ticket @ 7 turns] [rubric 0.86/0.60]
+  PASS  engagement_recovery_non_responder_1469_12 trajectory ok [exit_ticket @ 5 turns] [rubric 0.95/0.60]
+  PASS  engagement_recovery_struggler_1465_05    trajectory ok [exit_ticket @ 5 turns] [rubric 0.73/0.60]
+  PASS  error_cascade_error_prone_1145_06        trajectory ok [exit_ticket @ 13 turns] [rubric 0.92/0.60]
+  PASS  error_cascade_struggler_1143_08          trajectory ok [exit_ticket @ 13 turns] [rubric 0.88/0.60]
+  PASS  error_cascade_struggler_1465_05          trajectory ok [exit_ticket @ 12 turns] [rubric 0.68/0.60]
+  PASS  error_cascade_struggler_1470_11          trajectory ok [exit_ticket @ 6 turns] [rubric 0.90/0.60]
+  PASS  error_prone_straight_line_math_001       trajectory ok [exit_ticket @ 12 turns] [rubric 0.85/0.60]
+  PASS  help_intensive_error_prone_1141_11       trajectory ok [exit_ticket @ 15 turns] [rubric 0.82/0.60]
+  PASS  help_intensive_error_prone_1141_16       trajectory ok [exit_ticket @ 15 turns] [rubric 0.83/0.60]
+  PASS  help_intensive_error_prone_1144_09       trajectory ok [exit_ticket @ 15 turns] [rubric 0.89/0.60]
+  PASS  help_intensive_struggler_1465_07         trajectory ok [exit_ticket @ 5 turns] [rubric 0.94/0.60]
+  PASS  long_session_capable_001                 trajectory ok [exit_ticket @ 5 turns] [rubric 0.82/0.60]
+  PASS  long_session_probe_resistant_1142_10     trajectory ok [exit_ticket @ 11 turns] [rubric 0.88/0.60]
+  PASS  long_session_probe_resistant_1145_08     trajectory ok [exit_ticket @ 13 turns] [rubric 0.79/0.60]
+  PASS  no_banned_opener_loop_capable_001        trajectory ok [exit_ticket @ 5 turns] [rubric 0.91/0.65]
+  PASS  refusal_chain_non_responder_1141_12      trajectory ok [exit_ticket @ 15 turns] [rubric 0.78/0.60]
+  PASS  refusal_chain_non_responder_1464_15      trajectory ok [exit_ticket @ 5 turns] [rubric 0.96/0.60]
+  PASS  refusal_chain_non_responder_1466_08      trajectory ok [exit_ticket @ 7 turns] [rubric 0.96/0.60]
+  PASS  refusal_chain_non_responder_1468_06      trajectory ok [exit_ticket @ 6 turns] [rubric 0.99/0.60]
+  PASS  remediation_after_exit_ticket_fail_average_1139_17 trajectory ok [exit_ticket @ 13 turns] [rubric 0.67/0.60]
+  PASS  remediation_after_exit_ticket_fail_error_prone_1145_03 trajectory ok [exit_ticket @ 25 turns] [rubric 0.76/0.60]
+  PASS  self_correction_average_1139_05          trajectory ok [exit_ticket @ 12 turns] [rubric 0.61/0.60]
+  PASS  self_correction_average_1465_03          trajectory ok [exit_ticket @ 5 turns] [rubric 0.85/0.60]
+  PASS  session_completion_capable_1141_05       trajectory ok [exit_ticket @ 13 turns] [rubric 0.65/0.60]
+  PASS  session_completion_struggler_1137_14     trajectory ok [exit_ticket @ 19 turns] [rubric 0.79/0.60]
+  PASS  session_completion_struggler_1142_13     trajectory ok [exit_ticket @ 12 turns] [rubric 0.72/0.60]
+  PASS  session_completion_struggler_1468_09     trajectory ok [exit_ticket @ 5 turns] [rubric 0.99/0.60]
+  PASS  short_session_probe_resistant_1143_12    trajectory ok [max_turns @ 6 turns] [rubric 0.80/0.60]
+  PASS  short_session_probe_resistant_1465_10    trajectory ok [exit_ticket @ 5 turns] [rubric 0.77/0.60]
+  PASS  short_session_probe_resistant_1467_02    trajectory ok [exit_ticket @ 5 turns] [rubric 0.94/0.60]
+  PASS  speedrun_capable_1139_14                 trajectory ok [max_turns @ 6 turns] [rubric 0.87/0.60]
+  PASS  speedrun_capable_1141_07                 trajectory ok [exit_ticket @ 11 turns] [rubric 0.66/0.60]
+  PASS  speedrun_capable_1466_11                 trajectory ok [exit_ticket @ 5 turns] [rubric 0.91/0.60]
+  PASS  speedrun_capable_1470_09                 trajectory ok [exit_ticket @ 6 turns] [rubric 0.80/0.60]
+  PASS  speedrun_probe_resistant_1142_02         trajectory ok [max_turns @ 6 turns] [rubric 0.85/0.60]
+  PASS  straight_line_average_1139_07            trajectory ok [exit_ticket @ 12 turns] [rubric 0.68/0.60]
+  PASS  straight_line_average_1144_04            trajectory ok [exit_ticket @ 12 turns] [rubric 0.86/0.60]
+  FAIL  straight_line_average_1145_12            failed: max_turn_count [exit_ticket @ 12 turns] [rubric 0.88/0.60]
+  PASS  straight_line_average_1145_16            trajectory ok [exit_ticket @ 10 turns] [rubric 0.97/0.60]
+  PASS  straight_line_average_1469_09            trajectory ok [exit_ticket @ 5 turns] [rubric 0.98/0.60]
+  PASS  straight_line_average_1470_14            trajectory ok [exit_ticket @ 5 turns] [rubric 1.00/0.60]
+  FAIL  struggler_math_session_001               failed: max_turn_count [exit_ticket @ 16 turns] [rubric 0.82/0.60]
+
+Result: passed=47 failed=3 errored=0 total=50
+Output: /home/daniel/Documents/work/Nyansapo/web/ai-tutor/evals/runs/2026-07-26T16-20-24_1bdf2dab7bea.json
