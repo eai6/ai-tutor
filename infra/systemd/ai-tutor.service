@@ -24,6 +24,13 @@ Environment=PYTHONUNBUFFERED=1
 # line in the file.
 Environment=TUTOR_MODEL_OVERRIDE=local_ollama/qwen3-4b-jetson
 
+# Optional override file, read AFTER the line above so it wins. Lets the model
+# be swapped for testing without editing this unit:
+#   sudo scripts/tutor_kiosk.sh model local_ollama/qwen3.5:2b
+# The leading '-' means "carry on if it does not exist", which is the normal
+# state — the default above is the intended production model.
+EnvironmentFile=-/etc/default/ai-tutor
+
 # Must match ollama.service. See the comment there.
 Environment=OLLAMA_FLASH_ATTENTION=1
 Environment=OLLAMA_KV_CACHE_TYPE=q8_0

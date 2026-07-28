@@ -46,11 +46,16 @@ _HELP = {'/help', '/?'}
 # qwen3:8b and qwen3.5:9b are deliberately absent: 4.9 GB and 6.1 GB of weights
 # against ~5.5 GB free. The fit preflight refuses them anyway, but offering them
 # here would invite the attempt.
+#
+# No thinking checkpoints. They spend the box's scarce tokens/s on a monologue
+# the student never sees, and on the Ollama path a tool call emitted into the
+# reasoning channel has no salvage — _adapt_ollama_response never calls
+# _recover_reasoning_tool_call. qwen3-4b-jetson is built FROM qwen3:4b-instruct
+# precisely to avoid this.
 MODEL_ALIASES = {
     'qwen3-4b': 'local_ollama/qwen3-4b-jetson',
     'qwen3.5-4b': 'local_ollama/qwen3.5:4b',
     'qwen3.5-2b': 'local_ollama/qwen3.5:2b',
-    'qwen3-4b-thinking': 'local_ollama/qwen3:4b',
 }
 
 
