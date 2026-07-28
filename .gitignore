@@ -79,3 +79,6 @@ offline_eval/viewer_deploy/index.html
 
 # Terminal tutor client --debug session logs
 logs/
+
+# collectstatic output (regenerated on service start)
+staticfiles/

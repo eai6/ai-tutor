@@ -1,0 +1,38 @@
+[Unit]
+# Local model server for the tutor. Ollama is a per-user install
+# (/home/eai6/ollama/bin), not the vendor package, so there is no unit shipped
+# with it — this is that unit.
+Description=Ollama local model server (AI Tutor)
+After=network.target
+Before=ai-tutor.service
+
+[Service]
+Type=simple
+User=eai6
+Group=eai6
+WorkingDirectory=/home/eai6
+
+# These MUST match what apps/llm/client.py::_ollama_fit_preflight assumes, or
+# the guard mis-sizes the KV cache. It reads OLLAMA_KV_CACHE_TYPE from the
+# CLIENT environment while the value that governs allocation is set HERE, on the
+# server. A mismatch in the permissive direction under-estimates the footprint,
+# which is the direction that hangs the box.
+#   q8_0 KV        halves the cache (~2.4 GB -> ~1.2 GB at num_ctx=16384)
+#   NUM_PARALLEL=1 each parallel slot gets its OWN KV cache; 2 slots do not fit
+#   MAX_LOADED=1   one model resident at a time on a 7.4 GB unified pool
+#   KEEP_ALIVE=-1  never unload. On a kiosk the alternative is a student
+#                  waiting ~90 s for a cold load after any quiet spell.
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_FLASH_ATTENTION=1
+Environment=OLLAMA_KV_CACHE_TYPE=q8_0
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_MAX_LOADED_MODELS=1
+Environment=OLLAMA_KEEP_ALIVE=-1
+Environment=OLLAMA_MODELS=/home/eai6/.ollama/models
+
+ExecStart=/home/eai6/ollama/bin/ollama serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

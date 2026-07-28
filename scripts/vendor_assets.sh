@@ -53,6 +53,27 @@ sed -i -E 's#https://fonts\.gstatic\.com[^)]*/([^/)]+\.woff2)#../fonts/\1#g' \
     "$OUT/css/google-fonts.css"
 echo "    $(ls "$OUT/fonts" | wc -l) font files"
 
-remaining=$(grep -rlE 'https?://(fonts\.(googleapis|gstatic)|cdn\.jsdelivr)' "$OUT" 2>/dev/null | wc -l)
+echo "==> source maps"
+# WhiteNoise's CompressedManifestStaticFilesStorage FOLLOWS sourceMappingURL
+# comments and aborts collectstatic with MissingFileError when the .map is
+# absent. That takes the whole service down at boot, not just the map — it
+# failed exactly that way on 2026-07-27 for purify.min.js.map. Fetch whatever
+# each file references rather than stripping the comment, so the vendored files
+# stay byte-identical to upstream.
+for f in "$OUT"/js/*.js "$OUT"/css/*.css; do
+    [ -e "$f" ] || continue
+    map=$(grep -oE 'sourceMappingURL=[^ */]+' "$f" 2>/dev/null | tail -1) || true
+    [ -n "$map" ] || continue
+    map="${map#sourceMappingURL=}"
+    case "$(basename "$f")" in
+        purify.min.js) src="https://cdn.jsdelivr.net/npm/dompurify@${DOMPURIFY_VERSION}/dist/$map" ;;
+        katex.min.js|katex.min.css) src="https://cdn.jsdelivr.net/npm/katex@${KATEX_VERSION}/dist/$map" ;;
+        marked.min.js) src="https://cdn.jsdelivr.net/npm/marked/$map" ;;
+        *) echo "    WARNING: no source known for $map (referenced by $f)" >&2; continue ;;
+    esac
+    curl -fsS -o "$(dirname "$f")/$map" "$src" && echo "    $map"
+done
+
+remaining=$(grep -rlE 'https?://(fonts\.(googleapis|gstatic)|cdn\.jsdelivr)' "$OUT" --include='*.js' --include='*.css' 2>/dev/null | wc -l)
 [ "$remaining" -eq 0 ] || { echo "ERROR: $remaining vendored file(s) still reference a CDN" >&2; exit 1; }
 echo "==> done — no external references remain in static/vendor/"
