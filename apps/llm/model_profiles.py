@@ -274,6 +274,16 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # num_ctx here MUST equal the Modelfile's. If they disagree, the tutor path
     # sends this value while every other path inherits the Modelfile's, and the
     # two thrash — which is the exact bug this entry exists to prevent.
+    # Modelfile-tagged Qwen3.5 4B. Same reasoning as the 2b entry below: a
+    # profile cannot reach the grader's OpenAI-compatible verifier path, so the
+    # window has to be baked into the tag. num_ctx MUST equal the Modelfile's.
+    "local_ollama/qwen3.5-4b-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=1024,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False, num_gpu=99,
+        notes="Jetson Orin 8GB: Qwen3.5-4B with num_ctx pinned in the Modelfile.",
+    ),
+
     "local_ollama/qwen3.5-2b-jetson": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
         temperature=0.7, top_p=0.8, top_k=20,

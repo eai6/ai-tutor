@@ -54,9 +54,13 @@ _HELP = {'/help', '/?'}
 # precisely to avoid this.
 MODEL_ALIASES = {
     'qwen3-4b': 'local_ollama/qwen3-4b-jetson',
-    'qwen3.5-4b': 'local_ollama/qwen3.5:4b',
+    'qwen3.5-4b': 'local_ollama/qwen3.5-4b-jetson',
     'qwen3.5-2b': 'local_ollama/qwen3.5-2b-jetson',
-    'qwen3.5-2b-bare': 'local_ollama/qwen3.5:2b',
+    # Every alias points at a Modelfile-pinned tag, never a bare one. A bare tag
+    # does not pin num_ctx, so the grader's verifier loads a separate
+    # 4096-context runner and evicts the tutor on every graded turn. Adding a
+    # model here means building it a tag first — copy an
+    # infra/ollama/Modelfile.*-jetson and change the FROM line.
 }
 
 

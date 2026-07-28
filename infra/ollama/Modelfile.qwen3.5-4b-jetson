@@ -1,0 +1,28 @@
+# qwen3.5-4b-jetson — NVIDIA Jetson Orin (8 GB) tutor model, Qwen3.5 4B tier
+#
+# Build:   ollama create qwen3.5-4b-jetson -f infra/ollama/Modelfile.qwen3.5-4b-jetson
+# Use:     ./chat.py --qwen3.5-4b
+#          or pick it in /admin/ (ModelConfig, purpose=tutoring)
+#
+# Same reasoning as Modelfile.qwen3.5-2b-jetson — read that one for the full
+# story. In short: apps/llm/model_profiles.py can only pin num_ctx on requests
+# this codebase builds. The grader's Tier-2 verifier reaches Ollama through
+# instructor's OPENAI-COMPATIBLE endpoint (POST /v1/chat/completions), which has
+# no num_ctx field, so on a bare tag it lands at Ollama's 4096 default. Ollama
+# keys a runner on (model, params), so that is a second runner — and under
+# OLLAMA_MAX_LOADED_MODELS=1 the two evict each other on every graded turn.
+#
+# A Modelfile PARAMETER applies on every endpoint, which is the only way to
+# cover callers we do not construct requests for.
+FROM qwen3.5:4b
+
+# Must match local_ollama/qwen3.5-4b-jetson in apps/llm/model_profiles.py.
+# 16384 holds the tutor's system prompt + tool schemas + a turn of output; at
+# the stock window the KV cache plus weights exceeds this box's free memory.
+PARAMETER num_ctx 16384
+
+# Qwen3.5's own recommended sampling (framework §3.3), restated so the tag is
+# self-describing and the OpenAI-compatible path inherits them too.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20

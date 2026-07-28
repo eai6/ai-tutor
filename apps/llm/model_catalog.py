@@ -114,6 +114,24 @@ def _fits(spec: str, api_base: str = OLLAMA_HOST) -> bool:
         return True
 
 
+def _pins_own_context(tag: str, api_base: str = OLLAMA_HOST) -> bool:
+    """True when the tag bakes num_ctx into its own Modelfile.
+
+    This is the property that makes a local model safe to run here, and it is
+    NOT the same as having a profile: a Modelfile PARAMETER applies on every
+    endpoint, including the OpenAI-compatible one our profile cannot reach.
+
+    Fail-soft returns True — an unreadable tag is not evidence of a defect, and
+    hiding a working model is worse than listing a questionable one.
+    """
+    from apps.llm.client import _ollama_model_footprint
+
+    footprint = _ollama_model_footprint(api_base, tag)
+    if footprint is None:
+        return True
+    return footprint[2] is not None          # (weights, info, modelfile num_ctx)
+
+
 def _has_exact_profile(spec: str) -> bool:
     """True when MODEL_PROFILES has an EXACT entry for this spec.
 
@@ -142,6 +160,19 @@ def available_choices(include: str = '') -> list[tuple[str, list[tuple[str, str]
         profiled = _has_exact_profile(spec) or _has_exact_profile(f'local_ollama/{bare}')
         if not profiled:
             unusable.append((bare, f'{bare}  (no profile — would be sized for cloud)'))
+        elif not _pins_own_context(bare):
+            # Offering this is a trap. A profile pins num_ctx only for requests
+            # THIS codebase builds; the grader's Tier-2 verifier reaches Ollama
+            # through instructor's OpenAI-compatible endpoint, which has no
+            # num_ctx field and therefore loads a separate 4096-context runner.
+            # Under OLLAMA_MAX_LOADED_MODELS=1 the two evict each other every
+            # graded turn — measured at 4 reloads across 2 turns on the bare
+            # qwen3.5:2b, and 0 once the same weights were given a pinned tag.
+            unusable.append((
+                bare,
+                f'{bare}  (no num_ctx in its Modelfile — would reload every turn; '
+                f'build a pinned tag)',
+            ))
         elif not _fits(f'local_ollama/{bare}'):
             unusable.append((bare, f'{bare}  (too large for this device)'))
         else:

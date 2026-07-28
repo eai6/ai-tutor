@@ -1306,6 +1306,24 @@ def _ollama_fit_preflight(api_base: str, model_name: str, num_ctx: int | None) -
     # measured 4x on qwen3-4b-jetson, which pins num_ctx 16384.
     if num_ctx is None:
         num_ctx = file_ctx or 4096
+    elif file_ctx is None:
+        # We are pinning a window this tag does NOT bake in. Every caller that
+        # bypasses this client — notably the grader's Tier-2 verifier, which
+        # uses instructor's OpenAI-compatible endpoint and has no num_ctx field
+        # — will instead get Ollama's 4096 default. Ollama keys a runner on
+        # (model, params), so the two alternate and evict each other, reloading
+        # the model 30-45 s each way on every graded turn.
+        #
+        # Measured on the bare qwen3.5:2b tag 2026-07-28: 4 reloads across 2
+        # turns, gone after building a Modelfile-pinned tag. Warn loudly rather
+        # than let it look like ordinary slowness.
+        logger.warning(
+            "[OllamaFit] %s has no num_ctx in its Modelfile but the profile "
+            "pins %d — paths that bypass this client will load a separate "
+            "%d-context runner and evict this one on every call. Build a "
+            "pinned tag (see infra/ollama/Modelfile.qwen3.5-2b-jetson).",
+            model_name, num_ctx, 4096,
+        )
     if not weights:
         # Never silently pass: an unmeasurable model is exactly the case where
         # a bad fit goes undetected and takes the box down.
