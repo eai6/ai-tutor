@@ -88,12 +88,42 @@ cmd_model() {
 }
 
 cmd_status() {
-    printf '%-14s %s\n' "ollama:" "$(systemctl is-active ollama.service 2>/dev/null || echo unknown)/$(systemctl is-enabled ollama.service 2>/dev/null || echo -)"
-    printf '%-14s %s\n' "ai-tutor:" "$(systemctl is-active ai-tutor.service 2>/dev/null || echo unknown)/$(systemctl is-enabled ai-tutor.service 2>/dev/null || echo -)"
+    # `systemctl is-enabled` prints its answer AND exits non-zero for
+    # "disabled", so a `|| echo ...` fallback appends a second line to every
+    # row. Capture the output and substitute only when it is empty.
+    local u a e
+    for u in "${UNITS[@]}"; do
+        a="$(systemctl is-active "$u" 2>/dev/null || true)"
+        e="$(systemctl is-enabled "$u" 2>/dev/null || true)"
+        printf '%-14s %s\n' "${u%.service}:" "${a:-unknown}/${e:-unknown}"
+    done
     local auto
     auto="$(nmcli -t -f connection.autoconnect con show "$AP_CON" 2>/dev/null | cut -d: -f2 || echo '-')"
-    local m; m="$(grep -hoE 'TUTOR_MODEL_OVERRIDE=.*' /etc/default/ai-tutor 2>/dev/null | cut -d= -f2)"
-    printf '%-14s %s\n' "model:" "${m:-local_ollama/qwen3-4b-jetson (unit default)}"
+    # Resolve the model the app will ACTUALLY use, not just the override file.
+    # With no override the active tutoring ModelConfig row decides, and that row
+    # is editable from /admin/ — so the honest answer needs the database. A row
+    # pointing at a cloud provider is the failure that silently breaks an
+    # offline kiosk: the app looks healthy and every turn fails once the hotspot
+    # is up, with no monitor attached to notice.
+    local m
+    m="$(grep -hoE 'TUTOR_MODEL_OVERRIDE=.*' /etc/default/ai-tutor 2>/dev/null | cut -d= -f2 || true)"
+    if [ -n "$m" ]; then
+        printf '%-14s %s\n' "model:" "$m  (forced by /etc/default/ai-tutor)"
+    else
+        # `|| true` is load-bearing: this runs under `set -e`, so a failing
+        # probe (venv missing, DB locked) would abort status entirely and print
+        # nothing rather than reporting what it could.
+        m="$(cd "$ROOT" && DJANGO_SETTINGS_MODULE=config.settings .venv/bin/python -c "
+import django; django.setup()
+from apps.llm.models import ModelConfig
+c = ModelConfig.get_for('tutoring')
+print(f'{c.provider}/{c.model_name}' if c else 'UNRESOLVED')" 2>/dev/null)" || true
+        case "${m:-}" in
+            local_ollama/*) printf '%-14s %s\n' "model:" "$m  (from /admin/)" ;;
+            ''|UNRESOLVED)  printf '%-14s %s\n' "model:" "UNRESOLVED — the tutor cannot answer" ;;
+            *)              printf '%-14s %s\n' "model:" "$m  ** CLOUD — will NOT work offline **" ;;
+        esac
+    fi
     printf '%-14s %s\n' "hotspot boot:" "${auto:--}"
     local active
     active="$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: -v i="$IFACE" '$2==i{print $1; exit}')" || true
