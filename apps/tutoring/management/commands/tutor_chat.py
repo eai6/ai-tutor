@@ -49,6 +49,7 @@ _HELP = {'/help', '/?'}
 MODEL_ALIASES = {
     'qwen3-4b': 'local_ollama/qwen3-4b-jetson',
     'qwen3.5-4b': 'local_ollama/qwen3.5:4b',
+    'qwen3.5-2b': 'local_ollama/qwen3.5:2b',
     'qwen3-4b-thinking': 'local_ollama/qwen3:4b',
 }
 
