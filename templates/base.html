@@ -17,9 +17,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="AI Tutor">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    {% comment %}
+    Fonts are served locally, not from fonts.googleapis.com. The tutor runs
+    offline on a Jetson serving students over its own WiFi hotspot, where any
+    external request simply fails. Regenerate with scripts/vendor_assets.sh.
+    {% endcomment %}
+    <link href="{% static 'vendor/css/google-fonts.css' %}" rel="stylesheet">
     <style>
         :root {
             --bg-warm: #FFF9F5;

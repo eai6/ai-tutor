@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load static %}
 
 {% block title %}{{ lesson.title }} - AI Tutor{% endblock %}
 
@@ -1345,13 +1346,22 @@ body {
      page so JS-side strings (phase labels, dynamic toast messages) get
      the same pt-mz translations as the server-rendered HTML. -->
 <script src="{% url 'javascript-catalog' %}"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+{% comment %}
+Served locally, not from cdn.jsdelivr.net. This box tutors offline over its own
+WiFi hotspot, and offline these two did not degrade — they broke the page:
+marked.parse() is called unguarded below, so an undefined `marked` throws a
+ReferenceError and NO message renders at all. Regenerate with
+scripts/vendor_assets.sh. Integrity hashes are dropped deliberately: the files
+are in-repo and reviewed at commit time, and SRI on a same-origin static asset
+only adds a way for the page to break after a legitimate upgrade.
+{% endcomment %}
+<script defer src="{% static 'vendor/js/marked.min.js' %}"></script>
+<script defer src="{% static 'vendor/js/purify.min.js' %}"></script>
 {% comment %}Chart.js was used for the interactive plot_spec exit-ticket renderer. That feature was removed in favour of server-rendered SVG via figure_render.py.{% endcomment %}
 {% if is_math_lesson %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.css" integrity="sha384-/L6i+LN3dyoaK2jYG5ZLh5u13cjdsPDcFOSNJeFBFa/KgVXR5kOfTdiN3ft1uMAq" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/katex.min.js" integrity="sha384-H6s1ZrH2CKpFpqR680poRdStIRJGXty7fSkxAcIfxwl9iu6A4BOPtTk7vQ58Ovio" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.38/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{% static 'vendor/css/katex.min.css' %}">
+<script defer src="{% static 'vendor/js/katex.min.js' %}"></script>
+<script defer src="{% static 'vendor/js/katex-auto-render.min.js' %}"></script>
 {% endif %}
 <script>
 const lessonId = {{ lesson.id }};
@@ -1515,7 +1525,17 @@ function sanitizeContent(text) {
 
 function renderArtifactIframe(html) {
     if (!html) return '';
-    const clean = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+    // Fail CLOSED. This previously fell back to the raw `html` when DOMPurify
+    // was missing, which put unsanitised LLM output into the iframe exactly
+    // when the sanitiser had failed to load. That was reachable: DOMPurify came
+    // from a CDN, so every offline page load lost it. It is served locally now,
+    // but a sanitiser whose failure mode is "skip sanitising" is the wrong
+    // shape regardless — drop the artifact instead.
+    if (!window.DOMPurify) {
+        console.error('DOMPurify unavailable — refusing to render artifact HTML');
+        return '';
+    }
+    const clean = DOMPurify.sanitize(html);
     const resizeScript = '<script>new ResizeObserver(()=>{parent.postMessage({type:"resize",height:document.body.scrollHeight},"*")}).observe(document.body)<\/script>';
     const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#18181b}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{padding:8px 12px;border:1px solid #e4e4e7;text-align:left}th{background:#f4f4f5;font-weight:600}tr:nth-child(even){background:#fafafa}svg{max-width:100%}</style></head><body>${clean}${resizeScript}</body></html>`;
     const escaped = wrappedHtml.replace(/"/g, '&quot;');
