@@ -872,9 +872,28 @@ NetworkManager profile — that last one is what makes the AP come up at boot wi
 nobody logged in. `disable` reverses all three, so the board goes back to being a
 development machine with internet.
 
-Students use **`http://10.42.0.1/student/login/`** — a fixed address (pinned by
-`install`), on port 80 so there is no port number to type. Put it on a poster or
-a QR code.
+### The student URL
+
+| Mode | URL | Notes |
+| --- | --- | --- |
+| **AP (kiosk default)** | `http://10.42.0.1/student/login/` | Fixed — pinned by `install`. Safe for a poster or QR code. |
+| **Station (on your WiFi)** | `http://<board-ip>/student/login/` | The address is DHCP-assigned and changes. Get the current one from `scripts/tutor_kiosk.sh status`. |
+
+Three things that make this look broken when it is not:
+
+- **No port number.** The kiosk serves on **80**. A hand-started `./serve.py`
+  uses 8000 — reaching for `:8000` against the kiosk gets nothing while the
+  board is answering perfectly. `status` prints whichever is actually in use.
+- **Type `http://` explicitly.** There is no TLS here. A browser address bar
+  that "helpfully" upgrades to `https://`, or treats the input as a search,
+  will fail with no useful error.
+- **Nothing to start by hand.** `tutor_kiosk.sh enable` runs
+  `systemctl enable --now` on both units; the server is already up and survives
+  reboots. If a page will not load, check `status` before restarting anything.
+
+Students sign up at `/student/register/`. A student also needs an active
+`Membership` in the lesson's institution — without one the API returns
+`403 No institution membership`, which is easy to mistake for a login problem.
 
 ### AP mode vs WiFi mode
 
