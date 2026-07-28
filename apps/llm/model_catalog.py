@@ -28,6 +28,30 @@ DEPLOY_KV_TYPE = 'q8_0'
 # kiosk is worse than one that was never offered.
 SYSTEM_RESERVE_BYTES = 2 * 1024 ** 3
 
+# Cloud models offered even when no ModelConfig row exists yet, so an admin can
+# pick one without first hand-typing the tag. Grouped by provider because
+# ModelConfig stores provider and model_name separately and the picker only
+# edits the latter — selecting a Gemini model on an `anthropic` row would build
+# a spec that resolves to nothing.
+#
+# IDs are exact and complete: current Claude IDs carry NO date suffix
+# (`claude-opus-5`, never `claude-opus-5-2026…`), and the Gemini entries are the
+# ones already used elsewhere in this codebase rather than guesses.
+CURATED_CLOUD_MODELS = {
+    'anthropic': [
+        ('claude-opus-5', 'Claude Opus 5 — most capable'),
+        ('claude-opus-4-8', 'Claude Opus 4.8'),
+        ('claude-sonnet-5', 'Claude Sonnet 5 — balanced'),
+        ('claude-sonnet-4-6', 'Claude Sonnet 4.6'),
+        ('claude-haiku-4-5', 'Claude Haiku 4.5 — fastest, cheapest'),
+    ],
+    'google': [
+        ('gemini-3.5-flash', 'Gemini 3.5 Flash'),
+        ('gemini-2.5-pro', 'Gemini 2.5 Pro'),
+        ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
+    ],
+}
+
 
 def local_tags(api_base: str = OLLAMA_HOST, timeout: int = 5) -> list[str]:
     """Ollama tags pulled on this machine. Empty when Ollama is not running."""
@@ -130,9 +154,21 @@ def available_choices(include: str = '') -> list[tuple[str, list[tuple[str, str]
         .distinct()
     )
     seen = {v for v, _ in runnable + unusable}
-    cloud = sorted(
-        {(m, f'{m}  ({p})') for p, m in known if p != 'local_ollama' and m not in seen}
+    # Curated first (in the order declared — most capable first), then anything
+    # else already present in the database. The provider is in every label
+    # because this widget edits model_name only: the admin has to keep the
+    # provider field in step, and a Gemini id on an `anthropic` row resolves to
+    # nothing at runtime.
+    cloud: list[tuple[str, str]] = []
+    for provider, entries in CURATED_CLOUD_MODELS.items():
+        for name, label in entries:
+            if name not in seen:
+                seen.add(name)
+                cloud.append((name, f'{label}  [{provider}]'))
+    extra = sorted(
+        {(m, p) for p, m in known if p != 'local_ollama' and m not in seen}
     )
+    cloud += [(m, f'{m}  [{p}]') for m, p in extra]
 
     groups: list[tuple[str, list[tuple[str, str]]]] = []
     if runnable:
