@@ -1,0 +1,34 @@
+# qwen3.5-2b-jetson — NVIDIA Jetson Orin (8 GB) tutor model, small tier
+#
+# Build:   ollama create qwen3.5-2b-jetson -f infra/ollama/Modelfile.qwen3.5-2b-jetson
+# Use:     TUTOR_MODEL_OVERRIDE=local_ollama/qwen3.5-2b-jetson
+#          or pick it in /admin/ (ModelConfig, purpose=tutoring)
+#
+# WHY A TAG AND NOT JUST THE PROFILE — this is the whole point of the file.
+# apps/llm/model_profiles.py can only pin num_ctx on requests that go through
+# our own Ollama client. The grader's Tier-2 verifier does NOT: it reaches
+# Ollama through instructor.from_provider('ollama'), which uses the
+# OPENAI-COMPATIBLE endpoint (POST /v1/chat/completions), and that endpoint has
+# no field for num_ctx.
+#
+# Ollama keys a loaded runner on (model, params). So the verifier's call landed
+# at Ollama's 4096 default, which is a DIFFERENT runner from the tutor's 16384 —
+# and under OLLAMA_MAX_LOADED_MODELS=1 that evicts the tutor and reloads from
+# scratch, 30-45 s each way. Measured on plain qwen3.5:2b (2026-07-28): the
+# service log alternates 16384 / 4096 cells, two full reloads per graded turn.
+#
+# A Modelfile PARAMETER applies on EVERY endpoint, so pinning it here is the
+# only fix that covers the paths we do not construct requests for. This is
+# exactly why Modelfile.qwen3-4b-jetson never showed the problem.
+FROM qwen3.5:2b
+
+# Must match local_ollama/qwen3.5-2b-jetson in apps/llm/model_profiles.py.
+# If the two disagree, the disagreement IS the bug — the tutor path sends the
+# profile value while every other path inherits this one, and they thrash.
+PARAMETER num_ctx 16384
+
+# Qwen3.5's own recommended sampling (framework §3.3), restated here so the tag
+# is self-describing and the OpenAI-compatible path gets them too.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20

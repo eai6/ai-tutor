@@ -259,6 +259,27 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB fallback if 4b is too slow (2.7 GB Q4 weights).",
     ),
+
+    # Modelfile-tagged 2b, mirroring qwen3-4b-jetson. PREFER THIS over the bare
+    # qwen3.5:2b above on this box.
+    #
+    # A profile can only pin num_ctx on requests our own client builds. The
+    # grader's Tier-2 verifier goes through instructor's OpenAI-compatible path
+    # (POST /v1/chat/completions), which has no num_ctx field, so on the bare tag
+    # it landed at Ollama's 4096 default — a different runner from the tutor's
+    # 16384, which under OLLAMA_MAX_LOADED_MODELS=1 evicts and reloads the model
+    # 30-45 s each way, twice per graded turn. A Modelfile PARAMETER applies on
+    # every endpoint and closes that gap; see infra/ollama/Modelfile.qwen3.5-2b-jetson.
+    #
+    # num_ctx here MUST equal the Modelfile's. If they disagree, the tutor path
+    # sends this value while every other path inherits the Modelfile's, and the
+    # two thrash — which is the exact bug this entry exists to prevent.
+    "local_ollama/qwen3.5-2b-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=3072,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, ollama_think=False, num_gpu=99,
+        notes="Jetson Orin 8GB: Qwen3.5-2B with num_ctx pinned in the Modelfile.",
+    ),
     "local_ollama/qwen3.5:0.8b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
         temperature=0.7, top_p=0.8, top_k=20,
