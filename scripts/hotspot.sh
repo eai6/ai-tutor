@@ -82,24 +82,43 @@ cmd_down() {
     cmd_status
 }
 
+# The port students actually use. The kiosk service (infra/systemd/ai-tutor.service)
+# serves on 80 so there is no port number to type; a hand-started dev server uses
+# 8000. Printing the wrong one sends people to a dead URL on a board that is
+# working fine — which is exactly what this script used to do, because it
+# predates the kiosk and assumed 8000 unconditionally.
+serving_port() {
+    if systemctl is-active --quiet ai-tutor.service 2>/dev/null; then
+        echo 80
+    else
+        echo "$PORT"
+    fi
+}
+
 cmd_status() {
-    local active
+    local active port
+    port="$(serving_port)"
     active="$(nmcli -t -f NAME,DEVICE con show --active | awk -F: -v i="$IFACE" '$2==i{print $1; exit}')" || true
     if [ "${active:-}" = "$AP_CON" ]; then
         local ssid
         ssid="$(nmcli -t -f 802-11-wireless.ssid con show "$AP_CON" | cut -d: -f2)"
         echo "mode:     ACCESS POINT (no internet)"
         echo "ssid:     $ssid"
-        echo "students: http://$AP_IP:$PORT/student/login/"
-        echo
-        echo "Serve the app so clients can reach it (0.0.0.0, not localhost):"
-        echo "  .venv/bin/python manage.py runserver 0.0.0.0:$PORT"
+        echo "students: http://$AP_IP$( [ "$port" = 80 ] || printf ':%s' "$port" )/student/login/"
+        if systemctl is-active --quiet ai-tutor.service 2>/dev/null; then
+            echo "server:   ai-tutor.service is running on port 80 — nothing to start"
+        else
+            echo
+            echo "Serve the app so clients can reach it (0.0.0.0, not localhost):"
+            echo "  ./serve.py                      # or, for the kiosk:"
+            echo "  sudo scripts/tutor_kiosk.sh enable"
+        fi
     elif [ -n "${active:-}" ]; then
         local ip
         ip="$(ip -4 -br addr show "$IFACE" | awk '{print $3}' | cut -d/ -f1)"
         echo "mode:     station — joined '$active'"
         echo "address:  ${ip:-none}"
-        echo "students: http://${ip%%/*}:$PORT/student/login/  (same network only)"
+        echo "students: http://${ip%%/*}$( [ "$port" = 80 ] || printf ':%s' "$port" )/student/login/  (same network only)"
     else
         echo "mode:     $IFACE is not connected"
     fi
