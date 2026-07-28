@@ -1391,9 +1391,39 @@ class OllamaClient(BaseLLMClient):
 
         resolved_temp = temperature if temperature is not None else self.config.temperature
 
-        # This path pins no num_ctx; let the preflight resolve the effective
-        # window from the tag's Modelfile (falling back to Ollama's default).
-        _ollama_fit_preflight(api_base, self.config.model_name, None)
+        # Apply the SAME profile knobs the tools path uses. Ollama keys a loaded
+        # runner on (model, params): a request with a different num_ctx is a
+        # different runner, so under OLLAMA_MAX_LOADED_MODELS=1 it EVICTS the
+        # resident one and reloads from scratch.
+        #
+        # This path is the judge, the grader's verifier and the exit ticket;
+        # the tools path is the tutor. Left unpinned here, every graded turn
+        # cost two full reloads — tutor at 16384, judge at Ollama's 4096
+        # default, tutor again at 16384. Measured on the Jetson 2026-07-28:
+        # 14 loads across a handful of turns, alternating 16384 / 4096 cells.
+        # The tutor's own tag hid this, because its Modelfile pins 16384 and
+        # both paths therefore agreed by accident.
+        options = {
+            "temperature": resolved_temp,
+            "num_predict": max_tokens or self.config.max_tokens,
+        }
+        _profile_ctx = None
+        try:
+            from apps.llm.model_profiles import get_model_profile
+            _prov = str(getattr(self.config, 'provider', '') or '').lower()
+            _prof = get_model_profile(
+                f'{_prov}/{self.config.model_name}' if _prov else self.config.model_name
+            )
+            if _prof is not None:
+                if _prof.num_ctx is not None:
+                    options['num_ctx'] = _profile_ctx = _prof.num_ctx
+                if _prof.num_gpu is not None:
+                    options['num_gpu'] = _prof.num_gpu
+        except Exception as exc:
+            logger.warning("[Ollama] profile lookup failed for %s: %s",
+                           self.config.model_name, exc)
+
+        _ollama_fit_preflight(api_base, self.config.model_name, _profile_ctx)
 
         try:
             response = requests.post(
@@ -1402,10 +1432,7 @@ class OllamaClient(BaseLLMClient):
                     "model": self.config.model_name,
                     "messages": ollama_messages,
                     "stream": False,
-                    "options": {
-                        "temperature": resolved_temp,
-                        "num_predict": max_tokens or self.config.max_tokens,
-                    }
+                    "options": options,
                 },
                 timeout=120,  # Longer timeout for local models
             )
