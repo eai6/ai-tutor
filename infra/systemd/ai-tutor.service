@@ -22,13 +22,18 @@ Environment=PYTHONUNBUFFERED=1
 # anthropic/claude-haiku — and calls the cloud. On a hotspot with no internet
 # that means the tutor cannot answer at all. This is the single most important
 # line in the file.
-Environment=TUTOR_MODEL_OVERRIDE=local_ollama/qwen3-4b-jetson
-
-# Optional override file, read AFTER the line above so it wins. Lets the model
-# be swapped for testing without editing this unit:
+# NO TUTOR_MODEL_OVERRIDE here on purpose. That env var short-circuits
+# ModelConfig.get_for('tutoring'), so pinning it would make the admin's model
+# picker in /admin/ silently ineffective — the UI would save a change that never
+# took effect. The active purpose='tutoring' ModelConfig row is authoritative
+# instead, and admins change it from the browser.
+#
+# The safety net that used to justify pinning it is now the row itself: it must
+# point at a local model, or the box calls the cloud and cannot answer offline.
+#
+# This file can still force a model for testing, and wins when present:
 #   sudo scripts/tutor_kiosk.sh model local_ollama/qwen3.5:2b
-# The leading '-' means "carry on if it does not exist", which is the normal
-# state — the default above is the intended production model.
+#   sudo scripts/tutor_kiosk.sh model default      (removes it, DB back in charge)
 EnvironmentFile=-/etc/default/ai-tutor
 
 # Must match ollama.service. See the comment there.

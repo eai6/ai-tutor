@@ -412,6 +412,15 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         import os as _os
         from apps.llm.model_profiles import get_model_profile
         _spec = _os.getenv('TUTOR_MODEL_OVERRIDE', '').strip()
+        if not _spec:
+            # No sweep override: fall back to the model the DB actually selected,
+            # so an admin picking Qwen from the browser gets the Qwen prompt
+            # variant. Without this the family is None and a local Qwen runs on
+            # the base XML template meant for Anthropic.
+            from apps.llm.models import ModelConfig as _MC
+            _cfg = _MC.get_for('tutoring')
+            if _cfg is not None and _cfg.provider and _cfg.model_name:
+                _spec = f'{_cfg.provider}/{_cfg.model_name}'
         if _spec:
             _prof = get_model_profile(_spec)
             if _prof is not None:
@@ -1761,7 +1770,20 @@ def _call_llm(
     try:
         from apps.llm.model_profiles import get_model_profile
         spec = os.getenv('TUTOR_MODEL_OVERRIDE', '').strip()
-        profile = get_model_profile(spec or model_name)
+        # Fall back to the RESOLVED config's provider/model_name, not the bare
+        # model_name. MODEL_PROFILES is keyed by full spec
+        # ("local_ollama/qwen3.5:2b"), so a bare name never matches and drops
+        # through to a cloud family pattern sized at num_ctx=24192.
+        #
+        # That path is now reachable in production, not just in sweeps: the
+        # kiosk deliberately does NOT set TUTOR_MODEL_OVERRIDE so that an admin
+        # can pick the model from the browser. Measured on the Jetson
+        # 2026-07-28 before this fix — selecting qwen3.5:2b from the DB gave
+        # num_ctx=24192, 34%/66% CPU/GPU instead of full offload, and 204 s per
+        # turn against the ~79 s the same model does on its own profile.
+        profile = get_model_profile(
+            spec or (f'{provider}/{model_name}' if provider else model_name)
+        )
     except Exception as exc:
         logger.warning("_call_llm: model_profile lookup failed: %s", exc)
         profile = None

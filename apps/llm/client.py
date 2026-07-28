@@ -1218,8 +1218,16 @@ def _ollama_evictable_bytes(resident: list[dict], model_name: str) -> int:
     return sum(int(m.get('size') or 0) for m in resident)
 
 
-def _ollama_kv_bytes(info: dict, num_ctx: int) -> float | None:
-    """Projected KV-cache bytes at num_ctx, from GGUF architecture metadata."""
+def _ollama_kv_bytes(
+    info: dict, num_ctx: int, kv_type: str | None = None,
+) -> float | None:
+    """Projected KV-cache bytes at num_ctx, from GGUF architecture metadata.
+
+    ``kv_type`` overrides OLLAMA_KV_CACHE_TYPE. Callers that know what the
+    SERVER was launched with should pass it: the env var is a server setting,
+    and a client process that cannot see it silently assumes f16 and doubles the
+    estimate.
+    """
     arch = info.get('general.architecture')
     if not arch:
         return None
@@ -1239,7 +1247,7 @@ def _ollama_kv_bytes(info: dict, num_ctx: int) -> float | None:
             return None
         k_len = v_len = emb / heads
     elem = _OLLAMA_KV_ELEM_BYTES.get(
-        (os.environ.get('OLLAMA_KV_CACHE_TYPE') or 'f16').lower(), 2.0,
+        (kv_type or os.environ.get('OLLAMA_KV_CACHE_TYPE') or 'f16').lower(), 2.0,
     )
     # Parallel slots each get their own KV cache.
     slots = max(1, int(os.environ.get('OLLAMA_NUM_PARALLEL') or 1))

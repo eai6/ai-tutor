@@ -247,10 +247,16 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB. Hybrid template — think=False is honoured.",
     ),
+    # num_gpu=99 for the same reason as the 4b entries: unpinned, Ollama autofits
+    # against free memory AT LOAD TIME, so the layer split depends on whatever
+    # else happened to be running. Measured 2026-07-28 serving from the kiosk —
+    # autofit put this at 32%/68% CPU/GPU and a turn took 149 s, against 26/26
+    # layers on GPU and ~79 s when loaded on an idle box. Same model, same
+    # context, 2x on nothing but placement.
     "local_ollama/qwen3.5:2b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
         temperature=0.7, top_p=0.8, top_k=20,
-        num_ctx=16384, ollama_think=False,
+        num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB fallback if 4b is too slow (2.7 GB Q4 weights).",
     ),
     "local_ollama/qwen3.5:0.8b": ModelProfile(
