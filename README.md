@@ -28,6 +28,7 @@ https://aitutor-staging-app.icyplant-cffb8b76.centralus.azurecontainerapps.io �
 - [Content Generation Pipeline](#content-generation-pipeline)
 - [Management Commands](#management-commands)
 - [Deployment](#deployment)
+- [Offline Kiosk (NVIDIA Jetson)](#offline-kiosk-nvidia-jetson)
 - [URL Routes](#url-routes)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -844,6 +845,91 @@ Triggered on push to `main`:
 - **VectorDB on SMB**: Azure File Share (SMB) is too slow for SQLite-backed ChromaDB. The Dockerfile CMD copies vectordb from the mount to `/tmp/vectordb` on startup.
 - **arm64 vs amd64**: Local Mac builds produce arm64 images. Azure requires amd64. Always use `--platform linux/amd64` or build via GitHub Actions.
 - **Media serving**: Django's `static()` helper only works with `DEBUG=True`. The project uses an explicit `serve` view in `config/urls.py` for production media serving.
+
+---
+
+## Offline Kiosk (NVIDIA Jetson)
+
+Runs the tutor entirely on-device: a local Qwen model via Ollama, served over the
+Jetson's own WiFi access point. No internet, no monitor, no keyboard — power the
+board on and students connect with a browser.
+
+Enabled, the board **defaults to AP mode**: it broadcasts its own network instead
+of joining yours.
+
+### Enable / disable
+
+```bash
+sudo scripts/tutor_kiosk.sh install   # once: copy systemd units, pin the AP address
+sudo scripts/tutor_kiosk.sh enable    # start now AND on every boot; AP comes up
+sudo scripts/tutor_kiosk.sh disable   # stop now and on boot; rejoin normal WiFi
+     scripts/tutor_kiosk.sh status    # what is running, which model, the URL
+```
+
+`enable` does three things: `systemctl enable --now` on `ollama.service` and
+`ai-tutor.service`, and sets `connection.autoconnect yes` on the `tutor-hotspot`
+NetworkManager profile — that last one is what makes the AP come up at boot with
+nobody logged in. `disable` reverses all three, so the board goes back to being a
+development machine with internet.
+
+Students use **`http://10.42.0.1/student/login/`** — a fixed address (pinned by
+`install`), on port 80 so there is no port number to type. Put it on a poster or
+a QR code.
+
+### AP mode vs WiFi mode
+
+The Jetson's Realtek RTL8822CE cannot do both: `iw list` reports `interface
+combinations are not supported`. It is **either** an access point **or** joined
+to your network, never both. Switching is one command:
+
+```bash
+scripts/hotspot.sh up AITutor '<password>'   # become an AP (drops internet)
+scripts/hotspot.sh down                      # rejoin the previous WiFi network
+scripts/hotspot.sh status                    # current mode + the student URL
+```
+
+`down` restores whichever network was active when `up` ran, recorded at the time
+rather than guessed.
+
+**While the AP is up the board has no internet** — no `git push`, no `apt`, no
+`ollama pull`. The tutor itself is unaffected: MCQ grading, free-text grading and
+step advancement were all verified with WiFi genuinely off. Toggle back down
+before anything that needs the network.
+
+### Choosing the model
+
+The active `purpose='tutoring'` ModelConfig row decides, and it is editable from
+`/admin/` — the picker lists only models that are pulled, profiled, and small
+enough for this board. `status` prints what will actually be used and flags a
+cloud model loudly, since that is the failure that silently breaks an offline
+kiosk.
+
+To force a model for testing without touching the database:
+
+```bash
+sudo scripts/tutor_kiosk.sh model local_ollama/qwen3.5-2b-jetson
+sudo scripts/tutor_kiosk.sh model default    # remove the override, DB back in charge
+```
+
+**Local models need a Modelfile-pinned tag** (`infra/ollama/Modelfile.*-jetson`),
+not just a `MODEL_PROFILES` entry. A profile pins `num_ctx` only for requests
+this codebase builds; the grader's verifier reaches Ollama through an
+OpenAI-compatible endpoint that has no such field, so a bare tag loads a second
+runner at Ollama's default context and evicts the tutor on every graded turn.
+To add a model, copy an existing Modelfile, change the `FROM` line, then
+`ollama create <name>-jetson -f infra/ollama/Modelfile.<name>-jetson`.
+
+### Checking it after a reboot
+
+```bash
+scripts/tutor_kiosk.sh status        # both services active/enabled, AP up
+curl -s -o /dev/null -w '%{http_code}\n' http://10.42.0.1/student/login/
+journalctl -u ai-tutor.service -b --no-pager | tail -20
+```
+
+First reply after a cold boot takes ~90 s (the model loads); subsequent turns
+settle to ~20 s. `OLLAMA_KEEP_ALIVE=-1` keeps the model resident so a quiet spell
+never costs a reload.
 
 ---
 
