@@ -1,0 +1,416 @@
+{
+  "Qwen3-4B (Jetson, Q4_K_M) | short": {
+    "model": "qwen3-4b-jetson",
+    "label": "Qwen3-4B (Jetson, Q4_K_M)",
+    "size": "short",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.751029678000009,
+    "ttft_min": 0.6377286760000516,
+    "ttft_max": 0.7897263670000711,
+    "total_med": 6.979560558999992,
+    "total_min": 5.822867980999945,
+    "total_max": 7.631575494999993,
+    "tokens_in": 145,
+    "tokens_out": 109,
+    "tok_s": 17.729870729100544,
+    "prefill_med": 0.088568,
+    "raw": [
+      {
+        "ttft": 0.751029678000009,
+        "total": 7.622023474999992,
+        "tokens_in": 145,
+        "tokens_out": 121,
+        "chars": 411,
+        "load_s": 0.607656954,
+        "prefill_s": 0.082758,
+        "decode_s": 6.871659
+      },
+      {
+        "ttft": 0.7738780930000075,
+        "total": 5.847660811999958,
+        "tokens_in": 145,
+        "tokens_out": 90,
+        "chars": 397,
+        "load_s": 0.601625524,
+        "prefill_s": 0.10803,
+        "decode_s": 5.074846
+      },
+      {
+        "ttft": 0.6377286760000516,
+        "total": 7.631575494999993,
+        "tokens_in": 145,
+        "tokens_out": 124,
+        "chars": 442,
+        "load_s": 0.489982898,
+        "prefill_s": 0.084105,
+        "decode_s": 6.994564
+      },
+      {
+        "ttft": 0.750437791999957,
+        "total": 5.822867980999945,
+        "tokens_in": 145,
+        "tokens_out": 90,
+        "chars": 362,
+        "load_s": 0.599653761,
+        "prefill_s": 0.088568,
+        "decode_s": 5.073414
+      },
+      {
+        "ttft": 0.7897263670000711,
+        "total": 6.979560558999992,
+        "tokens_in": 145,
+        "tokens_out": 109,
+        "chars": 438,
+        "load_s": 0.632477304,
+        "prefill_s": 0.093849,
+        "decode_s": 6.19067
+      }
+    ]
+  },
+  "Qwen3-4B (Jetson, Q4_K_M) | medium": {
+    "model": "qwen3-4b-jetson",
+    "label": "Qwen3-4B (Jetson, Q4_K_M)",
+    "size": "medium",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.7122637489999306,
+    "ttft_min": 0.6409465200001705,
+    "ttft_max": 0.8076746560000174,
+    "total_med": 5.637903376000054,
+    "total_min": 3.842365177000147,
+    "total_max": 5.824822414999971,
+    "tokens_in": 491,
+    "tokens_out": 79,
+    "tok_s": 15.84878251368647,
+    "prefill_med": 0.089238,
+    "raw": [
+      {
+        "ttft": 0.741619581000009,
+        "total": 5.637903376000054,
+        "tokens_in": 491,
+        "tokens_out": 82,
+        "chars": 242,
+        "load_s": 0.580559457,
+        "prefill_s": 0.089238,
+        "decode_s": 4.897029
+      },
+      {
+        "ttft": 0.8076746560000174,
+        "total": 5.823835436000081,
+        "tokens_in": 491,
+        "tokens_out": 79,
+        "chars": 212,
+        "load_s": 0.639894583,
+        "prefill_s": 0.094416,
+        "decode_s": 5.017924
+      },
+      {
+        "ttft": 0.7122637489999306,
+        "total": 5.633777431999988,
+        "tokens_in": 491,
+        "tokens_out": 78,
+        "chars": 201,
+        "load_s": 0.536411226,
+        "prefill_s": 0.103079,
+        "decode_s": 4.921709
+      },
+      {
+        "ttft": 0.6444949140000062,
+        "total": 5.824822414999971,
+        "tokens_in": 491,
+        "tokens_out": 82,
+        "chars": 242,
+        "load_s": 0.496570352,
+        "prefill_s": 0.076634,
+        "decode_s": 5.179609
+      },
+      {
+        "ttft": 0.6409465200001705,
+        "total": 3.842365177000147,
+        "tokens_in": 491,
+        "tokens_out": 54,
+        "chars": 173,
+        "load_s": 0.481427173,
+        "prefill_s": 0.087693,
+        "decode_s": 3.202309
+      }
+    ]
+  },
+  "Qwen3-4B (Jetson, Q4_K_M) | long": {
+    "model": "qwen3-4b-jetson",
+    "label": "Qwen3-4B (Jetson, Q4_K_M)",
+    "size": "long",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.7796944120000262,
+    "ttft_min": 0.7266838640000515,
+    "ttft_max": 0.7998275039999498,
+    "total_med": 4.195564015999935,
+    "total_min": 3.71132762000002,
+    "total_max": 5.737806405999891,
+    "tokens_in": 1284,
+    "tokens_out": 56,
+    "tok_s": 16.461527578118023,
+    "prefill_med": 0.099387,
+    "raw": [
+      {
+        "ttft": 0.7796944120000262,
+        "total": 5.737806405999891,
+        "tokens_in": 1284,
+        "tokens_out": 81,
+        "chars": 216,
+        "load_s": 0.580643692,
+        "prefill_s": 0.10849,
+        "decode_s": 4.959421
+      },
+      {
+        "ttft": 0.7707464060001712,
+        "total": 5.412712157999977,
+        "tokens_in": 1284,
+        "tokens_out": 76,
+        "chars": 213,
+        "load_s": 0.59638807,
+        "prefill_s": 0.092014,
+        "decode_s": 4.642619
+      },
+      {
+        "ttft": 0.7266838640000515,
+        "total": 3.8816791819999708,
+        "tokens_in": 1284,
+        "tokens_out": 52,
+        "chars": 170,
+        "load_s": 0.558711622,
+        "prefill_s": 0.08086,
+        "decode_s": 3.15576
+      },
+      {
+        "ttft": 0.7998275039999498,
+        "total": 3.71132762000002,
+        "tokens_in": 1284,
+        "tokens_out": 48,
+        "chars": 152,
+        "load_s": 0.608760257,
+        "prefill_s": 0.108753,
+        "decode_s": 2.912282
+      },
+      {
+        "ttft": 0.7936926080001285,
+        "total": 4.195564015999935,
+        "tokens_in": 1284,
+        "tokens_out": 56,
+        "chars": 187,
+        "load_s": 0.604282191,
+        "prefill_s": 0.099387,
+        "decode_s": 3.402486
+      }
+    ]
+  },
+  "Sonnet 5 | short": {
+    "model": "claude-sonnet-5",
+    "label": "Sonnet 5",
+    "size": "short",
+    "kind": "cloud",
+    "n": 5,
+    "ttft_med": 0.7339501510000446,
+    "ttft_min": 0.6941021229999933,
+    "ttft_max": 1.1870009149999987,
+    "total_med": 2.9457407200000034,
+    "total_min": 2.295431312000119,
+    "total_max": 3.184719241000039,
+    "tokens_in": 205,
+    "tokens_out": 145,
+    "tok_s": 75.31256911788262,
+    "prefill_med": 0.0,
+    "raw": [
+      {
+        "ttft": 0.7143209670000488,
+        "total": 2.9457407200000034,
+        "tokens_in": 205,
+        "tokens_out": 145,
+        "chars": 437,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.7339501510000446,
+        "total": 2.380421669000043,
+        "tokens_in": 205,
+        "tokens_out": 124,
+        "chars": 395,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.6941021229999933,
+        "total": 2.295431312000119,
+        "tokens_in": 205,
+        "tokens_out": 127,
+        "chars": 348,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 1.06861681700002,
+        "total": 3.184719241000039,
+        "tokens_in": 205,
+        "tokens_out": 150,
+        "chars": 415,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 1.1870009149999987,
+        "total": 3.0029736050000793,
+        "tokens_in": 205,
+        "tokens_out": 146,
+        "chars": 435,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      }
+    ]
+  },
+  "Sonnet 5 | medium": {
+    "model": "claude-sonnet-5",
+    "label": "Sonnet 5",
+    "size": "medium",
+    "kind": "cloud",
+    "n": 5,
+    "ttft_med": 0.6366613059999509,
+    "ttft_min": 0.6088288079999984,
+    "ttft_max": 0.8068541080001523,
+    "total_med": 1.8511003950000031,
+    "total_min": 1.5818777419999606,
+    "total_max": 1.9808896460001506,
+    "tokens_in": 748,
+    "tokens_out": 67,
+    "tok_s": 62.797132599696255,
+    "prefill_med": 0.0,
+    "raw": [
+      {
+        "ttft": 0.6796174779999546,
+        "total": 1.9808896460001506,
+        "tokens_in": 748,
+        "tokens_out": 94,
+        "chars": 273,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.6366613059999509,
+        "total": 1.5818777419999606,
+        "tokens_in": 748,
+        "tokens_out": 41,
+        "chars": 117,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.8068541080001523,
+        "total": 1.8737818040001457,
+        "tokens_in": 748,
+        "tokens_out": 67,
+        "chars": 205,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.6088288079999984,
+        "total": 1.8511003950000031,
+        "tokens_in": 748,
+        "tokens_out": 87,
+        "chars": 261,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.6265389850000247,
+        "total": 1.8453822100000252,
+        "tokens_in": 748,
+        "tokens_out": 63,
+        "chars": 208,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      }
+    ]
+  },
+  "Sonnet 5 | long": {
+    "model": "claude-sonnet-5",
+    "label": "Sonnet 5",
+    "size": "long",
+    "kind": "cloud",
+    "n": 5,
+    "ttft_med": 0.6891460320000533,
+    "ttft_min": 0.6400534710001011,
+    "ttft_max": 4.586047423000082,
+    "total_med": 2.0591351179998583,
+    "total_min": 1.8388671279999471,
+    "total_max": 5.496871758999987,
+    "tokens_in": 1835,
+    "tokens_out": 75,
+    "tok_s": 59.3199680969742,
+    "prefill_med": 0.0,
+    "raw": [
+      {
+        "ttft": 0.6891460320000533,
+        "total": 2.7961180540000896,
+        "tokens_in": 1835,
+        "tokens_out": 71,
+        "chars": 226,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.6400534710001011,
+        "total": 1.8388671279999471,
+        "tokens_in": 1835,
+        "tokens_out": 81,
+        "chars": 237,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 4.586047423000082,
+        "total": 5.496871758999987,
+        "tokens_in": 1835,
+        "tokens_out": 46,
+        "chars": 146,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.676801265999984,
+        "total": 2.0591351179998583,
+        "tokens_in": 1835,
+        "tokens_out": 82,
+        "chars": 245,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      },
+      {
+        "ttft": 0.8316727500000525,
+        "total": 2.0296967340000265,
+        "tokens_in": 1835,
+        "tokens_out": 75,
+        "chars": 239,
+        "load_s": 0.0,
+        "prefill_s": 0.0,
+        "decode_s": 0.0
+      }
+    ]
+  }
+}
