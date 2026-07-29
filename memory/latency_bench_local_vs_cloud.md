@@ -149,4 +149,4 @@ sweeps, and the two results have to be read together before any routing decision
 - `qwen3.5:4b` and `qwen3.5-2b-jetson` as local arms, once the 3.5 tags are
   qualified for tutoring.
 
-Commit: 60916ec
+Commit: 08250e1
