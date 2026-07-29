@@ -18,11 +18,24 @@ from pathlib import Path
 # that it interleaves with engine logs in the debug file in true chronological
 # order. Two independent writers to one file would not.
 #
-# propagate=False permanently: this logger feeds the debug FILE only. The
-# terminal already shows the conversation through the normal render path, so
-# letting these records reach the console handler prints every reply twice.
+# propagate=False: this logger feeds the debug FILE only. The terminal already
+# shows the conversation through the normal render path, so letting these
+# records reach the 'apps' console handler prints every reply twice.
+#
+# Setting it here is necessary but NOT sufficient, which is why quiet() and
+# start_debug_log() re-assert it. If this module is imported before
+# django.setup(), Django's logging dictConfig runs afterwards and
+# logging.config._handle_existing_loggers resets propagate=True (and clears
+# handlers and level) on every already-existing logger that is a child of a
+# configured one — 'apps' is configured, so this logger qualifies. The reset is
+# silent and the only symptom is doubled output.
 transcript = logging.getLogger('apps.tutoring.cli.transcript')
 transcript.propagate = False
+
+
+def _isolate() -> None:
+    """Re-assert the no-propagate invariant. Cheap and idempotent."""
+    transcript.propagate = False
 
 # Chatty third parties. config/settings.py gives 'apps' its own handler with
 # propagate=False, so raising the root level alone does not silence it — it has
@@ -43,6 +56,7 @@ def quiet() -> None:
     logging.getLogger().setLevel(logging.ERROR)
     for name in _NOISY:
         logging.getLogger(name).setLevel(logging.ERROR)
+    _isolate()
     transcript.setLevel(logging.INFO)
 
 
@@ -75,6 +89,7 @@ def start_debug_log(log_dir: Path) -> Path:
             log.addHandler(handler)
     # transcript never propagates, so it needs the file handler directly. This
     # is what puts STUDENT/TUTOR turns in the file alongside the engine logs.
+    _isolate()
     transcript.setLevel(logging.INFO)
     transcript.addHandler(handler)
     return path

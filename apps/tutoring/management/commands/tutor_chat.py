@@ -52,10 +52,31 @@ _HELP = {'/help', '/?'}
 # reasoning channel has no salvage — _adapt_ollama_response never calls
 # _recover_reasoning_tool_call. qwen3-4b-jetson is built FROM qwen3:4b-instruct
 # precisely to avoid this.
+# The cloud model --cloud resolves to, for comparing turn latency against the
+# local tags above. Configurable: export TUTOR_CLOUD_MODEL to point it elsewhere
+# without editing this file.
+#
+# Opus 4.7 rather than a 5-series model, deliberately. Two properties make it the
+# one that needs no new plumbing:
+#   - AnthropicClient._supports_temperature already knows 4.7 rejects
+#     `temperature` with a 400 and omits it. Sonnet 5 and Opus 5 reject it too,
+#     but the guard does not match them yet, so they 400 on the first turn.
+#   - Omitting `thinking` runs 4.7 WITHOUT thinking, so a turn here is the same
+#     shape of work as a local turn. On Sonnet 5 and Opus 5 the same omission
+#     runs adaptive thinking, which would make the latency comparison measure a
+#     reasoning pass the local model never does.
+# Pointing TUTOR_CLOUD_MODEL at either of those is fine once the guard is
+# widened and thinking is disabled explicitly — not before.
+CLOUD_MODEL = os.environ.get('TUTOR_CLOUD_MODEL') or 'anthropic/claude-opus-4-7'
+
 MODEL_ALIASES = {
     'qwen3-4b': 'local_ollama/qwen3-4b-jetson',
     'qwen3.5-4b': 'local_ollama/qwen3.5-4b-jetson',
     'qwen3.5-2b': 'local_ollama/qwen3.5-2b-jetson',
+    # The num_ctx caveat below is local-only: the fit preflight lives in
+    # OllamaClient, so a cloud spec never reaches it and no profile entry is
+    # needed here.
+    'cloud': CLOUD_MODEL,
     # Every alias points at a Modelfile-pinned tag, never a bare one. A bare tag
     # does not pin num_ctx, so the grader's verifier loads a separate
     # 4096-context runner and evicts the tutor on every graded turn. Adding a
@@ -119,6 +140,12 @@ class Command(BaseCommand):
                             help='Show judge output persisted on the turn.')
         parser.add_argument('--show-state', action='store_true',
                             help='Show step position and grading verdict.')
+        parser.add_argument(
+            '--keep-progress', action='store_true',
+            help='Keep this lesson\'s mastery state instead of clearing it. By '
+                 'default every run starts the lesson fresh, so two models can '
+                 'be compared on equal footing.',
+        )
         parser.add_argument('--no-timing', action='store_true',
                             help='Hide the per-turn response time (shown by '
                                  'default).')
@@ -177,6 +204,7 @@ class Command(BaseCommand):
             lesson_id, note = resolve_lesson_id(opts['lesson'], opts['subject'])
             session = bootstrap_session(
                 lesson_id, student_username=opts['student'],
+                fresh=not opts['keep_progress'],
             )
         except BootstrapError as exc:
             raise CommandError(str(exc))
@@ -281,6 +309,16 @@ class Command(BaseCommand):
             f"model {tutor_spec}", 'dim', colour=colour,
         ))
         cli_logs.transcript.info("model=%s", tutor_spec)
+        # Deleting rows silently is not something a dev tool should do — say so
+        # when there was actually prior state to clear.
+        reset = getattr(session, '_cli_reset', None) or {}
+        if any(reset.values()):
+            self.stdout.write(render.paint(
+                f"fresh start · cleared {reset.get('progress', 0)} progress and "
+                f"{reset.get('skills', 0)} skill-mastery record(s) for this lesson "
+                f"(--keep-progress to retain)",
+                'dim', colour=colour,
+            ))
         self.stdout.write(render.paint(
             "/quit to end, /help for commands", 'dim', colour=colour,
         ))

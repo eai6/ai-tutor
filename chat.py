@@ -4,6 +4,13 @@
     ./chat.py --lesson 1137
     ./chat.py --list-lessons
     ./chat.py --lesson 1137 --show-all
+    ./chat.py --lesson 1137 --cloud       # same lesson against the cloud model
+
+Every turn prints its own response time, so --cloud is the way to feel the
+local-vs-cloud latency difference on a real tutoring conversation rather than a
+synthetic prompt. `--cloud` resolves to TUTOR_CLOUD_MODEL, defaulting to
+Opus 4.7 — see tutor_chat.CLOUD_MODEL for why that model specifically.
+Benchmarked numbers: memory/latency_bench_local_vs_cloud.md
 
 A convenience front door for ``manage.py tutor_chat``. It exists to remove the
 three papercuts that make the management command tedious to run repeatedly on
@@ -95,13 +102,47 @@ def _reexec_under_venv() -> None:
     os.execv(str(venv_python), [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]])
 
 
+def _selected_spec() -> str:
+    """The model spec this run will actually use.
+
+    The Ollama check below has to run before tutor_chat's argparse does, so
+    reading TUTOR_MODEL_OVERRIDE alone reports the default installed in main()
+    even when argv asks for a cloud model — and then warns that Ollama is down
+    for a run that never touches it.
+
+    Imports the command's own alias table rather than restating it, so adding an
+    alias there needs no edit here. Safe to import at this point: main() has
+    already put ROOT on sys.path and set DJANGO_SETTINGS_MODULE, and the module
+    imports cleanly without django.setup().
+    """
+    from apps.tutoring.management.commands.tutor_chat import MODEL_ALIASES
+
+    argv = sys.argv[1:]
+    chosen = None
+    for i, arg in enumerate(argv):
+        if arg == '--model' and i + 1 < len(argv):
+            chosen = argv[i + 1]
+        elif arg.startswith('--model='):
+            chosen = arg.split('=', 1)[1]
+        elif arg.startswith('--') and arg[2:] in MODEL_ALIASES:
+            chosen = arg[2:]
+    if chosen is None:
+        return os.environ.get('TUTOR_MODEL_OVERRIDE') or ''
+    return MODEL_ALIASES.get(chosen, chosen)
+
+
 def _check_ollama() -> str | None:
     """Return a human-readable problem with the local model server, or None.
 
-    Only advisory — a cloud TUTOR_MODEL_OVERRIDE does not need Ollama at all, so
-    this warns rather than exits.
+    Only advisory — a cloud model does not need Ollama at all, so this warns
+    rather than exits.
     """
-    if not (os.environ.get('TUTOR_MODEL_OVERRIDE') or '').startswith('local_ollama/'):
+    try:
+        spec = _selected_spec()
+    except Exception:
+        # Never let an advisory check break the run.
+        spec = os.environ.get('TUTOR_MODEL_OVERRIDE') or ''
+    if not spec.startswith('local_ollama/'):
         return None
     try:
         import urllib.request
@@ -123,6 +164,17 @@ def main() -> int:
     os.environ.setdefault('TUTOR_MODEL_OVERRIDE', DEFAULT_TUTOR_MODEL)
     for key, value in {**OLLAMA_DEFAULTS, **OFFLINE_DEFAULTS}.items():
         os.environ.setdefault(key, value)
+
+    # Configure Django BEFORE importing any app module. _check_ollama imports
+    # the command module to read its alias table, and Django's logging
+    # dictConfig resets propagate=True on loggers that already exist when it
+    # runs (logging.config._handle_existing_loggers). Importing app code first
+    # therefore silently undoes apps.tutoring.cli.logs' propagate=False and
+    # prints every tutor reply twice — once rendered, once via the transcript
+    # logger escaping to the 'apps' stderr handler. setup() is idempotent;
+    # execute_from_command_line calls it again below and it is a no-op.
+    import django
+    django.setup()
 
     problem = _check_ollama()
     if problem:

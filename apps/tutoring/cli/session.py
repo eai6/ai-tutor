@@ -158,10 +158,59 @@ def resolve_lesson_id(
     return int(first), f"no --lesson given; defaulted to {first}"
 
 
+def reset_lesson_state(student, lesson) -> dict[str, int]:
+    """Clear the per-(student, lesson) state that deliberately outlives a session.
+
+    ``bootstrap_session`` already creates a new TutorSession every run, but that
+    is not the same as a fresh start. Mastery is tracked ACROSS sessions by
+    design, so the second chat on a lesson is not a second first-encounter:
+
+      - StudentLessonProgress carries mastery_level, best_score and
+        attempts_count forward. The engine reads mastery_level to build
+        retrieval context (conversational_tutor.py::_get_retrieval_context).
+      - StudentSkillMastery carries the spaced-repetition state — streaks,
+        ease_factor, next_review_due.
+
+    Left in place, run 2 of a lesson behaves differently from run 1, which makes
+    the CLI useless for the A/B it exists to serve: you cannot compare two models
+    on a lesson when the second one to run inherits the first one's mastery.
+
+    Scoped hard — this student, this lesson, and only the skills this student
+    practised on it. Returns per-model delete counts for the caller to report;
+    a silent delete is not something a dev tool should do.
+    """
+    from apps.tutoring.models import (
+        SkillPracticeLog, StudentLessonProgress, StudentSkillMastery,
+    )
+
+    skill_ids = set(
+        SkillPracticeLog.objects
+        .filter(student=student, lesson_step__lesson=lesson)
+        .values_list('skill_id', flat=True)
+    )
+    counts = {
+        'progress': StudentLessonProgress.objects.filter(
+            student=student, lesson=lesson,
+        ).delete()[0],
+        'skills': (
+            StudentSkillMastery.objects.filter(
+                student=student, skill_id__in=skill_ids,
+            ).delete()[0] if skill_ids else 0
+        ),
+    }
+    if any(counts.values()):
+        logger.info(
+            "[tutor_chat] reset lesson state student=%s lesson=%s %s",
+            student.pk, lesson.pk, counts,
+        )
+    return counts
+
+
 def bootstrap_session(
     lesson_id: int,
     *,
     student_username: str | None = None,
+    fresh: bool = True,
 ) -> 'TutorSession':
     """Create a fresh TutorSession for a CLI chat.
 
@@ -172,6 +221,12 @@ def bootstrap_session(
 
     Always creates a new session — resuming introduces state-reconciliation
     questions that are not the point of a development tool.
+
+    With ``fresh`` (the default) the cross-session mastery state for this
+    student and lesson is cleared too, so every run is a true first encounter.
+    See ``reset_lesson_state`` for what that covers and why a new TutorSession
+    alone is not enough. The delete counts are attached to the returned session
+    as ``_cli_reset`` for the caller to report.
     """
     from django.contrib.auth.models import User
     from apps.accounts.models import Institution
@@ -221,6 +276,10 @@ def bootstrap_session(
             "No institution available for the session. Load the eval fixtures."
         )
 
+    # Before the session exists, so the engine's first read already sees a clean
+    # slate rather than state cleared out from under it mid-turn.
+    reset_counts = reset_lesson_state(student, lesson) if fresh else {}
+
     session = TutorSession.objects.create(
         student=student,
         lesson=lesson,
@@ -229,6 +288,7 @@ def bootstrap_session(
         is_synthetic=True,
         engine_state={'cli_session': True},
     )
+    session._cli_reset = reset_counts
     logger.info(
         "[tutor_chat] session=%s lesson=%s student=%s institution=%s",
         session.pk, lesson.pk, student.pk, institution.pk,
