@@ -170,16 +170,23 @@ class CurriculumKnowledgeBase:
         self.persist_directory = persist_directory or f"<pgvector:institution_{self.institution_id}>"
 
         # Storage backend availability: signal in the same shape the
-        # ChromaDB era exposed. Used by ``_index_chunks`` etc. to
-        # bail out cleanly on backends where vector storage isn't
-        # available (SQLite local dev / CI).
+        # ChromaDB era exposed. Read by ``_index_chunks`` and the query
+        # methods to bail out cleanly when vector storage isn't usable.
+        #
+        # This was ``connection.vendor == 'postgresql'`` until 2026-07-30,
+        # which made all eleven guarded methods no-op on SQLite. Combined
+        # with the same check inside kb_storage, an offline/SQLite install
+        # silently retrieved nothing and the tutor ran ungrounded without
+        # a warning. kb_storage now serves both backends (pgvector index on
+        # Postgres, brute-force cosine elsewhere), so storage is available
+        # everywhere and the flag stays only because callers still read it.
         from django.db import connection
-        self._storage_available = connection.vendor == 'postgresql'
-        if not self._storage_available:
-            logger.info(
-                "[KB] storage backend=%s — vector ops are no-ops (SQLite local dev / CI)",
-                connection.vendor,
-            )
+        self._storage_available = True
+        logger.debug(
+            "[KB] storage backend=%s (%s)",
+            connection.vendor,
+            'pgvector' if connection.vendor == 'postgresql' else 'bruteforce',
+        )
 
     def _get_collection(self):
         """Back-compat shim — no longer returns a ChromaDB collection.

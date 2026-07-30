@@ -82,3 +82,10 @@ logs/
 
 # collectstatic output (regenerated on service start)
 staticfiles/
+
+# ONNX encoder build artifacts (scripts/export_minilm_onnx.py) — ~90 MB
+models/
+
+# Vendored native binaries for the desktop installer (manage.py stage_ollama).
+# ~31 MB per platform, reproducible from a released Ollama.
+vendor/

@@ -1,0 +1,19 @@
+# Build-box only. Never installed on a server or a student device.
+#
+#   pip install -r requirements-build.txt
+#
+# Needed solely by scripts/export_minilm_onnx.py, which converts the cached
+# sentence-transformers weights into the ONNX encoder the desktop build ships.
+# That conversion needs torch (to trace) and onnx (to serialise); the resulting
+# .onnx file needs neither at runtime.
+#
+# Plan: memory/desktop_offline_app_plan.md
+
+# Protobuf serialisation for torch.onnx.export. torch 2.10 defaults to the
+# dynamo exporter, which additionally wants onnxscript — the export script
+# passes dynamo=False to stay on the TorchScript path and avoid that.
+onnx>=1.22,<2
+
+# torch + sentence-transformers come from requirements-ml.txt; the export
+# script needs both to load the reference weights and to check parity against
+# them before writing the artifact.

@@ -1679,11 +1679,26 @@ def _retrieve_kb(session, query_text: str) -> list[dict]:
         kb = CurriculumKnowledgeBase(
             institution_id=session.institution_id,
         )
-        return kb.query_with_global_fallback(
+        chunks = kb.query_with_global_fallback(
             query_text=query_text,
             n_results=5,
             course=course,
         )
+        if not chunks:
+            # An empty retrieval is legitimate (a KB with nothing relevant),
+            # but it is also exactly what a broken backend looks like — the
+            # SQLite path returned [] unconditionally from the pgvector
+            # migration until 2026-07-30 and nobody noticed, because the tutor
+            # keeps answering, just ungrounded. Say so once per turn.
+            from apps.curriculum import kb_storage
+            stats = kb_storage.collection_stats(session.institution_id)
+            logger.warning(
+                "_retrieve_kb: no chunks for session=%s institution=%s "
+                "(backend=%s, chunks_in_kb=%s) — tutoring turn will be ungrounded",
+                session.pk, session.institution_id,
+                stats.get('backend'), stats.get('total_chunks'),
+            )
+        return chunks
     except Exception as exc:
         logger.warning(
             "_retrieve_kb: failed (session=%s): %s",
