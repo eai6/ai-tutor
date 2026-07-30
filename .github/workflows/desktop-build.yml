@@ -37,7 +37,12 @@ on:
         default: 'all'
         options: [all, macos, windows, linux]
   push:
-    tags: ['v*']
+    # `desktop-v*`, NOT `v*`. deploy.yml triggers on `v[0-9]+.[0-9]+.[0-9]+`,
+    # so a plain `v*` pattern here would overlap it: tagging v0.1.0 to cut a
+    # desktop build would also deploy to production. The desktop app and the
+    # server are released on separate cadences anyway — the app is installed
+    # by hand on classroom machines, the server ships continuously.
+    tags: ['desktop-v*']
 
 permissions:
   contents: read
