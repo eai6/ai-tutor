@@ -1,0 +1,240 @@
+name: Desktop app (Windows / macOS / Linux)
+
+# Builds the offline desktop tutor for all three platforms.
+#
+# Additive: this workflow does not touch the Azure deploy pipeline in
+# deploy.yml / deploy-staging.yml. It builds artifacts and uploads them; it
+# never deploys anything.
+#
+# Manual by default. Desktop builds are slow (~15-25 min each) and produce
+# ~500 MB of artifacts per platform, so they should not run on every push to
+# a branch that only changes server code. Tag pushes (v*) also build, which is
+# how a release is cut.
+#
+# Why a matrix and not one job: everything platform-specific here genuinely
+# cannot be cross-built.
+#   - PyInstaller does not cross-compile. A macOS .app must be built on macOS.
+#   - Ollama is a native binary, staged per-platform by `manage.py stage_ollama`.
+#   - pywebview binds the platform's own webview: WKWebView (macOS),
+#     WebView2 (Windows), WebKitGTK (Linux, which needs system GTK packages).
+#
+# What the build does NOT include, by design:
+#   - The 2.5 GB tutor model. Installers stay ~150-250 MB; the app acquires the
+#     model after install from a USB file or a download. See
+#     memory/desktop_offline_app_plan.md (decision D1).
+#   - Code signing / notarisation. Unsigned builds are blocked by Gatekeeper
+#     and SmartScreen, so these artifacts are for internal testing until
+#     certificates exist. Tracked in the plan under Risks.
+#
+# Plan: memory/desktop_offline_app_plan.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Which platforms to build'
+        type: choice
+        default: 'all'
+        options: [all, macos, windows, linux]
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      # One platform failing should not cancel the others — a Linux GTK problem
+      # says nothing about whether the macOS build is sound.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS (Apple Silicon)
+            slug: macos-arm64
+            selector: macos
+          - os: windows-latest
+            label: Windows (x64)
+            slug: windows-x64
+            selector: windows
+          - os: ubuntu-22.04
+            label: Linux (x64)
+            slug: linux-x64
+            selector: linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip unselected platform
+        id: gate
+        shell: bash
+        run: |
+          want='${{ github.event.inputs.platforms || 'all' }}'
+          if [ "$want" = "all" ] || [ "$want" = "${{ matrix.selector }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping ${{ matrix.label }} (requested: $want)"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          python-version: '3.12'
+
+      # pywebview on Linux is a GTK/WebKitGTK binding, not a self-contained
+      # wheel. Without these the import succeeds and the window fails at
+      # runtime, which is a much worse failure than a missing package.
+      - name: Install GTK + WebKit (Linux)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
+            gir1.2-gtk-3.0 gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0
+
+      - name: Install Python dependencies
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-core.txt
+          pip install -r requirements-desktop.txt
+          # torch + onnx are build-only: needed to EXPORT the encoder, never to
+          # run it. The spec excludes them from the bundle.
+          pip install -r requirements-ml.txt -r requirements-build.txt
+          if [ "${{ runner.os }}" = "Linux" ]; then pip install pygobject; fi
+
+      # Deterministic: exported from the same weights the parity test pins,
+      # so every platform ships an identical encoder.
+      - name: Export the ONNX encoder
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        run: python scripts/export_minilm_onnx.py
+
+      # Ollama is a native binary and cannot be cross-copied, so each runner
+      # installs it and stages its own. This is what makes the installed app
+      # independent of any system Ollama on the target machine.
+      - name: Install + stage Ollama (macOS / Linux)
+        if: steps.gate.outputs.run == 'true' && runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          python manage.py stage_ollama --force
+
+      - name: Install + stage Ollama (Windows)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = 'https://ollama.com/download/OllamaSetup.exe'
+          Invoke-WebRequest -Uri $url -OutFile ollama-setup.exe
+          Start-Process -FilePath .\ollama-setup.exe -ArgumentList '/VERYSILENT','/NORESTART' -Wait
+          $candidates = @(
+            "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+            "$env:ProgramFiles\Ollama\ollama.exe"
+          )
+          $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $exe) { throw "ollama.exe not found after install" }
+          python manage.py stage_ollama --from "$exe" --force
+
+      # Fail the build if the two things that make it work offline are absent,
+      # rather than shipping an installer that cannot tutor. The spec only
+      # prints a warning, which is easy to miss in CI logs.
+      - name: Verify offline payload is present
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        run: |
+          test -f models/minilm-l6-v2/model.onnx || { echo "::error::ONNX encoder missing"; exit 1; }
+          ls vendor/ollama/*/ollama vendor/ollama/*/ollama.exe >/dev/null 2>&1 \
+            || { echo "::error::vendored Ollama binary missing"; exit 1; }
+          echo "payload OK"
+
+      - name: Build with PyInstaller
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        env:
+          APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.1.0-dev' }}
+        run: pyinstaller AI-Tutor.spec --noconfirm --log-level WARN
+
+      # The smoke test must actually SERVE A PAGE, not just report status.
+      #
+      # Learned the hard way on 2026-07-30: the first build of this spec exited
+      # 0, booted Django, ran migrations, loaded the ONNX encoder and reported
+      # every check — then died inside collectstatic on
+      # `ModuleNotFoundError: whitenoise.storage`, because settings names that
+      # backend by string and hidden-importing the top-level package collects
+      # only __init__. `--probe` returns BEFORE first-run setup, so a
+      # probe-only smoke test passes a build that cannot serve a single page.
+      # Requesting real HTML is the check that would have caught it.
+      - name: Smoke-test the frozen binary
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            BIN="dist/AI Tutor.app/Contents/MacOS/AI-Tutor"
+          elif [ "${{ runner.os }}" = "Windows" ]; then
+            BIN="dist/AI-Tutor/AI-Tutor.exe"
+          else
+            BIN="dist/AI-Tutor/AI-Tutor"
+          fi
+          echo "serving from: $BIN"
+          "$BIN" --serve --port 8799 > serve.log 2>&1 &
+          SERVER_PID=$!
+
+          for i in $(seq 1 60); do
+            if curl -fsS -o page.html "http://127.0.0.1:8799/student/login/" 2>/dev/null; then
+              echo "served a page after ${i}s"
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::frozen server exited during startup"
+              cat serve.log; exit 1
+            fi
+            sleep 1
+          done
+
+          if ! grep -q "AI Tutor" page.html 2>/dev/null; then
+            echo "::error::frozen binary never served the login page"
+            cat serve.log; exit 1
+          fi
+
+          # Startup must be clean, not merely survivable — a swallowed
+          # ModuleNotFoundError here means a broken feature later.
+          if grep -qE "Traceback|ModuleNotFoundError" serve.log; then
+            echo "::error::traceback during frozen startup"
+            cat serve.log; exit 1
+          fi
+
+          curl -fsS "http://127.0.0.1:8799/desktop/health/" | tee health.json
+          kill "$SERVER_PID" 2>/dev/null || true
+          echo "frozen binary serves pages with a clean startup"
+
+      - name: Package (macOS DMG)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'macOS'
+        run: |
+          hdiutil create -volname "AI Tutor" -srcfolder "dist/AI Tutor.app" \
+            -ov -format UDZO "dist/AI-Tutor-${{ matrix.slug }}.dmg"
+
+      - name: Package (Linux tarball)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
+        run: tar -czf "dist/AI-Tutor-${{ matrix.slug }}.tar.gz" -C dist AI-Tutor
+
+      - name: Package (Windows zip)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\AI-Tutor\* -DestinationPath "dist\AI-Tutor-${{ matrix.slug }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          name: AI-Tutor-${{ matrix.slug }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
