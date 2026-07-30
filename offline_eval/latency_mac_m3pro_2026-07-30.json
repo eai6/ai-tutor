@@ -1,0 +1,209 @@
+{
+  "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M) | short": {
+    "model": "qwen3:4b-instruct",
+    "label": "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M)",
+    "size": "short",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.10822408400417771,
+    "ttft_min": 0.10359554200840648,
+    "ttft_max": 0.3059212920052232,
+    "total_med": 1.9633600840024883,
+    "total_min": 1.8996833749988582,
+    "total_max": 3.428738083006465,
+    "tokens_in": 145,
+    "tokens_out": 79,
+    "tok_s": 39.88925879292267,
+    "prefill_med": 0.023948417,
+    "raw": [
+      {
+        "ttft": 0.10803145800309721,
+        "total": 3.428738083006465,
+        "tokens_in": 145,
+        "tokens_out": 110,
+        "chars": 394,
+        "load_s": 0.075674959,
+        "prefill_s": 0.023806041,
+        "decode_s": 3.133127416
+      },
+      {
+        "ttft": 0.3059212920052232,
+        "total": 2.9630019580072258,
+        "tokens_in": 145,
+        "tokens_out": 96,
+        "chars": 370,
+        "load_s": 0.2298045,
+        "prefill_s": 0.041848625,
+        "decode_s": 2.580576247
+      },
+      {
+        "ttft": 0.10822408400417771,
+        "total": 1.9633600840024883,
+        "tokens_in": 145,
+        "tokens_out": 74,
+        "chars": 272,
+        "load_s": 0.077094792,
+        "prefill_s": 0.023948417,
+        "decode_s": 1.824589044
+      },
+      {
+        "ttft": 0.11075999999593478,
+        "total": 1.8996833749988582,
+        "tokens_in": 145,
+        "tokens_out": 73,
+        "chars": 276,
+        "load_s": 0.0811435,
+        "prefill_s": 0.024144667,
+        "decode_s": 1.757337251
+      },
+      {
+        "ttft": 0.10359554200840648,
+        "total": 1.9346477500075707,
+        "tokens_in": 145,
+        "tokens_out": 79,
+        "chars": 308,
+        "load_s": 0.075245083,
+        "prefill_s": 0.022959458,
+        "decode_s": 1.812109335
+      }
+    ]
+  },
+  "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M) | medium": {
+    "model": "qwen3:4b-instruct",
+    "label": "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M)",
+    "size": "medium",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.11206099999253638,
+    "ttft_min": 0.0980825000006007,
+    "ttft_max": 0.20216004199755844,
+    "total_med": 1.8033459169964772,
+    "total_min": 1.4502506659919163,
+    "total_max": 2.2040787089936202,
+    "tokens_in": 491,
+    "tokens_out": 64,
+    "tok_s": 40.639955473962154,
+    "prefill_med": 0.024334291,
+    "raw": [
+      {
+        "ttft": 0.20216004199755844,
+        "total": 1.8033459169964772,
+        "tokens_in": 491,
+        "tokens_out": 62,
+        "chars": 180,
+        "load_s": 0.166755709,
+        "prefill_s": 0.025640583,
+        "decode_s": 1.569480125
+      },
+      {
+        "ttft": 0.11206099999253638,
+        "total": 1.4502506659919163,
+        "tokens_in": 491,
+        "tokens_out": 54,
+        "chars": 173,
+        "load_s": 0.079754417,
+        "prefill_s": 0.024509792,
+        "decode_s": 1.316003878
+      },
+      {
+        "ttft": 0.10646495800756384,
+        "total": 2.0338119579973863,
+        "tokens_in": 491,
+        "tokens_out": 81,
+        "chars": 221,
+        "load_s": 0.075859208,
+        "prefill_s": 0.024111375,
+        "decode_s": 1.904137336
+      },
+      {
+        "ttft": 0.11515483300900087,
+        "total": 1.6899597080046078,
+        "tokens_in": 491,
+        "tokens_out": 64,
+        "chars": 174,
+        "load_s": 0.084898916,
+        "prefill_s": 0.024217084,
+        "decode_s": 1.544426001
+      },
+      {
+        "ttft": 0.0980825000006007,
+        "total": 2.2040787089936202,
+        "tokens_in": 491,
+        "tokens_out": 86,
+        "chars": 261,
+        "load_s": 0.066975542,
+        "prefill_s": 0.024334291,
+        "decode_s": 2.068977243
+      }
+    ]
+  },
+  "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M) | long": {
+    "model": "qwen3:4b-instruct",
+    "label": "Qwen3-4B local (qwen3:4b-instruct, Q4_K_M)",
+    "size": "long",
+    "kind": "local",
+    "n": 5,
+    "ttft_med": 0.11207758400996681,
+    "ttft_min": 0.1001250830013305,
+    "ttft_max": 0.207174583003507,
+    "total_med": 2.434525249991566,
+    "total_min": 2.205672500000219,
+    "total_max": 2.721880625002086,
+    "tokens_in": 1284,
+    "tokens_out": 84,
+    "tok_s": 36.58049086559677,
+    "prefill_med": 0.025245333,
+    "raw": [
+      {
+        "ttft": 0.1001250830013305,
+        "total": 2.205672500000219,
+        "tokens_in": 1284,
+        "tokens_out": 84,
+        "chars": 227,
+        "load_s": 0.067875958,
+        "prefill_s": 0.025038958,
+        "decode_s": 2.075857746
+      },
+      {
+        "ttft": 0.11088229199231137,
+        "total": 2.434525249991566,
+        "tokens_in": 1284,
+        "tokens_out": 85,
+        "chars": 248,
+        "load_s": 0.077952458,
+        "prefill_s": 0.025684792,
+        "decode_s": 2.27738062
+      },
+      {
+        "ttft": 0.207174583003507,
+        "total": 2.517754625005182,
+        "tokens_in": 1284,
+        "tokens_out": 84,
+        "chars": 256,
+        "load_s": 0.15163325,
+        "prefill_s": 0.034536416,
+        "decode_s": 2.267494504
+      },
+      {
+        "ttft": 0.12205120800354052,
+        "total": 2.299034792013117,
+        "tokens_in": 1284,
+        "tokens_out": 85,
+        "chars": 248,
+        "load_s": 0.088798208,
+        "prefill_s": 0.025245333,
+        "decode_s": 2.144064495
+      },
+      {
+        "ttft": 0.11207758400996681,
+        "total": 2.721880625002086,
+        "tokens_in": 1284,
+        "tokens_out": 84,
+        "chars": 227,
+        "load_s": 0.080055542,
+        "prefill_s": 0.025074333,
+        "decode_s": 2.398793207
+      }
+    ]
+  }
+}

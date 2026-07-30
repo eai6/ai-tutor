@@ -36,7 +36,12 @@ OLLAMA = os.getenv("OLLAMA_BASE", "http://localhost:11434")
 TEMPERATURE = 0.3
 MAX_TOKENS = 400
 
-LOCAL_MODEL = "qwen3-4b-jetson"
+# The Jetson tag by default. Overridable so the same harness can run on a box
+# where that tag was never built — the tag is a thin wrapper over
+# qwen3:4b-instruct whose PARAMETERs (num_ctx, temperature, top_p, top_k) are
+# either sent explicitly below or identical to the base tag's own defaults, so
+# BENCH_LOCAL_MODEL=qwen3:4b-instruct measures the same configuration.
+LOCAL_MODEL = os.getenv("BENCH_LOCAL_MODEL", "qwen3-4b-jetson")
 LOCAL_NUM_CTX = 16384  # must match the Modelfile, else Ollama evicts + reloads
 
 CLOUD_MODELS = [
@@ -282,7 +287,7 @@ def main():
 
     targets = []
     if not args.cloud_only:
-        targets.append(("local", LOCAL_MODEL, f"Qwen3-4B (Jetson, Q4_K_M)"))
+        targets.append(("local", LOCAL_MODEL, f"Qwen3-4B local ({LOCAL_MODEL}, Q4_K_M)"))
     if not args.local_only:
         import anthropic
 
