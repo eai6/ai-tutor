@@ -84,7 +84,11 @@ drops the teaching sentence is a regression, not a win.
 
 **Est: 1 day**, most of it in the measure/tune loop.
 
-### 3. Fix the un-retried Ollama 500s
+### 3. Fix the un-retried Ollama 500s — **DONE (`138a94b`)**
+
+Shipped as described. `_is_transient_error` (now `engine.py:1655`) walks
+`exc.response.status_code` and matches `'500 server error'`. The rest of this
+section is kept for the diagnosis it records.
 
 `_is_transient_error` (`engine.py:1627-1648`) reads `exc.status_code`, but
 `requests.HTTPError` carries the code on `exc.response.status_code`, and the
@@ -100,6 +104,14 @@ substring list. One-line class of fix; add a unit test with a synthetic
 **Est: 1 hour.**
 
 ### 4. Stream the reply (the biggest perceived win)
+
+> **Superseded by `memory/offline_streaming_plan.md`** (approved 2026-07-29),
+> which expands this workstream into a phased design covering both the kiosk web
+> chat and the terminal CLI. Read that file before touching streaming. Two things
+> this section got wrong: a turn is **three** serialized local calls offline (the
+> `run_safety_judge` at `views.py:1095` falls back to the tutoring model), and
+> sentence-level buffering **cannot** be made byte-identical to the batch filter
+> pipeline — streaming has to be an advisory preview with a final reconcile.
 
 CLAUDE.md's no-SSE rule is scoped to **Azure Container Apps**, which does not
 support chunked streaming. The offline Jetson deployment is not on ACA. Ollama
@@ -162,12 +174,17 @@ each completed sentence passes the filters before release.
 
 ## Recommended sequence
 
-WS1 (instrument) → WS3 (500s, cheap and independent) → WS2 (the length fix, with
-the measure/tune loop) → re-measure → WS4 (streaming) if the numbers still
-warrant it.
+Original: WS1 (instrument) → WS3 (500s, cheap and independent) → WS2 (the length
+fix, with the measure/tune loop) → re-measure → WS4 (streaming) if the numbers
+still warrant it.
+
+**Revised 2026-07-29.** WS3 is done (`138a94b`). WS4 was pulled forward on user
+direction and now owns WS1: the Ollama streaming path has to read the per-phase
+timing fields anyway, so instrumentation falls out of it rather than preceding it.
+Live order: WS2 (output cap) → WS4 per `memory/offline_streaming_plan.md`.
 
 ## Next step
 
-Add the Ollama timing fields to the response log and re-run the 5-turn timed
-session, so WS2 is tuned against measured per-call decode time rather than
-wall-clock inference.
+WS2: cap `num_predict` at ~256 and drop the Jetson `max_tokens` 3072 → 1024. It
+shortens all three of a turn's serialized local calls, so it multiplies the
+streaming win rather than competing with it.

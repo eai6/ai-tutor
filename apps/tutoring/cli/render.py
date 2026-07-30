@@ -34,6 +34,41 @@ def format_reply(payload: dict, *, colour: bool = True) -> str:
     return paint(payload.get('message') or '', 'cyan', colour=colour)
 
 
+def format_reply_chunk(text: str, *, colour: bool = True) -> str:
+    """One streamed fragment, styled like `format_reply`.
+
+    Separate from format_reply because that one takes the whole payload dict
+    and a stream has no payload yet — only text.
+    """
+    return paint(text, 'cyan', colour=colour)
+
+
+def stream_delta(previous: str, current: str) -> tuple[str, bool]:
+    """Diff two cumulative stream snapshots into something a terminal can print.
+
+    The stream gate emits progressively longer SNAPSHOTS, not deltas, because
+    the browser re-renders a whole bubble. A terminal cannot un-print, so it
+    needs the new tail instead.
+
+    Returns ``(text_to_print, restarted)``. ``restarted`` is True when
+    ``current`` is not a continuation of ``previous`` — which happens when a
+    transient retry replays the generation (the gate's begin_attempt drops the
+    dead attempt), or when the final batch pipeline rewrites text that was
+    already shown (``_dedupe_reply`` prepends; the exit-ticket branch of
+    ``respond_for_view`` replaces outright). The caller is expected to start a
+    fresh line and reprint rather than append.
+
+    Also used at end-of-turn to append whatever the stream never reached: the
+    last sentence usually has no trailing boundary, so it is never emitted as
+    a snapshot and arrives only in the final payload.
+    """
+    if not previous:
+        return current, False
+    if current.startswith(previous):
+        return current[len(previous):], False
+    return current, True
+
+
 def format_state(payload: dict, *, colour: bool = True) -> str:
     """Step position and grading verdict for the turn.
 

@@ -1541,6 +1541,84 @@ class OllamaClient(BaseLLMClient):
                 out.append({'role': role, 'content': '\n'.join(text_parts)})
         return out
 
+    def _stream_chat(self, url: str, payload: dict, on_delta) -> dict:
+        """Drive Ollama's streaming /api/chat and rebuild the buffered shape.
+
+        Ollama's stream is NDJSON: one JSON object per line, each with a
+        partial ``message``, ending with a line carrying ``done: true`` plus
+        the per-phase counters and durations. Reassembling those into the
+        same dict the non-streaming call returns is what keeps
+        `_adapt_ollama_response` — and therefore `_dispatch_tools`, the
+        tool-leak recovery, and the timing log — one code path.
+
+        Two details that are easy to get wrong:
+
+        * ``message.thinking`` is accumulated but NEVER passed to on_delta.
+          The hybrid Qwen3.5 templates emit a reasoning channel; forwarding
+          it would stream a monologue to a student.
+        * Ollama emits WHOLE tool-call objects per line, not the
+          partial-JSON argument fragments the OpenAI streaming protocol
+          uses, so no incremental JSON parser is needed here. If that ever
+          changes, `_adapt_ollama_response` will start seeing malformed
+          arguments — that is the symptom to look for.
+        """
+        import requests
+
+        content_parts: list[str] = []
+        thinking_parts: list[str] = []
+        tool_calls: list = []
+        final: dict = {}
+        role = 'assistant'
+
+        with requests.post(url, json=payload, stream=True, timeout=600) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except ValueError:
+                    # A partial or malformed line is not fatal: the final
+                    # line carries the authoritative counters, and dropping
+                    # a delta only costs preview fidelity.
+                    logger.warning("[OllamaStream] unparsable line: %r", line[:200])
+                    continue
+                if chunk.get('error'):
+                    raise RuntimeError(f"Ollama stream error: {chunk['error']}")
+
+                msg = chunk.get('message') or {}
+                role = msg.get('role') or role
+                piece = msg.get('content') or ''
+                if piece:
+                    content_parts.append(piece)
+                    try:
+                        on_delta(piece)
+                    except Exception:
+                        # A transport-side failure must never abort
+                        # generation — the buffered result is still good.
+                        logger.exception("[OllamaStream] on_delta raised")
+                if msg.get('thinking'):
+                    thinking_parts.append(msg['thinking'])
+                if msg.get('tool_calls'):
+                    tool_calls.extend(msg['tool_calls'])
+
+                if chunk.get('done'):
+                    final = chunk
+
+        data = dict(final)
+        message = {'role': role, 'content': ''.join(content_parts)}
+        if tool_calls:
+            message['tool_calls'] = tool_calls
+        if thinking_parts:
+            message['thinking'] = ''.join(thinking_parts)
+        data['message'] = message
+        if not final:
+            logger.warning(
+                "[OllamaStream] stream ended with no done-line — token "
+                "counts and durations will read 0",
+            )
+        return data
+
     def generate_with_tools(
         self,
         messages: list[dict],
@@ -1550,6 +1628,7 @@ class OllamaClient(BaseLLMClient):
         *,
         tool_choice: dict | str | None = None,
         sampling: dict | None = None,
+        on_delta=None,
     ):
         """Ollama tool-calling. Accepts the same Anthropic-style tool
         schema ``{name, description, input_schema}`` the tutor engine
@@ -1560,6 +1639,15 @@ class OllamaClient(BaseLLMClient):
         ``tool_choice`` is accepted for signature parity but NOT
         forwarded — Ollama's forced-tool support is unreliable across
         models, and the tutor prompt already directs tool use.
+
+        ``on_delta`` — when set, the request is made with ``stream: true``
+        and each text delta is handed to the callback as it arrives. The
+        RETURN VALUE IS UNCHANGED: the final NDJSON line is folded back
+        into the same ``data`` dict the buffered path builds, so
+        `_adapt_ollama_response` and every caller downstream are identical
+        either way. Callers must treat deltas as a preview — the engine
+        still post-processes the complete text before it is safe to show
+        (see simple_tutor/stream_filter.py).
         """
         import requests
 
@@ -1654,7 +1742,7 @@ class OllamaClient(BaseLLMClient):
             'model': self.config.model_name,
             'messages': ollama_messages,
             'tools': ollama_tools,
-            'stream': False,
+            'stream': bool(on_delta),
             'options': options,
         }
         # Ollama's top-level `think` flag (distinct from `options`), set by a
@@ -1691,9 +1779,12 @@ class OllamaClient(BaseLLMClient):
         )
         _ollama_fit_preflight(api_base, self.config.model_name, options['num_ctx'])
         try:
-            response = requests.post(url, json=payload, timeout=600)
-            response.raise_for_status()
-            data = response.json()
+            if on_delta:
+                data = self._stream_chat(url, payload, on_delta)
+            else:
+                response = requests.post(url, json=payload, timeout=600)
+                response.raise_for_status()
+                data = response.json()
         except requests.exceptions.ConnectionError:
             raise ConnectionError(
                 f"Could not connect to Ollama at {api_base}. "

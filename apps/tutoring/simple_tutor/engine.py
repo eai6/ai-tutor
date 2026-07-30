@@ -321,12 +321,21 @@ def _course_locale(session) -> str:
         return 'en-us'
 
 
-def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = False) -> dict[str, Any]:
+def respond(
+    session: 'TutorSession', user_input: str, *, _is_opening: bool = False,
+    on_delta=None,
+) -> dict[str, Any]:
     """Process one student turn and return the tutor's response.
 
     Args:
         session: TutorSession (with engine='simple').
         user_input: the student's latest message text.
+        on_delta: optional ``callable(str)`` receiving progressively longer
+            SAFE snapshots of the reply as Call 2 generates it. Advisory
+            preview only — the full batch filter pipeline still runs on the
+            complete text below, and that is what persists and what the
+            returned ``content`` carries. When None (the default, and all of
+            production) this function is byte-identical to before.
 
     Returns:
         ``{'content': str, 'tool_calls': list[dict], ...}`` — the
@@ -480,6 +489,16 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     if isinstance(_es_intent, dict):
         _es_intent['_student_intent'] = student_intent
 
+    # Nothing is appended to the student's message here, and a per-turn tool
+    # directive is specifically the wrong fix for Call-1 tool skipping — it
+    # drove the local model into a duplicate tool-call loop that ran to
+    # num_predict every turn (median wall 17 s -> 164 s) while *lowering*
+    # compliance. Deleted 2026-07-29; measurements in
+    # memory/tool_compliance_root_cause.md. Ollama also ignores tool_choice
+    # outright, so _plan_call1's forcing is inert on every local model.
+    # Call-1 compliance remains open; the live leads are `presence_penalty`
+    # (repetition control is off on this tag) and shrinking the 24k system
+    # prompt, not more instruction text.
     messages: list = [{'role': 'user', 'content': user_input}]
     response = _call_llm(
         system_blocks=system_blocks, tools=call1_tools, messages=messages,
@@ -525,6 +544,63 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # ─── 6. Call 2 — feed tool_results back so the model writes
     #              the student-facing reply WITH the verdict in hand,
     #              and register whatever Call 1 skipped.
+    # Stream gate — built here because the grader verdict in `tool_results`
+    # is now known, and the reveal/polarity filters need it. Only construct
+    # one when a transport actually asked for deltas.
+    stream_gate = None
+    if on_delta is not None:
+        from apps.tutoring.simple_tutor.stream_filter import StreamGate
+        stream_gate = StreamGate(
+            session=session, tool_results=tool_results,
+            family=_family, emit=on_delta,
+        )
+        # Flush Call 1's prose NOW, if it wrote any.
+        #
+        # Measured on the Jetson 2026-07-29 (qwen3-4b-jetson, 8 turns): the
+        # student-visible reply came from CALL 1 on 4 of 5 turns. The local
+        # model writes the whole reply as prose and skips the tool; Call 2
+        # then exists only to register the repair (missing_tool=record_answer)
+        # and emits no text at all, so _run_second_call falls back to
+        # `text_reply_1`. Streaming only Call 2 therefore covered 2/8 turns.
+        #
+        # This text has been sitting complete since before _dispatch_tools —
+        # it could not be shown earlier because the reveal and polarity
+        # filters need the grader's verdict, which only exists now. Emitting
+        # it here cuts the wait on exactly the turns that previously streamed
+        # nothing: the student reads the reply after Call 1 + grading instead
+        # of after Call 2 finishes.
+        #
+        # If Call 2 does write prose, _call_llm's begin_attempt() resets the
+        # gate's buffer first, so Call 2's snapshots replace this text rather
+        # than concatenating onto it (transports treat a non-continuation as
+        # a replace — see cli/render.py::stream_delta).
+        # ...but ONLY when the verdict-dependent filters can actually run.
+        #
+        # Measured on the Jetson 2026-07-29, and the reason this guard exists:
+        # the student typed a correct answer, Call 1 wrote "Yes — 360° is the
+        # total...", and Call 1 SKIPPED record_answer. The grade was recorded
+        # by Call 2's repair, so at this point there is no verdict,
+        # _align_reply_polarity has nothing to act on, and the affirmation
+        # streamed. Call 2 then graded it incorrect (the slot wanted the MCQ
+        # letter) and the batch pass rewrote the opener — the student watched
+        # "Yes" turn into "Not this time." That flip is precisely what the
+        # head rule exists to prevent, so a flush is only safe when:
+        #
+        #   * a verdict is already recorded — every filter has its inputs; or
+        #   * no question was in flight when the turn began — no grade was
+        #     expected, so _missing_forced_tool cannot ask Call 2 to record
+        #     one, and both verdict-dependent filters are no-ops.
+        #
+        # Otherwise a grade is pending and Call 1's prose has to wait.
+        verdict_known = _turn_verdict(tool_results) is not None
+        if text_reply_1 and (verdict_known or in_flight is None):
+            stream_gate.feed(text_reply_1)
+            # Explicit handover: whatever Call 2 writes REPLACES this text,
+            # it does not continue it. _call_llm also resets the gate before
+            # each attempt, but relying on that would make correctness here
+            # depend on a retry mechanism firing as a side effect.
+            stream_gate.reset_buffer()
+
     text_reply, used_two_call = _run_second_call(
         session=session,
         system_blocks=system_blocks,
@@ -536,6 +612,8 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
         figure_catalog=figure_catalog,
         missing_tool=missing_tool,
         user_input=user_input,
+        on_delta=stream_gate,
+        family=_family,
     )
 
     # B2: latch a Call-1 skip (whether or not Call 2 repaired it). The skip
@@ -562,7 +640,16 @@ def respond(session: 'TutorSession', user_input: str, *, _is_opening: bool = Fal
     # with the grader's verdict, and an open question's reference must not
     # leak into a wrong-answer hint.
     if _family and _family not in _FORCE_POSE_EXEMPT_FAMILIES:
-        text_reply = _align_reply_polarity(session, text_reply, tool_results)
+        # Reuse the index the gate already consumed, so the ack the student
+        # watched appear is the ack that gets persisted. None when nothing
+        # streamed, which is the normal path and calls _rotation_index as
+        # it always has.
+        text_reply = _align_reply_polarity(
+            session, text_reply, tool_results,
+            rotation_index=(
+                stream_gate.used_rotation_index if stream_gate else None
+            ),
+        )
         text_reply = _filter_reveals(session, text_reply, tool_results)
 
     if not text_reply:
@@ -1242,7 +1329,9 @@ _POS_OPENER_RE = re.compile(
 _FIRST_SENTENCE_END_RE = re.compile(r'[.!?](?:\s+|$)|\n')
 
 
-def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
+def _align_reply_polarity(
+    session, text_reply: str, tool_results, *, rotation_index: int | None = None,
+) -> str:
     """The reply's opening must agree with the grader's verdict.
 
     The oss13_mt sweep's top rubric killer: models opened with "Not
@@ -1250,7 +1339,16 @@ def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
     then argued with their own verdicts for whole sessions. The verdict
     is authoritative; when the opening contradicts it, the opening
     sentence is replaced with a rotated verdict-consistent
-    acknowledgement."""
+    acknowledgement.
+
+    ``rotation_index`` exists for the streaming path. _rotation_index()
+    INCREMENTS a persisted counter and saves the session on every call,
+    so re-running this per streamed chunk would rotate the ack between
+    snapshots — the student would watch "Exactly!" turn into "Nice work!"
+    — and issue a DB write per chunk. The stream gate resolves the index
+    once and passes it here and to the final batch pass, so both agree.
+    None (the default, and every non-streaming call) preserves today's
+    behaviour exactly."""
     verdict = _turn_verdict(tool_results)
     if verdict not in ('correct', 'incorrect') or not text_reply:
         return text_reply
@@ -1265,7 +1363,11 @@ def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
     if acks is not None:
         m = _FIRST_SENTENCE_END_RE.search(stripped)
         rest = stripped[m.end():].lstrip() if m else ''
-        ack = acks[_rotation_index(session, 'polarity') % len(acks)]
+        idx = (
+            rotation_index if rotation_index is not None
+            else _rotation_index(session, 'polarity')
+        )
+        ack = acks[idx % len(acks)]
         logger.info(
             "[simple_tutor] polarity_align: %s opener replaced on %s "
             "verdict session=%s",
@@ -1298,18 +1400,26 @@ def _align_reply_polarity(session, text_reply: str, tool_results) -> str:
 _ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)
 
 
-def _filter_reveals(session, text_reply: str, tool_results) -> str:
+def _filter_reveals(
+    session, text_reply: str, tool_results, *, reference: str | None = None,
+) -> str:
     """While a question is open after a wrong answer, the reply must not
     state the reference (qwen3:14b printed "(Answer: A)" verbatim; others
     said "option C is correct" mid-hint). The engine knows the reference,
-    so this is deterministically enforceable."""
+    so this is deterministically enforceable.
+
+    ``reference`` lets the streaming path supply the answer it already
+    looked up, so this does not re-query InFlightQuestion once per
+    streamed chunk. None (the default) keeps the query."""
     if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
         return text_reply
-    from apps.tutoring.models import InFlightQuestion
-    slot = InFlightQuestion.objects.filter(session=session).first()
-    if slot is None:
-        return text_reply
-    ref = (slot.reference_answer or '').strip()
+    if reference is None:
+        from apps.tutoring.models import InFlightQuestion
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        if slot is None:
+            return text_reply
+        reference = slot.reference_answer or ''
+    ref = (reference or '').strip()
     if not ref:
         return text_reply
     out = _ANSWER_PAREN_RE.sub('', text_reply)
@@ -1651,6 +1761,92 @@ def _system_blocks_to_text(system_blocks) -> str:
 # Anthropic overload window that outlasted the short ladder.
 _TRANSIENT_BACKOFF = [2, 5, 12, 30, 60]
 
+# The local ladder is one short retry, and the difference is not timidity — the
+# two failure modes have nothing in common beyond the status code.
+#
+# A cloud 429/503/529 means "capacity, come back later": the wait IS the fix,
+# and 109s of laddered sleep is cheap next to deadlocking a session.
+#
+# A local Ollama 5xx is a different animal. There is no queue to drain — one
+# process, OLLAMA_NUM_PARALLEL=1 — so the usual cause is that the request
+# itself cannot succeed: a generation that ran to num_predict and got cut off
+# mid-`<tool_call>`, which Ollama then fails to parse and reports as a 500.
+# That is DETERMINISTIC in the request, so every retry reproduces it, and each
+# reproduction costs a full generation. Measured on the Jetson 2026-07-29:
+# ~92 s per attempt, so the cloud ladder turned one bad turn into ~11 minutes
+# (6 x 92 s decode + 109 s sleeping) before serving the placeholder anyway.
+# See memory/tool_compliance_root_cause.md.
+#
+# One retry is still worth having: a local 5xx CAN be a genuine blip — a model
+# reload, or an allocation failure while the box is under memory pressure, both
+# real on an 8 GB Jetson — and those clear on the next attempt. What is never
+# worth having is attempts 3-6, which have no failure mode they can fix.
+_LOCAL_TRANSIENT_BACKOFF = [2]
+
+# Providers running on the same box as Django. Not "open-weight" — a
+# Qwen served by a cloud host has cloud queueing behaviour and wants the
+# cloud ladder.
+_LOCAL_PROVIDERS = frozenset({'local_ollama'})
+
+
+def _backoff_for(provider: str | None) -> list[int]:
+    """Retry ladder for ``provider`` — short for local, laddered for cloud."""
+    if (provider or '').strip().lower() in _LOCAL_PROVIDERS:
+        return _LOCAL_TRANSIENT_BACKOFF
+    return _TRANSIENT_BACKOFF
+
+
+# A 5xx whose body names the GENERATION as malformed, not the server as busy.
+# Captured verbatim from the Jetson, 2026-07-29, Ollama 0.30.7:
+#
+#   {"error":"llama-server returned invalid tool call arguments for
+#             \"pose_question\": unexpected end of JSON input"}
+#
+# "unexpected end of JSON input" is the tell: the tool call was cut off
+# mid-arguments because decoding hit num_predict. Nothing about resending the
+# same request changes that, so this is the one 5xx worth zero retries rather
+# than one — it saves a guaranteed-wasted full generation (~92-103 s measured).
+#
+# Layered UNDER the local ladder on purpose: if a future Ollama reworded this,
+# the match lapses and the failure falls back to _LOCAL_TRANSIENT_BACKOFF's
+# single retry, which is still bounded. Sniffing the message can therefore only
+# improve on the fallback, never regress past it.
+_MALFORMED_GENERATION_MARKERS = (
+    'invalid tool call arguments',
+    'unexpected end of json input',
+)
+
+
+def _is_malformed_generation_error(exc: Exception) -> bool:
+    """True when the server rejected its own truncated output — a failure that
+    is deterministic in the request and so cannot be retried away."""
+    haystack = str(exc).lower()
+    try:
+        haystack += ' ' + (
+            getattr(getattr(exc, 'response', None), 'text', '') or '').lower()
+    except Exception:
+        pass
+    return any(m in haystack for m in _MALFORMED_GENERATION_MARKERS)
+
+
+def _error_detail(exc: Exception) -> str:
+    """One-line error text, including the HTTP body when there is one.
+
+    `requests.HTTPError.__str__` is only "500 Server Error: Internal Server
+    Error for url: …" — the provider's own explanation lives in
+    `exc.response.text` and was being dropped. Six Ollama 500s in one session
+    logged nothing about *why* (2026-07-27), which is the whole reason that
+    incident needed a probe script to diagnose.
+    """
+    msg = str(exc).strip().replace('\n', ' ')[:160]
+    body = ''
+    try:
+        raw = getattr(getattr(exc, 'response', None), 'text', '') or ''
+        body = raw.strip().replace('\n', ' ')[:240]
+    except Exception:
+        body = ''
+    return f'{msg} | body: {body}' if body else msg
+
 
 def _is_transient_error(exc: Exception) -> bool:
     """True for retryable cloud failures — rate limits, overloads, 5xx, connection
@@ -1688,26 +1884,50 @@ def _is_transient_error(exc: Exception) -> bool:
     ))
 
 
-def _invoke_with_transient_retry(fn, *, label: str):
+def _invoke_with_transient_retry(fn, *, label: str, on_attempt=None,
+                                 provider: str | None = None):
     """Call ``fn()``; on a transient error retry with backoff, else return None.
-    Never raises (preserves _call_llm's no-block contract)."""
-    retries = len(_TRANSIENT_BACKOFF) if (
+    Never raises (preserves _call_llm's no-block contract).
+
+    ``on_attempt`` fires before every attempt, including the first. It exists
+    for the streaming path: a retry re-runs the generation from scratch, so
+    without a reset the stream gate would append the second attempt's tokens
+    to the first attempt's partial text and emit the concatenation.
+
+    ``provider`` selects the retry ladder — see `_backoff_for`. A local
+    provider gets one short retry because its 5xx is usually deterministic in
+    the request and each attempt costs a whole generation; omitting it keeps
+    the cloud ladder, which is the safe default for anything remote.
+    """
+    backoff = _backoff_for(provider)
+    retries = len(backoff) if (
         os.getenv('SIMPLE_TUTOR_TRANSIENT_RETRY', '1').strip() != '0') else 0
     for attempt in range(retries + 1):
         try:
+            if on_attempt is not None:
+                on_attempt()
             return fn()
         except Exception as exc:
-            msg = str(exc).strip().replace('\n', ' ')[:160]
+            detail = _error_detail(exc)
+            if _is_malformed_generation_error(exc):
+                # Retrying cannot help: the server rejected its own truncated
+                # generation. Fail straight to the caller's fallback.
+                logger.warning(
+                    "_call_llm: %s malformed generation, not retrying: %s: %s",
+                    label, type(exc).__name__, detail,
+                )
+                return None
             if _is_transient_error(exc) and attempt < retries:
-                delay = _TRANSIENT_BACKOFF[attempt]
+                delay = backoff[attempt]
                 logger.warning(
                     "_call_llm: %s transient %s (%s) — retry %d/%d in %ds",
-                    label, type(exc).__name__, msg, attempt + 1, retries, delay,
+                    label, type(exc).__name__, detail, attempt + 1, retries,
+                    delay,
                 )
                 time.sleep(delay)
                 continue
             logger.warning("_call_llm: %s failed: %s: %s",
-                           label, type(exc).__name__, msg)
+                           label, type(exc).__name__, detail)
             return None
     return None
 
@@ -1718,6 +1938,7 @@ def _call_llm(
     tools: list,
     messages: list,
     tool_choice: dict | None = None,
+    on_delta=None,
 ):
     """Call Anthropic with the simple-tutor prompt + tools + the messages
     array. Returns the raw Anthropic response, or None on any error.
@@ -1736,6 +1957,13 @@ def _call_llm(
 
     ``messages`` is the full Anthropic messages list — the caller manages
     the user/assistant/tool_result alternation for the two-call loop.
+
+    ``on_delta`` is forwarded only to clients whose ``generate_with_tools``
+    accepts it (today: Ollama). It is deliberately NOT plumbed into the
+    native Anthropic branch below — production must stay byte-identical,
+    and streaming is an offline-kiosk feature. A client that does not
+    support it simply runs buffered; the caller's gate then emits nothing
+    and the turn behaves exactly as it does today.
     """
     try:
         from apps.llm.models import ModelConfig
@@ -1847,6 +2075,7 @@ def _call_llm(
                 **extra,
             ),
             label='Anthropic',
+            provider=provider,
         )
 
     # Any other provider (OpenAI / Gemini / local Ollama): route through
@@ -1866,6 +2095,22 @@ def _call_llm(
             type(client).__name__,
         )
         return None
+    extra_stream = {}
+    reset_stream = None
+    if on_delta is not None:
+        try:
+            import inspect
+            if 'on_delta' in inspect.signature(
+                    client.generate_with_tools).parameters:
+                extra_stream['on_delta'] = on_delta
+                reset_stream = getattr(on_delta, 'begin_attempt', None)
+            else:
+                logger.info(
+                    "_call_llm: %s does not support on_delta — running "
+                    "buffered", type(client).__name__,
+                )
+        except (TypeError, ValueError):
+            pass
     return _invoke_with_transient_retry(
         lambda: client.generate_with_tools(
             messages=messages,
@@ -1874,8 +2119,11 @@ def _call_llm(
             max_tokens=max_tokens,
             sampling=sampling,
             tool_choice=tool_choice,
+            **extra_stream,
         ),
         label=f'generate_with_tools({provider})',
+        on_attempt=reset_stream,
+        provider=provider,
     )
 
 
@@ -2032,9 +2280,41 @@ def _plan_call2(tools: list, missing_tool: str | None) -> tuple[list, dict | Non
     return (only or tools), {'type': 'tool', 'name': name}
 
 
+def _call_mode(family: str | None) -> str:
+    """'one' or 'two' — how many LLM calls a compliant turn may cost.
+
+    TWO-CALL is the original design and stays the default for Anthropic:
+    Call 1 picks tools, the platform grades, and Call 2 writes the reply
+    *knowing the verdict*. That ordering is why the model cannot
+    guess-confirm a grade it has not seen.
+
+    ONE-CALL accepts Call 1's prose and skips Call 2 whenever Call 1
+    already produced everything the turn needs (the expected tool AND
+    usable text). It halves the turn on a box where each call is 8-10s.
+
+    The trade is real and worth stating plainly: in one-call mode the
+    reply is written BEFORE the platform grades, so the model is
+    predicting its own verdict. `_align_reply_polarity` is the
+    deterministic net that catches the contradictions, and it is why
+    one-call is defensible rather than reckless.
+
+    'auto' (the default) resolves to one-call for local/open-weight
+    families and two-call for Anthropic — offline is where latency hurts
+    and where Call 2 was usually a silent tool-repair anyway. Override
+    with TUTOR_CALL_MODE=one|two|auto.
+    """
+    raw = os.getenv('TUTOR_CALL_MODE', 'auto').strip().lower()
+    if raw in ('one', 'two'):
+        return raw
+    if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
+        return 'two'
+    return 'one'
+
+
 def _run_second_call(
     *, session, system_blocks, tools, messages, response, text_reply_1,
-    tool_results, figure_catalog, missing_tool, user_input,
+    tool_results, figure_catalog, missing_tool, user_input, on_delta=None,
+    family=None,
 ) -> tuple[str, bool]:
     """Issue Call 2, folding in the repair when Call 1 skipped a forced tool.
 
@@ -2055,6 +2335,25 @@ def _run_second_call(
         # Nothing to feed back and nothing to repair — no second call, exactly
         # as before. This is the production/Anthropic path when Call 1 wrote a
         # plain conversational reply.
+        return text_reply_1, False
+
+    # One-call mode: Call 1 already produced the tool AND the prose, so the
+    # only thing Call 2 would add is a reply rewritten with the verdict in
+    # hand. Skip it and keep Call 1's text.
+    #
+    # Measured on the Jetson 2026-07-29: Call 2 emitted no student-visible
+    # text on 4 of 5 turns — it existed purely to register the tool Call 1
+    # had skipped, while `text_reply_1` was what the student actually read.
+    # With the per-turn directive making Call 1 compliant, that second call
+    # buys nothing on most turns and costs 8-10s.
+    #
+    # A MISSING tool still falls through to the repair below, so this only
+    # ever skips a call whose work is already done.
+    if missing_tool is None and text_reply_1 and _call_mode(family) == 'one':
+        logger.info(
+            "[simple_tutor] one_call: Call 1 delivered tool+prose — "
+            "skipping Call 2 (mode=%s)", _call_mode(family),
+        )
         return text_reply_1, False
 
     if tool_result_content:
@@ -2085,9 +2384,13 @@ def _run_second_call(
         )
 
     call2_tools, call2_tool_choice = _plan_call2(tools, missing_tool)
+    # Call 2 is the ONLY streamable call. Call 1's text is pre-text the
+    # repair path may discard, and the grader verdict the reveal/polarity
+    # filters need is not known until _dispatch_tools has run — which
+    # happens between the two calls.
     response2 = _call_llm(
         system_blocks=system_blocks, tools=call2_tools, messages=messages,
-        tool_choice=call2_tool_choice,
+        tool_choice=call2_tool_choice, on_delta=on_delta,
     )
     if response2 is None:
         return text_reply_1, False
@@ -2324,7 +2627,7 @@ def _persist_student_turn(session, user_input: str, step):
     )
 
 
-def respond_for_view(session, user_input: str) -> dict:
+def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
     """Adapter for ``apps.tutoring.views.chat_respond``.
 
     Calls ``respond(...)`` (which returns the engine's internal dict),
@@ -2333,11 +2636,18 @@ def respond_for_view(session, user_input: str) -> dict:
 
     Fields not produced by v1 of the simple engine (gamification,
     artifact_html, follow_up, etc.) default to safe values.
+
+    ``on_delta`` is forwarded to ``respond`` for the streaming transports
+    (the SSE view and the terminal CLI). Note that the returned
+    ``message`` can still differ from the last streamed snapshot — the
+    exit-ticket branch below deliberately REPLACES the reply text — which
+    is why transports must render the final payload rather than keeping
+    whatever they streamed.
     """
     from apps.curriculum.models import LessonStep
     from apps.tutoring.models import ExitTicketAttempt
 
-    out = respond(session, user_input)
+    out = respond(session, user_input, on_delta=on_delta)
 
     # Derive step display fields from session state (set by maybe_advance_step)
     session.refresh_from_db()

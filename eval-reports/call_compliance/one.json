@@ -1,0 +1,110 @@
+{
+  "config": "one",
+  "call_mode": "one",
+  "model": "local_ollama/qwen3-4b-jetson",
+  "lesson": 1137,
+  "persona": "error_prone",
+  "sim_reason": "max_turns",
+  "sim_error": "",
+  "session_id": 134,
+  "total_wall": 125.7,
+  "turns": [
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        7.72,
+        7.08
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 10.45,
+      "streamed": true,
+      "wall": 14.88,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        12.79,
+        3.97
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 16.84,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        13.57,
+        4.02
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 17.7,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        22.05,
+        10.75
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "pose_question"
+      ],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": true,
+      "verdict": "correct",
+      "ttft": 25.61,
+      "streamed": true,
+      "wall": 32.94,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        16.98,
+        4.0
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": true,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 21.09,
+      "error": null
+    }
+  ]
+}

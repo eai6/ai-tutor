@@ -613,6 +613,14 @@ async function submitExitTicket() {
             body: JSON.stringify(body),
             timeoutMs: 90000,
             retries: 3,
+            // Submitting an exit ticket creates and grades an
+            // ExitTicketAttempt and can complete the session — not
+            // idempotent. The disabled button above stops a second
+            // *click*; it does nothing about fetchWithRetry replaying
+            // the request internally after a network error or the 90s
+            // timeout, which on the offline Jetson (local grading) is
+            // reachable. Explicit 502/503/504 are still retried.
+            retryOnNetworkError: false,
         });
 
         const data = await response.json();

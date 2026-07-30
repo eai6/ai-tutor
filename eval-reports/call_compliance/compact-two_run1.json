@@ -1,0 +1,203 @@
+{
+  "config": "compact-two",
+  "call_mode": "two",
+  "block_0": "compact",
+  "block_0_chars": 13500,
+  "model": "local_ollama/qwen3-4b-jetson",
+  "lesson": 1137,
+  "persona": "error_prone",
+  "sim_reason": "max_turns",
+  "sim_error": "",
+  "session_id": 136,
+  "total_wall": 1262.6,
+  "turns": [
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        69.05,
+        52.69
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 119.9,
+      "streamed": true,
+      "wall": 123.2,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        98.86,
+        52.59
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 152.33,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        98.31,
+        68.67
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": 153.99,
+      "streamed": true,
+      "wall": 169.5,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        61.39,
+        37.9
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 96.72,
+      "streamed": true,
+      "wall": 100.44,
+      "error": null
+    },
+    {
+      "llm_calls": 1,
+      "call_secs": [
+        70.08
+      ],
+      "dispatch_seq": 1,
+      "call1_tools": [],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": null,
+      "ttft": null,
+      "streamed": false,
+      "wall": 72.37,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        30.13,
+        31.21
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 52.69,
+      "streamed": true,
+      "wall": 63.15,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        86.37,
+        39.56
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 128.81,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        34.57,
+        38.23
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 65.99,
+      "streamed": true,
+      "wall": 73.7,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        21.08,
+        27.2
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 39.43,
+      "streamed": true,
+      "wall": 48.87,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        30.14,
+        38.0
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": 60.58,
+      "streamed": true,
+      "wall": 70.53,
+      "error": null
+    }
+  ]
+}

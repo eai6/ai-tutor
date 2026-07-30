@@ -1,0 +1,204 @@
+{
+  "config": "compact-two",
+  "call_mode": "two",
+  "block_0": "compact",
+  "block_0_chars": 13500,
+  "mem_available_mb_at_start": 987,
+  "model": "local_ollama/qwen3-4b-jetson",
+  "lesson": 1137,
+  "persona": "error_prone",
+  "sim_reason": "max_turns",
+  "sim_error": "",
+  "session_id": 137,
+  "total_wall": 283.5,
+  "turns": [
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        6.57,
+        6.17
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 9.67,
+      "streamed": true,
+      "wall": 12.81,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        13.01,
+        3.97
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 17.06,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        13.8,
+        3.79
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 17.67,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        15.24,
+        4.06
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 19.41,
+      "error": null
+    },
+    {
+      "llm_calls": 1,
+      "call_secs": [
+        18.68
+      ],
+      "dispatch_seq": 1,
+      "call1_tools": [],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": null,
+      "ttft": null,
+      "streamed": false,
+      "wall": 18.75,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        15.66,
+        3.95
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": true,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 19.7,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        17.37,
+        11.69
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": 22.94,
+      "streamed": true,
+      "wall": 29.16,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        15.15,
+        3.9
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 19.17,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        14.11,
+        3.98
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 18.21,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        18.41,
+        4.15
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 22.64,
+      "error": null
+    }
+  ]
+}

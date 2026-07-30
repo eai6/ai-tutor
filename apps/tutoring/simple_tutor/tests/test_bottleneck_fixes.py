@@ -14,7 +14,9 @@ Failure classes (see offline_eval/multi_turn_results/multi_turn_bottlenecks_2026
 - B4: the empty-reply placeholder promises "Here's the next one:" with no
   question attached. Fix: slot-aware placeholder.
 """
+import os
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase as DjangoTestCase
 
@@ -903,6 +905,17 @@ class QwenLocalTagProfileTest(SimpleTestCase):
         'local_ollama/qwen3.5:9b',
     )
 
+    # Tags that actually tutor on the Jetson. These carry the runaway guard;
+    # 0.8b is an intent classifier and 9b cannot run on this box, so neither
+    # is held to it.
+    JETSON_TUTORING_TAGS = (
+        'local_ollama/qwen3.5:4b',
+        'local_ollama/qwen3.5:2b',
+        'local_ollama/qwen3.5-4b-jetson',
+        'local_ollama/qwen3.5-2b-jetson',
+        'local_ollama/qwen3-4b-jetson',
+    )
+
     def test_tags_pin_a_jetson_safe_context(self):
         from apps.llm.model_profiles import get_model_profile
         for spec in self.LOCAL_QWEN35_TAGS:
@@ -911,7 +924,23 @@ class QwenLocalTagProfileTest(SimpleTestCase):
                 self.assertIsNotNone(p)
                 self.assertEqual(p.family, 'qwen')
                 self.assertEqual(p.num_ctx, 16384)
-                self.assertEqual(p.max_tokens, 3072)
+                # Deliberately a bound, not an exact value. This assertion
+                # used to pin 3072 and silently rotted the moment qwen3.5:4b
+                # moved to 1024 — it was red on main before 2026-07-29. What
+                # the test is actually for is that the tag does NOT fall
+                # through to the generic r"qwen3" CLOUD pattern, which would
+                # give max_tokens=_MT_INSTRUCT (16000) and num_ctx=None.
+                self.assertLessEqual(p.max_tokens, 3072)
+
+    def test_jetson_tutoring_tags_carry_the_runaway_guard(self):
+        """max_tokens is an outer bound, not the length mechanism — measured
+        replies are 27-193 tokens and <reply_length> in prompts.py does the
+        real work. What this bounds is the bad case: a repetition loop at
+        ~16 tok/s costs a student 64 s at 1024 against 192 s at 3072."""
+        from apps.llm.model_profiles import get_model_profile
+        for spec in self.JETSON_TUTORING_TAGS:
+            with self.subTest(spec=spec):
+                self.assertEqual(get_model_profile(spec).max_tokens, 1024)
 
     def test_tags_suppress_thinking(self):
         """Qwen3.5 templates are hybrid and gate on `Think`, so Ollama's
@@ -1198,3 +1227,134 @@ class TransientErrorClassificationTest(SimpleTestCase):
         self.assertFalse(_is_transient_error(Exception('400 Bad Request')))
         self.assertTrue(_is_transient_error(
             Exception('500 Server Error: Internal Server Error for url: x')))
+
+
+class RetryBudgetTest(SimpleTestCase):
+    """Retrying a 5xx is right; retrying it six times is right only for a
+    provider that has a queue to drain.
+
+    The cloud ladder ([2,5,12,30,60]) applied to a local Ollama 500 turned one
+    bad turn into ~11 minutes on the Jetson (2026-07-29): each attempt is a
+    full generation, ~92-103 s measured, and the failure was deterministic in
+    the request, so all six attempts failed identically before the placeholder
+    reply was served anyway.
+
+    Numbers here are asserted as CALL COUNTS, not durations — time.sleep is
+    patched out, so a regression shows up as attempts rather than as a slow
+    test.
+    """
+
+    # Verbatim from Ollama 0.30.7 on the Jetson, 2026-07-29. The important
+    # part is that the status is 500 (so _is_transient_error says "retry")
+    # while the body says the generation was truncated (so it can't succeed).
+    TRUNCATED_TOOL_CALL_BODY = (
+        '{"error":"llama-server returned invalid tool call arguments for '
+        '\\"pose_question\\": unexpected end of JSON input"}'
+    )
+
+    def _http_error(self, status, body=''):
+        import requests
+        resp = requests.Response()
+        resp.status_code = status
+        resp._content = body.encode()
+        return requests.HTTPError(
+            f"{status} Server Error: Internal Server Error for url: "
+            "http://localhost:11434/api/chat",
+            response=resp,
+        )
+
+    def _count_attempts(self, exc, **kwargs):
+        from apps.tutoring.simple_tutor import engine
+        calls = []
+
+        def fn():
+            calls.append(1)
+            raise exc
+
+        with patch.object(engine.time, 'sleep'):
+            out = engine._invoke_with_transient_retry(fn, label='t', **kwargs)
+        self.assertIsNone(out, 'must stay fail-soft and return None')
+        return len(calls)
+
+    def test_local_provider_gets_one_retry(self):
+        """A generic local 500 — a model reload or an allocation blip — is
+        worth one cheap retry and no more."""
+        self.assertEqual(
+            self._count_attempts(self._http_error(500),
+                                 provider='local_ollama'),
+            2,
+        )
+
+    def test_cloud_provider_keeps_the_full_ladder(self):
+        """Anthropic overload windows outlast a short ladder — that is why the
+        cloud ladder was extended in the first place. Do not shorten it."""
+        from apps.tutoring.simple_tutor.engine import _TRANSIENT_BACKOFF
+        self.assertEqual(
+            self._count_attempts(self._http_error(503), provider='anthropic'),
+            len(_TRANSIENT_BACKOFF) + 1,
+        )
+
+    def test_unknown_provider_defaults_to_the_cloud_ladder(self):
+        """Omitting the provider must not silently shorten retries for a
+        remote model. Local is the special case and has to be named."""
+        from apps.tutoring.simple_tutor.engine import _TRANSIENT_BACKOFF
+        self.assertEqual(
+            self._count_attempts(self._http_error(503)),
+            len(_TRANSIENT_BACKOFF) + 1,
+        )
+
+    def test_truncated_tool_call_is_not_retried_at_all(self):
+        """The 500 that started this: the server rejected its own truncated
+        output. Resending the identical request reproduces it, so the only
+        thing a retry buys is another ~92 s of decode."""
+        self.assertEqual(
+            self._count_attempts(
+                self._http_error(500, self.TRUNCATED_TOOL_CALL_BODY),
+                provider='local_ollama'),
+            1,
+        )
+
+    def test_truncated_tool_call_is_not_retried_on_cloud_either(self):
+        """The claim is about the failure, not the host — a server that
+        rejects its own malformed generation cannot be retried into success
+        wherever it runs."""
+        self.assertEqual(
+            self._count_attempts(
+                self._http_error(500, self.TRUNCATED_TOOL_CALL_BODY),
+                provider='anthropic'),
+            1,
+        )
+
+    def test_error_detail_surfaces_the_response_body(self):
+        """`str(HTTPError)` is only the status line. Six Ollama 500s in one
+        session logged nothing about why (2026-07-27) because the provider's
+        explanation lives in exc.response.text."""
+        from apps.tutoring.simple_tutor.engine import _error_detail
+        detail = _error_detail(
+            self._http_error(500, self.TRUNCATED_TOOL_CALL_BODY))
+        self.assertIn('500 Server Error', detail)
+        self.assertIn('unexpected end of JSON input', detail)
+
+    def test_error_detail_survives_a_body_that_cannot_be_read(self):
+        """Logging must never be the thing that raises."""
+        from apps.tutoring.simple_tutor.engine import _error_detail
+
+        class Exploding:
+            @property
+            def text(self):
+                raise RuntimeError('boom')
+
+        exc = Exception('plain failure')
+        exc.response = Exploding()
+        self.assertIn('plain failure', _error_detail(exc))
+
+    def test_retry_disable_switch_still_wins(self):
+        from apps.tutoring.simple_tutor import engine
+        with patch.dict(os.environ, {'SIMPLE_TUTOR_TRANSIENT_RETRY': '0'}):
+            self.assertEqual(
+                self._count_attempts(self._http_error(503),
+                                     provider='anthropic'),
+                1,
+            )
+        # Sanity: the switch, not the ladder, is what produced that 1.
+        self.assertGreater(len(engine._TRANSIENT_BACKOFF), 0)

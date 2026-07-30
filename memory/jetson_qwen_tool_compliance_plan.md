@@ -213,7 +213,15 @@ honours `MODELS_FILE`.
 
 One A/B per change, never bundled.
 
-- **H2 — forward `tool_choice` on Ollama.** `client.py:1294-1303` discards it unless
+- **H2 — forward `tool_choice` on Ollama. ❌ REFUTED 2026-07-29.** Ollama 0.30.7
+  parses the field and discards it: `tool_choice: "none"` still returned 4/4 tool
+  calls and forcing a non-existent tool neither errored nor changed behaviour.
+  "Modern Ollama `/api/chat` accepts it" is wrong. The real root cause — and the
+  fix that replaces this — is in `memory/tool_compliance_root_cause.md`: the
+  directive has to move to the **user message**, because a 24k system prompt is
+  where tool compliance goes to die (8k prefix 5/5, full 24k 0/5). Original text
+  kept below for the record.
+- **H2 (original) — forward `tool_choice` on Ollama.** `client.py:1294-1303` discards it unless
   `OLLAMA_FORWARD_TOOL_CHOICE=1`; one mt50 log carries the "NOT forwarded" warning 151
   times, so `_plan_call1`/`_plan_call2`/`_adaptive_force_now` are all inert. Modern
   Ollama `/api/chat` accepts it. Invert the default; one-shot retry-without-it on HTTP

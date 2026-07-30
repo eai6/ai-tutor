@@ -5,6 +5,7 @@
 //   - NetHelpers.isOnline()           — current connectivity (navigator.onLine + connection events)
 //   - NetHelpers.onNetworkChange(fn)  — subscribe to online/offline transitions; returns unsubscribe
 //   - NetHelpers.fetchWithRetry(url, opts) — retries 5xx + network errors with exponential backoff
+//                                            (pass retryOnNetworkError:false for non-idempotent POSTs)
 //   - NetHelpers.installOfflineBanner() — wires the #offline-banner element to NetworkChange
 //   - NetHelpers.registerServiceWorker() — registers /static/pwa/sw.js (call once at app start)
 
@@ -38,7 +39,8 @@
    * fetch with exponential-backoff retry on transient failures.
    *
    * Retries on:
-   *   - network error (TypeError thrown by fetch)
+   *   - network error (TypeError thrown by fetch) / timeout abort
+   *       — ONLY when retryOnNetworkError is true (the default)
    *   - 502 / 503 / 504
    *   - 408 / 429 (with Retry-After when present)
    *
@@ -49,12 +51,32 @@
    *   retries: number   — max attempts (default 3)
    *   timeoutMs: number — per-attempt timeout (default 60s; tutor calls override to 120s+)
    *   onRetry: (attempt, delayMs) => void
+   *   retryOnNetworkError: boolean — default true. Set FALSE for
+   *     non-idempotent POSTs. This distinction is load-bearing:
+   *
+   *     A 502/503/504 is the server saying it did NOT process the
+   *     request, so replaying is safe.
+   *
+   *     A network error — or an AbortError from our own timeout —
+   *     says nothing about whether the server processed it. The
+   *     request may have arrived, run to completion, and only the
+   *     *response* got lost. Replaying re-runs the work.
+   *
+   *     For a tutoring turn on the offline Jetson that is not
+   *     academic: a turn is three serialized local LLM calls at
+   *     ~16 tok/s, so exceeding the 120s client timeout is ordinary
+   *     rather than exceptional. The retry then ran a second full
+   *     turn against the same session while the first was still
+   *     running — double-persisting turns and double-advancing the
+   *     step. Hence retryOnNetworkError: false on the tutor's
+   *     respond call.
    */
   async function fetchWithRetry(url, opts = {}) {
     const {
       retries = 3,
       timeoutMs = 60_000,
       onRetry,
+      retryOnNetworkError = true,
       ...fetchOpts
     } = opts;
 
@@ -82,7 +104,7 @@
         clearTimeout(timer);
         lastError = err;
         const isNetwork = err instanceof TypeError || err.name === 'AbortError';
-        if (!isNetwork || attempt >= retries) throw err;
+        if (!isNetwork || !retryOnNetworkError || attempt >= retries) throw err;
         const delay = backoffDelay(attempt);
         onRetry?.(attempt + 1, delay);
         await sleep(delay);

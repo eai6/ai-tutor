@@ -1,0 +1,149 @@
+{
+  "config": "directive-two",
+  "directive": true,
+  "call_mode": "two",
+  "model": "local_ollama/qwen3-4b-jetson",
+  "lesson": 1137,
+  "persona": "error_prone",
+  "sim_reason": "exit_ticket",
+  "sim_error": "",
+  "session_id": 124,
+  "total_wall": 903.1,
+  "turns": [
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        198.45,
+        11.31
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "advance_step",
+        "request_figure",
+        "redirect_off_topic"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 205.78,
+      "streamed": true,
+      "wall": 209.87,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        101.03,
+        17.21
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 108.69,
+      "streamed": true,
+      "wall": 118.42,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        31.69,
+        11.31
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question",
+        "advance_step"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": 35.21,
+      "streamed": true,
+      "wall": 43.16,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        392.57,
+        18.2
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "pose_question",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic",
+        "request_figure",
+        "advance_step",
+        "redirect_off_topic"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 401.96,
+      "streamed": true,
+      "wall": 410.96,
+      "error": null
+    }
+  ]
+}

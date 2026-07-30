@@ -1,0 +1,63 @@
+{
+  "config": "directive-one",
+  "directive": true,
+  "call_mode": "one",
+  "model": "local_ollama/qwen3-4b-jetson",
+  "lesson": 1137,
+  "persona": "error_prone",
+  "sim_reason": "max_turns",
+  "sim_error": "",
+  "session_id": 120,
+  "total_wall": 223.1,
+  "turns": [
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        103.95,
+        13.76
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer",
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 113.34,
+      "streamed": true,
+      "wall": 117.78,
+      "error": null
+    }
+  ]
+}

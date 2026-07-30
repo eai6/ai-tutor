@@ -197,8 +197,17 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     #      OLLAMA_FLASH_ATTENTION=1 + OLLAMA_KV_CACHE_TYPE=q8_0 (halves KV).
     #   3. num_gpu=99 for the same reason as qwen3.5:4b below — autofit was
     #      silently leaving layers on CPU.
+    #   4. max_tokens 3072 -> 1024 (2026-07-29), matching qwen3.5:4b below.
+    #      This is the tag the kiosk and ./chat.py actually run, so it was the
+    #      one profile still carrying the old ceiling. It is a RUNAWAY GUARD,
+    #      not the length mechanism — measured replies are 27-193 tokens, so
+    #      neither value binds on a well-behaved turn and this buys no latency
+    #      on a normal reply. What it bounds is the bad case: a repetition loop
+    #      at ~16 tok/s costs a student 192 s of staring at 3072, against 64 s
+    #      at 1024. The actual shortening is done by the <reply_length> budget
+    #      in simple_tutor/prompts.py::_render_length_budget (2-3 sentences).
     "local_ollama/qwen3-4b-jetson": ModelProfile(
-        family="qwen", mode="instruct", max_tokens=3072,
+        family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
@@ -253,8 +262,9 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # autofit put this at 32%/68% CPU/GPU and a turn took 149 s, against 26/26
     # layers on GPU and ~79 s when loaded on an idle box. Same model, same
     # context, 2x on nothing but placement.
+    # max_tokens 1024 for the same runaway-guard reason as the 4b entries.
     "local_ollama/qwen3.5:2b": ModelProfile(
-        family="qwen", mode="instruct", max_tokens=3072,
+        family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB fallback if 4b is too slow (2.7 GB Q4 weights).",
@@ -284,8 +294,11 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="Jetson Orin 8GB: Qwen3.5-4B with num_ctx pinned in the Modelfile.",
     ),
 
+    # max_tokens 1024: runaway guard, same as every other Jetson tutoring tag.
+    # (0.8b and 9b below keep 3072 — the first is an intent classifier, not a
+    # tutor, and the second cannot run on this box at all.)
     "local_ollama/qwen3.5-2b-jetson": ModelProfile(
-        family="qwen", mode="instruct", max_tokens=3072,
+        family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3.5-2B with num_ctx pinned in the Modelfile.",

@@ -90,6 +90,50 @@ def _log_dir() -> Path:
     return Path(getattr(settings, 'BASE_DIR', '.')) / 'logs' / 'tutor_chat'
 
 
+class _StreamPrinter:
+    """Prints stream snapshots to the terminal as they arrive.
+
+    Passed to the engine as ``on_delta``. The engine hands it progressively
+    longer SAFE SNAPSHOTS (see simple_tutor/stream_filter.py); this converts
+    them to the tail-only writes a terminal needs, via render.stream_delta.
+
+    Two details the buffered path never had to care about:
+
+    * ``ending=''`` — Django's OutputWrapper appends a newline to every
+      write, which would put each fragment on its own line.
+    * ``flush()`` — the command never flushed before because every write
+      ended in a newline and a TTY is line-buffered. A partial line is not
+      flushed on its own, so without this the reply appears in 4 KB lumps
+      when stdout is a pipe, i.e. exactly the wait streaming exists to
+      remove.
+    """
+
+    def __init__(self, out, colour: bool):
+        self._out = out
+        self._colour = colour
+        self.text = ''
+        self.started = False
+
+    def __call__(self, snapshot: str) -> None:
+        tail, restarted = render.stream_delta(self.text, snapshot)
+        if restarted:
+            # A transient retry replayed the generation; what was printed
+            # belongs to a dead attempt.
+            self._out.write(
+                '\n' + render.paint('  ↻ restarted:', 'dim',
+                                    colour=self._colour), ending='')
+        if not self.started:
+            self._out.write('\n', ending='')
+            self.started = True
+        self._out.write(
+            render.format_reply_chunk(tail, colour=self._colour), ending='')
+        try:
+            self._out.flush()
+        except Exception:
+            pass
+        self.text = snapshot
+
+
 class Command(BaseCommand):
     help = "Chat with the tutor in the terminal, driving the real engine."
 
@@ -151,6 +195,17 @@ class Command(BaseCommand):
                                  'default).')
         parser.add_argument('--show-all', action='store_true',
                             help='Enable every --show-* flag.')
+        stream = parser.add_mutually_exclusive_group()
+        stream.add_argument(
+            '--stream', dest='stream', action='store_true', default=None,
+            help='Print the reply as it decodes instead of waiting for the '
+                 'whole turn. Defaults to the TUTOR_STREAMING env var. Only '
+                 'the second LLM call streams — the grader has to run first.',
+        )
+        stream.add_argument(
+            '--no-stream', dest='stream', action='store_false',
+            help='Force buffered output even when TUTOR_STREAMING is set.',
+        )
         parser.add_argument(
             '--debug', action='store_true',
             help='Show engine logs and all diagnostics, and save the whole '
@@ -200,6 +255,16 @@ class Command(BaseCommand):
             show = {k: opts.get(f'show_{k}', False) for k in keys}
             show['timing'] = not opts['no_timing']
 
+        # --stream / --no-stream override the env default, so the streaming
+        # path is reachable here without exporting anything. The terminal has
+        # none of the constraints the env var exists to protect (no Azure, no
+        # gunicorn worker to pin), so an explicit flag is safe.
+        from apps.tutoring.simple_tutor.stream_filter import streaming_enabled
+        streaming = (
+            streaming_enabled() if opts.get('stream') is None
+            else opts['stream']
+        )
+
         try:
             lesson_id, note = resolve_lesson_id(opts['lesson'], opts['subject'])
             session = bootstrap_session(
@@ -223,7 +288,7 @@ class Command(BaseCommand):
             respond_for_view, start_for_view,
         )
 
-        self._banner(session, tutor_spec, colour)
+        self._banner(session, tutor_spec, colour, streaming=streaming)
 
         # Opening turn — the same warmup the browser fires on session start.
         try:
@@ -257,8 +322,10 @@ class Command(BaseCommand):
             try:
                 cli_logs.transcript.info("STUDENT: %s", message)
                 t0 = time.time()
-                payload = respond_for_view(session, message)
-                self._emit(session, payload, time.time() - t0, show, colour)
+                printer = _StreamPrinter(self.stdout, colour) if streaming else None
+                payload = respond_for_view(session, message, on_delta=printer)
+                self._emit(session, payload, time.time() - t0, show, colour,
+                           printer=printer)
             except Exception as exc:                  # noqa: BLE001
                 # respond() is documented as never raising, so anything landing
                 # here is from the view-adapter projection. Keep the loop alive
@@ -279,11 +346,32 @@ class Command(BaseCommand):
 
     # -- output -----------------------------------------------------------
 
-    def _emit(self, session, payload, elapsed, show, colour):
+    def _emit(self, session, payload, elapsed, show, colour, printer=None):
         cli_logs.transcript.info(
             "TUTOR (%.1fs): %s", elapsed, payload.get('message') or '',
         )
-        self.stdout.write('\n' + render.format_reply(payload, colour=colour))
+        if printer is not None and printer.started:
+            # Something already streamed. Reconcile against the authoritative
+            # final text rather than printing it a second time.
+            #
+            # A continuation is the NORMAL case, not an edge case: the last
+            # sentence of a reply usually has no trailing boundary, so the
+            # gate never emits it as a snapshot and it arrives only here.
+            tail, restarted = render.stream_delta(
+                printer.text, payload.get('message') or '')
+            if restarted:
+                # The batch pipeline rewrote text the student already read —
+                # _dedupe_reply prepends, the exit-ticket branch replaces.
+                # Say so instead of silently printing a second copy.
+                self.stdout.write(
+                    '\n' + render.paint('  ↻ revised:', 'dim', colour=colour))
+                self.stdout.write(render.format_reply(payload, colour=colour))
+            elif tail:
+                self.stdout.write(render.format_reply_chunk(tail, colour=colour))
+            else:
+                self.stdout.write('')
+        else:
+            self.stdout.write('\n' + render.format_reply(payload, colour=colour))
         if show['state']:
             self.stdout.write(render.format_state(payload, colour=colour))
         if show['tools'] or show['judge'] or show['timing']:
@@ -299,15 +387,17 @@ class Command(BaseCommand):
             if show['timing']:
                 self.stdout.write(render.format_timing(elapsed, turn, colour=colour))
 
-    def _banner(self, session, tutor_spec, colour):
+    def _banner(self, session, tutor_spec, colour, streaming=False):
         lesson = session.lesson
         self.stdout.write(render.paint(
             f"session {session.pk} · lesson {lesson.pk} · {lesson.title}",
             'bold', colour=colour,
         ))
-        self.stdout.write(render.paint(
-            f"model {tutor_spec}", 'dim', colour=colour,
-        ))
+        # Say which mode is live. Streaming changes what a slow turn LOOKS
+        # like, so a reader comparing two transcripts needs to know which
+        # they are looking at.
+        mode = f"model {tutor_spec}" + (" · streaming" if streaming else "")
+        self.stdout.write(render.paint(mode, 'dim', colour=colour))
         cli_logs.transcript.info("model=%s", tutor_spec)
         # Deleting rows silently is not something a dev tool should do — say so
         # when there was actually prior state to clear.

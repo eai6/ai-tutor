@@ -2,6 +2,7 @@
 
 The render helpers are pure functions by design, so they are tested without a
 TTY, a database, or an LLM. Plan: memory/terminal_tutor_client_plan.md
+Streaming: memory/offline_streaming_plan.md
 """
 from django.test import SimpleTestCase
 
@@ -152,3 +153,91 @@ class RenderLessonTableTest(SimpleTestCase):
         out = render.format_lesson_table([(42, 'Maths S3', 'Angles')])
         self.assertIn('42', out)
         self.assertIn('Angles', out)
+
+
+class StreamDeltaTest(SimpleTestCase):
+    """The stream gate emits cumulative SNAPSHOTS (the browser re-renders a
+    whole bubble). A terminal cannot un-print, so it needs the new tail."""
+
+    def test_first_snapshot_prints_whole(self):
+        self.assertEqual(render.stream_delta('', 'Hello.'), ('Hello.', False))
+
+    def test_continuation_prints_only_the_tail(self):
+        self.assertEqual(
+            render.stream_delta('One.', 'One. Two.'), (' Two.', False))
+
+    def test_identical_snapshot_prints_nothing(self):
+        self.assertEqual(render.stream_delta('One.', 'One.'), ('', False))
+
+    def test_divergence_signals_a_restart(self):
+        """A transient retry replays the generation, and the batch pipeline
+        can rewrite text already shown (_dedupe_reply prepends; the
+        exit-ticket branch of respond_for_view replaces outright). The caller
+        must reprint rather than append."""
+        text, restarted = render.stream_delta('One. Two.', 'Different reply.')
+        self.assertTrue(restarted)
+        self.assertEqual(text, 'Different reply.')
+
+    def test_prepend_is_a_restart_not_a_tail(self):
+        """_dedupe_reply puts a variation line in FRONT of the reply — the
+        naive 'strip the common prefix' approach would print the tail of a
+        string the student never saw the head of."""
+        _text, restarted = render.stream_delta(
+            'Try again.', 'Let me put it another way.\n\nTry again.')
+        self.assertTrue(restarted)
+
+    def test_final_payload_usually_appends_the_last_sentence(self):
+        """The normal end-of-turn case: the last sentence has no trailing
+        boundary so the gate never emitted it, and it arrives only in the
+        final payload."""
+        tail, restarted = render.stream_delta(
+            'Nice work. Here is why.', 'Nice work. Here is why. Ready?')
+        self.assertFalse(restarted)
+        self.assertEqual(tail, ' Ready?')
+
+
+class StreamPrinterTest(SimpleTestCase):
+    """The printer converts snapshots to terminal writes. Django's
+    OutputWrapper appends a newline to every write, so a fragment written
+    without ending='' would land on its own line."""
+
+    def _printer(self):
+        from apps.tutoring.management.commands.tutor_chat import _StreamPrinter
+
+        class _Out:
+            def __init__(self): self.chunks = []
+            def write(self, msg='', ending=None): self.chunks.append((msg, ending))
+            def flush(self): pass
+
+        out = _Out()
+        return _StreamPrinter(out, colour=False), out
+
+    def test_writes_are_newline_suppressed_and_flushed(self):
+        printer, out = self._printer()
+        printer('One.')
+        self.assertTrue(out.chunks, 'nothing written')
+        self.assertTrue(all(ending == '' for _m, ending in out.chunks),
+                        f'a write would emit a stray newline: {out.chunks}')
+
+    def test_only_the_tail_is_written_on_continuation(self):
+        printer, out = self._printer()
+        printer('One.')
+        out.chunks.clear()
+        printer('One. Two.')
+        self.assertEqual(''.join(m for m, _ in out.chunks), ' Two.')
+
+    def test_tracks_text_and_started(self):
+        printer, _out = self._printer()
+        self.assertFalse(printer.started)
+        printer('Hello.')
+        self.assertTrue(printer.started)
+        self.assertEqual(printer.text, 'Hello.')
+
+    def test_restart_is_announced_not_silently_appended(self):
+        printer, out = self._printer()
+        printer('Dead attempt.')
+        out.chunks.clear()
+        printer('Fresh attempt.')
+        written = ''.join(m for m, _ in out.chunks)
+        self.assertIn('restarted', written)
+        self.assertIn('Fresh attempt.', written)

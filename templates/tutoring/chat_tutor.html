@@ -2528,6 +2528,14 @@ async function performSend(text) {
         // LLM calls can take 30-90s — give plenty of headroom.
         timeoutMs: 120000,
         retries: 2,
+        // A tutoring turn is NOT idempotent: it persists turns, records a
+        // grade, and can advance the step. Retrying after a network error
+        // or our own 120s timeout replays a request the server may already
+        // be running — on the offline Jetson, where a turn is three
+        // serialized local LLM calls at ~16 tok/s, crossing 120s is
+        // ordinary. Explicit 502/503/504 responses are still retried;
+        // those mean the server did not process the request.
+        retryOnNetworkError: false,
     });
     if (!response.ok && response.status !== 200) {
         throw new Error(`Server returned ${response.status}`);
