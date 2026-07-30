@@ -41,6 +41,9 @@ urlpatterns = [
     path('health/', health_check),
     path('admin/', admin.site.urls),
     path('api/v1/', include('apps.api.urls', namespace='api')),
+    # Bootstrap status for the offline desktop shell's splash screen.
+    # Inert on the server — nothing links to it. See apps/desktop/views.py.
+    path('desktop/', include('apps.desktop.urls', namespace='desktop')),
     # i18n JS catalog so client-side gettext() calls can resolve the
     # same translations the templates use. Empty until M2/M3 ship
     # actual translations.

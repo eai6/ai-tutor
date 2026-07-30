@@ -1,0 +1,209 @@
+{% comment %}
+First-run setup for the offline desktop app.
+
+Deliberately standalone (no base.html): it runs before there is a logged-in
+user, before lessons exist, and often before the tutor model exists — so it
+cannot depend on navigation or context processors that assume any of those.
+
+The file pickers call pywebview's native dialog through window.pywebview.api
+rather than using <input type="file">. A browser upload of a 2.5 GB GGUF would
+read the whole file and POST it back to a server on the same machine, doubling
+the write for no reason. The native dialog returns a path; the server reads it
+in place.
+{% endcomment %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Set up AI Tutor</title>
+<style>
+  :root { color-scheme: light dark; --bg:#faf9f7; --fg:#1c1b19; --muted:#6b6862;
+          --line:#e5e1db; --card:#fff; --accent:#e8590c; --ok:#2f9e5f; --bad:#d1493f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17161a; --fg:#ece9e6; --muted:#9a958e; --line:#2c2a30; --card:#1f1e24; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system,
+         "Segoe UI",Inter,system-ui,sans-serif; padding:40px 20px; }
+  .wrap { max-width:640px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 6px; letter-spacing:-.02em; }
+  .lede { color:var(--muted); margin:0 0 28px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:22px; margin-bottom:16px; }
+  .card h2 { font-size:16px; margin:0 0 4px; }
+  .card p { color:var(--muted); font-size:13.5px; margin:0 0 16px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; border-radius:8px; padding:10px 16px;
+           border:1px solid var(--line); background:transparent; color:var(--fg);
+           cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.45; cursor:default; }
+  .state { display:flex; align-items:center; gap:9px; font-size:13.5px; margin-bottom:14px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#c9c6c1; flex:none; }
+  .ok .dot { background:var(--ok); } .bad .dot { background:var(--bad); }
+  .bar { height:6px; background:var(--line); border-radius:99px; overflow:hidden; margin:14px 0 8px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--accent);
+             transition:width .4s ease; }
+  .detail { font-size:12.5px; color:var(--muted); min-height:1.4em;
+            word-break:break-word; font-variant-numeric:tabular-nums; }
+  .err { color:var(--bad); font-size:13px; margin-top:10px; }
+  .hint { font-size:12.5px; color:var(--muted); margin-top:14px;
+          border-top:1px solid var(--line); padding-top:12px; }
+  .done { text-align:center; padding:14px 0 4px; }
+  a.launch { display:inline-block; background:var(--accent); color:#fff; font-weight:600;
+             text-decoration:none; padding:12px 22px; border-radius:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Set up AI Tutor</h1>
+  <p class="lede">This app runs entirely on this computer. Nothing is sent over the internet.</p>
+
+  <!-- ── model ─────────────────────────────────────────────────────── -->
+  <div class="card" id="model-card">
+    <h2>1. Tutor model</h2>
+    <p>The model is about 2.5&nbsp;GB, so it is not included in the installer.
+       Add it from a setup drive, or download it if this computer is online.</p>
+
+    <div class="state" id="model-state"><span class="dot"></span><span id="model-label">Checking…</span></div>
+
+    <div class="row" id="model-actions">
+      <button class="primary" id="pick-model">Choose model file…</button>
+      <button id="download-model">Download (needs internet)</button>
+    </div>
+
+    <div id="model-progress" hidden>
+      <div class="bar"><i id="model-bar"></i></div>
+      <div class="detail" id="model-detail"></div>
+    </div>
+    <div class="err" id="model-error" hidden></div>
+    <div class="hint">Choose the <code>models</code> folder on the setup drive, or the
+      <code>.gguf</code> file directly. Installing needs about 5&nbsp;GB free — Ollama keeps
+      its own copy.</div>
+  </div>
+
+  <!-- ── lessons ───────────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>2. Lessons</h2>
+    <p>Course content, exercises and pictures for your school.</p>
+    <div class="state" id="pack-state"><span class="dot"></span><span id="pack-label">Checking…</span></div>
+    <div class="row"><button class="primary" id="pick-pack">Choose lesson pack…</button></div>
+    <div class="detail" id="pack-detail" style="margin-top:12px"></div>
+    <div class="err" id="pack-error" hidden></div>
+    <div class="hint">Choose the setup drive folder, or the
+      <code>content-pack-….tar.gz</code> file.</div>
+  </div>
+
+  <div class="card done" id="finish" hidden>
+    <h2 style="margin-bottom:10px">Ready to teach</h2>
+    <a class="launch" href="/student/login/">Start</a>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const hasNative = () => !!(window.pywebview && window.pywebview.api
+                           && window.pywebview.api.pick_path);
+
+function setState(el, labelEl, ok, text) {
+  el.classList.toggle('ok', !!ok); el.classList.toggle('bad', ok === false);
+  labelEl.textContent = text;
+}
+
+// Native dialog when running inside the app; a typed path when the same page
+// is opened in a normal browser (which is how it gets tested).
+async function choosePath(kind) {
+  if (hasNative()) return await window.pywebview.api.pick_path(kind);
+  return prompt('Full path to the ' + (kind === 'model' ? 'model file or folder'
+                                                        : 'lesson pack or folder') + ':');
+}
+
+async function post(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                              body: JSON.stringify(body)});
+  return {ok: r.ok, data: await r.json()};
+}
+
+// ── model ──────────────────────────────────────────────────────────
+let polling = null;
+
+function renderProgress(s) {
+  $('model-progress').hidden = false;
+  $('model-bar').style.width = (s.percent || 0) + '%';
+  $('model-detail').textContent = s.detail || s.phase || '';
+  if (s.error) { $('model-error').hidden = false; $('model-error').textContent = s.error; }
+}
+
+async function pollProgress() {
+  const s = await (await fetch('/desktop/install-progress/')).json();
+  renderProgress(s);
+  if (s.installed) {
+    clearInterval(polling); polling = null;
+    setState($('model-state'), $('model-label'), true, 'Installed');
+    $('model-actions').hidden = true;
+    $('model-progress').hidden = true;
+    checkFinish();
+  } else if (!s.running && s.error) {
+    clearInterval(polling); polling = null;
+    document.querySelectorAll('#model-actions button').forEach(b => b.disabled = false);
+  }
+}
+
+function startPolling() {
+  document.querySelectorAll('#model-actions button').forEach(b => b.disabled = true);
+  $('model-error').hidden = true;
+  if (!polling) polling = setInterval(pollProgress, 1500);
+  pollProgress();
+}
+
+$('pick-model').onclick = async () => {
+  const path = await choosePath('model');
+  if (!path) return;
+  const {ok, data} = await post('/desktop/install-model/', {source:'file', path});
+  if (!ok) { $('model-error').hidden = false; $('model-error').textContent = data.error; return; }
+  startPolling();
+};
+
+$('download-model').onclick = async () => {
+  const {ok, data} = await post('/desktop/install-model/', {source:'download'});
+  if (!ok) { $('model-error').hidden = false; $('model-error').textContent = data.error; return; }
+  startPolling();
+};
+
+// ── lessons ────────────────────────────────────────────────────────
+$('pick-pack').onclick = async () => {
+  const path = await choosePath('pack');
+  if (!path) return;
+  $('pack-error').hidden = true;
+  $('pack-detail').textContent = 'Importing… this can take a minute.';
+  $('pick-pack').disabled = true;
+  const {ok, data} = await post('/desktop/import-pack/', {path});
+  $('pick-pack').disabled = false;
+  if (!ok) {
+    $('pack-error').hidden = false; $('pack-error').textContent = data.error;
+    $('pack-detail').textContent = ''; return;
+  }
+  $('pack-detail').textContent = data.skipped
+      ? ('Already up to date (v' + data.version + ').')
+      : (data.lessons + ' lessons imported (v' + data.version + ').');
+  await refresh();
+};
+
+// ── overall ────────────────────────────────────────────────────────
+async function refresh() {
+  const h = await (await fetch('/desktop/health/')).json();
+  const by = {}; (h.checks || []).forEach(c => by[c.key] = c);
+  setState($('model-state'), $('model-label'), by.model?.ok,
+           by.model?.ok ? 'Installed' : 'Not installed yet');
+  if (by.model?.ok) $('model-actions').hidden = true;
+  setState($('pack-state'), $('pack-label'), by.content?.ok,
+           by.content?.ok ? by.content.detail : 'No lessons yet');
+  window.__ready = h.ready;
+  checkFinish();
+}
+function checkFinish() { $('finish').hidden = !window.__ready; }
+
+refresh();
+</script>
+</body>
+</html>

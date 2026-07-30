@@ -55,6 +55,9 @@ INSTALLED_APPS = [
     'apps.api',
     'apps.support',
     'apps.benchmark',
+    # Offline desktop build (memory/desktop_offline_app_plan.md). Inert on the
+    # server: it only adds a device-local state table nothing else reads.
+    'apps.desktop',
 ]
 
 MIDDLEWARE = [

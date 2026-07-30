@@ -894,6 +894,42 @@ class CurriculumChunk(models.Model):
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
 
+class ContentPackVersion(models.Model):
+    """A built offline content pack for one institution.
+
+    Server-side bookkeeping only — the device records what it imported in
+    ``apps.desktop.DeviceState``. Deliberately NOT the same thing as
+    ``tutoring.LessonPackVersion``, which is the per-lesson JSON bundle for
+    the React Native client: different scope, consumer, and lifecycle.
+
+    See memory/desktop_offline_app_plan.md and apps/desktop/packs.py.
+    """
+
+    institution = models.ForeignKey(
+        'accounts.Institution', on_delete=models.CASCADE,
+        related_name='content_pack_versions',
+    )
+    version = models.PositiveIntegerField(
+        help_text="Monotonic per institution. Devices refuse to go backwards.")
+    built_at = models.DateTimeField(auto_now_add=True)
+    schema_rev = models.CharField(
+        max_length=40,
+        help_text="Fingerprint of the migration graph this pack was built "
+                  "against. An importer on a different schema refuses.",
+    )
+    checksum = models.CharField(max_length=64, help_text="sha256 of the archive.")
+    size_bytes = models.BigIntegerField(default=0)
+    lesson_count = models.PositiveIntegerField(default=0)
+    chunk_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = [('institution', 'version')]
+        ordering = ['-version']
+
+    def __str__(self) -> str:
+        return f'{self.institution:.30} pack v{self.version}'
+
+
 # ─── Content-quality benchmark models (Q5) ─────────────────────────────
 # Lives in a separate module for clarity but imported here so Django
 # discovers it via the curriculum app's models package.
