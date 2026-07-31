@@ -112,7 +112,19 @@ jobs:
           # torch + onnx are build-only: needed to EXPORT the encoder, never to
           # run it. The spec excludes them from the bundle.
           pip install -r requirements-ml.txt -r requirements-build.txt
-          if [ "${{ runner.os }}" = "Linux" ]; then pip install pygobject; fi
+          # pywebview's Linux backend needs PyGObject, which is an optional
+          # extra rather than a hard dependency. Install the extra rather than
+          # naming PyGObject ourselves: pywebview pins PyGObject==3.50.0, which
+          # is the version it is actually tested against.
+          #
+          # This also avoids the run-1 failure. Current PyGObject (3.52+)
+          # requires girepository-2.0, which ubuntu-22.04 does not ship — it
+          # has girepository-1.0 — so an unpinned install dies at metadata
+          # generation with "Dependency 'girepository-2.0' is required but not
+          # found". Staying on 22.04 rather than moving to 24.04 is deliberate:
+          # its older glibc makes the built binary run on more of the older
+          # classroom machines this is aimed at.
+          if [ "${{ runner.os }}" = "Linux" ]; then pip install "pywebview[gtk]==6.2.1"; fi
 
       # Deterministic: exported from the same weights the parity test pins,
       # so every platform ships an identical encoder.
@@ -167,8 +179,17 @@ jobs:
         shell: bash
         run: |
           test -f models/minilm-l6-v2/model.onnx || { echo "::error::ONNX encoder missing"; exit 1; }
-          ls vendor/ollama/*/ollama vendor/ollama/*/ollama.exe >/dev/null 2>&1 \
-            || { echo "::error::vendored Ollama binary missing"; exit 1; }
+          # Check the two names separately. `ls a b` exits non-zero when EITHER
+          # argument is missing, so listing both in one call always failed:
+          # ollama.exe never exists on macOS/Linux and ollama never exists on
+          # Windows. That reported "vendored Ollama binary missing" against a
+          # correctly staged binary.
+          if ls vendor/ollama/*/ollama >/dev/null 2>&1 \
+             || ls vendor/ollama/*/ollama.exe >/dev/null 2>&1; then
+            echo "engine: $(ls vendor/ollama/*/ollama* | head -1)"
+          else
+            echo "::error::vendored Ollama binary missing"; exit 1
+          fi
           echo "payload OK"
 
       - name: Build with PyInstaller

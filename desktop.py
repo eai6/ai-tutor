@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import signal
 import subprocess
 import sys
 import threading
@@ -293,7 +292,11 @@ def main() -> int:
             runtime.wait_until_serving()
             print(json.dumps({'url': app_url, 'status': runtime.poll_status()}),
                   flush=True)
-            signal.pause()
+            # threading.Event().wait(), not signal.pause(): the latter does not
+            # exist on Windows and raises AttributeError, so --url-only would
+            # die immediately there while working fine on macOS and Linux.
+            # Interruptible by Ctrl-C on every platform.
+            threading.Event().wait()
         finally:
             runtime.stop()
         return 0
