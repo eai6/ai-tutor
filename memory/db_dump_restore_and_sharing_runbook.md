@@ -167,121 +167,175 @@ available pgvector build, or accept that the KB table is skipped.
 
 ---
 
-## Part 3 — Sharing data with stakeholders
+## Part 3 — Sharing with government partners
 
-### The database is not shareable as-is
+**Decision (2026-07-31): government partners receive a full-fidelity copy —
+the exact artifact needed to restore production. No anonymisation, no
+redaction, no subsetting.**
 
-Measured on the restored copy, these columns carry personal or secret data:
+They are authorised to access everything. They are also, for their own
+students, a data controller in their own right rather than a third party
+receiving someone else's data. Anonymising would defeat the purpose twice
+over: a masked dump cannot restore a working system, and the whole point of
+handing it over is that they can stand the platform up independently of us.
 
-| table | columns | why it matters |
-|---|---|---|
-| `safety_consentrecord` | `parent_name`, `parent_email`, `ip_address` | **contact details of the parents of minors** — the most sensitive data in the system |
-| `auth_user` | `email`, `first_name`, `last_name`, `username`, `password` | directly identifies students |
-| `accounts_staffinvitation` | `email`, `token` | live invitation tokens |
-| `accounts_emailverificationtoken` | `token` | live tokens |
-| `django_session` | `session_key` | **live session cookies — an attacker can impersonate a logged-in user** |
-| `llm_modelconfig` | `api_key_encrypted` | provider credentials |
-| `safety_safetyauditlog` | `ip_address`, `details` | location-adjacent |
-| `tutoring_sessionturn` | `student_input`, tutor text | **free text — students disclose personal things unprompted** |
+This is the primary sharing path. The anonymised path further down exists for
+audiences who are *not* in that position.
 
-That last row is the one that resists automation. Names, schools and family
-details appear inside conversation text where no column-level rule finds them.
+### What "restore-grade" requires
 
-### Decide what the stakeholder actually needs
+A dump only counts as restore-grade if someone can rebuild a working tutor
+from it without asking us anything. That means:
 
-Most requests do not need row-level data at all. In rough order of preference:
+| requirement | why |
+|---|---|
+| **Custom format** (`-Fc`) or the vault's native output | lets `pg_restore` do selective restore, parallel restore, and reordering. A plain SQL file is all-or-nothing. |
+| **Complete schema + data**, no `--exclude-table` | a missing table is only discovered when the app crashes on it |
+| **`pgvector` extension** included | `curriculum_curriculumchunk` uses `vector(384)`; without the extension the KB will not load and the tutor runs ungrounded — the exact failure this project spent 2026-07-30 fixing |
+| **Roles/globals** (`roles.sql`) | the vault emits this separately; without it, ownership and grants must be reconstructed by hand |
+| **Extension list verified** | see the check below |
 
-1. **Aggregate report** — sessions per school, completion rates, mastery
-   distributions, time-on-task. Answers most "how is the pilot going?"
-   questions with zero personal data. Prefer this.
-2. **Anonymised sample** — a few hundred de-identified transcripts for
-   pedagogy review. Needs the treatment below.
-3. **Anonymised full dump** — for a research partner under agreement.
-4. **Raw dump** — only to someone already a data controller for this data
-   (e.g. the Ministry for its own students), under a written agreement, and
-   never over email or a public link.
+The database is self-contained apart from two things a dump cannot carry, and
+both must be communicated alongside it:
 
-### Anonymisation
+1. **Media files** — lesson figures live in blob/file storage, not the
+   database. `LessonStep.media` holds URLs. A restore without the media
+   produces lessons with missing images. Ship the `media` container contents
+   too, or the copy is incomplete in a way that is not obvious until a student
+   hits a diagram.
+2. **The tutor model** — `qwen3-4b` / cloud model config. The DB stores which
+   model to use, not the model. See `memory/desktop_offline_app_plan.md`.
 
-Two workable approaches.
+### Producing the handover artifact
 
-**Approach A — anonymise a restored copy (recommended).**
-Restore per Route A into a scratch server you control, anonymise there, then
-re-dump. Production is never touched, and you are not constrained by Azure's
-extension configuration limits. It also composes with the drill: the same
-restore that proves recoverability produces the shareable artifact.
+Either route from Part 2 yields a restore-grade dump. Route A (vault) is
+preferable for a scheduled handover — it does not touch production, and the
+recovery point is a defined moment rather than "whenever the dump happened to
+run".
 
-**Approach B — `anon` on Azure.**
-[PostgreSQL Anonymizer](https://postgresql-anonymizer.readthedocs.io/en/latest/anonymous_dumps/)
-is available on Azure Flexible Server (v1.3.2). Declare masking rules on
-columns, create a dedicated dumper role with
-`ALTER ROLE anon_dumper SET anon.transparent_dynamic_masking TO TRUE`, and
-`pg_dump` as that role to get a masked export. Caveats: Azure blocks some GUC
-changes from the portal, and `anon` is unsupported by in-place major version
-upgrades. Verify on staging before relying on it in a workflow.
+```bash
+# 1. Produce the dump (Route A or B from Part 2).
 
-Minimum treatment before anything leaves the building:
+# 2. Verify it is restore-grade BEFORE sending. The TOC check is cheap and
+#    catches a truncated or wrong-format file immediately.
+pg_restore --list aitutor-YYYY-MM-DD.sql > toc.txt
+grep -c ';' toc.txt                       # expect ~700 entries
+grep -i 'EXTENSION - vector' toc.txt      # MUST match — no output means no KB
+grep -c 'TABLE DATA' toc.txt              # expect ~70
+
+# 3. Prove it restores, do not assume. Same procedure as the drill.
+pg_restore -h 127.0.0.1 -p 5460 -U <admin> -d aitutor --no-owner --no-acl -j 4 \
+  aitutor-YYYY-MM-DD.sql
+psql ... -c "SELECT count(*) FROM tutoring_sessionturn;"   # compare to prod
+
+# 4. Checksum, so the partner can confirm what they received is intact.
+shasum -a 256 aitutor-YYYY-MM-DD.sql > aitutor-YYYY-MM-DD.sql.sha256
+```
+
+Step 3 is not optional ceremony. A dump that fails to restore is discovered
+either by us in ten minutes or by the partner in a meeting.
+
+### What to send with it
+
+A dump alone is not a handover. Include:
+
+- The dump + its `.sha256`
+- `roles.sql` if using the vault output
+- The media container contents (see above)
+- Postgres major version (**16**) and the required extension (**pgvector**)
+- Expected row counts at time of export, so they can verify their own restore
+- A pointer to this runbook's Part 2 "Loading a dump locally"
+
+### Transfer
+
+Full-fidelity means every student record and every credential in one file.
+Authorisation to receive it does not make the transit safe.
+
+- **Azure SAS URL with a short expiry** (days, not months), or a
+  government-designated secure transfer channel if they have one.
+- **Never email it**, and never put it in a shared drive with broad access.
+- **Log the handover**: who, when, which recovery point, what checksum. If the
+  question "who has a copy of the student database?" is ever asked, the answer
+  should be a list rather than a recollection.
+- **Rotate the LLM API keys afterwards** if the dump included
+  `llm_modelconfig.api_key_encrypted`. This is not about trusting the partner —
+  it is that a credential which has been copied to another organisation's
+  storage is no longer a credential only we control. Cheap to rotate, awkward
+  to explain later. Alternatively, blank that one column before export: it is
+  the only field whose removal does **not** impair a restore, since the
+  restoring party supplies their own provider keys anyway.
+
+### Withdrawn consent still applies
+
+`safety_consentrecord.withdrawn_at` is honoured in the app. A full-fidelity
+export by definition carries those rows too. That is defensible when the
+recipient is the controller for those same students — they hold the
+withdrawal record alongside the data and can act on it. It is worth confirming
+explicitly with them that withdrawals will be honoured downstream, and noting
+the confirmation in the handover log.
+
+---
+
+## Part 3b — Anonymised sharing (non-government audiences)
+
+For anyone who is *not* an authorised controller — research partners,
+vendors, conference datasets, demos.
+
+The database carries, measured on the restored copy: `safety_consentrecord`
+(`parent_name`, `parent_email`, `ip_address` — contact details for the parents
+of minors), `auth_user` (names, emails, password hashes), live
+`django_session.session_key` values, live invitation and verification tokens,
+`llm_modelconfig.api_key_encrypted`, and `tutoring_sessionturn` free text where
+students disclose personal things unprompted.
+
+Prefer an **aggregate report** — sessions per school, completion rates, mastery
+distributions — which answers most questions with no personal data at all.
+
+Where row-level data is genuinely needed, anonymise a restored copy (never
+production) and verify before sending:
 
 ```sql
--- Secrets and live credentials: DROP the rows, do not mask them.
 TRUNCATE django_session, accounts_emailverificationtoken, accounts_staffinvitation;
 UPDATE llm_modelconfig SET api_key_encrypted = '', api_key_env_var = '';
-
--- Direct identifiers: replace, keeping referential integrity via the id.
 UPDATE auth_user SET
-  username   = 'student' || id,
-  first_name = 'Student', last_name = id::text,
-  email      = 'student' || id || '@example.invalid',
-  password   = '!';                       -- unusable-password marker
-
--- Parent contact details: remove entirely. Consent is provable from
--- given/given_at without knowing who the parent is.
+  username = 'student' || id, first_name = 'Student', last_name = id::text,
+  email = 'student' || id || '@example.invalid', password = '!';
 UPDATE safety_consentrecord SET
   parent_name = 'redacted', parent_email = NULL, ip_address = NULL;
 UPDATE safety_safetyauditlog SET ip_address = NULL;
-```
-
-Then, for free text, **sample and read**. There is no query that reliably finds
-a student mentioning their sister by name. If you are sharing transcripts,
-someone reads them first. If the volume makes that impossible, share aggregates
-instead — that constraint is the point, not an obstacle.
-
-### Verify before sending
-
-```sql
-SELECT count(*) FROM auth_user WHERE email NOT LIKE '%@example.invalid';  -- expect 0
-SELECT count(*) FROM safety_consentrecord WHERE parent_email IS NOT NULL; -- expect 0
-SELECT count(*) FROM django_session;                                      -- expect 0
-SELECT count(*) FROM llm_modelconfig WHERE api_key_encrypted <> '';       -- expect 0
-```
-
-Re-dump only after all four return zero. Ship the checksum with the file, and
-transfer via a link that expires — a SAS URL with a short TTL, not email.
-
-### Consent and legal
-
-Pilot consent covers research use (`auto-memory/project_pilot_consent_scope.md`),
-so analysis of pilot data does not need re-consent. That is **not** the same as
-permission to hand identifiable records to a third party. Consent covering "we
-will study this" does not cover "we will give your child's transcript to a
-partner organisation". When in doubt, share aggregates and ask.
-
-`safety_consentrecord` has a `withdrawn_at` column. **Any export must exclude
-withdrawn users** — a withdrawal that is honoured in the app but not in exports
-is a withdrawal in name only:
-
-```sql
--- Before exporting, drop data for anyone who has withdrawn.
 DELETE FROM auth_user WHERE id IN (
   SELECT user_id FROM safety_consentrecord WHERE withdrawn_at IS NOT NULL);
 ```
+
+All four must return zero before the file leaves:
+
+```sql
+SELECT count(*) FROM auth_user WHERE email NOT LIKE '%@example.invalid';
+SELECT count(*) FROM safety_consentrecord WHERE parent_email IS NOT NULL;
+SELECT count(*) FROM django_session;
+SELECT count(*) FROM llm_modelconfig WHERE api_key_encrypted <> '';
+```
+
+Free text resists all of this — no query finds a student naming their sister.
+If transcripts are in scope, someone reads them first; if the volume makes that
+impossible, send aggregates instead.
+
+[PostgreSQL Anonymizer](https://postgresql-anonymizer.readthedocs.io/en/latest/anonymous_dumps/)
+(available on Azure Flexible Server, v1.3.2) can automate the column rules via
+a dumper role with `anon.transparent_dynamic_masking`, if this becomes routine.
 
 ---
 
 ## Quick runbook
 
-**"I need a dump for analysis."** Route A → load locally → anonymise →
-verify 4 queries → share via expiring link.
+**"A government partner needs a copy."** Route A → verify restore-grade (TOC
+has `EXTENSION - vector`, ~700 entries) → prove it restores → checksum → send
+via short-expiry SAS with the media contents, PG version, and expected row
+counts → log the handover → rotate LLM keys. Full fidelity, no redaction.
+
+**"Someone else wants data."** Ask what question they are answering; an
+aggregate report usually answers it. If not: Route A → load locally →
+anonymise (Part 3b) → verify 4 queries return zero → expiring link.
 
 **"Production is broken, restore it."** Route A into a *new* server →
 `pg_restore` → repoint `DATABASE_URL` on the container app → verify row counts.
@@ -297,9 +351,18 @@ Usually an aggregate report is the correct and faster answer.
 
 - **No permanent restore-target storage account.** Creating one in
   `aitutor-backup-rg` removes a step from the recovery critical path.
-- **The anonymisation SQL above is written but untested.** It should be run
+- **No handover log exists yet.** Part 3 says to record who received which
+  recovery point and when. There is nowhere to record it. A file in this repo
+  would do; the requirement is that the answer to "who holds a copy of the
+  student database?" is a list, not a memory.
+- **Media handover is unsolved.** The dump carries `LessonStep.media` URLs but
+  not the files. Nobody has yet exported the blob container alongside a dump,
+  so "ship the media too" is an instruction without a tested procedure.
+  `memory/blob_media_hosting_plan.md` is mid-migration and affects this.
+- **The Part 3b anonymisation SQL is written but untested.** It should be run
   against a restored copy and the verification queries confirmed before anyone
-  relies on it in a hurry.
+  relies on it in a hurry. Lower priority now that government handover is the
+  primary path and does not use it.
 - **Stale firewall rule** `allow-local` (108.31.132.119) on the production
   server should be reviewed and probably removed.
 - **No scripted export.** Both routes are manual. A
