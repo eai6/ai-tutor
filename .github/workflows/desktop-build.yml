@@ -124,8 +124,21 @@ jobs:
       # Ollama is a native binary and cannot be cross-copied, so each runner
       # installs it and stages its own. This is what makes the installed app
       # independent of any system Ollama on the target machine.
-      - name: Install + stage Ollama (macOS / Linux)
-        if: steps.gate.outputs.run == 'true' && runner.os != 'Windows'
+      # macOS and Linux need different treatment. ollama.com/install.sh on
+      # macOS installs Ollama.app into /Applications and then tries to LAUNCH
+      # it, which on a headless runner dies with "Unable to find application
+      # named 'Ollama'" and exits 1. Homebrew is preinstalled on the macOS
+      # runners and yields the plain CLI binary, which is all `stage_ollama`
+      # needs.
+      - name: Install + stage Ollama (macOS)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install ollama
+          python manage.py stage_ollama --force
+
+      - name: Install + stage Ollama (Linux)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
         shell: bash
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
