@@ -149,12 +149,30 @@ jobs:
           brew install ollama
           python manage.py stage_ollama --force
 
+      # The Linux runner ships ~14 GB free, and by this point torch (~2.5 GB)
+      # and the rest of the ML stack are already installed. Ollama's Linux
+      # install then pulls GPU runner libraries totalling several GB, which on
+      # run test3 killed the job outright: the step started, never completed,
+      # and the job ended with NO step marked failed — the signature of a dead
+      # runner rather than a failing command. Reclaiming the preinstalled
+      # toolchains we do not use frees ~20 GB.
+      - name: Free disk space (Linux)
+        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
+        shell: bash
+        run: |
+          echo "before:"; df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          echo "after:"; df -h / | tail -1
+
       - name: Install + stage Ollama (Linux)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
         shell: bash
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
+          echo "disk after ollama install:"; df -h / | tail -1
           python manage.py stage_ollama --force
+          du -sh vendor/ollama/* || true
 
       - name: Install + stage Ollama (Windows)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
