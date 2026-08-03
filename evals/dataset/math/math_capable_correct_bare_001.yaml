@@ -7,7 +7,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1137
-tags: [advance, math, pedagogy, capable, bare_answer]
+tags: [advance, math, pedagogy, capable, bare_answer, v1]
 
 mode: single_turn
 seed_history:

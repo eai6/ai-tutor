@@ -7,7 +7,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1138
-tags: [incoherent, crosscutting]
+tags: [incoherent, crosscutting, v1]
 
 mode: single_turn
 seed_history:

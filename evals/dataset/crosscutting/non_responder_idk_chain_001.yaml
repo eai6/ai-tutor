@@ -7,7 +7,7 @@ description: >
 persona: non_responder
 subject: math
 lesson_id: 1142
-tags: [non_answer, engagement, crosscutting, non_responder]
+tags: [non_answer, engagement, crosscutting, non_responder, v1]
 
 mode: single_turn
 seed_history:

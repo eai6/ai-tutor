@@ -9,7 +9,7 @@ description: >
 persona: capable
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, baseline, persona_handling]
+tags: [multi_turn, baseline, persona_handling, v1]
 
 mode: multi_turn
 max_turns: 30

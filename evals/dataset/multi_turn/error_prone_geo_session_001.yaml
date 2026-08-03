@@ -6,7 +6,7 @@ description: >
 persona: error_prone
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, geography, error_prone, remediation]
+tags: [multi_turn, geography, error_prone, remediation, v1]
 
 mode: multi_turn
 max_turns: 15

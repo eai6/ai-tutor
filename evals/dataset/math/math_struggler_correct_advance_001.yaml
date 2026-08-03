@@ -7,7 +7,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1139
-tags: [correct_with_working, advance, math, pedagogy, struggler]
+tags: [correct_with_working, advance, math, pedagogy, struggler, v1]
 
 mode: single_turn
 seed_history:

@@ -8,7 +8,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1137
-tags: [student_input, math, persona_handling]
+tags: [student_input, math, persona_handling, v1]
 
 mode: single_turn
 

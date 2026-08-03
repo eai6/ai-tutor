@@ -6,7 +6,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1138
-tags: [multi_turn, capable, pace]
+tags: [multi_turn, capable, pace, v1]
 
 mode: multi_turn
 max_turns: 30

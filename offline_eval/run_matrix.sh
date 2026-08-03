@@ -53,9 +53,29 @@ while read -r tag tier _rest; do
     echo; continue
   fi
   echo "==================== $tag ($tier) ===================="
-  echo ">> pulling $tag ..."
-  if ! ollama pull "$tag"; then
-    echo "!! pull failed for $tag — skipping"; echo; continue
+  base=""
+  # Modelfile-pinned tags (qwen3-4b-jetson etc.) are not registry tags — they
+  # are built locally from infra/ollama/Modelfile.<tag>, which bakes in num_ctx
+  # and the tested chat template. This is the config the Jetson actually runs,
+  # so sweeps should score it rather than the bare registry tag (bare tags were
+  # deprecated repo-wide in b5b7a68: the Tier-2 verifier reaches Ollama through
+  # /v1/chat/completions where num_ctx cannot be pinned, and the 4096-default
+  # runner evicts the tutor's on every graded turn).
+  MODELFILE="$ROOT/infra/ollama/Modelfile.$tag"
+  if [[ -f "$MODELFILE" ]]; then
+    base=$(awk '/^FROM /{print $2; exit}' "$MODELFILE")
+    echo ">> building $tag from $base via Modelfile ..."
+    if ! ollama pull "$base"; then
+      echo "!! pull failed for base $base — skipping"; echo; continue
+    fi
+    if ! ollama create "$tag" -f "$MODELFILE"; then
+      echo "!! ollama create failed for $tag — skipping"; echo; continue
+    fi
+  else
+    echo ">> pulling $tag ..."
+    if ! ollama pull "$tag"; then
+      echo "!! pull failed for $tag — skipping"; echo; continue
+    fi
   fi
   start=$(date +%s)
   log="$RESULTS/${safe}.log"
@@ -76,6 +96,8 @@ while read -r tag tier _rest; do
   # without re-pulling). Off by default so the laptop keeps its cached models.
   if [[ "${CLEANUP_MODELS:-0}" == "1" && -f "$RESULTS/${safe}.json" ]]; then
     ollama rm "$tag" >/dev/null 2>&1 || true
+    # A Modelfile-built tag leaves its base weights behind — drop those too.
+    [[ -n "$base" ]] && ollama rm "$base" >/dev/null 2>&1 || true
     echo ">> removed $tag weights from disk (CLEANUP_MODELS=1)"
   fi
   echo

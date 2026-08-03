@@ -6,7 +6,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1141
-tags: [scaffolding, math, persona_handling, struggler, help_request]
+tags: [scaffolding, math, persona_handling, struggler, help_request, v1]
 
 mode: single_turn
 seed_history:

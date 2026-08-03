@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1138
-tags: [false_accept, math, mcq, average]
+tags: [false_accept, math, mcq, average, v1]
 
 mode: single_turn
 seed_history:

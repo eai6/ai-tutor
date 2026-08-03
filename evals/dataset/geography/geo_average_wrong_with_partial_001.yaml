@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: geography
 lesson_id: 1463
-tags: [diagnostic, geography, average]
+tags: [diagnostic, geography, average, v1]
 
 mode: single_turn
 seed_history:

@@ -7,7 +7,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1137
-tags: [diagnostic, math, average, arithmetic_slip]
+tags: [diagnostic, math, average, arithmetic_slip, v1]
 
 mode: single_turn
 seed_history:

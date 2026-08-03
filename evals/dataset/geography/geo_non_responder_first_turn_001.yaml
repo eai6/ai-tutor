@@ -6,7 +6,7 @@ description: >
 persona: non_responder
 subject: geography
 lesson_id: 1465
-tags: [idk_non_answer, geography, engagement, non_responder]
+tags: [idk_non_answer, geography, engagement, non_responder, v1]
 
 mode: single_turn
 seed_history:

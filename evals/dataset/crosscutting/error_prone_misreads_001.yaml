@@ -9,7 +9,7 @@ description: >
 persona: error_prone
 subject: math
 lesson_id: 1139
-tags: [misread_question, diagnostic, error_prone, math]
+tags: [misread_question, diagnostic, error_prone, math, v1]
 
 mode: single_turn
 seed_history:
