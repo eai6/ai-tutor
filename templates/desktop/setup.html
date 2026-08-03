@@ -118,10 +118,20 @@ async function choosePath(kind) {
                                                         : 'lesson pack or folder') + ':');
 }
 
+// Never let a failed POST strand the UI: a non-JSON body (Django error page)
+// or a network fault used to throw out of the click handler, leaving
+// "Importing…" up forever with no error shown.
 async function post(url, body) {
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
-                              body: JSON.stringify(body)});
-  return {ok: r.ok, data: await r.json()};
+  try {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                                body: JSON.stringify(body)});
+    let data;
+    try { data = await r.json(); }
+    catch (e) { data = {error: 'Unexpected server response (HTTP ' + r.status + ').'}; }
+    return {ok: r.ok && !data.error, data};
+  } catch (e) {
+    return {ok: false, data: {error: 'Could not reach the app: ' + e}};
+  }
 }
 
 // ── model ──────────────────────────────────────────────────────────

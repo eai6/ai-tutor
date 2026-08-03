@@ -11,6 +11,7 @@ from pathlib import Path
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from apps.desktop import provisioning
@@ -33,6 +34,13 @@ def setup(request):
     })
 
 
+# csrf_exempt on the two setup POSTs: the setup page's fetch() sends no CSRF
+# token, so Django's middleware answered every click with a 403 HTML page the
+# page's JSON parse choked on — the UI sat on "Importing…" forever (found on
+# the first real desktop run, 2026-08-03). Exempting is consistent with the
+# module docstring: these run pre-auth on a loopback-only server whose sole
+# caller is the shell; there is no cross-site surface and no student data.
+@csrf_exempt
 @never_cache
 @require_POST
 def install_model(request):
@@ -59,6 +67,7 @@ def install_progress(request):
     return JsonResponse(state)
 
 
+@csrf_exempt
 @never_cache
 @require_POST
 def import_pack(request):
