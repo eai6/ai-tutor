@@ -174,20 +174,26 @@ jobs:
           python manage.py stage_ollama --force
           du -sh vendor/ollama/* || true
 
+      # Use the portable ZIP, NOT OllamaSetup.exe. On run test3 the installer
+      # under `Start-Process -Wait` with /VERYSILENT never returned: the step
+      # ran 56 minutes and was killed by the job timeout. Installers on
+      # headless runners wait on things that are not there. The ZIP is just the
+      # binary, which is all `stage_ollama` needs — same reasoning that moved
+      # macOS off install.sh.
       - name: Install + stage Ollama (Windows)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
         shell: pwsh
+        timeout-minutes: 15
         run: |
-          $url = 'https://ollama.com/download/OllamaSetup.exe'
-          Invoke-WebRequest -Uri $url -OutFile ollama-setup.exe
-          Start-Process -FilePath .\ollama-setup.exe -ArgumentList '/VERYSILENT','/NORESTART' -Wait
-          $candidates = @(
-            "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
-            "$env:ProgramFiles\Ollama\ollama.exe"
-          )
-          $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $exe) { throw "ollama.exe not found after install" }
-          python manage.py stage_ollama --from "$exe" --force
+          $url = 'https://ollama.com/download/ollama-windows-amd64.zip'
+          Write-Host "downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile ollama-win.zip -UseBasicParsing
+          Expand-Archive -Path ollama-win.zip -DestinationPath ollama-win -Force
+          $exe = Get-ChildItem -Path ollama-win -Filter ollama.exe -Recurse |
+                 Select-Object -First 1
+          if (-not $exe) { throw "ollama.exe not found in the downloaded archive" }
+          Write-Host "found $($exe.FullName)"
+          python manage.py stage_ollama --from "$($exe.FullName)" --force
 
       # Fail the build if the two things that make it work offline are absent,
       # rather than shipping an installer that cannot tutor. The spec only
