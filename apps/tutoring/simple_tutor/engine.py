@@ -436,6 +436,34 @@ def respond(
                 _family = _prof.family
     except Exception:
         _family = None
+
+    # ─── 3b. Server-side pre-grading (qwen_mt30 board, 2026-08-03) ───
+    # For weak tool-callers the grade cannot depend on the model calling
+    # record_answer: qwen3-4b-Instruct-2507 skipped the expected tool on
+    # ~80% of Call 1s, FLAT from the very first turn — so grades landed
+    # late (Call-2 repair) or never, the anti-repeat/reveal/polarity nets
+    # all ran on a desynced slot, and every reply was written before the
+    # verdict existed. The grader never needed the model (it already
+    # grades raw messages in _auto_grade_fallback), so on strict answer
+    # intents the server grades FIRST and the model narrates a verdict it
+    # is handed in <last_grade>. Eval families only; production/Anthropic
+    # keep the model-driven flow byte-identically.
+    pre_grade = None
+    if (_family and _family not in _FORCE_POSE_EXEMPT_FAMILIES
+            and not _is_opening
+            and in_flight is not None
+            and student_intent == 'answer'):
+        pre_grade = _pre_grade_answer(session, user_input)
+        if pre_grade is not None:
+            # The grade mutated the slot (cleared on correct; attempt
+            # bumped on wrong) — refresh everything derived from it.
+            in_flight = InFlightQuestion.objects.filter(session=session).first()
+            question_pool = build_question_pool(session)
+            if exit_ticket_review is not None:
+                mode = 'REMEDIATION+GRADE' if in_flight else 'REMEDIATION'
+            else:
+                mode = 'GRADE' if in_flight else 'POSE'
+
     system_blocks, tools = build_system_prompt(
         session=session,
         step=step,
@@ -450,6 +478,7 @@ def respond(
         student_intent=student_intent,
         locale=course_locale,
         family=_family,
+        pre_grade=pre_grade,
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -474,7 +503,12 @@ def respond(
     # the gate decides whether to actually constrain Call 1. Compliant models run
     # Call 1 unforced until the session is seen to skip an expected tool once.
     want_pose = _should_force_pose(_family, mode, student_intent)
-    want_grade = not want_pose and _should_force_grade(_family, mode, student_intent)
+    # A pre-graded turn needs no grade tool: the verdict already exists. On a
+    # pre-graded CORRECT the slot is gone, mode is POSE, and want_pose above
+    # forces the next question; on a pre-graded WRONG the reply is a hint on
+    # the same open question and no tool is expected at all.
+    want_grade = (pre_grade is None and not want_pose
+                  and _should_force_grade(_family, mode, student_intent))
     gate_open = _adaptive_force_now(session, want_pose or want_grade)
     force_pose = want_pose and gate_open
     force_grade = want_grade and gate_open
@@ -488,11 +522,13 @@ def respond(
     _es_intent = getattr(session, 'engine_state', None)
     if isinstance(_es_intent, dict):
         _es_intent['_student_intent'] = student_intent
-        # Per-turn flag — set by handle_record_answer on an incorrect grade,
-        # read by handle_pose_question's same-turn premature-pose guard.
-        # Cleared here so a stale value from the previous turn can never
-        # block a legitimate pose.
+        # Per-turn flags — set by handle_record_answer on an incorrect grade
+        # and by _pre_grade_answer, read by handle_pose_question's same-turn
+        # premature-pose guard and handle_record_answer's double-grade guard.
+        # Cleared here so stale values from the previous turn can never block
+        # a legitimate pose or grade.
         _es_intent.pop('_graded_incorrect_this_turn', None)
+        _es_intent.pop('_pre_graded_this_turn', None)
 
     # Nothing is appended to the student's message here, and a per-turn tool
     # directive is specifically the wrong fix for Call-1 tool skipping — it
@@ -537,6 +573,14 @@ def respond(
         response=response,
         figure_catalog=figure_catalog,
     )
+
+    # Surface the pre-grade as this turn's verdict: _turn_verdict, the
+    # polarity/reveal filters, the stream gate, and Call 2's tool-result
+    # formatting all read tool_results, and the pre-grade IS the turn's
+    # record_answer — just made by the server before Call 1 instead of by
+    # the model during it.
+    if pre_grade is not None:
+        tool_results.insert(0, {'tool': 'record_answer', 'result': pre_grade})
 
     # ─── 5b. Which forced tool did Call 1 skip? ───────────────────
     # tool_choice forcing only lands on providers whose client forwards it.
@@ -1615,6 +1659,38 @@ def _distinctive_tokens(s: str) -> set[str]:
     (``1:1,000,000``) plus words of 4+ letters, lowercased."""
     s = (s or '').lower()
     return set(re.findall(r'\d[\d,.:]*', s)) | set(re.findall(r'[a-z]{4,}', s))
+
+
+def _pre_grade_answer(session, user_input: str) -> dict | None:
+    """Grade the student's strict-shaped answer BEFORE Call 1.
+
+    Returns the record_answer-shaped result dict (with ``pre_graded`` and the
+    raw ``student_answer`` attached for the <last_grade> block), or None when
+    nothing was recorded — the caller then proceeds on the model-driven flow.
+    Sets the ``_pre_graded_this_turn`` engine_state flag so a model-issued
+    record_answer later in the turn cannot double-grade (it would bump
+    attempt_count a second time for one answer)."""
+    from apps.tutoring.simple_tutor.tools import handle_record_answer
+    try:
+        result = handle_record_answer(
+            session, extracted_answer=(user_input or '').strip()[:300])
+    except Exception:
+        logger.warning("[simple_tutor] pre_grade failed session=%s",
+                       getattr(session, 'pk', None), exc_info=True)
+        return None
+    if not result.get('recorded'):
+        return None
+    result['pre_graded'] = True
+    result['student_answer'] = (user_input or '').strip()[:200]
+    es = getattr(session, 'engine_state', None)
+    if isinstance(es, dict):
+        es['_pre_graded_this_turn'] = True
+        session.engine_state = es
+    logger.info(
+        "[simple_tutor] pre_graded session=%s verdict=%s tier=%s",
+        session.pk, result.get('verdict'), result.get('tier'),
+    )
+    return result
 
 
 def _auto_grade_fallback(

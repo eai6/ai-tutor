@@ -255,6 +255,7 @@ md("## Cell 11 — **did the 2026-08-03 fixes fire?** (grep the logs)\n"
 code(rf"""
 import glob, os, re
 PATTERNS = {{
+  'pre-graded': r'pre_graded session=',
   'grader scale-equiv': r'percent/decimal scale equivalence',
   'ack prepended': r'prepended missing \w+ ack',
   'ack rotated': r'ack_rotate: repeated opener',

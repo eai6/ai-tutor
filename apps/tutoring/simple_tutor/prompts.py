@@ -659,6 +659,7 @@ def build_system_prompt(
     student_intent: str | None = None,
     locale: str = 'en-us',
     family: str | None = None,
+    pre_grade: dict | None = None,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -773,6 +774,14 @@ def build_system_prompt(
     in_flight_text = _render_in_flight_block(in_flight_question)
     if in_flight_text:
         dynamic_parts.append(in_flight_text)
+
+    # Pre-grading (qwen_mt30 board): for weak tool-callers the server grades
+    # a strict-shaped answer BEFORE Call 1 and hands the verdict in here, so
+    # the model's prose is verdict-aware from the first token instead of
+    # being written blind and patched by the polarity nets afterwards.
+    last_grade_text = _render_last_grade_block(pre_grade)
+    if last_grade_text:
+        dynamic_parts.append(last_grade_text)
 
     intent_text = _render_message_intent_block(student_intent)
     if intent_text:
@@ -1178,6 +1187,53 @@ def _render_message_intent_block(student_intent: str | None) -> str:
         f"  <guidance>{_escape_xml(guidance)}</guidance>\n"
         f"</message_intent>"
     )
+
+
+def _render_last_grade_block(pre_grade: dict | None) -> str:
+    """Render the ``<last_grade>`` block — the verdict the platform's grader
+    recorded for the student's CURRENT message, before the model was called.
+
+    Rendered only on pre-graded turns (eval families with strict answer
+    intents — see engine._pre_grade_answer). The instructions ride inside the
+    block, query-adjacent, because a 4B reads past rules 8k tokens away: the
+    qwen_mt30 board showed 78% of turns writing verdict-blind prose that the
+    polarity nets then had to patch ("said 'Not this time' then confirmed the
+    answer was correct — a direct contradiction within a single turn").
+    """
+    if not pre_grade or not pre_grade.get('recorded'):
+        return ""
+    verdict = (pre_grade.get('verdict') or '').strip()
+    if verdict not in ('correct', 'partial', 'incorrect'):
+        return ""
+    qtext = (pre_grade.get('question_text') or '').strip()
+    answer = (pre_grade.get('student_answer') or '').strip()
+    attempts_before = int(pre_grade.get('attempt_count_before') or 0)
+    attempts = attempts_before if verdict == 'correct' else attempts_before + 1
+    if verdict == 'correct':
+        guidance = (
+            "The platform has ALREADY graded this answer: CORRECT. Do not "
+            "call record_answer and do not re-grade or second-guess it. "
+            "Affirm briefly (one clause), add one teaching sentence, and "
+            "pose the NEXT question via pose_question."
+        )
+    else:
+        guidance = (
+            f"The platform has ALREADY graded this answer: "
+            f"{verdict.upper()} (wrong attempt {attempts} on this question). "
+            "Do not call record_answer and do not affirm the answer. Name "
+            "the specific error, give one hint per the ladder, and keep the "
+            "SAME question open — pose no new question this turn."
+        )
+    parts = ["<last_grade>"]
+    parts.append(f'  <verdict>{verdict}</verdict>')
+    if qtext:
+        parts.append(f'  <question>{_escape_xml(qtext[:300])}</question>')
+    if answer:
+        parts.append(f'  <student_answer>{_escape_xml(answer[:200])}</student_answer>')
+    parts.append(f'  <wrong_attempts>{attempts}</wrong_attempts>')
+    parts.append(f'  <instruction>{_escape_xml(guidance)}</instruction>')
+    parts.append("</last_grade>")
+    return "\n".join(parts)
 
 
 def _render_in_flight_block(in_flight_question) -> str:

@@ -854,6 +854,20 @@ def handle_record_answer(
             'error': 'extracted_answer is empty',
         }
 
+    # Double-grade guard: on a pre-graded turn (engine._pre_grade_answer ran
+    # before Call 1) a model-issued record_answer would grade the SAME answer
+    # a second time — bumping attempt_count twice for one wrong answer, or
+    # grading against the NEXT question's slot after a correct one. The
+    # verdict already exists in <last_grade>; tell the model to use it.
+    _es_pg = getattr(session, 'engine_state', None)
+    if isinstance(_es_pg, dict) and _es_pg.get('_pre_graded_this_turn'):
+        return {
+            'recorded': False,
+            'error': 'already graded: the platform graded this answer before '
+                     'your call — compose your reply from the verdict shown '
+                     'in <last_grade>',
+        }
+
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     if in_flight is None:
         # No question in flight — LLM called record_answer in the

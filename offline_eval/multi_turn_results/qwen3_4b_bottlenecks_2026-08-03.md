@@ -212,6 +212,57 @@ two failures the mt50 fixes hadn't covered:
   whenever a pose was rejected, so Call-1 prose never announces a question
   that failed to register.
 
+## Addendum 2 — qwen_mt30 board results and the pre-grading fix (2026-08-03, same day)
+
+The rerun (`qwen_mt30/qwen3-4b-jetson.{json,log}`, 30 v1 scenarios, two-call,
+SHA 5bb9dce) scored **15/30 (50%)** — far below mt50's 88%. The regression is
+real on identical scenarios (`average_geo_direction_001`: 0.95/5 turns →
+0.51/18 turns) and its mechanism is now measured:
+
+**Call 1 skipped the expected tool on 350 of ~450 turns (78%)** vs mt50's
+4.7%, and the rate is FLAT by turn position (80/84/75/71% across session
+quartiles) — so it is not context growth, not prompt size, not `num_predict`
+truncation. The tag itself is a weak tool-caller: `qwen3-4b-jetson` builds
+from **Qwen3-4B-Instruct-2507**, which local probes already measured at 10/20
+on POSE tool calls (rung-1) and which the Jetson kiosk showed skipping tools
+on 4 of 5 turns. mt50's `qwen3:4b` (July 23, unpinned Ollama) predates the
+registry's re-point to the 2507 checkpoints — **the mt50 board's 88% was
+measured on different weights than the Jetson ships.** The mt50-vs-mt30 delta
+is a model-identity confound, not (only) a scenario or fix effect.
+
+Downstream cascade, visible in every failed transcript: with grades landing
+late (Call-2 repair) or never, `answered_correct`/pool-exclusion state
+diverged from the conversation → verbatim re-asks (65 repeat-pose
+rejections), auto-pose churn (128), interleaved questions, and — decisive
+for the rubric — **no reply was ever written with the verdict in hand**
+(Call-2 emits its repair tool call and text in one response, before the
+grader runs), so the run bled points on affirmed-wrong/denied-right and
+self-contradiction (21 and 19 low rubric items).
+
+**Fix: server-side pre-grading.** The grader never needed the model — it
+already grades raw messages in `_auto_grade_fallback`. On eval-family GRADE
+turns with strict `answer` intent (bare letter / number shapes), the server
+now grades BEFORE Call 1 (`engine._pre_grade_answer`), refreshes the
+slot/mode/pool, and injects the verdict into the prompt as a `<last_grade>`
+block with query-adjacent instructions. Consequences:
+
+- The model's prose is verdict-aware from the first token; polarity nets
+  become backstops instead of the primary author.
+- A grade can no longer be lost to a skipped tool; anti-repeat and pool
+  exclusion see every verdict.
+- Wrong answers arm the same-turn hint guard before the model can pose over
+  them; correct answers clear the slot so POSE forcing lines up.
+- A model-issued `record_answer` on a pre-graded turn is refused
+  ("already graded") so one answer can never double-bump `attempt_count`.
+- The streaming gate sees the verdict at Call-1 time, so Call-1 prose can
+  flush immediately (previously withheld pending the grade).
+
+Production/Anthropic keep the model-driven flow untouched (same
+`_FORCE_POSE_EXEMPT_FAMILIES` gate as every other net). `answer_or_other`
+and conversational intents still route through the model's judgement.
+
+Tests: `apps/tutoring/simple_tutor/tests/test_pre_grading.py`.
+
 ## Rerun setup (Colab)
 
 - Original pre-expansion dataset (90 = 60 single + 30 multi) is now tagged
