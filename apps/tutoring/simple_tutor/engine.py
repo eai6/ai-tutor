@@ -500,9 +500,19 @@ def respond(
     # (repetition control is off on this tag) and shrinking the 24k system
     # prompt, not more instruction text.
     messages: list = [{'role': 'user', 'content': user_input}]
+
+    # Resolve the student's offline/online preference ONCE per turn and pass
+    # the same config to both calls. Resolving separately would let a
+    # connection that drops between call 1 and call 2 switch models mid-turn,
+    # so the tool_use blocks from one model would be answered by another.
+    # Returns None on the hosted platform (only one tutor configured), which
+    # leaves the existing behaviour untouched.
+    from apps.tutoring.simple_tutor.model_choice import resolve_for_session
+    turn_config = resolve_for_session(session)
+
     response = _call_llm(
         system_blocks=system_blocks, tools=call1_tools, messages=messages,
-        tool_choice=call1_tool_choice,
+        tool_choice=call1_tool_choice, config=turn_config,
     )
     if response is None:
         _persist_student_turn(session, user_input, step)
@@ -612,6 +622,8 @@ def respond(
         figure_catalog=figure_catalog,
         missing_tool=missing_tool,
         user_input=user_input,
+        # Same config as call 1 — see the comment at the turn_config assignment.
+        config=turn_config,
         on_delta=stream_gate,
         family=_family,
     )
@@ -1954,6 +1966,7 @@ def _call_llm(
     messages: list,
     tool_choice: dict | None = None,
     on_delta=None,
+    config=None,
 ):
     """Call Anthropic with the simple-tutor prompt + tools + the messages
     array. Returns the raw Anthropic response, or None on any error.
@@ -1986,11 +1999,16 @@ def _call_llm(
         logger.warning("_call_llm: ModelConfig unavailable")
         return None
 
-    try:
-        config = ModelConfig.get_for('tutoring')
-    except Exception as exc:
-        logger.warning("_call_llm: ModelConfig.get_for raised: %s", exc)
-        return None
+    # `config` is passed in when the student's tutor_mode preference selected a
+    # specific model (offline vs online on the desktop build). None means no
+    # preference applies — the hosted platform's normal path — so fall through
+    # to the active tutoring config exactly as before.
+    if config is None:
+        try:
+            config = ModelConfig.get_for('tutoring')
+        except Exception as exc:
+            logger.warning("_call_llm: ModelConfig.get_for raised: %s", exc)
+            return None
 
     if config is None:
         logger.warning("_call_llm: no tutoring ModelConfig found")
@@ -2329,7 +2347,7 @@ def _call_mode(family: str | None) -> str:
 def _run_second_call(
     *, session, system_blocks, tools, messages, response, text_reply_1,
     tool_results, figure_catalog, missing_tool, user_input, on_delta=None,
-    family=None,
+    family=None, config=None,
 ) -> tuple[str, bool]:
     """Issue Call 2, folding in the repair when Call 1 skipped a forced tool.
 
@@ -2405,7 +2423,7 @@ def _run_second_call(
     # happens between the two calls.
     response2 = _call_llm(
         system_blocks=system_blocks, tools=call2_tools, messages=messages,
-        tool_choice=call2_tool_choice, on_delta=on_delta,
+        tool_choice=call2_tool_choice, on_delta=on_delta, config=config,
     )
     if response2 is None:
         return text_reply_1, False

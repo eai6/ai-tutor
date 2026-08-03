@@ -208,6 +208,43 @@
         </form>
     </section>
 
+    {% comment %}
+    Tutor choice. Rendered only when BOTH an offline and an online tutor are
+    configured, which in practice means the desktop app. Showing a picker with
+    one real option would imply a capability the install does not have.
+    Wording avoids "model", "local" and "cloud" — a student picking this is
+    choosing between "works without internet" and "needs internet".
+    {% endcomment %}
+    {% if tutor_choice.available %}
+    <section class="panel">
+        <h2>{% trans "Tutor" %}</h2>
+        <p class="panel-sub">{% trans "Choose which tutor to learn with. This is remembered for every lesson." %}</p>
+        <form method="post" action="?action=tutor_mode">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="tutor_mode">
+            <div class="field">
+                <label for="tutor_mode">{% trans "Which tutor" %}</label>
+                <select id="tutor_mode" name="tutor_mode">
+                    {% for value, label in tutor_mode_choices %}
+                    <option value="{{ value }}" {% if tutor_choice.mode == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="helptext">
+                    {% trans "Automatic uses the internet tutor when you are connected and switches to the offline one when you are not, so a lost connection will not stop your lesson." %}
+                </p>
+            </div>
+            <p class="helptext">
+                {% if tutor_choice.online_reachable %}
+                    {% trans "Internet tutor: available right now." %}
+                {% else %}
+                    {% trans "Internet tutor: not reachable right now — lessons will use the offline tutor." %}
+                {% endif %}
+            </p>
+            <button type="submit" class="btn btn-primary">{% trans "Save tutor choice" %}</button>
+        </form>
+    </section>
+    {% endif %}
+
     {# ── Password change ──────────────────────────────────────────── #}
     <section class="panel">
         <h2>{% trans "Password" %}</h2>

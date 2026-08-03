@@ -295,6 +295,30 @@ class StudentProfile(models.Model):
         ),
     )
 
+    # Which tutor engine this student prefers. Set once in student settings
+    # rather than chosen per lesson — a student picking a model before every
+    # lesson is a worse experience than a wrong default.
+    #
+    # Only meaningful where both options exist: the offline desktop build runs
+    # a local model and may also have internet. On the hosted platform there is
+    # no local model, so AUTO and ONLINE behave identically and the control is
+    # hidden.
+    class TutorMode(models.TextChoices):
+        AUTO = 'auto', 'Automatic — use the internet when available'
+        OFFLINE = 'offline', 'Always use the offline tutor'
+        ONLINE = 'online', 'Always use the online tutor'
+
+    tutor_mode = models.CharField(
+        max_length=10,
+        choices=TutorMode.choices,
+        default=TutorMode.AUTO,
+        help_text=(
+            "Which tutor to use when more than one is available. AUTO prefers "
+            "the online model when it is reachable and falls back to the "
+            "offline one, so a dropped connection does not end the lesson."
+        ),
+    )
+
     # Safety suspension — student locked out of tutor until teacher reviews
     is_tutor_suspended = models.BooleanField(
         default=False,

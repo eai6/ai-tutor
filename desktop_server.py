@@ -42,7 +42,24 @@ sys.path.insert(0, str(ROOT))
 # `ollama serve` was launched or the client's fit preflight sizes the KV cache
 # at double its real value and refuses a model that fits.
 DEFAULTS = {
-    'TUTOR_MODEL_OVERRIDE': 'local_ollama/qwen3-4b-jetson',
+    # NOTE: TUTOR_MODEL_OVERRIDE is deliberately NOT set here.
+    #
+    # It used to be, pinning the tutor to the local model — which silently
+    # defeated the design documented at
+    # apps/tutoring/simple_tutor/engine.py:2022: "the kiosk deliberately does
+    # NOT set TUTOR_MODEL_OVERRIDE so that an admin can pick the model from the
+    # browser". With the env var set, the model choice in
+    # /dashboard/settings/ is read, saved, and then ignored at runtime.
+    #
+    # Instead, _ensure_tutor_model_config() seeds an active local ModelConfig
+    # on first run, and from then on the database is the source of truth. That
+    # is what makes "use the local model offline, switch to a cloud model when
+    # the school has internet" a setting rather than a rebuild.
+    #
+    # Safe because model_profiles is keyed on the full spec: with no override,
+    # the engine falls back to f'{provider}/{model_name}', which for
+    # local_ollama/qwen3-4b-jetson matches the exact profile entry at
+    # apps/llm/model_profiles.py:209 and keeps num_ctx pinned at 16384.
     'OLLAMA_FLASH_ATTENTION': '1',
     'OLLAMA_KV_CACHE_TYPE': 'q8_0',
     'OLLAMA_NUM_PARALLEL': '1',
@@ -142,6 +159,41 @@ def _first_run_setup() -> None:
     if not manifest.exists():
         emit('setup', step='collectstatic', detail='building asset manifest')
         call_command('collectstatic', interactive=False, verbosity=0)
+
+    _ensure_tutor_model_config()
+
+
+def _ensure_tutor_model_config() -> None:
+    """Seed an active local tutoring ModelConfig if none exists.
+
+    The desktop app resolves its tutor model from the database rather than an
+    env var, so that a teacher can switch between the offline model and a cloud
+    model from /dashboard/settings/ without a reinstall. That only works if
+    there is a row to begin with: on a fresh device the table is empty and
+    ``ModelConfig.get_for('tutoring')`` finds nothing.
+
+    Seeds once and then leaves the row alone. If an admin later switches the
+    active tutoring model to a cloud provider, this must not quietly switch it
+    back on the next launch — which is why the guard is "is there an active
+    tutoring config at all", not "is the local one active".
+    """
+    from apps.llm.models import ModelConfig
+
+    if ModelConfig.objects.filter(purpose='tutoring', is_active=True).exists():
+        return
+
+    ModelConfig.objects.update_or_create(
+        provider='local_ollama', model_name='qwen3-4b-jetson', purpose='tutoring',
+        defaults=dict(
+            name='Offline tutor (qwen3-4b)',
+            api_key_env_var='',      # keyless: talks to the local Ollama server
+            api_base='',             # client defaults to http://localhost:11434
+            temperature=0.2,         # inside the TUTORING clamp [0.1, 0.3]
+            max_tokens=1024,
+            is_active=True,
+        ),
+    )
+    emit('setup', step='model_config', detail='seeded offline tutor model')
 
 
 def main() -> int:

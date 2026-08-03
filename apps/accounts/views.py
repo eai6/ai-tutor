@@ -695,6 +695,19 @@ def settings(request):
                 return redirect('accounts:settings')
             # else: fall through to render with form errors
 
+        elif action == 'tutor_mode' and student_profile is not None:
+            # Students only. A teacher has no StudentProfile, so there is
+            # nothing to set and the form is not rendered for them.
+            choice = (request.POST.get('tutor_mode') or '').strip()
+            valid = {c for c, _label in StudentProfile.TutorMode.choices}
+            if choice in valid:
+                student_profile.tutor_mode = choice
+                student_profile.save(update_fields=['tutor_mode'])
+                messages.success(request, _('Tutor preference saved.'))
+            else:
+                messages.error(request, _('That tutor option is not available.'))
+            return redirect('accounts:settings')
+
     # Dropdown choices for the form.
     school_choices = list(
         Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')
@@ -705,9 +718,21 @@ def settings(request):
     grade_choices = [code for code, _name in PlatformConfig.get_grade_choices()]
 
     from django.conf import settings as _settings
+    # Offline/online tutor choice. Only meaningful where BOTH a local and a
+    # cloud tutoring model are configured — i.e. the desktop build. On the
+    # hosted platform describe_for_student reports available=False and the
+    # template hides the control rather than offering a choice that does
+    # nothing.
+    tutor_choice = {'available': False}
+    if student_profile is not None:
+        from apps.tutoring.simple_tutor.model_choice import describe_for_student
+        tutor_choice = describe_for_student(student_profile)
+
     return render(request, 'accounts/settings.html', {
         'user_obj': user,
         'student_profile': student_profile,
+        'tutor_choice': tutor_choice,
+        'tutor_mode_choices': StudentProfile.TutorMode.choices,
         'membership': membership,
         'password_form': password_form,
         'is_staff_user': is_staff_user,
