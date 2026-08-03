@@ -132,6 +132,10 @@ md("## Cell 4 — install deps + start Ollama\n"
    "(memory: ollama-sweep-gotchas).")
 code(r"""
 !pip install -q -r requirements.txt
+# zstd is REQUIRED: Ollama's Linux artifact is now .tar.zst — install.sh pipes
+# through zstd and the legacy .tgz URL 404s for pinned versions (verified
+# 2026-08-03: ollama-linux-amd64.tgz?version=0.30.7 -> 404, .tar.zst -> 200).
+!apt-get -qq install -y zstd || (apt-get -qq update && apt-get -qq install -y zstd)
 import subprocess, time, shutil, os
 OLLAMA_VERSION = '0.30.7'
 def _has_ollama(): return shutil.which('ollama') is not None
@@ -144,10 +148,13 @@ def _install_ollama():
         time.sleep(5)
     for i in range(1, 4):
         print(f'[ollama] direct-binary attempt {i}', flush=True)
-        subprocess.run(f'curl -fL --retry 5 --retry-all-errors --connect-timeout 30 '
-                       f'-o /tmp/ollama.tgz https://github.com/ollama/ollama/releases/download/v{OLLAMA_VERSION}/ollama-linux-amd64.tgz', shell=True)
-        if os.path.exists('/tmp/ollama.tgz') and os.path.getsize('/tmp/ollama.tgz') > 1_000_000:
-            subprocess.run('tar -C /usr -xzf /tmp/ollama.tgz', shell=True)
+        r = subprocess.run(f'curl -fL --retry 5 --retry-all-errors --connect-timeout 30 '
+                           f'-o /tmp/ollama.tar.zst "https://ollama.com/download/ollama-linux-amd64.tar.zst?version={OLLAMA_VERSION}"',
+                           shell=True)
+        if r.returncode != 0:
+            print(f'[ollama] curl exited {r.returncode}', flush=True)
+        if os.path.exists('/tmp/ollama.tar.zst') and os.path.getsize('/tmp/ollama.tar.zst') > 1_000_000:
+            subprocess.run('tar --zstd -C /usr -xf /tmp/ollama.tar.zst', shell=True)
             if _has_ollama(): return True
         time.sleep(5)
     return False

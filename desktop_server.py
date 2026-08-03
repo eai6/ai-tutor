@@ -177,6 +177,7 @@ def _ensure_tutor_model_config() -> None:
     back on the next launch — which is why the guard is "is there an active
     tutoring config at all", not "is the local one active".
     """
+    from apps.accounts.models import Institution
     from apps.llm.models import ModelConfig
 
     if ModelConfig.objects.filter(purpose='tutoring', is_active=True).exists():
@@ -185,6 +186,13 @@ def _ensure_tutor_model_config() -> None:
     ModelConfig.objects.update_or_create(
         provider='local_ollama', model_name='qwen3-4b-jetson', purpose='tutoring',
         defaults=dict(
+            # institution is a required FK; the platform-global institution is
+            # the codebase's idiom for "not school-specific" (it is
+            # get-or-created, so this works on a completely fresh device DB).
+            # Without it the seed raises IntegrityError and the server dies
+            # before ever listening — found driving desktop.py --url-only
+            # against the dev DB, 2026-08-03.
+            institution=Institution.get_global(),
             name='Offline tutor (qwen3-4b)',
             api_key_env_var='',      # keyless: talks to the local Ollama server
             api_base='',             # client defaults to http://localhost:11434
