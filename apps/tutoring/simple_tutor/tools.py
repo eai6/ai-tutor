@@ -62,6 +62,16 @@ DEFAULT_STEP_TURN_CAP = 8
 _ANSWERED_CORRECT_CAP = 40      # remember at most this many resolved questions
 _REPEAT_STREAK_TO_ADVANCE = 2   # force-advance after this many exact re-asks in a row
 
+# How many times ONE normalised stem may be posed per session, whatever the
+# verdicts. The answered-correct guard above only knows about questions the
+# student RESOLVED — mt50 qwen3-4b looped a mis-authored catalog question
+# ("What is the probability value?", reference 0.166667) three times because
+# every grade came back incorrect, so the answered-correct list never saw it.
+# Two poses allow one legitimate re-pose (e.g. returning after a pivot); the
+# third is rejected with corrective feedback, and _auto_pose_fallback covers
+# the turn with a fresh pool question if the model has nothing else to ask.
+_MAX_POSES_PER_STEM = 2
+
 
 def _norm_q(text: str) -> str:
     """Normalise a question stem for exact-repeat comparison: lowercase, drop
@@ -133,6 +143,19 @@ def _note_pose_repetition(
     es = getattr(session, 'engine_state', None) or {}
     if not isinstance(es, dict):
         return False
+    # Per-stem pose counter for the stage-1b hard cap. Counted on ACCEPTED
+    # poses only (this function runs after the slot is created), keyed by the
+    # same normalisation the cap checks against.
+    key = _norm_q(question_text)
+    if key:
+        counts = es.get('posed_stem_counts')
+        if not isinstance(counts, dict):
+            counts = {}
+        counts[key] = int(counts.get(key) or 0) + 1
+        # Bound the map — drop oldest entries past the cap (insertion order).
+        while len(counts) > _ANSWERED_CORRECT_CAP:
+            counts.pop(next(iter(counts)))
+        es['posed_stem_counts'] = counts
     answered = es.get('answered_correct')
     okey = _norm_optset(options) if question_type == 'mcq' else None
     is_repeat = isinstance(answered, list) and (
@@ -416,6 +439,7 @@ def handle_pose_question(
     source: str,
     options: list | None = None,
     catalog_question_id: int | None = None,
+    engine_initiated: bool = False,
 ) -> dict[str, Any]:
     """Persist the LLM's question as the session's in-flight question.
 
@@ -616,6 +640,23 @@ def handle_pose_question(
                     'repeat_of_correct': True,
                     'question_type': qtype,
                 }
+        # Stage 1b — hard cap on verbatim re-asks regardless of verdict.
+        _counts = _es.get('posed_stem_counts') if isinstance(_es, dict) else None
+        if isinstance(_counts, dict) and int(_counts.get(_key) or 0) >= _MAX_POSES_PER_STEM:
+            logger.info(
+                "[simple_tutor] repeat_pose rejected session=%s "
+                "question=%r (already posed %sx this session)",
+                session.pk, qtext[:60], _counts.get(_key),
+            )
+            return {
+                'posed': False,
+                'error': 'repeat_question: this exact question has already '
+                         'been asked twice this session — pose a different '
+                         'question from the pool, or continue to the next '
+                         'piece of content',
+                'repeat_of_stem': True,
+                'question_type': qtype,
+            }
 
     # Replace any prior in-flight question (analytics-log the orphan).
     prior = InFlightQuestion.objects.filter(session=session).first()
@@ -636,7 +677,8 @@ def handle_pose_question(
         # over it. If they DECLINED ('idk' → non_engagement / clarification /
         # off_topic), allow the tutor to pivot to a new question; blocking there
         # traps it re-posing into a dead slot (the cycle-3 anti-desync deadlock).
-        if os.getenv('SIMPLE_TUTOR_ANTIDESYNC', '1').strip() != '0' \
+        if not engine_initiated \
+           and os.getenv('SIMPLE_TUTOR_ANTIDESYNC', '1').strip() != '0' \
            and (prior.attempt_count or 0) == 0 \
            and _intent in ('answer', 'answer_or_other'):
             logger.info(
@@ -648,6 +690,34 @@ def handle_pose_question(
                 'error': 'premature_pose: the student answered a question already '
                          'in flight — grade their answer to it before posing a new '
                          'one',
+                'premature': True,
+                'question_type': prior.question_type,
+            }
+        # Same-turn hint guard (kiosk session 74, 2026-08-03): the answer to
+        # this slot was graded INCORRECT earlier in THIS turn. The reply is a
+        # hint on the same question — posing a new question now swaps the
+        # question out before the student has even read the hint, and the
+        # freshly-revealed feedback ("You picked C — that's not quite right…
+        # here's the next one:") leaves the miss unresolved. Blocked until the
+        # ladder has actually run (attempts >= 3 matches <pivot_guidance>,
+        # which explicitly invites the pivot). Engine-initiated pivots
+        # (_force_pivot_stuck_slot) bypass — they fire on their own criteria.
+        if not engine_initiated \
+           and os.getenv('SIMPLE_TUTOR_ANTIDESYNC', '1').strip() != '0' \
+           and isinstance(_es_i, dict) \
+           and _es_i.get('_graded_incorrect_this_turn') \
+           and (prior.attempt_count or 0) < 3:
+            logger.info(
+                "[simple_tutor] premature_pose blocked session=%s — answer "
+                "graded incorrect this turn (attempts=%s); hint on the same "
+                "question instead", session.pk, prior.attempt_count,
+            )
+            return {
+                'posed': False,
+                'error': 'premature_pose: the student\'s answer was just graded '
+                         'incorrect — this reply must hint on the SAME question, '
+                         'not pose a new one. The question stays open until '
+                         'answered correctly or the pivot guidance applies.',
                 'premature': True,
                 'question_type': prior.question_type,
             }
@@ -869,6 +939,19 @@ def handle_record_answer(
         # Increment attempt counter for the hint ladder.
         in_flight.attempt_count = (in_flight.attempt_count or 0) + 1
         in_flight.save(update_fields=['attempt_count'])
+        # Flag for the same-turn premature-pose guard in handle_pose_question:
+        # an answer just graded wrong means this turn's reply is a HINT on the
+        # same question — the model may not swap the question out before the
+        # student has even seen the hint. Cleared at the start of each engine
+        # turn (respond()) and on any correct grade.
+        _es_g = getattr(session, 'engine_state', None) or {}
+        if isinstance(_es_g, dict):
+            _es_g['_graded_incorrect_this_turn'] = True
+            session.engine_state = _es_g
+            try:
+                session.save(update_fields=['engine_state'])
+            except Exception:
+                pass
 
     logger.info(
         "[simple_tutor] graded session=%s qtype=%s verdict=%s "

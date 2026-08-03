@@ -488,6 +488,11 @@ def respond(
     _es_intent = getattr(session, 'engine_state', None)
     if isinstance(_es_intent, dict):
         _es_intent['_student_intent'] = student_intent
+        # Per-turn flag — set by handle_record_answer on an incorrect grade,
+        # read by handle_pose_question's same-turn premature-pose guard.
+        # Cleared here so a stale value from the previous turn can never
+        # block a legitimate pose.
+        _es_intent.pop('_graded_incorrect_this_turn', None)
 
     # Nothing is appended to the student's message here, and a per-turn tool
     # directive is specifically the wrong fix for Call-1 tool skipping — it
@@ -662,6 +667,7 @@ def respond(
                 stream_gate.used_rotation_index if stream_gate else None
             ),
         )
+        text_reply = _rotate_repeated_ack(session, text_reply, tool_results)
         text_reply = _filter_reveals(session, text_reply, tool_results)
 
     if not text_reply:
@@ -717,11 +723,15 @@ def respond(
     # lands in judge_outputs['grader'] exactly like a model-issued grade. Skipped
     # on the synthetic opening turn (no student answer yet).
     if not _is_opening:
+        # "already recorded" means a verdict actually EXISTS this turn — a
+        # record_answer call that recorded nothing (empty extracted_answer)
+        # does not count, or a bare "a" the model waved off as a non-answer
+        # would never reach this net (kiosk session 74).
         autograded = autograde_bare_answer_if_clear(
             session,
             student_answer=user_input,
             student_intent=student_intent,
-            already_recorded=_tool_was_called(tool_results, 'record_answer'),
+            already_recorded=_turn_verdict(tool_results) is not None,
         )
         if autograded is not None:
             tool_results.append(autograded)
@@ -1145,7 +1155,7 @@ def _ensure_posed_question_in_text(
 _VOCAB_CI_RE = re.compile(
     r"(?i)\bin[-\s]?flight\b|\bpose_question\b|\brecord_answer\b|"
     r"pose\s*/\s*teach|\b(?:pose|grade|teach)\s+mode\b|\bquestion slot\b|"
-    r"\btool[- ]calls?\b"
+    r"\btool[- ]calls?\b|\breference\s+(?:answer|value)s?\b"
 )
 _VOCAB_CS_RE = re.compile(r"\b(?:POSE|GRADE|TEACH)\b")
 _SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
@@ -1333,11 +1343,12 @@ _MID_DENY_RE = re.compile(
     r"(?:isn[’']?t|is not|wasn[’']?t) (?:right|correct)\b)")
 
 _NEG_OPENER_RE = re.compile(
-    r"^(?:not quite|that'?s not|not this time|incorrect|close, but|sorry|"
-    r"hmm, not|no[,—: ])", re.I)
+    r"^(?:not quite|that'?s not|not this time|incorrect|close, but|almost\b|"
+    r"sorry|hmm, not|no[,—: ])", re.I)
 _POS_OPENER_RE = re.compile(
     r"^(?:exactly|correct|that'?s (?:it|right)|great|well done|got it|"
-    r"perfect|spot on|yes[,!— ])", re.I)
+    r"perfect|spot on|right\b|nice\b|brilliant|bang on|good "
+    r"(?:job|work|thinking)|you(?:'ve| have)? got it|yes[,!— ])", re.I)
 _FIRST_SENTENCE_END_RE = re.compile(r'[.!?](?:\s+|$)|\n')
 
 
@@ -1406,7 +1417,103 @@ def _align_reply_polarity(
             'affirmation' if verdict == 'incorrect' else 'denial', verdict,
             session.pk,
         )
+
+    # Ack-prepend (mt50 qwen3-4b): 62 turns acknowledged nothing — the reply
+    # opened straight onto the NEXT question ("A bearing is always measured
+    # clockwise from which direction?") with the just-graded answer passed
+    # over in silence, which the judges scored as "ignored what the student
+    # said". When a verdict exists but the reply's head carries neither
+    # polarity, prepend a rotated verdict-consistent acknowledgement. The
+    # mid-pattern check on the head keeps this from stacking a second ack
+    # onto phrasings the opener regexes don't know ("You're right — ...").
+    stripped = out.lstrip()
+    if stripped and not _POS_OPENER_RE.match(stripped) \
+            and not _NEG_OPENER_RE.match(stripped):
+        head = stripped[:140]
+        prepend = None
+        if verdict == 'correct' and not _MID_AFFIRM_RE.search(head):
+            prepend = _ACKS_CORRECT
+        elif verdict == 'incorrect' and not _MID_DENY_RE.search(head):
+            prepend = _ACKS_INCORRECT_SHORT
+        if prepend is not None:
+            idx = (
+                rotation_index if rotation_index is not None
+                else _rotation_index(session, 'polarity')
+            )
+            out = f"{prepend[idx % len(prepend)]} {stripped}"
+            logger.info(
+                "[simple_tutor] polarity_align: prepended missing %s ack "
+                "session=%s", verdict, session.pk,
+            )
     return out
+
+
+# Prepend-only incorrect acks: unlike _ACKS_INCORRECT these carry no guidance
+# clause, because the model's own hint follows immediately after.
+_ACKS_INCORRECT_SHORT = (
+    "Not quite.",
+    "Not this time.",
+    "Close — not quite.",
+)
+
+# Leading positive-ack lexeme + trailing punctuation, for the repeated-opener
+# rotation below. Matches only the ack PHRASE, not the sentence.
+_ACK_LEXEME_RE = re.compile(
+    r"^(exactly|correct|that'?s (?:it|right)|great(?:\s+(?:job|work))?|"
+    r"nice(?:\s+work)?|got it|spot on|perfect|well done|brilliant|"
+    r"you(?:'ve| have)? got it|yes)\b[\s,!.—:–-]*", re.I)
+
+# Short openers the rotation swaps in. Each reads naturally in front of
+# whatever followed the original ack ("Nice — 140°. Alternate interior…").
+_ACK_OPENERS = (
+    "Nice —", "Good —", "That's it —", "Well done —", "Spot on —",
+    "You've got it —",
+)
+
+
+def _rotate_repeated_ack(session, text_reply: str, tool_results) -> str:
+    """Break "Exactly — … / Exactly — …" opener chains on correct verdicts.
+
+    mt50 qwen3-4b opened with the same "Exactly —" on up to 10 of 13 turns in
+    a session; every judge flagged it as templated/robotic, and the prompt's
+    "vary your affirmations" rule is read straight past by 4B models. When
+    this turn's reply opens with the same ack lexeme as either of the last
+    two persisted tutor turns, swap the leading phrase for a rotated opener.
+    Deterministic, verdict-safe (correct verdicts only), and a no-op for
+    every reply whose opener is already fresh."""
+    if _turn_verdict(tool_results) != 'correct' or not text_reply:
+        return text_reply
+    stripped = text_reply.lstrip()
+    m = _ACK_LEXEME_RE.match(stripped)
+    if not m:
+        return text_reply
+    lexeme = m.group(1).lower()
+    from apps.tutoring.models import SessionTurn
+    prev_contents = list(
+        SessionTurn.objects
+        .filter(session=session, role=SessionTurn.Role.TUTOR)
+        .order_by('-created_at', '-pk')
+        .values_list('content', flat=True)[:2]
+    )
+    repeated = False
+    for prev in prev_contents:
+        pm = _ACK_LEXEME_RE.match((prev or '').lstrip())
+        if pm and pm.group(1).lower() == lexeme:
+            repeated = True
+            break
+    if not repeated:
+        return text_reply
+    idx = _rotation_index(session, 'ack_open')
+    for i in range(len(_ACK_OPENERS)):
+        opener = _ACK_OPENERS[(idx + i) % len(_ACK_OPENERS)]
+        if not opener.lower().startswith(lexeme[:4]):
+            break
+    rest = stripped[m.end():].lstrip()
+    logger.info(
+        "[simple_tutor] ack_rotate: repeated opener %r varied session=%s",
+        lexeme, session.pk,
+    )
+    return f"{opener} {rest}" if rest else opener.rstrip(' —')
 
 
 _ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)
@@ -1422,20 +1529,60 @@ def _filter_reveals(
 
     ``reference`` lets the streaming path supply the answer it already
     looked up, so this does not re-query InFlightQuestion once per
-    streamed chunk. None (the default) keeps the query."""
-    if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
+    streamed chunk. None (the default) keeps the query.
+
+    Runs on incorrect/partial verdicts AND on no-verdict turns where a
+    question is still in flight. The mt50 qwen3-4b reveals ("Let's
+    calculate: 1 − 0.8 = 0.2", "180 − 113 = 67°") mostly landed on
+    clarification/help turns — no record_answer, so no verdict, and the
+    old incorrect-only gate let them straight through. A correct verdict
+    still skips: the slot then holds the NEXT question, freshly posed,
+    and its stem is appended after this filter runs."""
+    verdict = _turn_verdict(tool_results)
+    if verdict == 'correct' or not text_reply:
         return text_reply
+    slot_options = None
     if reference is None:
         from apps.tutoring.models import InFlightQuestion
         slot = InFlightQuestion.objects.filter(session=session).first()
         if slot is None:
             return text_reply
         reference = slot.reference_answer or ''
+        if (slot.question_type or '') == 'mcq':
+            slot_options = slot.options or None
     ref = (reference or '').strip()
     if not ref:
         return text_reply
     out = _ANSWER_PAREN_RE.sub('', text_reply)
     is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
+    # Paraphrase net for MCQ reveals (kiosk session 74): "A small scale map
+    # has a large ratio (like 1:1,000,000 or bigger), meaning it covers a
+    # vast area but shows less detail" restates the correct option's content
+    # without ever naming its letter, so the letter patterns below can't see
+    # it. When a sentence covers ≥70% of the correct option's distinctive
+    # tokens (prefix-matched, so shows≈showing), it has told the student
+    # which option is right — drop it. Batch path only: the streaming gate
+    # supplies `reference` without options, and the batch pass is what
+    # persists.
+    opt_tokens = None
+    if is_letter and slot_options:
+        try:
+            opt_text = str(slot_options['ABCD'.index(ref.upper())])
+        except (IndexError, ValueError):
+            opt_text = ''
+        toks = _distinctive_tokens(opt_text)
+        if len(toks) >= 4:
+            opt_tokens = toks
+
+    def _paraphrases_option(sentence: str) -> bool:
+        if not opt_tokens:
+            return False
+        sent = _distinctive_tokens(sentence)
+        if not sent:
+            return False
+        sent_prefixes = {t[:4] for t in sent}
+        covered = sum(1 for t in opt_tokens if t[:4] in sent_prefixes)
+        return covered / len(opt_tokens) >= 0.7
     if is_letter:
         pat = re.compile(
             rf'(?i)\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b'
@@ -1448,11 +1595,11 @@ def _filter_reveals(
             rf'(?:correct|right|answer)')
     lines_out = []
     for line in out.split('\n'):
-        if not pat.search(line):
+        if not pat.search(line) and not (opt_tokens and _paraphrases_option(line)):
             lines_out.append(line)
             continue
         kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
-                if not pat.search(s)]
+                if not pat.search(s) and not _paraphrases_option(s)]
         lines_out.append(' '.join(kept).strip())
     result = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines_out)).strip('\n')
     if result != text_reply:
@@ -1461,6 +1608,13 @@ def _filter_reveals(
             "session=%s", session.pk,
         )
     return result
+
+
+def _distinctive_tokens(s: str) -> set[str]:
+    """Content-bearing tokens for the paraphrase net: numbers/ratios
+    (``1:1,000,000``) plus words of 4+ letters, lowercased."""
+    s = (s or '').lower()
+    return set(re.findall(r'\d[\d,.:]*', s)) | set(re.findall(r'[a-z]{4,}', s))
 
 
 def _auto_grade_fallback(
@@ -1480,8 +1634,16 @@ def _auto_grade_fallback(
     if student_intent != 'answer':
         return
     for tr in tool_results or []:
-        if tr.get('tool') == 'record_answer':
+        if tr.get('tool') == 'record_answer' \
+                and (tr.get('result') or {}).get('recorded'):
             return  # the model made a grading judgement — trust it
+    # A record_answer call with an EMPTY extracted_answer is NOT a judgement
+    # to trust here: intent='answer' means the message deterministically looks
+    # like an answer (bare MCQ letter, bare number). Kiosk session 74
+    # (2026-08-03): the model called record_answer('') on a bare "a" twice in
+    # a row — "that was not an answer" about a message that plainly was — and
+    # the old any-call-counts guard let the answer vanish; the tutor re-asked
+    # the same question verbatim with zero feedback, twice.
     from apps.tutoring.models import InFlightQuestion
     if not InFlightQuestion.objects.filter(session=session).exists():
         return
@@ -1561,6 +1723,7 @@ def _auto_pose_fallback(
             reference_answer=str(getattr(q, 'correct_answer', '') or ''),
             source='catalog',
             options=opts or None,
+            engine_initiated=True,
         )
         if result.get('posed'):
             tool_results.append({'tool': 'auto_pose_fallback', 'result': result})
@@ -1585,10 +1748,41 @@ def _auto_pose_fallback(
 
 
 _PIVOT_ATTEMPTS = 4
+# Tutor turns one slot may stay in flight before the engine pivots it, however
+# few wrong ATTEMPTS it has collected. The attempt-count trigger alone never
+# fires on the mt50 help-intensive burners (23-27 turns, budget 15-20):
+# clarification/help turns don't increment attempt_count, so a student who
+# asks for help every turn can idle one question forever while the session
+# runs out of budget. Age counts tutor REPLIES while the same slot is live.
+_PIVOT_SLOT_AGE = 6
 _PIVOT_BRIDGE = (
     "Let's park that one for now and come at the skill from a different "
     "problem:"
 )
+
+
+def _bump_slot_age(session, slot) -> int:
+    """Track how many tutor turns the current slot has been in flight.
+
+    ``InFlightQuestion.posed_at_turn`` would be the natural source, but
+    nothing ever sets ``engine_state['_current_turn_id']`` so the column is
+    always NULL — count in engine_state instead, keyed by slot pk so a
+    pivot/re-pose resets the clock."""
+    es = getattr(session, 'engine_state', None) or {}
+    if not isinstance(es, dict):
+        return 0
+    rec = es.get('_slot_age')
+    if isinstance(rec, dict) and rec.get('id') == slot.pk:
+        age = int(rec.get('age') or 0) + 1
+    else:
+        age = 1
+    es['_slot_age'] = {'id': slot.pk, 'age': age}
+    session.engine_state = es
+    try:
+        session.save(update_fields=['engine_state'])
+    except Exception:
+        pass
+    return age
 
 
 def _force_pivot_stuck_slot(
@@ -1607,7 +1801,11 @@ def _force_pivot_stuck_slot(
         return text_reply
     from apps.tutoring.models import InFlightQuestion
     slot = InFlightQuestion.objects.filter(session=session).first()
-    if slot is None or int(slot.attempt_count or 0) < _PIVOT_ATTEMPTS:
+    if slot is None:
+        return text_reply
+    age = _bump_slot_age(session, slot)
+    if int(slot.attempt_count or 0) < _PIVOT_ATTEMPTS \
+            and age < _PIVOT_SLOT_AGE:
         return text_reply
     from apps.tutoring.simple_tutor.tools import (
         build_question_pool, handle_pose_question,
@@ -1626,14 +1824,15 @@ def _force_pivot_stuck_slot(
             reference_answer=str(getattr(q, 'correct_answer', '') or ''),
             source='catalog',
             options=opts or None,
+            engine_initiated=True,
         )
         if result.get('posed'):
             tool_results.append({'tool': 'auto_pivot', 'result': result})
             new_slot = InFlightQuestion.objects.filter(session=session).first()
             logger.info(
                 "[simple_tutor] auto_pivot: replaced stuck slot (%r, "
-                "attempts=%s) session=%s", stuck_stem, slot.attempt_count,
-                session.pk,
+                "attempts=%s age=%s) session=%s", stuck_stem,
+                slot.attempt_count, age, session.pk,
             )
             rendered = _render_slot_question(new_slot) if new_slot else ''
             if not rendered:
@@ -2313,6 +2512,24 @@ def _plan_call2(tools: list, missing_tool: str | None) -> tuple[list, dict | Non
     return (only or tools), {'type': 'tool', 'name': name}
 
 
+def _call1_contradicts_verdict(text_reply_1: str, tool_results) -> bool:
+    """Whether Call-1 prose asserts the OPPOSITE of the grader's verdict.
+
+    In one-call mode the prose was written before grading; when the model
+    guessed its own verdict wrong, the reply's hint content is built on a
+    false premise that no deterministic rewrite can fix — those turns spend
+    Call 2 after all (see the call site in _run_second_call)."""
+    verdict = _turn_verdict(tool_results)
+    if verdict not in ('correct', 'incorrect') or not text_reply_1:
+        return False
+    head = text_reply_1.lstrip()
+    if verdict == 'correct':
+        return bool(_NEG_OPENER_RE.match(head)
+                    or _MID_DENY_RE.search(text_reply_1))
+    return bool(_POS_OPENER_RE.match(head)
+                or _MID_AFFIRM_RE.search(text_reply_1))
+
+
 def _call_mode(family: str | None) -> str:
     """'one' or 'two' — how many LLM calls a compliant turn may cost.
 
@@ -2382,12 +2599,41 @@ def _run_second_call(
     #
     # A MISSING tool still falls through to the repair below, so this only
     # ever skips a call whose work is already done.
+    #
+    # Escalation guard: in one-call mode the prose was written BEFORE the
+    # platform graded, so the model predicted its own verdict. When the
+    # prediction was WRONG — a "Not quite" opener on a graded-correct answer,
+    # or an affirmation on a graded-wrong one — _align_reply_polarity can fix
+    # the opener but not the hint content built on the wrong premise ("you
+    # used 0.65 instead of 0.60" about an answer that was right). Those turns
+    # spend Call 2 after all: the model rewrites with the verdict in hand.
+    # Contradiction turns are the minority, so the latency win of one-call
+    # mode survives; the quality floor comes back up to two-call on exactly
+    # the turns that need it.
     if missing_tool is None and text_reply_1 and _call_mode(family) == 'one':
-        logger.info(
-            "[simple_tutor] one_call: Call 1 delivered tool+prose — "
-            "skipping Call 2 (mode=%s)", _call_mode(family),
+        # A REJECTED pose also escalates: the platform refused the question
+        # (premature over an ungraded/just-missed slot, or a repeat), but
+        # Call-1's prose was written assuming it registered — it announces a
+        # question the student can never answer. Call 2 sees the rejection
+        # feedback and rewrites coherently against the surviving slot.
+        pose_rejected = any(
+            tr.get('tool') == 'pose_question'
+            and not (tr.get('result') or {}).get('posed')
+            for tr in (tool_results or [])
         )
-        return text_reply_1, False
+        if not pose_rejected \
+                and not _call1_contradicts_verdict(text_reply_1, tool_results):
+            logger.info(
+                "[simple_tutor] one_call: Call 1 delivered tool+prose — "
+                "skipping Call 2 (mode=%s)", _call_mode(family),
+            )
+            return text_reply_1, False
+        logger.info(
+            "[simple_tutor] one_call_escalated: %s — spending Call 2 to "
+            "rewrite",
+            'Call-1 pose was rejected' if pose_rejected
+            else f'Call-1 prose contradicts verdict={_turn_verdict(tool_results)}',
+        )
 
     if tool_result_content:
         messages.append({'role': 'assistant', 'content': response.content})

@@ -408,7 +408,7 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         snapshots = []
 
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, config=None):
             resp = responses.pop(0)
             if on_delta is not None and not responses:
                 # Call 2: hand the text over a character at a time, the way
@@ -524,7 +524,7 @@ class Call1FlushGuardTest(DjangoTestCase):
         snapshots = []
 
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, config=None):
             return responses.pop(0) if responses else _llm_response(text='')
 
         with patch.dict(os.environ, {'TUTOR_MODEL_OVERRIDE': self.KIOSK_MODEL}):

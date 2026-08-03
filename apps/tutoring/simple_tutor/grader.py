@@ -332,6 +332,14 @@ _NUMERIC_TOLERANCE = 0.01
 # there's a clear final number embedded in their working.
 _NUMBER_RX = re.compile(r'-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?')
 
+# Question-context gate for the percent/decimal scale-equivalence pass (2b).
+# EN + PT (Mozambique pilot) forms. Deliberately narrow: plain arithmetic
+# questions must never accept a ×100 scaling of the reference.
+_PERCENT_CONTEXT_RE = re.compile(
+    r'(?i)%|\bpercent(?:age)?s?\b|\bprobabilit(?:y|ies)\b|\bchances?\b|'
+    r'\blikelihood\b|\bprobabilidades?\b|\bpercentag(?:em|ens)\b|'
+    r'\bpor\s+cento\b')
+
 
 # ---------------------------------------------------------------------
 # Spoken-form normalisation (TTS/STT students)
@@ -608,6 +616,59 @@ def _grade_math(question, student_answer: str) -> GradeResult:
                         justification=(
                             f'numeric tolerance match: |{student_num} - {ref_num}|'
                             f' <= {_NUMERIC_TOLERANCE} (from {candidate!r})'
+                        ),
+                    )
+
+    # Pass 2b — percent/decimal scale equivalence. The mt50 sweep's dominant
+    # grader false-negative: a slot posed with a bare-number percentage
+    # reference ("What's 1.00 as a percentage?" ref '100'; "P(not passing) as
+    # a percentage" ref '30') graded a student who answered in probability
+    # form ('1', '0.3') INCORRECT — 5 of the 100 incorrect verdicts in that
+    # run were exactly a ×100 scaling of the reference, and each one spiralled
+    # into a false-correction hint ladder the judges scored as
+    # self-contradiction. Without a '%' sign on either side math-verify is
+    # right to treat 30 ≠ 0.3, so this pass supplies the missing context:
+    # accept the scaling ONLY when (a) the question or reference actually
+    # talks about percentages/probability, and (b) the pair looks like a
+    # (probability, percentage) rendering of one value — the STUDENT's number
+    # in (0, 1], the reference in (0, 100]. One direction only: every
+    # observed false negative was a student answering in decimal-probability
+    # form against a percentage-points reference, and the reverse direction
+    # would wrongly credit "100" against ref 1 on a "1% of 100" question.
+    # The range gate also rejects same-ratio-but-wrong pairs like 6 vs 600.
+    scale_ref = None
+    if ref_computed is not None:
+        try:
+            scale_ref = float(ref_computed)
+        except (TypeError, ValueError):
+            scale_ref = None
+    if scale_ref is None and ref_string:
+        scale_ref = _extract_last_number(ref_string)
+    if scale_ref is not None:
+        qtext = str(getattr(question, 'question_text', '') or '')
+        context = f'{qtext} {ref_string}'
+        if _PERCENT_CONTEXT_RE.search(context):
+            for candidate in (student_str, spoken_normalised):
+                student_num = _extract_last_number(candidate)
+                if student_num is None:
+                    continue
+                stu, ref_abs = abs(student_num), abs(scale_ref)
+                if not (0 < stu <= 1.0 and stu <= ref_abs <= 100.0):
+                    continue
+                if abs(stu * 100.0 - ref_abs) <= _NUMERIC_TOLERANCE * 100.0:
+                    logger.info(
+                        "[simple_tutor] grader percent/decimal scale "
+                        "equivalence: %s == %s (percentage/probability "
+                        "context)", student_num, scale_ref,
+                    )
+                    return GradeResult(
+                        verdict=Verdict.CORRECT,
+                        confidence=0.9,
+                        tier='math',
+                        justification=(
+                            f'percent/decimal scale equivalence: '
+                            f'{student_num} ≡ {scale_ref} in a percentage/'
+                            f'probability context'
                         ),
                     )
 
