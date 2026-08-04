@@ -34,7 +34,11 @@ BRANCH = 'offline-optimization'      # MUST carry the 2026-08-03 fixes — push 
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
 SWEEP = 'qwen_mt30'
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
-MODE = '--multi-turn --subset v1'    # the original 30 multi-turn scenarios
+# Capped draw for the bare-tag run: the it3 attempt at this arm was
+# OOM-killed at 9.4 h with 0/30 complete (~135 s/turn). 10 seeded scenarios
+# finish in ~3-4 h and answer the identity question. Restore the uncapped
+# line for jetson-arm iterations.
+MODE = '--multi-turn --subset v1 --sample 10 --seed 0'
 
 # The models under test (tag tier, run_matrix.sh shape).
 # - qwen3-4b-jetson: the settled offline tutor (Modelfile-pinned
