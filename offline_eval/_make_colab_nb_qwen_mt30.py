@@ -47,9 +47,15 @@ MODE = '--multi-turn --subset v1'    # the original 30 multi-turn scenarios
 #   you get if you run the mt50 configuration now". It gets no exact
 #   profile -> qwen family defaults (num_ctx 24192, max_tokens 16000),
 #   matching the mt50 run configuration.
+# The registry-control arm (bare `qwen3:4b`) is RETIRED after the it3 board
+# answered the identity question: today's tag serves Thinking-2507 — it ran
+# ~135 s/turn (10x the jetson arm on the same GPU), completed 0 of 30
+# scenarios in 9.4 h, and was OOM-killed; visible replies stayed short while
+# the tokens went to the reasoning channel. mt50's overnight 88% on 50
+# scenarios cannot have been this model. Re-add `qwen3:4b registry-control`
+# below only with a --sample cap and a big timeout.
 QWEN_MODELS = """\
 qwen3-4b-jetson      jetson
-qwen3:4b             registry-control
 """
 
 # Sanity at generation time: the v1 tag must select exactly 30 multi-turn
@@ -87,14 +93,14 @@ md(rf"""
 # AI Tutor — **qwen3-4b multi-turn** · original 30 scenarios (`v1`) · two-call mode
 
 Measures the qwen3-4b bottleneck fixes on the pre-expansion multi-turn
-benchmark, plus a **model-identity control**: the bare `qwen3:4b` registry
-tag under the mt50 configuration, to test whether the mt50 board's 88% was
-scored on different weights than the Jetson ships:
+benchmark. (The bare `qwen3:4b` model-identity control ran once on the it3
+board and settled the question — today's registry tag is Thinking-2507,
+unusable in this harness and not mt50's model — so it is retired from the
+sweep.)
 
 | tag | note |
 | --- | --- |
 | `qwen3-4b-jetson` | the settled offline tutor (qwen3:4b-instruct + pinned num_ctx) |
-| `qwen3:4b` | bare registry tag, mt50 configuration — the model-identity control. The registry re-points this tag over time (today likely Thinking-2507), so read it as "the mt50 config run today", not necessarily mt50's July weights |
 
 - **Scenarios:** `{MODE}` — the ORIGINAL 30 multi-turn scenarios (tag `v1`),
   every model sees all 30. No sampling.
@@ -219,7 +225,7 @@ open('offline_eval/models.txt', 'w').write('''# Qwen mt30 — Modelfile-pinned l
 print(open('offline_eval/models.txt').read())
 """)
 
-md(f"## Cell 9 — run the eval (30 v1 multi-turn scenarios × 2 models)\n"
+md(f"## Cell 9 — run the eval (30 v1 multi-turn scenarios)\n"
    "`TUTOR_CALL_MODE=two` pins two-call (mt50-comparable). Builds the tag from "
    "its Modelfile, runs 30 sessions, saves JSON+log to Drive.")
 code(rf"""

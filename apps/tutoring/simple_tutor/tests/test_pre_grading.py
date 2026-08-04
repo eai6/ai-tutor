@@ -260,3 +260,90 @@ class OptionNumberUnitsTest(SimpleTestCase):
         self.assertEqual(_option_number('360 degrees'), 360.0)
         self.assertEqual(_option_number('360°'), 360.0)
         self.assertEqual(_option_number('45 deg'), 45.0)
+
+
+# ============================================================================
+# it3 fixes — solver misfire guards + precise stale-slot skip
+# ============================================================================
+
+
+class SolverMisfireGuardsTest(SimpleTestCase):
+    """it3 board: the solver corrected refs it had no business touching."""
+
+    def test_greeting_stem_refused(self):
+        # Matched 'bearing…north' inside the session-opening greeting and
+        # rewrote MCQ ref 'A' -> '0'.
+        self.assertIsNone(solve_authored_stem(
+            "Welcome to navigation basics! Today we'll learn how to use "
+            "compass points and bearings — measured clockwise from north. "
+            "Which of the following lists all eight compass points?"))
+
+    def test_feedback_contaminated_stem_refused(self):
+        # question_text carried the previous turn's feedback; the solver
+        # matched 225° from the FEEDBACK and overrode ref '45'.
+        self.assertIsNone(solve_authored_stem(
+            "Exactly — a bearing of 225° corresponds to Southwest (SW). "
+            "Now: what bearing corresponds to Northeast?"))
+
+    def test_algebraic_angle_variant_refused(self):
+        self.assertIsNone(solve_authored_stem(
+            "Two angles around a point are 50° and 80°. The remaining "
+            "angles are equal. What is each angle x?"))
+
+    def test_plain_angle_template_still_solves(self):
+        self.assertEqual(solve_authored_stem(
+            "Three angles around a point are 60°, 75°, and x°. "
+            "What is x?"), "225")
+
+
+class VerifyReferenceTypeGateTest(DjangoTestCase):
+
+    def test_mcq_pose_never_corrected(self):
+        session, _ = _make_session()
+        posed = handle_pose_question(
+            session,
+            question_text='A bearing of 135° points to which compass point?',
+            question_type='mcq',
+            options=['northeast', 'southeast', 'southwest', 'northwest'],
+            reference_answer='B',
+            source='inline_authored',
+        )
+        self.assertTrue(posed['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'B')
+        self.assertEqual(slot.question_type, 'mcq')
+
+
+class PreciseStaleSlotGuardTest(DjangoTestCase):
+    """it3: a plain hint with no competing question must still pre-grade —
+    the it2 guard skipped 50 of these back into the chaotic model flow."""
+
+    def _slot_and_turn(self, session, tutor_text):
+        from apps.tutoring.models import SessionTurn
+        slot = InFlightQuestion.objects.create(
+            session=session,
+            question_text='Four angles around a point are 70°, 85°, 90°, '
+                          'and x°. What is x?',
+            question_type='short_numeric', reference_answer='115',
+            source='inline_authored',
+        )
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR, content=tutor_text)
+        return slot
+
+    def test_plain_hint_still_pre_grades(self):
+        session, _ = _make_session()
+        self._slot_and_turn(
+            session,
+            "Not quite — check the subtraction step and try once more.")
+        result = _pre_grade_answer(session, '115')
+        self.assertIsNotNone(result)
+        self.assertEqual(result['verdict'], 'correct')
+
+    def test_competing_prose_question_still_skips(self):
+        session, _ = _make_session()
+        self._slot_and_turn(
+            session,
+            "Not quite. Let's simplify things first.\n\n"
+            "What is 360° − 175°?")
+        self.assertIsNone(_pre_grade_answer(session, '185'))

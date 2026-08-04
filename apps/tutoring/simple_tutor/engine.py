@@ -1671,14 +1671,19 @@ def _pre_grade_answer(session, user_input: str) -> dict | None:
     record_answer later in the turn cannot double-grade (it would bump
     attempt_count a second time for one answer).
 
-    Stale-slot guard (it2): during a hint ladder the tutor often asks a
-    micro-step in PROSE ("what is 360 − 175?") while the slot still holds the
-    main question — the student's correct micro-answer must not be graded
-    against the main question's reference (it2 graded a correct '185' against
-    ref '175' twice this way). Pre-grade only when the tutor's last visible
-    message actually re-anchored the slot's stem; otherwise fall back to the
-    model-driven flow, which is what handled these turns before pre-grading
-    existed."""
+    Stale-slot guard (it2, tightened it3): during a hint ladder the tutor
+    sometimes asks a micro-step in PROSE ("what is 360 − 175?") while the
+    slot still holds the main question — the student's correct micro-answer
+    must not be graded against the main question's reference (it2 graded a
+    correct '185' against ref '175' twice this way). The it2 version skipped
+    whenever the last tutor turn didn't restate the stem, which threw out
+    the COMMON case — a plain hint ("check the subtraction") followed by the
+    student re-answering the main question — with the rare bad one: 50
+    skipped pre-grades on the it3 board, each falling back into the chaotic
+    model-flow. Now the skip requires an actual competing question: the last
+    tutor turn ends with a question-looking paragraph that does NOT match
+    the slot's stem. No trailing question, or a trailing question that IS
+    the slot → pre-grade."""
     from apps.tutoring.models import InFlightQuestion, SessionTurn
     from apps.tutoring.simple_tutor.tools import handle_record_answer
     slot = InFlightQuestion.objects.filter(session=session).first()
@@ -1689,12 +1694,15 @@ def _pre_grade_answer(session, user_input: str) -> dict | None:
             .order_by('-created_at', '-pk')
             .values_list('content', flat=True)
             .first()
-        )
+        ) or ''
+        stripped = _strip_trailing_prose_question(last_tutor)
+        trailing = last_tutor[len(stripped):].strip()
         needle = _norm_loose(slot.question_text)[:30]
-        if last_tutor and needle and needle not in _norm_loose(last_tutor):
+        if trailing and needle and needle not in _norm_loose(trailing) \
+                and _norm_loose(trailing)[:30] not in _norm_loose(slot.question_text):
             logger.info(
-                "[simple_tutor] pre_grade skipped: last tutor turn does not "
-                "re-anchor the slot stem session=%s", session.pk,
+                "[simple_tutor] pre_grade skipped: last tutor turn asks a "
+                "different question than the slot session=%s", session.pk,
             )
             return None
     try:

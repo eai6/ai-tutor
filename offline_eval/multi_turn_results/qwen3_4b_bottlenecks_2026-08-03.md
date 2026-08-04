@@ -312,6 +312,40 @@ configuration score today", not necessarily "what did mt50 pull in July".
 
 Tests: solver/correction/guard cases appended to `test_pre_grading.py`.
 
+## Addendum 4 — iteration 3: the it2 fixes misfired (2026-08-04)
+
+`qwen_mt30_it3/` (SHA 5dad170): **11/30** — worse than it2's 16. Both it2
+mechanisms were the cause, convicted by their own log lines:
+
+1. **The solver ran on MCQ poses** (no question-type gate) and on stems it
+   should have refused. `authored ref corrected 'A' -> '0'` on the
+   session-OPENING pose in four sessions: the greeting mentions "bearings…
+   clockwise from north", the compass→bearing family fired on word
+   co-occurrence, and a positional MCQ letter reference became the value
+   '0' — every answer graded wrong from turn 1. Also matched numbers inside
+   FEEDBACK prose the model packs into question_text ("Exactly — a bearing
+   of 225° corresponds to Southwest…" → overrode ref '45'), and mis-solved
+   algebraic angle variants ("the remaining angles are equal").
+   **Fixes**: verify_authored_reference gates to short_numeric/short_answer
+   and never touches letter references; the solver refuses greeting/
+   feedback-contaminated stems (ack-marker prefix), refuses algebraic angle
+   variants, and the compass→bearing family requires the explicit
+   interrogative form.
+2. **The stale-slot guard over-skipped**: 50 pre-grades were skipped because
+   the last tutor turn didn't restate the stem — but most of those were
+   plain hints followed by the student re-answering the main question, and
+   they fell back into the chaotic model-flow (record repairs 104 → 192).
+   **Fix**: the skip now requires an actual COMPETING question — the last
+   tutor turn ends with a question-looking paragraph that matches neither
+   direction against the slot stem. Plain hints pre-grade again.
+
+**Model-identity control settled.** The bare `qwen3:4b` arm ran ~135 s/turn
+(≈10× the jetson arm on the same GPU), completed 0/30 scenarios in 9.4 h,
+was OOM-killed, and its visible replies stayed short while the tokens went
+to a reasoning channel — today's registry tag is Thinking-2507. mt50's
+overnight 88% on 50 scenarios cannot have been this model. The control arm
+is retired from the notebook; the jetson tag is the only meaningful subject.
+
 ## Rerun setup (Colab)
 
 - Original pre-expansion dataset (90 = 60 single + 30 multi) is now tagged

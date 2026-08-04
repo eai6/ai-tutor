@@ -458,11 +458,29 @@ def _fmt_num(x: float) -> str:
     return str(int(x)) if float(x).is_integer() else f'{x:g}'
 
 
+# Stems the solver must REFUSE (it3 board): the model packs greeting or
+# feedback prose into question_text ("Exactly — a bearing of 225° corresponds
+# to Southwest (SW). Now try…"), and the solver matched numbers from the
+# FEEDBACK, overriding correct references. Also algebraic variants of the
+# angle templates ("the remaining angles are equal") that the simple
+# sum-and-subtract solve gets wrong. Refusing means the model's own
+# reference stands — the pre-it2 behaviour, never worse.
+_STEM_CONTAMINATION_RE = re.compile(
+    r"(?i)^(?:welcome|hello|hi[,! ]|great|nice|well done|spot on|got it|"
+    r"perfect|exactly|not quite|not this time|that'?s right|you'?re right|"
+    r"correct\b)")
+_ANGLE_VARIANT_RE = re.compile(
+    r'(?i)\bequal\b|\beach\b|\btwice\b|\bhalf\b|\bmore than\b|'
+    r'\bless than\b|\bratio\b|\btimes\b')
+
+
 def solve_authored_stem(stem: str) -> str | None:
     """Deterministically solve a self-authored stem when its template is
     recognised. Returns the answer as a string, or None."""
     s = ' '.join((stem or '').split())
     low = s.lower()
+    if _STEM_CONTAMINATION_RE.match(s):
+        return None
 
     # Bare arithmetic: "What is 360° − 175°?"
     m = _ARITH_RE.search(s)
@@ -482,7 +500,8 @@ def solve_authored_stem(stem: str) -> str | None:
 
     # Angles around a point / on a straight line: total − sum of given angles.
     # Only when the unknown is explicit (x/y/z or "find/what is the").
-    if re.search(r'(?i)\b[xyz]\b|missing|unknown|find', low):
+    if re.search(r'(?i)\b[xyz]\b|missing|unknown|find', low) \
+            and not _ANGLE_VARIANT_RE.search(low):
         total = None
         if 'around a point' in low or 'around the point' in low:
             total = 360.0
@@ -507,8 +526,13 @@ def solve_authored_stem(stem: str) -> str | None:
         if b in _BEARING_COMPASS:
             return _BEARING_COMPASS[b]
 
-    # Compass point → bearing ("What bearing is southwest?").
-    if 'bearing' in low and not m:
+    # Compass point → bearing. Requires the explicit interrogative form —
+    # a mere co-occurrence of 'bearing' and a compass word matched greeting
+    # sentences ("today we'll learn how bearings work… clockwise from
+    # north") and rewrote MCQ references to '0' at the session opening
+    # (it3 board, 4 sessions poisoned from turn 1).
+    if not m and re.search(r'(?i)what(?:\s+is)?\s+(?:the\s+)?bearing\b'
+                           r'|\bbearing\s+(?:corresponds|matches)\b', low):
         found = [v for k, v in _COMPASS_BEARING.items()
                  if re.search(rf'(?i)\b{k}\b|\({_compass_abbr(k)}\)', s)]
         if len(set(found)) == 1:
@@ -538,7 +562,17 @@ def verify_authored_reference(
     Returns the possibly-corrected ``(reference_answer, question_type)``.
     Numeric disagreement beyond tolerance → solver wins. A textual solver
     answer (compass point) against a short_numeric slot also retypes the
-    slot to short_answer so the grader compares words, not digits."""
+    slot to short_answer so the grader compares words, not digits.
+
+    NEVER touches MCQ poses or letter references (it3 board): an MCQ's
+    reference is positional — replacing 'A' with a computed value breaks
+    the slot structurally, and doing it on the session-opening pose
+    poisoned four sessions from turn 1."""
+    if (question_type or '') not in ('short_numeric', 'short_answer'):
+        return reference_answer, question_type
+    ref_s = (reference_answer or '').strip()
+    if len(ref_s) == 1 and ref_s.upper() in 'ABCD':
+        return reference_answer, question_type
     solved = solve_authored_stem(question_text)
     if solved is None:
         return reference_answer, question_type
