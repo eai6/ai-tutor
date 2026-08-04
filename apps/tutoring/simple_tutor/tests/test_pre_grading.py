@@ -129,3 +129,134 @@ class LastGradeBlockTest(DjangoTestCase):
         # Rendered before the length budget (query-adjacent ordering).
         self.assertLess(joined.index('<last_grade>'),
                         joined.index('<reply_length>'))
+
+
+# ============================================================================
+# it2 fixes — authored-reference solver + stale-slot guard
+# ============================================================================
+
+
+from apps.tutoring.simple_tutor.grader import _option_number
+from apps.tutoring.simple_tutor.tools import (
+    handle_pose_question,
+    solve_authored_stem,
+)
+from django.test import SimpleTestCase
+
+
+class SolveAuthoredStemTest(SimpleTestCase):
+
+    def test_recognised_families(self):
+        cases = [
+            ("Four angles around a point are 70°, 85°, 90°, and x°. "
+             "What is x?", "115"),
+            ("What is 360° − 175°?", "185"),
+            ("Two angles on a straight line are 113° and x°. Find x.", "67"),
+            ("An angle of 74° has a vertically opposite angle. "
+             "What is it?", "74"),
+            ("A bearing of 135° points to which compass point?", "southeast"),
+            ("What bearing corresponds to the compass point Southwest "
+             "(SW)?", "225"),
+            ("The probability of rain is 0.7. What is the probability that "
+             "it does not rain?", "0.3"),
+        ]
+        for stem, want in cases:
+            self.assertEqual(solve_authored_stem(stem), want, stem)
+
+    def test_unrecognised_stems_decline(self):
+        for stem in [
+            "In a lottery with 200 tickets, 20 are winners. If you buy 25 "
+            "tickets, how many winners do you expect to have?",
+            "Which of these is a biological weathering agent?",
+            "Angles around a point sum to how many degrees?",
+        ]:
+            self.assertIsNone(solve_authored_stem(stem), stem)
+
+
+class AuthoredRefCorrectionTest(DjangoTestCase):
+    """The it2 killer: reference_answer='175' for a stem whose true answer
+    is 115, enforced by pre-grading for five straight attempts."""
+
+    def test_wrong_authored_ref_is_corrected_at_pose(self):
+        session, _ = _make_session()
+        posed = handle_pose_question(
+            session,
+            question_text='Four angles around a point are 70°, 85°, 90°, '
+                          'and x°. What is x?',
+            question_type='short_numeric', reference_answer='175',
+            source='inline_authored',
+        )
+        self.assertTrue(posed['posed'])
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, '115')
+        # And the student's correct answer now grades correct.
+        result = handle_record_answer(session, extracted_answer='115')
+        self.assertEqual(result['verdict'], 'correct')
+
+    def test_correct_authored_ref_untouched(self):
+        session, _ = _make_session()
+        handle_pose_question(
+            session,
+            question_text='Two angles on a straight line are 113° and x°. '
+                          'Find x.',
+            question_type='short_numeric', reference_answer='67',
+            source='inline_authored',
+        )
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, '67')
+
+    def test_numeric_ref_on_compass_question_retyped(self):
+        session, _ = _make_session()
+        handle_pose_question(
+            session,
+            question_text='A bearing of 135° points to which compass point?',
+            question_type='short_numeric', reference_answer='135',
+            source='inline_authored',
+        )
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'southeast')
+        self.assertEqual(slot.question_type, 'short_answer')
+
+
+class StaleSlotPreGradeGuardTest(DjangoTestCase):
+    """it2: the tutor asked 'what is 360 − 175?' in prose while the slot held
+    the main question — the correct micro-answer '185' was graded against the
+    main reference '175' twice."""
+
+    def _slot_and_turn(self, session, tutor_text):
+        from apps.tutoring.models import SessionTurn
+        slot = InFlightQuestion.objects.create(
+            session=session,
+            question_text='Four angles around a point are 70°, 85°, 90°, '
+                          'and x°. What is x?',
+            question_type='short_numeric', reference_answer='115',
+            source='inline_authored',
+        )
+        SessionTurn.objects.create(
+            session=session, role=SessionTurn.Role.TUTOR, content=tutor_text)
+        return slot
+
+    def test_prose_microstep_skips_pre_grade(self):
+        session, _ = _make_session()
+        self._slot_and_turn(
+            session, "Not quite. Let's simplify: what is 360° − 175°?")
+        self.assertIsNone(_pre_grade_answer(session, '185'))
+        # Slot untouched — no attempt bump for the micro-answer.
+        self.assertEqual(
+            InFlightQuestion.objects.get(session=session).attempt_count, 0)
+
+    def test_reanchored_stem_pre_grades(self):
+        session, _ = _make_session()
+        self._slot_and_turn(
+            session, "Try again: Four angles around a point are 70°, 85°, "
+                     "90°, and x°. What is x?")
+        result = _pre_grade_answer(session, '115')
+        self.assertIsNotNone(result)
+        self.assertEqual(result['verdict'], 'correct')
+
+
+class OptionNumberUnitsTest(SimpleTestCase):
+    def test_spelled_degrees_parse(self):
+        self.assertEqual(_option_number('360 degrees'), 360.0)
+        self.assertEqual(_option_number('360°'), 360.0)
+        self.assertEqual(_option_number('45 deg'), 45.0)

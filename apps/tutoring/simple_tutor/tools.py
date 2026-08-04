@@ -34,6 +34,7 @@ must always flow — failures get logged + return error dicts, never block.
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -425,6 +426,144 @@ def _catalog_match_for_stem(session, question_text: str):
     return matches[0] if len(matches) == 1 else None
 
 
+# ── Authored-reference verification (qwen_mt30 it2) ─────────────────────────
+# A 4B miscomputes reference answers for its own self-authored questions: it2
+# posed "Four angles around a point are 70°, 85°, 90°, and x°" with
+# reference_answer='175' (true answer 115) and rode that wrong reference for
+# five attempts — with server-side pre-grading, the bad reference is ENFORCED
+# ("Not quite" on a correct answer) instead of merely ignored. These stems all
+# come from a handful of templates the model itself writes for the pilot
+# curriculum (angles, bearings, complement probability), so the server can
+# recompute the answer deterministically and override a wrong reference at
+# pose time and again at pre-grade time. Solves only what it confidently
+# recognises; returns None otherwise.
+
+_DEG_NUM_RE = re.compile(r'(\d+(?:\.\d+)?)\s*°')
+_PLAIN_NUM_RE = re.compile(r'-?\d+(?:\.\d+)?')
+_ARITH_RE = re.compile(
+    r'(?i)what\s+is\s*:?\s*(\d+(?:\.\d+)?)\s*°?\s*([-+×x*÷/−])\s*'
+    r'(\d+(?:\.\d+)?)\s*°?\s*\??')
+_COMPASS_BEARING = {
+    'north': 0, 'northeast': 45, 'north-east': 45, 'east': 90,
+    'southeast': 135, 'south-east': 135, 'south': 180,
+    'southwest': 225, 'south-west': 225, 'west': 270,
+    'northwest': 315, 'north-west': 315,
+}
+_BEARING_COMPASS = {0: 'north', 45: 'northeast', 90: 'east', 135: 'southeast',
+                    180: 'south', 225: 'southwest', 270: 'west',
+                    315: 'northwest', 360: 'north'}
+
+
+def _fmt_num(x: float) -> str:
+    return str(int(x)) if float(x).is_integer() else f'{x:g}'
+
+
+def solve_authored_stem(stem: str) -> str | None:
+    """Deterministically solve a self-authored stem when its template is
+    recognised. Returns the answer as a string, or None."""
+    s = ' '.join((stem or '').split())
+    low = s.lower()
+
+    # Bare arithmetic: "What is 360° − 175°?"
+    m = _ARITH_RE.search(s)
+    if m:
+        a, op, b = float(m.group(1)), m.group(2), float(m.group(3))
+        try:
+            if op in '-−':
+                return _fmt_num(a - b)
+            if op == '+':
+                return _fmt_num(a + b)
+            if op in '×x*':
+                return _fmt_num(a * b)
+            if op in '÷/' and b:
+                return _fmt_num(a / b)
+        except Exception:
+            return None
+
+    # Angles around a point / on a straight line: total − sum of given angles.
+    # Only when the unknown is explicit (x/y/z or "find/what is the").
+    if re.search(r'(?i)\b[xyz]\b|missing|unknown|find', low):
+        total = None
+        if 'around a point' in low or 'around the point' in low:
+            total = 360.0
+        elif 'straight line' in low:
+            total = 180.0
+        if total is not None:
+            given = [float(v) for v in _DEG_NUM_RE.findall(s)
+                     if float(v) not in (total,)]
+            if given and sum(given) < total:
+                return _fmt_num(total - sum(given))
+
+    # Vertically opposite angles are equal.
+    if 'vertically opposite' in low:
+        nums = [float(v) for v in _DEG_NUM_RE.findall(s)]
+        if len(nums) == 1:
+            return _fmt_num(nums[0])
+
+    # Bearing → compass point, at the eight 45° points only.
+    m = re.search(r'(?i)bearing\s+of\s+(\d+(?:\.\d+)?)\s*°', s)
+    if m and re.search(r'(?i)compass|direction|point', low):
+        b = float(m.group(1)) % 360
+        if b in _BEARING_COMPASS:
+            return _BEARING_COMPASS[b]
+
+    # Compass point → bearing ("What bearing is southwest?").
+    if 'bearing' in low and not m:
+        found = [v for k, v in _COMPASS_BEARING.items()
+                 if re.search(rf'(?i)\b{k}\b|\({_compass_abbr(k)}\)', s)]
+        if len(set(found)) == 1:
+            return _fmt_num(found[0])
+
+    # Complement probability: P(not X) = 1 − P(X).
+    if re.search(r'(?i)probability|chance', low) and \
+            re.search(r'(?i)\bnot\b|\bno\b|complement|does ?n[o’\']t', low):
+        probs = [float(v) for v in _PLAIN_NUM_RE.findall(s)
+                 if 0 < float(v) < 1]
+        if len(probs) == 1:
+            return _fmt_num(round(1 - probs[0], 10))
+
+    return None
+
+
+def _compass_abbr(name: str) -> str:
+    parts = name.replace('-', ' ').split()
+    return ''.join(p[0].upper() for p in parts)
+
+
+def verify_authored_reference(
+    session, *, question_text: str, question_type: str, reference_answer: str,
+) -> tuple[str, str]:
+    """Check (and correct) a self-authored reference against the solver.
+
+    Returns the possibly-corrected ``(reference_answer, question_type)``.
+    Numeric disagreement beyond tolerance → solver wins. A textual solver
+    answer (compass point) against a short_numeric slot also retypes the
+    slot to short_answer so the grader compares words, not digits."""
+    solved = solve_authored_stem(question_text)
+    if solved is None:
+        return reference_answer, question_type
+    from apps.tutoring.simple_tutor.grader import _option_number
+    ref_n, solved_n = _option_number(reference_answer), _option_number(solved)
+    if solved_n is not None:
+        if ref_n is not None and abs(ref_n - solved_n) <= 0.01:
+            return reference_answer, question_type
+        logger.info(
+            "[simple_tutor] authored ref corrected %r -> %r session=%s "
+            "stem=%r", reference_answer[:20], solved, session.pk,
+            question_text[:60],
+        )
+        return solved, question_type
+    # Solver produced a word (compass point); numeric slots can't grade it.
+    if _norm_q(solved) == _norm_q(reference_answer):
+        return reference_answer, question_type
+    logger.info(
+        "[simple_tutor] authored ref corrected %r -> %r (retyped "
+        "short_answer) session=%s stem=%r", reference_answer[:20], solved,
+        session.pk, question_text[:60],
+    )
+    return solved, 'short_answer'
+
+
 # ============================================================================
 # handle_pose_question — LLM-called: "I want to ask this question next"
 # ============================================================================
@@ -597,6 +736,17 @@ def handle_pose_question(
                          'options',
                 'question_type': qtype,
             }
+
+    # Authored-reference verification (it2): the model's own reference for a
+    # self-authored question is checked against the deterministic solver and
+    # corrected when the template is recognised — a wrong reference here
+    # poisons every grade on the slot. Catalog references are left alone
+    # (they have their own letter/text authority above).
+    if src == 'inline_authored':
+        ref, qtype = verify_authored_reference(
+            session, question_text=qtext, question_type=qtype,
+            reference_answer=ref,
+        )
 
     # Anti-repetition, stage 1 (2026-07-18 sweep): posing a question the
     # student already answered correctly wastes a turn — the sweep showed the

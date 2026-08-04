@@ -263,6 +263,55 @@ and conversational intents still route through the model's judgement.
 
 Tests: `apps/tutoring/simple_tutor/tests/test_pre_grading.py`.
 
+## Addendum 3 — iteration 2 (pre-grading engine) results and fixes (2026-08-04)
+
+`qwen_mt30_it2/` (SHA 658732a): **16/30** — pre-grading fired on all 191
+strict-answer turns and record_answer repairs fell 260 → 104, but the score
+barely moved and logical-consistency complaints ROSE (19 → 27). The new
+failure texture, from the transcripts + log:
+
+1. **Model-authored wrong references, now ENFORCED.** The killer transcript
+   (average_math_session_001): "Four angles around a point are 70°, 85°,
+   90°, and x°" posed with `reference_answer='175'` — true answer 115. The
+   grader marked the student's correct 115 wrong for five straight attempts,
+   and the model argued with its own verdict in the visible reply ("So why
+   is the grader saying it's wrong? Wait — no"). Before pre-grading, bad
+   self-authored references were merely ignored; the authoritative verdict
+   turned them into false corrections. Same family: numeric refs on
+   compass-word stems (ref '135' vs student "SE").
+   **Fix**: `tools.solve_authored_stem` + `verify_authored_reference` — a
+   deterministic solver for the stem templates the model actually writes
+   (angles around a point / straight line, bare arithmetic, vertically
+   opposite, bearing↔compass, complement probability); a recognised stem's
+   reference is recomputed at pose time and overridden on disagreement
+   (compass answers also retype short_numeric → short_answer). Unrecognised
+   stems are left alone. Catalog references untouched.
+2. **Prose micro-steps graded against the stale slot.** The tutor asked
+   "what is 360° − 175°?" in prose (poses are blocked mid-ladder by the
+   same-turn hint guard), and the student's correct "185" was pre-graded
+   against the slot's main-question reference — twice.
+   **Fix**: stale-slot guard in `_pre_grade_answer` — pre-grade only when
+   the tutor's LAST visible message re-anchors the slot's stem (same loose
+   matching as `_ensure_posed_question_in_text`); otherwise fall back to the
+   model-driven flow.
+3. **MCQ value-for-letter answers rejected** ("360 degrees" vs option
+   "360°"). **Fix**: `_option_number` strips spelled unit words, so the
+   existing option-text value match resolves the letter.
+4. **Two questions in one reply on pivots** — `_force_pivot_stuck_slot`
+   appended its bridge after a reply that already ended in a prose question.
+   **Fix**: strip the trailing prose question before bridging (same repair
+   `_auto_pose_fallback` already used).
+5. **Grader-speak leaked to the student** ("the grader") — added to the
+   engine-vocab scrub.
+
+Also: the Colab notebook now carries a second arm — the BARE `qwen3:4b`
+registry tag under the mt50 configuration (no Modelfile, family-default
+profile) as the model-identity control. Caveat printed in the notebook: the
+registry re-points that tag over time, so it answers "what does the mt50
+configuration score today", not necessarily "what did mt50 pull in July".
+
+Tests: solver/correction/guard cases appended to `test_pre_grading.py`.
+
 ## Rerun setup (Colab)
 
 - Original pre-expansion dataset (90 = 60 single + 30 multi) is now tagged

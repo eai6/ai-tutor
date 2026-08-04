@@ -213,8 +213,9 @@ def _norm_option(s: str) -> str:
 
 def _option_number(s: str) -> float | None:
     """Parse an option/answer as a number when possible — tolerates °, %,
-    commas, and simple fractions."""
+    commas, spelled-out unit words (``360 degrees``), and simple fractions."""
     t = (s or '').strip().replace('°', '').replace('%', '').replace(',', '')
+    t = re.sub(r'(?i)\s*(?:degrees?|deg)\s*$', '', t)
     try:
         return float(t)
     except ValueError:

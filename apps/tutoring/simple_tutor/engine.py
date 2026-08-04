@@ -1199,7 +1199,7 @@ def _ensure_posed_question_in_text(
 _VOCAB_CI_RE = re.compile(
     r"(?i)\bin[-\s]?flight\b|\bpose_question\b|\brecord_answer\b|"
     r"pose\s*/\s*teach|\b(?:pose|grade|teach)\s+mode\b|\bquestion slot\b|"
-    r"\btool[- ]calls?\b|\breference\s+(?:answer|value)s?\b"
+    r"\btool[- ]calls?\b|\breference\s+(?:answer|value)s?\b|\bthe graders?\b"
 )
 _VOCAB_CS_RE = re.compile(r"\b(?:POSE|GRADE|TEACH)\b")
 _SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
@@ -1669,8 +1669,34 @@ def _pre_grade_answer(session, user_input: str) -> dict | None:
     nothing was recorded — the caller then proceeds on the model-driven flow.
     Sets the ``_pre_graded_this_turn`` engine_state flag so a model-issued
     record_answer later in the turn cannot double-grade (it would bump
-    attempt_count a second time for one answer)."""
+    attempt_count a second time for one answer).
+
+    Stale-slot guard (it2): during a hint ladder the tutor often asks a
+    micro-step in PROSE ("what is 360 − 175?") while the slot still holds the
+    main question — the student's correct micro-answer must not be graded
+    against the main question's reference (it2 graded a correct '185' against
+    ref '175' twice this way). Pre-grade only when the tutor's last visible
+    message actually re-anchored the slot's stem; otherwise fall back to the
+    model-driven flow, which is what handled these turns before pre-grading
+    existed."""
+    from apps.tutoring.models import InFlightQuestion, SessionTurn
     from apps.tutoring.simple_tutor.tools import handle_record_answer
+    slot = InFlightQuestion.objects.filter(session=session).first()
+    if slot is not None and (slot.question_text or '').strip():
+        last_tutor = (
+            SessionTurn.objects
+            .filter(session=session, role=SessionTurn.Role.TUTOR)
+            .order_by('-created_at', '-pk')
+            .values_list('content', flat=True)
+            .first()
+        )
+        needle = _norm_loose(slot.question_text)[:30]
+        if last_tutor and needle and needle not in _norm_loose(last_tutor):
+            logger.info(
+                "[simple_tutor] pre_grade skipped: last tutor turn does not "
+                "re-anchor the slot stem session=%s", session.pk,
+            )
+            return None
     try:
         result = handle_record_answer(
             session, extracted_answer=(user_input or '').strip()[:300])
@@ -1913,7 +1939,13 @@ def _force_pivot_stuck_slot(
             rendered = _render_slot_question(new_slot) if new_slot else ''
             if not rendered:
                 return text_reply
-            base = (text_reply or '').rstrip()
+            # Strip a trailing prose question first: it2 produced replies that
+            # asked "What's 360 − 245?" and then immediately bridged to the
+            # pivot question — two questions in one bubble, and only the pivot
+            # is gradable.
+            base = _strip_trailing_prose_question(
+                (text_reply or '').rstrip()
+            ).rstrip()
             return (f"{base}\n\n{_PIVOT_BRIDGE}\n\n{rendered}" if base
                     else f"{_PIVOT_BRIDGE}\n\n{rendered}")
     return text_reply

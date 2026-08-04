@@ -36,12 +36,20 @@ SWEEP = 'qwen_mt30'
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 MODE = '--multi-turn --subset v1'    # the original 30 multi-turn scenarios
 
-# The model under test — Modelfile-pinned tag (tag tier), run_matrix.sh shape.
-# qwen3-4b-jetson is the settled offline tutor; this is deliberately a
-# single-model run (user direction 2026-08-03). Add qwen3.5-4b-jetson /
-# qwen3.5-2b-jetson lines here to widen to the fallback candidates.
+# The models under test (tag tier, run_matrix.sh shape).
+# - qwen3-4b-jetson: the settled offline tutor (Modelfile-pinned
+#   Qwen3-4B-Instruct-2507).
+# - qwen3:4b: the BARE registry tag, exactly as the mt50 board ran it —
+#   the model-identity control (user direction 2026-08-04). CAVEAT: the
+#   registry re-points this tag over time; today it likely serves
+#   Qwen3-4B-Thinking-2507, which is NOT necessarily what mt50 pulled in
+#   July. Whatever it resolves to is still the honest answer to "what do
+#   you get if you run the mt50 configuration now". It gets no exact
+#   profile -> qwen family defaults (num_ctx 24192, max_tokens 16000),
+#   matching the mt50 run configuration.
 QWEN_MODELS = """\
 qwen3-4b-jetson      jetson
+qwen3:4b             registry-control
 """
 
 # Sanity at generation time: the v1 tag must select exactly 30 multi-turn
@@ -57,6 +65,8 @@ for _f in (_ROOT / 'evals' / 'dataset').rglob('*.yaml'):
 assert _v1_mt == 30, f'expected 30 v1 multi-turn scenarios, found {_v1_mt}'
 for _line in QWEN_MODELS.strip().splitlines():
     _tag = _line.split()[0]
+    if not _tag.endswith('-jetson'):
+        continue                      # registry tags are pulled, not built
     _mf = _ROOT / 'infra' / 'ollama' / f'Modelfile.{_tag}'
     assert _mf.exists(), f'missing {_mf}'
 
@@ -76,13 +86,15 @@ def code(s: str):
 md(rf"""
 # AI Tutor — **qwen3-4b multi-turn** · original 30 scenarios (`v1`) · two-call mode
 
-Measures the **2026-08-03 qwen3-4b bottleneck fixes** on the pre-expansion
-multi-turn benchmark. Single model — the tag the offline (Jetson) tutor
-actually ships:
+Measures the qwen3-4b bottleneck fixes on the pre-expansion multi-turn
+benchmark, plus a **model-identity control**: the bare `qwen3:4b` registry
+tag under the mt50 configuration, to test whether the mt50 board's 88% was
+scored on different weights than the Jetson ships:
 
 | tag | note |
 | --- | --- |
 | `qwen3-4b-jetson` | the settled offline tutor (qwen3:4b-instruct + pinned num_ctx) |
+| `qwen3:4b` | bare registry tag, mt50 configuration — the model-identity control. The registry re-points this tag over time (today likely Thinking-2507), so read it as "the mt50 config run today", not necessarily mt50's July weights |
 
 - **Scenarios:** `{MODE}` — the ORIGINAL 30 multi-turn scenarios (tag `v1`),
   every model sees all 30. No sampling.
@@ -94,7 +106,7 @@ actually ships:
   prints HEAD; check it.
 
 **Before you start**
-1. Runtime → **Change runtime type** → **T4 GPU** (the model is ~2.5 GB).
+1. Runtime → **Change runtime type** → **T4 GPU** (each model is ~2.5 GB; run_matrix frees weights between models).
 2. Colab Secrets (🔑 sidebar), *Notebook access ON*:
    - `GH_TOKEN` — GitHub classic PAT, `repo` scope (collaborator on `{REPO}`).
    - `ANTHROPIC_API_KEY` — **required** (student-sim + rubric judge).
@@ -207,7 +219,7 @@ open('offline_eval/models.txt', 'w').write('''# Qwen mt30 — Modelfile-pinned l
 print(open('offline_eval/models.txt').read())
 """)
 
-md(f"## Cell 9 — run the eval (30 v1 multi-turn scenarios, qwen3-4b-jetson)\n"
+md(f"## Cell 9 — run the eval (30 v1 multi-turn scenarios × 2 models)\n"
    "`TUTOR_CALL_MODE=two` pins two-call (mt50-comparable). Builds the tag from "
    "its Modelfile, runs 30 sessions, saves JSON+log to Drive.")
 code(rf"""
