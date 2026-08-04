@@ -54,8 +54,13 @@ MODE = '--multi-turn --subset v1'    # the original 30 multi-turn scenarios
 # the tokens went to the reasoning channel. mt50's overnight 88% on 50
 # scenarios cannot have been this model. Re-add `qwen3:4b registry-control`
 # below only with a --sample cap and a big timeout.
+# User direction 2026-08-04: evaluate the bare registry tag ALONE (the
+# "faulty" arm) — jetson arm commented out for this run. Expect what the it3
+# board measured: ~135 s/turn and an OOM-kill risk before 30 scenarios
+# complete; if it dies again, cap with --sample in MODE.
 QWEN_MODELS = """\
-qwen3-4b-jetson      jetson
+# qwen3-4b-jetson      jetson
+qwen3:4b             registry-control
 """
 
 # Sanity at generation time: the v1 tag must select exactly 30 multi-turn
