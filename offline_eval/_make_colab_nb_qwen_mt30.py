@@ -27,18 +27,24 @@ Tutor = the local qwen under test; student-sim + rubric judge = Anthropic.
 Run: python offline_eval/_make_colab_nb_qwen_mt30.py
 """
 import json
+import os
 from pathlib import Path
 
 REPO = 'eai6/ai-tutor'
 BRANCH = 'offline-optimization'      # MUST carry the 2026-08-03 fixes — push first
 DRIVE_FOLDER = 'ai-tutor-eval-multiturn'
-SWEEP = 'qwen_mt30'
+# Env overrides let one generator emit sibling notebooks that can run
+# CONCURRENTLY in separate Colab tabs: each sweep gets its own Drive folder
+# (same folder = clobbered logs + broken resume-skip) and its own .ipynb.
+SWEEP = os.environ.get('QWEN_MT30_SWEEP', 'qwen_mt30')
+OUT_NAME = os.environ.get('QWEN_MT30_OUT', 'colab_qwen_mt30.ipynb')
 RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 # Capped draw for the bare-tag run: the it3 attempt at this arm was
 # OOM-killed at 9.4 h with 0/30 complete (~135 s/turn). 10 seeded scenarios
 # finish in ~3-4 h and answer the identity question. Restore the uncapped
 # line for jetson-arm iterations.
-MODE = '--multi-turn --subset v1 --sample 10 --seed 0'
+MODE = os.environ.get('QWEN_MT30_MODE',
+                      '--multi-turn --subset v1 --sample 10 --seed 0')
 
 # The models under test (tag tier, run_matrix.sh shape).
 # - qwen3-4b-jetson: the settled offline tutor (Modelfile-pinned
@@ -333,6 +339,6 @@ nb = {
     "nbformat_minor": 0,
 }
 
-out = Path(__file__).parent / 'colab_qwen_mt30.ipynb'
+out = Path(__file__).parent / OUT_NAME
 out.write_text(json.dumps(nb, indent=1))
 print(f'wrote {out} ({len(cells)} cells)')
