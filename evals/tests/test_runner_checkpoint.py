@@ -92,3 +92,55 @@ class CheckpointTest(TestCase):
                           side_effect=lambda s: _fake_result(s.id)):
             result = R.run([_fake_scenario('a')], on_result=bad_callback)
         self.assertEqual(result.passed, 1)
+
+
+class ResumeTest(TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        patcher = patch.object(R, 'RUNS_ROOT', Path(self._tmp.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_prior_results_skip_completed_scenarios(self):
+        ran = []
+
+        def fake_multi(scenario):
+            ran.append(scenario.id)
+            return _fake_result(scenario.id)
+
+        prior = [_fake_result('a'), _fake_result('b', passed=False)]
+        with patch.object(R, '_run_multi_turn', side_effect=fake_multi):
+            result = R.run(
+                [_fake_scenario('a'), _fake_scenario('b'), _fake_scenario('c')],
+                prior_results=prior)
+
+        self.assertEqual(ran, ['c'])                 # only the missing one
+        self.assertEqual(result.total_scenarios, 3)  # union reported
+        self.assertEqual(result.passed, 2)
+        self.assertEqual(result.failed, 1)
+
+    def test_indices_continue_from_prior(self):
+        seen = []
+        with patch.object(R, '_run_multi_turn',
+                          side_effect=lambda s: _fake_result(s.id)):
+            R.run([_fake_scenario('a'), _fake_scenario('b')],
+                  prior_results=[_fake_result('a')],
+                  on_result=lambda sr, i, t: seen.append((sr.scenario_id, i, t)))
+        self.assertEqual(seen, [('b', 2, 2)])
+
+    def test_load_partial_roundtrip_and_final_json_rejected(self):
+        # Write a checkpoint via the real writer, read it back.
+        path = Path(self._tmp.name) / 'partial_x.json'
+        R._write_partial(path, started='2026-08-05T00:00:00',
+                         git_sha='abc123', total=3,
+                         results=[_fake_result('a')])
+        results, sha = R.load_partial(path)
+        self.assertEqual([r.scenario_id for r in results], ['a'])
+        self.assertEqual(sha, 'abc123')
+        # A final run JSON (no partial marker) must be refused.
+        final = Path(self._tmp.name) / 'final.json'
+        final.write_text(json.dumps({'results': []}))
+        with self.assertRaises(ValueError):
+            R.load_partial(final)
