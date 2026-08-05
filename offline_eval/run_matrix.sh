@@ -33,6 +33,9 @@ export OLLAMA_MODELS="${OLLAMA_MODELS:-$ROOT/offline_eval/ollama_models}"
 # NOTE: models that can't tool-call will hit the engine's fallback on simple_tutor.
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
 mkdir -p "$RESULTS" "$OLLAMA_MODELS"
+# Per-scenario checkpoints go STRAIGHT to the (Drive-backed) results dir —
+# a dead runtime keeps them (2026-08-05: VM-disk checkpoints died with the VM).
+export EVAL_CHECKPOINT_DIR="$RESULTS"
 
 command -v ollama >/dev/null 2>&1 || { echo "ERROR: ollama not installed."; exit 1; }
 ollama list >/dev/null 2>&1 || { echo "ERROR: Ollama server not reachable. Start it: 'ollama serve &'"; exit 1; }

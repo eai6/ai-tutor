@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 import subprocess
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -656,15 +657,30 @@ def _write_partial(path: Path, *, started: str, git_sha: str, total: int,
     tmp.replace(path)
 
 
+def checkpoint_root() -> Path:
+    """Where per-scenario checkpoints are written.
+
+    EVAL_CHECKPOINT_DIR overrides the default (evals/runs). This exists
+    because of the 2026-08-05 laptop-shutdown loss: the checkpoint lived on
+    the Colab VM disk and the salvage copy in run_matrix.sh only ran when the
+    eval PROCESS died inside a living runtime — a runtime death (browser
+    closed, VM reclaimed) took the disk and the checkpoint with it, while the
+    .log survived because it was the one file written straight to the Drive
+    mount. The sweep scripts now point this at the Drive-backed results dir
+    so every per-scenario write is durable."""
+    override = (os.environ.get('EVAL_CHECKPOINT_DIR') or '').strip()
+    return Path(override) if override else RUNS_ROOT
+
+
 def partial_path_for(started: dt.datetime, git_sha: str) -> Path:
     ts = started.strftime('%Y-%m-%dT%H-%M-%S')
-    return RUNS_ROOT / f"partial_{ts}_{git_sha}.json"
+    return checkpoint_root() / f"partial_{ts}_{git_sha}.json"
 
 
 def latest_partial() -> Path | None:
-    """Newest checkpoint under RUNS_ROOT, or None. Filenames embed the run's
-    start timestamp, so lexical order is chronological order."""
-    partials = sorted(RUNS_ROOT.glob('partial_*.json'))
+    """Newest checkpoint under checkpoint_root(), or None. Filenames embed
+    the run's start timestamp, so lexical order is chronological order."""
+    partials = sorted(checkpoint_root().glob('partial_*.json'))
     return partials[-1] if partials else None
 
 
@@ -700,6 +716,7 @@ def run(scenarios: list[Scenario], on_result=None,
     from django.db import connections
     started = dt.datetime.now(dt.timezone.utc)
     RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+    checkpoint_root().mkdir(parents=True, exist_ok=True)
     sha = _git_sha()
     checkpoint = partial_path_for(started, sha)
     results: list[ScenarioResult] = list(prior_results or [])

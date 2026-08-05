@@ -144,3 +144,33 @@ class ResumeTest(TestCase):
         final.write_text(json.dumps({'results': []}))
         with self.assertRaises(ValueError):
             R.load_partial(final)
+
+
+class CheckpointDirOverrideTest(TestCase):
+    """2026-08-05 laptop-shutdown loss: checkpoints on the VM disk died with
+    the runtime. EVAL_CHECKPOINT_DIR points them at a durable (Drive) dir."""
+
+    def test_checkpoint_written_to_override_dir(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {'EVAL_CHECKPOINT_DIR': tmp}):
+                seen_partials = []
+
+                def on_result(sr, index, total):
+                    seen_partials.extend(Path(tmp).glob('partial_*.json'))
+
+                with patch.object(R, '_run_multi_turn',
+                                  side_effect=lambda s: _fake_result(s.id)):
+                    R.run([_fake_scenario('a')], on_result=on_result)
+                self.assertTrue(seen_partials, 'no checkpoint in override dir')
+                # Clean completion removes it from the override dir too.
+                self.assertEqual(list(Path(tmp).glob('partial_*.json')), [])
+
+    def test_latest_partial_reads_override_dir(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {'EVAL_CHECKPOINT_DIR': tmp}):
+                p = Path(tmp) / 'partial_2026-08-05T00-00-00_abc.json'
+                R._write_partial(p, started='x', git_sha='abc', total=1,
+                                 results=[_fake_result('a')])
+                self.assertEqual(R.latest_partial(), p)
