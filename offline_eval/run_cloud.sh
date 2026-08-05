@@ -17,6 +17,9 @@ MODELS_FILE="${CLOUD_MODELS_FILE:-$ROOT/offline_eval/cloud_models.txt}"
 MODE="${MODE:---single-turn}"
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
 mkdir -p "$RESULTS"
+# Per-scenario checkpoints go STRAIGHT to the (Drive-backed) results dir —
+# a dead runtime keeps them (2026-08-05: VM-disk checkpoints died with the VM).
+export EVAL_CHECKPOINT_DIR="$RESULTS"
 
 # One sweep per results dir. Two concurrent sweeps skip on the same JSONs, so they
 # run the same model at the same time, interleave writes into one per-model .log,
