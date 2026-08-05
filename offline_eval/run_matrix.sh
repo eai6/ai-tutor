@@ -99,7 +99,11 @@ try:
           ('THINKS by default' if t else 'answers directly (instruct-style)'))
 except Exception as e:
     print(f'probe unreadable: {e}')" 2>/dev/null)
-  echo ">> identity: $tag digest=$digest caps=[$caps] $identity"
+  identity_line=">> identity: $tag digest=$digest caps=[$caps] $identity"
+  echo "$identity_line"
+  # Into the results dir too — the notebook cell output dies with the browser
+  # tab, but the results folder is what gets zipped and analyzed.
+  echo "$(date -u +%FT%TZ) $identity_line" >> "$RESULTS/identity.log"
   start=$(date +%s)
   log="$RESULTS/${safe}.log"
   TUTOR_MODEL_OVERRIDE="local_ollama/$tag" "$PY" manage.py run_eval $MODE >"$log" 2>&1
