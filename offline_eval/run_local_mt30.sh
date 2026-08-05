@@ -13,6 +13,7 @@ ROOT="${AI_TUTOR_ROOT:-/home/daniel/Documents/work/Nyansapo/web/ai-tutor}"
 cd "$ROOT"
 PY="${PY:-$ROOT/venv/bin/python}"
 ITER="${ITER:?set ITER=itN}"
+MODE="${MODE:---multi-turn --subset v1}"
 RESULTS="$ROOT/offline_eval/multi_turn_results/local_${ITER}"
 mkdir -p "$RESULTS"
 
@@ -34,7 +35,7 @@ ollama list | grep -q qwen3-4b-jetson || { echo "qwen3-4b-jetson not installed";
 
 log="$RESULTS/qwen3-4b-jetson.log"
 start=$(date +%s)
-"$PY" manage.py run_eval --multi-turn --subset v1 >"$log" 2>&1
+"$PY" manage.py run_eval $MODE >"$log" 2>&1
 rc=$?
 elapsed=$(( $(date +%s) - start ))
 out=$(grep -oE "Output: .*\.json" "$log" | tail -1 | sed 's/^Output: //')

@@ -72,7 +72,7 @@ MODE = os.environ.get('QWEN_MT30_MODE',
 # variant on the SAME seeded 10 for the side-by-side. Same Drive folder on
 # purpose: different result filename, so both boards sit next to each other
 # and Cell 10 prints them on one leaderboard. Do NOT clear the Drive folder.
-QWEN_MODELS = """\
+QWEN_MODELS = os.environ.get('QWEN_MT30_MODELS') or """\
 qwen3-4b-jetson      jetson
 # qwen3:4b             registry-control
 """
