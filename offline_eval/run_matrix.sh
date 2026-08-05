@@ -80,6 +80,26 @@ while read -r tag tier _rest; do
       echo "!! pull failed for $tag — skipping"; echo; continue
     fi
   fi
+  # Model-identity probe: checkpoint families (Instruct vs Thinking) hide
+  # behind lookalike tags and the registry re-points bare tags over time —
+  # the mt50-vs-mt30 confound was exactly this. Capability flags and template
+  # markers are NOT discriminating (the qwen3 template carries thinking
+  # machinery even in the Instruct build), so the probe is EMPIRICAL: one
+  # tiny generation, then report whether the model thought by default.
+  caps=$(ollama show "$tag" 2>/dev/null | sed -n '/Capabilities/,/^\s*$/p' | grep -v Capabilities | tr -d ' ' | tr '\n' ',' | sed 's/,*$//')
+  digest=$(ollama list | awk -v t="$tag" '$1==t || $1==t":latest" {print $2; exit}')
+  probe=$(curl -s -m 600 http://localhost:11434/api/chat -d "{\"model\":\"$tag\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 2+2? Answer with just the number.\"}],\"stream\":false,\"options\":{\"num_predict\":80}}")
+  identity=$(printf '%s' "$probe" | "$PY" -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    m = d.get('message') or {}
+    t, c = len(m.get('thinking') or ''), len(m.get('content') or '')
+    print(f'thinking_chars={t} content_chars={c} -> ' +
+          ('THINKS by default' if t else 'answers directly (instruct-style)'))
+except Exception as e:
+    print(f'probe unreadable: {e}')" 2>/dev/null)
+  echo ">> identity: $tag digest=$digest caps=[$caps] $identity"
   start=$(date +%s)
   log="$RESULTS/${safe}.log"
   TUTOR_MODEL_OVERRIDE="local_ollama/$tag" "$PY" manage.py run_eval $MODE >"$log" 2>&1

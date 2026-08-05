@@ -1,0 +1,1 @@
+vertex_model_garden/qwen/qwen3-next-80b-a3b-instruct-maas     qwen3-next-80b-instruct    global

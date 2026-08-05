@@ -43,8 +43,10 @@ OSS_MODEL = 'sllm/glm-z1-9b'
 # The five cloud models: "provider/model  safe_name  [region]" — run_cloud.sh
 # reads this shape. gemini-2.5-flash is the Gemini Developer API (GOOGLE_API_KEY,
 # no region); the other four are Vertex Model Garden MaaS (ADC + region).
+# qwen3-next-80b moved OFF this notebook (user direction 2026-08-05): it is
+# API-served, so it runs from the local box via run_cloud.sh + the isolated
+# gcloud ADC instead of spending a Colab tab. Empty list = cell 9b no-ops.
 CLOUD_MODELS = """\
-vertex_model_garden/qwen/qwen3-next-80b-a3b-instruct-maas     qwen3-next-80b-instruct    global
 """
 
 # Sanity: confirm the multi-turn dataset is present at generation time.
