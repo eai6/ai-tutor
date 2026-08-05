@@ -625,9 +625,55 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     )
 
 
-def run(scenarios: list[Scenario]) -> RunResult:
+def _write_partial(path: Path, *, started: str, git_sha: str, total: int,
+                   results: list) -> None:
+    """Atomically checkpoint the run so far.
+
+    Exists because of the 2026-08-04 Colab bare-tag sweep: ~22 of 30
+    scenarios had COMPLETED (9+ hours of GPU time) when the VM's OOM killer
+    SIGKILLed the process — and since the JSON was only written at the end
+    of the whole run, every one of them was lost. This file holds the same
+    shape as a final run JSON plus ``"partial": true``, so aggregate.py and
+    the analysis tooling can read a salvaged run unchanged. Deleted on
+    successful completion (the final write_run supersedes it)."""
+    payload = {
+        'partial': True,
+        'started_at': started,
+        'finished_at': None,
+        'git_sha': git_sha,
+        'total_scenarios': total,
+        'completed_scenarios': len(results),
+        'passed': sum(1 for r in results if r.passed),
+        'failed': sum(1 for r in results if not r.passed and not r.error),
+        'errored': sum(1 for r in results if r.error),
+        'results': [asdict(r) for r in results],
+        'engine': None,
+        'tutor_model': _tutor_model_spec(),
+    }
+    tmp = path.with_suffix('.tmp')
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                   encoding='utf-8')
+    tmp.replace(path)
+
+
+def partial_path_for(started: dt.datetime, git_sha: str) -> Path:
+    ts = started.strftime('%Y-%m-%dT%H-%M-%S')
+    return RUNS_ROOT / f"partial_{ts}_{git_sha}.json"
+
+
+def run(scenarios: list[Scenario], on_result=None) -> RunResult:
+    """Run scenarios sequentially.
+
+    ``on_result`` is an optional callable ``(scenario_result, index, total)``
+    invoked after EACH scenario — the management command uses it to stream
+    per-scenario verdict lines (flushed) instead of printing them only after
+    the whole suite finishes, where a mid-run kill loses them all.
+    """
     from django.db import connections
     started = dt.datetime.now(dt.timezone.utc)
+    RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+    sha = _git_sha()
+    checkpoint = partial_path_for(started, sha)
     results: list[ScenarioResult] = []
     for scenario in scenarios:
         # Close idle DB connections between scenarios. Azure Postgres
@@ -660,13 +706,32 @@ def run(scenarios: list[Scenario]) -> RunResult:
                 tags=scenario.tags,
                 error=f"{type(exc).__name__}: {str(exc)[:200]}",
             ))
+        # Checkpoint + stream after EVERY scenario — a SIGKILL between
+        # scenarios now costs at most the scenario in flight.
+        try:
+            _write_partial(checkpoint, started=started.isoformat(),
+                           git_sha=sha, total=len(scenarios), results=results)
+        except Exception:
+            logger.warning("could not write partial checkpoint %s",
+                           checkpoint, exc_info=True)
+        if on_result is not None:
+            try:
+                on_result(results[-1], len(results), len(scenarios))
+            except Exception:
+                logger.warning("on_result callback failed", exc_info=True)
     finished = dt.datetime.now(dt.timezone.utc)
+    # Completed cleanly — the final write_run supersedes the checkpoint.
+    try:
+        checkpoint.unlink(missing_ok=True)
+        checkpoint.with_suffix('.tmp').unlink(missing_ok=True)
+    except Exception:
+        pass
     from apps.tutoring import simple_tutor as _st
     engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
     return RunResult(
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
-        git_sha=_git_sha(),
+        git_sha=sha,
         total_scenarios=len(results),
         passed=sum(1 for r in results if r.passed),
         failed=sum(1 for r in results if not r.passed and not r.error),

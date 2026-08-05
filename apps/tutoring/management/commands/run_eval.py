@@ -122,12 +122,20 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"\n=== Running {len(scenarios)} scenario(s) ===\n")
         )
+        self.stdout.write(
+            "Checkpoint: evals/runs/partial_*.json is rewritten after every "
+            "scenario — if this run is killed, salvage completed results "
+            "from there.\n"
+        )
+        self.stdout.flush()
 
-        result = run(scenarios)
-        out_path = write_run(result)
-
-        # Per-scenario one-liner.
-        for sr in result.results:
+        # Per-scenario one-liner — STREAMED as each scenario completes, and
+        # flushed. Printing these only after run() returned meant a mid-run
+        # SIGKILL (2026-08-04 Colab OOM) showed nothing per-scenario: the
+        # lines sat in Python's block buffer behind a file redirect. The
+        # runner also checkpoints a partial_*.json after every scenario now,
+        # so a killed sweep salvages everything completed.
+        def _print_result(sr, index, total):
             rubric_tag = ''
             if sr.rubric_result:
                 rr = sr.rubric_result
@@ -148,7 +156,7 @@ class Command(BaseCommand):
             elif sr.passed:
                 label = self.style.SUCCESS('PASS ')
                 if sr.mode == 'multi_turn':
-                    detail = f"trajectory ok"
+                    detail = "trajectory ok"
                 else:
                     detail = (sr.tutor_response[:60] + '...') if len(sr.tutor_response) > 60 else sr.tutor_response
                     detail = detail.replace('\n', ' ')
@@ -159,8 +167,13 @@ class Command(BaseCommand):
                     fails.append('rubric')
                 detail = f"failed: {', '.join(fails)}"
             self.stdout.write(
-                f"  {label} {sr.scenario_id:<40} {detail}{mode_tag}{rubric_tag}"
+                f"  [{index}/{total}] {label} {sr.scenario_id:<40} "
+                f"{detail}{mode_tag}{rubric_tag}"
             )
+            self.stdout.flush()
+
+        result = run(scenarios, on_result=_print_result)
+        out_path = write_run(result)
 
         # Summary line.
         summary = (
