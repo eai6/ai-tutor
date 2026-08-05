@@ -1218,6 +1218,90 @@ _VERIFIER_HIGH_CONFIDENCE = 0.85
 _VERIFIER_LOW_CONFIDENCE = 0.5
 
 
+def arbitrate_reference(question) -> str | None:
+    """Solve a question INDEPENDENTLY of its stored reference — the
+    false-reject arbiter for stuck slots.
+
+    Both qwen_mt10 boards burned sessions on slots whose stored reference
+    was simply wrong (a catalog MCQ letter defect, or a model-authored ref
+    the deterministic solver could not check): the student's correct answer
+    was graded incorrect over and over, and the judges scored every one of
+    those turns as a false correction. The normal Tier-2 verifier can't
+    help — it grades AGAINST the stored reference. This asks the judge
+    chain to solve the question from the stem (and options) alone; the
+    caller compares the independent answer to the stored reference and
+    corrects the slot on confident disagreement.
+
+    Returns the independent answer (an 'A'-'D' letter for MCQ, the value
+    otherwise), or None when unavailable/unconfident. Fail-soft: any
+    infrastructure error returns None (offline boxes have no judge chain —
+    the status quo simply persists there)."""
+    if not _HAS_PYDANTIC:
+        return None
+    try:
+        from pydantic import BaseModel, Field
+        from typing import Literal as _Lit
+
+        class RefArbiterResponse(BaseModel):
+            # Answer FIRST — commit before rationalising (same reasoning as
+            # VerifierResponse's field order).
+            correct_answer: str = Field(description=(
+                "The correct answer. For a multiple-choice question, the "
+                "single letter A, B, C or D. For a numeric question, the "
+                "number alone."))
+            confidence: _Lit['high', 'medium', 'low'] = Field(description=(
+                "high only when the answer is unambiguous from the "
+                "question itself."))
+
+        from apps.curriculum.content_judges._providers import get_judge_provider_chain
+        from apps.tutoring.judges._instructor_helper import (
+            get_instructor_from_client, structured_completion,
+        )
+    except Exception as e:                              # noqa: BLE001
+        logger.warning("ref arbiter infra unavailable: %s", e)
+        return None
+
+    qtext = (getattr(question, 'question_text', '') or '').strip()
+    if not qtext:
+        return None
+    opts = []
+    for letter in 'ABCD':
+        o = (getattr(question, f'option_{letter.lower()}', '') or '').strip()
+        if o:
+            opts.append(f"{letter}) {o}")
+    user_prompt = (
+        f"<question>\n{qtext}\n</question>\n"
+        + (f"<options>\n" + "\n".join(opts) + "\n</options>\n" if opts else "")
+        + "\nSolve the question yourself. Do NOT assume any answer key is "
+          "available or correct."
+    )
+    system_prompt = (
+        "You are a subject-matter checker for secondary-school geography and "
+        "mathematics questions. Solve the question independently and answer "
+        "in the requested structure. If the question is ambiguous, "
+        "unanswerable, or missing information, set confidence to low."
+    )
+    for prov in (get_judge_provider_chain('judge') or [])[:2]:
+        try:
+            client = get_instructor_from_client(prov.client)
+            if client is None:
+                continue
+            resp = structured_completion(
+                client, RefArbiterResponse,
+                system_prompt=system_prompt, user_prompt=user_prompt,
+                max_tokens=3500,
+                provider=(str(prov.config.provider) if prov.config else ''),
+            )
+            if resp is None or resp.confidence != 'high':
+                return None
+            answer = (resp.correct_answer or '').strip()
+            return answer or None
+        except Exception as e:                          # noqa: BLE001
+            logger.warning("ref arbiter call failed: %s", e)
+            continue
+    return None
+
+
 def _build_verifier_system_prompt() -> str:
     """The verifier's system prompt. Context-free (no tutoring history),
     temperature-zero (enforced by the judge purpose clamp).

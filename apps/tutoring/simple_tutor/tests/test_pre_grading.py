@@ -347,3 +347,115 @@ class PreciseStaleSlotGuardTest(DjangoTestCase):
             "Not quite. Let's simplify things first.\n\n"
             "What is 360° − 175°?")
         self.assertIsNone(_pre_grade_answer(session, '185'))
+
+
+# ============================================================================
+# qwen_mt10 fixes — reference arbiter, optset pose cap, mid-reply denial scrub
+# ============================================================================
+
+
+from unittest.mock import patch
+
+from apps.tutoring.simple_tutor.engine import _align_reply_polarity
+
+
+def _graded(verdict):
+    return [{'tool': 'record_answer',
+             'result': {'recorded': True, 'verdict': verdict}}]
+
+
+class RefArbiterTest(DjangoTestCase):
+    """Wrong stored reference (catalog letter defect) graded the student's
+    correct answer wrong forever — both qwen_mt10 boards burned their worst
+    sessions there. On the 2nd wrong attempt the judge chain solves the
+    question independently and a confident disagreement corrects the slot."""
+
+    def _slot(self, session):
+        return InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which map would best show the whole African '
+                          'continent?',
+            question_type='mcq',
+            options=['1:5,000', '1:25,000', '1:10,000,000', '1:50,000'],
+            reference_answer='B',        # wrong: the catalog defect
+            source='catalog',
+        )
+
+    def test_second_wrong_attempt_arbitrates_and_regrades(self):
+        session, _ = _make_session()
+        self._slot(session)
+        with patch('apps.tutoring.simple_tutor.grader.arbitrate_reference',
+                   return_value='C'):
+            first = handle_record_answer(session, extracted_answer='C')
+            self.assertEqual(first['verdict'], 'incorrect')   # attempt 1: no arbiter
+            second = handle_record_answer(session, extracted_answer='C')
+        self.assertEqual(second['verdict'], 'correct')
+        self.assertEqual(second['reference_answer'], 'C')
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_arbiter_decline_keeps_verdict(self):
+        session, _ = _make_session()
+        self._slot(session)
+        with patch('apps.tutoring.simple_tutor.grader.arbitrate_reference',
+                   return_value=None):
+            handle_record_answer(session, extracted_answer='C')
+            second = handle_record_answer(session, extracted_answer='C')
+        self.assertEqual(second['verdict'], 'incorrect')
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'B')
+        self.assertEqual(slot.attempt_count, 2)
+
+    def test_arbiter_fires_once_per_slot(self):
+        session, _ = _make_session()
+        self._slot(session)
+        with patch('apps.tutoring.simple_tutor.grader.arbitrate_reference',
+                   return_value=None) as arb:
+            handle_record_answer(session, extracted_answer='A')
+            handle_record_answer(session, extracted_answer='C')
+            handle_record_answer(session, extracted_answer='D')
+        self.assertEqual(arb.call_count, 1)
+
+    def test_mcq_arbitration_to_non_letter_rejected(self):
+        session, _ = _make_session()
+        self._slot(session)
+        with patch('apps.tutoring.simple_tutor.grader.arbitrate_reference',
+                   return_value='1:10,000,000'):
+            handle_record_answer(session, extracted_answer='C')
+            second = handle_record_answer(session, extracted_answer='C')
+        self.assertEqual(second['verdict'], 'incorrect')
+        self.assertEqual(
+            InFlightQuestion.objects.get(session=session).reference_answer, 'B')
+
+
+class OptsetPoseCapTest(DjangoTestCase):
+    """qwen_mt10: one catalog MCQ re-posed 7-8x with reworded stems — same
+    options every time — sailing past the stem-only cap."""
+
+    OPTS = ['1:5,000', '1:25,000', '1:10,000,000', '1:50,000']
+
+    def _pose(self, session, stem):
+        return handle_pose_question(
+            session, question_text=stem, question_type='mcq',
+            options=list(self.OPTS), reference_answer='B', source='catalog',
+        )
+
+    def test_third_pose_of_same_optset_rejected_despite_reworded_stem(self):
+        session, _ = _make_session()
+        self.assertTrue(self._pose(session, 'Which scale shows a town?')['posed'])
+        self.assertTrue(self._pose(session, 'Pick the scale that best shows '
+                                            'a town in detail.')['posed'])
+        third = self._pose(session, 'Now, which of these scales would you '
+                                    'choose for a town map?')
+        self.assertFalse(third['posed'])
+        self.assertTrue(third.get('repeat_of_stem'))
+
+
+class MidReplyDenialScrubTest(DjangoTestCase):
+    def test_plain_not_quite_dropped_on_correct_verdict(self):
+        session, _ = _make_session()
+        reply = ("Right — 180° is correct. Not quite the phrasing I taught, "
+                 "check the wording. Now try this: what is 360° − 90°?")
+        out = _align_reply_polarity(session, reply, _graded('correct'))
+        self.assertNotIn('Not quite', out)
+        self.assertIn('180° is correct', out)
+        self.assertIn('360° − 90°', out)

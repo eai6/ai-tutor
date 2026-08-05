@@ -1,0 +1,3918 @@
+{
+  "started_at": "2026-08-05T02:55:53.737830+00:00",
+  "finished_at": "2026-08-05T03:23:11.250049+00:00",
+  "git_sha": "8a6b24018b59",
+  "total_scenarios": 10,
+  "passed": 4,
+  "failed": 6,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "average_geo_scale_001",
+      "passed": true,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "baseline",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=7, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Adapts to the mix of bare and worked answers; asks for reasoning only when diagnostically useful",
+            "score": 0.6,
+            "reasoning": "The student consistently provided reasoning unprompted, and the tutor generally accepted this without demanding more, but the tutor repeated the same question twice (Beau Vallon buildings question) without adapting, suggesting limited responsiveness to the student's demonstrated mastery.",
+            "applicable": true
+          },
+          {
+            "item": "Corrects the large-vs-small-scale confusion with a specific pointer rather than a generic 'not quite'",
+            "score": 0.0,
+            "reasoning": "The student never made a large-vs-small-scale confusion — all answers were correct — so this correction was never needed.",
+            "applicable": false
+          },
+          {
+            "item": "Session reaches completion or the exit ticket",
+            "score": 1.0,
+            "reasoning": "The tutor explicitly handed off to the exit ticket quiz at the end of the session.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 1.0,
+            "reasoning": "The student answered every question correctly and the tutor affirmed each correct answer clearly and without hedging throughout the session.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student made no mistakes during the session, so this item never became relevant.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never pre-empted or revealed answers before the student responded; all confirmations came after the student had already answered.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never needed help — all answers were correct on the first attempt — so scaffolding or hints were never required.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "Most tutor turns ended with a clear MCQ prompt, though some confirmatory turns (e.g. after the 1:250,000 question) blended affirmation with a repeated question somewhat awkwardly, slightly reducing clarity of the handoff.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.7,
+            "reasoning": "The tutor was logically consistent in its definitions and affirmations, but repeated the identical Beau Vallon question twice without acknowledgment, which represents a minor lapse in tracking session progress.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 1.0,
+            "reasoning": "The tutor maintained a consistently warm, encouraging, and supportive tone throughout the entire session.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "Most turns felt reasonably natural, but some responses felt slightly templated with repeated affirmation phrases like 'You're absolutely right' and 'Yes, exactly right,' and the repeated identical question made the session feel somewhat scripted.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.85,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2402,
+        "tokens_out": 969,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today we’re learning about map scale—how a ratio like 1:50,000 tells us the relationship between distance on a map and real-world distance.\n\nWhich of the following best defines a large scale map?\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "hmm ok so large scale... i think that means it shows more detail right? so that would be b i think, because 1:25,000 is smaller numbers so it shows like a smaller area but like more zoomed in?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "You're absolutely right — large scale means more detail, like a close-up view of a small area.\nNow, which of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?  \nA) A small scale map of Mahé at 1:50,000  \nB) A large scale map of Beau Vallon at 1:5,000  \nC) A small scale map of the Indian Ocean at 1:10,000,000  \nD) A large scale map of all Seychelles at 1:100,000",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "b, because like you need the large scale one to see the buildings and streets right? and 1:5,000 is like really zoomed in compared to the others. the seychelles one is too big even though it says large scale.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "A small scale map is best described as having which of the following characteristics?\nA) A ratio of 1:10,000 and showing a small area with great detail.\nB) A ratio of 1:1,000,000 or larger and showing a large area with limited detail.\nC) A ratio of 1:50,000 and showing only urban centres.\nD) A map made from a reduced photograph rather than a survey.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "b i think, because small scale means like the numbers are really big right? so 1:1,000,000 is small scale and it shows like a huge area but not much detail. the 1:10,000 one is large scale so that's not it.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Which map ratio represents a large scale map?\nA) 1:100,000\nB) 1:500,000\nC) 1:5,000\nD) 1:2,000,000",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "c, because the smaller numbers mean it's like zoomed in more. so 1:5,000 shows more detail than the big ones like 1:100,000 or 1:500,000.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "A map with the ratio 1:250,000 would be classified as which scale type?\nA) Large scale\nB) Small scale\nC) Medium scale\nD) Ultra-large scale",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "i think b, small scale. because 1:250,000 is like a pretty big number so it covers a lot of area but not much detail right? it's not as zoomed in as the 1:5,000 one we did before.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "That's a great reasoning — you're absolutely right that a larger denominator means less detail. You’ve correctly identified that 1:250,000 covers a large area with limited detail, which fits the definition of small scale.  \n\nNow, let’s try a real-world example: which map would best show the layout of a small town like Beau Vallon?  \nA) A small scale map of Mahé at 1:50,000  \nB) A large scale map of Beau Vallon at 1:5,000  \nC) A small scale map of the Indian Ocean at 1:10,000,000  \nD) A large scale map of all Seychelles at 1:100,000  \n\nWhich option would show the most detail about streets and buildings?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "b, because you need large scale to see the streets and buildings and stuff. 1:5,000 is like really zoomed in so you can see all the details of beau vallon. the other ones are either too zoomed out or they're covering too big an area.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Yes, exactly right. You're absolutely right — a large scale map like 1:5,000 shows fine details of streets and buildings. A map with a ratio like 1:250,000 has a large denominator, meaning it covers a wide area with less detail, so it’s classified as small scale.\n\nWhich of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?\nA) A small scale map of Mahé at 1:50,000\nB) A large scale map of Beau Vallon at 1:5,000\nC) A small scale map of the Indian Ocean at 1:10,000,000\nD) A large scale map of all Seychelles at 1:100,000",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "b, same as before right? because 1:5,000 is large scale and it shows beau vallon with all the streets and buildings. the others don't work because they're either too zoomed out or they're showing way too big an area.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 7,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 1,
+      "error": ""
+    },
+    {
+      "scenario_id": "capable_math_session_001",
+      "passed": true,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "math",
+        "capable",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=13, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Confirms correct answers briefly without over-probing",
+            "score": 0.7,
+            "reasoning": "The tutor generally confirms correct answers briefly, but often repeats the same formula explanation after every correct answer, making confirmations feel slightly templated rather than truly brief.",
+            "applicable": true
+          },
+          {
+            "item": "Advances through the lesson at a pace appropriate for a capable student",
+            "score": 0.6,
+            "reasoning": "The tutor repeated the exact same question ('Five angles around a point are 50°, 80°, 60°, 50°, and m°') after the student already answered it correctly, and repeated the five equal angles question twice, slowing pace unnecessarily for a capable student.",
+            "applicable": true
+          },
+          {
+            "item": "Engages with any clarification request the student raises",
+            "score": 0.0,
+            "reasoning": "The student never raised a clarification request during the session.",
+            "applicable": false
+          },
+          {
+            "item": "Session reaches completion or exit ticket",
+            "score": 1.0,
+            "reasoning": "The session explicitly ends with the tutor handing off to a quiz, confirming the exit ticket was reached.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor correctly identified the student's error on the straight-line sum question (210°), but then falsely stated '180° is always the sum, not 80°' after the student correctly answered 80° to '180° minus 100°', which is a significant affirmation failure.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.6,
+            "reasoning": "The tutor did identify the specific error (adding 100+110 to get 210 instead of applying the 180° rule), but then repeated the same correction verbatim after the student gave the correct answer of 80°, failing to acknowledge the correct response.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor generally avoided revealing answers, though in one instance the explanation after a correct answer included numbers that effectively restated the solution process; no outright answer-giving to unsolved questions was observed.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.6,
+            "reasoning": "When the student answered 80° correctly to '180° minus 100°', the tutor incorrectly told them they were wrong and repeated the same unhelpful correction, failing to provide useful scaffolding at a critical moment.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.9,
+            "reasoning": "Nearly every tutor turn ended with a clear next question or prompt for the student, maintaining good conversational flow throughout.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor made a significant logical inconsistency by telling the student their correct answer of 80° was wrong, and also used incorrect numbers in one explanation (citing 50°+55°+70°+65° for a problem that had 50°+80°+60°+50°), showing factual inconsistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The tone was generally warm and encouraging, though telling a student their correct answer is wrong without acknowledgment could feel discouraging, slightly undermining the overall supportive tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "The tutor frequently repeated the same formulaic closing line ('The rule is: add the known angles, then subtract from 360°') after nearly every answer, making the responses feel templated and repetitive rather than naturally conversational.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6727272727272727,
+        "pass_threshold": 0.65,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2148,
+        "tokens_out": 1139,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today we’re learning that angles around a point always add up to 360 degrees — just like a full turn around a mountain viewpoint.  \n\nWhat is the sum of all angles around a point?  \nA) 180°  \nB) 270°  \nC) 450°  \nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 360° is the full turn around a point, just like spinning around a mountain viewpoint. Angles around a point always add up to 360°.  \nNext: Four angles around a point are 80°, 60°, 70°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "That's right — 80° + 60° + 70° = 210°, and 360° − 210° = 150°. The rule is: add the known angles, then subtract from 360°.  \nWhat is x if four angles around a point are 60°, 75°, 80°, and x°?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "145",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Nice — 60° + 75° + 80° = 215°, and 360° − 215° = 145°. The rule is: add the known angles, then subtract from 360°.  \nNow try this: Five angles around a point are 50°, 80°, 60°, 50°, and m°. What is m?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Got it — you're right, m = 120°. The angles around a point always sum to 360°, so subtract the known angles from 360° to find the missing one.\n\nFive angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Exactly — 50° + 55° + 70° + 65° = 240°, and 360° − 240° = 120°. Now try this one: five equal angles around a point. What is the measure of each angle?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "72",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Good — 72° is correct for each of the five equal angles around a point. Angles around a full point always sum to 360°, so dividing 360° by 5 gives 72°.  \nNow try this: On a straight line, angle A is 120°. What is the supplementary angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "60",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "That's it — 60° is correct because angles on a straight line always sum to 180°. Now try this: two angles on a straight line are 130° and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "50",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "That's right — 130° plus 50° makes 180°, which is the total for angles on a straight line. Now try this: Two angles on a straight line are 100° and 110°. What is their sum?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "210",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Not quite — the sum of angles on a straight line is always 180°, not 210°. You added 100° and 110°, but that gives 210°, which is too much. Check the rule: angles on a straight line must add to 180°. What’s 180° minus 100°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "80",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Not quite — the sum of angles on a straight line is always 180°, not 80°. You added 100° and 110°, which gives 210°, too much. What’s 180° minus 100°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "80",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Let's park that one for now and come at the skill from a different problem:\n\nAt a roundabout in Victoria, Seychelles, roads branch off in four directions creating four angles around the central point. The angles measure 85°, 92°, 88°, and x. Find x to determine all angles at the roundabout.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "95",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "Exactly — 85° + 92° + 88° = 265°, and 360° − 265° = 95°. The rule is: add the known angles, then subtract from 360°.  \nNow try this: five equal angles are arranged around a point. What is the measure of each angle?  \n\n",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "72",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 13,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 2,
+      "error": ""
+    },
+    {
+      "scenario_id": "capable_speedrun_001",
+      "passed": false,
+      "persona": "capable",
+      "subject": "math",
+      "lesson_id": 1138,
+      "tags": [
+        "multi_turn",
+        "capable",
+        "pace",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=12, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Confirms each correct answer briefly without re-explaining",
+            "score": 0.5,
+            "reasoning": "The tutor often re-explains the rule ('Angles on a straight line always add up to 180°') after confirming correct answers, rather than confirming briefly and moving on, and sometimes repeats the same question the student just answered correctly.",
+            "applicable": true
+          },
+          {
+            "item": "Advances at a pace appropriate to the student's competence",
+            "score": 0.4,
+            "reasoning": "The tutor repeatedly asks the same 60° question multiple times even after the student answers it correctly, and revisits very basic questions unnecessarily, showing poor pacing relative to the student's demonstrated competence.",
+            "applicable": true
+          },
+          {
+            "item": "Reaches exit_ticket",
+            "score": 1.0,
+            "reasoning": "The session ends with the tutor explicitly handing off to a quiz, confirming the exit ticket was reached.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.4,
+            "reasoning": "In the first turn the student correctly answered A (180°) but the tutor incorrectly told them 'not quite' and second-guessed a correct answer; later when the student correctly answered 120° the tutor said 'that's not right,' which is a significant false negation of correct answers.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.5,
+            "reasoning": "When the tutor incorrectly flagged correct answers as wrong, it gave somewhat specific guidance about the rule, but since the student hadn't actually made mistakes in those cases, the specificity of error identification is hard to assess; in genuine error cases the guidance was somewhat specific but confused.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 1.0,
+            "reasoning": "The tutor never gave away answers before the student attempted them.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.7,
+            "reasoning": "The guidance given was generally correct and relevant, though the tutor sometimes incorrectly identified correct answers as wrong, which undermined the quality of help offered.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.9,
+            "reasoning": "Nearly every tutor turn ended with a clear next question or prompt for the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.3,
+            "reasoning": "The tutor contradicted itself significantly by telling the student their correct answer of A (180°) was 'not quite' and then confirming 180° is correct, and by marking 120° as wrong when it was correct, showing logical inconsistency.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone was generally warm and encouraging, though falsely negating correct answers could be frustrating for the student even if not harsh in tone.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "The tutor avoids filler openers but becomes repetitive and templated, repeating the same rule and the same 60° question multiple times in a way that feels mechanical rather than natural.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6363636363636364,
+        "pass_threshold": 0.65,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1874,
+        "tokens_out": 1019,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Try this: Two angles on a straight line are 80° and 100°. What is their sum?  \nA) 180°  \nB) 200°  \nC) 100°  \nD) 80°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite — the sum of angles on a straight line is always 180°, not 180° as a choice. You picked option A, which matches the value, but the question asks for the sum, not a choice. What do 80° and 100° add up to when you combine them?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "oh right, 180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Right — 80° and 100° add up to 180°. That’s the rule: angles on a straight line always sum to 180°.  \nNext: One angle on a straight line is 60°. What is the other angle?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "You wrote \"120\" — that's not right for the sum of angles on a straight line. Angles on a straight line always add up to 180°. What is the sum of two angles on a straight line?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "You wrote \"180\" — that's right! Angles on a straight line always add up to 180°.  \nNow try this: one angle on a straight line is 60°. What is the other angle?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "That's right — 60° and 120° add up to 180°, which is what angles on a straight line always total. Now try this: one angle on a straight line is 110°. What is the other angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Exactly — 70°. Angles on a straight line always add up to 180°. What is the other angle if one angle is 60°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "A straight line is divided into three angles: 35°, 78°, and x. Find the value of x.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "67",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "That's right — 35° + 78° = 113°, and 180° − 113° = 67°. Angles on a straight line always sum to 180°, no matter how many angles are on it.  \nTwo angles on a straight line are 60° and 120°. What is their sum?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Good — angles on a straight line always add up to 180°. Now try this: one angle on a straight line is 60°. What is the other angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Exactly — 120° is correct because angles on a straight line add up to 180°, so 180° − 60° = 120°.  \nNow try this: two straight lines intersect, forming four angles. One angle is 90°. What is the vertically opposite angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "90",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "That's it — 90°. On a straight line, angles add up to 180°, so if one angle is 90°, the other must be the rest.  \nNow try this: One angle on a straight line is 45°. What is the other angle?",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "135",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 12,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 3,
+      "error": ""
+    },
+    {
+      "scenario_id": "error_prone_session_001",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "math",
+        "error_prone",
+        "remediation",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": false,
+          "detail": "turns=21, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Identifies WHICH error mode each mistake exhibits (wrong operation, arithmetic slip, etc.)",
+            "score": 0.4,
+            "reasoning": "The tutor sometimes identifies the error type (e.g., pointing out the student needs to add known angles then subtract from 360), but often just restates the procedure without naming the specific error mode (wrong operation, arithmetic slip, misconception about the rule, etc.).",
+            "applicable": true
+          },
+          {
+            "item": "Surfaces the specific error rather than just 'try again'",
+            "score": 0.6,
+            "reasoning": "The tutor usually points to where the student went wrong (e.g., 'you need to add the known angles and subtract from 360'), but sometimes just re-poses the question without clearly surfacing what specifically was incorrect in the student's answer.",
+            "applicable": true
+          },
+          {
+            "item": "Does NOT affirm wrong answers",
+            "score": 0.5,
+            "reasoning": "The tutor incorrectly affirmed 'x is 145' (correct answer is 145, so that's fine) and 'y is 120' (correct), but critically affirmed the student's wrong answer 'b' to the MCQ about which statement is correct — the student said 'b' (angles around a point sum to 180°) and the tutor said 'Angles on a straight line sum to 180°, which is the correct rule here,' which affirmed a wrong answer to the question asked.",
+            "applicable": true
+          },
+          {
+            "item": "Does NOT just reveal the correct answer — keeps the student diagnostic-active",
+            "score": 0.5,
+            "reasoning": "On several occasions the tutor revealed the answer directly, most notably telling the student '360° ÷ 5 = 72°' before the student had a chance to work it out, and restating full worked solutions rather than scaffolding toward them.",
+            "applicable": true
+          },
+          {
+            "item": "Session reaches a clean termination",
+            "score": 1.0,
+            "reasoning": "The session ends with the tutor handing off to the exit-ticket quiz, which constitutes a clean termination as described.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor failed to recognise the student's wrong answer to the MCQ (option B) and instead affirmed it, and also gave confusing feedback when the student answered 'x is 50' correctly for a straight-line question but the tutor treated it as wrong by redirecting to a different problem.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.6,
+            "reasoning": "The tutor often restated the correct procedure rather than pinpointing the exact nature of the student's error, though it did go beyond a bare 'try again' in most cases.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.4,
+            "reasoning": "The tutor revealed '360° ÷ 5 = 72°' directly when correcting the navigation chart question, and in multiple correction turns restated the full arithmetic solution (e.g., '80 + 110 = 190, and 360 − 190 = 170°') before the student had reworked it.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.6,
+            "reasoning": "Guidance was generally relevant and correct, but often over-scaffolded by giving the full solution rather than a calibrated hint, and there was one instance of affirming a wrong answer with an explanation that muddied the concept.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "Most tutor turns ended with a clear next question or prompt, though occasionally the tutor moved to a new problem without fully resolving the current one.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "There were notable logical inconsistencies: the tutor affirmed the wrong MCQ answer (B) then later corrected it; it treated the student's correct answer of 'x is 50' for a straight-line question as wrong by redirecting to a different problem; and it sometimes posed new problems without resolving the current one.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.9,
+            "reasoning": "The tone was consistently warm and supportive throughout the session with no harsh or dismissive moments.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The teaching felt mostly natural, though there was some repetitive templating in correction turns (restating the full rule each time) and occasional awkward transitions between problems.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6076923076923078,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2914,
+        "tokens_out": 1347,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today we’re learning that angles around a point always add up to 360 degrees — just like a full turn around a mountain peak.  \n\nWhat is the sum of all angles around a point?  \nA) 0°  \nB) 180°  \nC) 270°  \nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "d",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 360° is the full turn around a point, just like spinning in a circle from the top of a mountain.  \nNow try this: four angles around a point are 80°, 60°, 70°, and x°. What is x?  \n",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "x is 140",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Not quite — if four angles around a point are 80°, 60°, 70°, and x°, they must add up to 360°. You need to add the known angles (80 + 60 + 70 = 210°) and subtract from 360°. What’s 360° − 210°?  \nFour angles around a point are 70°, 50°, 90°, and x°. What is x?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "140",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — if the angles around a point add up to 360°, and you have 80°, 60°, and 70°, their sum is 210°. What’s 360° − (80° + 60° + 70°)?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ohh wait, 360 minus 210 is 150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Four angles around a point measure 70°, 50°, 90°, and x°. What is x?\nA) 150°\nB) -30°\nC) 30°\nD) 120°",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "the answer is a, 150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "You're right — the correct option is A, which gives 150°. Angles around a point always add up to 360°, so you add the known angles and subtract from 360.  \n\nNow try this one: Three angles around a point are 80°, 110°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "x is 170",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "That's right — 80° + 110° = 190°, and 360° − 190° = 170°. The rule is: add the known angles, then subtract from 360°.  \n\nNow try this one: Five angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "m is 120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "You got it — 50° + 80° + 60° + 50° = 240°, and 360° − 240° = 120°. The rule is: add all known angles, then subtract from 360°.  \nNow try this one: Three angles around a point are 70°, 120°, and x°. What is x?  ",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "x is 70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Not quite — if three angles around a point are 70°, 120°, and x°, you add the known angles (70 + 120 = 190°) and subtract from 360°. What is x?\nNow try this one: Five angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.  ",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "ohh wait, 360 minus 190 is 170",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Four angles around a point measure 60°, 75°, 80°, and x. Find the value of x.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "x is 145",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Five angles around a point measure 50°, 55°, 70°, 65°, and y. Calculate y.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "y is 120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Which statement is correct about angles?\nA) Angles on a straight line sum to 360°\nB) Angles around a point sum to 180°\nC) Angles around a point sum to 360°\nD) Vertically opposite angles always sum to 90°",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "the answer is b",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "Angles on a straight line sum to 180°, which is the correct rule here.\n\nWhich statement is correct about angles?  \nA) Angles on a straight line sum to 360°  \n\nD) Vertically opposite angles always sum to 90°  ",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "a",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "Not quite — option A says angles on a straight line sum to 360°, but they only sum to 180°. Check the rule: what do angles on a straight line always add up to?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "ohh wait, they add up to 180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "Let's park that one for now and come at the skill from a different problem:\n\nThree angles sit on a straight line. Two angles measure 45° and 65°. What is the third angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "the third angle is 70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "You're right — 45° + 65° = 110°, and 180° − 110° = 70°. The angles on a straight line always add up to 180°.  \nNow try this one: Two angles on a straight line are 130° and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "student",
+          "content": "x is 50",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "tutor",
+          "content": "You said \"x is 50\" — that’s a response to a question about angles around a point. Let’s check: angles around a point total 360°. If three angles are 80°, 110°, and x°, then 80 + 110 = 190, and 360 − 190 = 170°. So x should be 170°, not 50°.  \n\nNow try this: Three angles around a point are 80°, 110°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "student",
+          "content": "x is 170",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "tutor",
+          "content": "You said \"x is 170\" — that’s correct! Angles around a point always add up to 360°, so if three angles are 80°, 110°, and x°, you add 80 + 110 = 190, then subtract from 360: 360 − 190 = 170°.  \n\nNow try this: Two angles around a point are 100° and 110°. The remaining angle is y°. What is y?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "student",
+          "content": "y is 150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "tutor",
+          "content": "Correct — nice work. You said \"y is 150\" — that’s correct! Angles around a point always add up to 360°, so if two angles are 100° and 110°, you add them: 100 + 110 = 210, then subtract from 360: 360 − 210 = 150°.\n\nA fisherman in Seychelles marks 5 equal angles around a point on his boat's navigation chart. Each angle measures how many degrees?\nA) 36°\nB) 72°\nC) 355°\nD) 365°",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "student",
+          "content": "the answer is c, 355",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "tutor",
+          "content": "Not quite — 355° isn't right here. Five equal angles around a point must sum to 360°, so each angle is 360° ÷ 5 = 72°. What's the correct option?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "student",
+          "content": "ohh wait, the answer is b, 72",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "tutor",
+          "content": "At a roundabout in Victoria, Seychelles, roads branch off in four directions creating four angles around the central point. The angles measure 85°, 92°, 88°, and x. Find x to determine all angles at the roundabout.",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "student",
+          "content": "x is 95",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 21,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 4,
+      "error": ""
+    },
+    {
+      "scenario_id": "error_prone_straight_line_math_001",
+      "passed": false,
+      "persona": "error_prone",
+      "subject": "math",
+      "lesson_id": 1138,
+      "tags": [
+        "multi_turn",
+        "math",
+        "error_prone",
+        "bea_coverage",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": false,
+          "detail": "turns=16, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Identifies each specific error (wrong operation, arithmetic slip, echoed number) and remediates it",
+            "score": 0.5,
+            "reasoning": "The tutor caught most errors (e.g., the student answering '70' for the sum of 70°+110°, and '60' for x when one angle is 60°), but when the student correctly answered 115° for 180°−65°, the tutor incorrectly said 'Not quite — 115° isn't right here' before eventually confirming it was correct, showing inconsistent error identification.",
+            "applicable": true
+          },
+          {
+            "item": "Catches a self-contradictory answer (e.g. two angles on a straight line summing to more than 180) and points out that specific contradiction",
+            "score": 0.0,
+            "reasoning": "No student answer in this session produced a self-contradictory pair of angles summing to more or less than 180° in a way that was explicitly flagged as a contradiction.",
+            "applicable": false
+          },
+          {
+            "item": "Never affirms a wrong answer as correct; does not reveal the answer while remediating; session ends cleanly",
+            "score": 0.4,
+            "reasoning": "The tutor incorrectly told the student '115° isn't right' when 115° was actually correct, and in the 80° question the tutor revealed the answer ('the other must be 100°') before the student had confirmed it, and the session ended cleanly at the exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.3,
+            "reasoning": "The tutor incorrectly marked the correct answer of 115° as wrong, and in the 80° question unnecessarily second-guessed the student's correct answer of 100° with confused hedging, showing significant lapses in both directions.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.6,
+            "reasoning": "The tutor often pointed to the specific rule (angles sum to 180°) and directed the student to compute 180° minus the known angle, but sometimes used generic phrases like 'Not quite' without immediately specifying the nature of the error.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.4,
+            "reasoning": "In the 80° question, the tutor stated 'the other must be 100°' before the student had confirmed their answer, and in the 65° question the tutor eventually confirmed 115° after initially rejecting it, effectively revealing the answer during remediation.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.6,
+            "reasoning": "The tutor consistently pointed students to the 180° rule and the subtraction approach, which was appropriate scaffolding, but the incorrect rejection of the correct 115° answer and the confused 80° turn show lapses in guidance quality.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "Most tutor turns ended with a clear next question or prompt, though the 80° turn was confusingly structured with multiple rhetorical questions before landing on the next problem.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "The tutor contradicted itself by first saying 115° was wrong then confirming it was right, and in the 80° turn produced a self-contradictory statement ('Correct — nice work. Angles on a straight line always sum to 180°, not 100°') that was internally incoherent.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The overall tone was generally warm and supportive, though the confused and contradictory turns around 115° and 80° may have been frustrating or confusing for the student rather than encouraging.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "The tutor avoided filler openers but frequently repeated the same formulaic phrase 'Angles on a straight line always add up to 180°' in nearly every turn, making the responses feel templated and repetitive.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.53,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2342,
+        "tokens_out": 1241,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today we’ll learn why angles on a straight line always add up to 180° — and how to use that to find missing angles.  \n\nOn a straight line, angles always add up to 180°.  \nWhat is the sum of two angles on a straight line?  \n\nA) 90°  \nB) 180°  \nC) 270°  \nD) 360°  \n\n",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "b",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Quick one to get us going: what is the sum of two angles on a straight line?",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Exactly — 180°. Angles on a straight line always add up to 180°, so if you see two angles on a straight line, their sum is always 180°.  \nWhat is the other angle if one angle on a straight line is 60°?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Nice — 120° is correct. Angles on a straight line always add up to 180°, so if one angle is 60°, the other must be 120°.  \nNow try this: Two angles on a straight line are 70° and 110°. What is their sum?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Not quite — you answered 70, but the sum of angles on a straight line must be 180°. What is their sum?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "ohh wait, 180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Got it — that's right. The rule is: angles on a straight line always add up to 180°. Now try this: One angle on a straight line is 65°. What is the other angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "115",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Not quite — 115° isn't right here. Angles on a straight line always add up to 180°. So what is 180° minus 65°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "180 minus 65 is 115",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "You're right — 180 − 65 = 115. Angles on a straight line always add to 180°, so if one angle is 65°, the other is 115°.  \nWhat is the other angle if one angle on a straight line is 110°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "You're right — 180 − 110 = 70°. Angles on a straight line always add to 180°, so if one angle is 110°, the other is 70°.  \nWhat is the other angle if one angle on a straight line is 80°?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "100",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Correct — nice work. Angles on a straight line always sum to 180°, not 100°. If one angle is 80°, the other must be 100°? Wait — 80° + 100° = 180°, so yes, that works. But you said \"100\" — is that the sum or the other angle? Let’s check: if one angle is 80°, the other must be 100° to make 180°. So what is the other angle?\n\nOn a straight line, if one angle is 80°, the other is 100°. Now try this: two angles on a straight line are 60° and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "60",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Not quite — if one angle on a straight line is 60°, the other must be 120° because angles on a straight line always add up to 180°. What's 180° minus 60°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "wait what, 120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Wait — you're asking about 120°, right? Let's make sure: on a straight line, angles always add up to 180°. If one angle is 60°, the other must be 180° minus 60°. What’s 180 minus 60?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "At a market stall in Victoria, a shop owner positions a shade cloth on a straight line frame. The frame is divided by support poles into angles of 28°, 95°, and y. Find y.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "57",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "Exactly — 57° is correct. Angles on a straight line always add up to 180°, so you subtract the known angle from 180°.  \nWhat is the other angle if one angle on a straight line is 110°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "You answered \"70\" — that's right for the second angle on a straight line when one is 110°, since 180° − 110° = 70°.  \nNow try this: One angle on a straight line is 30°. What is the other angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "You answered \"150\" — that's right when one angle on a straight line is 30°, since 180° − 30° = 150°.  \nOn a straight line, angles always add to 180° — so if one is known, subtract it from 180° to find the other.  \nNow try this: One angle on a straight line is 40°. What is the other angle?",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "student",
+          "content": "140",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 16,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 5,
+      "error": ""
+    },
+    {
+      "scenario_id": "no_banned_opener_loop_capable_001",
+      "passed": true,
+      "persona": "capable",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "banned_opener",
+        "repetition",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=5, limit=12"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 4-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Across the session, the tutor varied its scaffolding — did not rely on the same probe ('walk me through', 'show me your working') turn after turn",
+            "score": 0.5,
+            "reasoning": "The tutor did not use banned probes, but it repeated the exact same MCQ question twice in a row (the 1:5,000 question) without any variation in scaffolding, showing limited variety in approach.",
+            "applicable": true
+          },
+          {
+            "item": "When the same student behaviour recurred, the tutor's response WAS NOT a verbatim repeat of the previous turn",
+            "score": 0.3,
+            "reasoning": "When the student answered C to the same question twice, the tutor's response was nearly identical ('Got it — that's right' vs 'Correct — nice work. C'), and the question itself was repeated verbatim, indicating a near-verbatim repeat.",
+            "applicable": true
+          },
+          {
+            "item": "No prescribed banned phrases ('walk me through your steps', 'show me your working, step by step', 'let's check this one together') appeared in two consecutive tutor turns",
+            "score": 1.0,
+            "reasoning": "None of the banned phrases appeared in any tutor turn throughout the session.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.7,
+            "reasoning": "The tutor affirmed correct answers clearly, but when the student answered B to the 1:250,000 question (which is arguably correct as 'small scale'), the tutor moved on without explicit affirmation or correction, leaving ambiguity.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.0,
+            "reasoning": "The student did not make any clear mistakes that the tutor needed to address with specific error identification.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.7,
+            "reasoning": "The tutor wrote 'Correct — nice work. C' after the student answered, which echoes the letter answer but only after the student had already answered, though it is slightly redundant confirmation rather than a reveal.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.0,
+            "reasoning": "The student never explicitly requested help and answered all questions without needing additional guidance.",
+            "applicable": false
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.9,
+            "reasoning": "Nearly every tutor turn presented a clear MCQ for the student to answer, consistently handing the floor back with structured prompts.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.6,
+            "reasoning": "The tutor repeated the same question twice without acknowledging the student had already answered it correctly, which represents an inconsistency in tracking the conversation state.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.9,
+            "reasoning": "The tutor maintained a consistently warm and encouraging tone throughout, with brief but positive affirmations and no harsh or dismissive language.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.7,
+            "reasoning": "The tutor avoided filler openers but the repetition of the same question verbatim and formulaic short affirmations gave some turns a slightly templated feel.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.7,
+        "pass_threshold": 0.65,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1745,
+        "tokens_out": 1036,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome! Today we’re learning about map scale—how different scales show either detailed views of small areas or broad views of large regions.  \n\nWhich of the following best defines a large scale map?  \nA) A map that covers a very large geographic area such as a continent or entire country.  \n\nC) A map printed on large paper or displayed on a large computer screen.  \nD) A map that requires a magnifying glass to read the labels.\n\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — a large scale map has a small ratio (like 1:25,000) and shows a limited area with high detail.  \nNow, which map ratio represents a large scale map?  \nA) 1:100,000  \nB) 1:500,000  \nC) 1:5,000  \nD) 1:2,000,000",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Got it — that's right. Quick one to get us going: which map ratio represents a large scale map?  \nA) 1:100,000  \nB) 1:500,000  \nC) 1:5,000  \nD) 1:2,000,000",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Correct — nice work. C\n\nWhich of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?\nA) A small scale map of Mahé at 1:50,000\nB) A large scale map of Beau Vallon at 1:5,000\nC) A small scale map of the Indian Ocean at 1:10,000,000\nD) A large scale map of all Seychelles at 1:100,000",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "A map with the ratio 1:250,000 would be classified as which scale type?\nA) Large scale\nB) Small scale\nC) Medium scale\nD) Ultra-large scale",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 5,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 6,
+      "error": ""
+    },
+    {
+      "scenario_id": "non_responder_engagement_001",
+      "passed": false,
+      "persona": "non_responder",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "non_answer",
+        "engagement",
+        "persona_handling",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=16, limit=30"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor adapted to monosyllabic input — did NOT continue lecturing as if the student were engaged",
+            "score": 0.5,
+            "reasoning": "When the student said 'idk', the tutor sometimes moved on with a scaffolded question, but other times repeated the same question verbatim or gave a brief nudge without truly adapting to the disengagement pattern.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor asked progressively more specific or scaffolded questions to invite a real response, rather than info-dumping or repeating itself",
+            "score": 0.4,
+            "reasoning": "The tutor frequently repeated questions verbatim after 'idk' responses (e.g., the four-angles question, the three-angles question) rather than breaking them down into smaller scaffolded steps.",
+            "applicable": true
+          },
+          {
+            "item": "The session did not advance through the lesson plan on the basis of 'ok' / 'yes' / 'idk' alone",
+            "score": 0.7,
+            "reasoning": "The tutor generally required a substantive answer before moving on, though it sometimes moved forward after minimal engagement or repeated the same question without meaningful scaffolding.",
+            "applicable": true
+          },
+          {
+            "item": "Tone remained warm and inviting throughout — no impatience",
+            "score": 0.8,
+            "reasoning": "The tone was consistently warm and patient, with no signs of frustration, though some turns felt slightly mechanical.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.5,
+            "reasoning": "The tutor affirmed the wrong answer of 150 for the first four-angles question and praised '230' correctly, but also incorrectly affirmed '120' for the five-angles question (correct answer is 120, so that's fine), yet gave wrong feedback framing on the straight-line question by mixing up the context.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.4,
+            "reasoning": "The tutor often used generic 'not quite' responses without pinpointing the specific error, such as when the student answered 250 twice for the straight-line question without the tutor identifying the specific misconception of using 360 instead of 180.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.6,
+            "reasoning": "The tutor revealed the answer to the MCQ question (D=360°) implicitly by confirming it, and after the student answered 'A' incorrectly for the four-angles MCQ, the tutor moved on without correction — but more critically, the tutor confirmed '150' as correct for the first four-angles problem when it was actually wrong, which is a different issue.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.5,
+            "reasoning": "Guidance was sometimes relevant but often just repeated the question or gave a minimal nudge; the scaffolding for 'idk' responses was rarely broken into smaller steps that would genuinely help the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.9,
+            "reasoning": "Almost every tutor turn ended with a clear, specific question or prompt for the student to respond to.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "The tutor affirmed the wrong answer of 150 for the first problem, then later gave feedback referencing '80+50=130' when the question involved different numbers, and mixed up straight-line vs. around-a-point contexts in the feedback for the 250 answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The tone was consistently warm and supportive throughout the session with no harsh or dismissive moments.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "The tutor avoided filler openers but relied heavily on templated phrases like 'Quick one to get us going' and repeated the same structural patterns, making it feel somewhat robotic.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.5916666666666667,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 2256,
+        "tokens_out": 1215,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we’ll learn that angles around a point always add up to 360 degrees — just like a full turn around a mountain viewpoint.  \n\nWhat is the sum of all angles around a point?  \nA) 270°  \nB) 180°  \nC) 450°  \nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 360° is the full turn around a point, just like spinning around a mountain viewpoint. Now, try this: four angles around a point are 80°, 60°, 70°, and x°. What is x?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Not quite. Quick one to get us going: four angles around a point are 80°, 60°, 70°, and x°. What is x?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "150",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Four angles around a point measure 70°, 50°, 90°, and x°. What is x?\nA) 150°\nB) -30°\nC) 30°\nD) 120°",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Three angles around a point are 80°, 50°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Quick one to get us going: three angles around a point are 80°, 50°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "230",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Exactly — 80° + 50° = 130°, and 360° − 130° = 230°. The rule is: add the known angles, then subtract from 360°.  \nFour angles around a point are 60°, 75°, 80°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "145",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "That's right — 60° + 75° + 80° = 215°, and 360° − 215° = 145°. The rule is: add the known angles, then subtract from 360°.  \nNow try this: Five angles around a point measure 50°, 55°, 70°, 65°, and y. Calculate y.  \n\n",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "120",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Good — 80° + 50° = 130°, and 360° − 130° = 230°. Angles around a point always add up to 360°.  \nNow try this: Three angles around a point are 60°, 75°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "225",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Well done — 60° + 75° = 135°, and 360° − 135° = 225°. Angles around a point always add up to 360°, so you add the known angles and subtract from 360.  \nWhat is the third angle if two angles on a straight line are 45° and 65°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "idk",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Close — not quite. Quick one to get us going: what do angles on a straight line always add up to?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "180",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Not quite — 180° is the sum of angles on a straight line, not the third angle when two angles are 45° and 65°. The angles around a point total 360°, so you subtract the known angles from 360°. What is 360° − (45° + 65°)?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "250",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "Not quite — 250° is not right here. Angles on a straight line total 180°, and you're looking for the third angle when two angles are 45° and 65°. The angles around a point total 360°, so you subtract the known angles from 360°. What is 360° − (45° + 65°)?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "250",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "What is the third angle if two angles on a straight line are 45° and 65°?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "70",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "Exactly — 45° + 65° = 110°, and since angles on a straight line total 180°, the third angle is 180° − 110° = 70°.  \nNow try this: Three angles around a point are 80°, 110°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "170",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "That's right — 80° + 110° = 190°, and 360° − 190° = 170°. The rule is: add the known angles, then subtract from 360°.  \nFive equal angles around a point: each measures how many degrees?",
+          "phase": "evaluate",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "student",
+          "content": "72",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 16,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 7,
+      "error": ""
+    },
+    {
+      "scenario_id": "short_session_struggler_001",
+      "passed": true,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "short_session",
+        "struggler",
+        "edge_case",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='max_turns', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=6, limit=6"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥2× in any 3-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Tutor adapts pacing to the short session — covers fewer concepts but covers them well",
+            "score": 0.7,
+            "reasoning": "The tutor stayed focused on a single concept (angles around a point) and drilled it well, though it repeated the same MCQ twice unnecessarily, wasting turns.",
+            "applicable": true
+          },
+          {
+            "item": "Does NOT cram",
+            "score": 0.9,
+            "reasoning": "The tutor stuck to one concept throughout without trying to introduce additional topics.",
+            "applicable": true
+          },
+          {
+            "item": "Reaches a clean termination",
+            "score": 0.0,
+            "reasoning": "The session ran out of turns mid-question without any closing summary or exit ticket.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.6,
+            "reasoning": "The tutor correctly identified mistakes and affirmed correct answers, but on the second mistake (x=190) it repeated the exact same question rather than adapting, and the 'Not this time' phrasing is slightly odd after the student gave the same wrong answer again.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.2,
+            "reasoning": "On both mistake turns the tutor gave only generic feedback ('Not quite', 'Not this time') and restated the rule without identifying the specific error (that the student was adding x to the known angles instead of subtracting from 360).",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.8,
+            "reasoning": "The tutor did not hand over answers prematurely; it waited for the student to reach the correct answer before confirming, though it did re-ask the same question after the student's second wrong attempt rather than scaffolding further.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.4,
+            "reasoning": "When the student made mistakes, the tutor only restated the rule and repeated the same question rather than providing targeted scaffolding to address the specific misconception.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.9,
+            "reasoning": "Every tutor turn ended with a clear, specific question for the student to answer.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.8,
+            "reasoning": "The tutor was mostly consistent, though it repeated the same MCQ twice and re-asked the same problem after the student's second wrong answer without acknowledging the repetition.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.8,
+            "reasoning": "The tone was generally warm and supportive, though 'Not this time' after the student's repeated mistake felt slightly dismissive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.5,
+            "reasoning": "Several turns felt templated, particularly the repeated 'Not quite/Not this time — but let's check the rule: angles around a point always add up to 360°' pattern used identically across mistake turns.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.6000000000000001,
+        "pass_threshold": 0.6,
+        "passed": true,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 1685,
+        "tokens_out": 974,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hi there! Today we’ll learn that angles around a point always add up to 360 degrees — just like a full turn around a mountain viewpoint.  \n\nWhat is the sum of all angles around a point?  \nA) 0°  \nB) 180°  \nC) 270°  \nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "360. the rule says so",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 360° is the sum of all angles around a point. That’s because it’s like a full turn around a mountain viewpoint.  \nWhat is the sum of all angles around a point?  \nA) 270°  \nB) 180°  \nC) 450°  \nD) 360°",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "360. you just said that",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Try this: Four angles around a point are 80°, 60°, 70°, and x°. What is x?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "hmm so i add them up? 80 plus 60 is 140, plus 70 is 210... so x is 210?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite. You're close — but let's check the rule: angles around a point always add up to 360°.\nNow try this: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ok so they add up to 360. um 80 plus 110 is 190. so x is 190?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Not this time. You're close — but let's check the rule: angles around a point always add up to 360°.  \n\nNow try this: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "wait so 80 plus 110 is 190. and then... i need to get to 360? so like 360 minus 190? that's 170?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "You're on the right track — yes, angles around a point always add up to 360°. So if two angles are 80° and 110°, their sum is 190°, and you're correct that 360° − 190° = 170°. That’s the third angle!  \n\nNow try this: Four angles around a point are 80°, 60°, 70°, and x°. What is x?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "ok so 80 plus 60 is 140, plus 70 is 210. then 360 minus 210 is 150. so x is 150?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Yes, exactly right. You're absolutely right — 80° + 60° + 70° = 210°, and 360° − 210° = 150°. So x = 150°. That’s a perfect example of how angles around a point always add up to 360°.  \n\nTry this: Four angles around a point are 70°, 50°, 90°, and x°. What is x?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "max_turns",
+      "sim_turns": 6,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 8,
+      "error": ""
+    },
+    {
+      "scenario_id": "struggler_math_session_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "math",
+      "lesson_id": 1137,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "math",
+        "struggler",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='max_turns', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": false,
+          "detail": "turns=30, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "Scaffolds appropriately for a struggling student — concrete examples, simple steps",
+            "score": 0.3,
+            "reasoning": "The tutor repeatedly asked the same question without varying scaffolding, failing to adapt when the student was stuck or when the student was already succeeding — no new concrete examples or step-by-step breakdowns were introduced to address the student's actual confusion.",
+            "applicable": true
+          },
+          {
+            "item": "Does not info-dump on slips or 'idk' responses",
+            "score": 0.7,
+            "reasoning": "Responses to mistakes were brief, but the tutor did reveal the full worked answer immediately after errors rather than guiding the student to find it themselves.",
+            "applicable": true
+          },
+          {
+            "item": "Session terminates cleanly (exit ticket or max turns)",
+            "score": 0.0,
+            "reasoning": "The session explicitly ran out of turns without reaching an exit ticket or clean conclusion.",
+            "applicable": true
+          },
+          {
+            "item": "Tone is warm throughout",
+            "score": 0.8,
+            "reasoning": "The tutor maintained an encouraging and supportive tone throughout, though the repetitive phrasing made it feel mechanical rather than genuinely warm.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.4,
+            "reasoning": "The tutor affirmed correct answers well, but on early mistakes (e.g., student saying x=210 or y=210) the tutor sometimes skipped over the error without clear recognition, and later kept affirming correct answers while repeating the same question as if the student were still wrong.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.3,
+            "reasoning": "When the student made errors (e.g., saying x=210 instead of subtracting from 360), the tutor gave only generic corrections like 'not quite' without specifically identifying that the student forgot to subtract from 360°.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.3,
+            "reasoning": "The tutor repeatedly revealed the full numeric answer immediately after the student's first attempt at a question, e.g., stating '360° − 190° = 170°' right after the student gave a wrong answer.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.3,
+            "reasoning": "The tutor's guidance was mathematically correct but not calibrated — it repeated the same explanation and the same question verbatim many times without adapting to the student's demonstrated level or varying the approach.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.8,
+            "reasoning": "The tutor consistently ended turns with a clear next question for the student, though the repetition of identical questions became counterproductive.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "The tutor repeatedly asked the same question even after the student had already answered it correctly multiple times, effectively ignoring the student's demonstrated mastery and creating logical inconsistency in the session flow.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone was consistently supportive and never harsh, but the endless repetition of the same question despite correct answers risked feeling dismissive of the student's progress.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.2,
+            "reasoning": "The tutor's responses were highly templated and robotic, with nearly identical phrasing repeated across many consecutive turns (e.g., 'You're on the right track — adding the known angles and subtracting from 360° is the correct method'), making the session feel scripted rather than natural.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.43333333333333335,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 4254,
+        "tokens_out": 1121,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we’ll learn that angles around a point always add up to 360 degrees — just like a full turn around a mountain peak.  \n\nWhat is the sum of all angles around a point?  \nA) 270°  \nB) 180°  \nC) 450°  \nD) 360°",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "360 degrees",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Exactly — 360°. When you spin around a full turn, like looking at the ocean from a mountain peak, you’ve covered all angles around a point, which always add up to 360 degrees.  \n\nNow try this: Four angles around a point are 80°, 60°, 70°, and x°. Find x.  \nAnswer with the value of x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "um so i add them? 80 plus 60 is 140, plus 70 is 210... so x is 210?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Now try this one: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "hmm so 80 plus 110 is 190, so x is 190?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — you're mixing up the angles. The angles around a point always add up to 360°. So if you have 80°, 60°, 70°, and x°, add the known angles first: 80 + 60 + 70 = 210°. What is x?\nNow try this one: Two angles around a point are 100° and 110°. The remaining angle is y°. Find y.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ok so 100 plus 110 is 210, so y is 210?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Not quite. ok so 100 plus 110 is 210, so y is 210?  \nNot quite — the angles around a point always add up to 360°.\nNow try this one: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "ohh so i need to subtract? 360 minus 80 is 280, minus 110 is 170, so x is 170?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Four angles around a point are 80°, 60°, 70°, and x°. Find x.",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "ok so 80 plus 60 plus 70... that's 210. then 360 minus 210 is 150, so x is 150?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Four angles around a point measure 70°, 50°, 90°, and x°. What is x?\nA) 150°\nB) -30°\nC) 30°\nD) 120°",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "so 70 plus 50 plus 90... that's 210. then 360 minus 210 is 150, so x is 150?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "You're right — 70° + 50° + 90° = 210°, and 360° − 210° = 150°. The key rule is: angles around a point always add up to 360°.  \nNext: Four angles around a point are 80°, 90°, 100°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "ok so 80 plus 90 plus 100... thats 270. then 360 minus 270 is 90, so x is 90?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "OK — you're thinking about it step by step, and that's great! The rule is: angles around a point always add up to 360°. So if you know three angles, add them up and subtract from 360° to find the missing one.  \n\nNow try this one: Three angles around a point are 80°, 50°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "so 80 plus 50 is 130. then 360 minus 130 is 230, so x is 230?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "You're on the right track — adding the known angles and subtracting from 360° is the correct method. Three angles around a point always add up to 360°, so if two angles are 80° and 50°, their sum is 130°, and the missing angle is 360° − 130° = 230°.  \n\nNow try this one: Five angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "so 50 plus 80 plus 60 plus 50... thats 240. then 360 minus 240 is 120, so m is 120?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "You're on the right track — adding all the known angles and subtracting from 360° is the correct method. Five angles around a point always sum to 360°, so if four angles are 50°, 80°, 60°, and 50°, their total is 240°, and the missing angle m is 360° − 240° = 120°.  \n\nNow try this one: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "so 80 plus 110 is 190. then 360 minus 190 is 170, so x is 170?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "You're on the right track — adding the known angles and subtracting from 360° is the correct method. Three angles around a point always sum to 360°, so if two angles are 80° and 110°, their total is 190°, and the missing angle x is 360° − 190° = 170°.  \n\nNow try this one: Two angles around a point are 100° and 110°. The remaining angle is y°. Find y.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "so 100 plus 110 is 210. then 360 minus 210 is 150, so y is 150?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "You're on the right track — adding the known angles and subtracting from 360° is the correct method. Two angles around a point total 100° + 110° = 210°, so the remaining angle y is 360° − 210° = 150°.  \n\nNow try this one: Three angles around a point are 80°, 50°, and x°. What is x?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "so 80 plus 50 is 130. then 360 minus 130 is 230, so x is 230?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "You're on the right track — adding the known angles and subtracting from 360° is the correct method. Three angles around a point total 80° + 50° = 130°, so the remaining angle x is 360° − 130° = 230°.  \n\nNow try this one: Five angles around a point are 50°, 80°, 60°, 50°, and m°. Find m.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "so 50 plus 80 plus 60 plus 50... thats 240. then 360 minus 240 is 120, so m is 120?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "You're on the right track — adding all the known angles and subtracting from 360° is the correct method. Five angles around a point total 50° + 80° + 60° + 50° = 240°, so the remaining angle m is 360° − 240° = 120°.  \n\nNow try this one: Three angles around a point are 70°, 120°, and x°. Calculate x.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "so 70 plus 120 is 190. then 360 minus 190 is 170, so x is 170?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "You're on the right track — adding the known angles and subtracting from 360° is the correct method. 70° + 120° = 190°, and 360° − 190° = 170°.  \n\nNow try this one: Three angles around a point are 80°, 110°, and x°. Find x.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "student",
+          "content": "so 80 plus 110 is 190. then 360 minus 190 is 170, so x is 170?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "tutor",
+          "content": "You're right — 80 + 110 = 190, and 360 − 190 = 170°. The rule is: add the known angles, then subtract from 360° to find the missing one.  \nNow try this: Five angles around a point measure 50°, 55°, 70°, 65°, and y. Calculate y.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "student",
+          "content": "so 50 plus 55 plus 70 plus 65... thats 240. then 360 minus 240 is 120, so y is 120?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "tutor",
+          "content": "You're right — 50 + 55 + 70 + 65 = 240, and 360 − 240 = 120°. The rule is: add all the known angles, then subtract from 360° to find the missing one.  \nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "student",
+          "content": "hmm so if theyre all equal and they add up to 360, i divide? 360 divided by 5 is 72, so each angle is 72?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "tutor",
+          "content": "You're right — if five equal angles add up to 360°, you divide 360 by 5 to find each one. 360 ÷ 5 = 72°.  \nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "student",
+          "content": "so 360 divided by 5 is 72, so each angle is 72?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "tutor",
+          "content": "Let me put it another way.\n\nYou're right — if five equal angles add up to 360°, you divide 360 by 5 to find each one. 360 ÷ 5 = 72°.  \nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "student",
+          "content": "360 divided by 5 is 72, so each angle is 72 degrees?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "tutor",
+          "content": "You're right — if five equal angles add up to 360°, you divide 360 by 5 to find each one. 360 ÷ 5 = 72°.  \nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "student",
+          "content": "360 divided by 5 is 72, so each angle is 72?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "tutor",
+          "content": "One more time, from a different angle.\n\nYou're right — if five equal angles add up to 360°, you divide 360 by 5 to find each one. 360 ÷ 5 = 72°.  \nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 22,
+          "role": "student",
+          "content": "72 degrees?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 22,
+          "role": "tutor",
+          "content": "You're right — 72° is correct for each of the five equal angles. Since all angles around a point sum to 360°, dividing 360° by 5 gives 72°.  \n\nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 23,
+          "role": "student",
+          "content": "72?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 23,
+          "role": "tutor",
+          "content": "Let's take this a step at a time.\n\nYou're right — 72° is correct for each of the five equal angles. Since all angles around a point sum to 360°, dividing 360° by 5 gives 72°.  \n\nNow try this: Five equal angles are arranged around a point. What is the measure of each angle?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 24,
+          "role": "student",
+          "content": "360 divided by 5 is 72, so each angle is 72?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 24,
+          "role": "tutor",
+          "content": "You're on the right track — 360 ÷ 5 = 72° is correct for equal angles around a point. But remember, this only applies when angles are equal. For angles on a straight line, they sum to 180°, not 360°. Let’s try a different one: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 25,
+          "role": "student",
+          "content": "180?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 25,
+          "role": "tutor",
+          "content": "You're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Let’s try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 26,
+          "role": "student",
+          "content": "180?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 26,
+          "role": "tutor",
+          "content": "Here it is again — take your time.\n\nYou're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Let’s try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 27,
+          "role": "student",
+          "content": "180?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 27,
+          "role": "tutor",
+          "content": "You're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Let’s try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 28,
+          "role": "student",
+          "content": "180 degrees?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 28,
+          "role": "tutor",
+          "content": "You're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Now try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 29,
+          "role": "student",
+          "content": "180?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 29,
+          "role": "tutor",
+          "content": "Let me put it another way.\n\nYou're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Now try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 30,
+          "role": "student",
+          "content": "180?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 30,
+          "role": "tutor",
+          "content": "You're on the right track — 180° is correct for angles on a straight line. Remember, angles on a straight line always sum to 180°, not 360°. Now try this: angles on a straight line sum to ___ degrees. What goes in the blank?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        }
+      ],
+      "sim_reason": "max_turns",
+      "sim_turns": 30,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 9,
+      "error": ""
+    },
+    {
+      "scenario_id": "struggler_session_completion_001",
+      "passed": false,
+      "persona": "struggler",
+      "subject": "geography",
+      "lesson_id": 1463,
+      "tags": [
+        "multi_turn",
+        "baseline",
+        "persona_handling",
+        "v1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": false,
+          "detail": "turns=22, limit=15"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": {
+        "items": [
+          {
+            "item": "The tutor's explanations were calibrated for a struggling Form 1 student — concrete, low-jargon, with examples",
+            "score": 0.7,
+            "reasoning": "The tutor generally used accessible language and concrete examples (streets, houses, Beau Vallon), but occasionally repeated the same explanation verbatim rather than finding a new angle when the student was confused, which limited calibration to the student's actual struggle.",
+            "applicable": true
+          },
+          {
+            "item": "When the student got things wrong, the tutor used diagnostic questions (not lectures, not just revealing the answer)",
+            "score": 0.4,
+            "reasoning": "The tutor frequently just re-stated the correct explanation or re-asked the same question rather than using probing diagnostic questions to uncover why the student was confused, and in several turns simply confirmed the answer without exploring the misconception.",
+            "applicable": true
+          },
+          {
+            "item": "When the student got things right, the tutor confirmed briefly and advanced — no over-probing",
+            "score": 0.5,
+            "reasoning": "The tutor sometimes over-probed by re-asking the same question multiple times even after the student gave a correct answer (e.g., the 'large region like a country' exchange), creating unnecessary confusion.",
+            "applicable": true
+          },
+          {
+            "item": "The session moved through the lesson at a reasonable pace — neither stuck on one step nor rushing past misunderstandings",
+            "score": 0.4,
+            "reasoning": "The session got badly stuck on the 'large region like a country' question, repeating it four times and telling the student 'not quite' when they were actually correct, which disrupted pacing significantly.",
+            "applicable": true
+          },
+          {
+            "item": "Tone was warm and patient across the entire transcript",
+            "score": 0.75,
+            "reasoning": "The tutor maintained a generally warm and patient tone throughout, though the repeated 'not quite' responses to correct answers could have felt frustrating and undermining to the student.",
+            "applicable": true
+          },
+          {
+            "item": "Across the session, whenever the student made a mistake the tutor recognised it rather than affirming a wrong answer, and whenever the student was correct the tutor affirmed it clearly without false hedging or unnecessary second-guessing.",
+            "score": 0.3,
+            "reasoning": "The tutor repeatedly told the student 'not quite' or 'close' when the student correctly identified 'a large region like a country' as the answer to the small scale map question, which is a significant failure to affirm correct answers clearly.",
+            "applicable": true
+          },
+          {
+            "item": "Whenever the student made a mistake, the tutor pointed at its specific location or nature — a particular step, a named misconception, a specific arithmetic slip — not just a generic 'try again' or 'not quite'.",
+            "score": 0.6,
+            "reasoning": "The tutor often named the specific misconception (e.g., confusing area size with scale size, mixing up denominator size), but sometimes defaulted to generic 'not quite' responses without pinpointing the error.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor never revealed the final answer to a question the student had not yet solved. Partial hints calibrated to the student's level are acceptable; handing over the canonical numeric or letter answer is not.",
+            "score": 0.6,
+            "reasoning": "In several turns the tutor confirmed the correct answer (e.g., affirming 'B is correct' for the 1:250,000 question and the Map A/B comparison) immediately after the student guessed, which is acceptable, but in the 'large region' exchange the tutor's repeated 'not quite' responses to a correct answer created confusion rather than revealing an answer prematurely.",
+            "applicable": true
+          },
+          {
+            "item": "When the student needed help, the tutor offered correct and relevant guidance — an explanation, elaboration, hint, worked example, or scaffolding — calibrated to the student's apparent level and the current concept.",
+            "score": 0.6,
+            "reasoning": "Guidance was generally relevant and correct, but the tutor's repeated rejection of the correct 'large region like a country' answer constitutes incorrect guidance that actively misled the student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns consistently made clear what the student should do next — a specific question to answer, an MCQ option to pick, a calculation to perform, or another structured prompt that hands the conversational floor back — rather than trailing off passively.",
+            "score": 0.75,
+            "reasoning": "Most turns ended with a clear prompt or question for the student, though some transitions between questions were abrupt or confusing, particularly when the tutor re-asked the same question without clarifying why.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor stayed logically consistent across the session — it did not contradict its own earlier turns, assume facts not yet established, or ignore what the student had just said.",
+            "score": 0.4,
+            "reasoning": "The tutor was significantly inconsistent in the 'large region like a country' exchange, repeatedly saying 'not quite' or 'close' to a correct answer while simultaneously saying 'you're on the right track,' creating direct contradictions within and across turns.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's tone stayed warm and encouraging throughout — supportive without being condescending, honest without being harsh, and never offensive, dismissive, or impatient.",
+            "score": 0.7,
+            "reasoning": "The tone was generally warm and encouraging, but the repeated contradictory feedback on the correct 'large region' answer could feel confusing and subtly discouraging to a struggling student.",
+            "applicable": true
+          },
+          {
+            "item": "The tutor's turns read as natural, conversational teaching — not robotic, templated, or padded with filler openers like 'Great question!', 'Let me think about this carefully', or 'I'm going to explain...'.",
+            "score": 0.6,
+            "reasoning": "The tutor avoided the worst filler phrases but frequently repeated the same explanatory sentences verbatim across multiple turns, which felt templated and robotic rather than naturally adaptive.",
+            "applicable": true
+          }
+        ],
+        "mean_score": 0.5615384615384615,
+        "pass_threshold": 0.6,
+        "passed": false,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "tokens_in": 4245,
+        "tokens_out": 1324,
+        "error": ""
+      },
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Welcome to today’s lesson! We’ll explore how map scale works—why some maps show tiny details of your village while others show vast areas like the whole Indian Ocean.  \n\nWhich of the following best defines a large scale map?  \nA) A map that covers a very large geographic area such as a continent or entire country.  \n\nC) A map printed on large paper or displayed on a large computer screen.  \nD) A map that requires a magnifying glass to read the labels.\n\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "hmm im not sure. is it A? because it says large area",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Not quite — you're thinking about the size of the area, but large scale means *high detail*, not large area. A large scale map shows a small, detailed area, like a village, not a huge region. The key is the ratio: a smaller second number (like 1:25,000) means more detail.\nWhich of the following best defines a large scale map?  \nA) A map that covers a very large geographic area such as a continent or entire country.  \n\nC) A map printed on large paper or displayed on a large computer screen.  \nD) A map that requires a magnifying glass to read the labels.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "ohh ok so like... small area with lots of detail?\n\nso is it B then?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "A small scale map is best described as having which of the following characteristics?\nA) A ratio of 1:10,000 and showing a small area with great detail.\nB) A ratio of 1:1,000,000 or larger and showing a large area with limited detail.\nC) A ratio of 1:50,000 and showing only urban centres.\nD) A map made from a reduced photograph rather than a survey.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "umm i think its A because it says small scale so small area right",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Not quite — a small scale map does not show a small area. Think of it like a photo of the whole island: it covers everything but shows less detail on any one part. Which option correctly describes a small scale map with a large area and limited detail?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "ohh wait so small scale is the big area one? that's confusing\n\nis it B then?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Ohh, I see — you're right to feel confused! So yes, **B** is correct — it matches that idea.\n\nNow, can you think of a real-life situation where you'd want a large scale map instead of a small scale one? For example, planning a walk in your neighborhood or looking at a street layout?",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "umm yeah like if you want to see like your street or where your house is you need the detailed one right? so thats large scale",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Exactly — you're right! A large scale map shows detailed features like streets and buildings, perfect for seeing your street or house.  \nA large scale map has a small second number in the ratio (like 1:5,000), meaning it covers a small area with lots of detail.  \nWhich of these best describes a large scale map?  \nA) A ratio of 1:10,000 and showing a small area with great detail.  \n\nC) A ratio of 1:50,000 and showing only urban centres.  \nD) A map made from a reduced photograph rather than a survey.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "is it A? because it says small area with great detail and thats what large scale is right",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Not quite — you're mixing up large and small scale maps.\n\nWhich of these best describes a small scale map?  \nA) A ratio of 1:10,000 and showing a small area with great detail.  \n\nC) A ratio of 1:50,000 and showing only urban centres.  \nD) A map made from a reduced photograph rather than a survey.",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "umm wait im confused again. small scale is the big area one right? so like... is it C? because 1:50,000 is bigger than 1:10,000?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "Not quite — you're mixing up the ratio numbers. A smaller denominator means a larger scale (more detail), not a bigger ratio. So 1:10,000 is larger scale than 1:50,000.\n\nLet's park that one for now and come at the skill from a different problem:\n\nWhich map ratio represents a large scale map?\nA) 1:100,000\nB) 1:500,000\nC) 1:5,000\nD) 1:2,000,000",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "umm so large scale means small number on the bottom right? so is it C? 1:5,000",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Got it — that's right. A smaller denominator means a larger scale (more detail), so 1:5,000 is indeed a large scale map because 5,000 is smaller than 100,000 or 500,000.\n\nA map with the ratio 1:250,000 would be classified as which scale type?\nA) Large scale\nB) Small scale\nC) Medium scale\nD) Ultra-large scale",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "student",
+          "content": "hmm so 1:250,000 has a big number at the bottom so thats small scale right? is it B?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 9,
+          "role": "tutor",
+          "content": "Yes — a big number in the ratio like 250,000 means small scale. The larger the denominator, the smaller the scale, so it shows less detail and covers a wider area. You're right to pick B — \"Small scale\".  \n\nNow, which of these maps would most clearly show the individual buildings and street layouts of the town of Beau Vallon?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "student",
+          "content": "umm so if you want to see buildings and streets thats like detailed right? so you need large scale? is it the one with the small number like 1:5,000?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 10,
+          "role": "tutor",
+          "content": "Yes — if you want to see detailed features like individual buildings and streets, you need a large scale map. A smaller denominator in the ratio, like 1:5,000, means a larger scale and more detail. You're right to think that — now, which of these maps would most clearly show the individual buildings and street layouts of the town of Beau Vallon?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "student",
+          "content": "yeah so like 1:5,000 would show the buildings and streets really good right? so thats the answer? is it 1:5,000?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 11,
+          "role": "tutor",
+          "content": "Yes — a scale like 1:5,000 shows a large scale and would clearly show individual buildings and streets. You're right that smaller denominators mean larger scale and more detail. Now, which of these maps would most clearly show the individual buildings and street layouts of the town of Beau Vallon?",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "student",
+          "content": "wait im confused, are you asking me to pick from options or like... is 1:5,000 the answer already?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 12,
+          "role": "tutor",
+          "content": "You're right to ask — let's clarify. The scale ratio *1:5,000* means it's a **large scale** map, showing more detail like individual buildings and street layouts. So yes, a map with a ratio like 1:5,000 would show the town of Beau Vallon in great detail. But the question we're working on now is: *Which scale type does a ratio of 1:250,000 belong to?* So we need to pick from the options — not just say \"1:5,000\" — because each ratio has a different scale type.  \n\nWhich of these options best describes a map with a ratio of 1:250,000?  \nA) Large scale  \nB) Small scale  \nC) Medium scale  \nD) Ultra-large scale",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "student",
+          "content": "oh ok so 1:250,000 has a big number so thats small scale right? is it B?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 13,
+          "role": "tutor",
+          "content": "Which of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?\nA) A small scale map of Mahé at 1:50,000\nB) A large scale map of Beau Vallon at 1:5,000\nC) A small scale map of the Indian Ocean at 1:10,000,000\nD) A large scale map of all Seychelles at 1:100,000",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "student",
+          "content": "umm so you need large scale to see buildings right? so is it B? because it says large scale and 1:5,000",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 14,
+          "role": "tutor",
+          "content": "What is the primary advantage of using a small scale map to view the entire African continent?\nA) It shows more detail about roads and towns.\nB) It fits the entire continent onto a single map.\nC) It is easier to read than large scale maps.\nD) It shows elevation and terrain more accurately.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "student",
+          "content": "umm small scale shows like big areas right? so the whole continent fits on it? is it B?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 15,
+          "role": "tutor",
+          "content": "You're on the right track — yes, a small scale map shows a large area, like the entire African continent, which fits on one map.\nNow try this: On a small scale map, which feature would you expect to see clearly — a single house, a major road, or a large region like a country?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "student",
+          "content": "umm i think a large region like a country because small scale shows big areas right? so you can see the whole country but not like a single house",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 16,
+          "role": "tutor",
+          "content": "Not this time. You're on the right track — yes, a small scale map shows a large area, like the entire African continent, which fits on one map.  \nOn a small scale map, you’d expect to see broad geographic features like countries or regions, not fine details like individual house addresses.  \nNow try this: On a small scale map, which feature would you expect to see clearly — a single house, a major road, or a large region like a country?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "student",
+          "content": "yeah so like a large region like a country right? because small scale shows the big stuff not the tiny details",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 17,
+          "role": "tutor",
+          "content": "Close — not quite. You're on the right track — yes, a small scale map shows a large region, like an entire country, fitting on one map.  \nThe key point is that small scale maps cover broad areas but show less detail, so you’d see major features like countries or continents, not fine details like individual houses.  \nWhich feature would you expect to see clearly on a small scale map — a single house, a major road, or a large region like a country?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "student",
+          "content": "ohh so like a large region like a country? is that the answer? because small scale shows big areas but not details so you see countries not houses",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 18,
+          "role": "tutor",
+          "content": "Not quite. Close — you're on the right track! A small scale map shows a large region like a country, but with less detail.  \nThe key point is that small scale maps cover broad areas, like an entire continent, but don’t show fine details like individual houses.  \nWhich of these would you expect to see clearly on a small scale map — a single house, a major road, or a large region like a country?",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "student",
+          "content": "umm im confused now. you said im on the right track but then it says not quite. so is it the large region one or not?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 19,
+          "role": "tutor",
+          "content": "Let's park that one for now and come at the skill from a different problem:\n\nConsider two maps: Map A uses a scale of 1:10,000 and Map B uses a scale of 1:1,000,000. Which statement best compares these maps?\nA) Map A is small scale and shows a larger area; Map B is large scale and shows more detail.\nB) Map A is large scale and shows high detail of a small area; Map B is small scale and shows less detail of a large area.\nC) Both maps show the same area but Map A is more appropriate for a country-level view.\nD) Map B is more detailed because its ratio is larger.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "student",
+          "content": "umm so map A has 1:10,000 which is a small number so thats large scale right? and map B is 1:1,000,000 which is a big number so thats small scale. so is it B?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 20,
+          "role": "tutor",
+          "content": "So yes, **B** is correct — it matches both the scale and the detail level.\n\nNow try this one: Which of the following map features would be visible on a large scale map but NOT on a small scale map of the same area?  \nA) International boundaries  \nB) Major capital cities  \nC) Individual house addresses and footpaths  \nD) Mountain ranges",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "student",
+          "content": "umm so large scale shows lots of detail right? so like individual houses and footpaths would show up? is it C?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 21,
+          "role": "tutor",
+          "content": "You're on the right track — yes, a large scale map shows fine detail, so individual houses and footpaths would be visible. That makes **C** a strong choice.  \nNow try this one: Which of the following map features would be visible on a large scale map but NOT on a small scale map of the same area?  \nA) International boundaries  \nB) Major capital cities  \nC) Individual house addresses and footpaths  \nD) Mountain ranges",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 22,
+          "role": "student",
+          "content": "yeah so large scale has all the detail so you can see the houses and footpaths right? so its C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false
+        },
+        {
+          "turn_number": 22,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 22,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 10,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/qwen3-4b-jetson"
+}

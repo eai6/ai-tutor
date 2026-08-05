@@ -346,6 +346,47 @@ to a reasoning channel — today's registry tag is Thinking-2507. mt50's
 overnight 88% on 50 scenarios cannot have been this model. The control arm
 is retired from the notebook; the jetson tag is the only meaningful subject.
 
+## Addendum 5 — the qwen_mt10 head-to-head and the reference arbiter (2026-08-05)
+
+Two boards on the SAME seeded 10 (`--sample 10 --seed 0` over the v1 30 —
+a hard draw: struggler/error-prone heavy), plus the full-30 bare-tag board:
+
+| board | model | passed | mean rubric |
+| --- | --- | --- | --- |
+| `qwen_mt30_full30/` | bare `qwen3:4b` (Thinking-2507) | **26/30** | 0.801 |
+| `qwen_mt10/` | bare `qwen3:4b`, same 10 | 6/10 | 0.733 |
+| `qwen_mt10/` | `qwen3-4b-jetson` (Instruct-2507), same 10 | 4/10 | 0.618 |
+
+Corrections to the record: the Thinking tag is NOT unusable — given RAM it
+finished the full board at the highest score of any qwen3-4b run (its
+2026-08-04 death was memory, not capability). It is ~10× slower, which
+remains the Jetson problem. The Instruct jetson tag stays behind on the
+same engine and the same scenarios.
+
+The shared bottleneck in BOTH mt10 boards — again — was **wrong stored
+references, enforced**: this time catalog MCQ letter defects (session 10 in
+both runs: judge-endorsed answers graded incorrect against catalog ref 'B',
+the same question re-posed 7-8× with reworded stems), which the
+deterministic solver deliberately never touches, plus solver-unverifiable
+authored refs. Fixes:
+
+1. **Reference arbiter** (`grader.arbitrate_reference` +
+   `handle_record_answer` wiring): on a slot's SECOND wrong attempt, once
+   per slot, the judge chain solves the question independently of the
+   stored reference; a high-confidence disagreement corrects the slot and
+   regrades the student's answer. Fail-soft (no judge chain offline →
+   status quo); `SIMPLE_TUTOR_REF_ARBITER=0` disables. This is the generic
+   cure for wrong references from EITHER source — catalog defects and
+   model-authored errors the stem solver can't check.
+2. **Option-set pose cap**: the stage-1b cap now also counts MCQ option
+   sets, so reworded stems with identical options can't be re-posed past
+   the cap.
+3. **Plain "not quite"/"not this time" count as mid-reply denials**: on a
+   correct verdict those sentences are dropped (and one-call escalates) —
+   the jetson board's "told the student their correct answer was 'not
+   quite' and then confirmed it" pattern slipped past the older, narrower
+   denial patterns.
+
 ## Rerun setup (Colab)
 
 - Original pre-expansion dataset (90 = 60 single + 30 multi) is now tagged

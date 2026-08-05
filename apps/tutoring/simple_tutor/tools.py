@@ -34,6 +34,7 @@ must always flow — failures get logged + return error dicts, never block.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -153,6 +154,9 @@ def _note_pose_repetition(
         if not isinstance(counts, dict):
             counts = {}
         counts[key] = int(counts.get(key) or 0) + 1
+        okey_cnt = _norm_optset(options) if question_type == 'mcq' else None
+        if okey_cnt:
+            counts[okey_cnt] = int(counts.get(okey_cnt) or 0) + 1
         # Bound the map — drop oldest entries past the cap (insertion order).
         while len(counts) > _ANSWERED_CORRECT_CAP:
             counts.pop(next(iter(counts)))
@@ -824,9 +828,16 @@ def handle_pose_question(
                     'repeat_of_correct': True,
                     'question_type': qtype,
                 }
-        # Stage 1b — hard cap on verbatim re-asks regardless of verdict.
+        # Stage 1b — hard cap on re-asks regardless of verdict. Checked by
+        # stem AND by MCQ option-set: the qwen_mt10 boards re-posed one
+        # catalog MCQ 7-8x with lightly reworded stems, sailing past the
+        # stem-only cap while the options (the question's identity) never
+        # changed.
         _counts = _es.get('posed_stem_counts') if isinstance(_es, dict) else None
-        if isinstance(_counts, dict) and int(_counts.get(_key) or 0) >= _MAX_POSES_PER_STEM:
+        _capped = (isinstance(_counts, dict) and (
+            int(_counts.get(_key) or 0) >= _MAX_POSES_PER_STEM
+            or (_okey and int(_counts.get(_okey) or 0) >= _MAX_POSES_PER_STEM)))
+        if _capped:
             logger.info(
                 "[simple_tutor] repeat_pose rejected session=%s "
                 "question=%r (already posed %sx this session)",
@@ -1123,6 +1134,63 @@ def handle_record_answer(
         'attempt_count_before': in_flight.attempt_count,
     }
 
+    # Stuck-slot referee (qwen_mt10 boards): a slot whose stored REFERENCE is
+    # wrong — a catalog letter defect, or an authored ref the deterministic
+    # solver couldn't check — grades every answer incorrect forever, and both
+    # models burned their worst sessions exactly there ("told the student
+    # 'Not quite' when the student was actually correct", four and five times
+    # over). On the SECOND wrong attempt, ask the judge chain to solve the
+    # question independently, once per slot; a confident disagreement corrects
+    # the slot's reference and this answer is regraded against it. Fail-soft:
+    # no judge chain (offline box) → status quo. SIMPLE_TUTOR_REF_ARBITER=0
+    # disables.
+    if verdict != 'correct' \
+            and (in_flight.attempt_count or 0) + 1 >= 2 \
+            and os.getenv('SIMPLE_TUTOR_REF_ARBITER', '1').strip() != '0':
+        es_arb = getattr(session, 'engine_state', None) or {}
+        arbitrated = es_arb.get('_ref_arbitrated') if isinstance(es_arb, dict) else None
+        if not isinstance(arbitrated, list):
+            arbitrated = []
+        if in_flight.pk not in arbitrated:
+            es_arb['_ref_arbitrated'] = (arbitrated + [in_flight.pk])[-20:]
+            session.engine_state = es_arb
+            try:
+                session.save(update_fields=['engine_state'])
+            except Exception:
+                pass
+            from apps.tutoring.simple_tutor.grader import arbitrate_reference
+            independent = arbitrate_reference(question)
+            cur_ref = (in_flight.reference_answer or '').strip()
+            if independent and _norm_q(independent) != _norm_q(cur_ref):
+                if in_flight.question_type == 'mcq' and \
+                        not (len(independent) == 1 and independent.upper() in 'ABCD'):
+                    independent = None      # mcq must arbitrate to a letter
+            else:
+                independent = None
+            if independent:
+                logger.warning(
+                    "[simple_tutor] ref arbiter corrected %r -> %r "
+                    "session=%s stem=%r", cur_ref[:20], independent,
+                    session.pk, in_flight.question_text[:60],
+                )
+                in_flight.reference_answer = independent
+                in_flight.save(update_fields=['reference_answer'])
+                question = _TransientQuestion(
+                    question_text=in_flight.question_text,
+                    question_type=in_flight.question_type,
+                    reference_answer=independent,
+                    options=in_flight.options or [],
+                )
+                try:
+                    result = grade_answer(question=question,
+                                          student_answer=extracted)
+                    verdict = result.verdict.value
+                    snapshot['reference_answer'] = independent
+                except Exception:
+                    logger.warning("[simple_tutor] regrade after arbitration "
+                                   "failed session=%s", session.pk,
+                                   exc_info=True)
+
     if verdict == 'correct':
         # Remember this stem BEFORE deleting the slot, so an exact re-ask on a
         # later turn is detectable (anti-repetition).
@@ -1131,7 +1199,7 @@ def handle_record_answer(
             options=(in_flight.options
                      if in_flight.question_type == 'mcq' else None))
         # Slot is resolved — clear it. The hint ladder + analytics
-        # state is preserved in the grader result + session turns.
+        # state is preserved in the grader result + result to_dict below.
         in_flight.delete()
     else:
         # Increment attempt counter for the hint ladder.

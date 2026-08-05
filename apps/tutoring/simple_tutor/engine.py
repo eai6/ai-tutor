@@ -1384,6 +1384,7 @@ _MID_AFFIRM_RE = re.compile(
 _MID_DENY_RE = re.compile(
     r"(?i)\b(?:you (?:picked|selected|chose)\s+\S{1,16}\s+instead of\b|"
     r"that[’']?s (?:not right|wrong|incorrect)\b|"
+    r"not quite\b|not this time\b|"
     r"(?:isn[’']?t|is not|wasn[’']?t) (?:right|correct)\b)")
 
 _NEG_OPENER_RE = re.compile(
