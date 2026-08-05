@@ -68,9 +68,13 @@ MODE = os.environ.get('QWEN_MT30_MODE',
 # "faulty" arm) — jetson arm commented out for this run. Expect what the it3
 # board measured: ~135 s/turn and an OOM-kill risk before 30 scenarios
 # complete; if it dies again, cap with --sample in MODE.
+# User direction 2026-08-05: the bare-tag 10-run is done — now the jetson
+# variant on the SAME seeded 10 for the side-by-side. Same Drive folder on
+# purpose: different result filename, so both boards sit next to each other
+# and Cell 10 prints them on one leaderboard. Do NOT clear the Drive folder.
 QWEN_MODELS = """\
-# qwen3-4b-jetson      jetson
-qwen3:4b             registry-control
+qwen3-4b-jetson      jetson
+# qwen3:4b             registry-control
 """
 
 # Sanity at generation time: the v1 tag must select exactly 30 multi-turn
