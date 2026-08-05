@@ -661,21 +661,52 @@ def partial_path_for(started: dt.datetime, git_sha: str) -> Path:
     return RUNS_ROOT / f"partial_{ts}_{git_sha}.json"
 
 
-def run(scenarios: list[Scenario], on_result=None) -> RunResult:
+def latest_partial() -> Path | None:
+    """Newest checkpoint under RUNS_ROOT, or None. Filenames embed the run's
+    start timestamp, so lexical order is chronological order."""
+    partials = sorted(RUNS_ROOT.glob('partial_*.json'))
+    return partials[-1] if partials else None
+
+
+def load_partial(path: Path) -> tuple[list[ScenarioResult], str]:
+    """Load a checkpoint's completed results for resuming.
+
+    Returns ``(results, git_sha_of_the_checkpointed_run)``. Raises ValueError
+    for a file that is not a partial checkpoint — resuming from a FINAL run
+    JSON would silently re-report old results as new."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if not data.get('partial'):
+        raise ValueError(f'{path} is not a partial checkpoint '
+                         f'(missing "partial": true)')
+    results = [ScenarioResult(**r) for r in data.get('results') or []]
+    return results, str(data.get('git_sha') or '')
+
+
+def run(scenarios: list[Scenario], on_result=None,
+        prior_results: 'list[ScenarioResult] | None' = None) -> RunResult:
     """Run scenarios sequentially.
 
     ``on_result`` is an optional callable ``(scenario_result, index, total)``
     invoked after EACH scenario — the management command uses it to stream
     per-scenario verdict lines (flushed) instead of printing them only after
     the whole suite finishes, where a mid-run kill loses them all.
+
+    ``prior_results`` resumes a killed run from its checkpoint: scenarios
+    whose id already appears there are skipped, the loaded results are
+    seeded into this run's output (and its checkpoints), and the final JSON
+    reports the union. The caller is responsible for reproducing the same
+    scenario set (same filters + same --sample seed).
     """
     from django.db import connections
     started = dt.datetime.now(dt.timezone.utc)
     RUNS_ROOT.mkdir(parents=True, exist_ok=True)
     sha = _git_sha()
     checkpoint = partial_path_for(started, sha)
-    results: list[ScenarioResult] = []
-    for scenario in scenarios:
+    results: list[ScenarioResult] = list(prior_results or [])
+    done_ids = {r.scenario_id for r in results}
+    pending = [s for s in scenarios if s.id not in done_ids]
+    total = len(results) + len(pending)
+    for scenario in pending:
         # Close idle DB connections between scenarios. Azure Postgres
         # aggressively closes long-idle SSL connections; without this
         # a multi-turn scenario can succeed but the NEXT scenario's
@@ -710,13 +741,13 @@ def run(scenarios: list[Scenario], on_result=None) -> RunResult:
         # scenarios now costs at most the scenario in flight.
         try:
             _write_partial(checkpoint, started=started.isoformat(),
-                           git_sha=sha, total=len(scenarios), results=results)
+                           git_sha=sha, total=total, results=results)
         except Exception:
             logger.warning("could not write partial checkpoint %s",
                            checkpoint, exc_info=True)
         if on_result is not None:
             try:
-                on_result(results[-1], len(results), len(scenarios))
+                on_result(results[-1], len(results), total)
             except Exception:
                 logger.warning("on_result callback failed", exc_info=True)
     finished = dt.datetime.now(dt.timezone.utc)

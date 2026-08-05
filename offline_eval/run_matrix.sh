@@ -69,6 +69,15 @@ while read -r tag tier _rest; do
     echo ">> saved results/${safe}.json   ${elapsed}s   $summary"
   else
     echo "!! no run JSON (rc=$rc, ${elapsed}s) — inspect $log"
+    # Salvage the per-scenario checkpoint to the (Drive-backed) results dir:
+    # evals/runs/ lives on the VM disk and dies with the runtime, and the
+    # 2026-08-04 OOM kill cost 22 completed scenarios exactly this way.
+    latest_partial=$(ls -1t "$ROOT"/evals/runs/partial_*.json 2>/dev/null | head -1)
+    if [[ -n "$latest_partial" ]]; then
+      cp "$latest_partial" "$RESULTS/${safe}.partial.json"
+      echo ">> salvaged checkpoint -> results/${safe}.partial.json"
+      echo ">> resume with: MODE=\"<same flags> --resume $RESULTS/${safe}.partial.json\" bash offline_eval/run_matrix.sh"
+    fi
   fi
   ollama stop "$tag" >/dev/null 2>&1 || true   # unload to free RAM
   # CLEANUP_MODELS=1 also deletes the weights from disk after scoring — used on
