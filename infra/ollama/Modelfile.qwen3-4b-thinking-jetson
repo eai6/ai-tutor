@@ -1,0 +1,29 @@
+# qwen3-4b-thinking-jetson — Qwen3-4B-Thinking-2507, pinned for 8 GB boxes
+#
+# Build:   ollama create qwen3-4b-thinking-jetson -f infra/ollama/Modelfile.qwen3-4b-thinking-jetson
+# Use:     pick it from /dashboard/settings (or TUTOR_MODEL_OVERRIDE=local_ollama/qwen3-4b-thinking-jetson)
+#
+# Why this tag exists: the bare `qwen3:4b` registry tag (Thinking-2507) scored
+# 26/30 on the v1 multi-turn board — the best qwen3-4b result on record, ~10×
+# slower than the Instruct tag (offline_eval/multi_turn_results/
+# qwen_mt30_full30/). This pins the same checkpoint with a baked num_ctx so it
+# is safe on constrained boxes and selectable from the dashboard picker (which
+# only offers tags that pin their own context — bare tags spawn a second
+# 4096-ctx runner via the grader verifier's /v1 endpoint and evict the tutor).
+#
+# The chat template opens <think> unconditionally; Ollama parses the monologue
+# into message.thinking and the visible answer stays clean. Expect the
+# reasoning to cost real decode time: on CPU-class hardware turns run minutes,
+# not seconds. This is the QUALITY end of the quality/latency trade, for
+# side-by-side trials against qwen3-4b-jetson (Instruct).
+
+FROM qwen3:4b
+
+# Same 8 GB rationale as Modelfile.qwen3-4b-jetson: stock window OOMs the box.
+PARAMETER num_ctx 16384
+
+# Qwen3-Thinking-2507's own recommended sampling (higher temp / top_p than the
+# Instruct checkpoint — the thinking series is tuned for it).
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20

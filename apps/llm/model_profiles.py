@@ -213,6 +213,22 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
+    # The Thinking-2507 sibling, pinned by infra/ollama/Modelfile.qwen3-4b-
+    # thinking-jetson. 26/30 on the v1 multi-turn board (qwen_mt30_full30) —
+    # the best qwen3-4b result on record — at ~10x the Instruct tag's decode
+    # cost, because the reasoning monologue is generated before every answer.
+    # max_tokens is the THINKING budget too (num_predict counts reasoning
+    # tokens): 1024 would truncate mid-think, so this gets 4096 — the
+    # quality end of the quality/latency trade, offered for side-by-side
+    # trials from the dashboard picker.
+    "local_ollama/qwen3-4b-thinking-jetson": ModelProfile(
+        family="qwen", mode="thinking", max_tokens=4096,
+        temperature=0.6, top_p=0.95, top_k=20,
+        num_ctx=16384, num_gpu=99,
+        notes="Qwen3-4B-Thinking-2507, context capped; slow, highest-quality "
+              "local 4B (26/30 on the v1 board).",
+    ),
+
     # --- Local Ollama, Qwen3.5 small series (0.8B/2B/4B/9B, released 2026-03-02) ---
     # WHY THESE EXIST: without an exact key, get_model_profile() falls through to the
     # generic r"qwen3" FAMILY_PATTERNS entry below, which is a CLOUD profile —
