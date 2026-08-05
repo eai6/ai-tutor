@@ -3486,6 +3486,7 @@ def settings_page(request):
     provider_choices = []
     provider_defaults_json = '{}'
     img_provider_defaults_json = '{}'
+    tutor_model_options_json = '{}'
     if is_superadmin:
         from apps.llm.models import ModelConfig
         tutor_config = ModelConfig.objects.filter(is_active=True, purpose='tutoring').first()
@@ -3507,6 +3508,21 @@ def settings_page(request):
             has_img_db_key = bool(img_config.api_key_encrypted)
             has_img_env_key = bool(os.getenv(img_config.api_key_env_var or '', ''))
         provider_choices = ModelConfig.Provider.choices
+        # Per-provider model options for the tutoring dropdown (replaces the
+        # free-text model_name — same rationale as the Django-admin picker:
+        # a typo'd tag on a headless box fails at the next student turn).
+        # Fail-soft: catalog errors leave the current value as the only
+        # option rather than breaking the settings page.
+        try:
+            from apps.llm.model_catalog import choices_by_provider
+            tutor_model_options_json = json.dumps(
+                choices_by_provider({tutor_provider: tutor_model}))
+        except Exception:
+            logger.warning("model catalog unavailable for settings dropdown",
+                           exc_info=True)
+            tutor_model_options_json = json.dumps({
+                tutor_provider: [{'value': tutor_model, 'disabled': False,
+                                  'label': tutor_model}]})
         provider_defaults_json = json.dumps({
             'anthropic': 'claude-sonnet-4-20250514',
             'openai': 'gpt-4o',
@@ -3570,6 +3586,7 @@ def settings_page(request):
         'has_img_env_key': has_img_env_key,
         'provider_choices': provider_choices,
         'provider_defaults_json': provider_defaults_json,
+        'tutor_model_options_json': tutor_model_options_json,
         'img_provider_defaults_json': img_provider_defaults_json,
         'personalities': personalities,
     }

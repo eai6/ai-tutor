@@ -399,7 +399,12 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="tutor_model">{% trans "Model Name" %}</label>
-                        <input type="text" class="form-control" id="tutor_model" name="tutor_model" value="{{ tutor_model }}" placeholder="e.g. gemini-3.1-pro-preview">
+                        {# Populated by JS from tutorModelOptions for the selected provider; #}
+                        {# server renders the saved value so the form works before JS runs. #}
+                        <select class="form-control" id="tutor_model" name="tutor_model" data-current="{{ tutor_model }}">
+                            {% if tutor_model %}<option value="{{ tutor_model }}" selected>{{ tutor_model }}</option>{% endif %}
+                        </select>
+                        <small style="color:var(--gray-500);">{% trans "Only models this device can actually run are selectable." %}</small>
                     </div>
                 </div>
 
@@ -631,13 +636,50 @@
     // AI Model — auto-fill model name on provider change (per-purpose)
     var providerDefaults = {{ provider_defaults_json|safe }};
     var imgProviderDefaults = {{ img_provider_defaults_json|safe }};
+    // Tutoring model is a DROPDOWN filtered by provider (free text was the
+    // typo-with-no-feedback trap the admin picker closed). Options come from
+    // the model catalog: local tags that are pulled + profiled + fit this
+    // device, curated lists for cloud providers. Disabled entries carry the
+    // reason in their label.
+    var tutorModelOptions = {{ tutor_model_options_json|safe }};
+    function repopulateTutorModels() {
+        var provSel = document.getElementById('tutor_provider');
+        var modelSel = document.getElementById('tutor_model');
+        if (!provSel || !modelSel || modelSel.tagName !== 'SELECT') return;
+        var current = modelSel.value || modelSel.getAttribute('data-current') || '';
+        var opts = tutorModelOptions[provSel.value] || [];
+        modelSel.innerHTML = '';
+        var matched = false;
+        opts.forEach(function(o) {
+            var el = document.createElement('option');
+            el.value = o.value;
+            el.textContent = o.label;
+            if (o.disabled) el.disabled = true;
+            if (o.value === current && !o.disabled) { el.selected = true; matched = true; }
+            modelSel.appendChild(el);
+        });
+        if (!opts.length) {
+            var el = document.createElement('option');
+            el.value = current;
+            el.textContent = current || '— no models available —';
+            modelSel.appendChild(el);
+        } else if (!matched) {
+            // Select the first enabled option when the previous value does
+            // not exist under the newly chosen provider.
+            for (var i = 0; i < modelSel.options.length; i++) {
+                if (!modelSel.options[i].disabled) { modelSel.selectedIndex = i; break; }
+            }
+        }
+    }
     window.onProviderChange = function(prefix) {
+        if (prefix === 'tutor') { repopulateTutorModels(); return; }
         var sel = document.getElementById(prefix + '_provider');
         var modelInput = document.getElementById(prefix + '_model');
         if (sel && modelInput && providerDefaults[sel.value]) {
             modelInput.value = providerDefaults[sel.value];
         }
     };
+    repopulateTutorModels();
     window.onImgProviderChange = function() {
         var sel = document.getElementById('img_provider');
         var modelInput = document.getElementById('img_model');

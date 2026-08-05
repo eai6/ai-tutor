@@ -144,6 +144,57 @@ def _has_exact_profile(spec: str) -> bool:
     return spec in MODEL_PROFILES
 
 
+def choices_by_provider(current: dict[str, str] | None = None) -> dict[str, list[dict]]:
+    """Per-provider option lists for a provider-aware model dropdown.
+
+    Returns ``{provider: [{'value','label','disabled'}, ...]}`` for every
+    provider in ``ModelConfig.Provider``. Built for the dashboard settings
+    page, which previously offered a free-text model_name — the same
+    typo-with-no-feedback trap the Django-admin picker was built to close.
+
+    - ``local_ollama``: runnable tags enabled; pulled-but-unusable tags
+      listed DISABLED with the reason in the label (no profile / no pinned
+      num_ctx / too large), so an admin can see why a model they installed
+      is not offered rather than wondering where it went.
+    - Cloud providers: the curated lists.
+    - ``current`` maps provider → the currently-saved model_name; that value
+      is always kept selectable so opening the page cannot invalidate an
+      existing configuration (e.g. a tag typed before this dropdown existed,
+      or picked while Ollama was up and queried while it is down).
+    """
+    from apps.llm.models import ModelConfig
+
+    current = current or {}
+    out: dict[str, list[dict]] = {}
+    for provider, _label in ModelConfig.Provider.choices:
+        opts: list[dict] = []
+        if provider == 'local_ollama':
+            for tag in local_tags():
+                spec = f'local_ollama/{tag}'
+                bare = tag.rsplit(':latest', 1)[0] if tag.endswith(':latest') else tag
+                profiled = _has_exact_profile(spec) or _has_exact_profile(f'local_ollama/{bare}')
+                if not profiled:
+                    opts.append({'value': bare, 'disabled': True,
+                                 'label': f'{bare} — no profile (would be sized for cloud)'})
+                elif not _pins_own_context(bare):
+                    opts.append({'value': bare, 'disabled': True,
+                                 'label': f'{bare} — no pinned num_ctx (would reload every turn)'})
+                elif not _fits(spec):
+                    opts.append({'value': bare, 'disabled': True,
+                                 'label': f'{bare} — too large for this device'})
+                else:
+                    opts.append({'value': bare, 'disabled': False, 'label': bare})
+        else:
+            for name, label in CURATED_CLOUD_MODELS.get(provider, []):
+                opts.append({'value': name, 'disabled': False, 'label': label})
+        cur = (current.get(provider) or '').strip()
+        if cur and cur not in {o['value'] for o in opts}:
+            opts.insert(0, {'value': cur, 'disabled': False,
+                            'label': f'{cur} (current)'})
+        out[provider] = opts
+    return out
+
+
 def available_choices(include: str = '') -> list[tuple[str, list[tuple[str, str]]]]:
     """Grouped ``(group_label, [(value, label), ...])`` for a select widget.
 
