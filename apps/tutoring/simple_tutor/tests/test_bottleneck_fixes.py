@@ -1511,3 +1511,140 @@ class NarratedQuestionWithNoPoseTest(DjangoTestCase):
         InFlightQuestion.objects.filter(session=session).delete()
         text = 'Some prose with options\nA) x\nB) y\nC) z\nD) w'
         self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
+
+
+class ToolNameNormalisationOrdersDispatchTest(DjangoTestCase):
+    """A padded or camelCase tool name must not reorder dispatch.
+
+    _dispatch_tools normalises names AFTER sorting, so _pose_before_record was
+    comparing raw ones. A model emitting ' record_answer' made has_record False,
+    the function fell through to `return not has_record` = True, and pose was
+    dispatched BEFORE the grade. handle_pose_question then rejected it as
+    premature_pose, so the tutor lost its pose while its reply still advertised
+    the next question.
+
+    Device session 21, lesson 1434: the mixed-use question was announced in
+    three consecutive replies and never registered; the student answered it
+    twice and was graded against the previous question both times.
+    """
+
+    def _blocks(self, record_name):
+        return [SimpleNamespace(name='pose_question', input={'question_index': 1}),
+                SimpleNamespace(name=record_name, input={'extracted_answer': 'b'})]
+
+    def _session_with_live_slot(self):
+        session, _ = _make_session()
+        InFlightQuestion.objects.create(
+            session=session, question_text='the live question',
+            question_type='mcq', options=['a', 'b', 'c', 'd'],
+            reference_answer='A', source='catalog', attempt_count=0,
+        )
+        return session
+
+    def test_canonical_name_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks('record_answer')))
+
+    def test_padded_name_still_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks(' record_answer ')))
+
+    def test_camelcase_name_still_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks('recordAnswer')))
+
+    def test_padded_name_dispatches_the_grade_first_end_to_end(self):
+        """_pose_before_record and _priority BOTH had to normalise. Fixing
+        only the first leaves a padded name at priority 2 (last), so pose
+        still runs first and is still rejected as premature_pose."""
+        from apps.tutoring.simple_tutor import engine
+        from apps.tutoring.simple_tutor.tests.test_engine import _llm_response
+        session = self._session_with_live_slot()
+        r = _llm_response(text='ok', tool_uses=[
+            {'name': ' record_answer ', 'input': {'extracted_answer': 'b'}},
+            {'name': 'pose_question', 'input': {'question_index': 1}},
+        ])
+        _, results, _ = engine._dispatch_tools(
+            session=session, response=r, figure_catalog=[], question_pool=None)
+        order = [x['tool'] for x in results]
+        self.assertEqual(order[0], 'record_answer',
+                         f'the grade must dispatch first, got {order}')
+
+
+class VerbatimOptionRunLeakTest(DjangoTestCase):
+    """Quoting an option's wording at length is a reveal however it is phrased.
+
+    Device session 21: "On a map, industrial land use is shown by symbols like
+    factory buildings, warehouses, and transportation hubs" — that is option C
+    verbatim. The assertion patterns need the value within 15 NON-word
+    characters of the verb, and "is shown by symbols like" has words in
+    between, so it went straight through to the student.
+    """
+
+    OPTIONS = ['Crop symbols and field boundaries',
+               'Residential blocks and commercial shops',
+               'Factory buildings, warehouses, and transportation hubs',
+               'Parks and recreational facilities']
+
+    def _slot(self, session, reference='C', options=None):
+        InFlightQuestion.objects.filter(session=session).delete()
+        return InFlightQuestion.objects.create(
+            session=session,
+            question_text='Which symbols would you expect in an industrial area?',
+            question_type='mcq', options=list(options or self.OPTIONS),
+            reference_answer=reference, source='catalog', attempt_count=1,
+        )
+
+    def _wrong(self):
+        return [{'tool': 'record_answer',
+                 'result': {'recorded': True, 'verdict': 'incorrect'}}]
+
+    def test_option_quoted_at_length_is_redacted(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = ('Not quite.\n'
+                'On a map, industrial land use is shown by symbols like factory '
+                'buildings, warehouses, and transportation hubs.\n'
+                'Which of the four fits that description?')
+        out = _filter_reveals(session, text, self._wrong())
+        self.assertNotIn('transportation hubs', out)
+        self.assertIn('Which of the four', out, 'the hand-back must survive')
+
+    def test_run_split_across_a_line_break_is_a_known_gap(self):
+        """KNOWN LIMITATION, asserted so it is not mistaken for coverage.
+
+        _filter_reveals redacts line by line, so a quoted run broken by a
+        newline is not matched even though the pattern itself allows \\W+
+        between words. Closing this means redacting over sentences spanning
+        lines, which changes granularity for every other rule in the function —
+        not worth doing on the same change that fixed the observed case.
+
+        The observed leak was on ONE line, which is covered above.
+        """
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = 'Think about factory buildings, warehouses,\nand transportation hubs.'
+        self.assertEqual(_filter_reveals(session, text, self._wrong()), text)
+
+    def test_short_options_do_not_trigger_the_run_rule(self):
+        """"Is the northing 23 or 56?" hands the question back. Options under
+        4 words stay with the assertion patterns, which let that through."""
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session, reference='C', options=['47', '39', '23', '56'])
+        text = 'Not quite. Is the northing 23 or 56 — which pair comes second?'
+        self.assertEqual(_filter_reveals(session, text, self._wrong()), text)
+
+    def test_correct_verdict_may_still_state_the_option(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = 'Correct — factory buildings, warehouses, and transportation hubs.'
+        results = [{'tool': 'record_answer',
+                    'result': {'recorded': True, 'verdict': 'correct'}}]
+        self.assertEqual(_filter_reveals(session, text, results), text)

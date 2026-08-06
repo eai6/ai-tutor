@@ -1522,6 +1522,21 @@ def _filter_reveals(
     out = _ANSWER_PAREN_RE.sub('', text_reply)
     is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
 
+    _VERBATIM_RUN_MIN_WORDS = 4
+
+    def _verbatim_run_pattern(value: str) -> str:
+        """Match the option's own wording quoted at length, however introduced.
+
+        Returns '' for options under _VERBATIM_RUN_MIN_WORDS words, where a
+        chance overlap is likely and the assertion patterns are the right tool.
+        Whitespace is made flexible so a line break or double space inside the
+        quoted run does not defeat the match.
+        """
+        words = re.findall(r"[\w'-]+", value or '')
+        if len(words) < _VERBATIM_RUN_MIN_WORDS:
+            return ''
+        return r'\b' + r'\W+'.join(re.escape(w) for w in words) + r'\b'
+
     def _value_pattern(value: str) -> str:
         v = re.escape(value)
         return (rf'(?:answer|correct|equals|=|\bis)\W{{0,15}}{v}\b'
@@ -1545,6 +1560,22 @@ def _filter_reveals(
             correct_text = str(options[idx] or '').strip()
         if correct_text:
             alts.append(_value_pattern(correct_text))
+            # Verbatim-run rule. The assertion patterns above require the value
+            # within 15 NON-word characters of the verb, which "the northing is
+            # 23" satisfies but "industrial land use IS SHOWN BY SYMBOLS LIKE
+            # factory buildings, warehouses, and transportation hubs" does not —
+            # there are words in between. That sentence quoted option C whole
+            # and the student read the answer straight off the hint (device
+            # session 21, lesson 1434).
+            #
+            # So: a long verbatim run of the option's own wording is a reveal
+            # however it is introduced. >= 4 words keeps short options ("23",
+            # "5 and 2") out of it — those stay with the assertion patterns,
+            # which is what protects the Socratic "Is the northing 23 or 56?"
+            # from being redacted.
+            run = _verbatim_run_pattern(correct_text)
+            if run:
+                alts.append(run)
         pat = re.compile('(?i)' + '|'.join(alts))
     else:
         pat = re.compile('(?i)' + _value_pattern(ref))
@@ -2565,10 +2596,22 @@ def _pose_before_record(session, tool_use_blocks, question_pool=None) -> bool:
     is registering the question the student actually answered. See
     _dispatch_tools' docstring for the full decision table.
     """
-    has_pose = any(getattr(b, 'name', '') == 'pose_question'
-                   for b in tool_use_blocks)
-    has_record = any(getattr(b, 'name', '') == 'record_answer'
-                     for b in tool_use_blocks)
+    # Normalise before comparing. _dispatch_tools normalises AFTER sorting, so
+    # matching raw names here made a padded or camelCase emission invisible to
+    # the ordering decision — `has_record` came out False, the function fell
+    # through to `return not has_record` = True, and pose was dispatched BEFORE
+    # the grade. handle_pose_question then rejected it as premature_pose ("the
+    # student answered a question already in flight"), so the tutor lost its
+    # pose while its reply still advertised the next question.
+    #
+    # Device session 21, lesson 1434: the mixed-use question was announced in
+    # three consecutive replies and never registered; the student answered it
+    # twice and was graded against the previous question both times.
+    # The parser is documented to emit ' record_answer' and 'requestFigure'
+    # (see _KNOWN_TOOLS) — this path just never accounted for it.
+    names = [_normalise_tool_name(getattr(b, 'name', '')) for b in tool_use_blocks]
+    has_pose = 'pose_question' in names
+    has_record = 'record_answer' in names
     if not (has_pose and has_record):
         return not has_record  # order is irrelevant with ≤1 of the pair
     if getattr(session, 'pk', None) is None:
@@ -2585,7 +2628,7 @@ def _pose_before_record(session, tool_use_blocks, question_pool=None) -> bool:
     ) or ''
     prev_norm = _norm_loose(prev)
     for b in tool_use_blocks:
-        if getattr(b, 'name', '') != 'pose_question':
+        if _normalise_tool_name(getattr(b, 'name', '')) != 'pose_question':
             continue
         params = getattr(b, 'input', None) or {}
         # The pose carries an index, not a stem (2026-08-06), so resolve the
@@ -2653,7 +2696,12 @@ def _dispatch_tools(*, session, response, figure_catalog, question_pool=None):
     pose_first = _pose_before_record(session, tool_use_blocks, question_pool)
 
     def _priority(blk) -> int:
-        n = getattr(blk, 'name', '')
+        # Normalise here too. Sorting on the raw name sent a padded
+        # ' record_answer' to priority 2 (last), so pose still dispatched
+        # first and was rejected as premature_pose — the same defect as in
+        # _pose_before_record, one function along. Fixing only that one would
+        # have left this in place and looked like the fix had failed.
+        n = _normalise_tool_name(getattr(blk, 'name', ''))
         if n == 'pose_question':
             return 0 if pose_first else 1
         if n == 'record_answer':
