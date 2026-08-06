@@ -273,18 +273,66 @@ def _option_number(s: str) -> float | None:
 # reply selects it. Adding a sixth heuristic was not going to end.
 
 
+def _exact_option_match(question, student_answer: str) -> str | None:
+    """The letter whose option the reply matches EXACTLY, or None.
+
+    Two forms, both exact and both requiring a UNIQUE winner:
+      * the option's text, normalised for case and whitespace only
+      * the option's numeric VALUE ("39" against an option reading "39")
+
+    Deliberately no fuzzy matching. The stack deleted on 2026-08-06 —
+    distinctive-substring, then LCS phrase overlap — is what marked
+    "two for easting, THEN two for northing" wrong against "Four digits (two
+    for easting, two for northing)". Interpreting a paraphrase is the LLM's
+    job; recognising that the student typed an option verbatim is not, and
+    paying a model call for it is what made grading feel slow on the desktop.
+
+    Measured on device sessions: "39" (the exact text of option B) cost a full
+    LLM round trip, and "The scale of the map" — an option quoted verbatim —
+    never reached a grader at all and was marked incorrect at confidence 0.6.
+    """
+    needle = _norm_option(student_answer)
+    if not needle:
+        return None
+    needle_num = _option_number(needle)
+    hits: list[str] = []
+    for letter in ('A', 'B', 'C', 'D'):
+        opt = _norm_option(getattr(question, f'option_{letter.lower()}', '') or '')
+        if not opt:
+            continue
+        if opt == needle:
+            hits.append(letter)
+            continue
+        # Numeric equality, so "39" matches an option written "39 " or "39.0".
+        # Only when BOTH sides are purely numeric — otherwise "3" would match
+        # "3947" via a loose parse.
+        if needle_num is not None and _norm_option(str(needle_num)) == needle or needle.isdigit():
+            opt_num = _option_number(opt)
+            if (opt_num is not None and needle_num is not None
+                    and opt.replace('.', '', 1).replace('-', '', 1).isdigit()
+                    and abs(opt_num - needle_num) < 1e-9):
+                hits.append(letter)
+    # Ambiguity is not a match: two options sharing a value must fall through
+    # to the LLM rather than pick one.
+    return hits[0] if len(hits) == 1 else None
+
+
 def _grade_mcq(question, student_answer: str) -> GradeResult:
     """Grade an MCQ answer.
 
-    A reply that is exactly a letter ("B", "Option B", "B.") is resolved
-    deterministically — that is 58% of real student replies, it is unambiguous,
-    and it keeps the common path exact and reproducible.
+    Fast paths first, both EXACT and both free:
+      1. a bare letter ("B", "Option B", "B.") — 58% of real replies
+      2. an option quoted verbatim, by text or by numeric value
 
-    Everything else goes to the LLM (``_grade_mcq_llm``), which is HANDED the
-    correct option and asked whether the reply selects it. The string matchers
-    that used to sit here were deleted 2026-08-06: they were five layers of
-    heuristics and still marked "two for easting, THEN two for northing" wrong
-    against "Four digits (two for easting, two for northing)".
+    Anything needing interpretation — a paraphrase, reasoning-then-answering —
+    falls through to the LLM via grade_answer's escalation.
+
+    The line is between recognising and interpreting. Fuzzy matching
+    (distinctive-substring, LCS overlap) was deleted on 2026-08-06 because it
+    marked "two for easting, THEN two for northing" wrong against "Four digits
+    (two for easting, two for northing)"; it is NOT coming back. Exact equality
+    was never the thing that failed, and paying an LLM call to notice the
+    student typed an option verbatim is what made grading feel slow offline.
     """
     correct = (getattr(question, 'correct_answer', '') or '').strip().upper()
     if correct not in ('A', 'B', 'C', 'D'):
@@ -305,25 +353,45 @@ def _grade_mcq(question, student_answer: str) -> GradeResult:
         )
 
     extracted = _extract_letter_forms(student_answer)
+    how = 'letter'
+    if extracted is None:
+        extracted = _exact_option_match(question, student_answer)
+        how = 'exact option'
     if extracted is not None:
         return GradeResult(
             verdict=Verdict.CORRECT if extracted == correct else Verdict.INCORRECT,
             confidence=1.0,
             tier='mcq',
             justification=(
-                f'letter {extracted!r} '
+                f'{how} {extracted!r} '
                 + ('matches' if extracted == correct else f'!= correct {correct!r}')
             ),
         )
 
-    # No bare letter. grade_answer escalates every non-CORRECT verdict to the
-    # LLM, so this is the value it escalates FROM — and the value it falls back
-    # to when no grader is reachable. Never blocks the turn.
+    # Neither fast path resolved it. grade_answer escalates this to the LLM;
+    # what is returned here is what SURVIVES when no grader is reachable.
+    #
+    # NOT a verdict of INCORRECT. Failing to parse an answer is not the same as
+    # the answer being wrong, and it used to be reported as wrong: on device
+    # session 22 a student typed an option verbatim and got
+    # "no A-D letter extractable" -> INCORRECT, with nothing having graded it.
+    # Students do not always reply with a letter, so this path is ordinary, not
+    # exceptional.
+    #
+    # PARTIAL + needs_followup is the engine's "this was not resolved" signal —
+    # handle_record_answer leaves the slot live, the hint ladder does not count
+    # an attempt, and the tutor asks the student to say which option they mean
+    # instead of telling them they are wrong. The turn cap still moves the
+    # lesson on if it keeps happening.
     return GradeResult(
-        verdict=Verdict.INCORRECT,
-        confidence=0.6,
+        verdict=Verdict.PARTIAL,
+        confidence=0.0,
         tier='mcq',
-        justification=f'no A-D letter extractable from {student_answer!r}',
+        justification=(
+            f'could not resolve {student_answer!r} to an option and no grader '
+            f'was reachable — NOT graded as wrong'
+        ),
+        needs_followup=True,
     )
 
 
@@ -478,8 +546,29 @@ def _llm_grade(question, student_answer: str, *, qtype: str):
 
     try:
         chain = list(get_judge_provider_chain('judge') or [])
-        if not chain:
-            chain = list(_local_verifier_chain(get_judge_provider_chain) or [])
+        # Append the local model as the LAST resort, not only when the cloud
+        # chain is empty.
+        #
+        # The desktop build has a cloud judge CONFIGURED but no internet, so
+        # the chain is non-empty and every call in it fails. Falling back only
+        # on `not chain` meant the local model was never tried, _llm_grade
+        # returned None, and the caller's defensive INCORRECT fired — telling
+        # a student their answer was wrong when nothing had graded it.
+        # Observed on device session 22: "The scale of the map" came back
+        # INCORRECT with justification "no A-D letter extractable".
+        #
+        # A parse failure is not a verdict. The local model is a weaker judge
+        # than a cross-family cloud one, but any real grade beats asserting
+        # "wrong" because the grader could not be reached.
+        local_tail = [
+            p for p in (_local_verifier_chain(get_judge_provider_chain) or [])
+            if not any(
+                getattr(getattr(c, 'config', None), 'model_name', None)
+                == getattr(getattr(p, 'config', None), 'model_name', None)
+                for c in chain
+            )
+        ]
+        chain = chain + local_tail
     except Exception as exc:                       # noqa: BLE001
         logger.warning("[grader] llm_grade chain build failed: %s", exc)
         return None
