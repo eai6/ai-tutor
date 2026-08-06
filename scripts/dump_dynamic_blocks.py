@@ -76,8 +76,10 @@ def main() -> int:
         # buries the sections that do differ.
         ('GRADE — answering the live question',
          dict(in_flight_question=slot, student_intent='answer')),
-        ('CONVERSATIONAL — student asked something instead',
-         dict(in_flight_question=slot, student_intent='clarification')),
+        # No CONVERSATIONAL case: it was cut from the offline prompt because a
+        # live question means the picker is showing and the typing box is not,
+        # so the student can only send a letter. This case rendered a GRADE
+        # block under a CONVERSATIONAL heading, which is worse than absent.
         ('REMEDIATION — failed the quiz, answering',
          dict(in_flight_question=slot, student_intent='answer',
               exit_ticket_review=review)),
