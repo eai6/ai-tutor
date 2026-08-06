@@ -11,6 +11,7 @@ attributes are all the public-API surface.
 from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from unittest import TestCase
+from unittest.mock import patch
 
 from apps.tutoring.simple_tutor.grader import (
     GradeResult,
@@ -18,6 +19,14 @@ from apps.tutoring.simple_tutor.grader import (
     grade_answer,
     _grade_mcq,
 )
+
+
+def _stub_llm(verdict='correct'):
+    """Stand in for the LLM grader so escalation is testable with no provider."""
+    def _fake(question, student_answer, *, qtype):
+        return GradeResult(verdict=Verdict(verdict), confidence=1.0,
+                           tier='mcq_llm', justification='stub')
+    return patch('apps.tutoring.simple_tutor.grader._llm_grade', _fake)
 
 
 def _mcq(correct: str, options: dict | None = None) -> SimpleNamespace:
@@ -81,46 +90,69 @@ class PrefixedFormsTest(TestCase):
         self.assertEqual(r.verdict, Verdict.CORRECT)
 
 
-class NumericFormsTest(TestCase):
-    """Student typed a number instead of a letter (1=A, 2=B, ...)."""
+class NonLetterRepliesEscalateTest(TestCase):
+    """Anything that is not a bare letter is the LLM's call now.
 
-    def test_bare_number(self):
-        # "2" → "B"
+    The string matchers that used to resolve "2", "Exports" and "225" were
+    deleted 2026-08-06 — five layers of heuristics that still marked
+    "two for easting, THEN two for northing" wrong against
+    "Four digits (two for easting, two for northing)". The deterministic layer
+    now defers and grade_answer escalates.
+    """
+
+    def test_deterministic_layer_defers_on_non_letter(self):
         r = _grade_mcq(_mcq('B'), '2')
+        self.assertEqual(r.verdict, Verdict.INCORRECT)
+        self.assertEqual(r.confidence, 0.6, 'signals "unresolved", not "wrong"')
+        self.assertIn('no A-D letter', r.justification)
+
+    def test_grade_answer_escalates_a_bare_number(self):
+        with _stub_llm('correct'):
+            r = grade_answer(question=_mcq('B'), student_answer='2')
+        self.assertEqual(r.verdict, Verdict.CORRECT)
+        self.assertEqual(r.tier, 'mcq_llm')
+
+    def test_grade_answer_escalates_option_text(self):
+        q = _mcq('B', {'A': 'Imports', 'B': 'Exports'})
+        with _stub_llm('correct'):
+            r = grade_answer(question=q, student_answer='Exports')
         self.assertEqual(r.verdict, Verdict.CORRECT)
 
-    def test_option_number(self):
-        r = _grade_mcq(_mcq('C'), 'Option 3')
+    def test_grade_answer_escalates_a_bare_value(self):
+        q = _mcq('B', {'A': '180', 'B': '225', 'C': '270', 'D': '315'})
+        with _stub_llm('correct'):
+            r = grade_answer(question=q, student_answer='225')
         self.assertEqual(r.verdict, Verdict.CORRECT)
 
-    def test_wrong_number(self):
-        # "1" maps to "A" but correct is "B"
-        r = _grade_mcq(_mcq('B'), '1')
+    def test_escalation_can_confirm_incorrect_too(self):
+        """The LLM is not a rubber stamp — it returns incorrect as readily."""
+        q = _mcq('B', {'A': 'Imports', 'B': 'Exports'})
+        with _stub_llm('incorrect'):
+            r = grade_answer(question=q, student_answer='Imports')
         self.assertEqual(r.verdict, Verdict.INCORRECT)
 
+    def test_a_bare_letter_never_escalates(self):
+        """58% of real replies are a bare letter. Those stay exact, free and
+        reproducible — no LLM call."""
+        called = {'n': 0}
 
-class FullOptionTextMatchTest(TestCase):
-    """Student typed the option's full text instead of the letter."""
+        def _fake(question, student_answer, *, qtype):
+            called['n'] += 1
+            return None
 
-    def test_exact_text(self):
-        q = _mcq('B', {'A': 'Imports', 'B': 'Exports'})
-        r = _grade_mcq(q, 'Exports')
+        with patch('apps.tutoring.simple_tutor.grader._llm_grade', _fake):
+            r = grade_answer(question=_mcq('B'), student_answer='B')
         self.assertEqual(r.verdict, Verdict.CORRECT)
+        self.assertEqual(r.tier, 'mcq')
+        self.assertEqual(called['n'], 0, 'a correct letter must not cost a call')
 
-    def test_case_insensitive(self):
-        q = _mcq('B', {'A': 'Imports', 'B': 'Exports'})
-        r = _grade_mcq(q, 'exports')
-        self.assertEqual(r.verdict, Verdict.CORRECT)
-
-    def test_wrong_text(self):
-        q = _mcq('B', {'A': 'Imports', 'B': 'Exports'})
-        r = _grade_mcq(q, 'Imports')
+    def test_falls_back_to_defensive_incorrect_when_no_grader(self):
+        """No provider, or every provider failed. Grading must never block."""
+        with patch('apps.tutoring.simple_tutor.grader._llm_grade',
+                   lambda *a, **k: None):
+            r = grade_answer(question=_mcq('B'), student_answer='Exports')
         self.assertEqual(r.verdict, Verdict.INCORRECT)
-
-
-# ============================================================================
-# Wrong answers
-# ============================================================================
+        self.assertEqual(r.confidence, 0.6)
 
 
 class WrongLetterTest(TestCase):
@@ -175,11 +207,21 @@ class UnparseableTest(TestCase):
 
 
 class MultiLetterNonAmbiguousTest(TestCase):
-    def test_single_letter_in_long_text(self):
-        # "I think it's B because..." — one letter, last-ditch pattern
-        # should pick it up.
-        r = _grade_mcq(_mcq('B'), "I think it's B because of trade balance")
+    """A letter buried in a sentence used to be caught by a last-ditch regex
+    that grabbed any lone A-D token. That heuristic is gone: it also fired on
+    "I got A but then changed my mind" and on option text containing a stray
+    letter. Reasoning-then-answering is exactly the shape the LLM should read.
+    """
+
+    def test_letter_inside_a_sentence_escalates(self):
+        with _stub_llm('correct'):
+            r = grade_answer(question=_mcq('B'),
+                             student_answer="I think it's B because of trade balance")
         self.assertEqual(r.verdict, Verdict.CORRECT)
+
+    def test_deterministic_layer_does_not_guess_at_it(self):
+        r = _grade_mcq(_mcq('B'), "I think it's B because of trade balance")
+        self.assertEqual(r.confidence, 0.6, 'unresolved, escalate rather than guess')
 
 
 # ============================================================================
@@ -247,7 +289,7 @@ class GradeResultToDictTest(TestCase):
             'confidence': 1.0,
             'tier': 'mcq',
             'per_criterion_scores': {},
-            'justification': "extracted 'B' matches correct_answer",
+            'justification': "letter 'B' matches",
             'needs_followup': False,
         })
 
@@ -281,37 +323,6 @@ class NeedsFollowupDefaultTest(TestCase):
         self.assertFalse(r.needs_followup)
 
 
-class ValueToLetterCycle8Test(TestCase):
-    """Cycle-8: a bare value that uniquely matches one option grades as
-    that option's letter — kills the 8-turn 'which letter?' nag loop
-    (kimi refusal_chain: student computed 225, tutor demanded the letter
-    for six more turns)."""
-
-    def _q(self, opts, correct):
-        return SimpleNamespace(
-            option_a=opts[0], option_b=opts[1],
-            option_c=opts[2], option_d=opts[3],
-            correct_answer=correct,
-        )
-
-    def test_unique_value_match_grades_as_letter(self):
-        q = self._q(['180°', '225°', '270°', '315°'], 'B')
-        r = _grade_mcq(q, '225')
-        self.assertEqual(r.verdict, Verdict.CORRECT)
-
-    def test_value_match_beats_positional_numeric(self):
-        # '2' is the VALUE of option B here — must not be read as
-        # "option 2" (positionally also B, so make the value sit at D).
-        q = self._q(['4', '6', '10', '2'], 'D')
-        r = _grade_mcq(q, '2')
-        self.assertEqual(r.verdict, Verdict.CORRECT)
-
-    def test_positional_still_works_when_no_value_match(self):
-        q = self._q(['red', 'blue', 'green', 'yellow'], 'B')
-        r = _grade_mcq(q, 'option 2')
-        self.assertEqual(r.verdict, Verdict.CORRECT)
-
-    def test_prefixed_option_text_still_value_matches(self):
-        q = self._q(['A) 11', 'B) 3.8', 'C) 31', 'D) 12'], 'A')
-        r = _grade_mcq(q, '11')
-        self.assertEqual(r.verdict, Verdict.CORRECT)
+# ValueToLetterCycle8Test was removed with the value matcher it covered
+# (2026-08-06). A bare value like "225" now escalates to the LLM —
+# see NonLetterRepliesEscalateTest.

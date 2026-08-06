@@ -714,7 +714,6 @@ def respond(
                 stream_gate.used_rotation_index if stream_gate else None
             ),
         )
-        text_reply = _filter_reveals(session, text_reply, tool_results)
 
     if not text_reply:
         # Last-resort: neither call produced usable text. Give a neutral
@@ -1153,11 +1152,32 @@ def _ensure_posed_question_in_text(
         and (tr.get('result') or {}).get('posed')
         for tr in tool_results
     )
-    if not posed:
-        return text_reply
 
     from apps.tutoring.models import InFlightQuestion
     slot = InFlightQuestion.objects.filter(session=session).first()
+
+    if not posed:
+        # No pose this turn — but the model may still have WRITTEN a question
+        # into its reply. Device session 20, lesson 1427: the slot held "In
+        # 3947, which digits represent the easting?" while the reply narrated
+        # a different MCQ ("Which reference has an easting of 52? A) 5234 …").
+        # The student answered what they could see, "5234", and it was graded
+        # against 3947 — marked wrong for answering the visible question.
+        #
+        # Lettered options in the text are the tell: a hint does not carry an
+        # A/B/C/D block, a narrated question does. When the slot's own stem is
+        # absent, the reply is showing a question the platform will not grade,
+        # so fall through to the divergent-prose repair below.
+        if slot is None or not _contains_lettered_options(text_reply):
+            return text_reply
+        stem_norm = ' '.join((slot.question_text or '').lower().split())[:30]
+        if stem_norm and stem_norm in ' '.join(text_reply.lower().split()):
+            return text_reply
+        logger.info(
+            "[simple_tutor] narrated question with no pose session=%s — "
+            "replacing with the slot's question", session.pk,
+        )
+
     if slot is None:
         # Slot was posed and then immediately graded clean this turn.
         # Nothing left to render.
@@ -1474,74 +1494,26 @@ def _align_reply_polarity(
 _ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)
 
 
-def _filter_reveals(
-    session, text_reply: str, tool_results, *, reference: str | None = None,
-) -> str:
-    """While a question is open after a wrong answer, the reply must not
-    state the reference (qwen3:14b printed "(Answer: A)" verbatim; others
-    said "option C is correct" mid-hint). The engine knows the reference,
-    so this is deterministically enforceable.
-
-    ``reference`` lets the streaming path supply the answer it already
-    looked up, so this does not re-query InFlightQuestion once per
-    streamed chunk. None (the default) keeps the query."""
-    if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
-        return text_reply
-    options: list | None = None
-    if reference is None:
-        from apps.tutoring.models import InFlightQuestion
-        slot = InFlightQuestion.objects.filter(session=session).first()
-        if slot is None:
-            return text_reply
-        reference = slot.reference_answer or ''
-        options = slot.options or []
-    ref = (reference or '').strip()
-    if not ref:
-        return text_reply
-    out = _ANSWER_PAREN_RE.sub('', text_reply)
-    is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
-
-    def _value_pattern(value: str) -> str:
-        v = re.escape(value)
-        return (rf'(?:answer|correct|equals|=|\bis)\W{{0,15}}{v}\b'
-                rf'|\b{v}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right|answer)')
-
-    if is_letter:
-        alts = [rf'\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b',
-                rf'\b{ref}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right)']
-        # For MCQ, stating what the option SAYS reveals exactly as much as
-        # naming its letter. Observed on lesson 1427: "the northing is the
-        # second pair of digits, not the first. The easting is 56, and the
-        # northing is 23" — 23 was option C, so the student read the answer
-        # straight off the hint. Matching only the letter missed it entirely.
-        #
-        # The assertion patterns require the value within 15 NON-word
-        # characters of "is"/"answer"/"equals", so "the northing is 23" is
-        # caught while a legitimate "is the northing 23 or 56?" is not.
-        correct_text = ''
-        idx = 'ABCD'.index(ref.upper())
-        if options and idx < len(options):
-            correct_text = str(options[idx] or '').strip()
-        if correct_text:
-            alts.append(_value_pattern(correct_text))
-        pat = re.compile('(?i)' + '|'.join(alts))
-    else:
-        pat = re.compile('(?i)' + _value_pattern(ref))
-    lines_out = []
-    for line in out.split('\n'):
-        if not pat.search(line):
-            lines_out.append(line)
-            continue
-        kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
-                if not pat.search(s)]
-        lines_out.append(' '.join(kept).strip())
-    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines_out)).strip('\n')
-    if result != text_reply:
-        logger.info(
-            "[simple_tutor] reveal_filter: redacted reference leak "
-            "session=%s", session.pk,
-        )
-    return result
+# _filter_reveals was REMOVED 2026-08-06.
+#
+# It redacted sentences from the tutor's reply when they stated the reference
+# answer while a wrong-answered question was still live. It grew three times in
+# one day — letter -> option text -> whole-option quote -> any 5-word run —
+# each widening prompted by a real leak the previous version missed, which is
+# the same trajectory the MCQ string matchers went down before they were
+# deleted in favour of the LLM grader.
+#
+# Removed per user direction: post-processing the tutor's reply is unreliable.
+# Every redaction is also a chance to cut correct teaching, and this one did —
+# it took a teaching sentence out with the leak because they shared a
+# paragraph. Leak prevention now lives entirely in the prompt (Block 0, "Name
+# the rule or the place to look, never the value it produces" and "for multiple
+# choice, saying what an option SAYS is the same as naming its letter").
+#
+# The tutor still SEES the reference answer, so a leak remains possible — that
+# trade was made deliberately. If it needs catching again, the right mechanism
+# is apps/tutoring/answer_leak.py (an LLM judge that already exists for exactly
+# this) feeding the regen path, NOT another regex over the reply.
 
 
 def _auto_grade_fallback(
@@ -2544,10 +2516,22 @@ def _pose_before_record(session, tool_use_blocks, question_pool=None) -> bool:
     is registering the question the student actually answered. See
     _dispatch_tools' docstring for the full decision table.
     """
-    has_pose = any(getattr(b, 'name', '') == 'pose_question'
-                   for b in tool_use_blocks)
-    has_record = any(getattr(b, 'name', '') == 'record_answer'
-                     for b in tool_use_blocks)
+    # Normalise before comparing. _dispatch_tools normalises AFTER sorting, so
+    # matching raw names here made a padded or camelCase emission invisible to
+    # the ordering decision — `has_record` came out False, the function fell
+    # through to `return not has_record` = True, and pose was dispatched BEFORE
+    # the grade. handle_pose_question then rejected it as premature_pose ("the
+    # student answered a question already in flight"), so the tutor lost its
+    # pose while its reply still advertised the next question.
+    #
+    # Device session 21, lesson 1434: the mixed-use question was announced in
+    # three consecutive replies and never registered; the student answered it
+    # twice and was graded against the previous question both times.
+    # The parser is documented to emit ' record_answer' and 'requestFigure'
+    # (see _KNOWN_TOOLS) — this path just never accounted for it.
+    names = [_normalise_tool_name(getattr(b, 'name', '')) for b in tool_use_blocks]
+    has_pose = 'pose_question' in names
+    has_record = 'record_answer' in names
     if not (has_pose and has_record):
         return not has_record  # order is irrelevant with ≤1 of the pair
     if getattr(session, 'pk', None) is None:
@@ -2564,7 +2548,7 @@ def _pose_before_record(session, tool_use_blocks, question_pool=None) -> bool:
     ) or ''
     prev_norm = _norm_loose(prev)
     for b in tool_use_blocks:
-        if getattr(b, 'name', '') != 'pose_question':
+        if _normalise_tool_name(getattr(b, 'name', '')) != 'pose_question':
             continue
         params = getattr(b, 'input', None) or {}
         # The pose carries an index, not a stem (2026-08-06), so resolve the
@@ -2632,7 +2616,12 @@ def _dispatch_tools(*, session, response, figure_catalog, question_pool=None):
     pose_first = _pose_before_record(session, tool_use_blocks, question_pool)
 
     def _priority(blk) -> int:
-        n = getattr(blk, 'name', '')
+        # Normalise here too. Sorting on the raw name sent a padded
+        # ' record_answer' to priority 2 (last), so pose still dispatched
+        # first and was rejected as premature_pose — the same defect as in
+        # _pose_before_record, one function along. Fixing only that one would
+        # have left this in place and looked like the fix had failed.
+        n = _normalise_tool_name(getattr(blk, 'name', ''))
         if n == 'pose_question':
             return 0 if pose_first else 1
         if n == 'record_answer':

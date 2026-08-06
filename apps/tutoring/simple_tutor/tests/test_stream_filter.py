@@ -230,68 +230,12 @@ def _make_session(idx):
         engine_state={})
 
 
-class StreamGateRevealTest(DjangoTestCase):
-    """The safety-critical one. qwen3:14b printed '(Answer: A)' verbatim into
-    a wrong-answer hint; _filter_reveals exists to redact exactly that. If the
-    stream bypasses it, the filter is decorative."""
-
-    def setUp(self):
-        self.session = _make_session(1)
-        InFlightQuestion.objects.create(
-            session=self.session, question_text='Which is the unit of force?',
-            question_type='mcq', options=['N', 'J', 'W', 'Pa'],
-            reference_answer='A', source='inline_authored',
-        )
-
-    def _gate(self, emitted):
-        return StreamGate(
-            session=self.session, tool_results=_graded('incorrect'),
-            family='qwen', emit=emitted.append,
-        )
-
-    def test_reference_never_appears_in_any_emitted_prefix(self):
-        raw = ("Not quite. The answer is A, because newtons measure force. "
-               "Want to try again?")
-        emitted = []
-        gate = self._gate(emitted)
-        # Feed one character at a time — the worst case for a boundary bug.
-        for ch in raw:
-            gate.feed(ch)
-        self.assertTrue(emitted, 'nothing streamed at all')
-        for snap in emitted:
-            self.assertNotIn('answer is A', snap)
-        # And the redaction really did fire (i.e. the test is not passing
-        # merely because nothing was emitted).
-        self.assertIn('Not quite.', emitted[-1])
-
-    def test_answer_parenthetical_is_never_emitted(self):
-        emitted = []
-        gate = self._gate(emitted)
-        for ch in 'Close one. (Answer: A) Think about units. ':
-            gate.feed(ch)
-        for snap in emitted:
-            self.assertNotIn('Answer: A', snap)
-
-    def test_snapshots_only_grow(self):
-        emitted = []
-        gate = self._gate(emitted)
-        for ch in 'One. Two. Three. ':
-            gate.feed(ch)
-        for a, b in zip(emitted, emitted[1:]):
-            self.assertTrue(b.startswith(a) or len(b) > len(a),
-                            f'snapshot shrank: {a!r} -> {b!r}')
-
-    def test_withholds_everything_when_the_reference_lookup_fails(self):
-        """Fail CLOSED. If we cannot establish whether a reference exists,
-        _filter_reveals would silently no-op and a hint stating the answer
-        would ship. Withholding costs a preview; leaking costs the lesson."""
-        emitted = []
-        gate = self._gate(emitted)
-        with patch('apps.tutoring.models.InFlightQuestion.objects') as m:
-            m.filter.side_effect = RuntimeError('db gone')
-            for ch in 'Not quite. The answer is A. ':
-                gate.feed(ch)
-        self.assertEqual(emitted, [])
+# StreamGateRevealTest was removed with the reveal gate it covered
+# (2026-08-06). It asserted that the stream is withheld when the reference
+# answer cannot be resolved on a wrong-answer turn — a gate that existed only
+# to keep _filter_reveals from silently no-opping mid-stream. With the filter
+# gone the gate protected nothing and only cost the student a stalled stream.
+# Leak prevention is the prompt's job now.
 
 
 class StreamGateRotationTest(DjangoTestCase):

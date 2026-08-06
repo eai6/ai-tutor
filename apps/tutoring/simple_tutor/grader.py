@@ -101,6 +101,35 @@ def grade_answer(*, question, student_answer: str) -> GradeResult:
             question types.
     """
     qtype = getattr(question, 'question_type', None)
+    result = _grade_deterministic(question, student_answer, qtype)
+
+    # Escalate to the LLM when the deterministic pass did NOT return a clean
+    # CORRECT. The asymmetry is deliberate: a deterministic CORRECT is an exact
+    # match and is trusted as-is (no latency, no variance, no cost), while a
+    # deterministic INCORRECT may only mean the student phrased it differently
+    # — which is precisely the bug this replaced. So the LLM can rescue a wrong
+    # verdict but can never overturn a right one.
+    #
+    # Tiers that ARE the LLM already are not re-asked.
+    # A RESOLVED MCQ letter is the one INCORRECT worth trusting: the student
+    # typed "b", the answer is C, there is nothing to reinterpret. _grade_mcq
+    # signals "resolved" with confidence 1.0 and "could not resolve" with 0.6.
+    # Without this every wrong bare letter — roughly a quarter of MCQ answers —
+    # would buy an LLM call to confirm what a regex already knew.
+    resolved_mcq = result.tier == 'mcq' and result.confidence >= 1.0
+
+    if (result.verdict is not Verdict.CORRECT
+            and not resolved_mcq
+            and result.tier not in ('verifier_llm', 'llm_grade')
+            and str(student_answer or '').strip()):
+        escalated = _llm_grade(question, student_answer, qtype=str(qtype or ''))
+        if escalated is not None:
+            return escalated
+    return result
+
+
+def _grade_deterministic(question, student_answer: str, qtype) -> GradeResult:
+    """Route to the type's deterministic grader. Raises for unknown types."""
     if qtype == 'mcq':
         return _grade_mcq(question, student_answer)
     if qtype in ('math', 'numeric', 'short_numeric'):
@@ -205,151 +234,57 @@ _FRACTION_RE = re.compile(r'^(-?\d+(?:\.\d+)?)\s*/\s*(-?\d+(?:\.\d+)?)$')
 
 
 def _norm_option(s: str) -> str:
-    """Normalise an option (or answer) for comparison: strip a leading
-    letter label ("A) 11" → "11"), lowercase, collapse whitespace."""
-    s = _OPT_PREFIX_RE.sub('', (s or '').strip())
-    return ' '.join(s.lower().split()).rstrip('.')
+    """Lowercase + collapse whitespace. Kept because tools.py uses it for the
+    anti-repeat option-set signature and the catalog cross-check."""
+    return ' '.join(str(s or '').strip().lower().split())
 
 
 def _option_number(s: str) -> float | None:
-    """Parse an option/answer as a number when possible — tolerates °, %,
-    commas, and simple fractions."""
-    t = (s or '').strip().replace('°', '').replace('%', '').replace(',', '')
+    """Parse an option's numeric value, or None. Kept for tools.py, which uses
+    it to decide whether a posed reference is numeric."""
+    t = _norm_option(s)
+    if not t:
+        return None
+    m = re.search(r'-?\d[\d,]*(?:\.\d+)?', t)
+    if not m:
+        return None
     try:
-        return float(t)
+        return float(m.group(0).replace(',', ''))
     except ValueError:
-        m = _FRACTION_RE.match(t)
-        if m and float(m.group(2)) != 0:
-            return float(m.group(1)) / float(m.group(2))
         return None
 
 
-def _extract_option_text_match(question, student_answer: str) -> str | None:
-    """If the student's answer matches exactly ONE option — by normalised
-    text or by numeric value — return that option's letter.
-
-    The value branch is what breaks the "which letter?" nag loop
-    (cycle-7 sweeps: a student who computed the correct value 225 for an
-    MCQ was asked for the letter across six further turns). A value that
-    matches two options is ambiguous → None.
-    """
-    needle = _norm_option(student_answer)
-    if not needle:
-        return None
-    needle_num = _option_number(needle)
-    matches: list[str] = []
-    partial: list[str] = []
-    for letter in ('A', 'B', 'C', 'D'):
-        opt = _norm_option(getattr(question, f'option_{letter.lower()}', '') or '')
-        if not opt:
-            continue
-        if opt == needle:
-            matches.append(letter)
-            continue
-        if needle_num is not None:
-            opt_num = _option_number(opt)
-            if opt_num is not None and abs(opt_num - needle_num) < 1e-9:
-                matches.append(letter)
-                continue
-        # Distinctive-substring match. Exact-equality alone required the
-        # student to retype the WHOLE option verbatim, so a student answering
-        # "easting" to
-        #   B) The horizontal axis (easting)
-        # was marked INCORRECT despite naming the one word that distinguishes
-        # B from A ("northing"). Observed on device 2026-08-05: the tutor said
-        # "that's a great start!" and then re-asked the identical question.
-        #
-        # Safe because the result is discarded unless it is UNIQUE across the
-        # options: "axis" appears in A, B and C, so it stays ambiguous and
-        # falls through exactly as before. Only a needle that identifies a
-        # single option counts.
-        #
-        # >= 4 chars so short fragments cannot carry a match on their own.
-        # A bare "a"/"b" is already handled upstream by letter extraction.
-        if len(needle) >= 4 and needle in opt:
-            partial.append(letter)
-            continue
-
-        # Token-subsequence match. The substring test above is literal, so a
-        # single inserted filler word breaks it. Observed on device
-        # 2026-08-06, lesson 1427:
-        #   C) "Four digits (two for easting, two for northing)"
-        #   student: "two for easting, THEN two for northing"  -> INCORRECT
-        # The student had named the option exactly; one connective marked
-        # them wrong, the step never got its correct verdict, and the tutor
-        # posed three more questions trying to move on.
-        #
-        # Order-preserving on purpose: a bag-of-words test would collide
-        # "5 and 2" with "2 and 5", which are different options on real
-        # grid-reference questions. Subsequence keeps the sequence meaningful
-        # while tolerating inserted words.
-        #
-        # Still discarded unless UNIQUE across options, exactly like the
-        # substring path.
-        if _phrase_overlap(needle, opt) >= _PHRASE_OVERLAP_RATIO:
-            partial.append(letter)
-
-    if len(matches) == 1:
-        return matches[0]
-    # Only fall back to partials when there was no exact/numeric hit at all —
-    # an exact match must never be overridden by a substring one.
-    if not matches and len(partial) == 1:
-        return partial[0]
-    return None
-
-
-_PHRASE_MIN_TOKENS = 3
-_PHRASE_OVERLAP_RATIO = 0.8
-
-
-def _phrase_overlap(a: str, b: str) -> float:
-    """Order-preserving overlap of two phrases, 0.0-1.0.
-
-    Longest common subsequence of the word tokens, over the length of the
-    SHORTER phrase — so extra words on either side are tolerated but reordering
-    is not.
-
-    Plain containment is not enough for real answers. Observed on device
-    2026-08-06, lesson 1427:
-
-        option C: "Four digits (two for easting, two for northing)"
-        student : "two for easting, THEN two for northing"
-
-    Neither contains the other — the student inserted a connective, the option
-    carries a "Four digits" prefix — yet the student named the option exactly.
-    They were marked INCORRECT, the step never got its correct verdict, and the
-    tutor posed three more questions trying to move past it. Overlap here is
-    6/7 = 0.86.
-
-    Order still matters, which is what keeps this safe on grid-reference
-    questions where "5 and 2" and "2 and 5" are DIFFERENT options: their
-    overlap is 0.33, nowhere near the threshold.
-    """
-    # Tokenise on word characters: _norm_option keeps punctuation, so a plain
-    # split leaves "easting," and "(two", which never compare equal to
-    # "easting" and "two" and silently defeat the whole check.
-    at = re.findall(r'[a-z0-9]+', a.lower())
-    bt = re.findall(r'[a-z0-9]+', b.lower())
-    if min(len(at), len(bt)) < _PHRASE_MIN_TOKENS:
-        return 0.0
-    # LCS length, iterative to stay cheap on option-sized strings.
-    prev = [0] * (len(bt) + 1)
-    for x in at:
-        cur = [0]
-        for j, y in enumerate(bt):
-            cur.append(prev[j] + 1 if x == y else max(cur[j], prev[j + 1]))
-        prev = cur
-    return prev[-1] / min(len(at), len(bt))
+# The option-text matchers that used to live here were DELETED 2026-08-06.
+#
+# They were a stack of heuristics, each added to rescue one student answer the
+# previous layer got wrong: exact text -> numeric value -> distinctive
+# substring -> LCS phrase overlap -> positional forms. The stack still failed
+# on ordinary phrasing. Device session, lesson 1427:
+#
+#   C) "Four digits (two for easting, two for northing)"
+#   student: "two for easting, THEN two for northing"   -> INCORRECT
+#
+# One inserted connective. The student had named the option exactly; the step
+# never got its correct verdict and the tutor posed three further questions
+# trying to move past it.
+#
+# Anything that is genuinely a matching-by-meaning problem now goes to
+# _grade_mcq_llm, which is handed the correct option and asked whether the
+# reply selects it. Adding a sixth heuristic was not going to end.
 
 
 def _grade_mcq(question, student_answer: str) -> GradeResult:
-    """Tier-1 deterministic MCQ grader.
+    """Grade an MCQ answer.
 
-    The tutor LLM has already extracted the student's intended option;
-    this grader just confirms it matches ``question.correct_answer``.
-    Defensive parsing handles edge cases ("Option B", "B.", "2", full
-    option text) but is NOT a natural-language understanding layer —
-    that's the tutor LLM's job.
+    A reply that is exactly a letter ("B", "Option B", "B.") is resolved
+    deterministically — that is 58% of real student replies, it is unambiguous,
+    and it keeps the common path exact and reproducible.
+
+    Everything else goes to the LLM (``_grade_mcq_llm``), which is HANDED the
+    correct option and asked whether the reply selects it. The string matchers
+    that used to sit here were deleted 2026-08-06: they were five layers of
+    heuristics and still marked "two for easting, THEN two for northing" wrong
+    against "Four digits (two for easting, two for northing)".
     """
     correct = (getattr(question, 'correct_answer', '') or '').strip().upper()
     if correct not in ('A', 'B', 'C', 'D'):
@@ -369,46 +304,279 @@ def _grade_mcq(question, student_answer: str) -> GradeResult:
             justification='empty answer',
         )
 
-    # Extraction priority: strict letter forms ("B", "Option B") → unique
-    # option text/value match ("225" → the letter whose option is 225°) →
-    # positional forms ("2" → B). Value-before-positional matters: on
-    # numeric-option MCQs a bare number is the student's ANSWER, not an
-    # option index.
-    extracted = (
-        _extract_letter_forms(student_answer)
-        or _extract_option_text_match(question, student_answer)
-        or _extract_positional_forms(student_answer)
-    )
-    if extracted is None:
-        # Couldn't pull a letter out — most likely the student wrote
-        # something unrelated. Defensive INCORRECT with lower confidence
-        # so the engine knows to treat as a possible misunderstanding.
+    extracted = _extract_letter_forms(student_answer)
+    if extracted is not None:
         return GradeResult(
-            verdict=Verdict.INCORRECT,
-            confidence=0.6,
-            tier='mcq',
-            justification=f'no A-D letter extractable from {student_answer!r}',
-        )
-
-    if extracted == correct:
-        return GradeResult(
-            verdict=Verdict.CORRECT,
+            verdict=Verdict.CORRECT if extracted == correct else Verdict.INCORRECT,
             confidence=1.0,
             tier='mcq',
-            justification=f'extracted {extracted!r} matches correct_answer',
+            justification=(
+                f'letter {extracted!r} '
+                + ('matches' if extracted == correct else f'!= correct {correct!r}')
+            ),
         )
 
+    # No bare letter. grade_answer escalates every non-CORRECT verdict to the
+    # LLM, so this is the value it escalates FROM — and the value it falls back
+    # to when no grader is reachable. Never blocks the turn.
     return GradeResult(
         verdict=Verdict.INCORRECT,
-        confidence=1.0,
+        confidence=0.6,
         tier='mcq',
-        justification=f'extracted {extracted!r} ≠ correct {correct!r}',
+        justification=f'no A-D letter extractable from {student_answer!r}',
     )
 
 
-# ============================================================================
-# Tier 1 — Math grader (M3)
-# ============================================================================
+def _reference_block(question, qtype: str) -> str:
+    """Render the KNOWN correct answer for the grader to match against.
+
+    Every type keeps its reference somewhere different — MCQ in
+    ``correct_answer`` as a letter, numeric in ``answer_data['computed']``,
+    fill_in_blank in ``answer_data['blanks']``, matching in
+    ``answer_data['pairs']``. One place that knows all of them, so the grader
+    prompt does not.
+    """
+    ad = getattr(question, 'answer_data', None) or {}
+    if not isinstance(ad, dict):
+        ad = {}
+    correct = (getattr(question, 'correct_answer', '') or '').strip()
+
+    if qtype == 'mcq':
+        letter = correct.upper()
+        text = (getattr(question, f'option_{letter.lower()}', '') or '').strip()
+        return f'{letter}) {text}' if text else letter
+
+    if qtype in ('short_numeric', 'math', 'numeric'):
+        computed = ad.get('computed')
+        model = (ad.get('model_answer') or '').strip()
+        unit = (ad.get('unit') or '').strip()
+        parts = []
+        if computed is not None:
+            parts.append(f'value: {computed}')
+        if model:
+            parts.append(f'written as: {model}')
+        if unit:
+            parts.append(f'unit: {unit}')
+        if not parts and correct:
+            parts.append(f'value: {correct}')
+        return '\n'.join(parts) or '(no reference)'
+
+    if qtype == 'fill_in_blank':
+        blanks = ad.get('blanks') or []
+        alts = ad.get('accept_alternatives') or []
+        lines = [f'blank {i + 1}: {b}' for i, b in enumerate(blanks)]
+        if alts:
+            lines.append(f'also acceptable: {alts}')
+        return '\n'.join(lines) or (correct or '(no reference)')
+
+    if qtype == 'matching':
+        pairs = ad.get('pairs') or ad.get('correct_pairs') or {}
+        if isinstance(pairs, dict):
+            return '\n'.join(f'{k} -> {v}' for k, v in pairs.items()) or '(no reference)'
+        return str(pairs)
+
+    # short_answer / data_interpretation and anything else.
+    model = (ad.get('model_answer') or '').strip() or correct
+    kws = ad.get('keywords') or []
+    out = model or '(no reference)'
+    if kws:
+        out += f'\nkey concepts: {", ".join(str(k) for k in kws)}'
+    return out
+
+
+def _build_grader_system_prompt(qtype: str) -> str:
+    shape = {
+        'mcq': 'The student is choosing between labelled options.',
+        'short_numeric': 'The student is giving a numeric value. Units and '
+                         'formatting vary ("1.8", "1.8 km", "one point eight") '
+                         'and do not change correctness; the VALUE must match.',
+        'math': 'The student is giving a numeric or symbolic value. '
+                'Equivalent forms are correct (1/2 = 0.5 = 50%).',
+        'numeric': 'The student is giving a numeric value.',
+        'fill_in_blank': 'The student is filling blanks in order. ALL blanks '
+                         'must be right for the answer to be correct.',
+        'matching': 'The student is pairing items. ALL pairs must be right '
+                    'for the answer to be correct.',
+    }.get(qtype, 'The student is answering in their own words. Wording may '
+                 'differ from the reference; the MEANING must match.')
+
+    return (
+        "You grade one student answer.\n\n"
+        f"{shape}\n\n"
+        "You are given the question and THE CORRECT ANSWER. Your only job is "
+        "to decide whether the student's reply matches it. Do not work the "
+        "answer out yourself — it is given to you.\n\n"
+        "Students rephrase, and rephrasing is not being wrong: "
+        "\"two for easting, then two for northing\" matches "
+        "\"Four digits (two for easting, two for northing)\".\n\n"
+        "Be strict about substance. The reply must give THE CORRECT ANSWER, "
+        "not merely something related to the topic or a step towards it. A "
+        "partial or different answer is 'incorrect'.\n\n"
+        "If the student did not attempt the question — \"idk\", \"I don't "
+        "know\", a question back to you, a request to move on — that is "
+        "'not_an_answer', NOT 'incorrect'. They have not answered wrongly; "
+        "they have not answered.\n\n"
+        "Output the verdict first, then one short sentence."
+    )
+
+
+def _build_grader_user_prompt(question, student_answer: str, qtype: str) -> str:
+    lines = [
+        '<question>',
+        (getattr(question, 'question_text', '') or '(no question text)').strip(),
+        '</question>',
+        '',
+    ]
+    if qtype == 'mcq':
+        opts = []
+        for letter in ('A', 'B', 'C', 'D'):
+            opt = (getattr(question, f'option_{letter.lower()}', '') or '').strip()
+            if opt:
+                opts.append(f'{letter}) {opt}')
+        if opts:
+            lines += ['<options>'] + opts + ['</options>', '']
+    lines += [
+        '<correct_answer>',
+        _reference_block(question, qtype),
+        '</correct_answer>',
+        '',
+        '<student_reply>',
+        str(student_answer).strip(),
+        '</student_reply>',
+        '',
+        'Does the student reply give the correct answer? Verdict first.',
+    ]
+    return '\n'.join(lines)
+
+
+def _llm_grade(question, student_answer: str, *, qtype: str):
+    """LLM verdict for any question type, or None when unavailable.
+
+    Handed the correct answer and asked whether the reply matches it — a
+    bounded matching question, not an open evaluation.
+
+    Walks the WHOLE provider chain rather than giving up on the first error.
+    Measured 2026-08-06: the Gemini judge returned
+    "'NoneType' object has no attribute 'parts'" on 2 of 14 calls, and with a
+    single-provider attempt each of those became a WRONG verdict via the
+    defensive fallback. The chain is Gemini -> OpenAI -> Haiku, plus the local
+    model on an offline install; a transient failure in one should not decide a
+    student's answer.
+
+    Returns None (never raises) so callers can fall back.
+    """
+    if not _HAS_PYDANTIC or McqVerdict is None:
+        return None
+    try:
+        from apps.curriculum.content_judges._providers import get_judge_provider_chain
+        from apps.tutoring.judges._instructor_helper import (
+            get_instructor_from_client, structured_completion,
+        )
+    except ImportError as exc:
+        logger.warning("[grader] llm_grade infra unavailable: %s", exc)
+        return None
+
+    try:
+        chain = list(get_judge_provider_chain('judge') or [])
+        if not chain:
+            chain = list(_local_verifier_chain(get_judge_provider_chain) or [])
+    except Exception as exc:                       # noqa: BLE001
+        logger.warning("[grader] llm_grade chain build failed: %s", exc)
+        return None
+    if not chain:
+        return None
+
+    system_prompt = _build_grader_system_prompt(qtype)
+    user_prompt = _build_grader_user_prompt(question, student_answer, qtype)
+
+    for attempt, provider in enumerate(chain, start=1):
+        try:
+            client = get_instructor_from_client(provider.client)
+            if client is None:
+                continue
+            result = structured_completion(
+                client, McqVerdict,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=200,
+                provider=str(provider.config.provider) if provider.config else '',
+            )
+        except Exception as exc:                   # noqa: BLE001
+            logger.warning(
+                "[grader] llm_grade provider %d/%d failed (%s: %s)",
+                attempt, len(chain), type(exc).__name__, str(exc)[:120],
+            )
+            continue
+
+        verdict = (getattr(result, 'verdict', '') or '').strip().lower()
+        just = (getattr(result, 'justification', '') or '').strip()[:300]
+        logger.info(
+            "[grader] llm_grade qtype=%s verdict=%s reply=%r",
+            qtype, verdict, str(student_answer)[:60],
+        )
+        tier = f'{qtype}_llm' if qtype == 'mcq' else 'llm_grade'
+        if verdict == 'not_an_answer':
+            # Not a wrong answer — no answer. PARTIAL + needs_followup leaves
+            # the slot live so the hint ladder does not count an attempt the
+            # student never made.
+            return GradeResult(
+                verdict=Verdict.PARTIAL, confidence=0.0, tier=tier,
+                justification=just or 'student did not attempt the question',
+                needs_followup=True,
+            )
+        if verdict == 'correct':
+            return GradeResult(
+                verdict=Verdict.CORRECT, confidence=1.0, tier=tier,
+                justification=just or 'reply matches the reference',
+            )
+        if verdict == 'incorrect':
+            return GradeResult(
+                verdict=Verdict.INCORRECT, confidence=1.0, tier=tier,
+                justification=just or 'reply does not match the reference',
+            )
+        logger.warning("[grader] llm_grade unusable verdict %r", verdict)
+
+    return None
+
+
+def _grade_mcq_llm(question, student_answer: str, *, correct: str):
+    """MCQ-shaped entry point. Kept as a named seam for the MCQ tests."""
+    return _llm_grade(question, student_answer, qtype='mcq')
+
+    try:
+        r = latex2sympy(ref)
+        a = latex2sympy(student)
+    except Exception:
+        return None
+
+    if r is None or a is None:
+        return None
+
+    try:
+        # ``simplify(diff) == 0`` is the canonical equivalence test.
+        # ``equals(0)`` is another option — slightly slower but more
+        # robust for trig/transcendentals. ``simplify`` is enough for
+        # secondary-school algebra (polynomial / rational).
+        diff = sympy.simplify(r - a)
+        return diff == 0
+    except Exception:
+        return None
+
+
+def _extract_last_number(text: str) -> float | None:
+    """Return the last numeric value in ``text``, or None if no number found.
+
+    Used as a fallback when math-verify can't parse a multi-line student
+    response but there IS a clean number at the end. For
+    ``"5x + 5 = 1x + 1\\nx = -1\\nThe answer is 5"`` returns ``5``.
+    """
+    matches = _NUMBER_RX.findall(text or '')
+    if not matches:
+        return None
+    try:
+        return float(matches[-1])
+    except ValueError:
+        return None
 
 
 # Numeric tolerance used as a fallback when math-verify rejects due to
@@ -416,6 +584,10 @@ def _grade_mcq(question, student_answer: str) -> GradeResult:
 # 0.6666666666666666). Matches what the legacy bank_grader.py uses
 # (apps/tutoring/bank_grader.py::_grade_numeric).
 _NUMERIC_TOLERANCE = 0.01
+
+# Regex for "find a number in a string" — used by the numeric tolerance
+# fallback when math-verify can't parse the student's expression but
+# there's a clear final number embedded in their working.
 
 # Regex for "find a number in a string" — used by the numeric tolerance
 # fallback when math-verify can't parse the student's expression but
@@ -434,8 +606,6 @@ _NUMBER_RX = re.compile(r'-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?')
 #
 # Fractions and signs need extra handling — word2number drops the sign
 # on "negative ten" → 10 and reads "two thirds" as 2 not 2/3.
-
-
 _WORD_FRACTIONS = {
     # Phrases must be ordered longest-first so "three quarters" matches
     # before "three" alone — the ``re.sub`` below uses the dict order.
@@ -454,7 +624,11 @@ _WORD_FRACTIONS = {
 }
 
 # Sign prefixes — "negative ten" → "-10".
+
+
+# Sign prefixes — "negative ten" → "-10".
 _SIGN_PREFIXES = ('negative ', 'minus ')
+
 
 
 def _spoken_to_numeric(text: str) -> str:
@@ -507,7 +681,6 @@ def _spoken_to_numeric(text: str) -> str:
         # Pass through the original (math-verify will try digit-form).
         return text
 
-
 def _sympy_symbolic_equal(ref: str, student: str) -> bool | None:
     """Test mathematical equivalence of two algebraic expressions via
     ``sympy.simplify(ref - student) == 0`` after parsing both with
@@ -546,7 +719,6 @@ def _sympy_symbolic_equal(ref: str, student: str) -> bool | None:
     except Exception:
         return None
 
-
 def _extract_last_number(text: str) -> float | None:
     """Return the last numeric value in ``text``, or None if no number found.
 
@@ -561,6 +733,10 @@ def _extract_last_number(text: str) -> float | None:
         return float(matches[-1])
     except ValueError:
         return None
+
+
+# ^ math helpers above are unchanged from before the MCQ matcher removal;
+# they were caught in the same block by accident and restored verbatim.
 
 
 def _grade_math(question, student_answer: str) -> GradeResult:
@@ -1235,10 +1411,36 @@ try:
             ),
         )
 
+    class McqVerdict(BaseModel):
+        """MCQ grader output. Same verdict-first discipline as VerifierResponse.
+
+        The grader is HANDED the correct option and asked whether the student's
+        reply selects it. That is a bounded matching question, not an open
+        evaluation — the model never works the answer out itself.
+        """
+        # 1. Verdict FIRST — commit before rationalising.
+        verdict: _Literal['correct', 'incorrect', 'not_an_answer'] = Field(
+            description=(
+                "'correct' if the student's reply identifies the correct "
+                "option — by its letter, its exact words, a paraphrase, or "
+                "the value it contains. 'incorrect' if it identifies a "
+                "different option or a wrong value. 'not_an_answer' if they "
+                "did not attempt the question at all (\"idk\", \"what does "
+                "easting mean?\", a request to move on)."
+            ),
+        )
+        justification: str = Field(
+            description=(
+                "One short sentence naming which option the reply selects "
+                "and why."
+            ),
+        )
+
     _HAS_PYDANTIC = True
 except ImportError:
     _HAS_PYDANTIC = False
     VerifierResponse = None  # type: ignore
+    McqVerdict = None  # type: ignore
 
 
 # Self-consistency bands. See memory/grading_system_research.md.

@@ -755,62 +755,6 @@ class PolarityAlignTest(DjangoTestCase):
         self.assertEqual(_align_reply_polarity(session, text, []), text)
 
 
-class RevealFilterTest(DjangoTestCase):
-    """BN3 — while a question is open after a wrong answer, the reply must
-    not state the reference: qwen3:14b printed '(Answer: A)' verbatim."""
-
-    def _session_with_slot(self, *, ref, qtype='mcq'):
-        session, _ = _make_session()
-        InFlightQuestion.objects.create(
-            session=session, question_text='Which option?', question_type=qtype,
-            options=['w', 'x', 'y', 'z'] if qtype == 'mcq' else [],
-            reference_answer=ref, source='inline_authored', attempt_count=1)
-        return session
-
-    def _incorrect(self):
-        return [{'tool': 'record_answer',
-                 'result': {'recorded': True, 'verdict': 'incorrect'}}]
-
-    def test_literal_answer_marker_stripped(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
-        session = self._session_with_slot(ref='A')
-        out = _filter_reveals(
-            session, "You're close — think about digit order. (Answer: A)",
-            self._incorrect())
-        self.assertNotIn('(Answer: A)', out)
-        self.assertIn('digit order', out)
-
-    def test_option_reveal_sentence_dropped(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
-        session = self._session_with_slot(ref='C')
-        out = _filter_reveals(
-            session,
-            'Not quite. Option C is correct because rows come first. '
-            'Look at the options again — which one matches?',
-            self._incorrect())
-        self.assertNotIn('Option C is correct', out)
-        self.assertIn('which one matches', out)
-
-    def test_numeric_reference_reveal_dropped(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
-        session = self._session_with_slot(ref='0.3', qtype='short_numeric')
-        out = _filter_reveals(
-            session,
-            'Think about the total. So the answer is 0.3. '
-            'What do you get when you subtract?',
-            self._incorrect())
-        self.assertNotIn('0.3', out)
-        self.assertIn('subtract', out)
-
-    def test_correct_verdict_untouched(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
-        session = self._session_with_slot(ref='A')
-        results = [{'tool': 'record_answer',
-                    'result': {'recorded': True, 'verdict': 'correct'}}]
-        text = 'Exactly — A is right because rows come first.'
-        self.assertEqual(_filter_reveals(session, text, results), text)
-
-
 class AutoGradeFallbackTest(DjangoTestCase):
     """BN4 — when the student clearly answered, a slot exists, and the
     model declined record_answer through both calls (Ollama cannot honour
@@ -1367,75 +1311,140 @@ class RetryBudgetTest(SimpleTestCase):
         self.assertGreater(len(engine._TRANSIENT_BACKOFF), 0)
 
 
-class McqOptionTextLeakTest(DjangoTestCase):
-    """Stating what an MCQ option SAYS reveals as much as naming its letter.
+class NarratedQuestionWithNoPoseTest(DjangoTestCase):
+    """A question written into the reply but never posed must not reach the
+    student.
 
-    Observed on lesson 1427 (desktop, 2026-08-06). Question: "In the
-    four-figure grid reference 5623, which digits represent the northing
-    value?  A) 56  B) 5 and 2  C) 23  D) 6 and 3". The student answered 56
-    (wrong) and the tutor replied:
+    Device session 20, lesson 1427. The slot held "In the four-figure grid
+    reference 3947, which digits represent the easting value?" while the reply
+    narrated a DIFFERENT MCQ:
 
-        "Not quite - in the reference 5623, the northing is the second pair
-         of digits, not the first. The easting is 56, and the northing is 23.
-         So which two digits represent the northing value?"
+        "...In the reference 3947, the easting is 39. Here's the next one:
+         Which of the following four-figure grid references has an easting
+         of 52?  A) 5234  B) 3452  C) 2552  D) 5125"
 
-    The reference is the letter 'C', which appears nowhere in that text, so
-    the letter-only pattern matched nothing and the student read the answer
-    straight off the hint.
+    pose_question was never called, so the slot never moved. The student
+    answered the question in front of them — "5234" — and it was graded
+    against 3947 and marked wrong. Two turns later auto_pose_fallback finally
+    posed it.
+
+    _ensure_posed_question_in_text existed to prevent exactly this but returned
+    early when no pose fired, i.e. in the only case that mattered.
     """
 
-    def _slot(self, session, *, reference='C',
-              options=('56', '5 and 2', '23', '6 and 3')):
+    def _slot(self, session):
         InFlightQuestion.objects.filter(session=session).delete()
         return InFlightQuestion.objects.create(
             session=session,
-            question_text='In 5623, which digits represent the northing?',
-            question_type='mcq', options=list(options),
-            reference_answer=reference, source='catalog', attempt_count=1,
+            question_text='In the four-figure grid reference 3947, which digits '
+                          'represent the easting value?',
+            question_type='mcq', options=['47', '39', '3 and 9', '4 and 7'],
+            reference_answer='B', source='catalog', attempt_count=1,
         )
 
-    def _wrong(self):
-        return [{'tool': 'record_answer',
-                 'result': {'recorded': True, 'verdict': 'incorrect'}}]
-
-    def test_option_text_assertion_is_redacted(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
+    def test_narrated_question_is_replaced_by_the_live_slot(self):
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
         session, _ = _make_session()
         self._slot(session)
-        text = ('Not quite — in the reference 5623, the northing is the second '
-                'pair of digits, not the first.\n'
-                'The easting is 56, and the northing is 23.\n'
-                'So which two digits represent the northing value?')
-        out = _filter_reveals(session, text, self._wrong())
-        self.assertNotIn('northing is 23', out)
-        # The actual hint and the hand-back must survive.
-        self.assertIn('second pair of digits', out)
-        self.assertIn('which two digits', out)
+        text = (
+            'You mentioned "easting" — that\'s the first two digits.\n'
+            "Here's the next one: Which of the following four-figure grid "
+            'references has an easting of 52?\n'
+            'A) 5234\nB) 3452\nC) 2552\nD) 5125'
+        )
+        out = _ensure_posed_question_in_text(text, [], session)
+        self.assertNotIn('5234', out, 'the unposed question must not be shown')
+        self.assertIn('3947', out, "the live slot's question must be")
 
-    def test_letter_naming_still_redacted(self):
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
+    def test_a_hint_with_no_options_is_left_alone(self):
+        """Hints do not carry an A/B/C/D block. They must pass through
+        untouched, or every hint turn would re-render the whole question."""
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
         session, _ = _make_session()
         self._slot(session)
-        out = _filter_reveals(
-            session, 'Not quite. The answer is C. Try again.', self._wrong())
-        self.assertNotIn('answer is C', out)
+        text = ('Not quite — the easting runs left to right, so it is the '
+                'first pair. Which two digits are those?')
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
 
-    def test_socratic_offer_of_two_options_is_not_redacted(self):
-        """"Is the northing 23 or 56?" hands the question back rather than
-        answering it. The assertion patterns require the value within 15
-        NON-word characters of the verb, so this must survive."""
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
+    def test_reply_restating_the_live_question_is_left_alone(self):
+        """Re-showing the question the platform IS grading is fine."""
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
         session, _ = _make_session()
         self._slot(session)
-        text = 'Not quite. Is the northing 23 or 56 — which pair comes second?'
-        self.assertEqual(_filter_reveals(session, text, self._wrong()), text)
+        text = ('Have another go. In the four-figure grid reference 3947, which '
+                'digits represent the easting value?\nA) 47\nB) 39\nC) 3 and 9\nD) 4 and 7')
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
 
-    def test_correct_verdict_is_untouched(self):
-        """Confirming a CORRECT answer must be allowed to state it."""
-        from apps.tutoring.simple_tutor.engine import _filter_reveals
+    def test_no_slot_means_no_rewrite(self):
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
         session, _ = _make_session()
-        self._slot(session)
-        text = "Correct — the northing is 23."
-        results = [{'tool': 'record_answer',
-                    'result': {'recorded': True, 'verdict': 'correct'}}]
-        self.assertEqual(_filter_reveals(session, text, results), text)
+        InFlightQuestion.objects.filter(session=session).delete()
+        text = 'Some prose with options\nA) x\nB) y\nC) z\nD) w'
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
+
+
+class ToolNameNormalisationOrdersDispatchTest(DjangoTestCase):
+    """A padded or camelCase tool name must not reorder dispatch.
+
+    _dispatch_tools normalises names AFTER sorting, so _pose_before_record was
+    comparing raw ones. A model emitting ' record_answer' made has_record False,
+    the function fell through to `return not has_record` = True, and pose was
+    dispatched BEFORE the grade. handle_pose_question then rejected it as
+    premature_pose, so the tutor lost its pose while its reply still advertised
+    the next question.
+
+    Device session 21, lesson 1434: the mixed-use question was announced in
+    three consecutive replies and never registered; the student answered it
+    twice and was graded against the previous question both times.
+    """
+
+    def _blocks(self, record_name):
+        return [SimpleNamespace(name='pose_question', input={'question_index': 1}),
+                SimpleNamespace(name=record_name, input={'extracted_answer': 'b'})]
+
+    def _session_with_live_slot(self):
+        session, _ = _make_session()
+        InFlightQuestion.objects.create(
+            session=session, question_text='the live question',
+            question_type='mcq', options=['a', 'b', 'c', 'd'],
+            reference_answer='A', source='catalog', attempt_count=0,
+        )
+        return session
+
+    def test_canonical_name_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks('record_answer')))
+
+    def test_padded_name_still_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks(' record_answer ')))
+
+    def test_camelcase_name_still_grades_first(self):
+        from apps.tutoring.simple_tutor.engine import _pose_before_record
+        s = self._session_with_live_slot()
+        self.assertFalse(_pose_before_record(s, self._blocks('recordAnswer')))
+
+    def test_padded_name_dispatches_the_grade_first_end_to_end(self):
+        """_pose_before_record and _priority BOTH had to normalise. Fixing
+        only the first leaves a padded name at priority 2 (last), so pose
+        still runs first and is still rejected as premature_pose."""
+        from apps.tutoring.simple_tutor import engine
+        from apps.tutoring.simple_tutor.tests.test_engine import _llm_response
+        session = self._session_with_live_slot()
+        r = _llm_response(text='ok', tool_uses=[
+            {'name': ' record_answer ', 'input': {'extracted_answer': 'b'}},
+            {'name': 'pose_question', 'input': {'question_index': 1}},
+        ])
+        _, results, _ = engine._dispatch_tools(
+            session=session, response=r, figure_catalog=[], question_pool=None)
+        order = [x['tool'] for x in results]
+        self.assertEqual(order[0], 'record_answer',
+                         f'the grade must dispatch first, got {order}')
+
+
+# RevealFilterTest, McqOptionTextLeakTest and VerbatimOptionRunLeakTest
+# were removed with _filter_reveals (2026-08-06). Leak prevention is now
+# the prompt's job — post-processing the tutor's reply was dropped as
+# unreliable. See the note where _filter_reveals used to live in engine.py.

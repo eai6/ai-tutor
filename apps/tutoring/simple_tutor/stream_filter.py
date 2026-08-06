@@ -3,7 +3,8 @@
 The engine post-processes a reply through eight whole-text transforms
 (engine.respond, "Deterministic backstop" onward) before any of it is safe
 to show a student. Streaming raw model tokens bypasses every one of them —
-including `_filter_reveals`, which is what stops a wrong-answer hint from
+including the reply post-processors that must not differ between the streamed
+and buffered paths. (`_filter_reveals` was removed 2026-08-06; what remains is
 printing the reference answer.
 
 So streaming here is an **advisory preview, never the source of truth**:
@@ -179,10 +180,6 @@ class StreamGate:
                     self.session, out, self.tool_results,
                     rotation_index=self.rotation_index(),
                 )
-            out = _eng._filter_reveals(
-                self.session, out, self.tool_results,
-                reference=self.reference_answer(),
-            )
         return out
 
     def feed(self, delta: str) -> None:
@@ -190,23 +187,12 @@ class StreamGate:
             return
         self.raw += delta
 
-        # Safety gate. When the verdict is `incorrect` and we cannot
-        # establish whether a reference answer exists, `_filter_reveals`
-        # would silently no-op and a hint stating the answer would go
-        # straight to the student. Withhold the stream instead; the batch
-        # pipeline still produces a correct final reply.
-        #
-        # The resolution MUST happen here rather than lazily inside
-        # safe_prefix(): resolving it there let the very first snapshot
-        # through before _resolved_reference was ever set, so a failed
-        # lookup leaked one sentence and only blocked afterwards.
-        from apps.tutoring.simple_tutor import engine as _eng
-        if (self.family
-                and self.family not in _eng._FORCE_POSE_EXEMPT_FAMILIES
-                and _eng._turn_verdict(self.tool_results) == 'incorrect'):
-            self.reference_answer()          # resolve before deciding
-            if self._reference is None:
-                return
+        # The safety gate that used to sit here withheld the stream whenever
+        # the reference answer could not be resolved on a wrong-answer turn,
+        # because _filter_reveals would then silently no-op and a leak would
+        # stream straight through. _filter_reveals was removed 2026-08-06 (see
+        # engine.py), so the gate protected nothing and only cost the student a
+        # stalled stream.
 
         prefix = self.safe_prefix()
         if prefix and prefix != self._last_emitted:
