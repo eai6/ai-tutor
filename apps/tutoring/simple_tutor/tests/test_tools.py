@@ -16,7 +16,7 @@ from django.test import TestCase as DjangoTestCase
 from apps.accounts.models import Institution
 from apps.curriculum.models import Course, Lesson, LessonStep, Unit
 from apps.tutoring.models import (
-    ExitTicket, ExitTicketQuestion, InFlightQuestion,
+    ExitTicket, ExitTicketAttempt, ExitTicketQuestion, InFlightQuestion,
     SessionTurn, TutorSession,
 )
 from apps.tutoring.simple_tutor.tools import (
@@ -24,12 +24,12 @@ from apps.tutoring.simple_tutor.tools import (
     DEFAULT_POOL_SIZE,
     DEFAULT_STEP_TURN_CAP,
     build_question_pool,
-    handle_advance_step,
     handle_pose_question,
+    handle_pose_question_by_index,
     handle_record_answer,
     handle_request_figure,
-    handle_redirect_off_topic,
     maybe_advance_step,
+    maybe_complete_remediation,
     _current_step_correct_verdict_count,
 )
 
@@ -628,37 +628,9 @@ class HandleRequestFigureTest(DjangoTestCase):
         self.assertIn('disabled', r['error'].lower())
 
 
-# ============================================================================
-# handle_redirect_off_topic
-# ============================================================================
-
-
-class HandleRedirectOffTopicTest(DjangoTestCase):
-
-    def test_increments_counter_in_engine_state(self):
-        session, _ = _make_session()
-        r = handle_redirect_off_topic(session, reason='asking about football')
-        self.assertTrue(r['recorded'])
-        self.assertEqual(r['off_topic_count'], 1)
-
-        session.refresh_from_db()
-        self.assertEqual(session.engine_state.get('off_topic_count'), 1)
-        self.assertEqual(
-            session.engine_state.get('last_off_topic_reason'),
-            'asking about football',
-        )
-
-    def test_increments_across_calls(self):
-        session, _ = _make_session()
-        handle_redirect_off_topic(session, reason='r1')
-        handle_redirect_off_topic(session, reason='r2')
-        r = handle_redirect_off_topic(session, reason='r3')
-        self.assertEqual(r['off_topic_count'], 3)
-
-    def test_empty_reason_safe(self):
-        session, _ = _make_session()
-        r = handle_redirect_off_topic(session)
-        self.assertTrue(r['recorded'])
+# handle_redirect_off_topic and its tests were removed 2026-08-05 — the handler
+# wrote an off_topic_count that nothing read, and the model called it once in
+# 1,443 production turns. memory/tool_surface_reduction_plan.md.
 
 
 # ============================================================================
@@ -666,43 +638,15 @@ class HandleRedirectOffTopicTest(DjangoTestCase):
 # ============================================================================
 
 
-class HandleAdvanceStepTest(DjangoTestCase):
-    """Soft-hint handler: LLM says 'student is ready', server bumps step.
-    Even if the LLM forgets it, maybe_advance_step provides the safety net.
-    """
-
-    def test_advances_step_index(self):
-        session, _ = _make_session(n_steps=3)
-        r = handle_advance_step(session, reason='student got it')
-        self.assertTrue(r['advanced'])
-        self.assertEqual(r['new_step_index'], 1)
-        self.assertTrue(r['has_next_step'])
-        session.refresh_from_db()
-        self.assertEqual(session.current_step_index, 1)
-        self.assertIsNone(session.current_question_id)
-
-    def test_records_reason_in_engine_state(self):
-        session, _ = _make_session()
-        handle_advance_step(session, reason='clear evidence of mastery')
-        session.refresh_from_db()
-        hints = session.engine_state.get('advance_step_hints', [])
-        self.assertEqual(len(hints), 1)
-        self.assertEqual(hints[0]['reason'], 'clear evidence of mastery')
-
-    def test_advance_past_last_step_returns_has_next_false(self):
-        session, _ = _make_session(n_steps=2)
-        # Advance to step 1
-        handle_advance_step(session, reason='ok')
-        # Advance to step 2 — past the last step (only indices 0, 1)
-        r = handle_advance_step(session, reason='all done')
-        self.assertTrue(r['advanced'])
-        self.assertEqual(r['new_step_index'], 2)
-        self.assertFalse(r['has_next_step'])
+# HandleAdvanceStepTest was removed with the tool it covered (2026-08-05).
+# Advancement is now MaybeAdvanceStepTest's subject alone, and the remediation
+# signal advance_step used to carry is covered by
+# MaybeCompleteRemediationTest at the bottom of this file.
 
 
 class MaybeAdvanceStepTest(DjangoTestCase):
-    """Server-driven auto-advance (safety net). LLM's advance_step is
-    the primary signal; this function only fires when:
+    """Server-driven auto-advance — the ONLY advancement path since
+    advance_step was removed. Fires when:
       1. Student has ≥ competence_threshold CORRECT verdicts on step's
          objective (default 1 — "demonstrated enough").
       2. Soft turn cap exceeded on the current step.
@@ -1143,3 +1087,231 @@ class OptionSetRepeatTest(DjangoTestCase):
             question_type='mcq', options=['40', '90', '140', '180'],
             reference_answer='A', source='inline_authored')
         self.assertTrue(r['posed'])
+
+
+# ============================================================================
+# maybe_complete_remediation — server-owned exit-ticket retake signal
+# ============================================================================
+#
+# Replaces the advance_step remediation branch removed 2026-08-05. The old path
+# depended on the LLM calling a tool it used once in 1,443 production turns, so
+# the retake was effectively unreachable. These tests cover the full
+# fail -> remediate -> retake cycle, which the compliance harness never reaches.
+
+
+def _failed_attempt(session, objective, *, asked=2, correct=0, passed=False):
+    """A completed, failed ExitTicketAttempt whose eo_competency marks
+    ``objective`` as incomplete. completed_at is backdated so turns created
+    afterwards in the test count as remediation."""
+    from datetime import timedelta
+    from django.utils import timezone
+    ticket = ExitTicket.objects.get(lesson=session.lesson)
+    attempt = ExitTicketAttempt.objects.create(
+        exit_ticket=ticket, student=session.student, session=session,
+        score=correct, passed=passed,
+        answers={
+            'per_question': [{'enabling_objective': objective, 'correct': False}],
+            'eo_competency': {objective: {'asked': asked, 'correct': correct}},
+        },
+        completed_at=timezone.now() - timedelta(hours=1),
+    )
+    return attempt
+
+
+class MaybeCompleteRemediationTest(DjangoTestCase):
+
+    def test_flag_set_once_every_missed_objective_is_recovered(self):
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        _failed_attempt(session, objective)
+
+        # Not recovered yet — no correct verdict since the attempt.
+        self.assertFalse(maybe_complete_remediation(session))
+        session.refresh_from_db()
+        self.assertNotIn('remediation_complete', session.engine_state or {})
+
+        # Student answers the missed objective correctly during remediation.
+        _add_graded_turn(session, questions[0], verdict='correct')
+
+        self.assertTrue(maybe_complete_remediation(session))
+        session.refresh_from_db()
+        self.assertTrue(session.engine_state.get('remediation_complete'))
+
+    def test_incorrect_verdict_does_not_complete_remediation(self):
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        _failed_attempt(session, objective)
+        _add_graded_turn(session, questions[0], verdict='incorrect')
+
+        self.assertFalse(maybe_complete_remediation(session))
+        session.refresh_from_db()
+        self.assertNotIn('remediation_complete', session.engine_state or {})
+
+    def test_turns_before_the_attempt_do_not_count(self):
+        """A correct answer from BEFORE the exit ticket is not remediation —
+        the student already got it wrong on the ticket itself.
+
+        created_at is auto_now_add, so the pre-attempt turn has to be
+        backdated explicitly; creating it earlier in the test body is not
+        enough because _failed_attempt backdates the attempt an hour.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        turn = _add_graded_turn(session, questions[0], verdict='correct')
+        attempt = _failed_attempt(session, objective)
+        SessionTurn.objects.filter(pk=turn.pk).update(
+            created_at=attempt.completed_at - timedelta(minutes=5),
+        )
+
+        self.assertFalse(maybe_complete_remediation(session))
+
+    def test_passed_attempt_never_triggers(self):
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        _failed_attempt(session, objective, correct=2, passed=True)
+        _add_graded_turn(session, questions[0], verdict='correct')
+
+        self.assertFalse(maybe_complete_remediation(session))
+
+    def test_no_attempt_is_a_noop(self):
+        session, _ = _make_session()
+        self.assertFalse(maybe_complete_remediation(session))
+
+    def test_does_not_refire_while_flag_is_still_set(self):
+        """The consumer clears the flag on the transition. Until it does, this
+        must not re-set it — otherwise the modal loops."""
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        _failed_attempt(session, objective)
+        _add_graded_turn(session, questions[0], verdict='correct')
+
+        self.assertTrue(maybe_complete_remediation(session))
+        self.assertFalse(maybe_complete_remediation(session))
+
+    def test_never_raises_on_malformed_answers(self):
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        attempt = _failed_attempt(session, objective)
+        attempt.answers = {'eo_competency': 'not-a-dict'}
+        attempt.save(update_fields=['answers'])
+
+        self.assertFalse(maybe_complete_remediation(session))
+
+
+# ============================================================================
+# handle_pose_question_by_index — the tutor selects, never invents
+# ============================================================================
+#
+# The model passes an index; the SERVER reads stem/options/answer off the bank
+# row. This is what makes stem corruption impossible rather than merely
+# filtered: on a 4B tutor, re-authoring mangled numeric notation
+# (1:200,000 -> -200,000, 1/6 -> -1/6, 0.5 -> 5) while the reference answer kept
+# its original value, so correct answers were marked wrong.
+# See memory/catalog_only_questions_plan.md.
+
+
+class PoseQuestionByIndexTest(DjangoTestCase):
+
+    def test_server_renders_the_question_from_the_bank(self):
+        session, questions = _make_session(n_questions=3)
+        pool = list(questions)
+        r = maybe = handle_pose_question_by_index(
+            session, question_index=2, question_pool=pool)
+        self.assertTrue(r['posed'])
+
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.question_text, pool[1].question_text)
+        self.assertEqual(slot.reference_answer, pool[1].correct_answer)
+        # Always catalog — there is no other provenance now.
+        self.assertEqual(slot.source, 'catalog')
+
+    def test_model_supplied_text_cannot_reach_the_slot(self):
+        """The whole point: there is no parameter through which a corrupted
+        stem could travel, so a mangled question cannot be shown to a student.
+        """
+        from apps.tutoring.simple_tutor.prompts import TOOL_SCHEMAS
+        pose = next(t for t in TOOL_SCHEMAS if t['name'] == 'pose_question')
+        self.assertEqual(set(pose['input_schema']['properties']),
+                         {'question_index'})
+
+    def test_out_of_range_index_is_rejected_not_guessed(self):
+        session, questions = _make_session(n_questions=3)
+        for bad in (0, -1, 4, 99):
+            r = handle_pose_question_by_index(
+                session, question_index=bad, question_pool=list(questions))
+            self.assertFalse(r['posed'], f'index {bad} should be rejected')
+            self.assertIn('out of range', r['error'])
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_non_integer_index_is_rejected(self):
+        session, questions = _make_session()
+        for bad in ('two', None, {}):
+            r = handle_pose_question_by_index(
+                session, question_index=bad, question_pool=list(questions))
+            self.assertFalse(r['posed'])
+
+    def test_empty_pool_poses_nothing(self):
+        """2% of steps have no catalog questions. Nothing to ask is a defined
+        outcome, not a fallback into inline authoring."""
+        session, _ = _make_session()
+        r = handle_pose_question_by_index(
+            session, question_index=1, question_pool=[])
+        self.assertFalse(r['posed'])
+        self.assertIn('empty', r['error'])
+        self.assertFalse(InFlightQuestion.objects.filter(session=session).exists())
+
+    def test_mcq_options_come_from_the_bank_row(self):
+        session, questions = _make_session(n_questions=1)
+        handle_pose_question_by_index(
+            session, question_index=1, question_pool=list(questions))
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.options, ['alpha', 'beta', 'gamma', 'delta'])
+        self.assertEqual(slot.reference_answer, 'B')
+
+    def test_short_numeric_reference_comes_from_answer_data(self):
+        """Only MCQ keeps its answer in `correct_answer`. Reading that field
+        for a short_numeric question yields an empty reference, which
+        handle_pose_question rejects — the eval caught this as 8/8 poses
+        rejected on math lesson 1144, the session asking nothing for 24 turns.
+        """
+        from types import SimpleNamespace
+        session, _ = _make_session()
+        pool = [SimpleNamespace(
+            question_text='P(rain)=0.7. What is P(not rain)?',
+            question_type='short_numeric', correct_answer='',
+            answer_data={'computed': 0.3, 'unit': ''},
+            option_a='', option_b='', option_c='', option_d='', pk=0,
+        )]
+        r = handle_pose_question_by_index(
+            session, question_index=1, question_pool=pool)
+        self.assertTrue(r['posed'], r.get('error'))
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, '0.3')
+
+    def test_model_answer_wins_over_computed(self):
+        from types import SimpleNamespace
+        session, _ = _make_session()
+        pool = [SimpleNamespace(
+            question_text='Explain why.', question_type='short_answer',
+            correct_answer='',
+            answer_data={'model_answer': 'because the scale is larger',
+                         'computed': 99},
+            option_a='', option_b='', option_c='', option_d='', pk=0,
+        )]
+        handle_pose_question_by_index(session, question_index=1, question_pool=pool)
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, 'because the scale is larger')
+
+    def test_entry_with_no_reference_is_skipped_not_posed(self):
+        from types import SimpleNamespace
+        session, _ = _make_session()
+        pool = [SimpleNamespace(
+            question_text='Unanswerable', question_type='short_numeric',
+            correct_answer='', answer_data={},
+            option_a='', option_b='', option_c='', option_d='', pk=0,
+        )]
+        r = handle_pose_question_by_index(session, question_index=1, question_pool=pool)
+        self.assertFalse(r['posed'])
+        self.assertIn('no reference answer', r['error'])

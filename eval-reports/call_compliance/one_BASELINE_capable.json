@@ -9,14 +9,35 @@
   "persona": "capable",
   "sim_reason": "exit_ticket",
   "sim_error": "",
-  "session_id": 981,
-  "total_wall": 96.4,
+  "session_id": 974,
+  "total_wall": 108.9,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        7.2,
-        4.4
+        7.37,
+        4.85
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": 12.48,
+      "streamed": true,
+      "wall": 12.52,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.66,
+        4.72
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -30,14 +51,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 11.92,
+      "wall": 13.63,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.64,
-        4.73
+        8.81,
+        4.27
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -51,14 +72,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.57,
+      "wall": 13.39,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.82,
-        4.4
+        8.75,
+        4.95
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -72,35 +93,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.43,
+      "wall": 13.96,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.55,
-        4.87
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.91,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        10.65,
-        2.07
+        11.2,
+        2.26
       ],
       "dispatch_seq": 2,
       "call1_tools": [],
@@ -112,7 +112,7 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.05,
+      "wall": 13.83,
       "error": null
     }
   ]

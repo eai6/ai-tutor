@@ -1,136 +1,22 @@
 {
-  "config": "compact-two",
-  "call_mode": "two",
-  "block_0": "compact",
-  "block_0_chars": 13500,
+  "config": "one",
+  "call_mode": "one",
+  "block_0": "full",
+  "block_0_chars": 14742,
   "mem_available_mb_at_start": null,
   "model": "local_ollama/qwen3-4b-jetson",
-  "lesson": 1137,
+  "lesson": 1427,
   "persona": "error_prone",
   "sim_reason": "max_turns",
   "sim_error": "",
-  "session_id": 964,
-  "total_wall": 142.8,
+  "session_id": 972,
+  "total_wall": 134.4,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        6.41,
-        3.9
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": 9.11,
-      "streamed": true,
-      "wall": 10.41,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        10.48,
-        2.27
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [],
-      "call2_tools": [
-        "record_answer"
-      ],
-      "missing_tool": "record_answer",
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": null,
-      "streamed": false,
-      "wall": 12.83,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        6.85,
-        5.38
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": 9.51,
-      "streamed": true,
-      "wall": 12.29,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.32,
-        4.62
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 10.71,
-      "streamed": true,
-      "wall": 13.08,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.74,
-        5.04
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 11.77,
-      "streamed": true,
-      "wall": 13.87,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        13.15,
-        5.42
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": 16.12,
-      "streamed": true,
-      "wall": 18.65,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        9.51,
-        2.28
+        6.37,
+        1.91
       ],
       "dispatch_seq": 2,
       "call1_tools": [],
@@ -142,14 +28,54 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 11.88,
+      "wall": 8.84,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.49,
-        5.11
+        8.98,
+        4.18
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 11.57,
+      "streamed": true,
+      "wall": 13.5,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        5.86,
+        2.78
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 8.08,
+      "streamed": true,
+      "wall": 9.07,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        5.26,
+        2.88
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -158,10 +84,87 @@
       "call2_tools": [],
       "missing_tool": null,
       "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 11.12,
+      "verdict": "incorrect",
+      "ttft": 7.36,
       "streamed": true,
-      "wall": 13.67,
+      "wall": 8.55,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        4.88,
+        3.37
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 7.14,
+      "streamed": true,
+      "wall": 8.87,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        7.81,
+        5.27
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": null,
+      "streamed": false,
+      "wall": 13.45,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        9.4,
+        2.88
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 11.21,
+      "streamed": true,
+      "wall": 12.54,
+      "error": null
+    },
+    {
+      "llm_calls": 1,
+      "call_secs": [
+        9.92
+      ],
+      "dispatch_seq": 1,
+      "call1_tools": [],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": null,
+      "ttft": null,
+      "streamed": false,
+      "wall": 10.33,
       "error": null
     }
   ]

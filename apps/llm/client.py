@@ -382,6 +382,42 @@ def _extract_balanced(s: str, start: int):
     return None
 
 
+def _tool_call_json_schema(tools, forced_name: str):
+    """JSON schema pinning the output to one specific tool call.
+
+    Shape is deliberately the one ``_maybe_parse_text_tool_call`` already
+    recovers::
+
+        {"name": "record_answer", "arguments": {...}}
+
+    ``name`` is a single-value enum, so the grammar cannot emit a different
+    tool. ``arguments`` is the tool's own ``input_schema``, so required fields
+    are required at the token level rather than by request.
+
+    Returns None when the tool is not in ``tools`` or has no usable schema —
+    the caller then simply omits ``format`` and behaviour is unchanged.
+    """
+    if not tools or not forced_name:
+        return None
+    spec = next((t for t in tools if t.get('name') == forced_name), None)
+    if spec is None:
+        return None
+
+    arg_schema = spec.get('input_schema') or {'type': 'object', 'properties': {}}
+    # additionalProperties=False on the envelope keeps the model from padding
+    # the object with commentary fields, which is a common small-model habit
+    # and would leave prose where the parser expects arguments.
+    return {
+        'type': 'object',
+        'properties': {
+            'name': {'type': 'string', 'enum': [forced_name]},
+            'arguments': arg_schema,
+        },
+        'required': ['name', 'arguments'],
+        'additionalProperties': False,
+    }
+
+
 def _maybe_parse_text_tool_call(text: str):
     """If ``text`` contains a JSON object shaped like a tool call —
     ``{"name": ..., "arguments": {...}}`` — return that dict, else None.
@@ -1676,14 +1712,22 @@ class OllamaClient(BaseLLMClient):
         # pose-repair path is the compensating mechanism. Set
         # OLLAMA_FORWARD_TOOL_CHOICE=1 to forward it anyway on builds that
         # accept it.
+        # Capture the required tool BEFORE tool_choice is dropped below — the
+        # constrained-decoding block further down needs it, and it is the only
+        # surviving record of what the engine actually demanded this turn.
+        forced_tool_name = None
+        if isinstance(tool_choice, dict) and tool_choice.get('type') == 'tool':
+            forced_tool_name = tool_choice.get('name')
+
         if tool_choice:
             if os.environ.get('OLLAMA_FORWARD_TOOL_CHOICE') == '1':
                 logger.info("[OllamaTools] forwarding tool_choice=%s (opt-in)", tool_choice)
             else:
                 logger.warning(
                     "[OllamaTools] tool_choice=%s requested but NOT forwarded — "
-                    "Ollama has no portable forced-tool field; the engine's "
-                    "pose-repair path compensates", tool_choice,
+                    "Ollama has no portable forced-tool field; constrained "
+                    "decoding (payload['format']) enforces it instead",
+                    tool_choice,
                 )
                 tool_choice = None
 
@@ -1745,6 +1789,40 @@ class OllamaClient(BaseLLMClient):
             'stream': bool(on_delta),
             'options': options,
         }
+
+        # Constrained decoding — the only real forcing mechanism available here.
+        #
+        # `tool_choice` cannot be honoured by Ollama (see the block above), so
+        # until now a turn where the engine REQUIRED a specific tool had nothing
+        # enforcing it. Measured 2026-08-05: Call 1 emitted a tool on 1-2 turns
+        # in 8 with the old prompt, 4-6 in 8 with the compact one. Neither is a
+        # guarantee, and the platform depends on these calls.
+        #
+        # `format` takes a JSON schema and llama.cpp compiles it to a grammar,
+        # masking every token that would violate it at sampling time — so a
+        # malformed or absent call becomes unrepresentable rather than merely
+        # discouraged.
+        #
+        # IMPORTANT: `format` constrains the CONTENT string, not the structured
+        # tool_calls channel. That is fine, and deliberate: the schema below
+        # produces exactly the {"name", "arguments"} shape that
+        # _maybe_parse_text_tool_call (line ~385) already recovers into a
+        # tool_use block. Constrained decoding guarantees the SHAPE; the
+        # existing salvage handles the CHANNEL. No new parsing.
+        #
+        # Applied ONLY when a specific tool is required. Structured output costs
+        # ~10-15% on reasoning tasks (Tam et al. 2501.10868), so free
+        # reasoning turns are left unconstrained and pay nothing.
+        if forced_tool_name and os.environ.get(
+                'OLLAMA_CONSTRAINED_TOOLS', '1').strip() != '0':
+            schema = _tool_call_json_schema(tools, forced_tool_name)
+            if schema is not None:
+                payload['format'] = schema
+                logger.info(
+                    "[OllamaTools] constrained decoding ON for %r "
+                    "(tool_choice cannot be forwarded; grammar enforces it)",
+                    forced_tool_name,
+                )
         # Ollama's top-level `think` flag (distinct from `options`), set by a
         # profile's ollama_think. The vLLM chat_template_kwargs toggle in
         # extra_body is ignored by Ollama, so this is the only `think` lever

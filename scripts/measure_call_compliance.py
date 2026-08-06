@@ -237,7 +237,14 @@ def run_config(name: str, *, lesson: int, turns: int, persona: str) -> dict:
     os.environ['TUTOR_CALL_MODE'] = cfg['call_mode']
     # Set explicitly rather than only when 'compact', so a stale value inherited
     # from the shell cannot silently make the control arm run the variant.
-    os.environ['QWEN_BLOCK_0'] = cfg.get('block_0', 'full')
+    #
+    # The fallback is 'compact' as of 2026-08-05, because that is now the
+    # shipped default (family_prompts.build_family_block_0). It used to be
+    # 'full', which meant a config with no explicit block_0 — like `two` —
+    # silently measured the OLD template and reported blk0=20475 even after the
+    # promotion. A harness whose implicit default drifts from production
+    # measures history rather than the product.
+    os.environ['QWEN_BLOCK_0'] = cfg.get('block_0', 'compact')
     # Streaming on for every arm so it is a constant, not a variable. It is
     # also what the kiosk will run, and it is the only way to get TTFT.
     os.environ['TUTOR_STREAMING'] = '1'

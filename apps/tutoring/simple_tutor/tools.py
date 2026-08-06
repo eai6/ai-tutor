@@ -5,9 +5,8 @@ auto-memory/feedback_server_owns_question_state.md):
 
   LLM-called tools (all soft / advisory — engine never blocks on them):
     - handle_record_answer  — student gave an answer; grade it
-    - handle_request_figure — display a figure inline
-    - handle_redirect_off_topic — soft moderation flag
-    - handle_advance_step — LLM hints "ready for the next step"
+    - handle_request_figure — display a figure inline (only offered when the
+                              course enables figures)
 
   Server-driven primitives the engine calls automatically:
     - pick_current_question(session)  → picks the next un-graded
@@ -120,31 +119,78 @@ def _record_answered_correct(
                        "session=%s", getattr(session, 'pk', None))
 
 
+# How many recent poses to remember when detecting a loop. Must be > 2: the
+# observed failure was the model ALTERNATING between two questions, so
+# comparing only against the immediately previous pose never matches.
+_POSE_HISTORY_WINDOW = 6
+
+
 def _note_pose_repetition(
     session: 'TutorSession', question_text: str, options=None,
     question_type: str = '',
 ) -> bool:
-    """Called on every pose. Returns True and sets a pending-advance flag when the
-    model has now re-asked an already-correct question _REPEAT_STREAK_TO_ADVANCE
-    times in a row — the signal to force the lesson forward. Returns False for a
-    normal (non-repeat) pose, and resets the streak."""
+    """Called on every pose. Returns True and sets a pending-advance flag when
+    the model is looping — the signal to force the lesson forward.
+
+    Two independent repeat signals, because they fail in different ways:
+
+    1. **Already answered correctly** — the pose matches something in
+       ``answered_correct``. The stronger signal, but it requires a grader
+       verdict, which requires the model to have called ``record_answer``.
+    2. **Recently posed** — the pose matches something in the last
+       ``_POSE_HISTORY_WINDOW`` poses, regardless of any verdict.
+
+    Signal 2 exists because signal 1 shares a single point of failure with the
+    competence trigger in ``maybe_advance_step``: both are downstream of
+    ``record_answer``. Observed 2026-08-05 on session 6 — the model confirmed
+    three correct answers in prose, never called ``record_answer``, so
+    ``engine_state`` stayed empty ({}), ``answered_correct`` was None, and BOTH
+    of those nets were dead. The only remaining escape was the turn cap at 8
+    student turns, by which point the student had answered correctly repeatedly
+    and been credited for none of it. One of them said "we already did this".
+
+    Signal 2 needs no verdict, no tool call, and no cooperation from the model
+    — only what the server itself already knows it asked.
+    """
     if not _antirepeat_enabled():
         return False
     es = getattr(session, 'engine_state', None) or {}
     if not isinstance(es, dict):
         return False
-    answered = es.get('answered_correct')
+
+    qkey = _norm_q(question_text)
     okey = _norm_optset(options) if question_type == 'mcq' else None
-    is_repeat = isinstance(answered, list) and (
-        _norm_q(question_text) in answered or (okey and okey in answered))
+
+    # Signal 1 — re-asking something already answered correctly.
+    answered = es.get('answered_correct')
+    already_correct = isinstance(answered, list) and (
+        qkey in answered or (okey and okey in answered))
+
+    # Signal 2 — re-asking something posed recently, verdict or not.
+    history = es.get('recent_poses')
+    history = history if isinstance(history, list) else []
+    recently_posed = qkey in history or bool(okey and okey in history)
+
+    is_repeat = already_correct or recently_posed
+
+    # Record this pose BEFORE returning, so the next call can see it. Keys are
+    # normalised question text plus, for MCQ, the option set — the observed
+    # loop re-used identical options under a reworded stem, which the text
+    # fingerprint alone would miss.
+    for key in (qkey, okey):
+        if key:
+            history.append(key)
+    es['recent_poses'] = history[-_POSE_HISTORY_WINDOW * 2:]
+
     streak = int(es.get('repeat_pose_streak') or 0)
     force = False
     if is_repeat:
         streak += 1
         logger.info(
             "[simple_tutor] repeat_pose session=%s streak=%d question=%r "
-            "(already answered correctly)",
+            "(already_correct=%s recently_posed=%s)",
             session.pk, streak, (question_text or '')[:60],
+            already_correct, recently_posed,
         )
         if streak >= _REPEAT_STREAK_TO_ADVANCE:
             force = True
@@ -405,6 +451,110 @@ def _catalog_match_for_stem(session, question_text: str):
 # ============================================================================
 # handle_pose_question — LLM-called: "I want to ask this question next"
 # ============================================================================
+
+
+def handle_pose_question_by_index(
+    session: 'TutorSession',
+    *,
+    question_index: int,
+    question_pool: list | None = None,
+) -> dict[str, Any]:
+    """Pose the pool question the model selected. THE ONLY tool-reachable pose.
+
+    The model passes an index into ``<question_pool>``; the server reads the
+    stem, options, type and correct answer off the catalog row and writes the
+    slot from those. The model never transmits question text, so it cannot
+    corrupt it — which is the point.
+
+    This replaces the old six-parameter pose (2026-08-06). A 4B tutor
+    re-authoring its own stems mangled numeric notation while keeping the
+    original reference answer: ``1:200,000`` became ``-200,000``, ``1/6``
+    became ``-1/6``, ``0.5`` became ``5``. The student saw a corrupted
+    question and was graded against a reference for the uncorrupted one, so a
+    correct answer was marked wrong. No amount of validation on a
+    model-supplied stem fixes that; not accepting one does.
+    See memory/catalog_only_questions_plan.md.
+
+    ``question_pool`` is the list the SYSTEM PROMPT was rendered from, threaded
+    through by the engine. Resolving against a rebuilt pool would risk the
+    indices shifting under the model between prompt and dispatch.
+    """
+    pool = question_pool
+    if pool is None:
+        # Only reachable from a direct call (tests, tooling). The engine always
+        # threads the rendered pool.
+        pool = build_question_pool(session)
+
+    try:
+        idx = int(question_index)
+    except (TypeError, ValueError):
+        return {'posed': False, 'error': f'question_index must be an integer, got {question_index!r}'}
+
+    if not pool:
+        logger.info(
+            "handle_pose_question_by_index: session=%s empty pool — nothing to "
+            "ask on this step", getattr(session, 'pk', None),
+        )
+        return {'posed': False, 'error': 'question_pool is empty'}
+
+    if idx < 1 or idx > len(pool):
+        # Rejected poses already trigger _auto_pose_fallback, which picks a
+        # pool question server-side — so an out-of-range index degrades to the
+        # right behaviour rather than a dead turn.
+        logger.warning(
+            "handle_pose_question_by_index: session=%s index=%s out of range "
+            "1..%d", getattr(session, 'pk', None), idx, len(pool),
+        )
+        return {'posed': False, 'error': f'question_index {idx} out of range 1..{len(pool)}'}
+
+    q = pool[idx - 1]
+    qtype = str(getattr(q, 'question_type', '') or '').strip().lower()
+    options = [
+        str(getattr(q, f'option_{letter}', '') or '').strip()
+        for letter in 'abcd'
+    ]
+    options = [o for o in options if o]
+
+    # Derive the reference EXACTLY as prompts._render_question_pool does, or the
+    # answer the model was shown is not the answer we grade against. Only MCQ
+    # keeps its answer in `correct_answer` (the letter); short_numeric / math /
+    # short_answer carry it in `answer_data`, and reading the wrong field yields
+    # an empty reference, which handle_pose_question rejects outright.
+    #
+    # Caught by the eval: math lesson 1144 rejected 8 of 8 poses with
+    # "question_text and reference_answer are required" and the session ran to
+    # the turn cap having asked nothing.
+    if qtype == 'mcq':
+        reference = str(getattr(q, 'correct_answer', '') or '').strip()
+    else:
+        ad = getattr(q, 'answer_data', None) or {}
+        ref = None
+        if isinstance(ad, dict):
+            ref = ad.get('model_answer')
+            if ref is None:
+                ref = ad.get('computed')
+        if ref is None:
+            ref = (getattr(q, 'correct_answer', '') or '').strip() or None
+        reference = '' if ref is None else str(ref).strip()
+
+    if not reference:
+        logger.warning(
+            "handle_pose_question_by_index: session=%s pool entry %d (type=%r) "
+            "has no usable reference answer — skipping rather than posing an "
+            "ungradable question",
+            getattr(session, 'pk', None), idx, qtype,
+        )
+        return {'posed': False, 'error': f'pool entry {idx} has no reference answer'}
+
+    return handle_pose_question(
+        session,
+        question_text=str(getattr(q, 'question_text', '') or ''),
+        question_type=qtype,
+        reference_answer=reference,
+        source='catalog',
+        options=options or None,
+        catalog_question_id=idx,
+    )
 
 
 def handle_pose_question(
@@ -1006,111 +1156,126 @@ def handle_request_figure(
     }
 
 
-# ============================================================================
-# handle_redirect_off_topic — soft moderation flag
-# ============================================================================
+def maybe_complete_remediation(session: 'TutorSession') -> bool:
+    """Set ``engine_state['remediation_complete']`` once the student has
+    recovered every objective they failed on their last exit-ticket attempt.
 
+    This is the server-side replacement for the signal that used to arrive via
+    the LLM calling ``advance_step`` after a failed attempt (removed
+    2026-08-05). That made the exit-ticket RETAKE depend on a tool the model
+    called once in 1,443 production turns — the retake path was effectively
+    dead. ``engine.respond_for_view`` reads the flag unchanged; only the
+    producer moved.
 
-def handle_redirect_off_topic(
-    session: 'TutorSession',
-    *,
-    reason: str = '',
-) -> dict[str, Any]:
-    """Increment the off-topic counter on the session's engine_state.
+    Criterion, deterministic and verdict-based so it mirrors
+    ``maybe_advance_step`` rather than inventing a new mechanism: every
+    enabling objective the student got wrong has since been answered CORRECTLY
+    in a turn recorded after the attempt was submitted.
 
-    Purely a signal for analytics; does not block the conversation.
+    The step↔objective link is ``SessionTurn.step.enabling_objective`` — no
+    schema change needed (``InFlightQuestion`` carries no objective, but the
+    turn's step FK is populated on 1,114 of the graded turns in prod).
+
+    Returns True when it flipped the flag this call. Never raises — a failure
+    here must not break the turn.
     """
-    es = getattr(session, 'engine_state', None) or {}
-    if not isinstance(es, dict):
-        es = {}
-    count = int(es.get('off_topic_count') or 0) + 1
-    es['off_topic_count'] = count
-    es['last_off_topic_reason'] = (reason or '')[:200]
+    from apps.tutoring.models import ExitTicketAttempt, SessionTurn
 
-    session.engine_state = es
-    session.save(update_fields=['engine_state'])
+    try:
+        attempt = (
+            ExitTicketAttempt.objects
+            .filter(session=session, completed_at__isnull=False)
+            .order_by('-completed_at')
+            .first()
+        )
+        # Nothing submitted, or they already passed → no remediation to finish.
+        if attempt is None or attempt.passed:
+            return False
 
-    logger.info(
-        "off_topic count=%s session=%s reason=%r",
-        count, session.pk, reason[:80],
-    )
-    return {
-        'recorded': True,
-        'off_topic_count': count,
-    }
+        es = getattr(session, 'engine_state', None) or {}
+        if not isinstance(es, dict):
+            es = {}
+        if es.get('remediation_complete'):
+            return False        # already signalled; consumer clears it
 
+        # Same source of truth _build_exit_ticket_review groups on. Read it
+        # directly rather than importing from engine.py — tools.py is imported
+        # BY engine.py, and this keeps the dependency one-way.
+        eo_competency = (attempt.answers or {}).get('eo_competency') or {}
+        missed = set()
+        for eo, bucket in eo_competency.items():
+            if not eo or not isinstance(bucket, dict):
+                continue
+            asked = int(bucket.get('asked') or 0)
+            correct = int(bucket.get('correct') or 0)
+            if asked > 0 and correct < asked:
+                missed.add(eo)
+        if not missed:
+            # Failed on score but no objective is individually incomplete —
+            # nothing for remediation to target, so don't gate the retake on it.
+            return False
 
-# ============================================================================
-# handle_advance_step — soft hint from LLM ("ready to move on")
-# ============================================================================
+        covered = set()
+        turns = (
+            SessionTurn.objects
+            .filter(
+                session=session, role='tutor',
+                created_at__gt=attempt.completed_at,
+            )
+            .exclude(judge_outputs={})
+            .select_related('step')
+        )
+        for turn in turns:
+            grader = (turn.judge_outputs or {}).get('grader') or {}
+            if grader.get('verdict') != 'correct':
+                continue
+            eo = (getattr(turn.step, 'enabling_objective', '') or '').strip()
+            if eo:
+                covered.add(eo)
 
+        if not missed.issubset(covered):
+            logger.info(
+                "maybe_complete_remediation: session=%s %d/%d objectives "
+                "recovered — not yet complete",
+                session.pk, len(missed & covered), len(missed),
+            )
+            return False
 
-def handle_advance_step(
-    session: 'TutorSession',
-    *,
-    reason: str = '',
-) -> dict[str, Any]:
-    """Soft-hint handler: the LLM thinks the student is ready for the
-    next step. We honour the hint by moving ``current_step_index`` and
-    clearing ``current_question_id`` — but the engine ALSO calls
-    ``maybe_advance_step`` automatically after every turn, so the LLM
-    forgetting this tool isn't fatal.
-
-    Records the LLM's reason on the session's engine_state for analytics.
-    """
-    from apps.curriculum.models import LessonStep
-
-    lesson = getattr(session, 'lesson', None)
-    if lesson is None:
-        return {'advanced': False, 'error': 'no lesson on session'}
-
-    # Find next step's order_index
-    next_idx = (session.current_step_index or 0) + 1
-    next_step = (
-        LessonStep.objects
-        .filter(lesson=lesson, order_index=next_idx)
-        .first()
-    )
-
-    es = getattr(session, 'engine_state', None) or {}
-    if not isinstance(es, dict):
-        es = {}
-    hints = es.get('advance_step_hints') or []
-    hints.append({
-        'from_step_index': session.current_step_index or 0,
-        'reason': (reason or '')[:200],
-    })
-    es['advance_step_hints'] = hints[-20:]   # keep last 20
-
-    # Remediation completion signal: when the LLM calls advance_step
-    # AFTER the student has submitted (and failed) the exit ticket,
-    # treat it as "remediation is done — re-fire the exit ticket so
-    # the student can re-take it." respond_for_view reads this flag
-    # to bypass the already_submitted guard and re-open the modal.
-    from apps.tutoring.models import ExitTicketAttempt
-    has_failed_attempt = ExitTicketAttempt.objects.filter(
-        session=session, completed_at__isnull=False, passed=False,
-    ).exists()
-    if has_failed_attempt:
         es['remediation_complete'] = True
+        session.engine_state = es
+        session.save(update_fields=['engine_state'])
+        logger.info(
+            "maybe_complete_remediation: session=%s all %d missed objectives "
+            "recovered — exit ticket re-opened",
+            session.pk, len(missed),
+        )
+        return True
+    except Exception:  # noqa: BLE001 — never break the turn
+        logger.warning(
+            "maybe_complete_remediation failed session=%s",
+            getattr(session, 'pk', None), exc_info=True,
+        )
+        return False
 
-    session.current_step_index = next_idx
-    session.engine_state = es
-    session.save(update_fields=[
-        'current_step_index', 'engine_state',
-    ])
 
-    logger.info(
-        "handle_advance_step: session=%s advanced to step_index=%s "
-        "next_step=%s reason=%r",
-        session.pk, next_idx,
-        getattr(next_step, 'pk', None), (reason or '')[:80],
-    )
-    return {
-        'advanced': True,
-        'new_step_index': next_idx,
-        'has_next_step': next_step is not None,
-    }
+# handle_redirect_off_topic was REMOVED 2026-08-05. It incremented an
+# `off_topic_count` on engine_state that nothing ever read, and the model called
+# it once in 1,443 production turns. Off-topic handling is fully covered by
+# intent.classify_student_message plus the CONVERSATIONAL branch of Block-0,
+# neither of which needs a tool. See memory/tool_surface_reduction_plan.md.
+#
+# Existing `off_topic_count` / `last_off_topic_reason` keys are left in place on
+# old sessions — inert JSON on a handful of rows; migrating them costs more than
+# it saves. Nothing writes them any more.
+
+
+# handle_advance_step was REMOVED 2026-08-05. Called once in 1,443 production
+# turns; maybe_advance_step below already advanced every measured session
+# through all its steps without it. Its one non-redundant job — setting
+# remediation_complete so the exit ticket re-opens — moved to
+# maybe_complete_remediation above, which is verdict-based rather than
+# dependent on the model remembering a tool call.
+# The `advance_step_hints` analytics list went with it (1 record ever).
 
 
 # ============================================================================
@@ -1133,8 +1298,31 @@ def handle_advance_step(
 # Deterministic tiers only — never an LLM verifier call in a safety net (cost +
 # the "clearly correct" bar). Toggle SIMPLE_TUTOR_AUTOGRADE_BARE=0 disables it so
 # a sweep can isolate this variable.
-_AUTOGRADE_QTYPES = frozenset({'mcq', 'math', 'numeric', 'short_numeric'})
+# 'short_answer' added 2026-08-05. Free text was excluded by construction, which
+# is exactly the reported failure: A/B/C/D graded fine (deterministic letter
+# match, no LLM) while a written answer was never graded at all, so the step
+# never advanced.
+_AUTOGRADE_QTYPES = frozenset(
+    {'mcq', 'math', 'numeric', 'short_numeric', 'short_answer'})
+
+# Tiers whose CORRECT verdict is trustworthy enough to record without the model
+# asking. Deliberately TWO sets rather than widening one: this name promises
+# determinism and free text cannot deliver it.
 _AUTOGRADE_DET_TIERS = frozenset({'mcq', 'math'})
+
+# Non-deterministic tiers also allowed to salvage a CORRECT verdict.
+#
+# 'embed_gate' only resolves above the high-similarity threshold, so a positive
+# is already conservative. 'verifier_llm' is a judged verdict — cross-family in
+# production, and offline it falls back to the local model
+# (grader._local_verifier_chain), which is weaker but was measured discriminating
+# correctly, including marking a plainly wrong answer INCORRECT at 0.99.
+#
+# Still CORRECT-only, like the deterministic path. Recording an INCORRECT the
+# model never asked for would pre-empt the tutor's hint ladder and tell a student
+# they are wrong with none of the framing that makes that useful. Salvage credit,
+# never blame.
+_AUTOGRADE_LLM_TIERS = frozenset({'embed_gate', 'verifier_llm'})
 _AUTOGRADE_SKIP_INTENTS = frozenset(
     {'clarification', 'pushback', 'off_topic', 'non_engagement'}
 )
@@ -1192,8 +1380,19 @@ def autograde_bare_answer_if_clear(
         )
         return None
 
-    if result.verdict.value != 'correct' or result.tier not in _AUTOGRADE_DET_TIERS:
+    if result.verdict.value != 'correct':
         return None
+    if result.tier not in (_AUTOGRADE_DET_TIERS | _AUTOGRADE_LLM_TIERS):
+        return None
+    if result.tier in _AUTOGRADE_LLM_TIERS:
+        # Log every non-deterministic salvage. Each one makes the model look
+        # more compliant than it is, and the compliance harness must be able to
+        # tell "the model called record_answer" from "the server rescued it".
+        logger.info(
+            "[simple_tutor] autograde salvaged a %s verdict via tier=%s "
+            "(session=%s) — model did not call record_answer",
+            result.verdict.value, result.tier, session.pk,
+        )
 
     # It IS clearly correct. Route through the real handler so the slot clears
     # and the result dict is byte-identical to a model-issued record_answer.
@@ -1218,11 +1417,12 @@ def maybe_advance_step(
     turn_cap: int = DEFAULT_STEP_TURN_CAP,
     competence_threshold: int = DEFAULT_COMPETENCE_THRESHOLD,
 ) -> bool:
-    """Soft, automatic step advancement called after each engine turn.
+    """Automatic step advancement, called after each engine turn.
 
-    The PRIMARY signal is the LLM's ``advance_step(reason)`` tool call
-    (handled by ``handle_advance_step``). This function only fires the
-    SAFETY NETS for when the LLM never calls it:
+    Since advance_step was removed (2026-08-05) this is the ONLY advancement
+    path — it was already doing the work, since the model called advance_step
+    once in 1,443 production turns while every measured session still reached
+    its last step. The two triggers:
 
     1. **Competence demonstrated** — the student has at least
        ``competence_threshold`` CORRECT verdicts on the current step's

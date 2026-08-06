@@ -41,11 +41,26 @@ def _response(*blocks, text=''):
     return SimpleNamespace(content=content)
 
 
+def _pool(*specs):
+    """Stand-in <question_pool> entries. pose_question now takes an index into
+    this list and the SERVER reads stem/answer off the row, so tests supply the
+    bank rather than the question text.
+    """
+    out = []
+    for stem, qtype, ref in specs:
+        out.append(SimpleNamespace(
+            question_text=stem, question_type=qtype, correct_answer=ref,
+            option_a='', option_b='', option_c='', option_d='',
+            answer_data={}, pk=0,
+        ))
+    return out
+
+
 class DuplicatePoseQuestionTests(SimpleTestCase):
     """RC-3 — only the FIRST pose_question of a turn may write the slot."""
 
     def _dispatch(self, response):
-        with patch('apps.tutoring.simple_tutor.tools.handle_pose_question') as pose, \
+        with patch('apps.tutoring.simple_tutor.tools.handle_pose_question_by_index') as pose, \
              patch('apps.tutoring.simple_tutor.tools.handle_record_answer') as rec:
             pose.return_value = {'posed': True, 'question_type': 'mcq'}
             rec.return_value = {'recorded': True, 'verdict': 'correct'}
@@ -55,8 +70,7 @@ class DuplicatePoseQuestionTests(SimpleTestCase):
         return text, results, called_rec, pose, rec
 
     def test_single_pose_dispatches_normally(self):
-        r = _response(_block('pose_question', question_text='What is 2+2?',
-                             question_type='short', reference_answer='4', source='llm'))
+        r = _response(_block('pose_question', question_index=1))
         _, results, _, pose, _ = self._dispatch(r)
         self.assertEqual(pose.call_count, 1)
         self.assertEqual(len(results), 1)
@@ -65,21 +79,19 @@ class DuplicatePoseQuestionTests(SimpleTestCase):
     def test_duplicate_pose_calls_dispatch_only_once(self):
         """139 poses in one turn must write the slot exactly once."""
         r = _response(*[
-            _block('pose_question', question_text=f'Q{i}', question_type='short',
-                   reference_answer=str(i), source='llm')
+            _block('pose_question', question_index=i + 1)
             for i in range(5)
         ])
         _, results, _, pose, _ = self._dispatch(r)
         self.assertEqual(pose.call_count, 1, 'slot must be written exactly once')
-        # The FIRST question is the one the student reads, so it wins.
-        self.assertEqual(pose.call_args.kwargs['question_text'], 'Q0')
+        # The FIRST pose is the one the student reads, so it wins.
+        self.assertEqual(pose.call_args.kwargs['question_index'], 1)
 
     def test_duplicate_pose_calls_still_return_a_tool_result_each(self):
         """Every tool_use block needs a paired tool_result or the Anthropic
         API rejects the Call-2 message. Skipped poses get a skip result."""
         blocks = [
-            _block('pose_question', question_text=f'Q{i}', question_type='short',
-                   reference_answer=str(i), source='llm')
+            _block('pose_question', question_index=i + 1)
             for i in range(3)
         ]
         r = _response(*blocks)
@@ -97,14 +109,12 @@ class DuplicatePoseQuestionTests(SimpleTestCase):
     def test_record_answer_after_duplicate_poses_reads_the_first_slot(self):
         r = _response(
             _block('record_answer', extracted_answer='4'),
-            _block('pose_question', question_text='Q0', question_type='short',
-                   reference_answer='4', source='llm'),
-            _block('pose_question', question_text='Q1', question_type='short',
-                   reference_answer='9', source='llm'),
+            _block('pose_question', question_index=1),
+            _block('pose_question', question_index=2),
         )
         _, _, called_rec, pose, rec = self._dispatch(r)
         self.assertEqual(pose.call_count, 1)
-        self.assertEqual(pose.call_args.kwargs['question_text'], 'Q0')
+        self.assertEqual(pose.call_args.kwargs['question_index'], 1)
         self.assertTrue(called_rec)
 
 
@@ -172,7 +182,7 @@ class Call2FoldTests(SimpleTestCase):
     def _run(self, response, missing_tool, call2):
         tool_results = []
         with patch.object(engine, '_call_llm', return_value=call2) as call, \
-             patch('apps.tutoring.simple_tutor.tools.handle_pose_question') as pose, \
+             patch('apps.tutoring.simple_tutor.tools.handle_pose_question_by_index') as pose, \
              patch('apps.tutoring.simple_tutor.tools.handle_record_answer') as rec:
             pose.return_value = {'posed': True, 'question_type': 'short'}
             rec.return_value = {'recorded': True, 'verdict': 'correct'}
@@ -194,8 +204,7 @@ class Call2FoldTests(SimpleTestCase):
     def test_repair_becomes_the_second_call_when_call1_fired_no_tool(self):
         """The expensive case in the sweep: 236 of qwen2.5:72b's repairs land
         here, and cost nothing extra because there was no Call 2 to begin with."""
-        call2 = _response(_block('pose_question', question_text='Q?', question_type='short',
-                                 reference_answer='1', source='llm'), text='Try this: Q?')
+        call2 = _response(_block('pose_question', question_index=1), text='Try this: Q?')
         text, used, call, pose, _ = self._run(_response(text='prose question?'),
                                               'pose_question', call2)
         self.assertEqual(call.call_count, 1, 'exactly one further LLM call — never two')
@@ -210,15 +219,14 @@ class Call2FoldTests(SimpleTestCase):
     def test_repair_rides_along_when_call1_fired_a_different_tool(self):
         """Previously 3 calls (Call 1 + repair + Call 2). Now 2."""
         call1 = _response(_block('record_answer', extracted_answer='360'))
-        call2 = _response(_block('pose_question', question_text='Next?', question_type='short',
-                                 reference_answer='2', source='llm'), text='Right. Next?')
+        call2 = _response(_block('pose_question', question_index=1), text='Right. Next?')
         # Call 1's record_answer must be dispatched first so a tool_result exists.
         with patch('apps.tutoring.simple_tutor.tools.handle_record_answer') as rec:
             rec.return_value = {'recorded': True, 'verdict': 'correct'}
             _, tool_results, _ = engine._dispatch_tools(
                 session=SimpleNamespace(), response=call1, figure_catalog=[])
         with patch.object(engine, '_call_llm', return_value=call2) as call, \
-             patch('apps.tutoring.simple_tutor.tools.handle_pose_question') as pose:
+             patch('apps.tutoring.simple_tutor.tools.handle_pose_question_by_index') as pose:
             pose.return_value = {'posed': True, 'question_type': 'short'}
             messages = [{'role': 'user', 'content': 'hi'}]
             text, used = engine._run_second_call(
@@ -285,21 +293,24 @@ class SlotIntegrityTests(DjangoTestCase):
     scored their answer against the LAST one and returned 'incorrect'.
     """
 
+    POOL = [
+        ('How many degrees around a point?', 'short_numeric', '360'),
+        ('What is the sum of angles in a triangle?', 'short_numeric', '180'),
+        ('How many sides has a pentagon?', 'short_numeric', '5'),
+    ]
+
     def _parallel_pose_response(self):
         return _response(
-            _block('pose_question', question_text='How many degrees around a point?',
-                   question_type='short_numeric', reference_answer='360', source='inline_authored'),
-            _block('pose_question', question_text='What is the sum of angles in a triangle?',
-                   question_type='short_numeric', reference_answer='180', source='inline_authored'),
-            _block('pose_question', question_text='How many sides has a pentagon?',
-                   question_type='short_numeric', reference_answer='5', source='inline_authored'),
+            _block('pose_question', question_index=1),
+            _block('pose_question', question_index=2),
+            _block('pose_question', question_index=3),
             text='How many degrees around a point?',
         )
 
     def test_slot_holds_the_question_the_student_read(self):
         session, _ = _make_session()
         engine._dispatch_tools(session=session, response=self._parallel_pose_response(),
-                               figure_catalog=[])
+                               figure_catalog=[], question_pool=_pool(*self.POOL))
         slot = InFlightQuestion.objects.get(session=session)
         self.assertEqual(slot.question_text, 'How many degrees around a point?')
         self.assertEqual(slot.reference_answer, '360')
@@ -311,7 +322,7 @@ class SlotIntegrityTests(DjangoTestCase):
         from apps.tutoring.simple_tutor.tools import handle_record_answer
         session, _ = _make_session()
         engine._dispatch_tools(session=session, response=self._parallel_pose_response(),
-                               figure_catalog=[])
+                               figure_catalog=[], question_pool=_pool(*self.POOL))
         result = handle_record_answer(session, extracted_answer='360')
         self.assertTrue(result['recorded'])
         self.assertEqual(result['verdict'], 'correct')
@@ -357,8 +368,7 @@ class ForceGradeGateTests(SimpleTestCase):
 
 class Call1PlanTests(SimpleTestCase):
     ALL = [{'name': n} for n in
-           ('pose_question', 'record_answer', 'request_figure',
-            'advance_step', 'redirect_off_topic')]
+           ('pose_question', 'record_answer', 'request_figure')]
 
     def test_unforced_call_is_unchanged(self):
         """Production and Anthropic must see exactly the old call."""
@@ -411,11 +421,10 @@ class DuplicateRecordAnswerTests(SimpleTestCase):
     def test_combined_turn_still_allows_one_of_each(self):
         r = _response(
             _block('record_answer', extracted_answer='360'),
-            _block('pose_question', question_text='Next?', question_type='short',
-                   reference_answer='1', source='llm'),
+            _block('pose_question', question_index=1),
         )
         with patch('apps.tutoring.simple_tutor.tools.handle_record_answer') as rec, \
-             patch('apps.tutoring.simple_tutor.tools.handle_pose_question') as pose:
+             patch('apps.tutoring.simple_tutor.tools.handle_pose_question_by_index') as pose:
             rec.return_value = {'recorded': True, 'verdict': 'correct'}
             pose.return_value = {'posed': True, 'question_type': 'short'}
             _, results, _ = engine._dispatch_tools(
@@ -434,10 +443,8 @@ class EmptyAnswerEscapeIsSideEffectFree(DjangoTestCase):
         session, _ = _make_session()
         engine._dispatch_tools(
             session=session, figure_catalog=[],
-            response=_response(_block(
-                'pose_question', question_text='Degrees around a point?',
-                question_type='short_numeric', reference_answer='360',
-                source='inline_authored')),
+            question_pool=_pool(('Degrees around a point?', 'short_numeric', '360')),
+            response=_response(_block('pose_question', question_index=1)),
         )
         before = InFlightQuestion.objects.get(session=session)
         result = handle_record_answer(session, extracted_answer='   ')

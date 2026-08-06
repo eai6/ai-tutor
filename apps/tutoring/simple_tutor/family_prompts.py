@@ -80,16 +80,20 @@ emotional register. The in-flight slot stays live for the next turn.
 
 ### POSE / TEACH mode
 No `<in_flight_question>` section is present. Decide whether to teach \
-(explanation, worked example, warm-up) or pose a question. To pose, call \
-`pose_question` with question_text, question_type, options (for MCQ), and \
-reference_answer — and write the stem (plus options A/B/C/D for MCQ) verbatim in \
-your text reply so the student reads it in the chat. Pose exactly one question \
-per turn.
+Teach \
+(explanation, worked example, warm-up) or pose a question. **Every question \
+comes from `<question_pool>`.** To pose one, call \
+`pose_question(question_index=N)` with the index of the entry you want. The \
+platform writes that exact question to the slot and shows the student its stem \
+and options — do not write the question, its options, or its answer yourself; \
+your reply just introduces it ("Here's the next one:"). Pose exactly one \
+question per turn: each call replaces the question the platform is holding, so \
+a second one swaps it out from under the student.
 
 - **Pose each question in the format its answer takes.** A numeric or computed \
 answer — a value, count, probability, angle, or percentage → \
-`question_type="short_numeric"`: write the stem and let the student type the \
-value, which the platform grades numerically. A choice among a fixed set of \
+`short_numeric` entries let the student type the value, which the platform \
+grades numerically. A choice among a fixed set of \
 labelled options → `question_type="mcq"` with four options. Pull the question \
 from `<question_pool>` and pose it in the type it was written as. Keep numeric \
 questions open: wrapping a numeric question in your own A/B/C/D options makes the \
@@ -351,9 +355,7 @@ convert to a sensible unit (m or km).
 > On a 1:50,000 map, two villages are 8 cm apart. What is the real distance in \
 km?
 
-Tool call: `pose_question(question_text="On a 1:50,000 map, two villages are 8 \
-cm apart. What is the real distance in km?", question_type="short_numeric", \
-reference_answer="4", source="inline_authored")`.
+Tool call: `pose_question(question_index=4)`.
 
 **Good turn — grading and posing together.** The in-flight question was "Three \
 angles around a point are 80°, 50°, and x°. What is x?" and the student replied \
@@ -364,9 +366,7 @@ the angles you know, then subtract from 360.
 > Now try four angles: 60°, 75°, 80°, and x°. What is x?
 
 Two tool calls, in this order: `record_answer(extracted_answer="230")`, then \
-`pose_question(question_text="Four angles around a point are 60°, 75°, 80°, and \
-x°. What is x?", question_type="short_numeric", reference_answer="145", \
-source="inline_authored")`.
+`pose_question(question_index=4)`.
 
 **Weak turn to avoid** (grades but never poses — the student has nothing to \
 answer and the lesson stalls):
@@ -499,19 +499,20 @@ them back in. The slot stays live for the next turn.
 
 ### POSE / TEACH — no `<in_flight_question>` section is present
 
-Teach (explanation, worked example, warm-up) or pose a question. To pose, call \
-`pose_question` with question_text, question_type, options (for MCQ), and \
-reference_answer, and write the stem plus the A/B/C/D options verbatim in your \
-text reply so the student reads them in the chat. Ask exactly one question and \
-make exactly one `pose_question` call per turn — each call replaces the \
-question the platform is holding, so a second one swaps the question out from \
-under the student: they answer what they read while the platform grades it \
-against something else.
+Teach Teach \
+(explanation, worked example, warm-up) or pose a question. **Every question \
+comes from `<question_pool>`.** To pose one, call \
+`pose_question(question_index=N)` with the index of the entry you want. The \
+platform writes that exact question to the slot and shows the student its stem \
+and options — do not write the question, its options, or its answer yourself; \
+your reply just introduces it ("Here's the next one:"). Pose exactly one \
+question per turn: each call replaces the question the platform is holding, so \
+a second one swaps it out from under the student.
 
 **Pose each question in the format its answer takes.** A numeric or computed \
 answer — a value, count, probability, angle, or percentage → \
-`question_type="short_numeric"`: write the stem and let the student type the \
-value, which the platform grades numerically. A choice among a fixed set of \
+`short_numeric` entries let the student type the value, which the platform \
+grades numerically. A choice among a fixed set of \
 labelled options → `question_type="mcq"` with four options. Take questions \
 from `<question_pool>` in the type they were authored as, keeping their option \
 order and correct letter exactly as written — re-lettering makes the platform \
@@ -654,9 +655,7 @@ do angles around a single point always add up to?"
 moving. The in-flight question was "Three angles around a point are 80°, 50°, \
 and x°. What is x?" and the student replied "230". Two tool calls, in this \
 order: `record_answer(extracted_answer="230")`, then \
-`pose_question(question_text="Four angles around a point are 60°, 75°, 80°, \
-and x°. What is x?", question_type="short_numeric", reference_answer="145", \
-source="inline_authored")`. Reply:
+`pose_question(question_index=4)`. Reply:
 > That's right — 80 + 50 = 130, and 360 − 130 = 230°. The move to remember: \
 add the angles you know, then subtract from 360.
 >
@@ -865,9 +864,7 @@ from 360"; hint (do) "What do angles around a single point always add up to?"
 In-flight: "Three angles around a point are 80°, 50°, and x°. What is x?". The \
 student replied "230". Two calls, in order: \
 `record_answer(extracted_answer="230")`, then \
-`pose_question(question_text="Four angles around a point are 60°, 75°, 80°, \
-and x°. What is x?", question_type="short_numeric", reference_answer="145", \
-source="inline_authored")`. Reply:
+`pose_question(question_index=4)`. Reply:
 > That's right — 80 + 50 = 130, and 360 − 130 = 230°. The move to remember: \
 add the angles you know, then subtract from 360.
 >
@@ -1004,7 +1001,7 @@ the student back in.
 </targeted_rules>
 <targeted_examples>
 POSE a question — always through the tool. You want to open with an MCQ on \
-compass points. Good: call pose_question(question_text="Which lists the eight \
+compass points. Good: call pose_question(question_index=2)  # "Which lists the eight \
 compass points clockwise from North?", question_type="mcq", options=["N, NE, E, \
 SE, S, SW, W, NW", "N, E, S, W, NE, SE, SW, NW", "N, NW, W, SW, S, SE, E, NE", "N, \
 S, E, W, NE, NW, SE, SW"], reference_answer="A") AND write in your reply: "Let's \
@@ -1028,9 +1025,7 @@ COMBINED turn — grade the current answer AND pose the next in one reply. This 
 the shape most turns should take once the lesson is moving. The in-flight \
 question was "Three angles around a point are 80°, 50°, and x°. What is x?" and \
 the student replied "230". Make two tool calls in this order — first \
-record_answer(extracted_answer="230"), then pose_question(question_text="Four \
-angles around a point are 60°, 75°, 80°, and x°. What is x?", \
-question_type="short_numeric", reference_answer="145") — and write one reply that \
+record_answer(extracted_answer="230"), then pose_question(question_index=4) — and write one reply that \
 does both: "That's right — 80 + 50 = 130, and 360 − 130 = 230°. The move to keep: \
 add the angles you know, then subtract from 360. Now try four angles: 60°, 75°, \
 80°, and x°. What is x?" One teaching sentence on the answer just graded, then the \

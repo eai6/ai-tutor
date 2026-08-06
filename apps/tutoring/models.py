@@ -128,8 +128,9 @@ class TutorSession(models.Model):
     # Engine selection (M1 of memory/simple_tutor_engine_milestones.md).
     # 'v1' = the legacy conversational_tutor.py state machine.
     # 'simple' = apps/tutoring/simple_tutor.py — single-LLM-call engine
-    # with 5 tools (pose_question, record_answer, advance_step,
-    # request_figure, redirect_off_topic) and deterministic grading.
+    # with pose_question + record_answer + advance_step, plus
+    # request_figure when the course enables figures, and deterministic
+    # grading.
     # Locked at session creation; do NOT mutate mid-session (would split
     # state across two engines that don't read each other's tables).
     class Engine(models.TextChoices):

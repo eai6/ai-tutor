@@ -213,6 +213,37 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
+    # Reasoning sibling of the tag above. Tag built from
+    # infra/ollama/Modelfile.qwen3-4b-thinking-jetson.
+    #
+    #   ollama_think=True — and this is the ONE local model here that wants it.
+    #   Measured 2026-08-05, same prompt both ways:
+    #     think=false -> 1184 chars of monologue in message.content, no answer
+    #     think=true  -> 93-char correct answer in content, reasoning in
+    #                    message.thinking, cleanly separated by Ollama's parser
+    #   The instruct tag's Modelfile says the Thinking checkpoint is unusable;
+    #   that was measured with think=false only. Do not "fix" this to False for
+    #   consistency with its sibling — that is what breaks it.
+    #
+    #   max_tokens=4096 vs the sibling's 1024. NOT a preference: reasoning is
+    #   spent from the SAME budget as the answer, so a thinking model on 1024
+    #   can exhaust it mid-deliberation and return done_reason=length with an
+    #   empty content and no tool call. Measured at num_predict=500 the model
+    #   produced 2340 chars of thinking, zero content, and 0/5 tool calls —
+    #   which reads in production as "the tutor stopped responding" rather than
+    #   as truncation. The cost is real: more tokens per turn, more latency, and
+    #   more KV pressure on an 8 GB board.
+    "local_ollama/qwen3-4b-thinking-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=4096,
+        temperature=0.6, top_p=0.95, top_k=20,
+        num_ctx=16384, num_gpu=99, ollama_think=True,
+        notes=(
+            "Jetson Orin 8GB: Qwen3-4B-Thinking-2507. Needs think=True (see "
+            "above) and a large max_tokens because reasoning shares the "
+            "generation budget with the answer."
+        ),
+    ),
+
     # --- Local Ollama, Qwen3.5 small series (0.8B/2B/4B/9B, released 2026-03-02) ---
     # WHY THESE EXIST: without an exact key, get_model_profile() falls through to the
     # generic r"qwen3" FAMILY_PATTERNS entry below, which is a CLOUD profile —

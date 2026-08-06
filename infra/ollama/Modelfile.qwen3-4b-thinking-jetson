@@ -1,0 +1,41 @@
+# qwen3-4b-thinking-jetson — reasoning variant of the offline tutor model
+#
+# Build:   ollama create qwen3-4b-thinking-jetson -f infra/ollama/Modelfile.qwen3-4b-thinking-jetson
+# Profile: apps/llm/model_profiles.py ("local_ollama/qwen3-4b-thinking-jetson")
+#
+# Sibling of Modelfile.qwen3-4b-jetson, which pins the *Instruct* checkpoint.
+# This one pins Thinking-2507, kept as a separate tag for the same reason the
+# instruct one exists: a distinct spec gives the profile table an exact key, so
+# num_ctx and the think flag are applied without touching the other tag.
+#
+# WHY THIS EXISTS AT ALL. The instruct tag's Modelfile says the Thinking
+# checkpoint is unusable, and under the settings tried at the time it was:
+# `think: false` disables Ollama's thinking *parser*, not the thinking, so the
+# monologue lands in message.content and the real answer is truncated.
+#
+# Measured 2026-08-05 on Ollama 0.15.2, same prompt both ways:
+#
+#   think: false   content 1184 chars of "Hmm, the user is asking about..."
+#                  thinking 0 chars          -> unusable, as documented
+#   think: true    content 93 chars, correct answer
+#                  thinking 1278 chars       -> parser separates them correctly
+#
+# So the fix is the opposite of the intuition that applies to every other model
+# here: this tag needs think ENABLED. The profile sets ollama_think=True; do not
+# "correct" it to False to match the instruct tag.
+#
+# Serve with: OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 (halves KV).
+FROM qwen3:4b-thinking
+
+# Same 16384 cap as the instruct tag: at the stock window the KV cache plus
+# weights exceeds an 8 GB shared pool and Ollama OOMs. Reasoning tokens make
+# the generation longer, not the context wider, so the cap still holds — but
+# max_tokens must be generous enough for thinking + answer (see the profile).
+PARAMETER num_ctx 16384
+
+# Qwen3-Thinking-2507's own recommended sampling, which differs from the
+# instruct checkpoint's (top_p 0.8 / top_k 20). Restated here so the tag is
+# self-describing rather than inheriting silently.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20

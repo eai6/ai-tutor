@@ -135,18 +135,19 @@ class ToolSchemasTest(TestCase):
     See memory/simple_tutor_m12_pose_question_milestones.md.
     """
 
-    def test_five_tools_present(self):
+    def test_tool_surface_is_minimal(self):
+        """redirect_off_topic was removed 2026-08-05 — it wrote a counter
+        nothing read and was called once in 1,443 production turns.
+        See memory/tool_surface_reduction_plan.md.
+        """
         names = {t['name'] for t in TOOL_SCHEMAS}
         self.assertEqual(
             names,
-            {'pose_question', 'record_answer', 'request_figure',
-             'redirect_off_topic', 'advance_step'},
+            {'pose_question', 'record_answer', 'request_figure'},
         )
+        self.assertNotIn('redirect_off_topic', names)
+        self.assertNotIn('advance_step', names)
 
-    def test_advance_step_description_marks_it_soft(self):
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'advance_step')
-        self.assertIn('soft hint', t['description'].lower())
-        self.assertIn('auto-advance', t['description'].lower())
 
     def test_every_tool_has_description_and_input_schema(self):
         for t in TOOL_SCHEMAS:
@@ -155,29 +156,21 @@ class ToolSchemasTest(TestCase):
             self.assertGreater(len(t['description']), 50,
                                f'{t["name"]} description is too thin')
 
-    def test_pose_question_required_fields(self):
-        """M12: pose_question takes question_text, question_type,
-        reference_answer, source. options + catalog_question_id are
-        optional but well-typed.
+    def test_pose_question_takes_only_an_index(self):
+        """The tutor SELECTS a bank question; it never authors one.
+
+        A model-supplied stem is not accepted at all, which is what makes
+        stem corruption structurally impossible rather than merely filtered.
+        See memory/catalog_only_questions_plan.md.
         """
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'pose_question')
-        required = t['input_schema']['required']
-        for field in (
-            'question_text', 'question_type',
-            'reference_answer', 'source',
-        ):
-            self.assertIn(field, required)
         props = t['input_schema']['properties']
-        # source must enum to catalog | inline_authored
-        self.assertEqual(
-            set(props['source']['enum']),
-            {'catalog', 'inline_authored'},
-        )
-        # question_type enum stays MCQ/short_numeric/short_answer
-        self.assertEqual(
-            set(props['question_type']['enum']),
-            {'mcq', 'short_numeric', 'short_answer'},
-        )
+        self.assertEqual(set(props), {'question_index'})
+        self.assertEqual(t['input_schema']['required'], ['question_index'])
+        self.assertEqual(props['question_index']['type'], 'integer')
+        for gone in ('question_text', 'reference_answer', 'options',
+                     'source', 'catalog_question_id', 'question_type'):
+            self.assertNotIn(gone, props)
 
     def test_record_answer_only_takes_extracted_answer(self):
         """M12: record_answer is simplified to a single arg. The
@@ -204,10 +197,6 @@ class ToolSchemasTest(TestCase):
     def test_request_figure_description_rejects_invented_ids(self):
         t = next(t for t in TOOL_SCHEMAS if t['name'] == 'request_figure')
         self.assertIn('invented', t['description'].lower())
-
-    def test_redirect_off_topic_takes_reason(self):
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'redirect_off_topic')
-        self.assertEqual(t['input_schema']['required'], ['reason'])
 
 
 # ============================================================================
@@ -808,9 +797,8 @@ class EndToEndShapeTest(TestCase):
             step_summaries=['Step 1 (Engage) — mastered after 1 attempt'],
         )
         self.assertEqual(len(blocks), 3)
-        # M12: 5 tools — pose_question, record_answer, request_figure,
-        # redirect_off_topic, advance_step.
-        self.assertEqual(len(tools), 5)
+        # pose_question, record_answer, request_figure.
+        self.assertEqual(len(tools), 3)
 
         # Block 0 — static
         b0 = blocks[0]['text']
@@ -877,8 +865,7 @@ class FiguresDisabledTest(TestCase):
         self.assertNotIn('request_figure', names)
         # Other tools still present
         self.assertIn('record_answer', names)
-        self.assertIn('advance_step', names)
-        self.assertIn('redirect_off_topic', names)
+        self.assertIn('pose_question', names)
 
     def test_request_figure_tool_present_when_enabled(self):
         _, tools = build_system_prompt(

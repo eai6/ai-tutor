@@ -2,105 +2,21 @@
   "config": "one",
   "call_mode": "one",
   "block_0": "full",
-  "block_0_chars": 13500,
+  "block_0_chars": 14742,
   "mem_available_mb_at_start": null,
   "model": "local_ollama/qwen3-4b-jetson",
   "lesson": 1427,
   "persona": "capable",
   "sim_reason": "exit_ticket",
   "sim_error": "",
-  "session_id": 981,
-  "total_wall": 96.4,
+  "session_id": 975,
+  "total_wall": 93.4,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        7.2,
-        4.4
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 11.92,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.64,
-        4.73
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.57,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.82,
-        4.4
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.43,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.55,
-        4.87
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.91,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        10.65,
-        2.07
+        7.09,
+        1.73
       ],
       "dispatch_seq": 2,
       "call1_tools": [],
@@ -112,7 +28,89 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.05,
+      "wall": 9.17,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        6.44,
+        5.13
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 11.91,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.25,
+        3.89
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 12.44,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        7.94,
+        4.75
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 12.97,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.41,
+        1.66
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": true,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 10.22,
       "error": null
     }
   ]

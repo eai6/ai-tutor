@@ -6,29 +6,37 @@ prompts.py + state.py + tools.py + the LLM call into a single
 
 Per-turn flow (server owns flow, LLM is the narrator):
 
-  1. Server picks the current question via pick_current_question.
-     Sets session.current_question_id so the LLM sees one focused
-     question (no attribution ambiguity).
+  1. Classify the student message (intent.classify_student_message) and
+     resolve the student's model → prompt family.
   2. Engine gathers context: current step, KB chunks (via
      query_with_global_fallback — the pgvector layer), figure
      catalog (from LessonStep.media.images), recent turns, step
      summaries.
-  3. build_system_prompt → 3 cache-marked blocks + 4 tool schemas
-     (or 3 when figures are disabled per course).
-  4. LLM call (Anthropic Claude Opus 4.7 by default via ModelConfig).
+  3. build_system_prompt → 3 cache-marked blocks + the tool schemas:
+     pose_question + record_answer, plus request_figure when the course
+     enables figures.
+  4. LLM call. Model comes from the student's pick via
+     model_choice.resolve_for_session, falling back to ModelConfig.
   5. Dispatch each tool_use block to its handler. Collect text reply.
-  6. Auto-fallback: if LLM skipped record_answer but student input
-     looked like an answer, server auto-grades.
+  6. Repair + salvage: re-issue Call 2 when a forced tool is missing;
+     autograde_bare_answer_if_clear if the student's message
+     deterministically matches the in-flight reference.
   7. Persist student + tutor SessionTurns with verdicts in judge_outputs.
-  8. Server auto-advance (competence threshold OR turn cap).
+  8. Server auto-advance (competence threshold OR turn cap), then
+     maybe_complete_remediation.
+
+NOTE: there is deliberately NO server-side question anchor. An earlier
+design set session.current_question_id via pick_current_question before the
+LLM call; it was removed in 2afc4e5 (2026-05-26) because it collided with
+LLM-authored questions and made the tutor grade against a question the
+student never saw. pick_current_question survives only as an unused
+backwards-compat shim (tools.py:370) — nothing in the request path calls it.
 
 Hard rules:
   - The engine NEVER raises. LLM exceptions → fallback reply.
   - Tool dispatch NEVER blocks. Every handler returns a dict.
-  - All server flow primitives (pick / advance / auto-grade) are
+  - All server flow primitives (advance / auto-grade / remediation) are
     softly-fallible and log warnings instead of crashing.
-
-Target: ≤ 600 lines including docstrings.
 """
 from __future__ import annotations
 
@@ -46,7 +54,6 @@ logger = logging.getLogger(__name__)
 # 'tool_name' placeholder. Normalise what we can, reject the rest loudly.
 _KNOWN_TOOLS = frozenset({
     'pose_question', 'record_answer', 'request_figure',
-    'redirect_off_topic', 'advance_step',
 })
 
 # How many times one tool may be dispatched in a single turn.
@@ -61,8 +68,8 @@ _KNOWN_TOOLS = frozenset({
 #   verdict clears the slot — so duplicates inflate the hint ladder and the
 #   later calls land on an empty slot. Forcing a tool call (below) makes
 #   parallel duplicates more likely, so cap it before turning forcing on.
-# Tools not listed here are uncapped (request_figure, advance_step,
-# redirect_off_topic are idempotent enough not to need it).
+# Tools not listed here are uncapped (request_figure is idempotent enough
+# not to need it).
 MAX_CALLS_PER_TURN = {'pose_question': 1, 'record_answer': 1}
 
 # Families exempt from the forced-tool overrides. Anthropic complies natively
@@ -70,6 +77,28 @@ MAX_CALLS_PER_TURN = {'pose_question': 1, 'record_answer': 1}
 # control — forcing it would move the control underneath the experiment.
 # ``None`` (production, no model profile) is exempt by construction.
 _FORCE_POSE_EXEMPT_FAMILIES = frozenset({'anthropic'})
+
+# The inverse of the exempt set: families forced from the FIRST turn rather than
+# after the adaptive gate has watched them miss once.
+#
+# The B2 gate below runs Call 1 unforced until a model is seen to skip an
+# expected tool, then latches for the rest of the session. That is right for
+# strong tool-users — its own note says "strong tool-users were never the ones
+# missing calls" — but the latch is per-session, so a model that misses in every
+# session still pays a wasted turn at the start of every session.
+#
+# qwen is not a borderline case. Measured 2026-08-05 on
+# scripts/measure_call_compliance.py, 8 turns each:
+#   full Block-0     call1_had_tool 1/8, 2/8
+#   compact Block-0  call1_had_tool 4/8, 5/8, 6/8, 6/8
+# It is definitionally the weak case the gate exists to eventually force, so
+# waiting to rediscover that every session buys nothing.
+#
+# This only became worth doing once forcing actually DID something on Ollama.
+# Until constrained decoding landed, tool_choice was dropped on the floor
+# (apps/llm/client.py) and forcing a local model was a no-op — so the gate was
+# trading away nothing. That is no longer true.
+_FORCE_FROM_FIRST_TURN_FAMILIES = frozenset({'qwen'})
 
 # Student intents that are conversation, not answering. A forced tool call on
 # these turns would talk over the student's question.
@@ -83,7 +112,7 @@ _NON_POSING_INTENTS = frozenset({'clarification', 'pushback', 'off_topic'})
 # and narrow the tool list instead, which is portable across providers:
 # OpenAI's "required" cannot be restricted to a subset, but a short tools list
 # achieves the same thing. Without this the model could satisfy "required" by
-# calling advance_step and skip a lesson step.
+# calling an unrelated tool and skip a lesson step.
 #
 # Narrowing costs nothing: Call 2 is issued with the FULL tool list, so a model
 # that wants a figure can still request one after the verdict is in hand.
@@ -201,17 +230,22 @@ def _session_forcing_misses(session) -> int:
         return 0
 
 
-def _adaptive_force_now(session, expected: bool) -> bool:
+def _adaptive_force_now(session, expected: bool, family: str | None = None) -> bool:
     """Whether Call 1 should actually constrain tool_choice this turn.
 
     ``expected`` is the output of _should_force_pose/_should_force_grade. With
     adaptive forcing off, we force whenever a tool is expected (pre-B2 blanket
     behaviour). With it on, we only force once this session has been seen to
-    skip an expected tool at least once.
+    skip an expected tool at least once — except for families in
+    _FORCE_FROM_FIRST_TURN_FAMILIES, which are forced immediately because their
+    non-compliance is already measured and re-learning it each session costs the
+    student a turn.
     """
     if not expected:
         return False
     if not _adaptive_forcing_enabled():
+        return True
+    if (family or '').strip().lower() in _FORCE_FROM_FIRST_TURN_FAMILIES:
         return True
     return _session_forcing_misses(session) >= 1
 
@@ -273,8 +307,8 @@ _REMEDIATION_OPENING_INSTRUCTION = (
     "that same enabling_objective — include the stem and options "
     "in your visible text reply. Do NOT ask for permission "
     "(\"would you like to review?\"); just open and pose. If "
-    "<missed_objectives> is empty, briefly congratulate and call "
-    "advance_step."
+    "<missed_objectives> is empty, briefly congratulate — the platform "
+    "re-opens the exit ticket on its own."
 )
 
 
@@ -411,6 +445,20 @@ def respond(
     course_locale = _course_locale(session)
 
     from apps.tutoring.simple_tutor.prompts import build_system_prompt
+
+    # Resolve the student's offline/online model preference ONCE per turn.
+    #
+    # Resolved HERE, before the family lookup, because both need it: the family
+    # decides which Block-0 prompt is built, and both LLM calls must run on the
+    # same model. Resolving separately per call would let a connection dropping
+    # between call 1 and call 2 switch models mid-turn, so the tool_use blocks
+    # from one model get answered by another.
+    #
+    # Returns None on the hosted platform (only one tutor configured), leaving
+    # every existing behaviour untouched.
+    from apps.tutoring.simple_tutor.model_choice import resolve_for_session
+    turn_config = resolve_for_session(session)
+
     # Eval-only: the selected model's FAMILY picks its own Block-0 prompt
     # (Qwen → Markdown variant; Gemini → XML base + targeted rules; everything
     # else, incl. Anthropic/production, → the base XML template unchanged). The
@@ -426,8 +474,19 @@ def respond(
             # so an admin picking Qwen from the browser gets the Qwen prompt
             # variant. Without this the family is None and a local Qwen runs on
             # the base XML template meant for Anthropic.
-            from apps.llm.models import ModelConfig as _MC
-            _cfg = _MC.get_for('tutoring')
+            #
+            # Prefer the STUDENT'S resolved model over get_for('tutoring').
+            # Since the offline/online picker shipped
+            # (simple_tutor/model_choice.py), those two can differ: a student on
+            # "always offline" runs the local model while get_for('tutoring')
+            # may return the cloud one. Deriving the family from the wrong model
+            # picks the wrong Block-0 template AND the wrong repair gating —
+            # i.e. a local Qwen would silently run the Anthropic prompt, which
+            # is the exact failure this fallback was added to prevent.
+            _cfg = turn_config
+            if _cfg is None:
+                from apps.llm.models import ModelConfig as _MC
+                _cfg = _MC.get_for('tutoring')
             if _cfg is not None and _cfg.provider and _cfg.model_name:
                 _spec = f'{_cfg.provider}/{_cfg.model_name}'
         if _spec:
@@ -475,7 +534,7 @@ def respond(
     # Call 1 unforced until the session is seen to skip an expected tool once.
     want_pose = _should_force_pose(_family, mode, student_intent)
     want_grade = not want_pose and _should_force_grade(_family, mode, student_intent)
-    gate_open = _adaptive_force_now(session, want_pose or want_grade)
+    gate_open = _adaptive_force_now(session, want_pose or want_grade, _family)
     force_pose = want_pose and gate_open
     force_grade = want_grade and gate_open
     call1_tools, call1_tool_choice = _plan_call1(tools, force_pose, force_grade)
@@ -501,15 +560,6 @@ def respond(
     # prompt, not more instruction text.
     messages: list = [{'role': 'user', 'content': user_input}]
 
-    # Resolve the student's offline/online preference ONCE per turn and pass
-    # the same config to both calls. Resolving separately would let a
-    # connection that drops between call 1 and call 2 switch models mid-turn,
-    # so the tool_use blocks from one model would be answered by another.
-    # Returns None on the hosted platform (only one tutor configured), which
-    # leaves the existing behaviour untouched.
-    from apps.tutoring.simple_tutor.model_choice import resolve_for_session
-    turn_config = resolve_for_session(session)
-
     response = _call_llm(
         system_blocks=system_blocks, tools=call1_tools, messages=messages,
         tool_choice=call1_tool_choice, config=turn_config,
@@ -528,6 +578,7 @@ def respond(
     # on conversational continuations. If the LLM doesn't call
     # record_answer, no grade is recorded for that turn (trust the LLM).
     text_reply_1, tool_results, _llm_called_record_answer = _dispatch_tools(
+        question_pool=question_pool,
         session=session,
         response=response,
         figure_catalog=figure_catalog,
@@ -612,6 +663,7 @@ def respond(
             stream_gate.reset_buffer()
 
     text_reply, used_two_call = _run_second_call(
+        question_pool=question_pool,
         session=session,
         system_blocks=system_blocks,
         tools=tools,
@@ -730,6 +782,16 @@ def respond(
 
     # ─── 9. Server auto-advance (safety net) ──────────────────────
     advanced = maybe_advance_step(session)
+
+    # ─── 9b. Remediation completion (server-owned since 2026-08-05) ──
+    # Flips engine_state['remediation_complete'] once every objective the
+    # student failed has been re-answered correctly, which re-opens the exit
+    # ticket for a retake. This used to be signalled by the LLM calling
+    # advance_step — a tool it used once in 1,443 turns, so the retake path was
+    # effectively dead. respond_for_view still reads the flag; only the producer
+    # moved. See memory/tool_surface_reduction_plan.md.
+    from apps.tutoring.simple_tutor.tools import maybe_complete_remediation
+    maybe_complete_remediation(session)
 
     return {
         'content': text_reply or '',
@@ -2347,7 +2409,7 @@ def _call_mode(family: str | None) -> str:
 def _run_second_call(
     *, session, system_blocks, tools, messages, response, text_reply_1,
     tool_results, figure_catalog, missing_tool, user_input, on_delta=None,
-    family=None, config=None,
+    family=None, config=None, question_pool=None,
 ) -> tuple[str, bool]:
     """Issue Call 2, folding in the repair when Call 1 skipped a forced tool.
 
@@ -2429,6 +2491,7 @@ def _run_second_call(
         return text_reply_1, False
 
     text_reply_2, extra_tool_results, _ = _dispatch_tools(
+        question_pool=question_pool,
         session=session, response=response2, figure_catalog=figure_catalog,
     )
     # Call 2 is meant to produce text; if it also chose to call a tool, accept
@@ -2454,7 +2517,7 @@ def _norm_loose(s: str) -> str:
     return ' '.join(s.split())
 
 
-def _pose_before_record(session, tool_use_blocks) -> bool:
+def _pose_before_record(session, tool_use_blocks, question_pool=None) -> bool:
     """Whether pose_question should dispatch before record_answer.
 
     True only for the late-registration case: no slot exists, and a posed
@@ -2485,13 +2548,29 @@ def _pose_before_record(session, tool_use_blocks) -> bool:
         if getattr(b, 'name', '') != 'pose_question':
             continue
         params = getattr(b, 'input', None) or {}
-        stem = _norm_loose(str(params.get('question_text') or ''))[:30]
+        # The pose carries an index, not a stem (2026-08-06), so resolve the
+        # stem off the pool the prompt was rendered from. Without this the
+        # late-registration case never matches and the student's answer to the
+        # question they actually read goes ungraded.
+        stem_raw = ''
+        idx = params.get('question_index')
+        if idx is None:
+            idx = params.get('catalog_question_id')
+        try:
+            i = int(idx)
+        except (TypeError, ValueError):
+            i = None
+        if i is not None and question_pool and 1 <= i <= len(question_pool):
+            stem_raw = str(
+                getattr(question_pool[i - 1], 'question_text', '') or ''
+            )
+        stem = _norm_loose(stem_raw)[:30]
         if stem and stem in prev_norm:
             return True  # late registration — grade against this pose
     return False
 
 
-def _dispatch_tools(*, session, response, figure_catalog):
+def _dispatch_tools(*, session, response, figure_catalog, question_pool=None):
     """Walk Anthropic response content. For each text block, accumulate
     the reply. For each tool_use block, dispatch to the right handler.
 
@@ -2515,8 +2594,8 @@ def _dispatch_tools(*, session, response, figure_catalog):
         (text_reply, tool_results, llm_called_record_answer)
     """
     from apps.tutoring.simple_tutor.tools import (
-        handle_pose_question, handle_record_answer, handle_request_figure,
-        handle_redirect_off_topic, handle_advance_step,
+        handle_pose_question_by_index, handle_record_answer,
+        handle_request_figure,
     )
 
     text_reply = ''
@@ -2531,7 +2610,7 @@ def _dispatch_tools(*, session, response, figure_catalog):
         elif btype == 'tool_use':
             tool_use_blocks.append(block)
 
-    pose_first = _pose_before_record(session, tool_use_blocks)
+    pose_first = _pose_before_record(session, tool_use_blocks, question_pool)
 
     def _priority(blk) -> int:
         n = getattr(blk, 'name', '')
@@ -2578,18 +2657,22 @@ def _dispatch_tools(*, session, response, figure_catalog):
 
         try:
             if name == 'pose_question':
-                result = handle_pose_question(
+                # Index-only since 2026-08-06. A model-supplied stem is never
+                # accepted — the server renders the question from the bank, so
+                # a mangled stem cannot reach a student. Small models corrupted
+                # numeric notation on re-authoring (1:200,000 -> -200,000)
+                # while keeping the original reference, which marked correct
+                # answers wrong. memory/catalog_only_questions_plan.md
+                idx = params.get('question_index')
+                if idx is None:
+                    # Tolerate the legacy argument name for one turn rather
+                    # than dropping the pose: a model that emits the old
+                    # catalog_question_id still meant "this pool entry".
+                    idx = params.get('catalog_question_id')
+                result = handle_pose_question_by_index(
                     session,
-                    question_text=str(params.get('question_text', '')),
-                    question_type=str(params.get('question_type', '')),
-                    reference_answer=str(params.get('reference_answer', '')),
-                    source=str(params.get('source', '')),
-                    options=params.get('options') or [],
-                    catalog_question_id=(
-                        params.get('catalog_question_id')
-                        if isinstance(params.get('catalog_question_id'), int)
-                        else None
-                    ),
+                    question_index=idx,
+                    question_pool=question_pool,
                 )
             elif name == 'record_answer':
                 result = handle_record_answer(
@@ -2611,14 +2694,6 @@ def _dispatch_tools(*, session, response, figure_catalog):
                         figure_id=fid,
                         figure_catalog=figure_catalog,
                     )
-            elif name == 'redirect_off_topic':
-                result = handle_redirect_off_topic(
-                    session, reason=str(params.get('reason', '')),
-                )
-            elif name == 'advance_step':
-                result = handle_advance_step(
-                    session, reason=str(params.get('reason', '')),
-                )
             else:
                 # Never silently no-op: an unknown name means either the model
                 # invented a tool or the text-recovery parser mis-extracted one
@@ -2731,12 +2806,13 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
         already_submitted = ExitTicketAttempt.objects.filter(
             session=session, completed_at__isnull=False,
         ).exists()
-        # Remediation-complete trigger: handle_advance_step sets this
-        # flag when the LLM calls advance_step after a failed attempt
-        # ("the student has recovered all missed objectives, time to
-        # re-take the quiz"). Bypasses the already_submitted guard so
-        # the modal re-fires. We clear the flag on this transition so
-        # the modal doesn't open in a loop after the next submit.
+        # Remediation-complete trigger: tools.maybe_complete_remediation
+        # sets this flag once every objective the student failed has been
+        # re-answered correctly ("time to re-take the quiz"). Bypasses the
+        # already_submitted guard so the modal re-fires. We clear the flag on
+        # this transition so the modal doesn't open in a loop after the next
+        # submit. Producer moved server-side 2026-08-05; this consumer is
+        # unchanged.
         session.refresh_from_db()
         es = session.engine_state or {}
         remediation_complete = bool(es.get('remediation_complete'))
@@ -3276,7 +3352,7 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
             }
             break
 
-    SessionTurn.objects.create(
+    turn = SessionTurn.objects.create(
         session=session,
         role=SessionTurn.Role.TUTOR,
         content=text_reply or '',
@@ -3284,3 +3360,32 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
         metadata=metadata,
         judge_outputs=judge_outputs,
     )
+
+    # Stamp the in-flight question with the turn it was posed on.
+    #
+    # Instrumentation only — no behaviour change. It makes the STALE-slot
+    # detector in tools.py::handle_record_answer actually able to fire.
+    #
+    # That detector has never run once. It is guarded by
+    # ``if in_flight.posed_at_turn_id:``, and that field is populated from
+    # ``engine_state['_current_turn_id']``, which nothing in the codebase ever
+    # writes — so it has always been None and the guard always falsy. The
+    # detector's own comment says "Measure it before changing anything"; this is
+    # what lets the measurement happen.
+    #
+    # Back-filled here rather than set at pose time because of ordering:
+    # pose_question writes the slot during tool dispatch, before this row
+    # exists, so there is no turn id to record yet.
+    #
+    # A stale slot is how a correct answer gets marked wrong — observed on
+    # device session 7 (2026-08-05): the student answered the visible question
+    # correctly, it went ungraded, and their next message was then graded
+    # INCORRECT against the earlier still-registered question.
+    try:
+        from apps.tutoring.models import InFlightQuestion
+        InFlightQuestion.objects.filter(
+            session=session, posed_at_turn__isnull=True,
+        ).update(posed_at_turn=turn)
+    except Exception as exc:                        # noqa: BLE001
+        # Never let instrumentation break a tutoring turn.
+        logger.warning("posed_at_turn backfill failed: %s", exc)

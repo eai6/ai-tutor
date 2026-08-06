@@ -9,9 +9,10 @@ Modules in this package:
                  Tier-2 (cross-family verifier LLM). Deterministic first;
                  verifier LLM only for the middle confidence band.
     state      — Sliding window + step-anchored summaries (M6)
-    prompts    — Stateless system-prompt template + 4 tool schemas (M7)
-    tools      — Server-side handlers for record_answer / advance_step /
-                 request_figure / redirect_off_topic + flow primitives (M8)
+    prompts    — Stateless system-prompt template + the tool schemas (M7)
+    tools      — Server-side handlers for pose_question / record_answer,
+                 plus request_figure when the course enables figures,
+                 + flow primitives (M8)
     engine     — The respond(session, user_input) -> dict entry point (M9)
 
 References:

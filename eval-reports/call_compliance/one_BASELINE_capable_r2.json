@@ -9,14 +9,14 @@
   "persona": "capable",
   "sim_reason": "exit_ticket",
   "sim_error": "",
-  "session_id": 981,
-  "total_wall": 96.4,
+  "session_id": 976,
+  "total_wall": 107.1,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        7.2,
-        4.4
+        7.41,
+        4.44
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -30,14 +30,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 11.92,
+      "wall": 12.17,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.64,
-        4.73
+        8.69,
+        4.85
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -51,14 +51,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.57,
+      "wall": 13.92,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.82,
-        4.4
+        8.92,
+        4.42
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -72,14 +72,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.43,
+      "wall": 13.75,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.55,
-        4.87
+        8.6,
+        4.81
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -93,13 +93,13 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.91,
+      "wall": 13.76,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        10.65,
+        10.62,
         2.07
       ],
       "dispatch_seq": 2,
@@ -112,7 +112,7 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.05,
+      "wall": 12.93,
       "error": null
     }
   ]

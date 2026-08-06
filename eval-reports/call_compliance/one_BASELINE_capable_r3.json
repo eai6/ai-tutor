@@ -9,14 +9,14 @@
   "persona": "capable",
   "sim_reason": "exit_ticket",
   "sim_error": "",
-  "session_id": 981,
-  "total_wall": 96.4,
+  "session_id": 978,
+  "total_wall": 166.0,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        7.2,
-        4.4
+        29.95,
+        4.7
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -30,14 +30,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 11.92,
+      "wall": 35.36,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.64,
-        4.73
+        8.97,
+        4.06
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -51,14 +51,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.57,
+      "wall": 13.39,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.82,
-        4.4
+        8.62,
+        4.33
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -72,14 +72,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.43,
+      "wall": 13.31,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.55,
-        4.87
+        9.27,
+        4.88
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -93,26 +93,26 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.91,
+      "wall": 14.54,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        10.65,
-        2.07
+        8.83,
+        3.86
       ],
       "dispatch_seq": 2,
-      "call1_tools": [],
-      "call2_tools": [
+      "call1_tools": [
         "record_answer"
       ],
-      "missing_tool": "record_answer",
+      "call2_tools": [],
+      "missing_tool": null,
       "polarity_rewrote": false,
       "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.05,
+      "ttft": 12.1,
+      "streamed": true,
+      "wall": 13.01,
       "error": null
     }
   ]

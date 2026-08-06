@@ -1,22 +1,22 @@
 {
-  "config": "compact-two",
-  "call_mode": "two",
-  "block_0": "compact",
+  "config": "one",
+  "call_mode": "one",
+  "block_0": "full",
   "block_0_chars": 13500,
   "mem_available_mb_at_start": null,
   "model": "local_ollama/qwen3-4b-jetson",
-  "lesson": 1137,
+  "lesson": 1427,
   "persona": "error_prone",
   "sim_reason": "max_turns",
   "sim_error": "",
-  "session_id": 964,
-  "total_wall": 142.8,
+  "session_id": 971,
+  "total_wall": 197.3,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        6.41,
-        3.9
+        9.55,
+        3.73
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -26,111 +26,16 @@
       "missing_tool": null,
       "polarity_rewrote": false,
       "verdict": "incorrect",
-      "ttft": 9.11,
+      "ttft": 12.62,
       "streamed": true,
-      "wall": 10.41,
+      "wall": 13.8,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        10.48,
-        2.27
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [],
-      "call2_tools": [
-        "record_answer"
-      ],
-      "missing_tool": "record_answer",
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": null,
-      "streamed": false,
-      "wall": 12.83,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        6.85,
-        5.38
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": 9.51,
-      "streamed": true,
-      "wall": 12.29,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.32,
-        4.62
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 10.71,
-      "streamed": true,
-      "wall": 13.08,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.74,
-        5.04
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 11.77,
-      "streamed": true,
-      "wall": 13.87,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        13.15,
-        5.42
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "incorrect",
-      "ttft": 16.12,
-      "streamed": true,
-      "wall": 18.65,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        9.51,
-        2.28
+        11.9,
+        2.51
       ],
       "dispatch_seq": 2,
       "call1_tools": [],
@@ -142,14 +47,14 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 11.88,
+      "wall": 14.81,
       "error": null
     },
     {
       "llm_calls": 2,
       "call_secs": [
-        8.49,
-        5.11
+        9.18,
+        4.92
       ],
       "dispatch_seq": 2,
       "call1_tools": [
@@ -158,10 +63,105 @@
       "call2_tools": [],
       "missing_tool": null,
       "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": 11.12,
+      "verdict": "incorrect",
+      "ttft": 12.27,
       "streamed": true,
-      "wall": 13.67,
+      "wall": 14.62,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        11.3,
+        5.95
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 15.18,
+      "streamed": true,
+      "wall": 18.09,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        13.38,
+        6.51
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 17.37,
+      "streamed": true,
+      "wall": 20.44,
+      "error": null
+    },
+    {
+      "llm_calls": 1,
+      "call_secs": [
+        13.87
+      ],
+      "dispatch_seq": 1,
+      "call1_tools": [],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": null,
+      "ttft": null,
+      "streamed": false,
+      "wall": 15.04,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.25,
+        3.83
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 10.97,
+      "streamed": true,
+      "wall": 12.47,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        10.65,
+        7.26
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer",
+        "pose_question"
+      ],
+      "call2_tools": [],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "incorrect",
+      "ttft": 14.43,
+      "streamed": true,
+      "wall": 18.63,
       "error": null
     }
   ]

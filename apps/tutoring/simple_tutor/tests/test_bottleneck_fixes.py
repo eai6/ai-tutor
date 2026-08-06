@@ -350,18 +350,25 @@ class DispatchOrderTest(DjangoTestCase):
     read the fresh fisherman slot → correct answer marked wrong."""
 
     def _response(self, *, pose_stem, pose_ref, answer):
+        """pose_question takes an index now, so the stem/ref the test wants
+        posed are supplied via the pool on self._pool (see _dispatch)."""
+        from types import SimpleNamespace
         from apps.tutoring.simple_tutor.tests.test_engine import _llm_response
+        self._pool = [SimpleNamespace(
+            question_text=pose_stem, question_type='short_numeric',
+            correct_answer=pose_ref, option_a='', option_b='', option_c='',
+            option_d='', answer_data={}, pk=0,
+        )]
         return _llm_response(text='ok', tool_uses=[
-            {'name': 'pose_question', 'input': {
-                'question_text': pose_stem, 'question_type': 'short_numeric',
-                'reference_answer': pose_ref, 'source': 'inline_authored'}},
+            {'name': 'pose_question', 'input': {'question_index': 1}},
             {'name': 'record_answer', 'input': {'extracted_answer': answer}},
         ])
 
     def _dispatch(self, session, response):
         from apps.tutoring.simple_tutor.engine import _dispatch_tools
         return _dispatch_tools(
-            session=session, response=response, figure_catalog=[])
+            session=session, response=response, figure_catalog=[],
+            question_pool=getattr(self, '_pool', None))
 
     def test_prior_slot_graded_before_new_pose_replaces_it(self):
         session, _ = _make_session()

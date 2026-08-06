@@ -2,105 +2,21 @@
   "config": "one",
   "call_mode": "one",
   "block_0": "full",
-  "block_0_chars": 13500,
+  "block_0_chars": 14742,
   "mem_available_mb_at_start": null,
   "model": "local_ollama/qwen3-4b-jetson",
   "lesson": 1427,
   "persona": "capable",
   "sim_reason": "exit_ticket",
   "sim_error": "",
-  "session_id": 981,
-  "total_wall": 96.4,
+  "session_id": 977,
+  "total_wall": 132.0,
   "turns": [
     {
       "llm_calls": 2,
       "call_secs": [
-        7.2,
-        4.4
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 11.92,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.64,
-        4.73
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.57,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.82,
-        4.4
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.43,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        8.55,
-        4.87
-      ],
-      "dispatch_seq": 2,
-      "call1_tools": [
-        "record_answer"
-      ],
-      "call2_tools": [
-        "pose_question"
-      ],
-      "missing_tool": null,
-      "polarity_rewrote": false,
-      "verdict": "correct",
-      "ttft": null,
-      "streamed": false,
-      "wall": 13.91,
-      "error": null
-    },
-    {
-      "llm_calls": 2,
-      "call_secs": [
-        10.65,
-        2.07
+        6.09,
+        1.67
       ],
       "dispatch_seq": 2,
       "call1_tools": [],
@@ -112,7 +28,85 @@
       "verdict": "correct",
       "ttft": null,
       "streamed": false,
-      "wall": 13.05,
+      "wall": 8.08,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.09,
+        1.64
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 10.08,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        21.53,
+        21.31
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 43.22,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        7.8,
+        5.02
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [
+        "record_answer"
+      ],
+      "call2_tools": [
+        "pose_question"
+      ],
+      "missing_tool": null,
+      "polarity_rewrote": false,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 13.12,
+      "error": null
+    },
+    {
+      "llm_calls": 2,
+      "call_secs": [
+        8.56,
+        13.79
+      ],
+      "dispatch_seq": 2,
+      "call1_tools": [],
+      "call2_tools": [
+        "record_answer"
+      ],
+      "missing_tool": "record_answer",
+      "polarity_rewrote": true,
+      "verdict": "correct",
+      "ttft": null,
+      "streamed": false,
+      "wall": 22.71,
       "error": null
     }
   ]

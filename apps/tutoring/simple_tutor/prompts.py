@@ -54,131 +54,24 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "pose_question",
         "description": (
-            "Call this when you want to ask the student a question that "
-            "will be graded. The platform writes the question to a "
-            "persisted in-flight slot at the moment of this call; the "
-            "student's next reply will be graded against the "
-            "reference_answer you provide here. Also include the "
-            "question stem (and A/B/C/D options for MCQ) verbatim in "
-            "your text reply so the student can read the question in "
-            "the chat — the slot is the grading anchor, not the "
-            "student-visible surface. Pose exactly one question per "
-            "turn.\n\n"
-            "Pick from question_pool verbatim, adapt entries, or "
-            "author your own — the pool is context, not a script. Set "
-            "source='catalog' + catalog_question_id when you pulled "
-            "from the pool; source='inline_authored' otherwise. The "
-            "platform cross-checks catalog references and logs "
-            "mismatches but still grades against YOUR "
-            "reference_answer.\n\n"
-            "Before this call, reason carefully (INTERNALLY — this "
-            "reasoning does NOT appear in the visible text reply) "
-            "about reference_answer: re-read the stem, check each "
-            "option for MCQ or compute the value for short_numeric, "
-            "commit to the answer YOU would defend. Inverse-ratio / "
-            "counter-intuitive items (map scale: 'smaller denominator "
-            "= larger scale = more detail', unit conversions, "
-            "negative numbers) are where wrong references most often "
-            "slip in. When the question is from question_pool, prefer "
-            "the catalog's recorded correct_answer over reasoning "
-            "from scratch."
+            "Ask the student one of the questions listed in "
+            "<question_pool>. Pass the index of the one you want. The "
+            "platform writes it to the in-flight slot and shows the "
+            "student the exact stem and options from the bank, so you do "
+            "not write the question yourself. Pose one question per turn."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "question_text": {
-                    "type": "string",
-                    "description": (
-                        "The question stem the student should answer. "
-                        "Include any setup context (e.g. 'On a 1:30,000 "
-                        "map, two villages are 6 cm apart. What is the "
-                        "real distance in km?'). Do NOT bake the "
-                        "A/B/C/D options into this field — pass them "
-                        "only via the separate `options` field. The "
-                        "platform composes the final visible question "
-                        "from stem + options; baking options into the "
-                        "stem causes double-render."
-                    ),
-                },
-                "question_type": {
-                    "type": "string",
-                    "enum": ["mcq", "short_numeric", "short_answer"],
-                    "description": (
-                        "Selects the grading tier. 'mcq' = letter "
-                        "match (A/B/C/D); pass 4 entries in options. "
-                        "'short_numeric' = numeric equality with "
-                        "tolerance; reference_answer is the bare "
-                        "number ('4', '180', '-12.5'). "
-                        "'short_answer' = semantic similarity via "
-                        "embedding gate + verifier LLM; "
-                        "reference_answer is one canonical phrasing. "
-                        "These are the only three supported types — "
-                        "fill_in_blank and matching are not graded "
-                        "reliably from free-form text answers."
-                    ),
-                },
-                "options": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": (
-                        "For MCQ only: ordered list of option texts "
-                        "[A, B, C, D]. Provide exactly 4 entries for "
-                        "MCQ. Empty / omitted for short_numeric and "
-                        "short_answer."
-                    ),
-                },
-                "reference_answer": {
-                    "type": "string",
-                    "description": (
-                        "What you would mark correct. For MCQ: the "
-                        "letter A/B/C/D. For short_numeric: the numeric "
-                        "value (e.g. '4' or '180'). For short_answer: "
-                        "one canonical phrasing. The grader will compare "
-                        "the student's answer to this.\n\n"
-                        "MCQ correct-letter balance: the correct option "
-                        "must rotate evenly across A, B, C, and D over a "
-                        "session. Do NOT default to B (a well-documented "
-                        "LLM bias — see auto-memory/feedback_mcq_b_bias.md). "
-                        "When deciding which letter holds the correct "
-                        "answer for a given question, shuffle independently "
-                        "of position-feel and don't just write the right "
-                        "answer second. If the last 2 MCQs in "
-                        "<recent_turns> had correct=B, deliberately use A, "
-                        "C, or D for this one. Rotation applies ONLY to "
-                        "questions you author: for catalog questions, pass "
-                        "the catalog's option order and correct letter "
-                        "unchanged."
-                    ),
-                },
-                "source": {
-                    "type": "string",
-                    "enum": ["catalog", "inline_authored"],
-                    "description": (
-                        "Where the question came from. 'catalog' = "
-                        "pulled from <question_pool> (verbatim or "
-                        "lightly adapted) and you should pass "
-                        "catalog_question_id. 'inline_authored' = you "
-                        "wrote it yourself for this turn."
-                    ),
-                },
-                "catalog_question_id": {
+                "question_index": {
                     "type": "integer",
                     "description": (
-                        "When source=catalog, the index attribute (1-N) "
-                        "of the entry in <question_pool> you used. The "
-                        "platform cross-checks your reference_answer "
-                        "against the catalog's recorded answer and logs "
-                        "any mismatch for content review (the platform "
-                        "still uses YOUR reference for grading)."
+                        "The index attribute of the <question> entry in "
+                        "<question_pool>, from 1 to N."
                     ),
                 },
             },
-            "required": [
-                "question_text",
-                "question_type",
-                "reference_answer",
-                "source",
-            ],
+            "required": ["question_index"],
         },
     },
     {
@@ -243,58 +136,14 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "required": ["figure_id"],
         },
     },
-    {
-        "name": "redirect_off_topic",
-        "description": (
-            "Call when the student has been off-topic for two consecutive "
-            "turns (chatting about unrelated games, personal life, etc.). "
-            "Your conversational reply should kindly bring them back to "
-            "the current lesson. This tool records the redirect so the "
-            "platform can flag persistent off-topic patterns."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "reason": {
-                    "type": "string",
-                    "description": (
-                        "Short note on what was off-topic (e.g. "
-                        "'asking about football scores')."
-                    ),
-                },
-            },
-            "required": ["reason"],
-        },
-    },
-    {
-        "name": "advance_step",
-        "description": (
-            "Hint to the platform that you have finished with the current "
-            "step's objective and the student is ready for the next step. "
-            "Call this once you have (a) delivered the step's content "
-            "appropriately for its 5E phase and (b) seen evidence that the "
-            "student has understood (e.g. correct verdicts on the "
-            "questions the platform posed). This is a SOFT hint — the "
-            "platform also auto-advances when all of the current step's "
-            "questions have a recorded verdict, or after a turn-cap "
-            "safety net fires. Use it to move faster when warranted."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "reason": {
-                    "type": "string",
-                    "description": (
-                        "One short sentence on why the student is ready "
-                        "(e.g. 'correct verdict on the angle-sum question "
-                        "with clear reasoning')."
-                    ),
-                },
-            },
-            "required": ["reason"],
-        },
-    },
 ]
+
+# advance_step was REMOVED 2026-08-05. The model called it once in 1,443
+# production turns while every measured session still advanced through all its
+# steps — maybe_advance_step (verdict-based + turn cap) was already doing the
+# work. Its one non-redundant job, signalling remediation-complete so the exit
+# ticket re-opens, is now server-side in tools.maybe_complete_remediation.
+# See memory/tool_surface_reduction_plan.md.
 
 
 # ============================================================================
@@ -341,13 +190,13 @@ the student returns to the question, the engine will route you \
 back to GRADE mode.
     * **POSE / TEACH mode** — no ``<in_flight_question>`` block is \
 present. Decide whether to teach (explanation, worked example, \
-warmup) or pose a question. When you decide to pose, call \
-pose_question with the question_text, question_type, options (for \
-MCQ), and reference_answer. Also include the question stem (and \
-options A/B/C/D for MCQ) verbatim in your text reply so the student \
-can read it in the chat — the slot is the platform's grading \
-anchor, but the student-visible question must appear in the chat \
-text. Pose exactly one question per turn.
+warmup) or pose a question. Every question comes from \
+``<question_pool>``: to pose one, call pose_question(question_index=N) \
+with the index of the entry you want. The platform writes that exact \
+question to the slot and shows the student its stem and options, so \
+you do not write the question, its options, or its answer yourself — \
+your reply introduces it and the platform supplies the rest. Pose \
+exactly one question per turn.
 
 - **Match each question's format to its answer.** Before posing, pick \
 the question_type that fits the answer the student will give:\n\
@@ -371,9 +220,8 @@ happens?", "Right?") because the student then has to guess which \
 question to answer. If you want to walk through reasoning, write it \
 as STATEMENTS ("The law applies regardless of how many people \
 break it.") not Socratic self-questions ("Does the law apply? Of \
-course not."). The actual question — the one matching pose_question's \
-question_text — should be the ONLY question mark in your reply before \
-the A/B/C/D list. Bad turn: "Does X count? No. Does Y count? Yes. \
+course not."). The question the platform renders from the pool should be \
+the ONLY question mark the student sees in your reply. Bad turn: "Does X count? No. Does Y count? Yes. \
 Now, which option is correct: A/B/C/D?" (three questions — confusing). \
 Good turn: "X and Y both count. Z does not. Which option captures \
 this: A/B/C/D?" (one question — clear).
@@ -521,10 +369,7 @@ sensible unit (m or km).
 On a 1:50,000 map, two villages are 8 cm apart. What is the real \
 distance in km?
 </tutor_reply>
-<tool_calls>pose_question(question_text="On a 1:50,000 map, two \
-villages are 8 cm apart. What is the real distance in km?", \
-question_type="short_numeric", reference_answer="4", \
-source="inline_authored")</tool_calls>
+<tool_calls>pose_question(question_index=3)</tool_calls>
 </good_turn>
 
 <bad_turn reason="meta-reasoning leakage + passive ending">
@@ -592,17 +437,15 @@ POSE rules above.
   4. Grade with record_answer as usual. On correct, move to the next \
 missed objective. On incorrect, hint per the ladder.
 Skip objectives in ``<mastered_objectives>`` — the student already \
-demonstrated those. When all missed objectives are recovered (or \
-the student says they're done reviewing), call \
-advance_step(reason="all missed objectives recovered") so the \
-platform can re-launch the exit ticket for a fresh attempt. Do not \
-write a "well done, here are the key takeaways" wrap-up message — \
-that strands the student. The advance_step tool call IS how you \
-end remediation; pair it with a short text reply like "Great work \
-— you've covered everything that tripped you up. Let's re-take the \
-quiz." (the platform opens the quiz modal automatically after this \
-turn). The ``<exit_ticket_review>`` block is the source of truth — \
-do not re-read it back to the student verbatim; use it to GUIDE \
+demonstrated those. Keep grading with record_answer until every missed \
+objective has a correct verdict; the platform re-launches the exit ticket \
+by itself once they are all recovered, so there is nothing for you to call \
+to end remediation. Do not write a "well done, here are the key takeaways" \
+wrap-up message — that strands the student. On the turn that recovers the \
+last missed objective, a short reply like "Great work — you've covered \
+everything that tripped you up. Let's re-take the quiz." is right; the quiz \
+modal opens automatically. The ``<exit_ticket_review>`` block is the source \
+of truth — do not re-read it back to the student verbatim; use it to GUIDE \
 your re-teaching.
 </remediation_mode>"""
 
@@ -813,21 +656,13 @@ def build_system_prompt(
             t for t in TOOL_SCHEMAS if t['name'] != 'request_figure'
         ]
 
-    # Narrow pose_question.question_type enum to the env-configured
-    # tutoring allowlist (TUTORING_QUESTION_TYPES, default 'mcq').
-    # Without this the LLM can ignore the pool's MCQ-only filter and
-    # author a short_answer question whose partial verdicts won't
-    # trigger step advance — exactly the 2026-05-28 staging failure
-    # mode (session 424 stuck on step 0 across 5 partial verdicts).
-    import copy
-    from apps.tutoring.simple_tutor.tools import _allowed_tutoring_types
-    allowed = _allowed_tutoring_types()
-    tools_for_llm = [
-        _narrow_pose_question_types(t, allowed) if t['name'] == 'pose_question' else t
-        for t in tools_for_llm
-    ]
-    _ = copy  # imported above for the helper
-
+    # The TUTORING_QUESTION_TYPES allowlist used to be enforced by narrowing
+    # pose_question's question_type enum. Since the tutor selects a pool index
+    # rather than authoring a question (2026-08-06), enforcement lives where it
+    # belongs: build_question_pool already filters the pool by
+    # _allowed_tutoring_types(), so a disallowed type is never offered and
+    # cannot be selected. _narrow_pose_question_types is kept for the tests
+    # that cover it but is no longer part of the request path.
     return blocks, tools_for_llm
 
 
@@ -1114,8 +949,7 @@ _INTENT_GUIDANCE = {
     'off_topic': (
         "Treat this turn as off-topic. Do NOT call record_answer. "
         "Acknowledge briefly, redirect to the current lesson "
-        "question. If this is the second off-topic turn in a row, "
-        "also call redirect_off_topic. Leave the slot active."
+        "question. Leave the slot active."
     ),
     'non_engagement': (
         "Treat this turn as a non-engagement signal — an emotional "

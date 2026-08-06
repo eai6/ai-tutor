@@ -238,6 +238,7 @@ def _extract_option_text_match(question, student_answer: str) -> str | None:
         return None
     needle_num = _option_number(needle)
     matches: list[str] = []
+    partial: list[str] = []
     for letter in ('A', 'B', 'C', 'D'):
         opt = _norm_option(getattr(question, f'option_{letter.lower()}', '') or '')
         if not opt:
@@ -249,7 +250,32 @@ def _extract_option_text_match(question, student_answer: str) -> str | None:
             opt_num = _option_number(opt)
             if opt_num is not None and abs(opt_num - needle_num) < 1e-9:
                 matches.append(letter)
-    return matches[0] if len(matches) == 1 else None
+                continue
+        # Distinctive-substring match. Exact-equality alone required the
+        # student to retype the WHOLE option verbatim, so a student answering
+        # "easting" to
+        #   B) The horizontal axis (easting)
+        # was marked INCORRECT despite naming the one word that distinguishes
+        # B from A ("northing"). Observed on device 2026-08-05: the tutor said
+        # "that's a great start!" and then re-asked the identical question.
+        #
+        # Safe because the result is discarded unless it is UNIQUE across the
+        # options: "axis" appears in A, B and C, so it stays ambiguous and
+        # falls through exactly as before. Only a needle that identifies a
+        # single option counts.
+        #
+        # >= 4 chars so short fragments cannot carry a match on their own.
+        # A bare "a"/"b" is already handled upstream by letter extraction.
+        if len(needle) >= 4 and needle in opt:
+            partial.append(letter)
+
+    if len(matches) == 1:
+        return matches[0]
+    # Only fall back to partials when there was no exact/numeric hit at all —
+    # an exact match must never be overridden by a substring one.
+    if not matches and len(partial) == 1:
+        return partial[0]
+    return None
 
 
 def _grade_mcq(question, student_answer: str) -> GradeResult:
@@ -1240,6 +1266,45 @@ def _verifier_self_consistency(votes: list) -> tuple:
     return (majority_verdict, mean_conf, just)
 
 
+def _local_verifier_chain(chain_builder):
+    """A one-item verifier chain built from the local tutoring model.
+
+    Used only when the normal (cloud) judge chain is empty — i.e. an offline
+    install. Reuses ``get_judge_provider_chain(force_model_config=...)`` rather
+    than constructing a JudgeProvider by hand, so client construction, retries
+    and the rest of the chain machinery stay in one place.
+
+    Returns [] when there is no local model either, which leaves the caller's
+    existing "no verifier provider available" path intact.
+    """
+    try:
+        from apps.llm.models import ModelConfig
+
+        local = (
+            ModelConfig.objects
+            .filter(provider='local_ollama', purpose='tutoring', is_active=True)
+            .first()
+        )
+        if local is None:
+            return []
+
+        # Judging runs at temperature 0 (CLAUDE.md invariant). That clamp is
+        # keyed on JUDGE purpose, and this is a TUTORING row being borrowed, so
+        # it would not otherwise apply. Set it on the in-memory instance only —
+        # never .save(), or a student's lesson would start tutoring at 0 too.
+        local.temperature = 0
+        logger.warning(
+            "[grader] no cloud judge available — verifying free text with the "
+            "LOCAL model %s/%s. Same-family verification is weaker than "
+            "cross-family; this is the offline fallback.",
+            local.provider, local.model_name,
+        )
+        return chain_builder('judge', force_model_config=local)
+    except Exception as exc:                       # noqa: BLE001
+        logger.warning("[grader] local verifier fallback failed: %s", exc)
+        return []
+
+
 def _grade_verifier_llm(
     question,
     student_answer: str,
@@ -1285,6 +1350,23 @@ def _grade_verifier_llm(
     if not chain:
         # Fall back to any judge provider if cross-family unavailable.
         chain = get_judge_provider_chain('judge')
+    if not chain:
+        # Last resort: verify with the LOCAL model.
+        #
+        # This deliberately breaks the cross-family rule in
+        # memory/feedback_grading_design_rules.md, and only where that rule
+        # cannot be satisfied at all. The judge chain is cloud-only (Gemini →
+        # OpenAI → Haiku), so on an offline install it is empty and every
+        # free-text answer returned PARTIAL/0.0 — neither correct nor
+        # incorrect. The visible symptom is that A/B/C/D grades fine (a
+        # deterministic letter match, no LLM) while a written answer is never
+        # graded at all.
+        #
+        # A same-family verdict is worse than a cross-family one, but it is
+        # much better than abstaining: an abstention leaves the student with
+        # no feedback and the step unable to advance. The hosted platform is
+        # unaffected — it has a chain, so it never reaches this branch.
+        chain = _local_verifier_chain(get_judge_provider_chain)
     if not chain:
         return GradeResult(
             verdict=Verdict.PARTIAL, confidence=0.0, tier='verifier_llm',
