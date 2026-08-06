@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 112, lesson 1427, step 5
+# DYNAMIC BLOCK (Block 2) — session 118, lesson 1427, step 0
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,304 chars   (whole prompt: 11,376)
+  1,304 chars   (whole prompt: 11,398)
 ==============================================================================
 
 <message_intent>
@@ -39,32 +39,26 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — first attempt
-  3,311 chars   (whole prompt: 13,383)
+  2,009 chars   (whole prompt: 12,103)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <attempt_count>1</attempt_count>
+  <stem>What does the vertical axis on a grid reference map represent?</stem>
   <options>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
+    <option key="A">The easting or horizontal distance</option>
+    <option key="B">The northing or vertical distance</option>
+    <option key="C">The scale of the map</option>
+    <option key="D">The longitude lines</option>
   </options>
   <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above. There is no text box on their screen. The only thing they can send you is one of the letters in <options> — not a word, not a number, not a sentence.
-
-So when the grader says INCORRECT, your whole reply is: say back the option they chose and why THAT one is wrong, then hand THIS question back. End on a statement. The buttons are the invitation to try again; you do not need to write one.
-
-Use the record_answer result's ``student_choice`` for this — it carries the exact wording of the option they tapped, so you never have to hunt for it in <options>. Session 30 hunted and missed: the student chose "It shows the compass direction between the two points" and was told "it doesn't help pick grid squares", which is a different option. Being told why an option you did not choose is wrong teaches nothing and reads as not being listened to.
-
-Any question you ask here is unanswerable, so ask none. "Now try this: what does the horizontal axis represent?" leaves the student holding four buttons that belong to a different question. Sub-questions, micro-steps, "can you explain why", and "which one do you think it is?" all fail this same way. Those belong to a question you pose with pose_question, which replaces the buttons with its own.
-
-Naming what an option SAYS ends the question just as surely as naming its letter, and here the student is looking straight at that wording — write a hint they can carry back to the four options, not the option itself.</answer_surface>
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>
 </in_flight_question>
 
 <message_intent>
@@ -96,32 +90,26 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — second attempt (hint ladder rung 1)
-  3,311 chars   (whole prompt: 13,383)
+  2,009 chars   (whole prompt: 12,103)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <attempt_count>1</attempt_count>
+  <stem>What does the vertical axis on a grid reference map represent?</stem>
   <options>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
+    <option key="A">The easting or horizontal distance</option>
+    <option key="B">The northing or vertical distance</option>
+    <option key="C">The scale of the map</option>
+    <option key="D">The longitude lines</option>
   </options>
   <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above. There is no text box on their screen. The only thing they can send you is one of the letters in <options> — not a word, not a number, not a sentence.
-
-So when the grader says INCORRECT, your whole reply is: say back the option they chose and why THAT one is wrong, then hand THIS question back. End on a statement. The buttons are the invitation to try again; you do not need to write one.
-
-Use the record_answer result's ``student_choice`` for this — it carries the exact wording of the option they tapped, so you never have to hunt for it in <options>. Session 30 hunted and missed: the student chose "It shows the compass direction between the two points" and was told "it doesn't help pick grid squares", which is a different option. Being told why an option you did not choose is wrong teaches nothing and reads as not being listened to.
-
-Any question you ask here is unanswerable, so ask none. "Now try this: what does the horizontal axis represent?" leaves the student holding four buttons that belong to a different question. Sub-questions, micro-steps, "can you explain why", and "which one do you think it is?" all fail this same way. Those belong to a question you pose with pose_question, which replaces the buttons with its own.
-
-Naming what an option SAYS ends the question just as surely as naming its letter, and here the student is looking straight at that wording — write a hint they can carry back to the four options, not the option itself.</answer_surface>
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>
 </in_flight_question>
 
 <message_intent>
@@ -153,32 +141,26 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   CONVERSATIONAL — student asked something instead
-  3,197 chars   (whole prompt: 13,269)
+  1,895 chars   (whole prompt: 11,989)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <attempt_count>1</attempt_count>
+  <stem>What does the vertical axis on a grid reference map represent?</stem>
   <options>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
+    <option key="A">The easting or horizontal distance</option>
+    <option key="B">The northing or vertical distance</option>
+    <option key="C">The scale of the map</option>
+    <option key="D">The longitude lines</option>
   </options>
   <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above. There is no text box on their screen. The only thing they can send you is one of the letters in <options> — not a word, not a number, not a sentence.
-
-So when the grader says INCORRECT, your whole reply is: say back the option they chose and why THAT one is wrong, then hand THIS question back. End on a statement. The buttons are the invitation to try again; you do not need to write one.
-
-Use the record_answer result's ``student_choice`` for this — it carries the exact wording of the option they tapped, so you never have to hunt for it in <options>. Session 30 hunted and missed: the student chose "It shows the compass direction between the two points" and was told "it doesn't help pick grid squares", which is a different option. Being told why an option you did not choose is wrong teaches nothing and reads as not being listened to.
-
-Any question you ask here is unanswerable, so ask none. "Now try this: what does the horizontal axis represent?" leaves the student holding four buttons that belong to a different question. Sub-questions, micro-steps, "can you explain why", and "which one do you think it is?" all fail this same way. Those belong to a question you pose with pose_question, which replaces the buttons with its own.
-
-Naming what an option SAYS ends the question just as surely as naming its letter, and here the student is looking straight at that wording — write a hint they can carry back to the four options, not the option itself.</answer_surface>
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>
 </in_flight_question>
 
 <message_intent>
@@ -206,7 +188,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  4,502 chars   (whole prompt: 14,574)
+  3,200 chars   (whole prompt: 13,294)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -230,25 +212,19 @@ A reply that runs past 3 sentences is too long, however good it is.
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <attempt_count>1</attempt_count>
+  <stem>What does the vertical axis on a grid reference map represent?</stem>
   <options>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
+    <option key="A">The easting or horizontal distance</option>
+    <option key="B">The northing or vertical distance</option>
+    <option key="C">The scale of the map</option>
+    <option key="D">The longitude lines</option>
   </options>
   <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above. There is no text box on their screen. The only thing they can send you is one of the letters in <options> — not a word, not a number, not a sentence.
-
-So when the grader says INCORRECT, your whole reply is: say back the option they chose and why THAT one is wrong, then hand THIS question back. End on a statement. The buttons are the invitation to try again; you do not need to write one.
-
-Use the record_answer result's ``student_choice`` for this — it carries the exact wording of the option they tapped, so you never have to hunt for it in <options>. Session 30 hunted and missed: the student chose "It shows the compass direction between the two points" and was told "it doesn't help pick grid squares", which is a different option. Being told why an option you did not choose is wrong teaches nothing and reads as not being listened to.
-
-Any question you ask here is unanswerable, so ask none. "Now try this: what does the horizontal axis represent?" leaves the student holding four buttons that belong to a different question. Sub-questions, micro-steps, "can you explain why", and "which one do you think it is?" all fail this same way. Those belong to a question you pose with pose_question, which replaces the buttons with its own.
-
-Naming what an option SAYS ends the question just as surely as naming its letter, and here the student is looking straight at that wording — write a hint they can carry back to the four options, not the option itself.</answer_surface>
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>
 </in_flight_question>
 
 <message_intent>
@@ -291,7 +267,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  2,495 chars   (whole prompt: 12,567)
+  2,495 chars   (whole prompt: 12,589)
 ==============================================================================
 
 <remediation_mode active="true"/>

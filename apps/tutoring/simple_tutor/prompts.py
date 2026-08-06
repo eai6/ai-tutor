@@ -1116,33 +1116,9 @@ def _render_message_intent_block(student_intent: str | None) -> str:
 # closest to the student's message, where instruction-following is strongest
 # (prompting-fundamentals: instructions last in long context).
 _ANSWER_SURFACE_PICKER = """  <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above. There is no \
-text box on their screen. The only thing they can send you is one of the \
-letters in <options> — not a word, not a number, not a sentence.
-
-So when the grader says INCORRECT, your whole reply is: say back the option \
-they chose and why THAT one is wrong, then hand THIS question back. End on a \
-statement. The buttons are the invitation to try again; you do not need to \
-write one.
-
-Use the record_answer result's ``student_choice`` for this — it carries the \
-exact wording of the option they tapped, so you never have to hunt for it in \
-<options>. Session 30 hunted and missed: the student chose "It shows the \
-compass direction between the two points" and was told "it doesn't help pick \
-grid squares", which is a different option. Being told why an option you did \
-not choose is wrong teaches nothing and reads as not being listened to.
-
-Any question you ask here is unanswerable, so ask none. "Now try this: what \
-does the horizontal axis represent?" leaves the student holding four buttons \
-that belong to a different question. Sub-questions, micro-steps, "can you \
-explain why", and "which one do you think it is?" all fail this same way. \
-Those belong to a question you pose with pose_question, which replaces the \
-buttons with its own.
-
-Naming what an option SAYS ends the question just as surely as naming its \
-letter, and here the student is looking straight at that wording — write a \
-hint they can carry back to the four options, not the option itself.\
-</answer_surface>"""
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>"""
 
 
 # One mode per turn, chosen by the server.

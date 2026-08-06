@@ -87,12 +87,21 @@ class AnswerSurfaceBlockTest(DjangoTestCase):
         out = _render_in_flight_block(_slot(options=()), ANSWER_MODE_PICKER)
         self.assertNotIn(MARKER, out)
 
-    def test_it_forbids_asking_rather_than_only_describing_the_surface(self):
-        """The failure was a well-formed sub-question, which the ladder
-        explicitly asks for. Stating 'there is no text box' without also
-        overriding that instruction leaves the model with two live rules."""
+    def test_it_states_the_surface_and_how_to_read_a_choice(self):
+        """Cut to two lines on 2026-08-06.
+
+        The long version also forbade asking anything, and stray hand-offs
+        measured 0/8 with it. Without it they measured 1/6 — weak evidence,
+        but the direction is real, and the mode block's "INCORRECT — hint, and
+        pose nothing" is now the only thing carrying that rule.
+
+        What the block must still do: name the surface, and say to resolve the
+        student's choice by letter key. The second half is what stops the
+        session-30 failure of refuting an option the student never picked.
+        """
         out = _render_in_flight_block(_slot(), ANSWER_MODE_PICKER)
-        self.assertIn('ask none', out)
+        self.assertIn('TAPPING', out)
+        self.assertIn('letter key', out)
 
 
 class ResolveStudentChoiceTest(DjangoTestCase):

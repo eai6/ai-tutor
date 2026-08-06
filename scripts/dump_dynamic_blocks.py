@@ -55,8 +55,19 @@ def main() -> int:
         attempt_count=0, options=['39', '47', '93', '74'],
         catalog_question_id=12,
     )
-    wrong_slot = SimpleNamespace(**{**vars(slot), 'attempt_count': 1}) \
-        if isinstance(slot, SimpleNamespace) else slot
+    # A real DB row is not a SimpleNamespace, so the old copy-with-override
+    # silently fell through to `slot` and the two GRADE samples rendered
+    # byte-identical. Build the variant from the fields the renderer reads,
+    # whatever the slot's type.
+    wrong_slot = SimpleNamespace(
+        question_text=getattr(slot, 'question_text', ''),
+        question_type=getattr(slot, 'question_type', 'mcq'),
+        reference_answer=getattr(slot, 'reference_answer', ''),
+        source=getattr(slot, 'source', 'catalog'),
+        options=list(getattr(slot, 'options', None) or []),
+        catalog_question_id=getattr(slot, 'catalog_question_id', None),
+        attempt_count=1,
+    )
     review = {
         'score': 2, 'total': 10, 'passed': False,
         'missed_objectives': [{
