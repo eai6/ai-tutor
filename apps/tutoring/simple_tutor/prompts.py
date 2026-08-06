@@ -640,7 +640,10 @@ def build_system_prompt(
     if summaries_text:
         dynamic_parts.append(summaries_text)
 
-    recent_text = _render_recent_turns_block(recent_window)
+    recent_text = _render_recent_turns_block(
+        recent_window,
+        trim_tutor_turns=(family or '').strip().lower() == 'qwen',
+    )
     if recent_text:
         dynamic_parts.append(recent_text)
 
@@ -1365,7 +1368,40 @@ def _render_history_summary_block(summaries: list[str] | None) -> str:
     return "\n".join(parts)
 
 
-def _render_recent_turns_block(recent_window: list | None) -> str:
+_TUTOR_TURN_HEAD_CHARS = 180
+
+
+def _trim_tutor_turn(content: str) -> str:
+    """Keep the head of a tutor turn; drop the tail.
+
+    The small local models copy their own previous reply forward. Device
+    session 127 carried "Next, let's practice identifying the northing value…"
+    in SEVEN consecutive tutor turns, word-identical — a sentence that appears
+    nowhere in the prompt. The model wrote it once, <recent_turns> handed it
+    back, and it kept handing it back.
+
+    What gets copied is always the TAIL: the hand-off to the next question is
+    the last thing in a reply and the last thing the model reads of it. The
+    head — the reaction and the teaching sentence — is what the next turn
+    genuinely needs to avoid repeating itself. So keep the head and cut the
+    rest, which removes the copyable part and keeps the useful part.
+
+    Cutting on a sentence boundary rather than mid-word: a truncated fragment
+    is itself something to copy, and a dangling half-sentence reads as
+    something to complete.
+    """
+    text = ' '.join((content or '').split())
+    if len(text) <= _TUTOR_TURN_HEAD_CHARS:
+        return text
+    window = text[:_TUTOR_TURN_HEAD_CHARS]
+    cut = max(window.rfind('. '), window.rfind('! '), window.rfind('? '))
+    head = window[:cut + 1] if cut > 40 else window.rsplit(' ', 1)[0]
+    return f'{head.rstrip()} […]'
+
+
+def _render_recent_turns_block(
+    recent_window: list | None, trim_tutor_turns: bool = False,
+) -> str:
     """Render the <recent_turns> block — last N turns of the current
     step, verbatim. The latest student turn is excluded — it goes in
     the user message instead.
@@ -1391,6 +1427,8 @@ def _render_recent_turns_block(recent_window: list | None) -> str:
         content = (getattr(turn, 'content', '') or '').strip()
         if not content:
             continue
+        if trim_tutor_turns and role == 'tutor':
+            content = _trim_tutor_turn(content)
         attrs = f'role="{role}"'
         if role == 'tutor':
             jo = getattr(turn, 'judge_outputs', None) or {}

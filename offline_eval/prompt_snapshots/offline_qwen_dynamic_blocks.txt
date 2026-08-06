@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 135, lesson 1427, step 0
+# DYNAMIC BLOCK (Block 2) — session 137, lesson 1434, step 0
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,161 chars   (whole prompt: 11,510)
+  1,161 chars   (whole prompt: 12,100)
 ==============================================================================
 
 <message_intent>
@@ -39,22 +39,22 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — answering the live question
-  1,931 chars   (whole prompt: 12,280)
+  2,053 chars   (whole prompt: 12,992)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>12</catalog_question_id>
+  <catalog_question_id>6</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <stem>When reading a land use map, what is the FIRST step you should take?</stem>
   <options>
-    <option key="A">39</option>
-    <option key="B">47</option>
-    <option key="C">93</option>
-    <option key="D">74</option>
+    <option key="A">Identify the scale of the map</option>
+    <option key="B">Look for the compass rose</option>
+    <option key="C">Count the number of buildings shown</option>
+    <option key="D">Consult the map legend to understand symbols and colors</option>
   </options>
-  <reference_answer>A</reference_answer>
+  <reference_answer>D</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -90,7 +90,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  2,789 chars   (whole prompt: 13,138)
+  2,911 chars   (whole prompt: 13,850)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -113,16 +113,16 @@ A reply that runs past 3 sentences is too long, however good it is.
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>12</catalog_question_id>
+  <catalog_question_id>6</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <stem>When reading a land use map, what is the FIRST step you should take?</stem>
   <options>
-    <option key="A">39</option>
-    <option key="B">47</option>
-    <option key="C">93</option>
-    <option key="D">74</option>
+    <option key="A">Identify the scale of the map</option>
+    <option key="B">Look for the compass rose</option>
+    <option key="C">Count the number of buildings shown</option>
+    <option key="D">Consult the map legend to understand symbols and colors</option>
   </options>
-  <reference_answer>A</reference_answer>
+  <reference_answer>D</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -164,7 +164,7 @@ Do not add a third unless it is genuinely needed, and never add a question — t
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  2,096 chars   (whole prompt: 12,445)
+  2,096 chars   (whole prompt: 13,035)
 ==============================================================================
 
 <remediation_mode active="true"/>

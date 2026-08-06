@@ -670,3 +670,71 @@ class ServerPicksTheModeTest(SimpleTestCase):
         text = '\n'.join(b['text'] for b in blocks)
         self.assertNotIn('## This turn:', text)
         self.assertIn('GRADE mode', blocks[0]['text'])
+
+
+class RecentTurnsTrimTest(SimpleTestCase):
+    """Tutor turns are trimmed to their head in <recent_turns>, offline only.
+
+    Device session 127 carried "Next, let's practice identifying the northing
+    value…" in SEVEN consecutive tutor turns, word-identical. That sentence
+    appears nowhere in the prompt: the model wrote it once, <recent_turns>
+    handed it back verbatim, and it kept handing it back.
+
+    What gets copied is always the TAIL — the hand-off to the next question is
+    the last thing in a reply. The head is what the next turn needs in order
+    not to repeat itself. So the fix is a cut, not a filter on the output.
+    """
+
+    LONG = (
+        "You picked C — that's correct! The student reversed the order of "
+        "easting and northing, which is a common mistake. Next, let's practice "
+        "identifying the northing value in 5623: which option shows it?"
+    )
+
+    def _turns(self, *contents):
+        from types import SimpleNamespace
+        return [SimpleNamespace(role='tutor', content=c, judge_outputs={})
+                for c in contents]
+
+    def test_the_hand_off_tail_is_dropped(self):
+        from apps.tutoring.simple_tutor.prompts import _render_recent_turns_block
+        out = _render_recent_turns_block(self._turns(self.LONG),
+                                         trim_tutor_turns=True)
+        self.assertIn('reversed the order of easting and northing', out)
+        self.assertNotIn("Next, let's practice", out)
+        self.assertIn('[…]', out)
+
+    def test_short_turns_are_untouched(self):
+        """A reply with no tail to cut must not gain an ellipsis — that would
+        read as omitted content the model might try to reconstruct."""
+        from apps.tutoring.simple_tutor.prompts import _render_recent_turns_block
+        out = _render_recent_turns_block(self._turns('Well done.'),
+                                         trim_tutor_turns=True)
+        self.assertIn('Well done.', out)
+        self.assertNotIn('[…]', out)
+
+    def test_it_cuts_on_a_sentence_boundary(self):
+        """A mid-word fragment is itself copyable, and a dangling half-sentence
+        reads as something to complete."""
+        from apps.tutoring.simple_tutor.prompts import _trim_tutor_turn
+        head = _trim_tutor_turn(self.LONG).replace(' […]', '')
+        self.assertTrue(head.endswith(('.', '!', '?')), head[-40:])
+
+    def test_student_turns_are_never_trimmed(self):
+        """They are a letter or a short phrase, and they are the record of what
+        the student actually sent."""
+        from types import SimpleNamespace
+        from apps.tutoring.simple_tutor.prompts import _render_recent_turns_block
+        long_student = 'B ' + ('x' * 400)
+        turns = [SimpleNamespace(role='student', content=long_student,
+                                 judge_outputs={})]
+        out = _render_recent_turns_block(turns, trim_tutor_turns=True)
+        self.assertNotIn('[…]', out)
+
+    def test_production_is_not_trimmed(self):
+        """Default off. Opus does not copy its own tail forward, and cutting
+        its context would be a regression for no gain."""
+        from apps.tutoring.simple_tutor.prompts import _render_recent_turns_block
+        out = _render_recent_turns_block(self._turns(self.LONG))
+        self.assertIn("Next, let's practice", out)
+        self.assertNotIn('[…]', out)
