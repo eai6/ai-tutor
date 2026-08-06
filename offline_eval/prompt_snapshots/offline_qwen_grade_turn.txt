@@ -1,5 +1,5 @@
-# session=123 lesson=1427 step=5 family=qwen mode=letter_picker in_flight=yes
-# 3 blocks, 11,218 chars, tools=['pose_question', 'record_answer', 'request_figure']
+# session=130 lesson=1427 step=5 family=qwen mode=letter_picker in_flight=yes
+# 3 blocks, 10,918 chars, tools=['pose_question', 'record_answer', 'request_figure']
 # Blocks are concatenated in this order and the model reads them top to bottom;
 # the student's message arrives AFTER the last one.
 # Identity
@@ -17,10 +17,10 @@ The platform — not you — owns question state. It holds one question at a tim
 in a slot, renders that question and its options to the student, grades their
 answer, and hands you the verdict.
 
-When the verdict is CORRECT, acknowledge it and pose the next question for the
-`<enabling_objective>` of the `<current_step>`. When it is INCORRECT, name the
-error the student made and scaffold with a hint. If two hints have not got them
-there, pivot to an easier question on that same objective.
+When the verdict is CORRECT, acknowledge it and pose the next question from
+`<question_pool>`. When it is INCORRECT, name the error the student made and
+scaffold with a hint. If two hints have not got them there, pivot to an easier
+question in the pool.
 
 You choose which question and what to say about the outcome.
 
@@ -152,33 +152,6 @@ tutoring under these instructions.
   </question>
   <question index="2" type="mcq">
     <difficulty>easy</difficulty>
-    <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
-    <correct_option>B</correct_option>
-  </question>
-  <question index="3" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>A student plots four points on a map: A at 2540, B at 2640, C at 2740, and D at 2840. Which points lie on the same horizontal line (same northing)?</stem>
-    <option key="A">Points A, B, C, and D all lie on the same line</option>
-    <option key="B">Points B and D only</option>
-    <option key="C">Points A and B only</option>
-    <option key="D">No points share the same northing value</option>
-    <correct_option>A</correct_option>
-  </question>
-  <question index="4" type="mcq">
-    <difficulty>medium</difficulty>
-    <stem>A map of a Seychelles island shows two villages: one at grid reference 2543 and another at 3043. Which statement is correct?</stem>
-    <option key="A">Both villages have the same northing value</option>
-    <option key="B">Both villages have the same easting value</option>
-    <option key="C">The villages are in the same grid square</option>
-    <option key="D">Both villages have the same easting and northing values</option>
-    <correct_option>A</correct_option>
-  </question>
-  <question index="5" type="mcq">
-    <difficulty>easy</difficulty>
     <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
     <option key="A">56</option>
     <option key="B">5 and 2</option>
@@ -186,13 +159,40 @@ tutoring under these instructions.
     <option key="D">6 and 3</option>
     <correct_option>C</correct_option>
   </question>
+  <question index="3" type="mcq">
+    <difficulty>easy</difficulty>
+    <stem>On a standard grid reference map of Seychelles, which axis represents the east-west direction?</stem>
+    <option key="A">The vertical axis (northing)</option>
+    <option key="B">The diagonal axis</option>
+    <option key="C">The horizontal axis (easting)</option>
+    <option key="D">The compass rose at the corner of the map</option>
+    <correct_option>C</correct_option>
+  </question>
+  <question index="4" type="mcq">
+    <difficulty>easy</difficulty>
+    <stem>What does the vertical axis on a grid reference map represent?</stem>
+    <option key="A">The easting or horizontal distance</option>
+    <option key="B">The northing or vertical distance</option>
+    <option key="C">The scale of the map</option>
+    <option key="D">The longitude lines</option>
+    <correct_option>B</correct_option>
+  </question>
+  <question index="5" type="mcq">
+    <difficulty>easy</difficulty>
+    <stem>A location is described as being in grid square 35. What does this two-figure reference tell you?</stem>
+    <option key="A">The exact point location at coordinates 3 and 5</option>
+    <option key="B">The general square on the map bounded by specific grid lines</option>
+    <option key="C">The distance in kilometres from the map's centre</option>
+    <option key="D">The position relative to the compass bearing</option>
+    <correct_option>B</correct_option>
+  </question>
   <question index="6" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
-    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
-    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
-    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
-    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
+    <difficulty>medium</difficulty>
+    <stem>You are given the four-figure grid reference 4156. What is the correct sequence for locating this point on a map?</stem>
+    <option key="A">Find easting 41, then find northing 56</option>
+    <option key="B">Find northing 41, then find easting 56</option>
+    <option key="C">Find northing 56, then find easting 41</option>
+    <option key="D">Look up the reference in the map legend</option>
     <correct_option>A</correct_option>
   </question>
 </question_pool>
@@ -200,10 +200,10 @@ tutoring under these instructions.
 ============================== BLOCK BOUNDARY ==============================
 
 <recent_turns>
-  <turn role="student">C</turn>
-  <turn role="tutor" graded="correct">Well done — you correctly identified that the student reversed the order of easting and northing. In a four-figure grid reference, the first two digits are the easting (east-west), and the last two are the northing (north-south).  
+  <turn role="student">B</turn>
+  <turn role="tutor" graded="correct">Well done — in a four-figure grid reference, the first two digits always show the easting.  
 
-Next, let’s practice reading a grid reference: which of the following has an easting of 52?</turn>
+Next, let’s look at another one: *In the four-figure grid reference 5623, which digits represent the northing value?*</turn>
 </recent_turns>
 
 <in_flight_question>

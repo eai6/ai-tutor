@@ -594,12 +594,15 @@ class ServerPicksTheModeTest(SimpleTestCase):
         """
         graded = self._mode(self.SLOT, 'answer', self.FAILED)
         self.assertIn('## This turn: GRADE (remediation)', graded)
-        self.assertIn('Do not call `pose_question`', graded)
-        self.assertNotIn('call `pose_question` for the next question', graded)
+        # 2026-08-06: remediation poses like tutoring again. The server-pose
+        # backstop stays, but it only fires when the model did not — so the
+        # instruction is now "pose", stated once, with nothing arguing back.
+        self.assertIn('pose_question', graded)
+        self.assertNotIn('Do not call `pose_question`', graded)
 
         teaching = self._mode(None, 'answer', self.FAILED)
         self.assertIn('## This turn: TEACH (remediation)', teaching)
-        self.assertIn('Do not call `pose_question`', teaching)
+        self.assertIn('pose_question', teaching)
 
     def test_remediation_never_points_at_a_step_that_is_not_rendered(self):
         """Remediation runs past the last step, so <current_step> and

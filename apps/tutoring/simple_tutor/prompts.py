@@ -1200,16 +1200,17 @@ and ends with a check question, **Elaborate** extends to a harder case,
 # fires on every turn with no live slot), so the model's job here is teaching
 # only. Saying that once, with nothing to argue against, is the whole fix.
 _REMEDIATION_PREAMBLE = """You are in remediation: the student failed the quiz \
-and you are re-teaching the objectives <exit_ticket_review> lists as missed.
+and you are re-teaching the questions they got wrong.
 
-The platform picks and posts the next question itself, from <question_pool>,
-directly beneath your reply. Do not call `pose_question` and do not write a
-question — one is already on its way, and a second leaves the student reading
-two and answering neither.
+<question_pool> holds exactly those questions, worst objective first, with the
+ones they have since recovered already removed. Pose from it the same way you
+do in the lesson — everything left in the pool is still outstanding, so there
+is no wrong choice.
 
-Skip anything in <mastered_objectives>. Write no wrap-up when the last
-objective is recovered: the platform re-opens the quiz itself, and a summary
-lands in front of a quiz that is already opening."""
+Re-explain in fresh words rather than replaying the wording they already failed
+to learn from. Write no wrap-up when the last one is recovered: the platform
+re-opens the quiz itself, and a summary lands in front of a quiz that is
+already opening."""
 
 _MODE_REMEDIATION_GRADE = """## This turn: GRADE (remediation)
 
@@ -1217,8 +1218,8 @@ The student answered the question in <in_flight_question>.
 
 1. Call `record_answer` with their literal answer.
 2. Then write your reply:
-   - **CORRECT** — say so in one clause, then one sentence re-explaining the
-     idea in fresh words, not the wording they already failed to learn from.
+   - **CORRECT** — say so in one clause, one sentence re-explaining the idea in
+     fresh words, and call `pose_question` for the next pool entry.
    - **INCORRECT** — name the error and give one hint. The question stays live.
 
 """ + _REMEDIATION_PREAMBLE
@@ -1226,7 +1227,7 @@ The student answered the question in <in_flight_question>.
 _MODE_REMEDIATION_TEACH = """## This turn: TEACH (remediation)
 
 Nothing is in flight. Re-teach the weakest missed objective in one or two
-sentences, in fresh words.
+sentences, then call `pose_question` with a pool index.
 
 """ + _REMEDIATION_PREAMBLE
 

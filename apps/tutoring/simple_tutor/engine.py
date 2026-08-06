@@ -155,7 +155,12 @@ def _should_force_pose(family: str | None, mode: str, student_intent: str | None
     """
     if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
         return False
-    if mode != 'POSE':
+    # 'REMEDIATION' is the same shape as 'POSE' — nothing in flight, a pool to
+    # pose from — and it was excluded only because the gate was written before
+    # remediation had a pool at all. Excluding it is why a remediation turn
+    # could end with a question narrated in prose and no gradable slot, leaving
+    # the student a text box on an MCQ-only build.
+    if mode not in ('POSE', 'REMEDIATION'):
         return False
     return (student_intent or '') not in _NON_POSING_INTENTS
 

@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 119, lesson 1427, step 5
+# DYNAMIC BLOCK (Block 2) — session 130, lesson 1427, step 5
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,161 chars   (whole prompt: 7,380)
+  1,161 chars   (whole prompt: 10,054)
 ==============================================================================
 
 <message_intent>
@@ -39,20 +39,20 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — first attempt
-  2,253 chars   (whole prompt: 8,472)
+  1,929 chars   (whole prompt: 10,822)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>1</attempt_count>
-  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
+  <attempt_count>0</attempt_count>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
-    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
-    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
-    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
   <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
@@ -90,7 +90,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — second attempt (hint ladder rung 1)
-  2,253 chars   (whole prompt: 8,472)
+  1,929 chars   (whole prompt: 10,822)
 ==============================================================================
 
 <in_flight_question>
@@ -98,12 +98,12 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
   <attempt_count>1</attempt_count>
-  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
-    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
-    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
-    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
   <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
@@ -141,20 +141,20 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   CONVERSATIONAL — student asked something instead
-  2,139 chars   (whole prompt: 8,358)
+  1,815 chars   (whole prompt: 10,708)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>1</attempt_count>
-  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
+  <attempt_count>0</attempt_count>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
-    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
-    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
-    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
   <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
@@ -188,7 +188,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  3,124 chars   (whole prompt: 9,343)
+  2,817 chars   (whole prompt: 11,710)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -212,13 +212,13 @@ A reply that runs past 3 sentences is too long, however good it is.
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>1</attempt_count>
-  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
+  <attempt_count>0</attempt_count>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
-    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
-    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
-    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
   <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
@@ -238,20 +238,21 @@ The student answered the question in <in_flight_question>.
 
 1. Call `record_answer` with their literal answer.
 2. Then write your reply:
-   - **CORRECT** — say so in one clause, then one sentence re-explaining the
-     idea in fresh words, not the wording they already failed to learn from.
+   - **CORRECT** — say so in one clause, one sentence re-explaining the idea in
+     fresh words, and call `pose_question` for the next pool entry.
    - **INCORRECT** — name the error and give one hint. The question stays live.
 
-You are in remediation: the student failed the quiz and you are re-teaching the objectives <exit_ticket_review> lists as missed.
+You are in remediation: the student failed the quiz and you are re-teaching the questions they got wrong.
 
-The platform picks and posts the next question itself, from <question_pool>,
-directly beneath your reply. Do not call `pose_question` and do not write a
-question — one is already on its way, and a second leaves the student reading
-two and answering neither.
+<question_pool> holds exactly those questions, worst objective first, with the
+ones they have since recovered already removed. Pose from it the same way you
+do in the lesson — everything left in the pool is still outstanding, so there
+is no wrong choice.
 
-Skip anything in <mastered_objectives>. Write no wrap-up when the last
-objective is recovered: the platform re-opens the quiz itself, and a summary
-lands in front of a quiz that is already opening.
+Re-explain in fresh words rather than replaying the wording they already failed
+to learn from. Write no wrap-up when the last one is recovered: the platform
+re-opens the quiz itself, and a summary lands in front of a quiz that is
+already opening.
 
 <reply_length>
 Write ONE or TWO sentences. Three is the absolute maximum.
@@ -263,7 +264,7 @@ Do not add a third unless it is genuinely needed, and never add a question — t
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  1,839 chars   (whole prompt: 8,058)
+  1,891 chars   (whole prompt: 10,784)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -291,18 +292,19 @@ Do not add a third unless it is genuinely needed, and never add a question — t
 ## This turn: TEACH (remediation)
 
 Nothing is in flight. Re-teach the weakest missed objective in one or two
-sentences, in fresh words.
+sentences, then call `pose_question` with a pool index.
 
-You are in remediation: the student failed the quiz and you are re-teaching the objectives <exit_ticket_review> lists as missed.
+You are in remediation: the student failed the quiz and you are re-teaching the questions they got wrong.
 
-The platform picks and posts the next question itself, from <question_pool>,
-directly beneath your reply. Do not call `pose_question` and do not write a
-question — one is already on its way, and a second leaves the student reading
-two and answering neither.
+<question_pool> holds exactly those questions, worst objective first, with the
+ones they have since recovered already removed. Pose from it the same way you
+do in the lesson — everything left in the pool is still outstanding, so there
+is no wrong choice.
 
-Skip anything in <mastered_objectives>. Write no wrap-up when the last
-objective is recovered: the platform re-opens the quiz itself, and a summary
-lands in front of a quiz that is already opening.
+Re-explain in fresh words rather than replaying the wording they already failed
+to learn from. Write no wrap-up when the last one is recovered: the platform
+re-opens the quiz itself, and a summary lands in front of a quiz that is
+already opening.
 
 <reply_length>
 Write ONE or TWO sentences. Three is the absolute maximum.
