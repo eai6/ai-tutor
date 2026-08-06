@@ -1522,20 +1522,35 @@ def _filter_reveals(
     out = _ANSWER_PAREN_RE.sub('', text_reply)
     is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
 
-    _VERBATIM_RUN_MIN_WORDS = 4
+    _VERBATIM_RUN_MIN_WORDS = 5
 
     def _verbatim_run_pattern(value: str) -> str:
-        """Match the option's own wording quoted at length, however introduced.
+        """Match any long verbatim run of the option's wording, however phrased.
 
-        Returns '' for options under _VERBATIM_RUN_MIN_WORDS words, where a
-        chance overlap is likely and the assertion patterns are the right tool.
-        Whitespace is made flexible so a line break or double space inside the
-        quoted run does not defeat the match.
+        Matching the option's FULL text was too strict: a tutor rarely quotes a
+        whole option, it quotes the distinctive middle. Device session 23,
+        lesson 1427 — option B was "The general square on the map bounded by
+        specific grid lines" and the reply said "...tells you which general
+        square on the map it's in", so a full-text pattern found nothing and
+        the answer went to the student.
+
+        So: every window of _VERBATIM_RUN_MIN_WORDS consecutive option words is
+        an alternative. Five keeps the window distinctive enough that a chance
+        overlap is unlikely, and options shorter than that fall back to the
+        assertion patterns — which is what lets a Socratic "Is the northing 23
+        or 56?" through untouched.
+
+        Whitespace is flexible so a line break inside the run still matches.
         """
         words = re.findall(r"[\w'-]+", value or '')
-        if len(words) < _VERBATIM_RUN_MIN_WORDS:
+        n = _VERBATIM_RUN_MIN_WORDS
+        if len(words) < n:
             return ''
-        return r'\b' + r'\W+'.join(re.escape(w) for w in words) + r'\b'
+        windows = [
+            r'\b' + r'\W+'.join(re.escape(w) for w in words[i:i + n]) + r'\b'
+            for i in range(len(words) - n + 1)
+        ]
+        return '|'.join(windows)
 
     def _value_pattern(value: str) -> str:
         v = re.escape(value)

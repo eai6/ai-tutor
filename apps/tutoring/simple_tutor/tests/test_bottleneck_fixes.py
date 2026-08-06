@@ -1640,6 +1640,27 @@ class VerbatimOptionRunLeakTest(DjangoTestCase):
         text = 'Not quite. Is the northing 23 or 56 — which pair comes second?'
         self.assertEqual(_filter_reveals(session, text, self._wrong()), text)
 
+    def test_partial_quote_of_a_long_option_is_redacted(self):
+        """A tutor quotes the distinctive middle of an option, not the whole
+        thing. Device session 23, lesson 1427: option B was "The general square
+        on the map bounded by specific grid lines" and the reply said "...tells
+        you which general square on the map it's in". A full-text pattern found
+        nothing and the answer reached the student.
+        """
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session, reference='B', options=[
+            'The exact point location at coordinates 3 and 5',
+            'The general square on the map bounded by specific grid lines',
+            "The distance in kilometres from the map's centre",
+            'The position relative to the compass bearing',
+        ])
+        text = ("A location in grid square 35 tells you which general square "
+                "on the map it's in.\nWhich option says that?")
+        out = _filter_reveals(session, text, self._wrong())
+        self.assertNotIn('general square on the map', out)
+        self.assertIn('Which option says that?', out)
+
     def test_correct_verdict_may_still_state_the_option(self):
         from apps.tutoring.simple_tutor.engine import _filter_reveals
         session, _ = _make_session()
