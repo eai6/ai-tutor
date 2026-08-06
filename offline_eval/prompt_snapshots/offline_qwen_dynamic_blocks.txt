@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 133, lesson 1427, step 0
+# DYNAMIC BLOCK (Block 2) — session 134, lesson 1427, step 5
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,161 chars   (whole prompt: 10,980)
+  1,161 chars   (whole prompt: 10,114)
 ==============================================================================
 
 <message_intent>
@@ -39,22 +39,22 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — answering the live question
-  1,941 chars   (whole prompt: 11,760)
+  1,940 chars   (whole prompt: 10,893)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>2</catalog_question_id>
+  <catalog_question_id>1</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
+  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
   <options>
-    <option key="A">56</option>
-    <option key="B">5 and 2</option>
-    <option key="C">23</option>
-    <option key="D">6 and 3</option>
+    <option key="A">47</option>
+    <option key="B">39</option>
+    <option key="C">3 and 9</option>
+    <option key="D">4 and 7</option>
   </options>
-  <reference_answer>C</reference_answer>
+  <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -90,22 +90,22 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   CONVERSATIONAL — student asked something instead
-  1,827 chars   (whole prompt: 11,646)
+  1,826 chars   (whole prompt: 10,779)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>2</catalog_question_id>
+  <catalog_question_id>1</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
+  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
   <options>
-    <option key="A">56</option>
-    <option key="B">5 and 2</option>
-    <option key="C">23</option>
-    <option key="D">6 and 3</option>
+    <option key="A">47</option>
+    <option key="B">39</option>
+    <option key="C">3 and 9</option>
+    <option key="D">4 and 7</option>
   </options>
-  <reference_answer>C</reference_answer>
+  <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -137,7 +137,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  2,829 chars   (whole prompt: 12,648)
+  2,828 chars   (whole prompt: 11,781)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -160,16 +160,16 @@ A reply that runs past 3 sentences is too long, however good it is.
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>2</catalog_question_id>
+  <catalog_question_id>1</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
+  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
   <options>
-    <option key="A">56</option>
-    <option key="B">5 and 2</option>
-    <option key="C">23</option>
-    <option key="D">6 and 3</option>
+    <option key="A">47</option>
+    <option key="B">39</option>
+    <option key="C">3 and 9</option>
+    <option key="D">4 and 7</option>
   </options>
-  <reference_answer>C</reference_answer>
+  <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -213,7 +213,7 @@ Do not add a third unless it is genuinely needed, and never add a question — t
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  1,891 chars   (whole prompt: 11,710)
+  1,891 chars   (whole prompt: 10,844)
 ==============================================================================
 
 <remediation_mode active="true"/>

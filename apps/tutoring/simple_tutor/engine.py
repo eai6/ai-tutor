@@ -405,6 +405,14 @@ def respond(
     # REMEDIATION mode — its job is to re-teach the failed enabling
     # objectives surfaced in the attempt's per-question results.
     from apps.tutoring.models import InFlightQuestion
+    # Remediation always has a question outstanding — the pool holds exactly
+    # the unrecovered ones and the mode ends when that set empties. Enforce it
+    # BEFORE the mode is resolved, not just after the turn: the backstop poses
+    # at the end, so a turn could still start with nothing in flight and get
+    # the TEACH-remediation shape, which on an MCQ-only build hands the student
+    # a typing box and grades nothing.
+    from apps.tutoring.simple_tutor.exit_ticket import ensure_remediation_question
+    ensure_remediation_question(session)
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
     question_pool = build_question_pool(session)

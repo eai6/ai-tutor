@@ -368,6 +368,68 @@ def _try_number(s) -> float | None:
         return None
 
 
+def ensure_remediation_question(session) -> bool:
+    """Guarantee a live question whenever remediation is running.
+
+    Remediation always has one outstanding: the pool holds exactly the missed
+    questions not yet recovered, and the mode ends the moment that set empties.
+    So a remediation turn with nothing in flight is an invariant violation, not
+    a state to write instructions for.
+
+    It was reachable because the backstop poses at the END of a turn — a turn
+    could still START without a slot if a pose failed, or on resume. Then the
+    tutor got the TEACH-remediation shape, the student got a typing box on an
+    MCQ-only build, and nothing graded what they sent.
+
+    Returns True if it posed one. Cheap when a slot already exists: one
+    existence check.
+    """
+    from apps.tutoring.models import InFlightQuestion
+
+    try:
+        if InFlightQuestion.objects.filter(session=session).exists():
+            return False
+        return bool(_pose_next_remediation_slot(session))
+    except Exception:  # noqa: BLE001 — never break the turn
+        logger.warning(
+            "[simple_tutor] ensure_remediation_question failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return False
+
+
+def _pose_next_remediation_slot(session):
+    """Pose the next remediation question, or None. Assumes no live slot.
+
+    Shared by ensure_remediation_question (start of turn, silent) and
+    maybe_pose_remediation_next (end of turn, returns text to append), so the
+    two can never disagree about which question is next.
+    """
+    from apps.tutoring.simple_tutor.tools import (
+        build_question_pool, handle_pose_question_by_index,
+    )
+
+    es = getattr(session, 'engine_state', None) or {}
+    if isinstance(es, dict) and es.get('remediation_complete'):
+        return None
+    from apps.tutoring.simple_tutor.engine import _build_exit_ticket_review
+    review = _build_exit_ticket_review(session)
+    if not review or review.get('passed') or not review.get('missed_objectives'):
+        return None
+
+    pool = build_question_pool(session)
+    if not pool:
+        return None
+    chosen = pool[0]
+    result = handle_pose_question_by_index(
+        session, question_index=1, question_pool=[chosen])
+    if not result.get('posed'):
+        logger.warning(
+            "[simple_tutor] remediation pose failed session=%s: %s",
+            session.pk, result.get('error'))
+        return None
+    return chosen
+
+
 def maybe_pose_remediation_next(session) -> str:
     """Pose the next remediation question server-side, or '' if not needed.
 
@@ -392,31 +454,12 @@ def maybe_pose_remediation_next(session) -> str:
     question is already in flight, remediation is over, or the pool is dry.
     """
     from apps.tutoring.models import InFlightQuestion
-    from apps.tutoring.simple_tutor.tools import (
-        build_question_pool, handle_pose_question_by_index,
-    )
 
     try:
-        es = getattr(session, 'engine_state', None) or {}
-        if isinstance(es, dict) and es.get('remediation_complete'):
-            return ''
         if InFlightQuestion.objects.filter(session=session).exists():
             return ''      # the model posed one itself — leave it alone
-        from apps.tutoring.simple_tutor.engine import _build_exit_ticket_review
-        review = _build_exit_ticket_review(session)
-        if not review or review.get('passed') or not review.get('missed_objectives'):
-            return ''
-
-        pool = build_question_pool(session)
-        if not pool:
-            return ''
-        chosen = pool[0]
-        result = handle_pose_question_by_index(
-            session, question_index=1, question_pool=[chosen])
-        if not result.get('posed'):
-            logger.warning(
-                "[simple_tutor] remediation follow-up could not pose "
-                "session=%s: %s", session.pk, result.get('error'))
+        chosen = _pose_next_remediation_slot(session)
+        if chosen is None:
             return ''
 
         lines = [(chosen.question_text or '').strip()]
