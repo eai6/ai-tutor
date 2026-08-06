@@ -22,6 +22,7 @@ The block only helps if it appears exactly when the buttons do, which is why
 """
 from __future__ import annotations
 
+import pathlib
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
@@ -331,31 +332,64 @@ class EveryPayloadBuilderCarriesAnswerChoicesTest(SimpleTestCase):
     MARKER_KEY = 'message'
     REQUIRED_KEY = 'answer_choices'
 
-    # Documented exemptions, if a payload ever legitimately cannot carry it.
-    # Empty on purpose — add here with a reason, never by loosening MARKER_KEY.
-    EXEMPT: set = set()
+    # Documented exemptions. Add here WITH A REASON, never by loosening
+    # MARKER_KEY — that would silently shrink this check to nothing.
+    EXEMPT: set = {
+        # Its own page with its own submit-and-redirect flow, not a chat turn.
+        # The payload's 'message' goes into a results panel; the chat picker is
+        # not on screen and there is nothing for answer_choices to control.
+        'lesson_pretest',
+    }
+
+    # Line-level exemptions for non-turn responses inside a covered function.
+    # Same rule: a reason, or it does not go in here.
+    EXEMPT_LINES: set = {
+        # views.py chat_start_session: a 400 {"error": "prerequisite_not_met"}.
+        # The frontend surfaces it as an error, never as a tutor turn, so there
+        # is no picker in play.
+        'prerequisite_not_met',
+    }
 
     def _builders(self):
-        """[(file, line, func, keys)] for every payload-shaped return."""
-        import ast
-        import pathlib
+        """[(file, line, func, keys)] for every payload-shaped return.
 
-        pkg = pathlib.Path(__file__).resolve().parent.parent
+        Covers two shapes, because the bug that motivated the second one was
+        invisible to the first: a bare ``return {...}`` in the engine, and a
+        ``return JsonResponse({...})`` in the view. The view hand-listed four
+        keys and dropped answer_choices on the way to the browser, so the
+        engine was correct and the student still got no buttons.
+        """
+        import ast
+
+        import apps.tutoring.simple_tutor as _pkg
+
+        pkg = pathlib.Path(_pkg.__file__).resolve().parent
+        paths = sorted(pkg.glob('*.py')) + [pkg.parent / 'views.py']
         found = []
-        for path in sorted(pkg.glob('*.py')):
+        for path in paths:
+            if not path.exists():
+                continue
             tree = ast.parse(path.read_text(), filename=str(path))
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
                 for sub in ast.walk(node):
-                    if not (isinstance(sub, ast.Return)
-                            and isinstance(sub.value, ast.Dict)):
+                    if not isinstance(sub, ast.Return):
+                        continue
+                    value = sub.value
+                    # Unwrap JsonResponse({...}) / Response({...}).
+                    if (isinstance(value, ast.Call) and value.args
+                            and isinstance(value.args[0], ast.Dict)):
+                        value = value.args[0]
+                    if not isinstance(value, ast.Dict):
                         continue
                     keys = {
-                        k.value for k in sub.value.keys
+                        k.value for k in value.keys
                         if isinstance(k, ast.Constant)
                         and isinstance(k.value, str)
                     }
+                    if 'error' in keys and keys & {'unmet_prerequisites'}:
+                        continue          # see EXEMPT_LINES
                     if self.MARKER_KEY in keys:
                         found.append((path.name, sub.lineno, node.name, keys))
         return found

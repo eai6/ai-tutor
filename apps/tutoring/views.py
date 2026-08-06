@@ -801,6 +801,7 @@ def chat_start_session(request, lesson_id):
             "show_exit_ticket": response.show_exit_ticket,
             "exit_ticket": response.exit_ticket_data,
             "is_complete": response.is_complete,
+            "answer_choices": None,   # legacy engine — no letter picker
             "step_number": response.step_number,
             "total_steps": response.total_steps,
             "history": history,
@@ -829,6 +830,7 @@ def chat_start_session(request, lesson_id):
             "exit_ticket": None,
             "is_complete": True,
             "review_available": True,
+            "answer_choices": None,   # lesson done — nothing to answer
             "history": history,
         })
 
@@ -936,6 +938,7 @@ def chat_start_session(request, lesson_id):
             "show_exit_ticket": response.show_exit_ticket,
             "exit_ticket": response.exit_ticket_data,
             "is_complete": response.is_complete,
+            "answer_choices": None,   # legacy engine — no letter picker
             "step_number": response.step_number,
             "total_steps": response.total_steps,
             # Same artifact-panel payload the resume path returns
@@ -1033,6 +1036,7 @@ def chat_respond(request, session_id):
                 "phase": "suspended",
                 "is_complete": True,
                 "suspended": True,
+                "answer_choices": None,   # session over — clear the picker
             })
     except Exception:
         pass
@@ -1043,6 +1047,7 @@ def chat_respond(request, session_id):
             "message": "This lesson is already complete! Great work!",
             "phase": "completed",
             "is_complete": True,
+            "answer_choices": None,   # lesson done — nothing to answer
         })
 
     # Rate limiting (non-streaming)
@@ -1176,8 +1181,12 @@ def chat_respond(request, session_id):
                 "exit_ticket": None,
                 "is_complete": True,
                 "suspended": True,
+                "answer_choices": None,   # session over — clear the picker
             })
 
+        from apps.tutoring.simple_tutor.engine import (
+            _answer_choices_payload as _ac,
+        )
         return JsonResponse({
             "message": safe_response,
             "phase": "safety",
@@ -1185,6 +1194,9 @@ def chat_respond(request, session_id):
             "show_exit_ticket": False,
             "exit_ticket": None,
             "is_complete": False,
+            # The session continues and the question is still live. A canned
+            # safety reply must not take the student's answer buttons away.
+            "answer_choices": _ac(session),
         })
 
     # PII redaction stays as a separate deterministic regex pass —
@@ -1271,6 +1283,7 @@ def chat_start_review(request, session_id):
         "show_exit_ticket": False,
         "exit_ticket": None,
         "is_complete": False,
+        "answer_choices": None,   # legacy engine — no letter picker
         "step_number": result.step_number,
         "total_steps": result.total_steps,
         "artifact_html": getattr(result, 'artifact_html', None),
@@ -1639,12 +1652,18 @@ def chat_exit_ticket(request, session_id):
             enriched_exit_ticket = dict(et_data)
             enriched_exit_ticket['competency'] = competency
 
-            return JsonResponse({
-                'message': simple_resp.get('message', ''),
-                'phase': simple_resp.get('phase', 'exit_ticket'),
-                'exit_ticket': enriched_exit_ticket,
-                'is_complete': simple_resp.get('is_complete', False),
-            })
+            # Pass the engine's payload through and enrich, rather than
+            # re-listing keys by hand. The hand-written version named four
+            # keys, so 'answer_choices' — added to submit_exit_ticket for the
+            # offline letter picker — was silently dropped on the way to the
+            # browser, and remediation posed an MCQ with no buttons under it.
+            # Any key the engine adds now reaches the client without a second
+            # edit here, which is the only way this stays correct.
+            payload = dict(simple_resp)
+            payload['exit_ticket'] = enriched_exit_ticket
+            payload.setdefault('phase', 'exit_ticket')
+            payload.setdefault('is_complete', False)
+            return JsonResponse(payload)
 
         from apps.tutoring.conversational_tutor import ConversationalTutor
         tutor = ConversationalTutor(session)
@@ -1683,6 +1702,7 @@ def chat_exit_ticket(request, session_id):
             "phase": response.phase,
             "exit_ticket": enriched_exit_ticket,
             "is_complete": response.is_complete,
+            "answer_choices": None,   # legacy engine — no letter picker
         })
     except Exception as e:
         import traceback
@@ -1693,6 +1713,7 @@ def chat_exit_ticket(request, session_id):
             "phase": "completed",
             "exit_ticket": {"results": [], "score": 0, "passed": False},
             "is_complete": True,
+            "answer_choices": None,   # scoring failed — do not leave buttons up
         })
 
 
