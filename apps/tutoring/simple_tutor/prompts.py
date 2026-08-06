@@ -1261,6 +1261,12 @@ def _render_active_mode(
     return _MODE_GRADE
 
 
+# Two hints, then pivot. Must match the Block-0 ladder's "2+" rung: this block
+# renders at the point of decision, so a higher threshold here means the slot
+# says nothing on the exact turn the ladder calls for a pivot.
+_PIVOT_AFTER_ATTEMPTS = 2
+
+
 def _render_in_flight_block(
     in_flight_question, answer_mode: str = ANSWER_MODE_FREE_TEXT,
 ) -> str:
@@ -1316,16 +1322,23 @@ def _render_in_flight_block(
     # the bug is silent and looks exactly like session 30 — so they share it.
     if answer_mode == ANSWER_MODE_PICKER and qtype == 'mcq' and options:
         parts.append(_ANSWER_SURFACE_PICKER)
-    if attempts >= 3:
+    if attempts >= _PIVOT_AFTER_ATTEMPTS:
         # Cycle-8: without this, sessions ground 15+ turns re-scaffolding
         # one hard question against a disengaged student. The anti-desync
         # guard already permits replacing a question after a wrong attempt.
+        #
+        # Threshold was 3, while the hint ladder in Block 0 says rung "2+ —
+        # pivot". So the block that fires at the point of decision stayed
+        # silent on the exact turn the ladder called for a pivot, and only
+        # spoke up a turn later. Device transcript: three wrong answers on one
+        # question, no pivot. Two hints then pivot means this fires at 2.
         parts.append(
             '  <pivot_guidance>This question has had '
-            f'{attempts} unsuccessful attempts. Stop re-explaining it. '
-            'Pivot now: call pose_question with a strictly simpler '
-            'question on the same skill (it replaces this one), or '
-            'continue to the next piece of content.</pivot_guidance>'
+            f'{attempts} wrong attempts — two hints have not worked, so a '
+            'third will not either. Pivot NOW, this turn: call pose_question '
+            'with a lower-<difficulty> entry from <question_pool> on the same '
+            'objective. That call replaces this question. Do not write another '
+            'hint.</pivot_guidance>'
         )
     parts.append("</in_flight_question>")
     return "\n".join(parts)
