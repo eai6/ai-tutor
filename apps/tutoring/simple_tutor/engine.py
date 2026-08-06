@@ -2951,6 +2951,7 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
         'pending_question': None,
         'follow_up_message': None,
         'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
     }
 
 
@@ -3242,6 +3243,18 @@ def _build_resume_message(slot, locale: str = 'en-us') -> str:
     return "\n".join(p for p in parts if p is not None).strip()
 
 
+def _remediation_progress_payload(session) -> dict | None:
+    """``{'recovered': n, 'total': m}`` so the header can show where the
+    student is inside remediation. None outside it — the chip is left alone.
+    """
+    try:
+        from apps.tutoring.simple_tutor.tools import remediation_progress
+        return remediation_progress(session)
+    except Exception:                              # noqa: BLE001
+        logger.warning("remediation progress failed", exc_info=True)
+        return None
+
+
 def _uses_answer_picker(session, slot, cfg=None) -> bool:
     """True when the A-D buttons are the student's ONLY way to answer ``slot``.
 
@@ -3415,6 +3428,7 @@ def _project_start_payload(session, message: str) -> dict:
         'pending_question': None,
         'follow_up_message': None,
         'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
     }
 
 

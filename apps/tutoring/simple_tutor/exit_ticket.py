@@ -311,13 +311,16 @@ def submit_exit_ticket(session, answers: list) -> dict:
     # villages while the picker still offered "Locate northing 29 and mark
     # where the lines intersect" from the pre-quiz question. The slot was
     # correct the whole time; nothing told the frontend to repaint it.
-    from apps.tutoring.simple_tutor.engine import _answer_choices_payload
+    from apps.tutoring.simple_tutor.engine import (
+        _answer_choices_payload, _remediation_progress_payload,
+    )
 
     return {
         'message': message,
         'phase': 'exit_ticket',
         'is_complete': passed,
         'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
         'exit_ticket': {
             'results': results_list,
             'score': correct_count,

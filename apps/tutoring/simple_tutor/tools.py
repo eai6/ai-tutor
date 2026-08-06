@@ -1330,6 +1330,98 @@ def handle_request_figure(
     }
 
 
+def remediation_progress(session: 'TutorSession') -> dict | None:
+    """``{'recovered': int, 'total': int}`` while remediation is running.
+
+    The same objective sets maybe_complete_remediation compares, exposed so the
+    student can see where they are. During remediation the header's step chip
+    is deliberately blanked — there is no lesson step to count — so a student
+    working through six missed objectives had no idea whether they were near
+    the end or nowhere near it.
+
+    None when nothing is in remediation, so the caller can leave the chip alone.
+    """
+    try:
+        missed, covered = _remediation_objective_sets(session)
+        if missed is None:
+            return None
+        return {'recovered': len(missed & covered), 'total': len(missed)}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _remediation_objective_sets(session) -> tuple[set | None, set]:
+    """(missed, covered) enabling objectives for the latest failed attempt.
+
+    ``missed`` is None when there is nothing to remediate — no completed
+    attempt, a passed one, or a fail with no individually-incomplete objective.
+    """
+    from apps.tutoring.models import (
+        ExitTicketAttempt, ExitTicketQuestion, SessionTurn,
+    )
+
+    attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    if attempt is None or attempt.passed:
+        return None, set()
+
+    eo_competency = (attempt.answers or {}).get('eo_competency') or {}
+    missed = set()
+    for eo, bucket in eo_competency.items():
+        if not eo or not isinstance(bucket, dict):
+            continue
+        asked = int(bucket.get('asked') or 0)
+        correct = int(bucket.get('correct') or 0)
+        if asked > 0 and correct < asked:
+            missed.add(eo)
+    if not missed:
+        return None, set()
+
+    # Map every bank question in this lesson to its objective, keyed on
+    # normalised stem. This is how a remediation turn's objective is recovered:
+    # SessionTurn.step is NULL for all of them.
+    #
+    # The original criterion read turn.step.enabling_objective, which is
+    # populated on lesson turns and NEVER on remediation ones — remediation
+    # runs past the last step, so there is no step to attach. `covered` stayed
+    # empty on every session and the exit ticket could not come back at all.
+    # Device session 123: six missed objectives, a correct answer recorded,
+    # covered=set().
+    stem_to_objective = {
+        _norm_q(q.question_text or ''): (q.enabling_objective or '').strip()
+        for q in ExitTicketQuestion.objects.filter(
+            exit_ticket__lesson=session.lesson)
+        if (q.question_text or '').strip()
+        and (q.enabling_objective or '').strip()
+    }
+
+    covered = set()
+    turns = (
+        SessionTurn.objects
+        .filter(session=session, role='tutor',
+                created_at__gt=attempt.completed_at)
+        .exclude(judge_outputs={})
+        .select_related('step')
+    )
+    for turn in turns:
+        grader = (turn.judge_outputs or {}).get('grader') or {}
+        if grader.get('verdict') != 'correct':
+            continue
+        # The graded question first — it is what the student actually answered
+        # and the only signal present in remediation. The step FK stays as a
+        # fallback for lesson turns.
+        eo = stem_to_objective.get(_norm_q(grader.get('question_text') or ''))
+        if not eo:
+            eo = (getattr(turn.step, 'enabling_objective', '') or '').strip()
+        if eo:
+            covered.add(eo)
+    return missed, covered
+
+
 def maybe_complete_remediation(session: 'TutorSession') -> bool:
     """Set ``engine_state['remediation_complete']`` once the student has
     recovered every objective they failed on their last exit-ticket attempt.
@@ -1353,59 +1445,16 @@ def maybe_complete_remediation(session: 'TutorSession') -> bool:
     Returns True when it flipped the flag this call. Never raises — a failure
     here must not break the turn.
     """
-    from apps.tutoring.models import ExitTicketAttempt, SessionTurn
-
     try:
-        attempt = (
-            ExitTicketAttempt.objects
-            .filter(session=session, completed_at__isnull=False)
-            .order_by('-completed_at')
-            .first()
-        )
-        # Nothing submitted, or they already passed → no remediation to finish.
-        if attempt is None or attempt.passed:
-            return False
-
         es = getattr(session, 'engine_state', None) or {}
         if not isinstance(es, dict):
             es = {}
         if es.get('remediation_complete'):
             return False        # already signalled; consumer clears it
 
-        # Same source of truth _build_exit_ticket_review groups on. Read it
-        # directly rather than importing from engine.py — tools.py is imported
-        # BY engine.py, and this keeps the dependency one-way.
-        eo_competency = (attempt.answers or {}).get('eo_competency') or {}
-        missed = set()
-        for eo, bucket in eo_competency.items():
-            if not eo or not isinstance(bucket, dict):
-                continue
-            asked = int(bucket.get('asked') or 0)
-            correct = int(bucket.get('correct') or 0)
-            if asked > 0 and correct < asked:
-                missed.add(eo)
-        if not missed:
-            # Failed on score but no objective is individually incomplete —
-            # nothing for remediation to target, so don't gate the retake on it.
+        missed, covered = _remediation_objective_sets(session)
+        if missed is None:
             return False
-
-        covered = set()
-        turns = (
-            SessionTurn.objects
-            .filter(
-                session=session, role='tutor',
-                created_at__gt=attempt.completed_at,
-            )
-            .exclude(judge_outputs={})
-            .select_related('step')
-        )
-        for turn in turns:
-            grader = (turn.judge_outputs or {}).get('grader') or {}
-            if grader.get('verdict') != 'correct':
-                continue
-            eo = (getattr(turn.step, 'enabling_objective', '') or '').strip()
-            if eo:
-                covered.add(eo)
 
         if not missed.issubset(covered):
             logger.info(

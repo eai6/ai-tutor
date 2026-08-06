@@ -1549,6 +1549,17 @@ function phaseLabel(phase) {
 }
 
 function updateStepProgress(data) {
+    // Remediation first: there is no lesson step to count, so the chip used to
+    // be blanked — and a student working through six missed objectives had no
+    // idea whether they were one away from the retake or nowhere near it.
+    // The server counts recovered objectives (tools.remediation_progress), the
+    // same set that decides when the quiz re-opens, so the number the student
+    // reads is the one that actually gates them.
+    const rp = data.remediation_progress;
+    if (rp && rp.total) {
+        stepProgress.textContent = rp.recovered + '/' + rp.total;
+        return;
+    }
     if (data.step_number && data.total_steps) {
         if (data.phase === 'exit_ticket' || data.phase === 'completed' || data.phase === 'remediation') {
             stepProgress.textContent = '';

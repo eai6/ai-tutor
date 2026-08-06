@@ -142,6 +142,7 @@ class RespondForViewTest(DjangoTestCase):
             # and whenever no MCQ is live, so the frontend renders nothing and
             # typing is unchanged where it works.
             'answer_choices',
+            'remediation_progress',
         }
         self.assertEqual(set(payload.keys()), expected_keys)
         self.assertEqual(payload['message'], 'Hello, student.')
