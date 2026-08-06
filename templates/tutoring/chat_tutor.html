@@ -141,15 +141,17 @@
                 {% endif %}
                 {% comment %}
                 Answer picker — offline (local model) MCQ only. Populated by
-                renderAnswerChoices() from the turn payload's answer_choices.
-                Hidden by default and whenever there is no live MCQ.
+                renderAnswerChoices() from the turn payload's answer_choices,
+                which swaps this in and the typing box out. Hidden by default
+                and whenever there is no live MCQ.
 
-                {% comment %} not {# #}: Django only treats {# #} as a comment
-                on a SINGLE line, so a multi-line one renders as literal text
-                to the student. Caught here by the screenshot check.
+                This is a comment tag and not a hash-brace comment because
+                Django only treats the latter as a comment on a SINGLE line —
+                a multi-line one renders as literal text to the student.
+                Caught here by the screenshot check.
                 {% endcomment %}
                 <div id="answer-choices" class="answer-choices" style="display:none;"></div>
-                <div class="input-wrapper">
+                <div class="input-wrapper" id="input-wrapper">
                     <textarea
                         id="user-input"
                         placeholder="{% trans 'Type your answer...' %}"
@@ -897,29 +899,41 @@ body {
 }
 
 /* ── Input Area ── */
+/* Offline answer picker. This REPLACES the typing box rather than sitting
+   above it, so it is the student's only control and gets sized like one:
+   full-width rows at the same 768px column as .input-wrapper, one option per
+   line. A wrapped row of chips was the first version and it read as a hint
+   strip next to the "real" input — wrong signal when it IS the input, and it
+   truncated the longer options. */
 .answer-choices {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.4rem;
-    padding: 0.5rem 0.75rem 0;
-    justify-content: center;
+    max-width: 768px;
+    margin: 0 auto;
 }
 .answer-choice-btn {
-    display: inline-flex;
+    display: flex;
     align-items: baseline;
-    gap: 0.4rem;
-    max-width: 100%;
-    padding: 0.45rem 0.75rem;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.7rem 1rem;
     background: #fff;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
+    border: 1.5px solid #e4e4e7;
+    border-radius: 0.9rem;
     cursor: pointer;
-    font-size: 0.9rem;
-    line-height: 1.3;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    line-height: 1.4;
     text-align: left;
     transition: border-color .12s, background .12s;
 }
 .answer-choice-btn:hover:not(:disabled) { border-color: #f97316; background: #fff7ed; }
+.answer-choice-btn:focus-visible {
+    outline: none;
+    border-color: #a1a1aa;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
 .answer-choice-btn:disabled { opacity: .5; cursor: default; }
 .answer-choice-btn .letter {
     font-weight: 700;
@@ -929,12 +943,6 @@ body {
 .answer-choice-btn .opt-text {
     color: #374151;
     overflow-wrap: anywhere;
-}
-@media (max-width: 640px) {
-    /* Stack full-width on a phone: option text is long enough that two per
-       row truncates badly. */
-    .answer-choices { flex-direction: column; }
-    .answer-choice-btn { width: 100%; }
 }
 .chat-input-area {
     flex-shrink: 0;
@@ -2652,12 +2660,35 @@ function applyTutorResponse(data) {
 //
 // Online sessions get answer_choices = null and this renders nothing, so
 // typing is unchanged where it works.
-function renderAnswerChoices(choices) {
+//
+// The picker REPLACES the typing box rather than sitting beside it. Leaving
+// both meant the student could still type prose at an offline MCQ and get it
+// marked wrong for phrasing — which is the whole failure this exists to
+// remove, so offering the broken path alongside the working one defeats it.
+// The typing box comes back the moment there is no live MCQ (a teaching turn,
+// a completed lesson), since a reply that isn't being graded can't be graded
+// wrong, and leaving the student with no input at all would strand them.
+//
+// `opts.preserveInput` clears the picker and leaves the typing box exactly as
+// it is — used while a turn is in flight, where the arriving payload decides
+// what comes next. Without it, clicking a letter would pop "Type your
+// answer..." open for the length of an offline turn (measured at 43 s on this
+// machine), inviting the student to do the one thing the picker exists to
+// prevent. On a turn where typing was already the input, it stays. Every path
+// that ends a turn WITHOUT a payload — the catch block, the offline queue —
+// must call this plainly, or the student is left with no way to reply at all.
+function renderAnswerChoices(choices, opts) {
     const box = document.getElementById('answer-choices');
     if (!box) return;
+    const typing = document.getElementById('input-wrapper');
     box.innerHTML = '';
     const letters = (choices && choices.letters) || [];
-    if (!letters.length) { box.style.display = 'none'; return; }
+    if (!letters.length) {
+        box.style.display = 'none';
+        if (typing && !(opts && opts.preserveInput)) typing.style.display = '';
+        return;
+    }
+    if (typing) typing.style.display = 'none';
 
     letters.forEach(function (opt) {
         const btn = document.createElement('button');
@@ -2707,8 +2738,9 @@ async function sendMessage() {
 
     // The previous question's options are stale the instant an answer is
     // sent — leaving them clickable invites answering a question that is no
-    // longer live.
-    renderAnswerChoices(null);
+    // longer live. preserveInput: the arriving payload decides what the
+    // student gets next; don't pop a typing box open for the length of the wait.
+    renderAnswerChoices(null, {preserveInput: true});
 
     // Add student message bubble immediately (optimistic UI).
     const bubble = addMessage('student', text);
@@ -2722,6 +2754,7 @@ async function sendMessage() {
         markBubbleQueued(bubble, queueId);
         isSending = false;
         sendBtn.disabled = false;
+        renderAnswerChoices(null);   // no payload coming — give typing back
         userInput.focus();
         return;
     }
@@ -2739,6 +2772,9 @@ async function sendMessage() {
         showTyping(false);
         sendBtn.disabled = false;
         isSending = false;
+        // The turn died, so no payload will restore the input. Without this
+        // the student is left with neither a picker nor a typing box.
+        renderAnswerChoices(null);
         // Network died mid-send — queue it instead of losing the
         // student's work.
         if (window.NetHelpers && !window.NetHelpers.isOnline()) {
