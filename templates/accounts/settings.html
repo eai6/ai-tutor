@@ -215,13 +215,14 @@
     Wording avoids "model", "local" and "cloud" — a student picking this is
     choosing between "works without internet" and "needs internet".
     {% endcomment %}
-    {% if tutor_choice.available %}
+    {% if tutor_choice.available or tutor_choice.offline_options_available %}
     <section class="panel">
         <h2>{% trans "Tutor" %}</h2>
         <p class="panel-sub">{% trans "Choose which tutor to learn with. This is remembered for every lesson." %}</p>
         <form method="post" action="?action=tutor_mode">
             {% csrf_token %}
             <input type="hidden" name="action" value="tutor_mode">
+            {% if tutor_choice.available %}
             <div class="field">
                 <label for="tutor_mode">{% trans "Which tutor" %}</label>
                 <select id="tutor_mode" name="tutor_mode">
@@ -233,6 +234,27 @@
                     {% trans "Automatic uses the internet tutor when you are connected and switches to the offline one when you are not, so a lost connection will not stop your lesson." %}
                 </p>
             </div>
+            {% else %}
+            {# No internet tutor configured, so there is nothing to switch
+               between. Post the current mode unchanged so the form still
+               validates while only the offline-model picker is shown. #}
+            <input type="hidden" name="tutor_mode" value="{{ tutor_choice.mode }}">
+            {% endif %}
+            {% if tutor_choice.offline_options_available %}
+            <div class="field">
+                <label for="offline_model">{% trans "Offline tutor" %}</label>
+                <select id="offline_model" name="offline_model">
+                    <option value="">{% trans "— Let the app choose —" %}</option>
+                    {% for opt in tutor_choice.offline_options %}
+                    <option value="{{ opt.pk }}" {% if tutor_choice.offline_model_id == opt.pk %}selected{% endif %}>{{ opt.model_name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="helptext">
+                    {% trans "Which offline tutor to use. Larger ones understand more but answer more slowly." %}
+                </p>
+            </div>
+            {% endif %}
+            {% if tutor_choice.available %}
             <p class="helptext">
                 {% if tutor_choice.online_reachable %}
                     {% trans "Internet tutor: available right now." %}
@@ -240,6 +262,7 @@
                     {% trans "Internet tutor: not reachable right now — lessons will use the offline tutor." %}
                 {% endif %}
             </p>
+            {% endif %}
             <button type="submit" class="btn btn-primary">{% trans "Save tutor choice" %}</button>
         </form>
     </section>

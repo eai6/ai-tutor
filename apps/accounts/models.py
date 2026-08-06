@@ -319,6 +319,28 @@ class StudentProfile(models.Model):
         ),
     )
 
+    # WHICH offline tutor, when more than one is installed. Distinct from
+    # tutor_mode, which chooses online-vs-offline: this only says which local
+    # model the offline path uses.
+    #
+    # Null means "whichever the platform picks" — the previous behaviour, and
+    # the right default on a deployment with exactly one local model, where
+    # there is nothing to choose between and the control stays hidden.
+    #
+    # SET_NULL rather than CASCADE: retiring a model must not delete a
+    # student's profile, it should just drop them back to the default.
+    offline_model = models.ForeignKey(
+        'llm.ModelConfig',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text=(
+            "Which local model the offline tutor uses. Blank = let the "
+            "platform choose. Only meaningful when more than one local model "
+            "is installed."
+        ),
+    )
+
     # Safety suspension — student locked out of tutor until teacher reviews
     is_tutor_suspended = models.BooleanField(
         default=False,
