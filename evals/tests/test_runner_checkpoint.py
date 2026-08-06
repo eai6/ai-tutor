@@ -174,3 +174,63 @@ class CheckpointDirOverrideTest(TestCase):
                 R._write_partial(p, started='x', git_sha='abc', total=1,
                                  results=[_fake_result('a')])
                 self.assertEqual(R.latest_partial(), p)
+
+
+class AutoResumeSelectionTest(TestCase):
+    """Auto-resume must pick the FULLEST checkpoint for THIS model.
+
+    Two properties that a naive 'newest wins' gets wrong, both observed on
+    the 2026-08-06 harness board: restarts write newer-but-emptier
+    checkpoints, and a sweep points every model at one checkpoint dir, so
+    model A's work must never be resumed into model B's board.
+    """
+
+    def setUp(self):
+        import os
+        self._tmp = tempfile.TemporaryDirectory()
+        p = patch.dict(os.environ, {'EVAL_CHECKPOINT_DIR': self._tmp.name})
+        p.start(); self.addCleanup(p.stop); self.addCleanup(self._tmp.cleanup)
+
+    def _write(self, name, model, n):
+        path = Path(self._tmp.name) / name
+        R._write_partial(path, started='x', git_sha='sha', total=30,
+                         results=[_fake_result(f'{model}-s{i}') for i in range(n)])
+        # _write_partial stamps the CURRENT tutor model; rewrite the field so
+        # the fixture can express several models.
+        data = json.loads(path.read_text())
+        data['tutor_model'] = model
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_picks_fullest_not_newest(self):
+        self._write('partial_2026-08-06T09-00-00_sha.json', 'modelA', 17)
+        newest = self._write('partial_2026-08-06T16-00-00_sha.json', 'modelA', 4)
+        with patch.object(R, '_tutor_model_spec', return_value='modelA'):
+            chosen = R.auto_resume_partial()
+        self.assertIsNotNone(chosen)
+        self.assertNotEqual(chosen, newest)
+        results, _ = R.load_partial(chosen)
+        self.assertEqual(len(results), 17)
+
+    def test_never_crosses_models(self):
+        self._write('partial_2026-08-06T09-00-00_sha.json', 'modelA', 25)
+        with patch.object(R, '_tutor_model_spec', return_value='modelB'):
+            self.assertIsNone(R.auto_resume_partial())
+
+    def test_empty_checkpoint_is_not_resumed(self):
+        self._write('partial_2026-08-06T09-00-00_sha.json', 'modelA', 0)
+        with patch.object(R, '_tutor_model_spec', return_value='modelA'):
+            self.assertIsNone(R.auto_resume_partial())
+
+    def test_no_checkpoints_starts_fresh(self):
+        with patch.object(R, '_tutor_model_spec', return_value='modelA'):
+            self.assertIsNone(R.auto_resume_partial())
+
+    def test_clear_partials_only_touches_this_model(self):
+        self._write('partial_2026-08-06T09-00-00_sha.json', 'modelA', 5)
+        self._write('partial_2026-08-06T10-00-00_sha.json', 'modelA', 9)
+        keep = self._write('partial_2026-08-06T11-00-00_sha.json', 'modelB', 7)
+        self.assertEqual(R.clear_partials('modelA'), 2)
+        self.assertTrue(keep.exists())
+        with patch.object(R, '_tutor_model_spec', return_value='modelA'):
+            self.assertIsNone(R.auto_resume_partial())

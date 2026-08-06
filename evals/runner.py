@@ -684,6 +684,52 @@ def latest_partial() -> Path | None:
     return partials[-1] if partials else None
 
 
+def resumable_partials(tutor_model: str) -> list[tuple[Path, int]]:
+    """Checkpoints belonging to ``tutor_model``, richest first.
+
+    Keyed on the tutor model because a sweep points every model at ONE
+    checkpoint dir (EVAL_CHECKPOINT_DIR=$RESULTS): resuming model A's
+    scenarios into model B's board would silently publish A's scores under
+    B's name — worse than losing the run.
+
+    Ranked by completed_scenarios, NOT recency. Restarts that began from
+    scratch write a newer but emptier checkpoint, so 'newest' is exactly
+    the wrong pick; scenarios always run in the same sorted order, so the
+    fullest checkpoint contains every other one's work."""
+    out: list[tuple[Path, int]] = []
+    for path in checkpoint_root().glob('partial_*.json'):
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        if not data.get('partial'):
+            continue
+        if (data.get('tutor_model') or '') != (tutor_model or ''):
+            continue
+        out.append((path, int(data.get('completed_scenarios') or 0)))
+    return sorted(out, key=lambda t: t[1], reverse=True)
+
+
+def auto_resume_partial() -> Path | None:
+    """The checkpoint this run should resume, or None to start fresh."""
+    ranked = resumable_partials(_tutor_model_spec())
+    return ranked[0][0] if ranked and ranked[0][1] > 0 else None
+
+
+def clear_partials(tutor_model: str) -> int:
+    """Delete this model's checkpoints — called once a run completes and its
+    final JSON supersedes them. Without this, superseded checkpoints from a
+    finished run would be auto-resumed by the NEXT run of the same model."""
+    removed = 0
+    for path, _ in resumable_partials(tutor_model):
+        try:
+            path.unlink(missing_ok=True)
+            removed += 1
+        except Exception:
+            logger.warning("could not remove checkpoint %s", path, exc_info=True)
+    return removed
+
+
 def load_partial(path: Path) -> tuple[list[ScenarioResult], str]:
     """Load a checkpoint's completed results for resuming.
 

@@ -45,6 +45,12 @@ class Command(BaseCommand):
         parser.add_argument('--seed', type=int, default=0,
                             help='Seed for --sample (default: 0). Same seed + '
                                  'same dataset = same draw.')
+        parser.add_argument('--no-resume', action='store_true',
+                            help='Start from scratch even when a checkpoint '
+                                 'for this tutor model exists. Resuming is '
+                                 'the DEFAULT: a killed sweep continues where '
+                                 'it stopped instead of re-running scenarios '
+                                 'it already scored.')
         parser.add_argument('--resume', nargs='?', const='latest', default=None,
                             metavar='PARTIAL_JSON',
                             help='Resume a killed run from its checkpoint: '
@@ -56,7 +62,7 @@ class Command(BaseCommand):
                                  'run so the scenario set matches.')
 
     def handle(self, *args, smoke, scenario, single_turn, multi_turn, subset,
-               sample, seed, resume, **kwargs) -> None:
+               sample, seed, resume, no_resume, **kwargs) -> None:
         if single_turn and multi_turn:
             raise CommandError("Pass at most one of --single-turn / --multi-turn.")
         if sample is not None and sample < 1:
@@ -145,6 +151,21 @@ class Command(BaseCommand):
         # board would misreport it), and let run() skip the rest.
         prior_results = None
         consumed_partial = None
+        # Auto-resume (default): pick up this tutor model's fullest checkpoint
+        # without anyone having to paste a path. A Colab sweep that dies is
+        # restarted by re-running the same cell, and before this every restart
+        # began at scenario 1 — seven attempts on the harness board produced
+        # seven checkpoints and zero finished runs.
+        if resume is None and not no_resume:
+            from evals.runner import auto_resume_partial
+            auto = auto_resume_partial()
+            if auto is not None:
+                resume = str(auto)
+                self.stdout.write(self.style.SUCCESS(
+                    f">> AUTO-RESUME: found a checkpoint for this model "
+                    f"({auto.name}); continuing from it. Pass --no-resume to "
+                    f"start over."))
+                self.stdout.flush()
         if resume is not None:
             from pathlib import Path as _Path
             from evals.runner import latest_partial, load_partial, _git_sha
@@ -235,6 +256,13 @@ class Command(BaseCommand):
         # run's checkpoint.
         if consumed_partial is not None:
             consumed_partial.unlink(missing_ok=True)
+        # Sweep away every superseded checkpoint for this model, not just the
+        # one consumed: leftovers would be auto-resumed by the next run and
+        # silently re-publish finished results.
+        from evals.runner import clear_partials, _tutor_model_spec
+        n_cleared = clear_partials(_tutor_model_spec())
+        if n_cleared:
+            self.stdout.write(f"Cleared {n_cleared} superseded checkpoint(s).")
 
         # Summary line.
         summary = (
