@@ -714,7 +714,6 @@ def respond(
                 stream_gate.used_rotation_index if stream_gate else None
             ),
         )
-        text_reply = _filter_reveals(session, text_reply, tool_results)
 
     if not text_reply:
         # Last-resort: neither call produced usable text. Give a neutral
@@ -1495,120 +1494,26 @@ def _align_reply_polarity(
 _ANSWER_PAREN_RE = re.compile(r'\(\s*answer\s*:[^)]*\)', re.I)
 
 
-def _filter_reveals(
-    session, text_reply: str, tool_results, *, reference: str | None = None,
-) -> str:
-    """While a question is open after a wrong answer, the reply must not
-    state the reference (qwen3:14b printed "(Answer: A)" verbatim; others
-    said "option C is correct" mid-hint). The engine knows the reference,
-    so this is deterministically enforceable.
-
-    ``reference`` lets the streaming path supply the answer it already
-    looked up, so this does not re-query InFlightQuestion once per
-    streamed chunk. None (the default) keeps the query."""
-    if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
-        return text_reply
-    options: list | None = None
-    if reference is None:
-        from apps.tutoring.models import InFlightQuestion
-        slot = InFlightQuestion.objects.filter(session=session).first()
-        if slot is None:
-            return text_reply
-        reference = slot.reference_answer or ''
-        options = slot.options or []
-    ref = (reference or '').strip()
-    if not ref:
-        return text_reply
-    out = _ANSWER_PAREN_RE.sub('', text_reply)
-    is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
-
-    _VERBATIM_RUN_MIN_WORDS = 5
-
-    def _verbatim_run_pattern(value: str) -> str:
-        """Match any long verbatim run of the option's wording, however phrased.
-
-        Matching the option's FULL text was too strict: a tutor rarely quotes a
-        whole option, it quotes the distinctive middle. Device session 23,
-        lesson 1427 — option B was "The general square on the map bounded by
-        specific grid lines" and the reply said "...tells you which general
-        square on the map it's in", so a full-text pattern found nothing and
-        the answer went to the student.
-
-        So: every window of _VERBATIM_RUN_MIN_WORDS consecutive option words is
-        an alternative. Five keeps the window distinctive enough that a chance
-        overlap is unlikely, and options shorter than that fall back to the
-        assertion patterns — which is what lets a Socratic "Is the northing 23
-        or 56?" through untouched.
-
-        Whitespace is flexible so a line break inside the run still matches.
-        """
-        words = re.findall(r"[\w'-]+", value or '')
-        n = _VERBATIM_RUN_MIN_WORDS
-        if len(words) < n:
-            return ''
-        windows = [
-            r'\b' + r'\W+'.join(re.escape(w) for w in words[i:i + n]) + r'\b'
-            for i in range(len(words) - n + 1)
-        ]
-        return '|'.join(windows)
-
-    def _value_pattern(value: str) -> str:
-        v = re.escape(value)
-        return (rf'(?:answer|correct|equals|=|\bis)\W{{0,15}}{v}\b'
-                rf'|\b{v}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right|answer)')
-
-    if is_letter:
-        alts = [rf'\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b',
-                rf'\b{ref}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right)']
-        # For MCQ, stating what the option SAYS reveals exactly as much as
-        # naming its letter. Observed on lesson 1427: "the northing is the
-        # second pair of digits, not the first. The easting is 56, and the
-        # northing is 23" — 23 was option C, so the student read the answer
-        # straight off the hint. Matching only the letter missed it entirely.
-        #
-        # The assertion patterns require the value within 15 NON-word
-        # characters of "is"/"answer"/"equals", so "the northing is 23" is
-        # caught while a legitimate "is the northing 23 or 56?" is not.
-        correct_text = ''
-        idx = 'ABCD'.index(ref.upper())
-        if options and idx < len(options):
-            correct_text = str(options[idx] or '').strip()
-        if correct_text:
-            alts.append(_value_pattern(correct_text))
-            # Verbatim-run rule. The assertion patterns above require the value
-            # within 15 NON-word characters of the verb, which "the northing is
-            # 23" satisfies but "industrial land use IS SHOWN BY SYMBOLS LIKE
-            # factory buildings, warehouses, and transportation hubs" does not —
-            # there are words in between. That sentence quoted option C whole
-            # and the student read the answer straight off the hint (device
-            # session 21, lesson 1434).
-            #
-            # So: a long verbatim run of the option's own wording is a reveal
-            # however it is introduced. >= 4 words keeps short options ("23",
-            # "5 and 2") out of it — those stay with the assertion patterns,
-            # which is what protects the Socratic "Is the northing 23 or 56?"
-            # from being redacted.
-            run = _verbatim_run_pattern(correct_text)
-            if run:
-                alts.append(run)
-        pat = re.compile('(?i)' + '|'.join(alts))
-    else:
-        pat = re.compile('(?i)' + _value_pattern(ref))
-    lines_out = []
-    for line in out.split('\n'):
-        if not pat.search(line):
-            lines_out.append(line)
-            continue
-        kept = [s for s in _SENTENCE_SPLIT_RE.split(line)
-                if not pat.search(s)]
-        lines_out.append(' '.join(kept).strip())
-    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(lines_out)).strip('\n')
-    if result != text_reply:
-        logger.info(
-            "[simple_tutor] reveal_filter: redacted reference leak "
-            "session=%s", session.pk,
-        )
-    return result
+# _filter_reveals was REMOVED 2026-08-06.
+#
+# It redacted sentences from the tutor's reply when they stated the reference
+# answer while a wrong-answered question was still live. It grew three times in
+# one day — letter -> option text -> whole-option quote -> any 5-word run —
+# each widening prompted by a real leak the previous version missed, which is
+# the same trajectory the MCQ string matchers went down before they were
+# deleted in favour of the LLM grader.
+#
+# Removed per user direction: post-processing the tutor's reply is unreliable.
+# Every redaction is also a chance to cut correct teaching, and this one did —
+# it took a teaching sentence out with the leak because they shared a
+# paragraph. Leak prevention now lives entirely in the prompt (Block 0, "Name
+# the rule or the place to look, never the value it produces" and "for multiple
+# choice, saying what an option SAYS is the same as naming its letter").
+#
+# The tutor still SEES the reference answer, so a leak remains possible — that
+# trade was made deliberately. If it needs catching again, the right mechanism
+# is apps/tutoring/answer_leak.py (an LLM judge that already exists for exactly
+# this) feeding the regen path, NOT another regex over the reply.
 
 
 def _auto_grade_fallback(
