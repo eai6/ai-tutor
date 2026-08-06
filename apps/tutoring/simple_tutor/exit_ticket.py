@@ -303,10 +303,21 @@ def submit_exit_ticket(session, answers: list) -> dict:
             if opener:
                 message = f"{message}\n\n{opener}"
 
+    # The third payload site. respond_for_view and _project_start_payload both
+    # carry answer_choices; this one did not, and the remediation opener is
+    # exactly where it matters — it deletes the lesson's stale slot and poses a
+    # fresh question, so the buttons on screen belong to a question that no
+    # longer exists. Device session 81: the review text asked about two
+    # villages while the picker still offered "Locate northing 29 and mark
+    # where the lines intersect" from the pre-quiz question. The slot was
+    # correct the whole time; nothing told the frontend to repaint it.
+    from apps.tutoring.simple_tutor.engine import _answer_choices_payload
+
     return {
         'message': message,
         'phase': 'exit_ticket',
         'is_complete': passed,
+        'answer_choices': _answer_choices_payload(session),
         'exit_ticket': {
             'results': results_list,
             'score': correct_count,

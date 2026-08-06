@@ -3099,10 +3099,17 @@ function continueAfterExit() {
     document.getElementById('exit-modal').style.display = 'none';
     if (data && data.is_complete) {
         const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
+        renderAnswerChoices(null);   // lesson over — nothing left to answer
         showCompletion(data.message, gam);
     } else if (data) {
         document.getElementById('input-area').style.display = 'block';
         addMessage('tutor', data.message);
+        // The one path back into tutoring that never repainted the picker.
+        // Remediation retires the lesson's slot and poses a fresh question, so
+        // without this the student reads the new question and is handed the
+        // OLD question's buttons — device session 81. Every other path routes
+        // through applyTutorResponse, which does this; this one does not.
+        renderAnswerChoices(data.answer_choices);
     }
 }
 

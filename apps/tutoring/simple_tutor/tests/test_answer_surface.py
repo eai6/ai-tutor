@@ -219,3 +219,91 @@ class UsesAnswerPickerTest(DjangoTestCase):
                         f'{provider}/{qtype}/{len(options)} options: the tutor '
                         f'and the student disagree about the answer surface',
                     )
+
+
+class RemediationPickerRepaintTest(DjangoTestCase):
+    """The exit-ticket submit payload must carry answer_choices.
+
+    Device session 81: the review text asked "two villages at 2543 and 3043 —
+    which statement is correct?" while the buttons on screen still read
+    "Locate northing 29 and mark where the lines intersect" — the question from
+    before the quiz. It looked like the slot had not been reset.
+
+    It had. `_remediation_opening_question` deletes the lesson's leftover slot
+    and poses a fresh question, and the DB was right the whole time. What was
+    missing is that submit_exit_ticket was the third payload builder and the
+    only one that never carried answer_choices, so nothing told the frontend to
+    repaint. The student read one question and was handed another one's
+    options — worse than no picker, because it is confidently wrong.
+    """
+
+    def _lesson(self):
+        _n['i'] += 1
+        i = _n['i']
+        from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+        inst = Institution.objects.create(name=f'RM{i}', slug=f'rm{i}')
+        user = User.objects.create_user(username=f'stu-rm-{i}', password='x')
+        course = Course.objects.create(title=f'C{i}', institution=inst,
+                                       grade_level='S3', is_published=True)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        lesson = Lesson.objects.create(unit=unit, title='L', objective='o',
+                                       order_index=0, is_published=True)
+        LessonStep.objects.create(lesson=lesson, order_index=0, phase='explain',
+                                  teacher_script='s', enabling_objective='EO-1')
+        ModelConfig.objects.create(
+            provider='local_ollama', purpose='tutoring',
+            model_name='qwen3-4b-jetson', is_active=True, institution=inst)
+        # passing_score is an absolute count of questions, not a percent —
+        # 3 of the 4 below.
+        et = ExitTicket.objects.create(lesson=lesson, passing_score=3)
+        qs = [
+            ExitTicketQuestion.objects.create(
+                exit_ticket=et, order_index=k, question_type='mcq',
+                question_text=f'Q{k}?', enabling_objective='EO-1',
+                option_a=f'a{k}', option_b=f'b{k}', option_c=f'c{k}',
+                option_d=f'd{k}', correct_answer='A',
+            ) for k in range(4)
+        ]
+        session = TutorSession.objects.create(
+            institution=inst, student=user, lesson=lesson, engine='simple')
+        session.engine_state = {'selected_exit_ticket_ids': [q.id for q in qs]}
+        session.save(update_fields=['engine_state'])
+        return session, qs
+
+    def test_failed_ticket_repaints_the_picker_to_the_remediation_question(self):
+        from apps.tutoring.simple_tutor.exit_ticket import submit_exit_ticket
+
+        session, qs = self._lesson()
+        # The state the last pre-quiz turn leaves behind: a live lesson slot.
+        InFlightQuestion.objects.create(
+            session=session, question_text='STALE — pre-quiz question',
+            question_type='mcq', reference_answer='A',
+            options=['stale-a', 'stale-b', 'stale-c', 'stale-d'])
+
+        out = submit_exit_ticket(session, ['B'] * len(qs))   # fail every item
+        self.assertFalse(out['is_complete'])
+        self.assertIn('answer_choices', out,
+                      'submit payload has no answer_choices — the frontend '
+                      'cannot know the picker changed')
+
+        letters = (out['answer_choices'] or {}).get('letters') or []
+        texts = [c['text'] for c in letters]
+        self.assertTrue(texts, 'remediation posed a question but offered no buttons')
+        self.assertNotIn('stale-a', texts,
+                         'the picker still shows the pre-quiz options')
+
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        self.assertIsNotNone(slot)
+        self.assertNotEqual(slot.question_text, 'STALE — pre-quiz question')
+        self.assertEqual(texts, [str(o) for o in slot.options],
+                         'the buttons and the live slot disagree')
+
+    def test_passed_ticket_offers_no_picker(self):
+        """Nothing is in flight after a pass, so the payload must say so rather
+        than leaving the last question's buttons on screen."""
+        from apps.tutoring.simple_tutor.exit_ticket import submit_exit_ticket
+
+        session, qs = self._lesson()
+        out = submit_exit_ticket(session, ['A'] * len(qs))   # pass every item
+        self.assertTrue(out['is_complete'])
+        self.assertIsNone(out.get('answer_choices'))
