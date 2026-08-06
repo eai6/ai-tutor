@@ -1439,3 +1439,75 @@ class McqOptionTextLeakTest(DjangoTestCase):
         results = [{'tool': 'record_answer',
                     'result': {'recorded': True, 'verdict': 'correct'}}]
         self.assertEqual(_filter_reveals(session, text, results), text)
+
+
+class NarratedQuestionWithNoPoseTest(DjangoTestCase):
+    """A question written into the reply but never posed must not reach the
+    student.
+
+    Device session 20, lesson 1427. The slot held "In the four-figure grid
+    reference 3947, which digits represent the easting value?" while the reply
+    narrated a DIFFERENT MCQ:
+
+        "...In the reference 3947, the easting is 39. Here's the next one:
+         Which of the following four-figure grid references has an easting
+         of 52?  A) 5234  B) 3452  C) 2552  D) 5125"
+
+    pose_question was never called, so the slot never moved. The student
+    answered the question in front of them — "5234" — and it was graded
+    against 3947 and marked wrong. Two turns later auto_pose_fallback finally
+    posed it.
+
+    _ensure_posed_question_in_text existed to prevent exactly this but returned
+    early when no pose fired, i.e. in the only case that mattered.
+    """
+
+    def _slot(self, session):
+        InFlightQuestion.objects.filter(session=session).delete()
+        return InFlightQuestion.objects.create(
+            session=session,
+            question_text='In the four-figure grid reference 3947, which digits '
+                          'represent the easting value?',
+            question_type='mcq', options=['47', '39', '3 and 9', '4 and 7'],
+            reference_answer='B', source='catalog', attempt_count=1,
+        )
+
+    def test_narrated_question_is_replaced_by_the_live_slot(self):
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
+        session, _ = _make_session()
+        self._slot(session)
+        text = (
+            'You mentioned "easting" — that\'s the first two digits.\n'
+            "Here's the next one: Which of the following four-figure grid "
+            'references has an easting of 52?\n'
+            'A) 5234\nB) 3452\nC) 2552\nD) 5125'
+        )
+        out = _ensure_posed_question_in_text(text, [], session)
+        self.assertNotIn('5234', out, 'the unposed question must not be shown')
+        self.assertIn('3947', out, "the live slot's question must be")
+
+    def test_a_hint_with_no_options_is_left_alone(self):
+        """Hints do not carry an A/B/C/D block. They must pass through
+        untouched, or every hint turn would re-render the whole question."""
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
+        session, _ = _make_session()
+        self._slot(session)
+        text = ('Not quite — the easting runs left to right, so it is the '
+                'first pair. Which two digits are those?')
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
+
+    def test_reply_restating_the_live_question_is_left_alone(self):
+        """Re-showing the question the platform IS grading is fine."""
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
+        session, _ = _make_session()
+        self._slot(session)
+        text = ('Have another go. In the four-figure grid reference 3947, which '
+                'digits represent the easting value?\nA) 47\nB) 39\nC) 3 and 9\nD) 4 and 7')
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)
+
+    def test_no_slot_means_no_rewrite(self):
+        from apps.tutoring.simple_tutor.engine import _ensure_posed_question_in_text
+        session, _ = _make_session()
+        InFlightQuestion.objects.filter(session=session).delete()
+        text = 'Some prose with options\nA) x\nB) y\nC) z\nD) w'
+        self.assertEqual(_ensure_posed_question_in_text(text, [], session), text)

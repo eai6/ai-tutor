@@ -1153,11 +1153,32 @@ def _ensure_posed_question_in_text(
         and (tr.get('result') or {}).get('posed')
         for tr in tool_results
     )
-    if not posed:
-        return text_reply
 
     from apps.tutoring.models import InFlightQuestion
     slot = InFlightQuestion.objects.filter(session=session).first()
+
+    if not posed:
+        # No pose this turn — but the model may still have WRITTEN a question
+        # into its reply. Device session 20, lesson 1427: the slot held "In
+        # 3947, which digits represent the easting?" while the reply narrated
+        # a different MCQ ("Which reference has an easting of 52? A) 5234 …").
+        # The student answered what they could see, "5234", and it was graded
+        # against 3947 — marked wrong for answering the visible question.
+        #
+        # Lettered options in the text are the tell: a hint does not carry an
+        # A/B/C/D block, a narrated question does. When the slot's own stem is
+        # absent, the reply is showing a question the platform will not grade,
+        # so fall through to the divergent-prose repair below.
+        if slot is None or not _contains_lettered_options(text_reply):
+            return text_reply
+        stem_norm = ' '.join((slot.question_text or '').lower().split())[:30]
+        if stem_norm and stem_norm in ' '.join(text_reply.lower().split()):
+            return text_reply
+        logger.info(
+            "[simple_tutor] narrated question with no pose session=%s — "
+            "replacing with the slot's question", session.pk,
+        )
+
     if slot is None:
         # Slot was posed and then immediately graded clean this turn.
         # Nothing left to render.
