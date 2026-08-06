@@ -55,19 +55,6 @@ def main() -> int:
         attempt_count=0, options=['39', '47', '93', '74'],
         catalog_question_id=12,
     )
-    # A real DB row is not a SimpleNamespace, so the old copy-with-override
-    # silently fell through to `slot` and the two GRADE samples rendered
-    # byte-identical. Build the variant from the fields the renderer reads,
-    # whatever the slot's type.
-    wrong_slot = SimpleNamespace(
-        question_text=getattr(slot, 'question_text', ''),
-        question_type=getattr(slot, 'question_type', 'mcq'),
-        reference_answer=getattr(slot, 'reference_answer', ''),
-        source=getattr(slot, 'source', 'catalog'),
-        options=list(getattr(slot, 'options', None) or []),
-        catalog_question_id=getattr(slot, 'catalog_question_id', None),
-        attempt_count=1,
-    )
     review = {
         'score': 2, 'total': 10, 'passed': False,
         'missed_objectives': [{
@@ -82,10 +69,13 @@ def main() -> int:
     cases = [
         ('POSE / TEACH — nothing in flight',
          dict(in_flight_question=None, student_intent='answer')),
-        ('GRADE — first attempt',
+        # One GRADE sample, not two. A first-vs-second attempt pair differed
+        # by exactly one character — <attempt_count>0</attempt_count> against
+        # 1 — because the hint ladder that branches on it lives in Block 0,
+        # which this file does not dump. 51 lines of duplication for a digit
+        # buries the sections that do differ.
+        ('GRADE — answering the live question',
          dict(in_flight_question=slot, student_intent='answer')),
-        ('GRADE — second attempt (hint ladder rung 1)',
-         dict(in_flight_question=wrong_slot, student_intent='answer')),
         ('CONVERSATIONAL — student asked something instead',
          dict(in_flight_question=slot, student_intent='clarification')),
         ('REMEDIATION — failed the quiz, answering',

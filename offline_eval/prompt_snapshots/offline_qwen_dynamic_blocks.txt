@@ -38,7 +38,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 
 ==============================================================================
-  GRADE — first attempt
+  GRADE — answering the live question
   1,941 chars   (whole prompt: 11,760)
 ==============================================================================
 
@@ -47,57 +47,6 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>2</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
-  <options>
-    <option key="A">56</option>
-    <option key="B">5 and 2</option>
-    <option key="C">23</option>
-    <option key="D">6 and 3</option>
-  </options>
-  <reference_answer>C</reference_answer>
-  <answer_surface mode="letter_picker">
-The student answers by TAPPING one of the option buttons above.
-Reference the options by their letter key to know exactly which one the
-student selected.</answer_surface>
-</in_flight_question>
-
-<message_intent>
-  <classification>answer</classification>
-  <guidance>Treat this turn as a graded answer attempt to the in-flight question. Call record_answer with the literal extracted answer.</guidance>
-</message_intent>
-
-## This turn: GRADE
-
-The student answered the question in <in_flight_question>.
-
-1. Call `record_answer` with their literal answer. The platform already holds
-   the reference, the type, and the options.
-2. Read the verdict it returns, then write your reply:
-   - **CORRECT** — acknowledge in one clause, teach one sentence, and call
-     `pose_question` for the next question in the SAME turn.
-   - **INCORRECT** — hint, and pose nothing. The question stays live until it
-     is answered correctly or you pivot.
-
-<reply_length>
-Write 2-3 sentences, then stop. That is the whole visible reply.
-Budget them like this:
-  1. One clause reacting to what the student just said.
-  2. One sentence that teaches — the rule, the step, or the slip.
-  3. A next question ONLY if you are calling pose_question this turn — that swaps the buttons for its own. Otherwise stop after 2: the buttons on screen are already how the student replies.
-A reply that runs past 3 sentences is too long, however good it is.
-</reply_length>
-
-
-==============================================================================
-  GRADE — second attempt (hint ladder rung 1)
-  1,941 chars   (whole prompt: 11,760)
-==============================================================================
-
-<in_flight_question>
-  <question_type>mcq</question_type>
-  <source>catalog</source>
-  <catalog_question_id>2</catalog_question_id>
-  <attempt_count>1</attempt_count>
   <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
   <options>
     <option key="A">56</option>
