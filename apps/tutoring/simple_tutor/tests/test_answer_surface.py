@@ -562,22 +562,28 @@ class ServerPicksTheModeTest(SimpleTestCase):
         from apps.tutoring.simple_tutor.prompts import _render_active_mode
         return _render_active_mode(slot, intent, review)
 
-    def test_the_three_base_modes(self):
-        for label, slot, intent in (
-            ('GRADE', self.SLOT, 'answer'),
-            ('GRADE', self.SLOT, 'answer_or_other'),
-            ('CONVERSATIONAL', self.SLOT, 'clarification'),
-            ('CONVERSATIONAL', self.SLOT, 'off_topic'),
-            ('POSE / TEACH', None, 'answer'),
-        ):
-            with self.subTest(slot=bool(slot), intent=intent):
-                self.assertIn(f'## This turn: {label}', self._mode(slot, intent))
+    def test_the_two_base_modes(self):
+        """Offline has two: a question is in flight or it is not."""
+        for label, slot in (('GRADE', self.SLOT), ('POSE / TEACH', None)):
+            with self.subTest(slot=bool(slot)):
+                self.assertIn(f'## This turn: {label}', self._mode(slot, 'answer'))
 
-    def test_a_missing_intent_with_a_live_slot_grades(self):
-        """Intent classification can fail. Falling back to CONVERSATIONAL would
-        record an empty answer and silently discard a real attempt."""
-        self.assertIn('GRADE', self._mode(self.SLOT, None))
-        self.assertIn('GRADE', self._mode(self.SLOT, ''))
+    def test_intent_never_selects_a_mode_offline(self):
+        """CONVERSATIONAL was cut 2026-08-06. It means "a question is in flight
+        AND the message is not an answer", and offline that state cannot occur:
+        a live question puts the picker on screen and takes the typing box
+        away, so the only thing the student can send is a letter.
+
+        Rendering a mode the student's input can never select gave the model a
+        fourth shape to pick the wrong one of, which is the failure every
+        mode-related bug this week traced back to.
+        """
+        for intent in ('answer', 'answer_or_other', 'clarification',
+                       'off_topic', 'pushback', 'non_engagement', None, ''):
+            with self.subTest(intent=intent):
+                out = self._mode(self.SLOT, intent)
+                self.assertIn('## This turn: GRADE', out)
+                self.assertNotIn('CONVERSATIONAL', out)
 
     def test_remediation_is_one_block_whatever_the_turn_looks_like(self):
         """Remediation is the tutoring loop with a different pool, so there is
@@ -633,6 +639,7 @@ class ServerPicksTheModeTest(SimpleTestCase):
             (self.SLOT, 'clarification', None),
             (None, 'answer', None),
             (self.SLOT, 'answer', self.FAILED),
+            (None, 'off_topic', self.FAILED),
         ):
             with self.subTest(slot=bool(slot), intent=intent, remed=bool(review)):
                 blocks, _ = build_system_prompt(
@@ -640,9 +647,17 @@ class ServerPicksTheModeTest(SimpleTestCase):
                     student_intent=intent, exit_ticket_review=review,
                     family='qwen', answer_mode=ANSWER_MODE_PICKER)
                 text = '\n'.join(b['text'] for b in blocks)
+                # Line-anchored: Block 0's pointer ("a `## This turn:` section
+                # appears near the bottom") contains the literal but is not a
+                # section. Counting the raw substring made this assert 2 != 1
+                # from the day it was written — and it went unnoticed because
+                # a failing subTest does not print a "FAILED" line, which is
+                # what the regression diff greps for.
+                import re as _re
+                headings = _re.findall(r'(?m)^## This turn: .+$', text)
                 self.assertEqual(
-                    text.count('## This turn:'), 1,
-                    'the model must be handed one mode, not a menu')
+                    len(headings), 1,
+                    f'the model must be handed one mode, not a menu: {headings}')
 
     def test_production_still_carries_all_four_in_block_0(self):
         """Only the offline template was restructured. Rendering the dynamic

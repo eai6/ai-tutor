@@ -1169,14 +1169,6 @@ The student answered the question in <in_flight_question>.
    - **INCORRECT** — hint, and pose nothing. The question stays live until it
      is answered correctly or you pivot."""
 
-_MODE_CONVERSATIONAL = """## This turn: CONVERSATIONAL
-
-The student sent something that is not an answer — see <message_intent>.
-
-Call `record_answer` with an **empty** `extracted_answer` to tell the platform
-"not an answer": it records nothing and leaves the question open. Then answer
-what they said and point them back at the options."""
-
 _MODE_POSE = """## This turn: POSE / TEACH
 
 Nothing is in flight. Teach, or pose a question, or both.
@@ -1234,12 +1226,13 @@ def _render_active_mode(
 ) -> str:
     """The one mode block that applies this turn.
 
-    Same three signals the model was being asked to read, resolved here
-    instead. Remediation rides as a suffix because a remediation turn is still
-    a GRADE or a POSE turn — treating it as a fifth exclusive mode is what put
-    two competing turn procedures in the prompt.
+    ``student_intent`` is accepted and deliberately unused: offline, a live
+    question means the picker is showing and the typing box is not, so the
+    student can only send a letter and the intent is always an answer. It stays
+    in the signature because the caller has it and a future non-picker offline
+    surface would need it back.
     """
-    intent = (student_intent or '').strip().lower()
+    _ = student_intent
     remediating = bool(
         exit_ticket_review and not exit_ticket_review.get('passed'))
 
@@ -1250,11 +1243,19 @@ def _render_active_mode(
         # unchanged from the lesson, so there is nothing to branch on.
         return _MODE_REMEDIATION
 
+    # No CONVERSATIONAL branch. It is defined as "a question is in flight AND
+    # the message is not an answer", and offline that state cannot occur: a
+    # live question means the picker is on screen and the typing box is not, so
+    # the only thing the student can send is a letter. Rendering a mode the
+    # student's input can never select just gave the model a fourth shape to
+    # pick the wrong one of.
+    #
+    # (This renderer is offline-only — build_system_prompt calls it for
+    # family='qwen'. Every other family still carries all four modes in its own
+    # Block 0, where typing IS possible and CONVERSATIONAL is reachable.)
     if in_flight_question is None:
         return _MODE_POSE
-    if intent in _ANSWERING_INTENTS:
-        return _MODE_GRADE
-    return _MODE_CONVERSATIONAL
+    return _MODE_GRADE
 
 
 def _render_in_flight_block(
