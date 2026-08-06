@@ -268,6 +268,26 @@ def _extract_option_text_match(question, student_answer: str) -> str | None:
         # A bare "a"/"b" is already handled upstream by letter extraction.
         if len(needle) >= 4 and needle in opt:
             partial.append(letter)
+            continue
+
+        # Token-subsequence match. The substring test above is literal, so a
+        # single inserted filler word breaks it. Observed on device
+        # 2026-08-06, lesson 1427:
+        #   C) "Four digits (two for easting, two for northing)"
+        #   student: "two for easting, THEN two for northing"  -> INCORRECT
+        # The student had named the option exactly; one connective marked
+        # them wrong, the step never got its correct verdict, and the tutor
+        # posed three more questions trying to move on.
+        #
+        # Order-preserving on purpose: a bag-of-words test would collide
+        # "5 and 2" with "2 and 5", which are different options on real
+        # grid-reference questions. Subsequence keeps the sequence meaningful
+        # while tolerating inserted words.
+        #
+        # Still discarded unless UNIQUE across options, exactly like the
+        # substring path.
+        if _phrase_overlap(needle, opt) >= _PHRASE_OVERLAP_RATIO:
+            partial.append(letter)
 
     if len(matches) == 1:
         return matches[0]
@@ -276,6 +296,50 @@ def _extract_option_text_match(question, student_answer: str) -> str | None:
     if not matches and len(partial) == 1:
         return partial[0]
     return None
+
+
+_PHRASE_MIN_TOKENS = 3
+_PHRASE_OVERLAP_RATIO = 0.8
+
+
+def _phrase_overlap(a: str, b: str) -> float:
+    """Order-preserving overlap of two phrases, 0.0-1.0.
+
+    Longest common subsequence of the word tokens, over the length of the
+    SHORTER phrase — so extra words on either side are tolerated but reordering
+    is not.
+
+    Plain containment is not enough for real answers. Observed on device
+    2026-08-06, lesson 1427:
+
+        option C: "Four digits (two for easting, two for northing)"
+        student : "two for easting, THEN two for northing"
+
+    Neither contains the other — the student inserted a connective, the option
+    carries a "Four digits" prefix — yet the student named the option exactly.
+    They were marked INCORRECT, the step never got its correct verdict, and the
+    tutor posed three more questions trying to move past it. Overlap here is
+    6/7 = 0.86.
+
+    Order still matters, which is what keeps this safe on grid-reference
+    questions where "5 and 2" and "2 and 5" are DIFFERENT options: their
+    overlap is 0.33, nowhere near the threshold.
+    """
+    # Tokenise on word characters: _norm_option keeps punctuation, so a plain
+    # split leaves "easting," and "(two", which never compare equal to
+    # "easting" and "two" and silently defeat the whole check.
+    at = re.findall(r'[a-z0-9]+', a.lower())
+    bt = re.findall(r'[a-z0-9]+', b.lower())
+    if min(len(at), len(bt)) < _PHRASE_MIN_TOKENS:
+        return 0.0
+    # LCS length, iterative to stay cheap on option-sized strings.
+    prev = [0] * (len(bt) + 1)
+    for x in at:
+        cur = [0]
+        for j, y in enumerate(bt):
+            cur.append(prev[j] + 1 if x == y else max(cur[j], prev[j + 1]))
+        prev = cur
+    return prev[-1] / min(len(at), len(bt))
 
 
 def _grade_mcq(question, student_answer: str) -> GradeResult:

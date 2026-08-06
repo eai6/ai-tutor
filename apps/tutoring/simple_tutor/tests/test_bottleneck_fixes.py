@@ -1365,3 +1365,77 @@ class RetryBudgetTest(SimpleTestCase):
             )
         # Sanity: the switch, not the ladder, is what produced that 1.
         self.assertGreater(len(engine._TRANSIENT_BACKOFF), 0)
+
+
+class McqOptionTextLeakTest(DjangoTestCase):
+    """Stating what an MCQ option SAYS reveals as much as naming its letter.
+
+    Observed on lesson 1427 (desktop, 2026-08-06). Question: "In the
+    four-figure grid reference 5623, which digits represent the northing
+    value?  A) 56  B) 5 and 2  C) 23  D) 6 and 3". The student answered 56
+    (wrong) and the tutor replied:
+
+        "Not quite - in the reference 5623, the northing is the second pair
+         of digits, not the first. The easting is 56, and the northing is 23.
+         So which two digits represent the northing value?"
+
+    The reference is the letter 'C', which appears nowhere in that text, so
+    the letter-only pattern matched nothing and the student read the answer
+    straight off the hint.
+    """
+
+    def _slot(self, session, *, reference='C',
+              options=('56', '5 and 2', '23', '6 and 3')):
+        InFlightQuestion.objects.filter(session=session).delete()
+        return InFlightQuestion.objects.create(
+            session=session,
+            question_text='In 5623, which digits represent the northing?',
+            question_type='mcq', options=list(options),
+            reference_answer=reference, source='catalog', attempt_count=1,
+        )
+
+    def _wrong(self):
+        return [{'tool': 'record_answer',
+                 'result': {'recorded': True, 'verdict': 'incorrect'}}]
+
+    def test_option_text_assertion_is_redacted(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = ('Not quite — in the reference 5623, the northing is the second '
+                'pair of digits, not the first.\n'
+                'The easting is 56, and the northing is 23.\n'
+                'So which two digits represent the northing value?')
+        out = _filter_reveals(session, text, self._wrong())
+        self.assertNotIn('northing is 23', out)
+        # The actual hint and the hand-back must survive.
+        self.assertIn('second pair of digits', out)
+        self.assertIn('which two digits', out)
+
+    def test_letter_naming_still_redacted(self):
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        out = _filter_reveals(
+            session, 'Not quite. The answer is C. Try again.', self._wrong())
+        self.assertNotIn('answer is C', out)
+
+    def test_socratic_offer_of_two_options_is_not_redacted(self):
+        """"Is the northing 23 or 56?" hands the question back rather than
+        answering it. The assertion patterns require the value within 15
+        NON-word characters of the verb, so this must survive."""
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = 'Not quite. Is the northing 23 or 56 — which pair comes second?'
+        self.assertEqual(_filter_reveals(session, text, self._wrong()), text)
+
+    def test_correct_verdict_is_untouched(self):
+        """Confirming a CORRECT answer must be allowed to state it."""
+        from apps.tutoring.simple_tutor.engine import _filter_reveals
+        session, _ = _make_session()
+        self._slot(session)
+        text = "Correct — the northing is 23."
+        results = [{'tool': 'record_answer',
+                    'result': {'recorded': True, 'verdict': 'correct'}}]
+        self.assertEqual(_filter_reveals(session, text, results), text)

@@ -530,9 +530,22 @@ def handle_pose_question_by_index(
         ad = getattr(q, 'answer_data', None) or {}
         ref = None
         if isinstance(ad, dict):
-            ref = ad.get('model_answer')
-            if ref is None:
+            # Precedence flips by type. For a NUMERIC question the grader
+            # needs the bare value: `model_answer` carries the unit ('165°',
+            # '39 SCR', '8.94427 m') and handle_pose_question rejects it with
+            # "short_numeric requires a numeric reference_answer", while
+            # `computed` holds 165.0. For short_answer the opposite is true —
+            # `model_answer` is the canonical phrasing and `computed` is
+            # meaningless. The eval caught the numeric half as 4 rejected
+            # poses after the earlier reference fix.
+            if qtype in ('short_numeric', 'math', 'numeric'):
                 ref = ad.get('computed')
+                if ref is None:
+                    ref = ad.get('model_answer')
+            else:
+                ref = ad.get('model_answer')
+                if ref is None:
+                    ref = ad.get('computed')
         if ref is None:
             ref = (getattr(q, 'correct_answer', '') or '').strip() or None
         reference = '' if ref is None else str(ref).strip()

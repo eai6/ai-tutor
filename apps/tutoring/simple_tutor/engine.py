@@ -1487,27 +1487,46 @@ def _filter_reveals(
     streamed chunk. None (the default) keeps the query."""
     if _turn_verdict(tool_results) != 'incorrect' or not text_reply:
         return text_reply
+    options: list | None = None
     if reference is None:
         from apps.tutoring.models import InFlightQuestion
         slot = InFlightQuestion.objects.filter(session=session).first()
         if slot is None:
             return text_reply
         reference = slot.reference_answer or ''
+        options = slot.options or []
     ref = (reference or '').strip()
     if not ref:
         return text_reply
     out = _ANSWER_PAREN_RE.sub('', text_reply)
     is_letter = len(ref) == 1 and ref.upper() in 'ABCD'
+
+    def _value_pattern(value: str) -> str:
+        v = re.escape(value)
+        return (rf'(?:answer|correct|equals|=|\bis)\W{{0,15}}{v}\b'
+                rf'|\b{v}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right|answer)')
+
     if is_letter:
-        pat = re.compile(
-            rf'(?i)\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b'
-            rf'|\b{ref}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right)')
+        alts = [rf'\b(?:option|answer|letter)\s*(?:is\s*)?{ref}\b',
+                rf'\b{ref}\s*(?:is|was)\s*(?:the\s*)?(?:correct|right)']
+        # For MCQ, stating what the option SAYS reveals exactly as much as
+        # naming its letter. Observed on lesson 1427: "the northing is the
+        # second pair of digits, not the first. The easting is 56, and the
+        # northing is 23" — 23 was option C, so the student read the answer
+        # straight off the hint. Matching only the letter missed it entirely.
+        #
+        # The assertion patterns require the value within 15 NON-word
+        # characters of "is"/"answer"/"equals", so "the northing is 23" is
+        # caught while a legitimate "is the northing 23 or 56?" is not.
+        correct_text = ''
+        idx = 'ABCD'.index(ref.upper())
+        if options and idx < len(options):
+            correct_text = str(options[idx] or '').strip()
+        if correct_text:
+            alts.append(_value_pattern(correct_text))
+        pat = re.compile('(?i)' + '|'.join(alts))
     else:
-        ref_esc = re.escape(ref)
-        pat = re.compile(
-            rf'(?i)(?:answer|correct|equals|=|\bis)\W{{0,15}}{ref_esc}\b'
-            rf'|\b{ref_esc}\s*(?:is|was)\s*(?:the\s*)?'
-            rf'(?:correct|right|answer)')
+        pat = re.compile('(?i)' + _value_pattern(ref))
     lines_out = []
     for line in out.split('\n'):
         if not pat.search(line):

@@ -1290,6 +1290,24 @@ class PoseQuestionByIndexTest(DjangoTestCase):
         slot = InFlightQuestion.objects.get(session=session)
         self.assertEqual(slot.reference_answer, '0.3')
 
+    def test_numeric_reference_prefers_computed_over_model_answer(self):
+        """model_answer carries the unit ('165 degrees'); the numeric grader
+        needs the bare value. Preferring model_answer here produced 4 rejected
+        poses in the eval with "short_numeric requires a numeric
+        reference_answer".
+        """
+        from types import SimpleNamespace
+        session, _ = _make_session()
+        pool = [SimpleNamespace(
+            question_text='Angles around a point?', question_type='short_numeric',
+            correct_answer='', answer_data={'model_answer': '165 deg', 'computed': 165.0},
+            option_a='', option_b='', option_c='', option_d='', pk=0,
+        )]
+        r = handle_pose_question_by_index(session, question_index=1, question_pool=pool)
+        self.assertTrue(r['posed'], r.get('error'))
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(slot.reference_answer, '165.0')
+
     def test_model_answer_wins_over_computed(self):
         from types import SimpleNamespace
         session, _ = _make_session()
