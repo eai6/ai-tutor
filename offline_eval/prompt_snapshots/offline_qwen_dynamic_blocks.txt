@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 118, lesson 1427, step 0
+# DYNAMIC BLOCK (Block 2) — session 119, lesson 1427, step 5
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,304 chars   (whole prompt: 11,398)
+  1,161 chars   (whole prompt: 7,380)
 ==============================================================================
 
 <message_intent>
@@ -32,14 +32,14 @@ Write 2-3 sentences, then stop. That is the whole visible reply.
 Budget them like this:
   1. One clause reacting to what the student just said.
   2. One sentence that teaches — the rule, the step, or the slip.
-  3. A next question ONLY if you are calling pose_question this turn — that swaps the buttons for its own. Otherwise stop after 2: the buttons on screen are already how the student replies.
+  3. The next question, if you are posing one.
 A reply that runs past 3 sentences is too long, however good it is.
 </reply_length>
 
 
 ==============================================================================
   GRADE — first attempt
-  2,009 chars   (whole prompt: 12,103)
+  2,253 chars   (whole prompt: 8,472)
 ==============================================================================
 
 <in_flight_question>
@@ -47,14 +47,14 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
   <attempt_count>1</attempt_count>
-  <stem>What does the vertical axis on a grid reference map represent?</stem>
+  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
   <options>
-    <option key="A">The easting or horizontal distance</option>
-    <option key="B">The northing or vertical distance</option>
-    <option key="C">The scale of the map</option>
-    <option key="D">The longitude lines</option>
+    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
+    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
+    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
+    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -90,7 +90,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — second attempt (hint ladder rung 1)
-  2,009 chars   (whole prompt: 12,103)
+  2,253 chars   (whole prompt: 8,472)
 ==============================================================================
 
 <in_flight_question>
@@ -98,14 +98,14 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
   <attempt_count>1</attempt_count>
-  <stem>What does the vertical axis on a grid reference map represent?</stem>
+  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
   <options>
-    <option key="A">The easting or horizontal distance</option>
-    <option key="B">The northing or vertical distance</option>
-    <option key="C">The scale of the map</option>
-    <option key="D">The longitude lines</option>
+    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
+    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
+    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
+    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -141,7 +141,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   CONVERSATIONAL — student asked something instead
-  1,895 chars   (whole prompt: 11,989)
+  2,139 chars   (whole prompt: 8,358)
 ==============================================================================
 
 <in_flight_question>
@@ -149,14 +149,14 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
   <attempt_count>1</attempt_count>
-  <stem>What does the vertical axis on a grid reference map represent?</stem>
+  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
   <options>
-    <option key="A">The easting or horizontal distance</option>
-    <option key="B">The northing or vertical distance</option>
-    <option key="C">The scale of the map</option>
-    <option key="D">The longitude lines</option>
+    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
+    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
+    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
+    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -188,7 +188,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  3,200 chars   (whole prompt: 13,294)
+  3,124 chars   (whole prompt: 9,343)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -213,14 +213,14 @@ A reply that runs past 3 sentences is too long, however good it is.
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
   <attempt_count>1</attempt_count>
-  <stem>What does the vertical axis on a grid reference map represent?</stem>
+  <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
   <options>
-    <option key="A">The easting or horizontal distance</option>
-    <option key="B">The northing or vertical distance</option>
-    <option key="C">The scale of the map</option>
-    <option key="D">The longitude lines</option>
+    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
+    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
+    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
+    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -232,42 +232,38 @@ student selected.</answer_surface>
   <guidance>Treat this turn as a graded answer attempt to the in-flight question. Call record_answer with the literal extracted answer.</guidance>
 </message_intent>
 
-## This turn: GRADE
+## This turn: GRADE (remediation)
 
 The student answered the question in <in_flight_question>.
 
-1. Call `record_answer` with their literal answer. The platform already holds
-   the reference, the type, and the options.
-2. Read the verdict it returns, then write your reply:
-   - **CORRECT** — acknowledge in one clause, teach one sentence, and call
-     `pose_question` for the next question in the SAME turn.
-   - **INCORRECT** — hint, and pose nothing. The question stays live until it
-     is answered correctly or you pivot.
+1. Call `record_answer` with their literal answer.
+2. Then write your reply:
+   - **CORRECT** — say so in one clause, then one sentence re-explaining the
+     idea in fresh words, not the wording they already failed to learn from.
+   - **INCORRECT** — name the error and give one hint. The question stays live.
 
-You are in remediation: the student failed the quiz and you are re-teaching the
-objectives <exit_ticket_review> lists as missed. <question_pool> holds
-questions on those objectives, worst first, and the platform poses the next one
-for you after a correct answer — so your reply is the teaching, not the
-hand-off.
+You are in remediation: the student failed the quiz and you are re-teaching the objectives <exit_ticket_review> lists as missed.
 
-Re-explain in fresh words rather than replaying the script they already failed
-to learn from, skip anything in <mastered_objectives>, and write no wrap-up
-when the last objective is recovered: the platform re-opens the quiz itself and
-a summary lands in front of a quiz that is already opening.
+The platform picks and posts the next question itself, from <question_pool>,
+directly beneath your reply. Do not call `pose_question` and do not write a
+question — one is already on its way, and a second leaves the student reading
+two and answering neither.
+
+Skip anything in <mastered_objectives>. Write no wrap-up when the last
+objective is recovered: the platform re-opens the quiz itself, and a summary
+lands in front of a quiz that is already opening.
 
 <reply_length>
-Write 2-3 sentences, then stop. That is the whole visible reply.
-Budget them like this:
-  1. One clause reacting to what the student just said.
-  2. One sentence that teaches — the rule, the step, or the slip.
-  3. A next question ONLY if you are calling pose_question this turn — that swaps the buttons for its own. Otherwise stop after 2: the buttons on screen are already how the student replies.
-A reply that runs past 3 sentences is too long, however good it is.
+Write ONE or TWO sentences. Three is the absolute maximum.
+  1. One clause on what the student just did.
+  2. One sentence re-teaching the idea in fresh words.
+Do not add a third unless it is genuinely needed, and never add a question — the platform posts one below your reply.
 </reply_length>
 
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  2,495 chars   (whole prompt: 12,589)
+  1,839 chars   (whole prompt: 8,058)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -292,35 +288,25 @@ A reply that runs past 3 sentences is too long, however good it is.
   <guidance>Treat this turn as a graded answer attempt to the in-flight question. Call record_answer with the literal extracted answer.</guidance>
 </message_intent>
 
-## This turn: POSE / TEACH
+## This turn: TEACH (remediation)
 
-Nothing is in flight. Teach, or pose a question, or both.
+Nothing is in flight. Re-teach the weakest missed objective in one or two
+sentences, in fresh words.
 
-Call `pose_question` with an index from <question_pool>. The platform writes
-that question to the slot and renders its stem and options to the student.
-Exactly one call this turn — a second swaps the question out from under them.
+You are in remediation: the student failed the quiz and you are re-teaching the objectives <exit_ticket_review> lists as missed.
 
-Match the phase in <current_step>: **Engage** opens with curiosity, **Explore**
-asks what they notice, **Explain** teaches the procedure from <teaching_notes>
-and ends with a check question, **Elaborate** extends to a harder case,
-**Evaluate** poses and grades.
+The platform picks and posts the next question itself, from <question_pool>,
+directly beneath your reply. Do not call `pose_question` and do not write a
+question — one is already on its way, and a second leaves the student reading
+two and answering neither.
 
-You are in remediation: the student failed the quiz and you are re-teaching the
-objectives <exit_ticket_review> lists as missed. <question_pool> holds
-questions on those objectives, worst first, and the platform poses the next one
-for you after a correct answer — so your reply is the teaching, not the
-hand-off.
-
-Re-explain in fresh words rather than replaying the script they already failed
-to learn from, skip anything in <mastered_objectives>, and write no wrap-up
-when the last objective is recovered: the platform re-opens the quiz itself and
-a summary lands in front of a quiz that is already opening.
+Skip anything in <mastered_objectives>. Write no wrap-up when the last
+objective is recovered: the platform re-opens the quiz itself, and a summary
+lands in front of a quiz that is already opening.
 
 <reply_length>
-Write 2-3 sentences, then stop. That is the whole visible reply.
-Budget them like this:
-  1. One clause reacting to what the student just said.
-  2. One sentence that teaches — the rule, the step, or the slip.
-  3. A next question ONLY if you are calling pose_question this turn — that swaps the buttons for its own. Otherwise stop after 2: the buttons on screen are already how the student replies.
-A reply that runs past 3 sentences is too long, however good it is.
+Write ONE or TWO sentences. Three is the absolute maximum.
+  1. One clause on what the student just did.
+  2. One sentence re-teaching the idea in fresh words.
+Do not add a third unless it is genuinely needed, and never add a question — the platform posts one below your reply.
 </reply_length>

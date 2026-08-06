@@ -526,14 +526,14 @@ class RemediationQuestionPoolTest(DjangoTestCase):
         prompt, firing in exactly the mode that had no pool to pose from."""
         from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
         from apps.tutoring.simple_tutor.prompts import (
-            _MODE_REMEDIATION_SUFFIX, _REMEDIATION_INSTRUCTIONS as R,
+            _REMEDIATION_PREAMBLE as _P, _REMEDIATION_INSTRUCTIONS as R,
         )
         # Offline: remediation guidance rides on the per-turn mode block the
         # server picks, so Block 0 carries none of it.
         offline = build_family_block_0('qwen', 'BASE')
         self.assertNotIn('REMEDIATION', offline)
         self.assertNotIn('author your own', offline.lower())
-        self.assertNotIn('author your own', _MODE_REMEDIATION_SUFFIX.lower())
+        self.assertNotIn('author your own', _P.lower())
         # Production still ships the long form and must not regain authoring.
         self.assertNotIn('author your own', R.lower())
         self.assertNotIn('surface the stem', R.lower(),
@@ -579,17 +579,38 @@ class ServerPicksTheModeTest(SimpleTestCase):
         self.assertIn('GRADE', self._mode(self.SLOT, None))
         self.assertIn('GRADE', self._mode(self.SLOT, ''))
 
-    def test_remediation_is_a_suffix_not_a_fifth_mode(self):
-        """A remediation turn is still a GRADE or POSE turn. Making it
-        exclusive is what put two competing turn procedures in the prompt —
-        measured at 0/4 turns posing anything."""
-        graded = self._mode(self.SLOT, 'answer', self.FAILED)
-        self.assertIn('## This turn: GRADE', graded)
-        self.assertIn('in remediation', graded)
+    def test_remediation_gets_its_own_bodies_not_a_contradicting_suffix(self):
+        """Superseded the suffix approach on 2026-08-06.
 
-        posing = self._mode(None, 'answer', self.FAILED)
-        self.assertIn('## This turn: POSE / TEACH', posing)
-        self.assertIn('in remediation', posing)
+        Appending "the platform poses the next one for you" to a body that
+        already said "call pose_question for the next question in the SAME
+        turn" left the model to resolve a contradiction, and it resolved it by
+        writing a question in PROSE without the tool call. The server then
+        posed as well, so the student read two questions and got buttons for
+        the second.
+
+        The remediation bodies now say it once: the platform posts the
+        question, write none yourself.
+        """
+        graded = self._mode(self.SLOT, 'answer', self.FAILED)
+        self.assertIn('## This turn: GRADE (remediation)', graded)
+        self.assertIn('Do not call `pose_question`', graded)
+        self.assertNotIn('call `pose_question` for the next question', graded)
+
+        teaching = self._mode(None, 'answer', self.FAILED)
+        self.assertIn('## This turn: TEACH (remediation)', teaching)
+        self.assertIn('Do not call `pose_question`', teaching)
+
+    def test_remediation_never_points_at_a_step_that_is_not_rendered(self):
+        """Remediation runs past the last step, so <current_step> and
+        <teaching_notes> are absent from the prompt. The lesson POSE body
+        tells the model to read both — carrying that into remediation pointed
+        it at two blocks it cannot find."""
+        for slot in (self.SLOT, None):
+            with self.subTest(live_question=bool(slot)):
+                out = self._mode(slot, 'answer', self.FAILED)
+                self.assertNotIn('<current_step>', out)
+                self.assertNotIn('<teaching_notes>', out)
 
     def test_a_passed_review_is_not_remediation(self):
         """The review block survives a pass. Re-teaching objectives the student

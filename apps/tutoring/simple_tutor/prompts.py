@@ -686,7 +686,12 @@ def build_system_prompt(
         dynamic_parts.append(_render_active_mode(
             in_flight_question, student_intent, exit_ticket_review))
 
-    dynamic_parts.append(_render_length_budget(answer_mode))
+    dynamic_parts.append(_render_length_budget(
+        answer_mode,
+        has_live_question=in_flight_question is not None,
+        remediating=bool(
+            exit_ticket_review and not exit_ticket_review.get('passed')),
+    ))
 
     if dynamic_parts:
         blocks.append({
@@ -1035,7 +1040,12 @@ _INTENT_GUIDANCE = {
 }
 
 
-def _render_length_budget(answer_mode: str = ANSWER_MODE_FREE_TEXT) -> str:
+def _render_length_budget(
+    answer_mode: str = ANSWER_MODE_FREE_TEXT,
+    *,
+    has_live_question: bool = True,
+    remediating: bool = False,
+) -> str:
     """The per-turn reply-length budget, in sentences.
 
     Sentences rather than tokens or words: the model cannot count its own
@@ -1057,7 +1067,21 @@ def _render_length_budget(answer_mode: str = ANSWER_MODE_FREE_TEXT) -> str:
     question written into the text strands the student, while pose_question
     swaps the buttons for its own and is always fine.
     """
-    if answer_mode == ANSWER_MODE_PICKER:
+    if remediating:
+        # Remediation replies ran long in testing: the model treats
+        # "re-teach the objective" as licence to lecture, and the platform's
+        # question is already queued underneath whatever it writes. Two
+        # sentences is the whole job here — there is no question to introduce.
+        return (
+            "<reply_length>\n"
+            "Write ONE or TWO sentences. Three is the absolute maximum.\n"
+            "  1. One clause on what the student just did.\n"
+            "  2. One sentence re-teaching the idea in fresh words.\n"
+            "Do not add a third unless it is genuinely needed, and never add a "
+            "question — the platform posts one below your reply.\n"
+            "</reply_length>"
+        )
+    if answer_mode == ANSWER_MODE_PICKER and has_live_question:
         third = (
             "  3. A next question ONLY if you are calling pose_question this "
             "turn — that swaps the buttons for its own. Otherwise stop after "
@@ -1166,20 +1190,45 @@ asks what they notice, **Explain** teaches the procedure from <teaching_notes>
 and ends with a check question, **Elaborate** extends to a harder case,
 **Evaluate** poses and grades."""
 
-# Remediation is a MODIFIER, not a fifth mode: a remediation turn is still a
-# GRADE or POSE turn. Appended to whichever applies rather than replacing it.
-_MODE_REMEDIATION_SUFFIX = """
+# Remediation gets its own bodies rather than a suffix appended to the lesson
+# ones. The suffix approach put "call pose_question" twelve lines above "the
+# platform poses the next one for you", and the model resolved it by writing a
+# question in prose without the tool call — so the server posed too and the
+# student read two questions with buttons for the second.
+#
+# In remediation the server ALWAYS poses (exit_ticket.maybe_pose_remediation_next
+# fires on every turn with no live slot), so the model's job here is teaching
+# only. Saying that once, with nothing to argue against, is the whole fix.
+_REMEDIATION_PREAMBLE = """You are in remediation: the student failed the quiz \
+and you are re-teaching the objectives <exit_ticket_review> lists as missed.
 
-You are in remediation: the student failed the quiz and you are re-teaching the
-objectives <exit_ticket_review> lists as missed. <question_pool> holds
-questions on those objectives, worst first, and the platform poses the next one
-for you after a correct answer — so your reply is the teaching, not the
-hand-off.
+The platform picks and posts the next question itself, from <question_pool>,
+directly beneath your reply. Do not call `pose_question` and do not write a
+question — one is already on its way, and a second leaves the student reading
+two and answering neither.
 
-Re-explain in fresh words rather than replaying the script they already failed
-to learn from, skip anything in <mastered_objectives>, and write no wrap-up
-when the last objective is recovered: the platform re-opens the quiz itself and
-a summary lands in front of a quiz that is already opening."""
+Skip anything in <mastered_objectives>. Write no wrap-up when the last
+objective is recovered: the platform re-opens the quiz itself, and a summary
+lands in front of a quiz that is already opening."""
+
+_MODE_REMEDIATION_GRADE = """## This turn: GRADE (remediation)
+
+The student answered the question in <in_flight_question>.
+
+1. Call `record_answer` with their literal answer.
+2. Then write your reply:
+   - **CORRECT** — say so in one clause, then one sentence re-explaining the
+     idea in fresh words, not the wording they already failed to learn from.
+   - **INCORRECT** — name the error and give one hint. The question stays live.
+
+""" + _REMEDIATION_PREAMBLE
+
+_MODE_REMEDIATION_TEACH = """## This turn: TEACH (remediation)
+
+Nothing is in flight. Re-teach the weakest missed objective in one or two
+sentences, in fresh words.
+
+""" + _REMEDIATION_PREAMBLE
 
 _ANSWERING_INTENTS = {'', 'answer', 'answer_or_other'}
 
@@ -1195,16 +1244,21 @@ def _render_active_mode(
     two competing turn procedures in the prompt.
     """
     intent = (student_intent or '').strip().lower()
-    if in_flight_question is None:
-        mode = _MODE_POSE
-    elif intent in _ANSWERING_INTENTS:
-        mode = _MODE_GRADE
-    else:
-        mode = _MODE_CONVERSATIONAL
+    remediating = bool(
+        exit_ticket_review and not exit_ticket_review.get('passed'))
 
-    if exit_ticket_review and not exit_ticket_review.get('passed'):
-        mode = mode + _MODE_REMEDIATION_SUFFIX
-    return mode
+    if remediating:
+        # CONVERSATIONAL folds into GRADE here: its instruction is still
+        # record_answer with an empty extracted_answer, and remediation has no
+        # separate shape for it.
+        return (_MODE_REMEDIATION_TEACH if in_flight_question is None
+                else _MODE_REMEDIATION_GRADE)
+
+    if in_flight_question is None:
+        return _MODE_POSE
+    if intent in _ANSWERING_INTENTS:
+        return _MODE_GRADE
+    return _MODE_CONVERSATIONAL
 
 
 def _render_in_flight_block(

@@ -1,5 +1,5 @@
-# session=118 lesson=1427 step=0 family=qwen mode=letter_picker in_flight=yes
-# 3 blocks, 12,470 chars, tools=['pose_question', 'record_answer', 'request_figure']
+# session=123 lesson=1427 step=5 family=qwen mode=letter_picker in_flight=yes
+# 3 blocks, 11,218 chars, tools=['pose_question', 'record_answer', 'request_figure']
 # Blocks are concatenated in this order and the model reads them top to bottom;
 # the student's message arrives AFTER the last one.
 # Identity
@@ -140,30 +140,35 @@ tutoring under these instructions.
 
 ============================== BLOCK BOUNDARY ==============================
 
-<current_step>
-<phase>Engage</phase>
-<step_number>1</step_number>
-<teaching_notes>Imagine you're helping a friend find a hiking trail starting point on a map of Mahé. Instead of saying 'somewhere in the middle', we use a grid system with numbers along the bottom (horizontal) and side (vertical) to pinpoint exact locations. Today we're learning to read and write these grid references — they're like a secret code that tells you exactly where something is on a map. Now, think about a location on the map that you would like to find using grid references. What place would you choose, and how do you think we could describe its exact position?</teaching_notes>
 <question_pool>
   <question index="1" type="mcq">
     <difficulty>medium</difficulty>
-    <stem>When plotting the point 4729 on a map, after locating easting 47, what is the next step?</stem>
-    <option key="A">Write the grid reference in the legend</option>
-    <option key="B">Measure the distance from the origin</option>
-    <option key="C">Locate northing 29 and mark where the lines intersect</option>
-    <option key="D">Check that easting 47 is to the right of centre</option>
-    <correct_option>C</correct_option>
+    <stem>Which of the following four-figure grid references has an easting of 52?</stem>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
+    <correct_option>A</correct_option>
   </question>
   <question index="2" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>Two hikers are at four-figure grid references 3350 and 3355 on a map where each grid square represents 1 km on the ground. What is the approximate distance between them measured north–south?</stem>
-    <option key="A">0.5 km</option>
-    <option key="B">5 km</option>
-    <option key="C">5 metres</option>
-    <option key="D">50 km</option>
+    <difficulty>easy</difficulty>
+    <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+    <option key="A">47</option>
+    <option key="B">39</option>
+    <option key="C">3 and 9</option>
+    <option key="D">4 and 7</option>
     <correct_option>B</correct_option>
   </question>
   <question index="3" type="mcq">
+    <difficulty>hard</difficulty>
+    <stem>A student plots four points on a map: A at 2540, B at 2640, C at 2740, and D at 2840. Which points lie on the same horizontal line (same northing)?</stem>
+    <option key="A">Points A, B, C, and D all lie on the same line</option>
+    <option key="B">Points B and D only</option>
+    <option key="C">Points A and B only</option>
+    <option key="D">No points share the same northing value</option>
+    <correct_option>A</correct_option>
+  </question>
+  <question index="4" type="mcq">
     <difficulty>medium</difficulty>
     <stem>A map of a Seychelles island shows two villages: one at grid reference 2543 and another at 3043. Which statement is correct?</stem>
     <option key="A">Both villages have the same northing value</option>
@@ -172,63 +177,48 @@ tutoring under these instructions.
     <option key="D">Both villages have the same easting and northing values</option>
     <correct_option>A</correct_option>
   </question>
-  <question index="4" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>A four-figure grid reference 4535 identifies which location on a map?</stem>
-    <option key="A">The exact point where lines 45 and 35 intersect</option>
-    <option key="B">The grid square with easting 35 and northing 45</option>
-    <option key="C">The grid square with easting 45 and northing 35</option>
-    <option key="D">A location that requires six digits to identify precisely</option>
+  <question index="5" type="mcq">
+    <difficulty>easy</difficulty>
+    <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
+    <option key="A">56</option>
+    <option key="B">5 and 2</option>
+    <option key="C">23</option>
+    <option key="D">6 and 3</option>
     <correct_option>C</correct_option>
   </question>
-  <question index="5" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>A beach is located at grid reference 1520 and a market is located at grid reference 1820. Each grid square on the map represents 1 km on the ground. What is the straight-line east-west distance between the beach and the market?</stem>
-    <option key="A">3 km</option>
-    <option key="B">30 km</option>
-    <option key="C">300 m</option>
-    <option key="D">Cannot be determined without a ruler</option>
-    <correct_option>A</correct_option>
-  </question>
   <question index="6" type="mcq">
-    <difficulty>medium</difficulty>
-    <stem>You are given the four-figure grid reference 4156. What is the correct sequence for locating this point on a map?</stem>
-    <option key="A">Find easting 41, then find northing 56</option>
-    <option key="B">Find northing 41, then find easting 56</option>
-    <option key="C">Find northing 56, then find easting 41</option>
-    <option key="D">Look up the reference in the map legend</option>
+    <difficulty>hard</difficulty>
+    <stem>On an Ordnance Survey map grid, which statement correctly describes how eastings and northings are positioned and read?</stem>
+    <option key="A">Eastings run horizontally along the bottom of the map and are read first</option>
+    <option key="B">Northings run horizontally along the bottom of the map and are read first</option>
+    <option key="C">Eastings run vertically up the left side of the map and are read second</option>
+    <option key="D">Eastings and northings can be read in either order depending on the map scale</option>
     <correct_option>A</correct_option>
   </question>
 </question_pool>
-<figure_catalog/>
-</current_step>
 
 ============================== BLOCK BOUNDARY ==============================
 
 <recent_turns>
-  <turn role="tutor">Try this: What does the vertical axis on a grid reference map represent?  
+  <turn role="student">C</turn>
+  <turn role="tutor" graded="correct">Well done — you correctly identified that the student reversed the order of easting and northing. In a four-figure grid reference, the first two digits are the easting (east-west), and the last two are the northing (north-south).  
 
-A) The easting or horizontal distance  
-B) The northing or vertical distance  
-C) The scale of the map  
-D) The longitude lines</turn>
-  <turn role="student">A</turn>
-  <turn role="tutor" graded="incorrect">You picked A — that refers to the horizontal distance, not the vertical axis. The vertical axis on a map shows northing, which measures distance from the bottom upward. Try looking at the options again to see what the vertical direction represents.</turn>
+Next, let’s practice reading a grid reference: which of the following has an easting of 52?</turn>
 </recent_turns>
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
   <catalog_question_id>1</catalog_question_id>
-  <attempt_count>1</attempt_count>
-  <stem>What does the vertical axis on a grid reference map represent?</stem>
+  <attempt_count>0</attempt_count>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">The easting or horizontal distance</option>
-    <option key="B">The northing or vertical distance</option>
-    <option key="C">The scale of the map</option>
-    <option key="D">The longitude lines</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
