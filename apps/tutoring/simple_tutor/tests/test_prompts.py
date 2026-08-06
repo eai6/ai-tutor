@@ -796,9 +796,9 @@ class RulesContentTest(TestCase):
         # Remediation guidance now rides on the per-turn mode block the server
         # picks — Block 0 carries no modes at all for the offline template.
         self.assertNotIn('REMEDIATION', blocks[0]['text'])
-        self.assertIn('in remediation', blocks[-1]['text'],
-                      'the server-picked mode block must carry the '
-                      'remediation suffix when the review says failed')
+        self.assertIn('## This turn: REMEDIATION', blocks[-1]['text'],
+                      'the server-picked mode block must be the remediation '
+                      'one when the review says failed')
         self.assertNotIn('TARGETED RE-TEACHING', blocks[-1]['text'],
                          'the long form is production-only; carrying it here '
                          'too gives two procedures for one turn')

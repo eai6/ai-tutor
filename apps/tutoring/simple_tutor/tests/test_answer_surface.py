@@ -526,7 +526,7 @@ class RemediationQuestionPoolTest(DjangoTestCase):
         prompt, firing in exactly the mode that had no pool to pose from."""
         from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
         from apps.tutoring.simple_tutor.prompts import (
-            _REMEDIATION_PREAMBLE as _P, _REMEDIATION_INSTRUCTIONS as R,
+            _MODE_REMEDIATION as _P, _REMEDIATION_INSTRUCTIONS as R,
         )
         # Offline: remediation guidance rides on the per-turn mode block the
         # server picks, so Block 0 carries none of it.
@@ -579,30 +579,31 @@ class ServerPicksTheModeTest(SimpleTestCase):
         self.assertIn('GRADE', self._mode(self.SLOT, None))
         self.assertIn('GRADE', self._mode(self.SLOT, ''))
 
-    def test_remediation_gets_its_own_bodies_not_a_contradicting_suffix(self):
-        """Superseded the suffix approach on 2026-08-06.
+    def test_remediation_is_one_block_whatever_the_turn_looks_like(self):
+        """Remediation is the tutoring loop with a different pool, so there is
+        one block and no branch.
 
-        Appending "the platform poses the next one for you" to a body that
-        already said "call pose_question for the next question in the SAME
-        turn" left the model to resolve a contradiction, and it resolved it by
-        writing a question in PROSE without the tool call. The server then
-        posed as well, so the student read two questions and got buttons for
-        the second.
+        It was split into GRADE/TEACH variants, and before that carried a
+        suffix that contradicted the body it was appended to — which the model
+        resolved by writing a question in prose without the tool call, so the
+        student read two questions and got buttons for the second. Every
+        version of this bug came from giving the model more than one shape to
+        choose between.
 
-        The remediation bodies now say it once: the platform posts the
-        question, write none yourself.
+        A question is always in flight here (ensure_remediation_question), and
+        CONVERSATIONAL's instruction is unchanged from the lesson, so neither
+        the slot nor the intent is something to branch on.
         """
-        graded = self._mode(self.SLOT, 'answer', self.FAILED)
-        self.assertIn('## This turn: GRADE (remediation)', graded)
-        # 2026-08-06: remediation poses like tutoring again. The server-pose
-        # backstop stays, but it only fires when the model did not — so the
-        # instruction is now "pose", stated once, with nothing arguing back.
-        self.assertIn('pose_question', graded)
-        self.assertNotIn('Do not call `pose_question`', graded)
-
-        teaching = self._mode(None, 'answer', self.FAILED)
-        self.assertIn('## This turn: TEACH (remediation)', teaching)
-        self.assertIn('pose_question', teaching)
+        seen = {
+            self._mode(slot, intent, self.FAILED)
+            for slot in (self.SLOT, None)
+            for intent in ('answer', 'clarification', 'off_topic')
+        }
+        self.assertEqual(len(seen), 1, 'remediation rendered more than one block')
+        block = seen.pop()
+        self.assertIn('## This turn: REMEDIATION', block)
+        self.assertIn('pose_question', block)
+        self.assertNotIn('Do not call `pose_question`', block)
 
     def test_remediation_never_points_at_a_step_that_is_not_rendered(self):
         """Remediation runs past the last step, so <current_step> and

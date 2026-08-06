@@ -3204,6 +3204,8 @@ def start_for_view(session) -> dict:
        to ``start()`` and let the engine decide via mode detection
        (POSE / TEACH / REMEDIATION).
     """
+    from django.utils import translation
+
     from apps.curriculum.models import LessonStep
     from apps.tutoring.models import InFlightQuestion, SessionTurn
 
@@ -3215,9 +3217,19 @@ def start_for_view(session) -> dict:
     # re-posing there sends the student to a question chat_respond will refuse
     # to grade. Clear it rather than only skipping the branch, so the picker
     # and every other slot reader agree the lesson is over.
-    if in_flight is not None and _is_completed(session):
+    if _is_completed(session):
         InFlightQuestion.objects.filter(session=session).delete()
-        in_flight = None
+        payload = _project_start_payload(
+            session,
+            translation.gettext(
+                "This lesson is complete. Open Review to go back over it."),
+        )
+        payload['is_complete'] = True
+        payload['answer_choices'] = None
+        logger.info(
+            "[simple_tutor] start on a COMPLETED session=%s — returning the "
+            "completion state, not a tutoring turn", session.pk)
+        return payload
 
     if in_flight is not None and has_prior_turns:
         message = _build_resume_message(in_flight, _course_locale(session))

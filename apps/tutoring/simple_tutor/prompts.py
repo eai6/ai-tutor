@@ -1199,37 +1199,32 @@ and ends with a check question, **Elaborate** extends to a harder case,
 # In remediation the server ALWAYS poses (exit_ticket.maybe_pose_remediation_next
 # fires on every turn with no live slot), so the model's job here is teaching
 # only. Saying that once, with nothing to argue against, is the whole fix.
-_REMEDIATION_PREAMBLE = """You are in remediation: the student failed the quiz \
-and you are re-teaching the questions they got wrong.
+# One block. Remediation is the tutoring loop with a different pool — there is
+# no second shape to describe, and splitting it into GRADE/TEACH variants only
+# gave the model more surface to pick the wrong half of.
+#
+# A question is ALWAYS in flight here: the pool holds exactly the unrecovered
+# missed questions, ensure_remediation_question guarantees one at the start of
+# every turn, and the mode ends when that set empties.
+_MODE_REMEDIATION = """## This turn: REMEDIATION
 
-<question_pool> holds exactly those questions, worst objective first, with the
-ones they have since recovered already removed. Pose from it the same way you
-do in the lesson — everything left in the pool is still outstanding, so there
-is no wrong choice.
+The student failed the quiz. You are working back through the questions they
+got wrong, and <question_pool> holds exactly those — worst objective first,
+with the ones they have since recovered already removed.
 
-Re-explain in fresh words rather than replaying the wording they already failed
-to learn from. Write no wrap-up when the last one is recovered: the platform
-re-opens the quiz itself, and a summary lands in front of a quiz that is
-already opening."""
+This is the lesson loop with a different pool. Nothing else changes:
 
-_MODE_REMEDIATION_GRADE = """## This turn: GRADE (remediation)
-
-The student answered the question in <in_flight_question>.
-
-1. Call `record_answer` with their literal answer.
+1. Call `record_answer` with their literal answer to <in_flight_question>.
 2. Then write your reply:
    - **CORRECT** — say so in one clause, one sentence re-explaining the idea in
      fresh words, and call `pose_question` for the next pool entry.
    - **INCORRECT** — name the error and give one hint. The question stays live.
 
-""" + _REMEDIATION_PREAMBLE
-
-_MODE_REMEDIATION_TEACH = """## This turn: TEACH (remediation)
-
-Nothing is in flight. Re-teach the weakest missed objective in one or two
-sentences, then call `pose_question` with a pool index.
-
-""" + _REMEDIATION_PREAMBLE
+Everything in the pool is still outstanding, so there is no wrong choice of
+next question. Re-explain in fresh words rather than replaying the wording they
+already failed to learn from, and write no wrap-up when the last one is
+recovered — the platform re-opens the quiz itself, and a summary lands in front
+of a quiz that is already opening."""
 
 _ANSWERING_INTENTS = {'', 'answer', 'answer_or_other'}
 
@@ -1249,11 +1244,11 @@ def _render_active_mode(
         exit_ticket_review and not exit_ticket_review.get('passed'))
 
     if remediating:
-        # CONVERSATIONAL folds into GRADE here: its instruction is still
-        # record_answer with an empty extracted_answer, and remediation has no
-        # separate shape for it.
-        return (_MODE_REMEDIATION_TEACH if in_flight_question is None
-                else _MODE_REMEDIATION_GRADE)
+        # One block regardless of intent or slot. A question is always in
+        # flight (ensure_remediation_question), and CONVERSATIONAL's
+        # instruction — record_answer with an empty extracted_answer — is
+        # unchanged from the lesson, so there is nothing to branch on.
+        return _MODE_REMEDIATION
 
     if in_flight_question is None:
         return _MODE_POSE
