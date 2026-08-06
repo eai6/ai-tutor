@@ -145,3 +145,48 @@ class RemediationOpenerTest(DjangoTestCase):
         session, _ = _session_with_bank()
         for bad in ({}, None, {'x': 'not-a-dict'}, {'': {'asked': 1}}):
             self.assertEqual(_remediation_opening_question(session, bad), '')
+
+
+class RemediationOpenerFiresAtSubmitTest(DjangoTestCase):
+    """The question must arrive WITH the score, not a turn later.
+
+    Observed on device session 18: the review said "You scored 3 out of 10.
+    Let's revisit the concepts you missed." and stopped. Only after the student
+    typed "okay" did a question appear.
+
+    Cause: the final lesson turn leaves an InFlightQuestion with
+    attempt_count=0 and `_student_intent='answer'`, and handle_pose_question's
+    anti-desync guard refuses to pose over exactly that state. The filler
+    "okay" flipped the intent to non_engagement, the guard stopped firing, and
+    the pose landed one turn late.
+    """
+
+    def test_opens_even_with_a_live_slot_and_answer_intent(self):
+        session, questions = _session_with_bank()
+        InFlightQuestion.objects.create(
+            session=session, question_text='the last lesson question',
+            question_type='mcq', options=['w', 'x', 'y', 'z'],
+            reference_answer='A', source='catalog', attempt_count=0,
+        )
+        session.engine_state = {'_student_intent': 'answer'}
+        session.save(update_fields=['engine_state'])
+
+        out = _remediation_opening_question(session, _competency())
+
+        self.assertTrue(out, 'the guard must not swallow the remediation opener')
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertNotEqual(slot.question_text, 'the last lesson question')
+        self.assertIn(slot.question_text, out)
+
+    def test_stale_lesson_slot_is_retired(self):
+        session, _ = _session_with_bank()
+        InFlightQuestion.objects.create(
+            session=session, question_text='stale', question_type='mcq',
+            options=['w', 'x', 'y', 'z'], reference_answer='A',
+            source='catalog', attempt_count=0,
+        )
+        _remediation_opening_question(session, _competency())
+        # Exactly one slot, and it is the remediation question.
+        self.assertEqual(InFlightQuestion.objects.filter(session=session).count(), 1)
+        self.assertNotEqual(
+            InFlightQuestion.objects.get(session=session).question_text, 'stale')

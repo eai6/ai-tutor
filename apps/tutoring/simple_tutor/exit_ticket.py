@@ -420,6 +420,20 @@ def _remediation_opening_question(session, eo_competency_map: dict) -> str:
         fresh = [q for q in pool_for_pick if q.pk not in failed_ids]
         chosen = (fresh or pool_for_pick)[0]
 
+        # Retire the lesson's leftover in-flight question first. Submitting the
+        # exit ticket ends the lesson phase, so a slot still open from it is
+        # stale by definition — and leaving it there silently blocks this pose:
+        # handle_pose_question's anti-desync guard refuses to pose over a slot
+        # with attempt_count 0 while `_student_intent` is still 'answer', which
+        # is exactly the state the final lesson turn leaves behind.
+        #
+        # That is why remediation only started after the student typed "okay":
+        # the filler flipped the intent to non_engagement, the guard stopped
+        # firing, and the question the submit response should have carried
+        # finally appeared a turn late.
+        from apps.tutoring.models import InFlightQuestion as _IFQ
+        _IFQ.objects.filter(session=session).delete()
+
         result = handle_pose_question_by_index(
             session, question_index=1, question_pool=[chosen])
         if not result.get('posed'):
