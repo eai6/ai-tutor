@@ -826,6 +826,15 @@ def _render_question_pool(pool) -> str:
         qtype = (getattr(q, 'question_type', '') or '').strip() or 'short_answer'
         stem = (getattr(q, 'question_text', '') or '').strip()
         parts.append(f'  <question index="{i}" type="{qtype}">')
+        # Difficulty has been on ExitTicketQuestion all along (easy/medium/hard,
+        # and populated — 2601/2463/2395 across the device catalog) but was
+        # never rendered. The hint ladder says "pivot to an EASIER pool
+        # question" and the model had no way to tell which one that is; it was
+        # picking blind. Surfacing the field costs one line and makes the
+        # instruction executable.
+        diff = (getattr(q, 'difficulty', '') or '').strip()
+        if diff:
+            parts.append(f'    <difficulty>{_escape_xml(diff)}</difficulty>')
         if stem:
             parts.append(f'    <stem>{_escape_xml(stem)}</stem>')
 

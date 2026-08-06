@@ -691,8 +691,11 @@ class QwenVariantCycle10Test(SimpleTestCase):
         """
         b = self._qwen_block().lower()
         for phrase in ('authored question', 'distractors plausible',
-                       'roll a fair 1-in-4', 'four options'):
+                       'roll a fair 1-in-4', 'with four options'):
             self.assertNotIn(phrase, b, f'authoring guidance is back: {phrase!r}')
+        # Not a bare 'four options' — the no-reveal rule says "the student is
+        # reading those four options on screen", which is the opposite of
+        # authoring. Match the authoring phrasing, not the noun.
 
     def test_no_hand_off_phrase_is_taught_verbatim(self):
         """Measured 2026-08-06: the model reaches for whatever hand-off string
