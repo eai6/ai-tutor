@@ -587,7 +587,13 @@ def _llm_grade(question, student_answer: str, *, qtype: str):
                 client, McqVerdict,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                max_tokens=200,
+                # 200 truncated the reasoning-capable local models before they
+                # emitted the JSON — "output is incomplete due to a max_tokens
+                # length limit", then a retry storm, then None, and the caller
+                # reported the student's answer as unresolved. The verdict
+                # itself is ~30 tokens; the budget has to cover whatever
+                # deliberation the model does first.
+                max_tokens=1024,
                 provider=str(provider.config.provider) if provider.config else '',
             )
         except Exception as exc:                   # noqa: BLE001
@@ -1635,9 +1641,21 @@ def _local_verifier_chain(chain_builder):
     try:
         from apps.llm.models import ModelConfig
 
+        # Oldest row first, deliberately. Unordered .first() picked whatever
+        # SQLite returned — on a device with 4B/8B/14B installed that was the
+        # 14B, so GRADING loaded a second 9.3 GB model alongside the tutor's
+        # own. Measured 2026-08-06: 45 s and then a failure, on a machine
+        # already holding the 8B.
+        #
+        # The oldest local row is the one the device shipped with — the
+        # smallest and fastest, and the non-thinking instruct tag. A grader
+        # only has to decide correct/incorrect against a supplied answer, so
+        # the smallest model is the right tool; spending the largest one on it
+        # is backwards.
         local = (
             ModelConfig.objects
             .filter(provider='local_ollama', purpose='tutoring', is_active=True)
+            .order_by('id')
             .first()
         )
         if local is None:
