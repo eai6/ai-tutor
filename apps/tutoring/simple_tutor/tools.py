@@ -1437,6 +1437,74 @@ def _remediation_question_sets(session) -> tuple[set | None, set]:
     return missed, covered
 
 
+PIVOT_AFTER_ATTEMPTS = 2
+
+
+def maybe_pivot_stalled_question(session: 'TutorSession'):
+    """Replace a question the student has failed twice, server-side.
+
+    The prompt asks for this at rung 2+ of the hint ladder and
+    <pivot_guidance> repeats it inside the slot. Neither reliably fires: a 4B
+    does not act on a conditional instruction, which is the same finding that
+    took remediation posing from 0/4 on prompt alone to 4/4 once the server
+    did it. Device transcript: three wrong answers on one question, three
+    hints, no pivot.
+
+    So the server pivots. Prefers a strictly easier question on the same
+    objective; falls back to any unasked pool entry, because a third hint on
+    an item they have failed twice is worse than a sideways move.
+
+    Returns the ExitTicketQuestion posed, or None when nothing needed doing —
+    fewer than two attempts, no slot, or a pool with nothing else in it.
+    """
+    from apps.tutoring.models import ExitTicketQuestion, InFlightQuestion
+
+    _RANK = {'easy': 0, 'medium': 1, 'hard': 2}
+    try:
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        if slot is None:
+            return None
+        if (slot.attempt_count or 0) < PIVOT_AFTER_ATTEMPTS:
+            return None
+
+        current_rank = _RANK.get(
+            (ExitTicketQuestion.objects
+             .filter(pk=slot.catalog_question_id)
+             .values_list('difficulty', flat=True).first() or 'medium'), 1)
+
+        pool = [q for q in build_question_pool(session)
+                if _norm_q(q.question_text or '') != _norm_q(slot.question_text or '')]
+        if not pool:
+            return None
+        easier = [q for q in pool
+                  if _RANK.get((q.difficulty or 'medium'), 1) < current_rank]
+        easier.sort(key=lambda q: _RANK.get((q.difficulty or 'medium'), 1))
+        chosen = (easier or pool)[0]
+
+        # Retire the stalled slot first: handle_pose_question_by_index refuses
+        # to pose over a live one, which is the guard that stops the model
+        # swapping a question out from under the student mid-answer.
+        InFlightQuestion.objects.filter(session=session).delete()
+        result = handle_pose_question_by_index(
+            session, question_index=1, question_pool=[chosen])
+        if not result.get('posed'):
+            logger.warning(
+                "[simple_tutor] pivot could not pose session=%s: %s",
+                session.pk, result.get('error'))
+            return None
+        logger.info(
+            "[simple_tutor] pivoted after %d attempts session=%s "
+            "%s -> %s (difficulty %s)",
+            slot.attempt_count, session.pk, slot.catalog_question_id,
+            chosen.pk, chosen.difficulty)
+        return chosen
+    except Exception:  # noqa: BLE001 — a missed pivot must not lose the turn
+        logger.warning(
+            "[simple_tutor] pivot failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return None
+
+
 def maybe_complete_remediation(session: 'TutorSession') -> bool:
     """Set ``engine_state['remediation_complete']`` once the student has
     recovered every objective they failed on their last exit-ticket attempt.

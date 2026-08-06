@@ -489,13 +489,17 @@ class PivotGuidanceTest(SimpleTestCase):
         )
         return _render_in_flight_block(slot)
 
-    def test_pivot_guidance_appears_after_repeated_attempts(self):
-        block = self._block(3)
+    def test_pivot_guidance_appears_after_two_attempts(self):
+        """Two hints, then pivot. Threshold was 3, which meant this block said
+        nothing on the exact turn Block 0's ladder called for a pivot."""
+        block = self._block(2)
         self.assertIn('pivot', block.lower())
-        self.assertIn('simpler', block.lower())
+        self.assertIn('difficulty', block.lower())
 
     def test_no_pivot_guidance_on_early_attempts(self):
-        self.assertNotIn('pivot', self._block(1).lower())
+        for attempts in (0, 1):
+            with self.subTest(attempts=attempts):
+                self.assertNotIn('pivot', self._block(attempts).lower())
 
 
 class ScrubToolJsonTest(SimpleTestCase):

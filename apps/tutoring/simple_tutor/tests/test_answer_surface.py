@@ -738,3 +738,103 @@ class RecentTurnsTrimTest(SimpleTestCase):
         out = _render_recent_turns_block(self._turns(self.LONG))
         self.assertIn("Next, let's practice", out)
         self.assertNotIn('[…]', out)
+
+
+class ServerPivotTest(DjangoTestCase):
+    """The server pivots a question the student has failed twice.
+
+    The prompt asks for this at rung 2+ and <pivot_guidance> repeats it inside
+    the slot. Device transcript: three wrong answers on one question, three
+    hints, no pivot. Same finding as remediation posing — 0/4 on instruction
+    alone, 4/4 once the server did it.
+    """
+
+    def _lesson(self):
+        from apps.tutoring.models import ExitTicket, ExitTicketQuestion
+        _n['i'] += 1
+        i = _n['i']
+        inst = Institution.objects.create(name=f'PV{i}', slug=f'pv{i}')
+        user = User.objects.create_user(username=f'stu-pv-{i}', password='x')
+        course = Course.objects.create(title=f'C{i}', institution=inst,
+                                       grade_level='S3', is_published=True)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        lesson = Lesson.objects.create(unit=unit, title='L', objective='o',
+                                       order_index=0, is_published=True)
+        LessonStep.objects.create(lesson=lesson, order_index=0, phase='explain',
+                                  teacher_script='s', enabling_objective='EO-1')
+        et = ExitTicket.objects.create(lesson=lesson, passing_score=3)
+        for k, diff in enumerate(('hard', 'easy', 'medium')):
+            ExitTicketQuestion.objects.create(
+                exit_ticket=et, order_index=k, question_type='mcq',
+                question_text=f'{diff} question {k}?', enabling_objective='EO-1',
+                option_a=f'{diff}-a', option_b=f'{diff}-b', option_c=f'{diff}-c',
+                option_d=f'{diff}-d', correct_answer='A', difficulty=diff)
+        session = TutorSession.objects.create(
+            institution=inst, student=user, lesson=lesson, engine='simple',
+            current_step_index=0)
+        return session
+
+    def _pose_hard(self, session):
+        from apps.tutoring.simple_tutor.tools import (
+            build_question_pool, handle_pose_question_by_index,
+        )
+        hard = next(q for q in build_question_pool(session)
+                    if q.difficulty == 'hard')
+        handle_pose_question_by_index(session, question_index=1,
+                                      question_pool=[hard])
+        return InFlightQuestion.objects.get(session=session)
+
+    def _set_attempts(self, session, n):
+        InFlightQuestion.objects.filter(session=session).update(attempt_count=n)
+
+    def test_no_pivot_before_two_attempts(self):
+        """One hint has not been given a chance yet; swapping there would read
+        as the tutor giving up on the first mistake."""
+        from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+        session = self._lesson()
+        slot = self._pose_hard(session)
+        for n in (0, 1):
+            with self.subTest(attempts=n):
+                self._set_attempts(session, n)
+                self.assertIsNone(maybe_pivot_stalled_question(session))
+                live = InFlightQuestion.objects.get(session=session)
+                self.assertEqual(live.question_text, slot.question_text)
+
+    def test_pivots_at_two_and_picks_something_easier(self):
+        from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+        session = self._lesson()
+        slot = self._pose_hard(session)
+        self._set_attempts(session, 2)
+
+        chosen = maybe_pivot_stalled_question(session)
+        self.assertIsNotNone(chosen, 'two hints failed and nothing changed')
+        self.assertEqual(chosen.difficulty, 'easy',
+                         'pivoted sideways or harder')
+        live = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(live.question_text, chosen.question_text,
+                         'the slot and the posed question disagree')
+        self.assertEqual(live.attempt_count, 0, 'the ladder must restart')
+
+    def test_the_stalled_question_is_never_re_posed_as_the_pivot(self):
+        """Swapping a question for itself is the failure mode that looks like
+        working code: the counter resets and the student is stuck forever."""
+        from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+        session = self._lesson()
+        slot = self._pose_hard(session)
+        self._set_attempts(session, 2)
+        chosen = maybe_pivot_stalled_question(session)
+        self.assertNotEqual(chosen.question_text, slot.question_text)
+
+    def test_a_pool_with_nothing_else_leaves_the_question_alone(self):
+        """Better to keep hinting than to blank the slot and strand them."""
+        from apps.tutoring.models import ExitTicketQuestion
+        from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+        session = self._lesson()
+        slot = self._pose_hard(session)
+        ExitTicketQuestion.objects.filter(
+            exit_ticket__lesson=session.lesson).exclude(
+            question_text=slot.question_text).delete()
+        self._set_attempts(session, 2)
+
+        self.assertIsNone(maybe_pivot_stalled_question(session))
+        self.assertTrue(InFlightQuestion.objects.filter(session=session).exists())

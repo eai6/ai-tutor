@@ -816,6 +816,22 @@ def respond(
     from apps.tutoring.simple_tutor.tools import maybe_complete_remediation
     maybe_complete_remediation(session)
 
+    # ─── 9b2. Pivot a stalled question (server-owned) ────────────────
+    # Two hints have not worked, so a third will not either. The prompt asks
+    # for this and does not get it — same finding as remediation posing, which
+    # went 0/4 on instruction alone. Runs BEFORE the remediation follow-up so a
+    # pivot counts as "a question is in flight" and the follow-up stands down.
+    from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+    _pivoted = maybe_pivot_stalled_question(session)
+    if _pivoted is not None:
+        lines = [(_pivoted.question_text or '').strip()]
+        for _L in ('A', 'B', 'C', 'D'):
+            _opt = (getattr(_pivoted, f'option_{_L.lower()}', '') or '').strip()
+            if _opt:
+                lines.append(f'{_L}) {_opt}')
+        text_reply = f"{(text_reply or '').rstrip()}\n\n" + "\n".join(lines)
+        text_reply = text_reply.strip()
+
     # ─── 9c. Remediation follow-up (server-owned) ────────────────────
     # Runs AFTER the completion check, so the last recovered objective ends
     # remediation instead of posing a seventh question into a finished set.
