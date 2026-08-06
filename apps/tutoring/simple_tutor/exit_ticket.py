@@ -254,6 +254,15 @@ def submit_exit_ticket(session, answers: list) -> dict:
         session.ended_at = timezone.now()
         session.completed_lesson_at = timezone.now()
         session.mastery_achieved = True
+        # Retire whatever was still in flight when the quiz was passed.
+        # Without this the completed session keeps a live question the
+        # student can never answer: resume re-poses it ("Welcome back! You
+        # were working on this question"), they answer, and chat_respond's
+        # completed-session branch replies "This lesson is already complete!"
+        # without grading. Offline it is worse — the picker renders buttons
+        # for a question whose session will refuse every one of them.
+        from apps.tutoring.models import InFlightQuestion
+        InFlightQuestion.objects.filter(session=session).delete()
     es = session.engine_state or {}
     es['exit_ticket_score'] = correct_count
     es['exit_ticket_total'] = total

@@ -3202,6 +3202,15 @@ def start_for_view(session) -> dict:
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     has_prior_turns = SessionTurn.objects.filter(session=session).exists()
 
+    # A completed session must not re-pose. Existing sessions were left with a
+    # live slot by the pass path (fixed at source in exit_ticket.py), and
+    # re-posing there sends the student to a question chat_respond will refuse
+    # to grade. Clear it rather than only skipping the branch, so the picker
+    # and every other slot reader agree the lesson is over.
+    if in_flight is not None and _is_completed(session):
+        InFlightQuestion.objects.filter(session=session).delete()
+        in_flight = None
+
     if in_flight is not None and has_prior_turns:
         message = _build_resume_message(in_flight, _course_locale(session))
         step = _load_current_step(session)
@@ -3219,6 +3228,16 @@ def start_for_view(session) -> dict:
 
     out = start(session)
     return _project_start_payload(session, out.get('content', ''))
+
+
+def _is_completed(session) -> bool:
+    """True when the lesson is finished, so nothing should be posed or graded."""
+    try:
+        from apps.tutoring.models import TutorSession
+        return str(getattr(session, 'status', '')) == str(
+            TutorSession.Status.COMPLETED)
+    except Exception:                              # noqa: BLE001
+        return False
 
 
 def _build_resume_message(slot, locale: str = 'en-us') -> str:
