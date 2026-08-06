@@ -33,6 +33,7 @@ must always flow — failures get logged + return error dicts, never block.
 from __future__ import annotations
 
 import logging
+import random
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -290,6 +291,28 @@ def build_question_pool(
     allowed_types = _allowed_tutoring_types()
     pool: list = []
 
+    # Per-session question order.
+    #
+    # The DB order (order_index, id) is the authoring order and it never
+    # varied, so every student on a given step met the same question first,
+    # and a student retaking a lesson met it again. That was survivable while
+    # the tutor authored and adapted its own questions; since catalog-only
+    # (f59bdb7) it selects a pool INDEX, so the authoring order became the
+    # teaching order verbatim.
+    #
+    # Seeded on session.pk, exactly like the exit-ticket sub-sample in
+    # engine._build_exit_ticket_payload. Different session → different pk →
+    # different order, which is the variety the student sees; a retake is a
+    # new session, so a retake gets a new order.
+    #
+    # Seeded rather than free rng deliberately. One turn builds the pool once
+    # and threads the same list to both the prompt and the dispatcher
+    # (engine.py:405), so pose_question(question_index=N) is safe either way —
+    # but a free shuffle would reorder the pool the model reads on EVERY turn,
+    # so the question it saw at index 2 last turn is somewhere else now. That
+    # churn is exactly what makes a 4B lose track of what it already asked.
+    rng = random.Random(getattr(session, 'pk', None) or 0)
+
     # Source 1 — LessonStep.question (one entry max). StepQuestion
     # produces short_numeric or short_answer; skip when the allowlist
     # rejects those (e.g. MCQ-only mode).
@@ -304,7 +327,12 @@ def build_question_pool(
     # Source 2 — ETQs matching this step's enabling_objective.
     objective = (getattr(step, 'enabling_objective', '') or '').strip()
     if objective and len(pool) < max_questions:
-        for q in (
+        # Shuffled WITHIN the tier, never across tiers. The tiers encode
+        # pedagogy — this step's objective outranks the rest of the lesson —
+        # and a global shuffle would let an off-objective question take the
+        # last slot from an on-objective one. What varies is which of the
+        # objective's own questions the student meets first.
+        candidates = list(
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
@@ -312,7 +340,9 @@ def build_question_pool(
                 question_type__in=allowed_types,
             )
             .order_by('order_index', 'id')
-        ):
+        )
+        rng.shuffle(candidates)
+        for q in candidates:
             if _is_already_graded(q):
                 continue
             pool.append(q)
@@ -321,7 +351,7 @@ def build_question_pool(
 
     # Source 3 — ANY allowed ETQ on the lesson (fills the rest).
     if len(pool) < max_questions:
-        for q in (
+        candidates = list(
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
@@ -332,7 +362,9 @@ def build_question_pool(
                 if getattr(p, 'source', '') != 'lesson_step'
             ])
             .order_by('order_index', 'id')
-        ):
+        )
+        rng.shuffle(candidates)
+        for q in candidates:
             if _is_already_graded(q):
                 continue
             pool.append(q)
