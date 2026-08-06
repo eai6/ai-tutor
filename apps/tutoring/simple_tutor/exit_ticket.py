@@ -288,6 +288,20 @@ def submit_exit_ticket(session, answers: list) -> dict:
                 "📋 **Exit ticket review**\n\nYou scored %(score)d out of %(total)d. "
                 "Let's revisit the concepts you missed."
             ) % {'score': correct_count, 'total': total}
+            # Open remediation with an actual question. Without this the
+            # student is told to "revisit the concepts" and handed nothing to
+            # do: no in-flight slot, no prompt, and remediation only starts if
+            # they happen to type something unprompted.
+            #
+            # This does NOT call an LLM. Proactive remediation was removed on
+            # 2026-05-26 (views.py::chat_exit_ticket) because it added a
+            # synchronous 5-15s model call on top of deterministic MCQ grading
+            # and made the "Grading..." spinner look hung. Since the tutor
+            # became catalog-only the server can pick the question itself, so
+            # the opener costs a DB read — the objection no longer applies.
+            opener = _remediation_opening_question(session, eo_competency_map)
+            if opener:
+                message = f"{message}\n\n{opener}"
 
     return {
         'message': message,
@@ -329,6 +343,113 @@ def _try_number(s) -> float | None:
         return float(str(s).strip().replace(',', ''))
     except (TypeError, ValueError):
         return None
+
+
+def _remediation_opening_question(session, eo_competency_map: dict) -> str:
+    """Pose the first question of remediation and return it rendered for the
+    student, or '' when there is nothing sensible to ask.
+
+    Every tutor turn owes the student something to do. A failed exit ticket
+    that ends on "let's revisit the concepts you missed" is a dead end: no
+    in-flight slot exists, so even if the student replies there is nothing to
+    grade, and the lesson stalls.
+
+    Deterministic by design — no LLM call:
+      * pick the missed objective with the worst correct/asked ratio,
+      * prefer a bank question on that objective the student did NOT just get
+        wrong (re-asking the identical item teaches nothing; a sibling item on
+        the same objective is the point of remediation),
+      * fall back to a failed one if that objective has no sibling.
+
+    Returns '' on any problem — a missing opener is a worse turn, but a raised
+    exception here would lose the student's whole submission.
+    """
+    from apps.tutoring.models import ExitTicketQuestion
+    from apps.tutoring.simple_tutor.tools import (
+        _allowed_tutoring_types, handle_pose_question_by_index,
+    )
+
+    try:
+        missed = [
+            (eo, b) for eo, b in (eo_competency_map or {}).items()
+            if eo and isinstance(b, dict)
+            and int(b.get('asked') or 0) > 0
+            and int(b.get('correct') or 0) < int(b.get('asked') or 0)
+        ]
+        if not missed:
+            return ''
+        # Worst-first: the objective they understood least.
+        missed.sort(key=lambda kv: (
+            int(kv[1].get('correct') or 0) / max(int(kv[1].get('asked') or 1), 1),
+            kv[0],
+        ))
+        objective, bucket = missed[0]
+        failed_ids = {
+            q for q in (bucket.get('failed_question_ids') or [])
+            if isinstance(q, int)
+        }
+
+        candidates = list(
+            ExitTicketQuestion.objects
+            .filter(
+                exit_ticket__lesson=session.lesson,
+                enabling_objective=objective,
+                question_type__in=_allowed_tutoring_types(),
+            )
+            .order_by('order_index', 'id')
+        )
+        if not candidates:
+            return ''
+
+        # Never re-open on something they already got right. The anti-repeat
+        # guard logs these as `already_correct=True` and forces the lesson
+        # onward — opening remediation with one wastes the turn and reads as
+        # the tutor not having noticed.
+        from apps.tutoring.simple_tutor.tools import _norm_q
+        es = getattr(session, 'engine_state', None) or {}
+        answered = set(es.get('answered_correct') or []) if isinstance(es, dict) else set()
+        unseen = [
+            q for q in candidates
+            if _norm_q(q.question_text or '') not in answered
+        ]
+        pool_for_pick = unseen or candidates
+
+        # Prefer an item they have NOT already failed: a sibling on the same
+        # objective is what remediation is for. Re-asking the identical failed
+        # question is the fallback, not the goal.
+        fresh = [q for q in pool_for_pick if q.pk not in failed_ids]
+        chosen = (fresh or pool_for_pick)[0]
+
+        result = handle_pose_question_by_index(
+            session, question_index=1, question_pool=[chosen])
+        if not result.get('posed'):
+            logger.warning(
+                "[simple_tutor] remediation opener could not pose session=%s "
+                "objective=%r: %s",
+                session.pk, objective[:60], result.get('error'),
+            )
+            return ''
+
+        lines = [
+            f"Let's start with **{objective}**.",
+            '',
+            (chosen.question_text or '').strip(),
+        ]
+        for letter in ('A', 'B', 'C', 'D'):
+            opt = (getattr(chosen, f'option_{letter.lower()}', '') or '').strip()
+            if opt:
+                lines.append(f'{letter}) {opt}')
+        logger.info(
+            "[simple_tutor] remediation opened session=%s objective=%r q=%s",
+            session.pk, objective[:60], chosen.pk,
+        )
+        return '\n'.join(lines)
+    except Exception:  # noqa: BLE001 — never lose the submission
+        logger.warning(
+            "[simple_tutor] remediation opener failed session=%s",
+            getattr(session, 'pk', None), exc_info=True,
+        )
+        return ''
 
 
 def _empty_payload(message: str) -> dict:
