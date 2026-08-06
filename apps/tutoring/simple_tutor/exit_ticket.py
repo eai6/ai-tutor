@@ -495,11 +495,13 @@ def _remediation_opening_question(session, eo_competency_map: dict) -> str:
         ]
         pool_for_pick = unseen or candidates
 
-        # Prefer an item they have NOT already failed: a sibling on the same
-        # objective is what remediation is for. Re-asking the identical failed
-        # question is the fallback, not the goal.
-        fresh = [q for q in pool_for_pick if q.pk not in failed_ids]
-        chosen = (fresh or pool_for_pick)[0]
+        # Open on a question they actually got wrong. Remediation is meant to
+        # work back through the missed items, and the completion check counts
+        # them — so opening on a sibling they never failed leaves the item that
+        # tripped them up unaddressed and the counter unable to move.
+        # Reverses the earlier "prefer a fresh sibling" preference.
+        failed_first = [q for q in pool_for_pick if q.pk in failed_ids]
+        chosen = (failed_first or pool_for_pick)[0]
 
         # Retire the lesson's leftover in-flight question first. Submitting the
         # exit ticket ends the lesson phase, so a slot still open from it is

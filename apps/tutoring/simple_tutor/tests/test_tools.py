@@ -1099,10 +1099,16 @@ class OptionSetRepeatTest(DjangoTestCase):
 # fail -> remediate -> retake cycle, which the compliance harness never reaches.
 
 
-def _failed_attempt(session, objective, *, asked=2, correct=0, passed=False):
+def _failed_attempt(session, objective, *, asked=2, correct=0, passed=False,
+                    failed_ids=None):
     """A completed, failed ExitTicketAttempt whose eo_competency marks
     ``objective`` as incomplete. completed_at is backdated so turns created
-    afterwards in the test count as remediation."""
+    afterwards in the test count as remediation.
+
+    ``failed_ids`` names the questions that were wrong. Remediation completion
+    counts QUESTIONS recovered, not objectives (2026-08-06: "if I missed 10
+    questions the denominator should be 10"), so a fixture without them has
+    nothing to recover and the flag can never flip."""
     from datetime import timedelta
     from django.utils import timezone
     ticket = ExitTicket.objects.get(lesson=session.lesson)
@@ -1111,7 +1117,10 @@ def _failed_attempt(session, objective, *, asked=2, correct=0, passed=False):
         score=correct, passed=passed,
         answers={
             'per_question': [{'enabling_objective': objective, 'correct': False}],
-            'eo_competency': {objective: {'asked': asked, 'correct': correct}},
+            'eo_competency': {objective: {
+                'asked': asked, 'correct': correct,
+                'failed_question_ids': list(failed_ids or []),
+            }},
         },
         completed_at=timezone.now() - timedelta(hours=1),
     )
@@ -1120,10 +1129,10 @@ def _failed_attempt(session, objective, *, asked=2, correct=0, passed=False):
 
 class MaybeCompleteRemediationTest(DjangoTestCase):
 
-    def test_flag_set_once_every_missed_objective_is_recovered(self):
+    def test_flag_set_once_every_missed_question_is_recovered(self):
         session, questions = _make_session()
         objective = session.lesson.steps.first().enabling_objective
-        _failed_attempt(session, objective)
+        _failed_attempt(session, objective, failed_ids=[questions[0].pk])
 
         # Not recovered yet — no correct verdict since the attempt.
         self.assertFalse(maybe_complete_remediation(session))
@@ -1136,6 +1145,23 @@ class MaybeCompleteRemediationTest(DjangoTestCase):
         self.assertTrue(maybe_complete_remediation(session))
         session.refresh_from_db()
         self.assertTrue(session.engine_state.get('remediation_complete'))
+
+    def test_recovering_one_of_two_missed_questions_is_not_enough(self):
+        """The counter the student reads is this same set. Completing at 1/2
+        would re-open the quiz while the chip still said there was work left."""
+        session, questions = _make_session()
+        objective = session.lesson.steps.first().enabling_objective
+        _failed_attempt(session, objective,
+                        failed_ids=[questions[0].pk, questions[1].pk])
+        _add_graded_turn(session, questions[0], verdict='correct')
+
+        self.assertFalse(maybe_complete_remediation(session))
+        from apps.tutoring.simple_tutor.tools import remediation_progress
+        self.assertEqual(remediation_progress(session),
+                         {'recovered': 1, 'total': 2})
+
+        _add_graded_turn(session, questions[1], verdict='correct')
+        self.assertTrue(maybe_complete_remediation(session))
 
     def test_incorrect_verdict_does_not_complete_remediation(self):
         session, questions = _make_session()
@@ -1184,7 +1210,7 @@ class MaybeCompleteRemediationTest(DjangoTestCase):
         must not re-set it — otherwise the modal loops."""
         session, questions = _make_session()
         objective = session.lesson.steps.first().enabling_objective
-        _failed_attempt(session, objective)
+        _failed_attempt(session, objective, failed_ids=[questions[0].pk])
         _add_graded_turn(session, questions[0], verdict='correct')
 
         self.assertTrue(maybe_complete_remediation(session))

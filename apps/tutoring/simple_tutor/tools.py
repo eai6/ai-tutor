@@ -385,19 +385,21 @@ def build_question_pool(
 
 
 def _remediation_question_pool(session, lesson, max_questions: int) -> list:
-    """Pool for a failed-exit-ticket session, drawn from the MISSED objectives.
+    """Pool for a failed-exit-ticket session: the questions they actually missed.
 
-    Remediation is the one mode where the pool cannot come from the current
-    step, because the session has run past its last one. The objectives the
-    student actually failed are in the latest attempt's `eo_competency`, and
-    the bank is indexed by `enabling_objective` — so the pool is exactly the
-    questions on the objectives they missed.
+    Remediation is meant to work back through every question the exit ticket
+    marked wrong, so the pool IS that list, minus the ones already re-answered
+    correctly. Ordered worst-objective-first, since the model takes index 1 and
+    index 1 should be the objective they understood least.
 
-    Worst objective first, mirroring `_remediation_opening_question`: the model
-    reaches for index 1, and index 1 should be the thing they understood least.
-    Already-answered-correctly items are dropped, as are ones already graded
-    this session — re-asking those is what remediation is meant to avoid.
+    This reverses the earlier "prefer a sibling they did NOT fail" preference.
+    That was written to avoid re-asking an identical item, but it meant a
+    student could finish remediation without ever revisiting a question they
+    got wrong, and it left the completion check — which counts missed questions
+    — unable to ever reach zero.
 
+    Falls back to any question on the missed objectives when the failed items
+    are exhausted, so the tutor is never handed an empty pool mid-session.
     Returns [] when there is no completed attempt or nothing was missed, which
     puts the tutor back in plain TEACH mode rather than posing at random.
     """
@@ -426,17 +428,45 @@ def _remediation_question_pool(session, lesson, max_questions: int) -> list:
         kv[0],
     ))
 
-    graded_texts = _previously_graded_question_texts(session)
-    es = getattr(session, 'engine_state', None) or {}
-    answered = set(es.get('answered_correct') or []) if isinstance(es, dict) else set()
+    _, covered_ids = _remediation_question_sets(session)
     allowed_types = _allowed_tutoring_types()
     rng = random.Random(getattr(session, 'pk', None) or 0)
 
     pool: list = []
+    seen: set[int] = set()
+
+    def _take(queryset):
+        for q in queryset:
+            if len(pool) >= max_questions:
+                return
+            if q.pk in seen or q.pk in covered_ids:
+                continue
+            seen.add(q.pk)
+            pool.append(q)
+
+    # Pass 1 — the failed questions themselves, worst objective first.
+    for objective, bucket in missed:
+        if len(pool) >= max_questions:
+            break
+        ids = [q for q in (bucket.get('failed_question_ids') or [])
+               if isinstance(q, int)]
+        if not ids:
+            continue
+        rows = list(
+            ExitTicketQuestion.objects
+            .filter(pk__in=ids, question_type__in=allowed_types)
+            .order_by('order_index', 'id')
+        )
+        rng.shuffle(rows)
+        _take(rows)
+
+    # Pass 2 — anything else on the missed objectives, once the failures run
+    # out. Without this the pool empties as the student recovers items and the
+    # tutor is left with nothing to pose.
     for objective, _bucket in missed:
         if len(pool) >= max_questions:
             break
-        candidates = list(
+        rows = list(
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
@@ -445,18 +475,8 @@ def _remediation_question_pool(session, lesson, max_questions: int) -> list:
             )
             .order_by('order_index', 'id')
         )
-        # Same seeded shuffle as the step pool, and for the same reason: a
-        # retake should not replay the identical remediation item first.
-        rng.shuffle(candidates)
-        for q in candidates:
-            qtext = (q.question_text or '').strip().lower()
-            if qtext and qtext in graded_texts:
-                continue
-            if _norm_q(q.question_text or '') in answered:
-                continue
-            pool.append(q)
-            if len(pool) >= max_questions:
-                break
+        rng.shuffle(rows)
+        _take(rows)
     return pool
 
 
@@ -1331,18 +1351,22 @@ def handle_request_figure(
 
 
 def remediation_progress(session: 'TutorSession') -> dict | None:
-    """``{'recovered': int, 'total': int}`` while remediation is running.
+    """``{'recovered': int, 'total': int}`` in QUESTIONS, while remediating.
 
-    The same objective sets maybe_complete_remediation compares, exposed so the
-    student can see where they are. During remediation the header's step chip
-    is deliberately blanked — there is no lesson step to count — so a student
-    working through six missed objectives had no idea whether they were near
-    the end or nowhere near it.
+    Counts the questions the student got wrong on the exit ticket, not the
+    objectives behind them. Score 0/10 means ten questions to work back
+    through, and that is the denominator the student should see — an objective
+    count reads as 1/6 when there are ten items left, which understates the
+    work rather than orienting them.
 
-    None when nothing is in remediation, so the caller can leave the chip alone.
+    During remediation the header's step chip is blanked (there is no lesson
+    step to count), so without this a student has no idea whether they are one
+    item from the retake or nine.
+
+    None outside remediation, so the caller leaves the chip alone.
     """
     try:
-        missed, covered = _remediation_objective_sets(session)
+        missed, covered = _remediation_question_sets(session)
         if missed is None:
             return None
         return {'recovered': len(missed & covered), 'total': len(missed)}
@@ -1350,11 +1374,21 @@ def remediation_progress(session: 'TutorSession') -> dict | None:
         return None
 
 
-def _remediation_objective_sets(session) -> tuple[set | None, set]:
-    """(missed, covered) enabling objectives for the latest failed attempt.
+def _remediation_question_sets(session) -> tuple[set | None, set]:
+    """(missed_question_ids, covered_question_ids) for the latest failed attempt.
+
+    Remediation goes over every question the student missed, so both sets are
+    ExitTicketQuestion PKs. ``failed_question_ids`` on each eo_competency
+    bucket is the authoritative list of what was wrong.
+
+    ``covered`` is matched by normalised stem against the grader payload,
+    because SessionTurn.step is NULL on every remediation turn — remediation
+    runs past the last step, so there is no step to attach. Reading the
+    objective off the step FK is what made the retake unreachable: `covered`
+    was empty on every session and the completion check never fired.
 
     ``missed`` is None when there is nothing to remediate — no completed
-    attempt, a passed one, or a fail with no individually-incomplete objective.
+    attempt, a passed one, or a fail with no recorded failures.
     """
     from apps.tutoring.models import (
         ExitTicketAttempt, ExitTicketQuestion, SessionTurn,
@@ -1369,56 +1403,37 @@ def _remediation_objective_sets(session) -> tuple[set | None, set]:
     if attempt is None or attempt.passed:
         return None, set()
 
-    eo_competency = (attempt.answers or {}).get('eo_competency') or {}
-    missed = set()
-    for eo, bucket in eo_competency.items():
-        if not eo or not isinstance(bucket, dict):
+    missed: set[int] = set()
+    for bucket in ((attempt.answers or {}).get('eo_competency') or {}).values():
+        if not isinstance(bucket, dict):
             continue
-        asked = int(bucket.get('asked') or 0)
-        correct = int(bucket.get('correct') or 0)
-        if asked > 0 and correct < asked:
-            missed.add(eo)
+        for qid in (bucket.get('failed_question_ids') or []):
+            if isinstance(qid, int):
+                missed.add(qid)
     if not missed:
         return None, set()
 
-    # Map every bank question in this lesson to its objective, keyed on
-    # normalised stem. This is how a remediation turn's objective is recovered:
-    # SessionTurn.step is NULL for all of them.
-    #
-    # The original criterion read turn.step.enabling_objective, which is
-    # populated on lesson turns and NEVER on remediation ones — remediation
-    # runs past the last step, so there is no step to attach. `covered` stayed
-    # empty on every session and the exit ticket could not come back at all.
-    # Device session 123: six missed objectives, a correct answer recorded,
-    # covered=set().
-    stem_to_objective = {
-        _norm_q(q.question_text or ''): (q.enabling_objective or '').strip()
+    stem_to_id = {
+        _norm_q(q.question_text or ''): q.pk
         for q in ExitTicketQuestion.objects.filter(
             exit_ticket__lesson=session.lesson)
         if (q.question_text or '').strip()
-        and (q.enabling_objective or '').strip()
     }
 
-    covered = set()
+    covered: set[int] = set()
     turns = (
         SessionTurn.objects
         .filter(session=session, role='tutor',
                 created_at__gt=attempt.completed_at)
         .exclude(judge_outputs={})
-        .select_related('step')
     )
     for turn in turns:
         grader = (turn.judge_outputs or {}).get('grader') or {}
         if grader.get('verdict') != 'correct':
             continue
-        # The graded question first — it is what the student actually answered
-        # and the only signal present in remediation. The step FK stays as a
-        # fallback for lesson turns.
-        eo = stem_to_objective.get(_norm_q(grader.get('question_text') or ''))
-        if not eo:
-            eo = (getattr(turn.step, 'enabling_objective', '') or '').strip()
-        if eo:
-            covered.add(eo)
+        qid = stem_to_id.get(_norm_q(grader.get('question_text') or ''))
+        if qid is not None:
+            covered.add(qid)
     return missed, covered
 
 
@@ -1452,13 +1467,13 @@ def maybe_complete_remediation(session: 'TutorSession') -> bool:
         if es.get('remediation_complete'):
             return False        # already signalled; consumer clears it
 
-        missed, covered = _remediation_objective_sets(session)
+        missed, covered = _remediation_question_sets(session)
         if missed is None:
             return False
 
         if not missed.issubset(covered):
             logger.info(
-                "maybe_complete_remediation: session=%s %d/%d objectives "
+                "maybe_complete_remediation: session=%s %d/%d questions "
                 "recovered — not yet complete",
                 session.pk, len(missed & covered), len(missed),
             )
@@ -1468,7 +1483,7 @@ def maybe_complete_remediation(session: 'TutorSession') -> bool:
         session.engine_state = es
         session.save(update_fields=['engine_state'])
         logger.info(
-            "maybe_complete_remediation: session=%s all %d missed objectives "
+            "maybe_complete_remediation: session=%s all %d missed questions "
             "recovered — exit ticket re-opened",
             session.pk, len(missed),
         )
