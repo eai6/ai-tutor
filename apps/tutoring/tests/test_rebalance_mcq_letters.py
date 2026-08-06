@@ -188,72 +188,10 @@ class RebalanceSkipTest(DjangoTestCase):
         self.assertNotIn('already_shown', out.getvalue())
 
 
-# ============================================================================
-# MCQ option-text matching — a student who names the option must be marked right
-# ============================================================================
-
-
-class OptionPhraseMatchTest(DjangoTestCase):
-    """Observed on device 2026-08-06, lesson 1427, step 4:
-
-        C) "Four digits (two for easting, two for northing)"
-        student: "two for easting, THEN two for northing"   -> INCORRECT
-
-    The student named the option exactly; one inserted connective broke the
-    literal substring test. The step never got its correct verdict, so the
-    tutor posed three further questions trying to move past it. The visible
-    symptom was "why is this step asking three different questions?".
-    """
-
-    def _q(self, **opts):
-        from types import SimpleNamespace
-        base = dict(pk=0, question_type='mcq', question_text='?', answer_data={},
-                    option_a='', option_b='', option_c='', option_d='')
-        base.update({f'option_{k}': v for k, v in opts.items() if k in 'abcd'})
-        base['correct_answer'] = opts['correct']
-        return SimpleNamespace(**base)
-
-    def _verdict(self, q, answer):
-        from apps.tutoring.simple_tutor.grader import grade_answer
-        return grade_answer(question=q, student_answer=answer).verdict.value
-
-    def test_inserted_connective_still_matches_the_option(self):
-        q = self._q(correct='C',
-                    a='Two digits (a two-figure reference)', b='Three digits',
-                    c='Four digits (two for easting, two for northing)',
-                    d='Six digits (a six-figure reference)')
-        self.assertEqual(
-            self._verdict(q, 'two for easting, then two for northing'), 'correct')
-
-    def test_distinctive_fragment_still_matches(self):
-        q = self._q(correct='C',
-                    a='Two digits (a two-figure reference)', b='Three digits',
-                    c='Four digits (two for easting, two for northing)',
-                    d='Six digits (a six-figure reference)')
-        self.assertEqual(self._verdict(q, 'four digits'), 'correct')
-        self.assertEqual(self._verdict(q, 'three digits'), 'incorrect')
-
-    def test_reordering_is_not_a_match(self):
-        """Order carries meaning on grid references: '5 and 2' and '2 and 5'
-        are different options, so a bag-of-words test would be wrong here."""
-        q = self._q(correct='A', a='5 and 2', b='2 and 5', c='23', d='56')
-        self.assertEqual(self._verdict(q, '5 and 2'), 'correct')
-        self.assertEqual(self._verdict(q, '2 and 5'), 'incorrect')
-
-    def test_near_identical_options_still_discriminate(self):
-        q = self._q(correct='A',
-                    a='Find easting 41, then find northing 56',
-                    b='Find northing 41, then find easting 56',
-                    c='Find northing 56, then find easting 41',
-                    d='Look up the reference in the map legend')
-        self.assertEqual(
-            self._verdict(q, 'Find easting 41, then find northing 56'), 'correct')
-        self.assertEqual(
-            self._verdict(q, 'Find northing 41, then find easting 56'), 'incorrect')
-
-    def test_short_answers_do_not_carry_a_phrase_match(self):
-        """Under 3 tokens the overlap test is skipped entirely — a bare 'two'
-        must not select an option on its own."""
-        from apps.tutoring.simple_tutor.grader import _phrase_overlap
-        self.assertEqual(_phrase_overlap('two', 'two for easting two'), 0.0)
-        self.assertEqual(_phrase_overlap('a b', 'a b c d'), 0.0)
+# OptionPhraseMatchTest lived here until 2026-08-06. It covered
+# _phrase_overlap, the LCS matcher added that morning to rescue
+# "two for easting, THEN two for northing". Both are gone: matching an
+# answer to an option by string similarity is now the LLM grader's job
+# (grader._llm_grade), because a sixth heuristic was never going to be
+# the last one. Coverage moved to
+# apps/tutoring/simple_tutor/tests/test_grader_mcq.py.
