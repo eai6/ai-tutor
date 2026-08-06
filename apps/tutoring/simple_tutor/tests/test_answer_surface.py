@@ -517,14 +517,107 @@ class RemediationQuestionPoolTest(DjangoTestCase):
         prompt, firing in exactly the mode that had no pool to pose from."""
         from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
         from apps.tutoring.simple_tutor.prompts import (
-            _REMEDIATION_INSTRUCTIONS as R,
+            _MODE_REMEDIATION_SUFFIX, _REMEDIATION_INSTRUCTIONS as R,
         )
-        # Offline: the behaviour is a Block-0 mode; the dynamic block is a flag.
+        # Offline: remediation guidance rides on the per-turn mode block the
+        # server picks, so Block 0 carries none of it.
         offline = build_family_block_0('qwen', 'BASE')
-        self.assertIn('REMEDIATION mode', offline)
+        self.assertNotIn('REMEDIATION', offline)
         self.assertNotIn('author your own', offline.lower())
+        self.assertNotIn('author your own', _MODE_REMEDIATION_SUFFIX.lower())
         # Production still ships the long form and must not regain authoring.
         self.assertNotIn('author your own', R.lower())
         self.assertNotIn('surface the stem', R.lower(),
                          'contradicts "your reply does not repeat the stem"')
         self.assertIn('pose_question', R)
+
+
+class ServerPicksTheModeTest(SimpleTestCase):
+    """Exactly one mode reaches the model, chosen by the platform.
+
+    Block 0 used to carry all four and ask the model to work out which applied
+    from <in_flight_question>, <message_intent> and <exit_ticket_review>. All
+    three are arguments to build_system_prompt — the platform already holds
+    them — so that asked a 4B to re-derive a known fact with three wrong
+    answers available and nothing gained by getting it right.
+    """
+
+    from types import SimpleNamespace as _N
+    SLOT = _N(question_text='Which axis?', question_type='mcq',
+              reference_answer='B', source='catalog', attempt_count=0,
+              options=['w', 'x', 'y', 'z'], catalog_question_id=1)
+    FAILED = {'passed': False, 'missed_objectives': [{'enabling_objective': 'EO'}],
+              'mastered_objectives': []}
+
+    def _mode(self, slot, intent, review=None):
+        from apps.tutoring.simple_tutor.prompts import _render_active_mode
+        return _render_active_mode(slot, intent, review)
+
+    def test_the_three_base_modes(self):
+        for label, slot, intent in (
+            ('GRADE', self.SLOT, 'answer'),
+            ('GRADE', self.SLOT, 'answer_or_other'),
+            ('CONVERSATIONAL', self.SLOT, 'clarification'),
+            ('CONVERSATIONAL', self.SLOT, 'off_topic'),
+            ('POSE / TEACH', None, 'answer'),
+        ):
+            with self.subTest(slot=bool(slot), intent=intent):
+                self.assertIn(f'## This turn: {label}', self._mode(slot, intent))
+
+    def test_a_missing_intent_with_a_live_slot_grades(self):
+        """Intent classification can fail. Falling back to CONVERSATIONAL would
+        record an empty answer and silently discard a real attempt."""
+        self.assertIn('GRADE', self._mode(self.SLOT, None))
+        self.assertIn('GRADE', self._mode(self.SLOT, ''))
+
+    def test_remediation_is_a_suffix_not_a_fifth_mode(self):
+        """A remediation turn is still a GRADE or POSE turn. Making it
+        exclusive is what put two competing turn procedures in the prompt —
+        measured at 0/4 turns posing anything."""
+        graded = self._mode(self.SLOT, 'answer', self.FAILED)
+        self.assertIn('## This turn: GRADE', graded)
+        self.assertIn('in remediation', graded)
+
+        posing = self._mode(None, 'answer', self.FAILED)
+        self.assertIn('## This turn: POSE / TEACH', posing)
+        self.assertIn('in remediation', posing)
+
+    def test_a_passed_review_is_not_remediation(self):
+        """The review block survives a pass. Re-teaching objectives the student
+        just mastered wastes the turn."""
+        out = self._mode(self.SLOT, 'answer', {'passed': True})
+        self.assertNotIn('in remediation', out)
+
+    def test_exactly_one_mode_section_reaches_the_prompt(self):
+        """The property that matters. Two would restore the ambiguity the
+        server resolution exists to remove."""
+        from apps.tutoring.simple_tutor.prompts import (
+            ANSWER_MODE_PICKER, build_system_prompt,
+        )
+        for slot, intent, review in (
+            (self.SLOT, 'answer', None),
+            (self.SLOT, 'clarification', None),
+            (None, 'answer', None),
+            (self.SLOT, 'answer', self.FAILED),
+        ):
+            with self.subTest(slot=bool(slot), intent=intent, remed=bool(review)):
+                blocks, _ = build_system_prompt(
+                    session=None, step=None, in_flight_question=slot,
+                    student_intent=intent, exit_ticket_review=review,
+                    family='qwen', answer_mode=ANSWER_MODE_PICKER)
+                text = '\n'.join(b['text'] for b in blocks)
+                self.assertEqual(
+                    text.count('## This turn:'), 1,
+                    'the model must be handed one mode, not a menu')
+
+    def test_production_still_carries_all_four_in_block_0(self):
+        """Only the offline template was restructured. Rendering the dynamic
+        mode for other families would duplicate what their Block 0 already
+        has, and stripping their Block 0 would leave them with neither."""
+        from apps.tutoring.simple_tutor.prompts import build_system_prompt
+        blocks, _ = build_system_prompt(
+            session=None, step=None, in_flight_question=self.SLOT,
+            student_intent='answer')
+        text = '\n'.join(b['text'] for b in blocks)
+        self.assertNotIn('## This turn:', text)
+        self.assertIn('GRADE mode', blocks[0]['text'])

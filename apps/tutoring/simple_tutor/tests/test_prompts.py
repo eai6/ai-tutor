@@ -793,10 +793,15 @@ class RulesContentTest(TestCase):
             session=_session(), step=_step(),
             exit_ticket_review=review, family='qwen',
         )
-        self.assertIn('REMEDIATION mode', blocks[0]['text'])
+        # Remediation guidance now rides on the per-turn mode block the server
+        # picks — Block 0 carries no modes at all for the offline template.
+        self.assertNotIn('REMEDIATION', blocks[0]['text'])
+        self.assertIn('in remediation', blocks[-1]['text'],
+                      'the server-picked mode block must carry the '
+                      'remediation suffix when the review says failed')
         self.assertNotIn('TARGETED RE-TEACHING', blocks[-1]['text'],
-                         'offline carries the long form AND the Block-0 mode '
-                         '— two procedures for one turn')
+                         'the long form is production-only; carrying it here '
+                         'too gives two procedures for one turn')
         self.assertIn('<exit_ticket_review>', blocks[-1]['text'],
                       'the review DATA must still ride in the dynamic block')
 

@@ -679,6 +679,13 @@ def build_system_prompt(
     # pedagogy (affirm in one clause, one teaching sentence, name the slip).
     # This is the arithmetic version of the same rule, restated where the model
     # will actually still be attending to it.
+    # Offline only: the Qwen Block 0 has had its four mode sections removed in
+    # favour of this. Every other family still carries all four in its own
+    # Block 0, so rendering here as well would duplicate them.
+    if (family or '').strip().lower() == 'qwen':
+        dynamic_parts.append(_render_active_mode(
+            in_flight_question, student_intent, exit_ticket_review))
+
     dynamic_parts.append(_render_length_budget(answer_mode))
 
     if dynamic_parts:
@@ -1136,6 +1143,92 @@ Naming what an option SAYS ends the question just as surely as naming its \
 letter, and here the student is looking straight at that wording — write a \
 hint they can carry back to the four options, not the option itself.\
 </answer_surface>"""
+
+
+# One mode per turn, chosen by the server.
+#
+# Block 0 used to carry all four and ask the model to work out which applied
+# from <in_flight_question>, <message_intent> and <exit_ticket_review>. The
+# platform already knows all three — they are arguments to build_system_prompt
+# — so that asked a 4B to re-derive a fact we hold, with three wrong answers
+# available and nothing gained by getting it right.
+#
+# Rendered into the DYNAMIC block, not Block 0: the applicable mode changes per
+# turn, and Block 0 is the cached prefix. Moving it out shrinks the cached
+# prefix by ~2,500 chars AND cuts what the model reads each turn to the quarter
+# that applies.
+_MODE_GRADE = """## This turn: GRADE
+
+The student answered the question in <in_flight_question>.
+
+1. Call `record_answer` with their literal answer. The platform already holds
+   the reference, the type, and the options.
+2. Read the verdict it returns, then write your reply:
+   - **CORRECT** — acknowledge in one clause, teach one sentence, and call
+     `pose_question` for the next question in the SAME turn.
+   - **INCORRECT** — hint, and pose nothing. The question stays live until it
+     is answered correctly or you pivot."""
+
+_MODE_CONVERSATIONAL = """## This turn: CONVERSATIONAL
+
+The student sent something that is not an answer — see <message_intent>.
+
+Call `record_answer` with an **empty** `extracted_answer` to tell the platform
+"not an answer": it records nothing and leaves the question open. Then answer
+what they said and point them back at the options."""
+
+_MODE_POSE = """## This turn: POSE / TEACH
+
+Nothing is in flight. Teach, or pose a question, or both.
+
+Call `pose_question` with an index from <question_pool>. The platform writes
+that question to the slot and renders its stem and options to the student.
+Exactly one call this turn — a second swaps the question out from under them.
+
+Match the phase in <current_step>: **Engage** opens with curiosity, **Explore**
+asks what they notice, **Explain** teaches the procedure from <teaching_notes>
+and ends with a check question, **Elaborate** extends to a harder case,
+**Evaluate** poses and grades."""
+
+# Remediation is a MODIFIER, not a fifth mode: a remediation turn is still a
+# GRADE or POSE turn. Appended to whichever applies rather than replacing it.
+_MODE_REMEDIATION_SUFFIX = """
+
+You are in remediation: the student failed the quiz and you are re-teaching the
+objectives <exit_ticket_review> lists as missed. <question_pool> holds
+questions on those objectives, worst first, and the platform poses the next one
+for you after a correct answer — so your reply is the teaching, not the
+hand-off.
+
+Re-explain in fresh words rather than replaying the script they already failed
+to learn from, skip anything in <mastered_objectives>, and write no wrap-up
+when the last objective is recovered: the platform re-opens the quiz itself and
+a summary lands in front of a quiz that is already opening."""
+
+_ANSWERING_INTENTS = {'', 'answer', 'answer_or_other'}
+
+
+def _render_active_mode(
+    in_flight_question, student_intent, exit_ticket_review,
+) -> str:
+    """The one mode block that applies this turn.
+
+    Same three signals the model was being asked to read, resolved here
+    instead. Remediation rides as a suffix because a remediation turn is still
+    a GRADE or a POSE turn — treating it as a fifth exclusive mode is what put
+    two competing turn procedures in the prompt.
+    """
+    intent = (student_intent or '').strip().lower()
+    if in_flight_question is None:
+        mode = _MODE_POSE
+    elif intent in _ANSWERING_INTENTS:
+        mode = _MODE_GRADE
+    else:
+        mode = _MODE_CONVERSATIONAL
+
+    if exit_ticket_review and not exit_ticket_review.get('passed'):
+        mode = mode + _MODE_REMEDIATION_SUFFIX
+    return mode
 
 
 def _render_in_flight_block(
