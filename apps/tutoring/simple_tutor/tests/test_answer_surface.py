@@ -385,3 +385,112 @@ class EveryPayloadBuilderCarriesAnswerChoicesTest(SimpleTestCase):
               "question may be live, or None when nothing is in flight. "
               "Omitting it is not the same as None.",
         )
+
+
+class RemediationQuestionPoolTest(DjangoTestCase):
+    """build_question_pool must not return [] during remediation.
+
+    Device session 83, after a failed exit ticket: current_step_index=5 with
+    5 steps, so the LessonStep lookup missed and the pool came back empty.
+    Nothing about that was visible from build_question_pool — the damage
+    happened two layers away. pose_question(question_index=N) had no entry to
+    select, so the only way the tutor could ask anything was to write a
+    question in prose. Prose creates no slot, so nothing grades it, and
+    offline the student gets no letter buttons either: the transcript showed
+    "Now try this: What does the horizontal axis represent?" with no options
+    and a typing box.
+
+    The prompt licensed that ("or author your own"), which is why this needs
+    both halves fixed — but the pool is the half that made prose the only
+    option available.
+    """
+
+    def _failed_ticket_session(self):
+        from apps.tutoring.models import (
+            ExitTicket, ExitTicketAttempt, ExitTicketQuestion,
+        )
+        from django.utils import timezone
+
+        _n['i'] += 1
+        i = _n['i']
+        inst = Institution.objects.create(name=f'RQ{i}', slug=f'rq{i}')
+        user = User.objects.create_user(username=f'stu-rq-{i}', password='x')
+        course = Course.objects.create(title=f'C{i}', institution=inst,
+                                       grade_level='S3', is_published=True)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        lesson = Lesson.objects.create(unit=unit, title='L', objective='o',
+                                       order_index=0, is_published=True)
+        # Two steps, and the session sits PAST both — the remediation state.
+        for k in range(2):
+            LessonStep.objects.create(
+                lesson=lesson, order_index=k, phase='explain',
+                teacher_script='s', enabling_objective=f'EO-{k}')
+        et = ExitTicket.objects.create(lesson=lesson, passing_score=3)
+        for eo in ('EO-0', 'EO-1'):
+            for k in range(3):
+                ExitTicketQuestion.objects.create(
+                    exit_ticket=et, order_index=k, question_type='mcq',
+                    question_text=f'{eo} q{k}?', enabling_objective=eo,
+                    option_a='a', option_b='b', option_c='c', option_d='d',
+                    correct_answer='A', difficulty='easy',
+                )
+        session = TutorSession.objects.create(
+            institution=inst, student=user, lesson=lesson, engine='simple',
+            current_step_index=2)          # past the last step
+        # EO-0 missed badly, EO-1 mastered.
+        ExitTicketAttempt.objects.create(
+            session=session, student=user, exit_ticket=et,
+            completed_at=timezone.now(),
+            answers={
+                'per_question': [{'index': 0}],
+                'eo_competency': {
+                    'EO-0': {'asked': 3, 'correct': 0, 'failed_question_ids': []},
+                    'EO-1': {'asked': 3, 'correct': 3, 'failed_question_ids': []},
+                },
+            },
+        )
+        return session
+
+    def test_pool_is_not_empty_past_the_last_step(self):
+        from apps.tutoring.simple_tutor.tools import build_question_pool
+        pool = build_question_pool(self._failed_ticket_session())
+        self.assertTrue(
+            pool,
+            'empty pool during remediation — pose_question has nothing to '
+            'select and the tutor can only write a question in prose')
+
+    def test_pool_holds_only_missed_objectives(self):
+        """Posing an item from a mastered objective wastes the turn and reads
+        as the tutor not having looked at the results."""
+        from apps.tutoring.simple_tutor.tools import build_question_pool
+        pool = build_question_pool(self._failed_ticket_session())
+        self.assertTrue(all(q.enabling_objective == 'EO-0' for q in pool),
+                        [q.enabling_objective for q in pool])
+
+    def test_no_completed_attempt_means_no_pool(self):
+        """Past the last step with nothing failed is a finished lesson, not
+        remediation. Posing at random there would be worse than teaching."""
+        from apps.tutoring.models import ExitTicketAttempt
+        from apps.tutoring.simple_tutor.tools import build_question_pool
+        session = self._failed_ticket_session()
+        ExitTicketAttempt.objects.filter(session=session).delete()
+        self.assertEqual(build_question_pool(session), [])
+
+    def test_remediation_instructions_do_not_license_authoring(self):
+        """The prompt half. `pose_question` takes an index and nothing else, so
+        "author your own" described a capability the tool does not have — and
+        it was the last surviving authoring instruction anywhere in the
+        prompt, firing in exactly the mode that had no pool to pose from."""
+        from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
+        from apps.tutoring.simple_tutor.prompts import (
+            _REMEDIATION_INSTRUCTIONS as R,
+        )
+        # Offline: the behaviour is a Block-0 mode; the dynamic block is a flag.
+        offline = build_family_block_0('qwen', 'BASE')
+        self.assertIn('REMEDIATION mode', offline)
+        self.assertNotIn('author your own', offline.lower())
+        # Production still ships the long form and must not regain authoring.
+        self.assertNotIn('author your own', R.lower())
+        self.assertNotIn('surface the stem', R.lower(),
+                         'contradicts "your reply does not repeat the stem"')
+        self.assertIn('pose_question', R)

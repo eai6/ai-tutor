@@ -103,6 +103,23 @@ Call `record_answer` with an **empty** `extracted_answer` to tell the platform
 "not an answer": it records nothing and leaves the question open. Then answer
 what they said and point them back at the options.
 
+## REMEDIATION mode
+
+`<exit_ticket_review>` is present: the student failed the quiz and you are
+re-teaching the objectives it lists as missed.
+
+Nothing about the turn changes. GRADE mode still applies to their answers,
+POSE / TEACH still applies to asking, the hint ladder still applies to wrong
+ones. The only difference is that `<question_pool>` now holds questions on the
+MISSED objectives, worst first — so a correct answer still means pose the next
+one in the same turn, exactly as it does in the lesson.
+
+Two things are specific to this mode: re-explain in fresh words rather than
+replaying the script they already failed to learn from, and skip anything in
+`<mastered_objectives>`. Keep going until every missed objective has a correct
+verdict; the platform re-opens the quiz itself, so there is nothing to call and
+no wrap-up to write.
+
 ## POSE / TEACH mode
 
 No `<in_flight_question>`. Teach, or pose a question, or both.

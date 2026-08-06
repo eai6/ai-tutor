@@ -356,6 +356,73 @@ def _try_number(s) -> float | None:
         return None
 
 
+def maybe_pose_remediation_next(session) -> str:
+    """Pose the next remediation question server-side, or '' if not needed.
+
+    Remediation ends the moment a turn leaves no question in flight: there is
+    no step to advance to and no warm-up to fall back on, so the student is
+    handed a compliment and a dead end.
+
+    That is what happens. Measured over 4 offline turns answering the opener
+    correctly, the tutor posed a follow-up 0 times — it wrote "Well done, you
+    correctly identified..." and stopped. Neither an empty pool (fixed), nor
+    the prompt licensing prose (fixed), nor moving the remediation rules into
+    Block 0 as a mode (tried) changed it: a 4B does not reliably make a second
+    tool call in the same turn, and remediation is the one mode where missing
+    it terminates the session rather than costing a beat.
+
+    So the server poses instead. This is the codebase's existing position —
+    tool calls are hints, the server owns question state
+    (auto-memory/feedback_server_owns_question_state.md) — and the opener
+    already works this way; this is the same move for every turn after it.
+
+    Returns the rendered stem + options to append to the reply, or '' when a
+    question is already in flight, remediation is over, or the pool is dry.
+    """
+    from apps.tutoring.models import InFlightQuestion
+    from apps.tutoring.simple_tutor.tools import (
+        build_question_pool, handle_pose_question_by_index,
+    )
+
+    try:
+        es = getattr(session, 'engine_state', None) or {}
+        if isinstance(es, dict) and es.get('remediation_complete'):
+            return ''
+        if InFlightQuestion.objects.filter(session=session).exists():
+            return ''      # the model posed one itself — leave it alone
+        from apps.tutoring.simple_tutor.engine import _build_exit_ticket_review
+        review = _build_exit_ticket_review(session)
+        if not review or review.get('passed') or not review.get('missed_objectives'):
+            return ''
+
+        pool = build_question_pool(session)
+        if not pool:
+            return ''
+        chosen = pool[0]
+        result = handle_pose_question_by_index(
+            session, question_index=1, question_pool=[chosen])
+        if not result.get('posed'):
+            logger.warning(
+                "[simple_tutor] remediation follow-up could not pose "
+                "session=%s: %s", session.pk, result.get('error'))
+            return ''
+
+        lines = [(chosen.question_text or '').strip()]
+        for letter in ('A', 'B', 'C', 'D'):
+            opt = (getattr(chosen, f'option_{letter.lower()}', '') or '').strip()
+            if opt:
+                lines.append(f'{letter}) {opt}')
+        logger.info(
+            "[simple_tutor] remediation follow-up posed server-side "
+            "session=%s q=%s", session.pk, chosen.pk)
+        return '\n'.join(lines)
+    except Exception:  # noqa: BLE001 — a missing follow-up must not lose the turn
+        logger.warning(
+            "[simple_tutor] remediation follow-up failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return ''
+
+
 def _remediation_opening_question(session, eo_competency_map: dict) -> str:
     """Pose the first question of remediation and return it rendered for the
     student, or '' when there is nothing sensible to ask.

@@ -803,6 +803,14 @@ def respond(
     from apps.tutoring.simple_tutor.tools import maybe_complete_remediation
     maybe_complete_remediation(session)
 
+    # ─── 9c. Remediation follow-up (server-owned) ────────────────────
+    # Runs AFTER the completion check, so the last recovered objective ends
+    # remediation instead of posing a seventh question into a finished set.
+    from apps.tutoring.simple_tutor.exit_ticket import maybe_pose_remediation_next
+    _follow_up = maybe_pose_remediation_next(session)
+    if _follow_up:
+        text_reply = f"{(text_reply or '').rstrip()}\n\n{_follow_up}".strip()
+
     return {
         'content': text_reply or '',
         'tool_calls': tool_results,

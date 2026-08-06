@@ -441,6 +441,21 @@ of such attempts.
 # static prefix (and don't read them as competing with TUTORING-mode
 # rules). When this block IS present, it sits late in the prompt next
 # to the <exit_ticket_review> data — the model reads them together.
+# Two forms, because only the Qwen (offline) template has a REMEDIATION mode
+# section in Block 0.
+#
+# The long form is what production has always shipped and is unchanged. The
+# offline path uses the flag instead, because its Block 0 now defines
+# remediation as a fourth mode alongside GRADE / CONVERSATIONAL / POSE, and
+# carrying both meant two procedures for one turn: Block 0 said "correct ->
+# pose the next question in the SAME turn" while this block said "1. re-explain
+# 2. pose 3. grade". Measured on the 4B, it did step 1 and stopped — 0/4 turns
+# posed anything, and remediation dead-ended after one correct answer.
+#
+# Do NOT collapse these into one. Changing the long form changes the hosted
+# Anthropic prompt, which has no Block-0 section to fall back on.
+_REMEDIATION_FLAG = """<remediation_mode active="true"/>"""
+
 _REMEDIATION_INSTRUCTIONS = """<remediation_mode>
 The student has just submitted the exit ticket and an \
 ``<exit_ticket_review>`` block is present below. Your job this turn \
@@ -450,10 +465,9 @@ mini-step:
   1. Pick one missed objective the student hasn't recovered yet.
   2. Briefly re-explain the concept (1-3 sentences) using fresh \
 phrasing — do not just re-read the previous lesson script.
-  3. Call pose_question with a NEW question targeting that same \
-enabling_objective (you may adapt from <question_pool> or author \
-your own). Surface the stem + options in your text reply per the \
-POSE rules above.
+  3. Call pose_question with an index from <question_pool>, which now \
+holds questions on the missed objectives. Introduce it in your reply; \
+the platform renders the stem and options itself.
   4. Grade with record_answer as usual. On correct, move to the next \
 missed objective. On incorrect, hint per the ladder.
 Skip objectives in ``<mastered_objectives>`` — the student already \
@@ -636,7 +650,10 @@ def build_system_prompt(
         # data so the model reads the mode-switch and the failing
         # objectives in one window. Kept out of Block 0 (static
         # prefix) to keep non-remediation turns clean.
-        dynamic_parts.append(_REMEDIATION_INSTRUCTIONS)
+        dynamic_parts.append(
+            _REMEDIATION_FLAG if (family or '').strip().lower() == 'qwen'
+            else _REMEDIATION_INSTRUCTIONS
+        )
         dynamic_parts.append(review_text)
 
     in_flight_text = _render_in_flight_block(in_flight_question, answer_mode)
@@ -773,11 +790,19 @@ def _render_current_step_block(
     (exit-ticket mode — engine handles separately).
 
     The block carries the step's phase + objective + teacher_script +
-    a <question_pool> of catalog questions the LLM CAN draw from. The
-    LLM is NOT required to pose from the pool — it's context only.
+    a <question_pool> of catalog questions the LLM poses from by index.
     """
     if step is None:
-        return ""
+        # No step, but there may still be questions: remediation runs PAST the
+        # last step, and its pool comes from the missed objectives instead
+        # (tools._remediation_question_pool).
+        #
+        # Returning "" here dropped <question_pool> out of the prompt entirely,
+        # so pose_question(question_index=N) had no N to name even once the
+        # pool was populated — the model could see no questions and wrote one
+        # in prose. Emit the pool on its own: the step fields are genuinely
+        # absent, the questions are not.
+        return _render_question_pool(question_pool) if question_pool else ""
 
     phase = (getattr(step, 'phase', '') or '').capitalize() or "Unspecified"
     order_index = getattr(step, 'order_index', None)

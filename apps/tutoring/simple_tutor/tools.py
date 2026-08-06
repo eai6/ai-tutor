@@ -276,7 +276,17 @@ def build_question_pool(
         .first()
     )
     if step is None:
-        return []
+        # Past the last step. That is remediation: the exit ticket has been
+        # submitted and failed, and there is no LessonStep to key a pool off.
+        #
+        # This returned [] and the consequences were invisible from here.
+        # pose_question(question_index=N) had nothing to select, so the only
+        # way the tutor could ask anything at all was to write a question in
+        # prose — which creates no slot, so nothing grades, and offline the
+        # student gets no letter buttons either. The prompt licensed exactly
+        # that ("or author your own"), so the instruction and the empty pool
+        # were the same bug arriving from two directions.
+        return _remediation_question_pool(session, lesson, max_questions)
 
     # Drop questions whose text has already been graded in this session.
     # Without this, the LLM keeps seeing the just-answered question in
@@ -371,6 +381,82 @@ def build_question_pool(
             if len(pool) >= max_questions:
                 break
 
+    return pool
+
+
+def _remediation_question_pool(session, lesson, max_questions: int) -> list:
+    """Pool for a failed-exit-ticket session, drawn from the MISSED objectives.
+
+    Remediation is the one mode where the pool cannot come from the current
+    step, because the session has run past its last one. The objectives the
+    student actually failed are in the latest attempt's `eo_competency`, and
+    the bank is indexed by `enabling_objective` — so the pool is exactly the
+    questions on the objectives they missed.
+
+    Worst objective first, mirroring `_remediation_opening_question`: the model
+    reaches for index 1, and index 1 should be the thing they understood least.
+    Already-answered-correctly items are dropped, as are ones already graded
+    this session — re-asking those is what remediation is meant to avoid.
+
+    Returns [] when there is no completed attempt or nothing was missed, which
+    puts the tutor back in plain TEACH mode rather than posing at random.
+    """
+    from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
+
+    attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    if attempt is None:
+        return []
+    eo_competency = (attempt.answers or {}).get('eo_competency') or {}
+
+    missed = [
+        (eo, b) for eo, b in eo_competency.items()
+        if eo and isinstance(b, dict)
+        and int(b.get('asked') or 0) > 0
+        and int(b.get('correct') or 0) < int(b.get('asked') or 0)
+    ]
+    if not missed:
+        return []
+    missed.sort(key=lambda kv: (
+        int(kv[1].get('correct') or 0) / max(int(kv[1].get('asked') or 1), 1),
+        kv[0],
+    ))
+
+    graded_texts = _previously_graded_question_texts(session)
+    es = getattr(session, 'engine_state', None) or {}
+    answered = set(es.get('answered_correct') or []) if isinstance(es, dict) else set()
+    allowed_types = _allowed_tutoring_types()
+    rng = random.Random(getattr(session, 'pk', None) or 0)
+
+    pool: list = []
+    for objective, _bucket in missed:
+        if len(pool) >= max_questions:
+            break
+        candidates = list(
+            ExitTicketQuestion.objects
+            .filter(
+                exit_ticket__lesson=lesson,
+                enabling_objective=objective,
+                question_type__in=allowed_types,
+            )
+            .order_by('order_index', 'id')
+        )
+        # Same seeded shuffle as the step pool, and for the same reason: a
+        # retake should not replay the identical remediation item first.
+        rng.shuffle(candidates)
+        for q in candidates:
+            qtext = (q.question_text or '').strip().lower()
+            if qtext and qtext in graded_texts:
+                continue
+            if _norm_q(q.question_text or '') in answered:
+                continue
+            pool.append(q)
+            if len(pool) >= max_questions:
+                break
     return pool
 
 

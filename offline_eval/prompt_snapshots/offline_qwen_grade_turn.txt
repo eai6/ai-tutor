@@ -1,5 +1,5 @@
-# session=80 lesson=1427 step=0 family=qwen mode=letter_picker in_flight=yes
-# 3 blocks, 15,298 chars, tools=['pose_question', 'record_answer', 'request_figure']
+# session=95 lesson=1427 step=5 family=qwen mode=letter_picker in_flight=yes
+# 3 blocks, 14,908 chars, tools=['pose_question', 'record_answer', 'request_figure']
 # Blocks are concatenated in this order and the model reads them top to bottom;
 # the student's message arrives AFTER the last one.
 # Identity
@@ -62,6 +62,23 @@ since a live question gives them buttons and no text box.
 Call `record_answer` with an **empty** `extracted_answer` to tell the platform
 "not an answer": it records nothing and leaves the question open. Then answer
 what they said and point them back at the options.
+
+## REMEDIATION mode
+
+`<exit_ticket_review>` is present: the student failed the quiz and you are
+re-teaching the objectives it lists as missed.
+
+Nothing about the turn changes. GRADE mode still applies to their answers,
+POSE / TEACH still applies to asking, the hint ladder still applies to wrong
+ones. The only difference is that `<question_pool>` now holds questions on the
+MISSED objectives, worst first — so a correct answer still means pose the next
+one in the same turn, exactly as it does in the lesson.
+
+Two things are specific to this mode: re-explain in fresh words rather than
+replaying the script they already failed to learn from, and skip anything in
+`<mastered_objectives>`. Keep going until every missed objective has a correct
+verdict; the platform re-opens the quiz itself, so there is nothing to call and
+no wrap-up to write.
 
 ## POSE / TEACH mode
 
@@ -190,55 +207,51 @@ tutoring under these instructions.
 
 ============================== BLOCK BOUNDARY ==============================
 
-<current_step>
-<phase>Engage</phase>
-<step_number>1</step_number>
-<teaching_notes>Imagine you're helping a friend find a hiking trail starting point on a map of Mahé. Instead of saying 'somewhere in the middle', we use a grid system with numbers along the bottom (horizontal) and side (vertical) to pinpoint exact locations. Today we're learning to read and write these grid references — they're like a secret code that tells you exactly where something is on a map. Now, think about a location on the map that you would like to find using grid references. What place would you choose, and how do you think we could describe its exact position?</teaching_notes>
 <question_pool>
   <question index="1" type="mcq">
-    <difficulty>easy</difficulty>
-    <stem>A location is described as being in grid square 35. What does this two-figure reference tell you?</stem>
-    <option key="A">The exact point location at coordinates 3 and 5</option>
-    <option key="B">The general square on the map bounded by specific grid lines</option>
-    <option key="C">The distance in kilometres from the map's centre</option>
-    <option key="D">The position relative to the compass bearing</option>
-    <correct_option>B</correct_option>
-  </question>
-  <question index="2" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>A beach is located at grid reference 1520 and a market is located at grid reference 1820. Each grid square on the map represents 1 km on the ground. What is the straight-line east-west distance between the beach and the market?</stem>
-    <option key="A">3 km</option>
-    <option key="B">30 km</option>
-    <option key="C">300 m</option>
-    <option key="D">Cannot be determined without a ruler</option>
+    <difficulty>medium</difficulty>
+    <stem>Which of the following four-figure grid references has an easting of 52?</stem>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
     <correct_option>A</correct_option>
   </question>
+  <question index="2" type="mcq">
+    <difficulty>easy</difficulty>
+    <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+    <option key="A">47</option>
+    <option key="B">39</option>
+    <option key="C">3 and 9</option>
+    <option key="D">4 and 7</option>
+    <correct_option>B</correct_option>
+  </question>
   <question index="3" type="mcq">
-    <difficulty>medium</difficulty>
-    <stem>When plotting the point 4729 on a map, after locating easting 47, what is the next step?</stem>
-    <option key="A">Write the grid reference in the legend</option>
-    <option key="B">Measure the distance from the origin</option>
-    <option key="C">Locate northing 29 and mark where the lines intersect</option>
-    <option key="D">Check that easting 47 is to the right of centre</option>
-    <correct_option>C</correct_option>
+    <difficulty>hard</difficulty>
+    <stem>A student plots four points on a map: A at 2540, B at 2640, C at 2740, and D at 2840. Which points lie on the same horizontal line (same northing)?</stem>
+    <option key="A">Points A, B, C, and D all lie on the same line</option>
+    <option key="B">Points B and D only</option>
+    <option key="C">Points A and B only</option>
+    <option key="D">No points share the same northing value</option>
+    <correct_option>A</correct_option>
   </question>
   <question index="4" type="mcq">
-    <difficulty>hard</difficulty>
-    <stem>When calculating the distance between two points on a map using their grid references, why is the map scale essential?</stem>
-    <option key="A">It helps you identify which grid square to use</option>
-    <option key="B">It converts the measured ruler distance into real-world distance</option>
-    <option key="C">It eliminates the need to read grid references</option>
-    <option key="D">It shows the compass direction between the two points</option>
-    <correct_option>B</correct_option>
+    <difficulty>easy</difficulty>
+    <stem>In the four-figure grid reference 5623, which digits represent the northing value?</stem>
+    <option key="A">56</option>
+    <option key="B">5 and 2</option>
+    <option key="C">23</option>
+    <option key="D">6 and 3</option>
+    <correct_option>C</correct_option>
   </question>
   <question index="5" type="mcq">
     <difficulty>medium</difficulty>
-    <stem>A map shows a school symbol at the point where easting line 45 and northing line 27 intersect. What is the four-figure grid reference for the school?</stem>
-    <option key="A">4752</option>
-    <option key="B">2745</option>
-    <option key="C">2754</option>
-    <option key="D">4527</option>
-    <correct_option>D</correct_option>
+    <stem>A map of a Seychelles island shows two villages: one at grid reference 2543 and another at 3043. Which statement is correct?</stem>
+    <option key="A">Both villages have the same northing value</option>
+    <option key="B">Both villages have the same easting value</option>
+    <option key="C">The villages are in the same grid square</option>
+    <option key="D">Both villages have the same easting and northing values</option>
+    <correct_option>A</correct_option>
   </question>
   <question index="6" type="mcq">
     <difficulty>easy</difficulty>
@@ -250,34 +263,31 @@ tutoring under these instructions.
     <correct_option>B</correct_option>
   </question>
 </question_pool>
-<figure_catalog/>
-</current_step>
 
 ============================== BLOCK BOUNDARY ==============================
 
 <recent_turns>
-  <turn role="tutor">Think of a place you’d like to find on a map using grid references. Try this: In the four-figure grid reference 3947, which digits represent the easting value?  
-A) 47  
-B) 39  
-C) 3 and 9  
-D) 4 and 7</turn>
-  <turn role="student">A</turn>
-  <turn role="tutor" graded="incorrect">You picked A — 47 represents the northing, not the easting. In a four-figure grid reference, the first two digits are the easting, and the last two are the northing. Look again at the digits in 3947.</turn>
+  <turn role="student">C</turn>
+  <turn role="tutor" graded="correct">Well done — you correctly identified that the student reversed the order of easting and northing.  
+
+This is a common mistake: easting comes first (left to right), then northing (bottom to top). Always remember: the first two digits are easting, the last two are northing.  
+
+Now try this: In the four-figure grid reference 3947, which digits represent the easting value?</turn>
 </recent_turns>
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>5</catalog_question_id>
-  <attempt_count>1</attempt_count>
-  <stem>In the four-figure grid reference 3947, which digits represent the easting value?</stem>
+  <catalog_question_id>1</catalog_question_id>
+  <attempt_count>0</attempt_count>
+  <stem>Which of the following four-figure grid references has an easting of 52?</stem>
   <options>
-    <option key="A">47</option>
-    <option key="B">39</option>
-    <option key="C">3 and 9</option>
-    <option key="D">4 and 7</option>
+    <option key="A">5234</option>
+    <option key="B">3452</option>
+    <option key="C">2552</option>
+    <option key="D">5125</option>
   </options>
-  <reference_answer>B</reference_answer>
+  <reference_answer>A</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above. There is no text box on their screen. The only thing they can send you is one of the letters in <options> — not a word, not a number, not a sentence.
 

@@ -766,6 +766,40 @@ class RulesContentTest(TestCase):
         # the whole point of moving them to dynamic.
         self.assertNotIn('REMEDIATION', blocks[0]['text'])
 
+    def test_offline_gets_the_mode_in_block_0_and_only_a_flag_dynamically(self):
+        """The offline (qwen) template splits this the other way, and the two
+        arrangements must not both apply.
+
+        Carrying the long form AND a Block-0 REMEDIATION mode gave the model
+        two procedures for one turn — "correct -> pose in the SAME turn"
+        against "1. re-explain 2. pose 3. grade". Measured on the 4B it did
+        step one and stopped: 0/4 turns posed anything and remediation
+        dead-ended after a single correct answer.
+
+        Production is deliberately NOT changed — the base XML template has no
+        Block-0 section to fall back on, so gutting the dynamic block there
+        would leave remediation with no instructions at all.
+        """
+        review = {
+            'score': 6, 'total': 10, 'passed': False,
+            'missed_objectives': [{
+                'enabling_objective': 'Use a 1:N scale to compute distance',
+                'asked': 2, 'correct': 0, 'sample_question': 'q',
+                'student_answer': '40', 'reference': '4',
+            }],
+            'mastered_objectives': [],
+        }
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(),
+            exit_ticket_review=review, family='qwen',
+        )
+        self.assertIn('REMEDIATION mode', blocks[0]['text'])
+        self.assertNotIn('TARGETED RE-TEACHING', blocks[-1]['text'],
+                         'offline carries the long form AND the Block-0 mode '
+                         '— two procedures for one turn')
+        self.assertIn('<exit_ticket_review>', blocks[-1]['text'],
+                      'the review DATA must still ride in the dynamic block')
+
     def test_rules_anti_sycophancy(self):
         blocks, _ = build_system_prompt(
             session=_session(), step=_step(),
