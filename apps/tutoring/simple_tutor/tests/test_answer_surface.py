@@ -25,6 +25,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from django.test import TestCase as DjangoTestCase
 
 from apps.accounts.models import Institution
@@ -307,3 +308,80 @@ class RemediationPickerRepaintTest(DjangoTestCase):
         out = submit_exit_ticket(session, ['A'] * len(qs))   # pass every item
         self.assertTrue(out['is_complete'])
         self.assertIsNone(out.get('answer_choices'))
+
+
+class EveryPayloadBuilderCarriesAnswerChoicesTest(SimpleTestCase):
+    """No student-facing payload may omit ``answer_choices``.
+
+    The picker is drawn from this key and from nothing else, so a builder that
+    omits it does not draw an empty picker — it leaves whatever was on screen
+    from the previous turn. That is how device session 81 showed the pre-quiz
+    question's four options underneath the remediation question. Every letter
+    the student could press was an answer to something nobody asked, and it
+    would have graded against the live slot.
+
+    Written against the SOURCE rather than by calling three known functions,
+    because the bug was never in the builders that existed when the picker
+    shipped — it was in the one nobody thought to check. A fourth builder
+    added next year fails this test the moment it is written.
+    """
+
+    # Payload builders are recognised by returning a dict literal with a
+    # 'message' key: that is the student-facing turn shape.
+    MARKER_KEY = 'message'
+    REQUIRED_KEY = 'answer_choices'
+
+    # Documented exemptions, if a payload ever legitimately cannot carry it.
+    # Empty on purpose — add here with a reason, never by loosening MARKER_KEY.
+    EXEMPT: set = set()
+
+    def _builders(self):
+        """[(file, line, func, keys)] for every payload-shaped return."""
+        import ast
+        import pathlib
+
+        pkg = pathlib.Path(__file__).resolve().parent.parent
+        found = []
+        for path in sorted(pkg.glob('*.py')):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                for sub in ast.walk(node):
+                    if not (isinstance(sub, ast.Return)
+                            and isinstance(sub.value, ast.Dict)):
+                        continue
+                    keys = {
+                        k.value for k in sub.value.keys
+                        if isinstance(k, ast.Constant)
+                        and isinstance(k.value, str)
+                    }
+                    if self.MARKER_KEY in keys:
+                        found.append((path.name, sub.lineno, node.name, keys))
+        return found
+
+    def test_the_scan_finds_the_builders_we_know_about(self):
+        """Guards the guard. If the marker stops matching, every assertion
+        below passes vacuously and the check is worthless."""
+        names = {f for _, _, f, _ in self._builders()}
+        for known in ('respond_for_view', '_project_start_payload',
+                      'submit_exit_ticket', '_empty_payload'):
+            self.assertIn(known, names,
+                          f'{known} is no longer detected as a payload builder '
+                          f'— the scan has stopped working, not the code')
+
+    def test_every_builder_carries_answer_choices(self):
+        missing = [
+            f'{fname}:{line} {func}()'
+            for fname, line, func, keys in self._builders()
+            if func not in self.EXEMPT and self.REQUIRED_KEY not in keys
+        ]
+        self.assertEqual(
+            missing, [],
+            "these payload builders omit 'answer_choices', so the frontend "
+            "keeps the previous turn's buttons on screen:\n  "
+            + '\n  '.join(missing)
+            + "\n\nSet it — engine._answer_choices_payload(session) when a "
+              "question may be live, or None when nothing is in flight. "
+              "Omitting it is not the same as None.",
+        )

@@ -478,10 +478,19 @@ def _remediation_opening_question(session, eo_competency_map: dict) -> str:
 
 
 def _empty_payload(message: str) -> dict:
+    """Bail-out payload for a lesson with no exit ticket or no questions.
+
+    ``answer_choices`` is explicitly None rather than absent. Both callers
+    return before anything is posed, so there is genuinely nothing in flight —
+    but the frontend clears the picker on a null and leaves it alone on an
+    undefined, and 'happens to be falsy' is how the stale picker in device
+    session 81 survived. Say it, don't imply it.
+    """
     return {
         'message': message,
         'phase': 'exit_ticket',
         'is_complete': False,
+        'answer_choices': None,
         'exit_ticket': {
             'results': [], 'score': 0, 'passed': False,
             'total': 0, 'passing_score': 0,
