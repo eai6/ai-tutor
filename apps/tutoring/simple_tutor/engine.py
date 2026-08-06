@@ -444,7 +444,9 @@ def respond(
     # courses simultaneously. See memory/multi_locale_architecture_research.md.
     course_locale = _course_locale(session)
 
-    from apps.tutoring.simple_tutor.prompts import build_system_prompt
+    from apps.tutoring.simple_tutor.prompts import (
+        ANSWER_MODE_FREE_TEXT, ANSWER_MODE_PICKER, build_system_prompt,
+    )
 
     # Resolve the student's offline/online model preference ONCE per turn.
     #
@@ -509,6 +511,15 @@ def respond(
         student_intent=student_intent,
         locale=course_locale,
         family=_family,
+        # The hint ladder assumes the student can type back. When the buttons
+        # are their only input it has to stop asking things — same predicate
+        # the frontend uses to render them, and `turn_config` is the model we
+        # already resolved above.
+        answer_mode=(
+            ANSWER_MODE_PICKER
+            if _uses_answer_picker(session, in_flight, turn_config)
+            else ANSWER_MODE_FREE_TEXT
+        ),
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -3223,6 +3234,46 @@ def _build_resume_message(slot, locale: str = 'en-us') -> str:
     return "\n".join(p for p in parts if p is not None).strip()
 
 
+def _uses_answer_picker(session, slot, cfg=None) -> bool:
+    """True when the A-D buttons are the student's ONLY way to answer ``slot``.
+
+    Two callers, and they must never disagree: ``_answer_choices_payload``
+    decides whether the buttons render, and the system prompt's
+    ``<answer_surface>`` block tells the tutor a hint may not ask anything
+    because they did. If the frontend shows buttons the prompt doesn't know
+    about, you get device session 30 — the tutor hinted "Now try this: what
+    does the horizontal axis represent?" while the buttons on screen still
+    belonged to the vertical-axis question. That failure is invisible from
+    either side alone, which is why the condition lives in one function.
+
+    ``cfg`` lets the turn path pass the model it already resolved rather than
+    resolving twice.
+    """
+    try:
+        from apps.tutoring.simple_tutor.model_choice import (
+            LOCAL_PROVIDER, resolve_for_session,
+        )
+
+        if slot is None or (slot.question_type or '').strip().lower() != 'mcq':
+            return False
+        if len([o for o in (slot.options or []) if str(o).strip()]) < 2:
+            return False
+        if cfg is None:
+            cfg = resolve_for_session(session)
+        if cfg is None:
+            from apps.llm.models import ModelConfig
+            cfg = ModelConfig.get_for('tutoring')
+        return (
+            cfg is not None
+            and str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
+        )
+    except Exception:                              # noqa: BLE001
+        # Free text is the safe default on both sides: the student keeps a
+        # way to reply, and the tutor keeps the ladder it has always had.
+        logger.warning("answer picker check failed", exc_info=True)
+        return False
+
+
 def _answer_choices_payload(session) -> dict | None:
     """The live MCQ's options, when the student should CLICK rather than type.
 
@@ -3243,23 +3294,11 @@ def _answer_choices_payload(session) -> dict | None:
     """
     try:
         from apps.tutoring.models import InFlightQuestion
-        from apps.tutoring.simple_tutor.model_choice import (
-            LOCAL_PROVIDER, resolve_for_session,
-        )
-
-        cfg = resolve_for_session(session)
-        if cfg is None:
-            from apps.llm.models import ModelConfig
-            cfg = ModelConfig.get_for('tutoring')
-        if cfg is None or str(getattr(cfg, 'provider', '')) != LOCAL_PROVIDER:
-            return None
 
         slot = InFlightQuestion.objects.filter(session=session).first()
-        if slot is None or (slot.question_type or '').strip().lower() != 'mcq':
+        if not _uses_answer_picker(session, slot):
             return None
         options = list(slot.options or [])
-        if len(options) < 2:
-            return None
         return {
             'letters': [
                 {'letter': L, 'text': str(t).strip()}

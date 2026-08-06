@@ -50,6 +50,13 @@ if TYPE_CHECKING:
 # settled on — see memory/tutor_engine_research.md.
 
 
+# What the student can physically send back this turn. Offline sessions answer
+# an MCQ by tapping one of four buttons and have no text box at all, which
+# changes what a hint is allowed to be — see _ANSWER_SURFACE_PICKER.
+ANSWER_MODE_FREE_TEXT = 'free_text'
+ANSWER_MODE_PICKER = 'letter_picker'
+
+
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "pose_question",
@@ -515,6 +522,7 @@ def build_system_prompt(
     student_intent: str | None = None,
     locale: str = 'en-us',
     family: str | None = None,
+    answer_mode: str = ANSWER_MODE_FREE_TEXT,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -545,6 +553,11 @@ def build_system_prompt(
             from the returned tools list.
         recent_window: last N SessionTurns of this step, oldest → newest.
         step_summaries: one-line summary per completed step.
+        answer_mode: what the student can physically send back this turn.
+            ``letter_picker`` (offline sessions) means the A-D buttons are
+            their only input, so the hint ladder's sub-questions and
+            micro-steps are unanswerable — see _ANSWER_SURFACE_PICKER.
+            Defaults to free text, which is every hosted session.
 
     Returns:
         (system_blocks, tools)
@@ -626,7 +639,7 @@ def build_system_prompt(
         dynamic_parts.append(_REMEDIATION_INSTRUCTIONS)
         dynamic_parts.append(review_text)
 
-    in_flight_text = _render_in_flight_block(in_flight_question)
+    in_flight_text = _render_in_flight_block(in_flight_question, answer_mode)
     if in_flight_text:
         dynamic_parts.append(in_flight_text)
 
@@ -649,7 +662,7 @@ def build_system_prompt(
     # pedagogy (affirm in one clause, one teaching sentence, name the slip).
     # This is the arithmetic version of the same rule, restated where the model
     # will actually still be attending to it.
-    dynamic_parts.append(_render_length_budget())
+    dynamic_parts.append(_render_length_budget(answer_mode))
 
     if dynamic_parts:
         blocks.append({
@@ -981,7 +994,7 @@ _INTENT_GUIDANCE = {
 }
 
 
-def _render_length_budget() -> str:
+def _render_length_budget(answer_mode: str = ANSWER_MODE_FREE_TEXT) -> str:
     """The per-turn reply-length budget, in sentences.
 
     Sentences rather than tokens or words: the model cannot count its own
@@ -993,14 +1006,31 @@ def _render_length_budget() -> str:
 
     Stated as what TO do. The family prompts already say what not to do and
     the small local models read straight past it; see the call site.
+
+    Line 3 is answer-mode-aware, and that is not cosmetic. This block renders
+    DEAD LAST, after <answer_surface>, so on the first offline run the final
+    thing the 4B read was "3. The next question, if you are posing one." — and
+    it duly wrote one, in prose, under buttons belonging to the old question.
+    Two live rules with the closer one winning is the expected outcome, not a
+    surprise. The distinction that actually matters is prose-vs-tool: a
+    question written into the text strands the student, while pose_question
+    swaps the buttons for its own and is always fine.
     """
+    if answer_mode == ANSWER_MODE_PICKER:
+        third = (
+            "  3. A next question ONLY if you are calling pose_question this "
+            "turn — that swaps the buttons for its own. Otherwise stop after "
+            "2: the buttons on screen are already how the student replies.\n"
+        )
+    else:
+        third = "  3. The next question, if you are posing one.\n"
     return (
         "<reply_length>\n"
         "Write 2-3 sentences, then stop. That is the whole visible reply.\n"
         "Budget them like this:\n"
         "  1. One clause reacting to what the student just said.\n"
         "  2. One sentence that teaches — the rule, the step, or the slip.\n"
-        "  3. The next question, if you are posing one.\n"
+        f"{third}"
         "A reply that runs past 3 sentences is too long, however good it is.\n"
         "</reply_length>"
     )
@@ -1027,7 +1057,49 @@ def _render_message_intent_block(student_intent: str | None) -> str:
     )
 
 
-def _render_in_flight_block(in_flight_question) -> str:
+# Appended INSIDE <in_flight_question> when the student's only answer surface is
+# the A-D button row (offline sessions — see engine._uses_answer_picker).
+#
+# Every hint-ladder instruction we ship assumes the student can type back:
+# "ask a clarifying sub-question" (family_prompts.py:623), "carry at most ONE
+# micro-step per hint ... once the student answers it" (:880), and both
+# hint-vs-reveal examples are themselves questions (:888). With a letter picker
+# that guidance is not merely unhelpful, it is unanswerable — device session 30
+# hinted "Now try this: what does the horizontal axis represent?" while the
+# buttons on screen still belonged to the vertical-axis question. The student
+# had four options for a question nobody asked.
+#
+# So this is not a nudge, it is a mode switch, and it overrides the ladder for
+# the reply text only. Placed here rather than in Block 0 because it is a
+# property of THIS turn's slot, and because the dynamic block renders last —
+# closest to the student's message, where instruction-following is strongest
+# (prompting-fundamentals: instructions last in long context).
+_ANSWER_SURFACE_PICKER = """  <answer_surface mode="letter_picker">
+The student answers by TAPPING one of the option buttons above. There is no \
+text box on their screen. The only thing they can send you is one of the \
+letters in <options> — not a word, not a number, not a sentence.
+
+So when the grader says INCORRECT, your whole reply is: name the rule, the \
+place to look, or the misconception they fell for, and hand THIS question \
+back. End on a statement. The buttons are the invitation to try again; you \
+do not need to write one.
+
+Any question you ask here is unanswerable, so ask none. "Now try this: what \
+does the horizontal axis represent?" leaves the student holding four buttons \
+that belong to a different question. Sub-questions, micro-steps, "can you \
+explain why", and "which one do you think it is?" all fail this same way. \
+Those belong to a question you pose with pose_question, which replaces the \
+buttons with its own.
+
+Naming what an option SAYS ends the question just as surely as naming its \
+letter, and here the student is looking straight at that wording — write a \
+hint they can carry back to the four options, not the option itself.\
+</answer_surface>"""
+
+
+def _render_in_flight_block(
+    in_flight_question, answer_mode: str = ANSWER_MODE_FREE_TEXT,
+) -> str:
     """Render the ``<in_flight_question>`` block — the platform's
     persisted slot of the question the student is currently answering.
 
@@ -1039,6 +1111,10 @@ def _render_in_flight_block(in_flight_question) -> str:
 
     The reference_answer is included so the LLM can compose a
     grading-aware hint without revealing it to the student.
+
+    ``answer_mode`` describes what the student can physically send back.
+    ``letter_picker`` means the A-D buttons are their only input, which
+    changes what a hint is allowed to be — see _ANSWER_SURFACE_PICKER.
     """
     if in_flight_question is None:
         return ""
@@ -1070,6 +1146,12 @@ def _render_in_flight_block(in_flight_question) -> str:
         parts.append(
             f'  <reference_answer>{_escape_xml(ref)}</reference_answer>'
         )
+    # Only when the buttons are actually on screen: the frontend renders them
+    # for a local session with a live MCQ carrying options, which is the same
+    # condition engine._uses_answer_picker checks. If the two ever disagree,
+    # the bug is silent and looks exactly like session 30 — so they share it.
+    if answer_mode == ANSWER_MODE_PICKER and qtype == 'mcq' and options:
+        parts.append(_ANSWER_SURFACE_PICKER)
     if attempts >= 3:
         # Cycle-8: without this, sessions ground 15+ turns re-scaffolding
         # one hard question against a disengaged student. The anti-desync
