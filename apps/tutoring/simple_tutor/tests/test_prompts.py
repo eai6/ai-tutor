@@ -826,18 +826,22 @@ class EndToEndShapeTest(TestCase):
         self.assertIn('What is an angle?', b2)
 
     def test_minimal_render_no_extras(self):
-        # No KB, no history, no figures, no pool — only blocks 0 + 1
+        # No KB, no history, no figures, no pool — blocks 0 + 1 + the
+        # always-rendered <reply_length> budget (c16192f); no dynamic block.
         blocks, tools = build_system_prompt(
             session=_session(), step=_step(),
         )
-        self.assertEqual(len(blocks), 2)   # block 0 + block 1; no block 2
+        self.assertEqual(len(blocks), 3)
+        self.assertIn('<reply_length>', blocks[-1]['text'])
 
     def test_no_step_only_block_0(self):
-        # Exit-ticket mode: step is None → only block 0 (rules + safety)
+        # Exit-ticket mode: step is None → block 0 (rules + safety) + the
+        # always-rendered <reply_length> budget.
         blocks, _ = build_system_prompt(
             session=_session(), step=None,
         )
-        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks), 2)
+        self.assertIn('<reply_length>', blocks[-1]['text'])
 
     def test_empty_pool_renders_status_marker(self):
         # No catalog questions for the step — pool renders status="empty"

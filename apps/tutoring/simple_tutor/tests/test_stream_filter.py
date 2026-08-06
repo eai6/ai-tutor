@@ -352,7 +352,7 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         snapshots = []
 
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, config=None):
             resp = responses.pop(0)
             if on_delta is not None and not responses:
                 # Call 2: hand the text over a character at a time, the way
@@ -397,9 +397,14 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
     def test_an_unsafe_reply_streams_only_its_corrected_form(self, _kb):
         """LEAKY is unsafe end to end — a false affirmation on a wrong answer,
         followed by the reference itself. What streams must be the CORRECTED
-        text: the opener replaced with a verdict-consistent acknowledgement
-        and the reveal sentence gone. The student never sees the model's
-        original claim, not even briefly.
+        text: the opener replaced with a verdict-consistent acknowledgement.
+        The student never sees the model's false affirmation, not even briefly.
+
+        Scope narrowed 2026-08-06 (7f1e7f4 removed _filter_reveals): the
+        REVEAL is no longer redacted — leak prevention moved entirely into
+        Block 0's prompt rules, because post-processing cut correct teaching
+        that shared a paragraph with the leak. Verdict-polarity correction
+        stays, so that is what this asserts.
 
         This is also the regression test for the Call-1 handover. When the
         gate's buffer was not reset between Call 1's prose and Call 2's
@@ -412,8 +417,8 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         self.assertTrue(snapshots)
         streamed = snapshots[-1]
         self.assertNotIn('Exactly right', streamed)
-        self.assertNotIn('answer is A', streamed)
-        # Positively assert the correction, not just the absence of the leak.
+        # Positively assert the correction, not just the absence of the
+        # false affirmation.
         self.assertIn('Not quite', streamed)
 
     def test_a_safe_reply_does_stream(self, _kb):
@@ -428,15 +433,19 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         self.assertTrue(snapshots, 'a benign reply produced no snapshots')
         self.assertIn('Not quite', snapshots[-1])
 
-    def test_the_stream_never_showed_what_the_batch_pass_redacted(self, _kb):
+    def test_the_stream_never_showed_what_the_batch_pass_rewrote(self, _kb):
+        """No frame the student saw may contain what the batch pass removed.
+
+        Since 7f1e7f4 that means the FALSE AFFIRMATION only — the reveal
+        filter is gone, so the reference sentence now reaches the student
+        and prompt rules are what prevent it. Parity is the invariant this
+        test defends: whatever the batch pass rewrites must never have
+        streamed first.
+        """
         session = _make_session(12)
         self._slot(session)
         out, snapshots = self._run(session, stream=True)
-        # The model claimed "Exactly right!" on a WRONG answer and stated the
-        # reference. Neither may survive — in the final text or in any frame
-        # the student saw on the way there.
         for snap in snapshots + [out['content']]:
-            self.assertNotIn('The answer is A', snap)
             self.assertNotIn('Exactly right', snap)
 
 
@@ -468,7 +477,7 @@ class Call1FlushGuardTest(DjangoTestCase):
         snapshots = []
 
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, config=None):
             return responses.pop(0) if responses else _llm_response(text='')
 
         with patch.dict(os.environ, {'TUTOR_MODEL_OVERRIDE': self.KIOSK_MODEL}):
