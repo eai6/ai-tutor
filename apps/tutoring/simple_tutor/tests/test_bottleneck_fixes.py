@@ -638,10 +638,15 @@ class AutoPoseFallbackTest(DjangoTestCase):
 
 class QwenVariantCycle10Test(SimpleTestCase):
     """Cycle-10 qwen prompt iteration — pins the rules added for the
-    cycle-9 qwen signature: hint micro-step loops (0.70+0.30 asked 8x,
-    'yes' and '1' both rejected), precision pedantry (33.3% for 1/3
-    rejected), re-asking answered questions, naming the correct option
-    mid-hint, and authored questions with impossible numbers."""
+    cycle-9 qwen signature: precision pedantry (33.3% for 1/3 rejected),
+    re-asking answered questions, and naming the correct option mid-hint.
+
+    Restructured 2026-08-06 (memory/offline_prompt_conflict_audit.md). These
+    assert the RULE survives, not the sentence that carried it — pinning
+    wording makes a prompt un-editable, which is how the template accumulated
+    the contradictions the audit found. Two former members of this class are
+    gone on purpose and are documented below.
+    """
 
     def _qwen_block(self):
         from apps.tutoring.simple_tutor.family_prompts import (
@@ -649,25 +654,56 @@ class QwenVariantCycle10Test(SimpleTestCase):
         )
         return build_family_block_0('qwen', 'BASE')
 
-    def test_micro_step_rule_present(self):
-        b = self._qwen_block()
-        self.assertIn('micro-step', b)
-
     def test_precision_rule_present(self):
-        self.assertIn('33.3', self._qwen_block())
+        b = self._qwen_block().lower()
+        self.assertIn('rounding', b)
 
     def test_answered_question_is_finished_rule_present(self):
-        self.assertIn('answered question is finished', self._qwen_block().lower())
-
-    def test_authored_number_sanity_rule_present(self):
         b = self._qwen_block().lower()
-        self.assertIn('between 0 and 1', b)
+        self.assertIn('answered correctly is finished', b)
 
     def test_no_worries_not_seeded_as_example_opener(self):
-        # The non-answer worked example must not itself model the
-        # templated opener the judge flags.
+        # The non-answer example must not itself model the templated opener
+        # the judge flags.
         b = self._qwen_block()
         self.assertNotIn('> No worries', b)
+
+    # ── Deliberately deleted ────────────────────────────────────────────────
+    #
+    # test_micro_step_rule_present pinned "a hint carries at most ONE
+    # micro-step ... once the student answers it". A micro-step is a question
+    # asked mid-hint, and offline the student has four buttons and no text box
+    # — there is nothing to answer it with. The rule was written when typing
+    # was the only answer surface (audit C6).
+    #
+    # test_authored_number_sanity_rule_present pinned "a probability lies
+    # between 0 and 1", from "check your numbers before posing an AUTHORED
+    # question". pose_question takes question_index and nothing else; the tutor
+    # cannot author a question, so the rule described a capability that does
+    # not exist and implied one that must not (audit C3).
+
+    def test_the_tutor_is_not_told_it_can_author_questions(self):
+        """The inverse of the deleted authoring test, and the one worth having.
+
+        Catalog-only (f59bdb7) removed question authoring from the tool; every
+        sentence that still described it was telling a 4B it may write its own
+        question, which is exactly the behaviour we keep seeing in transcripts.
+        """
+        b = self._qwen_block().lower()
+        for phrase in ('authored question', 'distractors plausible',
+                       'roll a fair 1-in-4', 'four options'):
+            self.assertNotIn(phrase, b, f'authoring guidance is back: {phrase!r}')
+
+    def test_no_hand_off_phrase_is_taught_verbatim(self):
+        """Measured 2026-08-06: the model reaches for whatever hand-off string
+        the prompt spells out, including on wrong answers where no question
+        follows — 3/6 turns. Removing the literal string took it to 0/8. The
+        rule that FORBIDS the phrases still names them, so match on the
+        instructional shape rather than the words themselves.
+        """
+        b = self._qwen_block()
+        self.assertNotIn('Introduce the question ("', b)
+        self.assertNotIn('. Here\'s the next one:\n', b)
 
 
 # ════════════════════════════════════════════════════════════════════════════
