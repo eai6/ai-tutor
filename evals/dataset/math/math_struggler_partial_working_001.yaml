@@ -8,7 +8,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1142
-tags: [scaffolding, math, struggler, partial_work, wrong_with_working]
+tags: [scaffolding, math, struggler, partial_work, wrong_with_working, v1]
 
 mode: single_turn
 seed_history:

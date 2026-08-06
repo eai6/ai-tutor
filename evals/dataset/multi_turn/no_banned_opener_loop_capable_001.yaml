@@ -8,7 +8,7 @@ description: >
 persona: capable
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, banned_opener, repetition]
+tags: [multi_turn, banned_opener, repetition, v1]
 
 mode: multi_turn
 max_turns: 13

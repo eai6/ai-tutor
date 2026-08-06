@@ -6,7 +6,7 @@ description: >
 persona: capable
 subject: geography
 lesson_id: 1463
-tags: [factual, claim_unverified, crosscutting]
+tags: [factual, claim_unverified, crosscutting, v1]
 
 mode: single_turn
 seed_history:

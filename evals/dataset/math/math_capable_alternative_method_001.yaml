@@ -6,7 +6,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1138
-tags: [student_input, math, capable, alternative_method]
+tags: [student_input, math, capable, alternative_method, v1]
 
 mode: single_turn
 seed_history:

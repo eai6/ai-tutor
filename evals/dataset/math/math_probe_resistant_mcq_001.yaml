@@ -6,7 +6,7 @@ description: >
 persona: probe_resistant
 subject: math
 lesson_id: 1145
-tags: [correct_mcq, math, mcq, probe_resistant, bare_answer]
+tags: [correct_mcq, math, mcq, probe_resistant, bare_answer, v1]
 
 mode: single_turn
 seed_history:

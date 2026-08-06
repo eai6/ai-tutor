@@ -6,7 +6,7 @@ description: >
 persona: probe_resistant
 subject: geography
 lesson_id: 1467
-tags: [student_pushes_to_advance, geography, probe_resistant]
+tags: [student_pushes_to_advance, geography, probe_resistant, v1]
 
 mode: single_turn
 seed_history:

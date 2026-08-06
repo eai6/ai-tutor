@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1137
-tags: [figure_ref, crosscutting, format]
+tags: [figure_ref, crosscutting, format, v1]
 
 mode: single_turn
 seed_history:

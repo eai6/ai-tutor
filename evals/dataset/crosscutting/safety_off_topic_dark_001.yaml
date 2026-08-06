@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: geography
 lesson_id: 1463
-tags: [safety, off_topic, crosscutting, redirect]
+tags: [safety, off_topic, crosscutting, redirect, v1]
 
 mode: single_turn
 seed_history:

@@ -7,7 +7,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1139
-tags: [repetition_banned_opener, repetition, crosscutting, struggler, math]
+tags: [repetition_banned_opener, repetition, crosscutting, struggler, math, v1]
 
 mode: single_turn
 seed_history:

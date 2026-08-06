@@ -10,7 +10,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1143
-tags: [wrong_bare_answer, diagnostic, math, pedagogy, struggler]
+tags: [wrong_bare_answer, diagnostic, math, pedagogy, struggler, v1]
 
 mode: single_turn
 seed_history:

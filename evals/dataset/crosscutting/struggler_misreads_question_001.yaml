@@ -8,7 +8,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1142
-tags: [diagnostic, struggler, misread, math]
+tags: [diagnostic, struggler, misread, math, v1]
 
 mode: single_turn
 seed_history:

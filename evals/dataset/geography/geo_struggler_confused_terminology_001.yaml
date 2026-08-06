@@ -6,7 +6,7 @@ description: >
 persona: struggler
 subject: geography
 lesson_id: 1465
-tags: [terminology_confusion, geography, diagnostic, struggler]
+tags: [terminology_confusion, geography, diagnostic, struggler, v1]
 
 mode: single_turn
 seed_history:

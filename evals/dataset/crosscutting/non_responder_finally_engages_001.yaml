@@ -7,7 +7,7 @@ description: >
 persona: non_responder
 subject: math
 lesson_id: 1141
-tags: [persona_handling, non_responder, idk_non_answer, math, engagement]
+tags: [persona_handling, non_responder, idk_non_answer, math, engagement, v1]
 
 mode: single_turn
 seed_history:

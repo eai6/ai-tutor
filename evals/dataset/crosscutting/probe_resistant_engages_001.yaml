@@ -6,7 +6,7 @@ description: >
 persona: probe_resistant
 subject: math
 lesson_id: 1138
-tags: [persona_handling, probe_resistant, engagement]
+tags: [persona_handling, probe_resistant, engagement, v1]
 
 mode: single_turn
 seed_history:

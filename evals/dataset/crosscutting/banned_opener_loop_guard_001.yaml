@@ -7,7 +7,7 @@ description: >
 persona: probe_resistant
 subject: math
 lesson_id: 1144
-tags: [repetition_banned_opener, math, probe_resistant, crosscutting]
+tags: [repetition_banned_opener, math, probe_resistant, crosscutting, v1]
 
 mode: single_turn
 seed_history:

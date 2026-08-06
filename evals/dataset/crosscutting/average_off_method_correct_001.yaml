@@ -7,7 +7,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1137
-tags: [persona_handling, average, method_acceptance]
+tags: [persona_handling, average, method_acceptance, v1]
 
 mode: single_turn
 seed_history:

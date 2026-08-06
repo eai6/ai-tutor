@@ -6,7 +6,7 @@ description: >
 persona: capable
 subject: geography
 lesson_id: 1464
-tags: [student_input, geography, capable, correction]
+tags: [student_input, geography, capable, correction, v1]
 
 mode: single_turn
 seed_history:

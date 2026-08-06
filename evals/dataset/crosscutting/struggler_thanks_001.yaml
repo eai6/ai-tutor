@@ -7,7 +7,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1143
-tags: [gives_up_rapport, math, persona_handling, struggler, rapport]
+tags: [gives_up_rapport, math, persona_handling, struggler, rapport, v1]
 
 mode: single_turn
 seed_history:

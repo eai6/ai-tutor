@@ -213,6 +213,30 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
     ),
 
+    # Qwen3.6-27B in NON-THINKING mode. Tag built from
+    # infra/ollama/Modelfile.qwen3.6-27b-instruct.
+    #
+    # Unlike the 2507 pair above, Qwen3.6 is ONE hybrid checkpoint that thinks
+    # by default; instruct mode is a request-time switch, so this profile is
+    # half the mechanism (the Modelfile's sampling + num_ctx is the other half).
+    # ollama_think=False is correct HERE and wrong on qwen3-4b-jetson: this
+    # template GATES on Think, so the flag genuinely suppresses the monologue,
+    # whereas Thinking-2507 opens <think> unconditionally and the flag only
+    # disables Ollama's parser.
+    #
+    # max_tokens 2048 (not the 4B's 1024): a 27B writes longer teaching turns,
+    # and with thinking off the budget is all visible answer.
+    #
+    # Baseline: the same weights in DEFAULT (thinking) mode scored 29/30 rubric
+    # 0.89 on the v1 board — best on record — at ~5 h for 30 scenarios. This
+    # entry exists to measure the same model without the reasoning tax.
+    "local_ollama/qwen3.6-27b-instruct": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=2048,
+        temperature=0.7, top_p=0.80, top_k=20,
+        num_ctx=32768, ollama_think=False,
+        notes="Qwen3.6-27B hybrid forced non-thinking (card's instruct sampling).",
+    ),
+
     # Reasoning sibling of the tag above. Tag built from
     # infra/ollama/Modelfile.qwen3-4b-thinking-jetson.
     #

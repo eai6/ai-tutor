@@ -5,7 +5,7 @@ description: >
 persona: capable
 subject: math
 lesson_id: 1137
-tags: [exit_ticket, premature_advance, crosscutting]
+tags: [exit_ticket, premature_advance, crosscutting, v1]
 
 mode: single_turn
 seed_history:
