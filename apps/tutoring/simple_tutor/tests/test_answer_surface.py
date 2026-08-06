@@ -37,6 +37,7 @@ from apps.tutoring.simple_tutor.engine import (
 from apps.tutoring.simple_tutor.prompts import (
     ANSWER_MODE_FREE_TEXT, ANSWER_MODE_PICKER, _render_in_flight_block,
 )
+from apps.tutoring.simple_tutor.tools import _resolve_student_choice
 
 User = get_user_model()
 _n = {'i': 0}
@@ -90,6 +91,54 @@ class AnswerSurfaceBlockTest(DjangoTestCase):
         overriding that instruction leaves the model with two live rules."""
         out = _render_in_flight_block(_slot(), ANSWER_MODE_PICKER)
         self.assertIn('ask none', out)
+
+
+class ResolveStudentChoiceTest(DjangoTestCase):
+    """``student_choice`` on the record_answer result.
+
+    Device session 30: the student clicked D ("It shows the compass direction
+    between the two points") and was told "it doesn't help pick grid squares"
+    — a refutation of option A. The tutor passed the letter in itself, and the
+    options were in its prompt, but the lookup sits ~7,000 tokens up and the
+    4B missed it. Resolving server-side removes the lookup instead of asking
+    the model to be more careful with it.
+    """
+
+    OPTS = [
+        'It helps you identify which grid square to use',
+        'It converts the measured ruler distance into real-world distance',
+        'It eliminates the need to read grid references',
+        'It shows the compass direction between the two points',
+    ]
+
+    def test_the_session_30_case(self):
+        self.assertEqual(
+            _resolve_student_choice(self.OPTS, 'mcq', 'D'),
+            {'letter': 'D', 'text': self.OPTS[3]},
+        )
+
+    def test_letter_forms_the_grader_already_accepts(self):
+        for raw, letter in (('B', 'B'), ('Option C', 'C'), ('a.', 'A')):
+            with self.subTest(raw=raw):
+                got = _resolve_student_choice(self.OPTS, 'mcq', raw)
+                self.assertEqual(got['letter'], letter)
+                self.assertEqual(got['text'], self.OPTS['ABCD'.index(letter)])
+
+    def test_prose_resolves_to_nothing_rather_than_a_guess(self):
+        """Typed prose online. There is no option to name, and naming the
+        wrong one is the failure being fixed — silence beats a guess."""
+        self.assertIsNone(
+            _resolve_student_choice(self.OPTS, 'mcq', 'the compass direction'))
+
+    def test_letter_past_the_end_of_the_options(self):
+        """A three-option question graded against 'D'. Indexing without the
+        bound would either raise inside a tool handler or name nothing."""
+        self.assertIsNone(_resolve_student_choice(self.OPTS[:3], 'mcq', 'D'))
+        self.assertIsNone(_resolve_student_choice(self.OPTS, 'mcq', 'E'))
+
+    def test_not_an_mcq(self):
+        self.assertIsNone(_resolve_student_choice(self.OPTS, 'short_answer', 'D'))
+        self.assertIsNone(_resolve_student_choice([], 'mcq', 'D'))
 
 
 class UsesAnswerPickerTest(DjangoTestCase):

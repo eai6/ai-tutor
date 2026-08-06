@@ -1049,6 +1049,9 @@ def handle_record_answer(
         'question_type': in_flight.question_type,
         'attempt_count_before': in_flight.attempt_count,
     }
+    # Read off the row before the correct-verdict branch deletes it.
+    in_flight_options = list(in_flight.options or [])
+    in_flight_type = in_flight.question_type
 
     if verdict == 'correct':
         # Remember this stem BEFORE deleting the slot, so an exact re-ask on a
@@ -1073,11 +1076,51 @@ def handle_record_answer(
         snapshot['attempt_count_before'] + (0 if verdict == 'correct' else 1),
     )
 
-    return {
+    payload = {
         'recorded': True,
         **snapshot,
         **result.to_dict(),
     }
+    choice = _resolve_student_choice(in_flight_options, in_flight_type, extracted)
+    if choice is not None:
+        payload['student_choice'] = choice
+    return payload
+
+
+def _resolve_student_choice(
+    options: list, question_type: str, extracted_answer: str,
+) -> dict | None:
+    """``{'letter': 'D', 'text': '...'}`` for the option the student picked.
+
+    The tutor already knows the letter — it passed it in — and has the option
+    list in its prompt, so on paper this is redundant. In practice the lookup
+    is ~7,000 tokens up in a 30k-char prompt and the 4B gets it wrong. Device
+    session 30: the student clicked D ("It shows the compass direction between
+    the two points") and the tutor answered "it doesn't help pick grid
+    squares", which refutes option A. The student was told why an option they
+    did not choose was wrong.
+
+    Resolving it here costs nothing and removes the lookup rather than asking
+    the model to be more careful about it. Returns None for a non-MCQ or an
+    answer that isn't a letter (someone typing prose online), where there is
+    no option to name and inventing one would be worse than silence.
+    """
+    if (question_type or '').strip().lower() != 'mcq':
+        return None
+    opts = [str(o).strip() for o in (options or [])]
+    if len(opts) < 2:
+        return None
+    try:
+        from apps.tutoring.simple_tutor.grader import _extract_letter_forms
+        letter = _extract_letter_forms(extracted_answer or '')
+    except Exception:                              # noqa: BLE001
+        return None
+    if not letter:
+        return None
+    idx = 'ABCD'.find(letter)
+    if idx < 0 or idx >= len(opts) or not opts[idx]:
+        return None
+    return {'letter': letter, 'text': opts[idx]}
 
 
 class _TransientQuestion:
