@@ -139,6 +139,16 @@
                     <button type="button" onclick="insertChatSymbol('θ')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">θ</button>
                 </div>
                 {% endif %}
+                {% comment %}
+                Answer picker — offline (local model) MCQ only. Populated by
+                renderAnswerChoices() from the turn payload's answer_choices.
+                Hidden by default and whenever there is no live MCQ.
+
+                {% comment %} not {# #}: Django only treats {# #} as a comment
+                on a SINGLE line, so a multi-line one renders as literal text
+                to the student. Caught here by the screenshot check.
+                {% endcomment %}
+                <div id="answer-choices" class="answer-choices" style="display:none;"></div>
                 <div class="input-wrapper">
                     <textarea
                         id="user-input"
@@ -887,6 +897,45 @@ body {
 }
 
 /* ── Input Area ── */
+.answer-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem 0;
+    justify-content: center;
+}
+.answer-choice-btn {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    max-width: 100%;
+    padding: 0.45rem 0.75rem;
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1.3;
+    text-align: left;
+    transition: border-color .12s, background .12s;
+}
+.answer-choice-btn:hover:not(:disabled) { border-color: #f97316; background: #fff7ed; }
+.answer-choice-btn:disabled { opacity: .5; cursor: default; }
+.answer-choice-btn .letter {
+    font-weight: 700;
+    color: #ea580c;
+    flex: 0 0 auto;
+}
+.answer-choice-btn .opt-text {
+    color: #374151;
+    overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+    /* Stack full-width on a phone: option text is long enough that two per
+       row truncates badly. */
+    .answer-choices { flex-direction: column; }
+    .answer-choice-btn { width: 100%; }
+}
 .chat-input-area {
     flex-shrink: 0;
     padding: 0.75rem 1rem 1rem;
@@ -2134,6 +2183,9 @@ function handleResponse(data) {
     // Add tutor message
     addMessage('tutor', data.message, data.media, data.artifact_html, data.probe || null);
 
+    // Offline MCQ picker for the question just posed (null online → cleared).
+    renderAnswerChoices(data.answer_choices);
+
     // R5 (2026-05-15): if a bank question is awaiting answer (set on
     // session resume by chat_start_session), re-render it in the
     // artifact panel + show a "welcome back" banner so the student
@@ -2550,6 +2602,10 @@ function applyTutorResponse(data) {
     }
     stopCurrentAudio();
     addMessage('tutor', data.message, data.media || [], data.artifact_html, data.probe || null);
+    // This is the answer-turn path (sendMessage), distinct from the start
+    // path above — the picker has to render on BOTH or it disappears after
+    // the first answer.
+    renderAnswerChoices(data.answer_choices);
     if (data.is_correct) showCorrectFeedback(data.streak_count);
     if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
     if (data.phase) phaseBadge.textContent = phaseLabel(data.phase);
@@ -2586,6 +2642,53 @@ function applyTutorResponse(data) {
     }
 }
 
+
+// ── Answer picker (offline MCQ) ──────────────────────────────────────────────
+// The offline 4B cannot reliably read "northing" as option B — device session
+// 29: the student typed exactly that, nothing graded it, and the question was
+// re-asked. Offline is already MCQ-only, so a letter picker covers every
+// question the offline tutor can ask, and a clicked letter grades
+// deterministically with no model call.
+//
+// Online sessions get answer_choices = null and this renders nothing, so
+// typing is unchanged where it works.
+function renderAnswerChoices(choices) {
+    const box = document.getElementById('answer-choices');
+    if (!box) return;
+    box.innerHTML = '';
+    const letters = (choices && choices.letters) || [];
+    if (!letters.length) { box.style.display = 'none'; return; }
+
+    letters.forEach(function (opt) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'answer-choice-btn';
+        btn.setAttribute('aria-label', opt.letter + ': ' + opt.text);
+        const l = document.createElement('span');
+        l.className = 'letter';
+        l.textContent = opt.letter;
+        const t = document.createElement('span');
+        t.className = 'opt-text';
+        t.textContent = opt.text;      // textContent, never innerHTML — option
+        t.style.pointerEvents = 'none'; // text is authored content, not markup
+        l.style.pointerEvents = 'none';
+        btn.appendChild(l);
+        btn.appendChild(t);
+        btn.addEventListener('click', function () {
+            // Disable the whole row immediately: a double-tap would otherwise
+            // send two answers and the second would grade against a slot the
+            // first already cleared.
+            Array.prototype.forEach.call(
+                box.querySelectorAll('button'), function (b) { b.disabled = true; });
+            const input = document.getElementById('user-input');
+            input.value = opt.letter;
+            sendMessage();
+        });
+        box.appendChild(btn);
+    });
+    box.style.display = 'flex';
+}
+
 async function sendMessage() {
     // R8 (2026-05-15): if the mic is currently recording, treat the
     // Send click as "stop & send". mediaRecorder.stop() fires onstop
@@ -2601,6 +2704,11 @@ async function sendMessage() {
 
     isSending = true;
     sendBtn.disabled = true;
+
+    // The previous question's options are stale the instant an answer is
+    // sent — leaving them clickable invites answering a question that is no
+    // longer live.
+    renderAnswerChoices(null);
 
     // Add student message bubble immediately (optimistic UI).
     const bubble = addMessage('student', text);

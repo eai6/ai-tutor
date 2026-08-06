@@ -2931,6 +2931,7 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
         'probe': None,
         'pending_question': None,
         'follow_up_message': None,
+        'answer_choices': _answer_choices_payload(session),
     }
 
 
@@ -3222,6 +3223,55 @@ def _build_resume_message(slot, locale: str = 'en-us') -> str:
     return "\n".join(p for p in parts if p is not None).strip()
 
 
+def _answer_choices_payload(session) -> dict | None:
+    """The live MCQ's options, when the student should CLICK rather than type.
+
+    Returned only for a session running a LOCAL model. Typing is fine online:
+    a cloud tutor reads "northing" as option B without difficulty. The local 4B
+    does not, and the failure is expensive — device session 29, the student
+    typed "northing" against "B) The northing or vertical distance", nothing
+    graded it, and the question was simply asked again.
+
+    Offline is already MCQ-only (TUTORING_QUESTION_TYPES defaults to 'mcq'), so
+    a letter picker covers every question the offline tutor can ask. Clicking a
+    letter sends "B", which the deterministic fast path grades in ~0.1 ms with
+    no model call and no parsing — the whole class of "student phrased it
+    differently" failures stops existing rather than being handled.
+
+    None when: no live question, not an MCQ, or the session is on a cloud
+    model. The frontend renders nothing in that case and typing is unchanged.
+    """
+    try:
+        from apps.tutoring.models import InFlightQuestion
+        from apps.tutoring.simple_tutor.model_choice import (
+            LOCAL_PROVIDER, resolve_for_session,
+        )
+
+        cfg = resolve_for_session(session)
+        if cfg is None:
+            from apps.llm.models import ModelConfig
+            cfg = ModelConfig.get_for('tutoring')
+        if cfg is None or str(getattr(cfg, 'provider', '')) != LOCAL_PROVIDER:
+            return None
+
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        if slot is None or (slot.question_type or '').strip().lower() != 'mcq':
+            return None
+        options = list(slot.options or [])
+        if len(options) < 2:
+            return None
+        return {
+            'letters': [
+                {'letter': L, 'text': str(t).strip()}
+                for L, t in zip('ABCD', options) if str(t).strip()
+            ],
+        }
+    except Exception:                              # noqa: BLE001
+        # A missing picker costs the student a click, never the turn.
+        logger.warning("answer choices payload failed", exc_info=True)
+        return None
+
+
 def _project_start_payload(session, message: str) -> dict:
     """Shared payload-shaping for ``start_for_view`` — keeps both the
     resume and fresh-start branches returning the exact same JSON
@@ -3317,6 +3367,7 @@ def _project_start_payload(session, message: str) -> dict:
         'probe': None,
         'pending_question': None,
         'follow_up_message': None,
+        'answer_choices': _answer_choices_payload(session),
     }
 
 

@@ -138,6 +138,10 @@ class RespondForViewTest(DjangoTestCase):
             'is_complete', 'step_number', 'total_steps',
             'is_correct', 'streak_count', 'practice_score', 'milestone',
             'artifact_html', 'probe', 'pending_question', 'follow_up_message',
+            # Offline MCQ letter picker (2026-08-06). None for cloud sessions
+            # and whenever no MCQ is live, so the frontend renders nothing and
+            # typing is unchanged where it works.
+            'answer_choices',
         }
         self.assertEqual(set(payload.keys()), expected_keys)
         self.assertEqual(payload['message'], 'Hello, student.')

@@ -235,9 +235,11 @@
                 </p>
             </div>
             {% else %}
-            {# No internet tutor configured, so there is nothing to switch
-               between. Post the current mode unchanged so the form still
-               validates while only the offline-model picker is shown. #}
+            {% comment %}
+            No internet tutor configured, so there is nothing to switch
+            between. Post the current mode unchanged so the form still
+            validates while only the offline-model picker is shown.
+            {% endcomment %}
             <input type="hidden" name="tutor_mode" value="{{ tutor_choice.mode }}">
             {% endif %}
             {% if tutor_choice.offline_options_available %}
