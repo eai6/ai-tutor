@@ -173,9 +173,11 @@ if enable_ecs:
     pulumi.export("material_task_definition", compute.material_task_definition.family)
 else:
     pulumi.export(
-        "blocked_on_iam",
-        "ECS is not deployed: iam:PassRole is denied for this account's SSO "
-        "role, and a Fargate task definition cannot omit an execution role. "
-        "The code is written and gated — see docs/aws-iam-access-request.md, "
-        "then: pulumi config set enable-ecs true && pulumi up",
+        "ecs_status",
+        "ECS is written but not deployed (enable-ecs=false). Deploy it in this "
+        "order — the service pulls <ecr>/aitutor:<tag>, so an image must exist "
+        "first or tasks crash-loop on ImagePullFailure: "
+        "(1) build and push an image to the ecr_repository_url above, "
+        "(2) pulumi config set --secret <key> for the app secrets, "
+        "(3) pulumi config set enable-ecs true && pulumi up.",
     )
