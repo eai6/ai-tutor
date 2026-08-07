@@ -4,15 +4,14 @@
 # environment and are deliberately untouched. Azure and AWS run the same image
 # in parallel; this pipeline only ever talks to AWS.
 #
-# Manual-only for now, deliberately. Neither the ECS service nor the
-# AWS_DEPLOY_ROLE_ARN secret exists yet (both wait on the iam:PassRole grant),
-# so an automatic trigger would just paint every push red. Once ECS is up, add:
+# Deploys on every push to aws_deployment, and on demand.
 #
-#   push:
-#     branches: [aws_deployment]
+# NOT on main. main deploys Azure, which serves live users; this branch has
+# diverged from it substantially. Adding main here would point two pipelines at
+# two clouds from one merge — only do that deliberately.
 #
-# Add `main` only when AWS is meant to track production — today main deploys
-# Azure, which serves live users.
+# Requires the repo secret AWS_DEPLOY_ROLE_ARN, whose role trusts GitHub's OIDC
+# provider for refs/heads/* in this repo only.
 #
 # What this has that the Azure pipeline never did:
 #   - buildx layer caching (Azure rebuilds ~4.7 GB cold on every deploy)
@@ -33,6 +32,16 @@ on:
         description: Skip the migrate task (use only if migrations already ran)
         type: boolean
         default: false
+  push:
+    branches: [aws_deployment]
+    paths-ignore:
+      # Docs and the Azure infra program cannot change what runs on AWS, so
+      # they should not trigger a ~20 minute image build.
+      - 'docs/**'
+      - 'memory/**'
+      - 'infra/__main__.py'
+      - 'infra/Pulumi.*.yaml'
+      - '**/*.md'
 
 concurrency:
   # Serialise: a second deploy mid-rollout races the service update.
