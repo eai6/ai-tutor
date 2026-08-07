@@ -1,0 +1,272 @@
+# AWS deploy — ECS Fargate.
+#
+# SEPARATE from deploy.yml / deploy-staging.yml, which deploy the LIVE Azure
+# environment and are deliberately untouched. Azure and AWS run the same image
+# in parallel; this pipeline only ever talks to AWS.
+#
+# Manual-only for now, deliberately. Neither the ECS service nor the
+# AWS_DEPLOY_ROLE_ARN secret exists yet (both wait on the iam:PassRole grant),
+# so an automatic trigger would just paint every push red. Once ECS is up, add:
+#
+#   push:
+#     branches: [aws_deployment]
+#
+# Add `main` only when AWS is meant to track production — today main deploys
+# Azure, which serves live users.
+#
+# What this has that the Azure pipeline never did:
+#   - buildx layer caching (Azure rebuilds ~4.7 GB cold on every deploy)
+#   - migrations gated as a one-shot task that must exit 0 before the service
+#     is touched
+#   - a smoke test against /health/
+#   - automatic rollback to the previous task definition on failure
+name: Deploy (AWS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Pulumi stack / resource name suffix
+        type: string
+        default: dev
+      skip_migrations:
+        description: Skip the migrate task (use only if migrations already ran)
+        type: boolean
+        default: false
+
+concurrency:
+  # Serialise: a second deploy mid-rollout races the service update.
+  group: deploy-aws-${{ github.event.inputs.stack || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  STACK: ${{ github.event.inputs.stack || 'dev' }}
+  ECR_REPO: aitutor
+
+permissions:
+  id-token: write # OIDC — no long-lived access keys
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Android-SDK disk space (runner only)
+        # The image is ~4.7 GB (CPU torch + Whisper tiny + Piper voice) and the
+        # build ran out of runner disk without this.
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve names
+        id: names
+        run: |
+          # Validate before use. STACK is a workflow_dispatch input, so it is
+          # attacker-influenced by anyone who can trigger the workflow, and it
+          # flows from here into step outputs that later steps interpolate
+          # directly into `run:` blocks. Constraining it to a resource-name
+          # charset closes that path (and catches typos).
+          if ! printf '%s' "$STACK" | grep -Eq '^[a-z0-9][a-z0-9-]{0,20}$'; then
+            echo "::error title=Invalid stack::'$STACK' must match ^[a-z0-9][a-z0-9-]{0,20}$"
+            exit 1
+          fi
+          PREFIX="aitutor-${STACK}"
+          {
+            echo "prefix=$PREFIX"
+            echo "cluster=${PREFIX}-cluster"
+            echo "service=${PREFIX}-service"
+            echo "web_family=${PREFIX}-web"
+            echo "migrate_family=${PREFIX}-migrate"
+            echo "alb_name=${PREFIX}-alb"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify the ECS service exists
+        # ECS is gated behind `enable-ecs` in Pulumi because iam:PassRole was
+        # denied. Fail with an explanation rather than a confusing AWS error.
+        run: |
+          if ! aws ecs describe-services \
+                --cluster "${{ steps.names.outputs.cluster }}" \
+                --services "${{ steps.names.outputs.service }}" \
+                --query 'services[0].status' --output text 2>/dev/null | grep -q ACTIVE; then
+            echo "::error title=ECS not deployed::Service ${{ steps.names.outputs.service }} does not exist."
+            echo "ECS is gated off in Pulumi pending the iam:PassRole grant."
+            echo "See docs/aws-iam-access-request.md, then:"
+            echo "  cd infra/aws && pulumi config set enable-ecs true && pulumi up"
+            exit 1
+          fi
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64 # Fargate is x86_64; see runtimePlatform in compute.py
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest
+          # Layer caching — the Azure pipeline has none, so every deploy there
+          # is a cold ~4.7 GB build.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Capture the current task definition (rollback target)
+        id: current
+        run: |
+          CURRENT=$(aws ecs describe-services \
+            --cluster "${{ steps.names.outputs.cluster }}" \
+            --services "${{ steps.names.outputs.service }}" \
+            --query 'services[0].taskDefinition' --output text)
+          echo "task_definition=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Rollback target: $CURRENT"
+
+      - name: Register new task definition revisions
+        id: register
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          register () {
+            FAMILY="$1"
+            # Take the live definition, swap the image, strip the read-only
+            # fields AWS rejects on re-register.
+            aws ecs describe-task-definition --task-definition "$FAMILY" \
+              --query 'taskDefinition' --output json \
+            | jq --arg IMAGE "$IMAGE" '
+                .containerDefinitions |= map(.image = $IMAGE)
+                | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                      .compatibilities, .registeredAt, .registeredBy)
+              ' > "/tmp/${FAMILY}.json"
+            aws ecs register-task-definition \
+              --cli-input-json "file:///tmp/${FAMILY}.json" \
+              --query 'taskDefinition.taskDefinitionArn' --output text
+          }
+          WEB_TD=$(register "${{ steps.names.outputs.web_family }}")
+          MIGRATE_TD=$(register "${{ steps.names.outputs.migrate_family }}")
+          echo "web_td=$WEB_TD" >> "$GITHUB_OUTPUT"
+          echo "migrate_td=$MIGRATE_TD" >> "$GITHUB_OUTPUT"
+          echo "web: $WEB_TD"
+          echo "migrate: $MIGRATE_TD"
+
+      - name: Run migrations and wait
+        if: ${{ github.event.inputs.skip_migrations != 'true' }}
+        env:
+          CLUSTER: ${{ steps.names.outputs.cluster }}
+          MIGRATE_TD: ${{ steps.register.outputs.migrate_td }}
+        run: |
+          set -euo pipefail
+          # Reuse the service's own network config rather than duplicating the
+          # subnet and security-group ids as CI secrets.
+          NETCFG=$(aws ecs describe-services --cluster "$CLUSTER" \
+            --services "${{ steps.names.outputs.service }}" \
+            --query 'services[0].networkConfiguration' --output json)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" --task-definition "$MIGRATE_TD" \
+            --launch-type FARGATE \
+            --network-configuration "$NETCFG" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migrate task: $TASK_ARN"
+
+          # Poll rather than `ecs wait tasks-stopped`: that waiter gives up
+          # after ~10 minutes, and migrate plus six seed commands can exceed it.
+          DEADLINE=$((SECONDS + 1800))
+          while [ $SECONDS -lt $DEADLINE ]; do
+            STATUS=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+              --query 'tasks[0].lastStatus' --output text)
+            [ "$STATUS" = "STOPPED" ] && break
+            echo "  status=$STATUS"
+            sleep 15
+          done
+
+          EXIT_CODE=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          REASON=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].stoppedReason' --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error title=Migrations failed::exit=$EXIT_CODE reason=$REASON"
+            echo "--- migrate task logs ---"
+            TASK_ID="${TASK_ARN##*/}"
+            aws logs tail "/ecs/${{ steps.names.outputs.prefix }}" \
+              --log-stream-names "migrate/migrate/${TASK_ID}" --since 30m || true
+            exit 1
+          fi
+          echo "Migrations completed (exit 0)."
+
+      - name: Deploy the service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ steps.names.outputs.cluster }}" \
+            --service "${{ steps.names.outputs.service }}" \
+            --task-definition "${{ steps.register.outputs.web_td }}" \
+            --query 'service.serviceName' --output text
+          aws ecs wait services-stable \
+            --cluster "${{ steps.names.outputs.cluster }}" \
+            --services "${{ steps.names.outputs.service }}"
+
+      - name: Smoke test
+        id: smoke
+        run: |
+          set -euo pipefail
+          HOST=$(aws elbv2 describe-load-balancers \
+            --names "${{ steps.names.outputs.alb_name }}" \
+            --query 'LoadBalancers[0].DNSName' --output text)
+          echo "Health: http://${HOST}/health/"
+
+          # The ALB may serve briefly from draining targets, so allow retries.
+          for attempt in 1 2 3 4 5 6; do
+            if BODY=$(curl -fsS --max-time 30 "http://${HOST}/health/"); then
+              echo "$BODY"
+              echo "$BODY" | jq -e '.status == "ok"' >/dev/null \
+                && { echo "url=http://${HOST}" >> "$GITHUB_OUTPUT"; exit 0; }
+            fi
+            echo "  attempt ${attempt} failed; retrying"
+            sleep 10
+          done
+          echo "::error title=Smoke test failed::/health/ never returned status=ok"
+          exit 1
+
+      - name: Roll back
+        if: failure() && steps.current.outputs.task_definition != ''
+        run: |
+          echo "::warning title=Rolling back::Restoring ${{ steps.current.outputs.task_definition }}"
+          aws ecs update-service \
+            --cluster "${{ steps.names.outputs.cluster }}" \
+            --service "${{ steps.names.outputs.service }}" \
+            --task-definition "${{ steps.current.outputs.task_definition }}" \
+            --query 'service.serviceName' --output text
+          aws ecs wait services-stable \
+            --cluster "${{ steps.names.outputs.cluster }}" \
+            --services "${{ steps.names.outputs.service }}"
+          echo "Rolled back."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### AWS deploy — \`${STACK}\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`${{ github.sha }}\` |"
+            echo "| Web task def | \`${{ steps.register.outputs.web_td }}\` |"
+            echo "| URL | ${{ steps.smoke.outputs.url || 'n/a' }} |"
+            echo "| Result | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
