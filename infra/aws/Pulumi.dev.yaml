@@ -10,4 +10,4 @@ config:
     secure: v1:ycjMx13wk5k7azCi:3+ZX3GZlz+MZu9QeJrGgv8UT8bKgUoEwi7rZIQrCPn1IceiH/QXLHkrBGCWG2ehh3N16pHwneA==
   aitutor-aws:elevenlabs-api-key:
     secure: v1:C0GtzAhwDho24jPV:FyQm527TZdMyV9A2URW4pV2Tfhi5TYCOKXaBYdmsKaWQ8VyEZYTj7eDWVJEkl7I1GfZqIngTIwybVbR/LO6w1hBbmQ==
-  aitutor-aws:image-tag: 4a3a967
+  aitutor-aws:image-tag: 6f74ffd
