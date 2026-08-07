@@ -158,6 +158,22 @@ class S3MediaServingTests(SimpleTestCase):
                 with self.assertRaises(Http404):
                     s3_media.serve_media(request, "../../etc/passwd")
 
+    def test_a_sibling_directory_sharing_the_prefix_is_refused(self):
+        """A bare startswith(MEDIA_ROOT) check would let /app/media-old
+        through for a root of /app/media. Escaping into a prefix-sharing
+        sibling must 404 like any other traversal."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "media"
+            root.mkdir()
+            sibling = Path(tmp) / "media-old"
+            sibling.mkdir()
+            (sibling / "secret.txt").write_bytes(b"secret")
+
+            with override_settings(MEDIA_ROOT=str(root)):
+                request = self.factory.get("/media/x")
+                with self.assertRaises(Http404):
+                    s3_media.serve_media(request, "../media-old/secret.txt")
+
 
 @override_settings(MEDIA_URL="media/")
 class S3MediaStorageUrlTests(SimpleTestCase):

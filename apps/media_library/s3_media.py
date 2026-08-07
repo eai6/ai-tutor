@@ -78,9 +78,14 @@ def _s3_client():
 
 def _filesystem_fallback(path: str):
     """Serve from MEDIA_ROOT for anything not in the bucket."""
-    full = os.path.join(settings.MEDIA_ROOT, path)
     root = os.path.abspath(settings.MEDIA_ROOT)
-    if not os.path.abspath(full).startswith(root) or not os.path.isfile(full):
+    full = os.path.abspath(os.path.join(root, path))
+    # Compare against root + separator, not a bare prefix match: with a bare
+    # ``startswith(root)`` a sibling directory that merely shares the prefix
+    # (``/app/media-old`` against a root of ``/app/media``) escapes the check.
+    if not (full == root or full.startswith(root + os.sep)):
+        raise Http404(path)
+    if not os.path.isfile(full):
         raise Http404(path)
     return FileResponse(open(full, "rb"))
 
