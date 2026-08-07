@@ -32,8 +32,11 @@ pulumi up
 cd infra/aws
 python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 
-export AWS_PROFILE=pixeldesignlabs
-aws sso login --profile pixeldesignlabs   # SSO tokens expire
+# `pixeldesignlabs` is the AZURE org. AWS runs in a separate account, so the
+# profile here must NOT be reused from infra/ (the Azure Pulumi program).
+export AWS_PROFILE=aitutor
+aws sso login --profile aitutor           # SSO tokens expire; omit for a
+                                          # plain IAM-user profile
 
 pulumi stack select dev
 pulumi preview
