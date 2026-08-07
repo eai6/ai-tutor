@@ -162,6 +162,7 @@ if enable_ecs:
         private_subnet_ids=network.private_subnet_ids,
         tasks_sg_id=network.tasks_sg.id,
         target_group=edge.target_group,
+        alb=edge.alb,
         region=region,
         account_id=account_id,
         min_tasks=config.get_int("min-tasks") or 1,

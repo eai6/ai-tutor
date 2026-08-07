@@ -57,6 +57,7 @@ def create_compute(
     private_subnet_ids,
     tasks_sg_id,
     target_group,
+    alb,
     region: str,
     account_id: str,
     min_tasks: int,
@@ -162,13 +163,32 @@ def create_compute(
         ),
     )
 
+    # Secret env-var name -> Secrets Manager ARN. Ordered explicitly rather than
+    # zipped against dict order, so a reordering upstream can't silently wire
+    # ANTHROPIC_API_KEY to the database DSN.
+    secret_env = [
+        ("DATABASE_URL", "database-url"),
+        ("SECRET_KEY", "django-secret-key"),
+        ("ANTHROPIC_API_KEY", "anthropic-api-key"),
+        ("OPENAI_API_KEY", "openai-api-key"),
+        ("GOOGLE_API_KEY", "google-api-key"),
+        ("ELEVENLABS_API_KEY", "elevenlabs-api-key"),
+    ]
+    ordered_secret_arns = [secret_arns[key] for _, key in secret_env]
+
     def _container(name, command, cpu, memory):
-        return pulumi.Output.all(log_group.name, task_environment, *secret_arns.values()).apply(
+        # `image` is an Output (derived from the ECR repo URL) and so are the
+        # secret ARNs — every one has to go through Output.all before json.dumps
+        # can see it, or serialization fails with "Object of type Output is not
+        # JSON serializable".
+        return pulumi.Output.all(
+            image, log_group.name, task_environment, *ordered_secret_arns
+        ).apply(
             lambda a: json.dumps(
                 [
                     {
                         "name": name,
-                        "image": image,
+                        "image": a[0],
                         "essential": True,
                         "command": command,
                         "portMappings": (
@@ -176,23 +196,16 @@ def create_compute(
                             if name == "web" else []
                         ),
                         "environment": [
-                            {"name": k, "value": str(v)} for k, v in a[1].items()
+                            {"name": k, "value": str(v)} for k, v in a[2].items()
                         ],
                         "secrets": [
                             {"name": env_name, "valueFrom": arn}
-                            for env_name, arn in zip(
-                                [
-                                    "DATABASE_URL", "SECRET_KEY", "ANTHROPIC_API_KEY",
-                                    "OPENAI_API_KEY", "GOOGLE_API_KEY",
-                                    "ELEVENLABS_API_KEY",
-                                ],
-                                a[2:],
-                            )
+                            for (env_name, _), arn in zip(secret_env, a[3:])
                         ],
                         "logConfiguration": {
                             "logDriver": "awslogs",
                             "options": {
-                                "awslogs-group": a[0],
+                                "awslogs-group": a[1],
                                 "awslogs-region": region,
                                 "awslogs-stream-prefix": name,
                             },
@@ -289,9 +302,13 @@ def create_compute(
             target_value=150,
             predefined_metric_specification=aws.appautoscaling.PolicyTargetTrackingScalingPolicyConfigurationPredefinedMetricSpecificationArgs(
                 predefined_metric_type="ALBRequestCountPerTarget",
+                # Must be "app/<lb-name>/<lb-id>/targetgroup/<tg-name>/<tg-id>",
+                # which is exactly arn_suffix on each. Deriving it from
+                # target_group.load_balancer_arns does not work — that list is
+                # empty here, since the association is made by the Listener.
                 resource_label=pulumi.Output.all(
-                    target_group.arn_suffix, target_group.load_balancer_arns
-                ).apply(lambda a: f"{a[1][0].split('loadbalancer/')[-1]}/{a[0]}"),
+                    alb.arn_suffix, target_group.arn_suffix
+                ).apply(lambda a: f"{a[0]}/{a[1]}"),
             ),
             scale_in_cooldown=300,
             scale_out_cooldown=60,
