@@ -1261,10 +1261,14 @@ def _render_active_mode(
     return _MODE_GRADE
 
 
-# Two hints, then pivot. Must match the Block-0 ladder's "2+" rung: this block
-# renders at the point of decision, so a higher threshold here means the slot
-# says nothing on the exact turn the ladder calls for a pivot.
-_PIVOT_AFTER_ATTEMPTS = 2
+# Three hints, then pivot (2026-08-06: raised from 2 after the pivot was
+# confirmed working — two was cutting students off before the scaffolding had
+# a fair run). Must match the Block-0 ladder's top rung AND
+# tools.PIVOT_AFTER_ATTEMPTS: this block renders at the point of decision, so a
+# higher threshold here means the slot says nothing on the exact turn the
+# ladder calls for a pivot, and a lower one asks for a pivot the server will
+# not perform.
+_PIVOT_AFTER_ATTEMPTS = 3
 
 
 def _render_in_flight_block(
@@ -1334,8 +1338,8 @@ def _render_in_flight_block(
         # question, no pivot. Two hints then pivot means this fires at 2.
         parts.append(
             '  <pivot_guidance>This question has had '
-            f'{attempts} wrong attempts — two hints have not worked, so a '
-            'third will not either. Pivot NOW, this turn: call pose_question '
+            f'{attempts} wrong attempts — three hints have not worked, so a '
+            'fourth will not either. Pivot NOW, this turn: call pose_question '
             'with a lower-<difficulty> entry from <question_pool> on the same '
             'objective. That call replaces this question. Do not write another '
             'hint.</pivot_guidance>'

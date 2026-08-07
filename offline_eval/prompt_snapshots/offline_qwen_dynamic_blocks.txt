@@ -1,4 +1,4 @@
-# DYNAMIC BLOCK (Block 2) — session 137, lesson 1434, step 0
+# DYNAMIC BLOCK (Block 2) — session 138, lesson 1434, step 1
 # One rendering per turn mode. Block 0 is the same in all of them and
 # is dumped separately by scripts/dump_tutor_prompt.py.
 # The student's message arrives immediately AFTER this block.
@@ -6,7 +6,7 @@
 
 ==============================================================================
   POSE / TEACH — nothing in flight
-  1,161 chars   (whole prompt: 12,100)
+  1,161 chars   (whole prompt: 12,409)
 ==============================================================================
 
 <message_intent>
@@ -39,22 +39,22 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   GRADE — answering the live question
-  2,053 chars   (whole prompt: 12,992)
+  2,085 chars   (whole prompt: 13,333)
 ==============================================================================
 
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>6</catalog_question_id>
+  <catalog_question_id>5</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>When reading a land use map, what is the FIRST step you should take?</stem>
+  <stem>On a land use map, agricultural areas are typically distributed where?</stem>
   <options>
-    <option key="A">Identify the scale of the map</option>
-    <option key="B">Look for the compass rose</option>
-    <option key="C">Count the number of buildings shown</option>
-    <option key="D">Consult the map legend to understand symbols and colors</option>
+    <option key="A">Only in areas with steep mountain terrain</option>
+    <option key="B">In flat or gently sloping areas with organized field patterns</option>
+    <option key="C">Exclusively surrounding urban city centers</option>
+    <option key="D">Only along major river valleys</option>
   </options>
-  <reference_answer>D</reference_answer>
+  <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -90,7 +90,7 @@ A reply that runs past 3 sentences is too long, however good it is.
 
 ==============================================================================
   REMEDIATION — failed the quiz, answering
-  2,911 chars   (whole prompt: 13,850)
+  2,943 chars   (whole prompt: 14,191)
 ==============================================================================
 
 <remediation_mode active="true"/>
@@ -113,16 +113,16 @@ A reply that runs past 3 sentences is too long, however good it is.
 <in_flight_question>
   <question_type>mcq</question_type>
   <source>catalog</source>
-  <catalog_question_id>6</catalog_question_id>
+  <catalog_question_id>5</catalog_question_id>
   <attempt_count>0</attempt_count>
-  <stem>When reading a land use map, what is the FIRST step you should take?</stem>
+  <stem>On a land use map, agricultural areas are typically distributed where?</stem>
   <options>
-    <option key="A">Identify the scale of the map</option>
-    <option key="B">Look for the compass rose</option>
-    <option key="C">Count the number of buildings shown</option>
-    <option key="D">Consult the map legend to understand symbols and colors</option>
+    <option key="A">Only in areas with steep mountain terrain</option>
+    <option key="B">In flat or gently sloping areas with organized field patterns</option>
+    <option key="C">Exclusively surrounding urban city centers</option>
+    <option key="D">Only along major river valleys</option>
   </options>
-  <reference_answer>D</reference_answer>
+  <reference_answer>B</reference_answer>
   <answer_surface mode="letter_picker">
 The student answers by TAPPING one of the option buttons above.
 Reference the options by their letter key to know exactly which one the
@@ -164,7 +164,7 @@ Do not add a third unless it is genuinely needed, and never add a question — t
 
 ==============================================================================
   REMEDIATION — failed the quiz, nothing in flight
-  2,096 chars   (whole prompt: 13,035)
+  2,096 chars   (whole prompt: 13,344)
 ==============================================================================
 
 <remediation_mode active="true"/>

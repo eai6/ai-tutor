@@ -787,27 +787,28 @@ class ServerPivotTest(DjangoTestCase):
     def _set_attempts(self, session, n):
         InFlightQuestion.objects.filter(session=session).update(attempt_count=n)
 
-    def test_no_pivot_before_two_attempts(self):
-        """One hint has not been given a chance yet; swapping there would read
-        as the tutor giving up on the first mistake."""
+    def test_no_pivot_while_hints_are_still_owed(self):
+        """Three hints before pivoting (raised from two on 2026-08-06 once the
+        pivot was confirmed working — two cut students off before the
+        scaffolding had a fair run)."""
         from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
         session = self._lesson()
         slot = self._pose_hard(session)
-        for n in (0, 1):
+        for n in (0, 1, 2):
             with self.subTest(attempts=n):
                 self._set_attempts(session, n)
                 self.assertIsNone(maybe_pivot_stalled_question(session))
                 live = InFlightQuestion.objects.get(session=session)
                 self.assertEqual(live.question_text, slot.question_text)
 
-    def test_pivots_at_two_and_picks_something_easier(self):
+    def test_pivots_at_three_and_picks_something_easier(self):
         from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
         session = self._lesson()
         slot = self._pose_hard(session)
-        self._set_attempts(session, 2)
+        self._set_attempts(session, 3)
 
         chosen = maybe_pivot_stalled_question(session)
-        self.assertIsNotNone(chosen, 'two hints failed and nothing changed')
+        self.assertIsNotNone(chosen, 'three hints failed and nothing changed')
         self.assertEqual(chosen.difficulty, 'easy',
                          'pivoted sideways or harder')
         live = InFlightQuestion.objects.get(session=session)
@@ -821,7 +822,7 @@ class ServerPivotTest(DjangoTestCase):
         from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
         session = self._lesson()
         slot = self._pose_hard(session)
-        self._set_attempts(session, 2)
+        self._set_attempts(session, 3)
         chosen = maybe_pivot_stalled_question(session)
         self.assertNotEqual(chosen.question_text, slot.question_text)
 
@@ -834,7 +835,7 @@ class ServerPivotTest(DjangoTestCase):
         ExitTicketQuestion.objects.filter(
             exit_ticket__lesson=session.lesson).exclude(
             question_text=slot.question_text).delete()
-        self._set_attempts(session, 2)
+        self._set_attempts(session, 3)
 
         self.assertIsNone(maybe_pivot_stalled_question(session))
         self.assertTrue(InFlightQuestion.objects.filter(session=session).exists())

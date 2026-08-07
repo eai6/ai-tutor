@@ -489,15 +489,18 @@ class PivotGuidanceTest(SimpleTestCase):
         )
         return _render_in_flight_block(slot)
 
-    def test_pivot_guidance_appears_after_two_attempts(self):
-        """Two hints, then pivot. Threshold was 3, which meant this block said
-        nothing on the exact turn Block 0's ladder called for a pivot."""
-        block = self._block(2)
+    def test_pivot_guidance_appears_after_three_attempts(self):
+        """Three hints, then pivot. This block renders at the point of
+        decision, so its threshold must equal the Block-0 ladder's top rung and
+        tools.PIVOT_AFTER_ATTEMPTS — higher and it stays silent on the turn the
+        ladder calls for a pivot, lower and it asks for one the server will not
+        perform."""
+        block = self._block(3)
         self.assertIn('pivot', block.lower())
         self.assertIn('difficulty', block.lower())
 
-    def test_no_pivot_guidance_on_early_attempts(self):
-        for attempts in (0, 1):
+    def test_no_pivot_guidance_while_hints_are_still_owed(self):
+        for attempts in (0, 1, 2):
             with self.subTest(attempts=attempts):
                 self.assertNotIn('pivot', self._block(attempts).lower())
 

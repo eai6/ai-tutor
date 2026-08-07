@@ -1437,7 +1437,7 @@ def _remediation_question_sets(session) -> tuple[set | None, set]:
     return missed, covered
 
 
-PIVOT_AFTER_ATTEMPTS = 2
+PIVOT_AFTER_ATTEMPTS = 3
 
 
 def maybe_pivot_stalled_question(session: 'TutorSession'):
