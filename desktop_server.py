@@ -129,6 +129,27 @@ def emit(event: str, **fields) -> None:
     print(json.dumps({'event': event, **fields}), flush=True)
 
 
+def _force_utf8_stdio() -> None:
+    """Make stdout/stderr UTF-8 before anything prints.
+
+    The Windows console defaults to cp1252, and six data migrations print
+    characters outside it (llm.0015, 0021, 0028, 0030, 0031 use arrows and
+    em-dashes). The frozen build died mid-migrate with
+
+        UnicodeEncodeError: 'charmap' codec can't encode character '\u2192'
+
+    leaving a half-migrated database. Fixing the six migrations would work
+    until someone writes a seventh, so set the encoding once at the boundary
+    instead. errors='replace' so a character we did not anticipate degrades to
+    '?' rather than taking the install down.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass        # already wrapped, or not a real stream
+
+
 def _first_run_setup() -> None:
     """Apply migrations and collect static files if they are not current.
 
@@ -148,6 +169,7 @@ def _first_run_setup() -> None:
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
 
+    _force_utf8_stdio()
     executor = MigrationExecutor(connection)
     pending = executor.migration_plan(executor.loader.graph.leaf_nodes())
     if pending:
@@ -177,14 +199,23 @@ def _ensure_tutor_model_config() -> None:
     back on the next launch — which is why the guard is "is there an active
     tutoring config at all", not "is the local one active".
     """
+    from apps.accounts.models import Institution
     from apps.llm.models import ModelConfig
 
     if ModelConfig.objects.filter(purpose='tutoring', is_active=True).exists():
         return
 
+    # ModelConfig.institution is NOT NULL. Omitting it crashed every fresh
+    # install with "NOT NULL constraint failed: llm_modelconfig.institution_id"
+    # — and only a fresh install, because a machine that already has an active
+    # tutoring config returns at the guard above and never reaches this line.
+    # That is why the dev Mac never saw it and all three CI runners did.
+    institution = Institution.get_global()
+
     ModelConfig.objects.update_or_create(
         provider='local_ollama', model_name='qwen3-4b-jetson', purpose='tutoring',
         defaults=dict(
+            institution=institution,
             name='Offline tutor (qwen3-4b)',
             api_key_env_var='',      # keyless: talks to the local Ollama server
             api_base='',             # client defaults to http://localhost:11434
