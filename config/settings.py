@@ -375,12 +375,17 @@ LOGIN_REDIRECT_URL = '/tutor/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 
-# Email — defaults to console (prints to terminal). Production uses
-# Azure Communication Services Email (transactional only) when the
-# connection string is provided. Pulumi wires this via:
+# Email — defaults to console (prints to terminal). Azure Container Apps and
+# AWS ECS run the SAME image and each supplies only its own vars, so both
+# transactional backends stay wired up and the configured one wins.
+#
+# Azure (live) — Pulumi wires:
 #   AZURE_COMMUNICATION_CONNECTION_STRING (secret)
 #   AZURE_COMMUNICATION_SENDER_ADDRESS    (e.g. noreply@mail.example.com)
-#   DEFAULT_FROM_EMAIL                    (e.g. "AI Tutor <noreply@...>")
+# AWS — the ECS task definition wires:
+#   AWS_SES_SENDER                        (e.g. noreply@mail.example.com)
+#   AWS_SES_REGION                        (defaults to us-east-1)
+# Both — DEFAULT_FROM_EMAIL               (e.g. "AI Tutor <noreply@...>")
 AZURE_COMMUNICATION_CONNECTION_STRING = os.getenv(
     'AZURE_COMMUNICATION_CONNECTION_STRING', ''
 )
@@ -388,24 +393,26 @@ AZURE_COMMUNICATION_SENDER_ADDRESS = os.getenv(
     'AZURE_COMMUNICATION_SENDER_ADDRESS', ''
 )
 
-if AZURE_COMMUNICATION_CONNECTION_STRING:
-    # Production / live test path. Real delivery via ACS REST API.
-    EMAIL_BACKEND = os.getenv(
-        'EMAIL_BACKEND',
-        'apps.safety.email_backends.AzureCommunicationEmailBackend',
-    )
+AWS_SES_SENDER = os.getenv('AWS_SES_SENDER', '')
+AWS_SES_REGION = os.getenv('AWS_SES_REGION', 'us-east-1')
+
+# An explicit EMAIL_BACKEND always wins — it is the SMTP escape hatch
+# (Mailgun/Resend/etc.) for local testing without either cloud:
+#   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+#   EMAIL_HOST=smtp.resend.com
+#   EMAIL_HOST_USER=resend
+#   EMAIL_HOST_PASSWORD=re_xxx
+if os.getenv('EMAIL_BACKEND'):
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
+elif AWS_SES_SENDER:
+    # AWS path. Real delivery via the SESv2 API.
+    EMAIL_BACKEND = 'apps.safety.email_backends.SESEmailBackend'
+elif AZURE_COMMUNICATION_CONNECTION_STRING:
+    # Azure path. Real delivery via the ACS REST API.
+    EMAIL_BACKEND = 'apps.safety.email_backends.AzureCommunicationEmailBackend'
 else:
-    # Dev path — console prints emails to stdout. SMTP is still
-    # supported as an explicit override (Mailgun/Resend/etc.) for
-    # local testing without ACS:
-    #   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-    #   EMAIL_HOST=smtp.resend.com
-    #   EMAIL_HOST_USER=resend
-    #   EMAIL_HOST_PASSWORD=re_xxx
-    EMAIL_BACKEND = os.getenv(
-        'EMAIL_BACKEND',
-        'django.core.mail.backends.console.EmailBackend',
-    )
+    # Dev path — console prints emails to stdout.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.mailgun.org')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
