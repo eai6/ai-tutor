@@ -106,8 +106,7 @@ pulumi.export(
 # The exact environment the ECS task definition must supply. Kept here rather
 # than in prose so it cannot drift from what the app actually reads — every key
 # below is consumed by config/settings.py or apps/dashboard/job_dispatch.py.
-pulumi.export(
-    "task_environment",
+task_environment = (
     pulumi.Output.all(
         storage.media_bucket.bucket,
         network.private_subnet_ids,
@@ -135,11 +134,48 @@ pulumi.export(
             "CSRF_TRUSTED_ORIGINS": f"http://{a[4]}",
             "EMBEDDING_BACKEND": "local",
         }
-    ),
+    )
 )
+pulumi.export("task_environment", task_environment)
 
-pulumi.export(
-    "blocked_on_iam",
-    "ECS task definitions and services are not created: iam:PassRole is denied "
-    "for this account's SSO role. See docs/aws-iam-access-request.md.",
-)
+# ── ECS, gated on the IAM grant ────────────────────────────────────────────
+# Off by default: iam:PassRole is denied, and a Fargate task definition cannot
+# omit an execution role. Once the grant in docs/aws-iam-access-request.md
+# lands:  pulumi config set enable-ecs true && pulumi up
+enable_ecs = config.get_bool("enable-ecs") or False
+
+if enable_ecs:
+    from components.compute import create_compute
+
+    image_tag = config.get("image-tag") or "latest"
+    compute = create_compute(
+        prefix,
+        cluster=cluster,
+        image=storage.ecr_repo.repository_url.apply(lambda u: f"{u}:{image_tag}"),
+        log_group=log_group,
+        media_bucket=storage.media_bucket,
+        secret_arns={
+            "database-url": data.database_url_secret.arn,
+            **{k: v.arn for k, v in data.app_secrets.items()},
+        },
+        task_environment=task_environment,
+        private_subnet_ids=network.private_subnet_ids,
+        tasks_sg_id=network.tasks_sg.id,
+        target_group=edge.target_group,
+        region=region,
+        account_id=account_id,
+        min_tasks=config.get_int("min-tasks") or 1,
+        max_tasks=config.get_int("max-tasks") or 4,
+        tags=tags,
+    )
+    pulumi.export("ecs_service_name", compute.service.name)
+    pulumi.export("migrate_task_definition", compute.migrate_task_definition.family)
+    pulumi.export("material_task_definition", compute.material_task_definition.family)
+else:
+    pulumi.export(
+        "blocked_on_iam",
+        "ECS is not deployed: iam:PassRole is denied for this account's SSO "
+        "role, and a Fargate task definition cannot omit an execution role. "
+        "The code is written and gated — see docs/aws-iam-access-request.md, "
+        "then: pulumi config set enable-ecs true && pulumi up",
+    )

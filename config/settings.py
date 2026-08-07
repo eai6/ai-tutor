@@ -421,11 +421,29 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'AI Tutor <noreply@example.com>')
 
-# Production security settings
+# Production security settings.
+#
+# HTTPS_EDGE says whether the load balancer in front of us terminates TLS.
+# It defaults to true, so Azure (App Gateway, TLS-terminating) keeps hardening
+# exactly as before without setting anything.
+#
+# The AWS deployment sets HTTPS_EDGE=false while it runs HTTP-only on the ALB's
+# own hostname — it serves no users and has no domain, and a public ACM cert
+# cannot be issued for an AWS-owned ELB domain. Leaving the cookies Secure there
+# breaks login in the most confusing way possible: browsers refuse to send
+# Secure cookies over plain HTTP, so every login silently bounces back to the
+# login page with no error anywhere. config/settings_kiosk.py and
+# settings_desktop.py exist to undo the same block for plain-HTTP builds.
+#
+# Drop HTTPS_EDGE (or set it true) the moment a certificate is attached.
+HTTPS_EDGE = os.getenv('HTTPS_EDGE', 'true').lower() not in ('0', 'false', 'no', 'off')
+
 if not DEBUG:
+    # Safe to keep unconditionally: both App Gateway and the ALB overwrite
+    # X-Forwarded-Proto, so it cannot be spoofed by a client.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = HTTPS_EDGE
+    CSRF_COOKIE_SECURE = HTTPS_EDGE
 
 
 # =============================================================================
