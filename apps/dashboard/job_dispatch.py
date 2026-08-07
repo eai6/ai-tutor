@@ -1,12 +1,15 @@
-"""Container Apps Job dispatch — large material processing.
+"""Background job dispatch — large material processing.
 
-Two backends:
-  - Azure SDK: in production, posts a Job execution start to ARM.
+Three backends, because Azure Container Apps and AWS ECS run the SAME image
+and each supplies only its own environment:
+  - ECS RunTask: starts a Fargate task from the material task definition.
+  - Azure SDK: posts a Container Apps Job execution start to ARM. Live today.
   - Local subprocess: in dev, runs `python manage.py process_material`
-    detached so devs can exercise the same flow without Azure.
+    detached so devs can exercise the same flow without either cloud.
 
-Selection: if `AZURE_RESOURCE_GROUP` and `AZURE_MATERIAL_JOB_NAME` env vars
-are both set, use the SDK backend; otherwise fall back to subprocess.
+Selection, in order: ECS if `ECS_CLUSTER`, `ECS_MATERIAL_TASK_DEFINITION` and
+`ECS_SUBNETS` are all set; else Azure if `AZURE_RESOURCE_GROUP` and
+`AZURE_MATERIAL_JOB_NAME` are both set; else subprocess.
 """
 
 import logging
@@ -19,6 +22,88 @@ from typing import Optional
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _ecs_settings():
+    """Returns (cluster, task_definition, subnets, security_groups, container_name)
+    or None if not configured."""
+    cluster = os.getenv('ECS_CLUSTER')
+    task_definition = os.getenv('ECS_MATERIAL_TASK_DEFINITION')
+    subnets = [s for s in os.getenv('ECS_SUBNETS', '').split(',') if s]
+    security_groups = [g for g in os.getenv('ECS_SECURITY_GROUPS', '').split(',') if g]
+    container_name = os.getenv('ECS_MATERIAL_CONTAINER_NAME', 'material-processor')
+    if not (cluster and task_definition and subnets):
+        return None
+    return cluster, task_definition, subnets, security_groups, container_name
+
+
+def _ecs_client():
+    """boto3 ECS client. Credentials come from the web task's role."""
+    import boto3
+
+    return boto3.client('ecs', region_name=os.getenv('AWS_REGION', 'us-east-1'))
+
+
+def _dispatch_via_ecs(
+    upload_id: int, mode: str,
+    cluster: str, task_definition: str,
+    subnets: list, security_groups: list, container_name: str,
+) -> str:
+    """Start a Fargate task from the material task definition.
+
+    Only the command is overridden. The task definition already carries the
+    image, CPU/memory, environment and secrets — so unlike the Container Apps
+    Job path below, there is no need to restate them per execution. That
+    difference is the whole reason this backend is short.
+    """
+    try:
+        client = _ecs_client()
+    except ImportError as exc:
+        raise RuntimeError(
+            "boto3 not installed. Add it to requirements.txt before "
+            "dispatching material jobs to ECS."
+        ) from exc
+
+    response = client.run_task(
+        cluster=cluster,
+        taskDefinition=task_definition,
+        launchType='FARGATE',
+        count=1,
+        networkConfiguration={
+            'awsvpcConfiguration': {
+                'subnets': subnets,
+                'securityGroups': security_groups,
+                'assignPublicIp': 'DISABLED',
+            },
+        },
+        overrides={
+            'containerOverrides': [
+                {
+                    'name': container_name,
+                    'command': [
+                        'python', 'manage.py', 'process_material',
+                        str(upload_id), '--mode', mode,
+                    ],
+                },
+            ],
+        },
+    )
+
+    failures = response.get('failures') or []
+    if failures:
+        raise RuntimeError(
+            f"ECS RunTask failed for upload {upload_id}: {failures}"
+        )
+    tasks = response.get('tasks') or []
+    if not tasks:
+        raise RuntimeError(
+            f"ECS RunTask returned no task for upload {upload_id}"
+        )
+
+    task_arn = tasks[0].get('taskArn', '')
+    execution_name = task_arn.rsplit('/', 1)[-1] or task_arn
+    logger.info(f"Dispatched material job for upload {upload_id} → {execution_name}")
+    return execution_name
 
 
 def _azure_settings():
@@ -38,6 +123,9 @@ def dispatch_material_job(upload_id: int, mode: str = 'rich') -> str:
     (subprocess fallback). Persisted on the upload row so the UI can
     surface it for debugging.
     """
+    ecs_cfg = _ecs_settings()
+    if ecs_cfg:
+        return _dispatch_via_ecs(upload_id, mode, *ecs_cfg)
     azure_cfg = _azure_settings()
     if azure_cfg:
         return _dispatch_via_azure_sdk(upload_id, mode, *azure_cfg)
