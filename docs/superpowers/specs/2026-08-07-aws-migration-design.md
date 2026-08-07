@@ -124,7 +124,9 @@ Media continues to be **served through Django** at `/media/<path>`, not through 
 
 ### Email on SES
 
-A verified domain identity for `mail.<primary-domain>` with DKIM, matching the current Azure sender. Because DNS stays at name.com, the DKIM CNAMEs, the MAIL FROM records, and DMARC are all added manually; Pulumi exports them.
+A verified domain identity with DKIM, matching the current Azure sender domain (`mail.ai-tutor.wbg.edwardamoah.com` today, derived from the first entry in `custom-domains`). Because DNS stays at name.com, the DKIM CNAMEs, the MAIL FROM records, and DMARC are all added manually; Pulumi exports them.
+
+The backend is a `SESEmailBackend` built on boto3's SESv2 client rather than the `django-ses` package. Three reasons: boto3 is already a dependency for S3 and ECS dispatch, so this adds nothing new; the existing class already encodes `fail_silently` semantics, HTML alternatives, reply-to handling, and display-name stripping that are worth keeping; and a fake boto3 client makes the outgoing payload directly assertable, where mocking a third-party backend's internals would be brittle. Messages carrying attachments are sent as SES `Raw` content, since `Simple` content has no attachment field.
 
 **SES starts every new account in sandbox mode**, where sending is restricted to verified addresses. Production access must be requested early — approval is usually under a day but is not guaranteed, and it gates real email at cutover.
 
@@ -149,7 +151,7 @@ ECR with `scanOnPush` and a lifecycle policy retaining 20 images. That policy re
 | File | Change |
 | --- | --- |
 | `apps/media_library/blob_media.py` | `AzureStorage` → `S3Storage`; `serve_media` rewritten to stream from S3 with Range support |
-| `apps/safety/email_backends.py` | `AzureCommunicationEmailBackend` → SES via `django-ses`, keeping the custom-backend shape |
+| `apps/safety/email_backends.py` | `AzureCommunicationEmailBackend` → `SESEmailBackend` on boto3 SESv2, keeping the class shape |
 | `apps/dashboard/job_dispatch.py` | `azure.mgmt.appcontainers` → `boto3` `ecs.run_task` |
 | `apps/safety/client_ip.py` | Docstring only — the last-hop logic is correct for ALB. ALB omits the `:port` suffix by default, which `_normalize_ip` already tolerates |
 | `config/settings.py` | `AZURE_BLOB_MEDIA_*` → `AWS_MEDIA_*`; ACS variables → SES; Azure job variables → `ECS_*` |
