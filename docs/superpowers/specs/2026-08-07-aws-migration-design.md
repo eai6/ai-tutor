@@ -16,7 +16,7 @@
 | Region | `us-east-1` | Cheapest region, full service coverage, and ACM certs live here already if CloudFront is added later. Latency to the Seychelles and Tanzania pilots is the trade accepted. |
 | Media storage | S3, added beside the Azure Blob backend | `apps/media_library/s3_media.py` is added next to `blob_media.py`; the configured backend wins at runtime. Removes the shared-mount dependency between web and material-processing tasks on the AWS side. |
 | Scope | Full AWS parity in one build-out | ECS, RDS, S3, ALB, ACM, AWS WAF, SES, the material-processing job, and a staging environment all land together — but as a second live environment, not a replacement. |
-| DNS | Stays at name.com | One ACM validation CNAME added by hand, and a separate hostname for AWS. `www.seselai.sc` keeps pointing at Azure. |
+| DNS | **Deferred entirely** | AWS serves no users in this phase, so it needs no domain. It runs on the ALB's own DNS name. No ACM certificate, no name.com records, no Route 53. Revisited only when AWS is about to take real traffic. |
 
 ### What "side by side" means in practice
 
@@ -106,9 +106,24 @@ Three task definitions share one image:
 
 ### Edge and TLS
 
-An ACM certificate covering `www.seselai.sc`, and `ai-tutor.wbg.edwardamoah.com` as a subject alternative name **if that zone is reachable**. The second name sits in `CSRF_TRUSTED_ORIGINS` today but has no working TLS path on Azure, because the App Gateway listener hardcodes only `www.seselai.sc`. Including it fixes that — but ACM validates each name independently, and `wbg.edwardamoah.com` is a different zone that may not be under the same control as `seselai.sc`. **Open question:** if a validation CNAME cannot be added there, drop the name from the certificate and from `CSRF_TRUSTED_ORIGINS` rather than shipping a certificate that never issues.
+**No certificate and no domain in this phase.** Since AWS serves no users yet, it runs on the ALB's own hostname (`aitutor-<hash>.us-east-1.elb.amazonaws.com`) over plain **HTTP on port 80**. A public ACM certificate cannot be issued for an AWS-owned ELB domain anyway — you cannot prove control of it — so HTTPS genuinely has to wait for a real hostname. This removes the manual DNS validation step from the critical path entirely.
 
-Because DNS stays at name.com, certificate issuance requires adding ACM's validation CNAME records by hand before the HTTPS listener will come up. This is a blocking manual step, and Pulumi will export the exact records to add.
+**This has a consequence that will otherwise waste an afternoon.** With `DEBUG=False`, `config/settings.py:405-408` sets `SESSION_COOKIE_SECURE = True` and `CSRF_COOKIE_SECURE = True`. Browsers refuse to send `Secure` cookies over plain HTTP, so **login and every form POST break silently** on an HTTP-only deployment — you get redirected back to the login page with no error. The app already has precedent for this exact situation: `config/settings_kiosk.py:25-32` and `config/settings_desktop.py:28` exist purely to undo that block for plain-HTTP deployments.
+
+The fix is an environment-driven relaxation rather than a new settings module, so the same image still hardens correctly on Azure:
+
+```python
+# config/settings.py, replacing the bare `if not DEBUG:` guard
+_HTTPS_EDGE = os.getenv('HTTPS_EDGE', 'true').lower() not in ('0', 'false', 'no', 'off')
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = _HTTPS_EDGE
+    CSRF_COOKIE_SECURE = _HTTPS_EDGE
+```
+
+Azure sets nothing and keeps today's behaviour; the AWS task definition sets `HTTPS_EDGE=false` until it has a certificate. `CSRF_TRUSTED_ORIGINS` takes the `http://` ALB hostname, which is a Pulumi output rather than a hand-managed value.
+
+When a real hostname does arrive, the work is: request an ACM cert, add one validation CNAME, add a 443 listener, redirect 80 → 443, and drop `HTTPS_EDGE`. That is an afternoon, and nothing above needs redoing.
 
 **The ALB idle timeout must be raised to 120 seconds.** The default is 60, and Gunicorn's timeout is 120 — leaving the default would sever long LLM requests at the load balancer with a 504 while the worker keeps running. Target group deregistration delay is likewise set to 120 seconds so in-flight tutoring turns drain rather than drop during a deploy.
 
@@ -263,7 +278,8 @@ Staging costs about $220 in the same shape. Two levers, both recommended: run st
 
 | Risk | Mitigation |
 | --- | --- |
-| ACM validation CNAME is manual and gates HTTPS | Do it first; Pulumi exports the exact records |
+| **IAM writes are denied on this account** — `iam:CreateRole` and `iam:PutRolePolicy` return AccessDenied under the SSO PowerUserAccess role. ECS cannot run without a task role and an execution role, so `pulumi up` fails at the first IAM resource | **Probe before building.** `iam:ListRoles` works, so enumerate what already exists and check for a reusable `ecsTaskExecutionRole` before writing the stack. If none, someone with IAM admin must create the roles up front and Pulumi references them by ARN instead of creating them |
+| Secure cookies break login on an HTTP-only ALB | `HTTPS_EDGE=false` on the AWS task definition; Azure unaffected |
 | SES sandbox blocks real email | Request production access at the start of the work, not at cutover |
 | WAF managed rules false-positive on teacher dashboard input | Deploy in `COUNT`, observe, then flip to `BLOCK` |
 | ALB 60s default idle timeout severs LLM requests | Explicitly set to 120s; covered by a smoke test that exercises a slow path |
