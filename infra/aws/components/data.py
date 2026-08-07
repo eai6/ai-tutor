@@ -13,6 +13,7 @@ CloudWatch metrics are unaffected. See docs/aws-iam-access-request.md.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import pulumi
 import pulumi_aws as aws
@@ -91,9 +92,17 @@ def create_data(
     # (Azure Flexible Server required an azure.extensions allowlist first.)
 
     database_url = pulumi.Output.all(instance.address, db_password.result).apply(
-        # sslmode=require is NOT optional: nothing in config/settings.py enforces
-        # TLS, so it comes entirely from this query string.
-        lambda a: f"postgres://{DB_USER}:{a[1]}@{a[0]}:{DB_PORT}/{DB_NAME}?sslmode=require"
+        # The password MUST be percent-encoded. The generated charset includes
+        # #, ?, : and & — all of which are URL-structural, so an unencoded
+        # password makes dj_database_url raise ParseError at import time and
+        # every task dies before Django starts.
+        #
+        # sslmode=require is NOT optional either: nothing in config/settings.py
+        # enforces TLS, so it comes entirely from this query string.
+        lambda a: (
+            f"postgres://{DB_USER}:{quote(a[1], safe='')}"
+            f"@{a[0]}:{DB_PORT}/{DB_NAME}?sslmode=require"
+        )
     )
 
     database_url_secret = _secret(
