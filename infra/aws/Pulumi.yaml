@@ -1,0 +1,6 @@
+name: aitutor-aws
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: AI Tutor – AWS ECS Fargate infrastructure (runs alongside the Azure stack)
