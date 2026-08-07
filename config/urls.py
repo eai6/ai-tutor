@@ -63,10 +63,16 @@ urlpatterns = [
 ]
 
 # Serve media on our own domain (school-network-friendly, behind the WAF).
-# When blob media is enabled, stream from the private blob container (range-
-# capable) with a File-Share fallback for un-migrated files; otherwise serve
-# straight from the File Share mount.
-if getattr(settings, 'USE_BLOB_MEDIA', False):
+# Azure and AWS deployments run the same image, so both streamers stay wired up
+# and the configured one wins: S3 on ECS, Azure Blob on Container Apps, each
+# range-capable with a filesystem fallback for anything not yet migrated.
+# With neither configured, serve straight from the local media directory.
+if getattr(settings, 'USE_S3_MEDIA', False):
+    from apps.media_library.s3_media import serve_media
+    urlpatterns += [
+        path('media/<path:path>', serve_media),
+    ]
+elif getattr(settings, 'USE_BLOB_MEDIA', False):
     from apps.media_library.blob_media import serve_media
     urlpatterns += [
         path('media/<path:path>', serve_media),

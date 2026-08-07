@@ -284,18 +284,31 @@ STORAGES = {
     },
 }
 
-# ── Media on Azure Blob (Phase 1) ────────────────────────────────────────────
-# Active only when the account + key env vars are present (prod). Media is then
-# stored in a PRIVATE blob container and served from our own domain via
-# apps.media_library.blob_media.serve_media (school-network-friendly, behind the
-# WAF, range-capable). Without these vars (local/dev) media stays on the
-# filesystem / File Share — no behaviour change. See
-# memory/blob_media_hosting_plan.md.
+# ── Media storage — Azure Blob and S3 side by side ───────────────────────────
+# Azure Container Apps and AWS ECS run the SAME image; each deployment supplies
+# only its own env vars, and whichever is configured wins. Azure is live for
+# real users, so its path must keep working untouched while AWS is stood up.
+# S3 takes precedence if both are somehow set.
+#
+# Either way media is stored PRIVATELY and served from our own domain via the
+# matching serve_media (school-network-friendly, behind the WAF, range-capable)
+# — never a blob/bucket URL and never a presigned link, because schools
+# allowlist our domain and nothing else. With neither set (local/dev) media
+# stays on the filesystem. See memory/blob_media_hosting_plan.md.
 AZURE_BLOB_MEDIA_ACCOUNT = os.getenv('AZURE_BLOB_MEDIA_ACCOUNT', '')
 AZURE_BLOB_MEDIA_KEY = os.getenv('AZURE_BLOB_MEDIA_KEY', '')
 AZURE_BLOB_MEDIA_CONTAINER = os.getenv('AZURE_BLOB_MEDIA_CONTAINER', 'media')
 USE_BLOB_MEDIA = bool(AZURE_BLOB_MEDIA_ACCOUNT and AZURE_BLOB_MEDIA_KEY)
-if USE_BLOB_MEDIA:
+
+AWS_MEDIA_BUCKET = os.getenv('AWS_MEDIA_BUCKET', '')
+AWS_MEDIA_REGION = os.getenv('AWS_MEDIA_REGION', 'us-east-1')
+USE_S3_MEDIA = bool(AWS_MEDIA_BUCKET)
+
+if USE_S3_MEDIA:
+    STORAGES['default'] = {
+        'BACKEND': 'apps.media_library.s3_media.S3MediaStorage',
+    }
+elif USE_BLOB_MEDIA:
     STORAGES['default'] = {
         'BACKEND': 'apps.media_library.blob_media.AzureMediaStorage',
     }
