@@ -11,6 +11,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import dj_database_url
+from django.urls import reverse_lazy
 
 load_dotenv()
 
@@ -369,10 +370,25 @@ ELEVENLABS_MODEL_ID = os.getenv('ELEVENLABS_MODEL_ID', 'eleven_multilingual_v2')
 # benchmark can slice agreement by history-aware vs not.
 JUDGE_HISTORY_TURNS = int(os.getenv('JUDGE_HISTORY_TURNS', '12'))
 
-# Auth settings
-LOGIN_URL = '/accounts/login/'
+# Auth settings.
+#
+# LOGIN_URL is where every @login_required view sends a logged-out user, with
+# ?next= appended. reverse_lazy rather than a hardcoded path: this was
+# '/accounts/login/' for a long time, but apps.accounts.urls is mounted at the
+# ROOT (config/urls.py) so the real route is '/login/'. Django never validates
+# LOGIN_URL, so the mismatch silently 404'd every protected view for anyone
+# arriving with an expired session or a bookmarked URL. Resolving by name means
+# a future route rename fails loudly instead of quietly.
+#
+# accounts:login is a dispatcher that reads ?next= and routes dashboard traffic
+# to the staff login form — logic that was unreachable while LOGIN_URL pointed
+# at a non-existent path.
+LOGIN_URL = reverse_lazy('accounts:login')
 LOGIN_REDIRECT_URL = '/tutor/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+# Unused in practice — apps.accounts.views.logout_view redirects to the landing
+# page explicitly, so Django never consults this. Kept correct so that anything
+# switching to Django's built-in LogoutView doesn't inherit the old 404.
+LOGOUT_REDIRECT_URL = '/'
 
 
 # Email — defaults to console (prints to terminal). Azure Container Apps and
