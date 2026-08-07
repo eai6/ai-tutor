@@ -2,484 +2,76 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace every Azure SDK on the application's request path with an AWS equivalent, so the container image can run on ECS Fargate without any Azure dependency.
+**Goal:** Give the application an AWS backend for each of the three Azure-coupled subsystems, so the same image runs on ECS Fargate **and** on Azure Container Apps.
 
-**Architecture:** Three modules currently import Azure SDKs — media storage, email, and background-job dispatch. Each is rewritten against `boto3` while preserving its existing public interface, so callers elsewhere in the codebase are untouched. The Azure implementations are deleted rather than kept behind a flag: this branch targets AWS only, and Azure production continues to run the image built from `main` until cutover.
+**Architecture:** Three modules import Azure SDKs — media storage, email, and background-job dispatch. Each **gains** a `boto3` sibling selected by environment variables at runtime. The Azure implementations stay exactly as they are, because Azure serves live users and keeps doing so while AWS is stood up. One image, two clouds, whichever set of env vars is present wins.
 
-**Tech Stack:** Python 3.12, Django 5, `boto3`, `django-storages[s3]`, pytest with pytest-django.
+**Tech Stack:** Python 3.12 (venv is 3.13), Django 5, `boto3`, `django-storages[s3]`, Django's own test runner.
 
 ## Global Constraints
 
 Copied from `docs/superpowers/specs/2026-08-07-aws-migration-design.md`. Every task's requirements implicitly include this section.
 
+- **Azure is live. Additions only.** Do not delete, rewrite in place, or downgrade any Azure module, setting, dependency, or workflow. Every task that touches shared code must leave a test pinning the Azure path.
+- **Do not modify** `Dockerfile`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-staging.yml`, or `.github/workflows/cert-renew.yml`. Azure depends on all four. AWS overrides `command` in its ECS task definitions instead of changing `CMD`.
 - Region is `us-east-1`.
 - Media is **served through Django** at `/media/<path>`. Never return a presigned S3 URL or a public bucket URL — school networks allowlist only the application's own domain.
 - HTTP Range support on media is **required** and its current semantics must be preserved exactly; video scrubbing depends on it.
 - `boto3` is the only new cloud SDK. Do not add provider-specific wrappers.
 - Do not touch `apps/llm/` — `azure_openai` remains a valid model-vendor choice and is unrelated to hosting.
-- Run tests with: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest <path> -v`
-- There is no `pytest.ini` or `conftest.py`; `DJANGO_SETTINGS_MODULE` must be set on the command line.
+- **Run tests with Django's runner:** `./venv/bin/python manage.py test apps.<app>.tests.test_<feature>`
+  `pytest-django is NOT installed`, so bare `pytest` cannot run this suite — existing test files fail to collect under it too, and CLAUDE.md is out of date on this point.
+- **Write tests as `SimpleTestCase` / `TestCase` subclasses**, matching all 165 existing test files. Function-style pytest tests fail: with no `conftest.py`, the first test in a session runs before Django settings are wrapped and `override_settings` raises `AttributeError: 'object' object has no attribute 'DATABASES'`.
 - Test files live at `apps/<app>/tests/test_<feature>.py` and every `tests/` directory needs an `__init__.py`.
 - Commit after every task. Do not squash tasks into one commit.
+
+**Known pre-existing breakage, not yours to fix:** `./venv/bin/python manage.py test apps.curriculum` fails to collect with `ImportError: 'tests' module incorrectly imported`. This reproduces on a clean checkout with all migration work stashed. Do not try to fix it inside this plan; run neighbouring app suites individually instead.
 
 ## File Structure
 
 | File | Responsibility |
 | --- | --- |
-| `apps/media_library/s3_media.py` | **Create.** `S3MediaStorage` + range-aware `serve_media`. Replaces `blob_media.py`. |
-| `apps/media_library/blob_media.py` | **Delete** in Task 1. |
-| `apps/media_library/tests.py` | **Delete** in Task 1 — 3-line Django stub, and it blocks creating a `tests/` package. |
-| `apps/media_library/tests/test_s3_media.py` | **Create.** Range, content-type, and fallback behaviour. |
-| `apps/safety/email_backends.py` | **Rewrite.** `AzureCommunicationEmailBackend` → `SESEmailBackend`. |
+| `apps/media_library/s3_media.py` | **Create.** `S3MediaStorage` + range-aware `serve_media`, beside `blob_media.py`. |
+| `apps/media_library/blob_media.py` | **Untouched.** Azure's live media path. |
+| `apps/media_library/tests.py` | **Delete** in Task 1 — empty 3-line Django stub with no tests, and it blocks creating a `tests/` package. The only deletion in this plan. |
+| `apps/media_library/tests/test_s3_media.py` | **Create.** Range, content-type, fallback, plus Azure-path guards. |
+| `apps/safety/email_backends.py` | **Append** `SESEmailBackend`; `AzureCommunicationEmailBackend` stays in the same file. |
 | `apps/safety/tests/test_ses_email.py` | **Create.** |
-| `apps/dashboard/job_dispatch.py` | **Modify.** Azure ARM backend → ECS `RunTask`. |
+| `apps/dashboard/job_dispatch.py` | **Append** an ECS backend; the Azure ARM backend stays. |
 | `apps/dashboard/tests/test_job_dispatch.py` | **Create.** |
-| `apps/safety/tests/test_client_ip.py` | **Create.** Pin last-hop behaviour under ALB-shaped headers. |
-| `config/settings.py` | **Modify** across tasks 1–3: `AZURE_BLOB_MEDIA_*` → `AWS_MEDIA_*`, ACS → SES, job vars → `ECS_*`. |
-| `config/urls.py` | **Modify** in Task 1: media route points at the S3 server. |
-| `Dockerfile` | **Modify** in Task 5: `CMD` reduced to Gunicorn alone. |
-| `requirements.txt` | **Modify** in Task 5: drop Azure SDKs, add AWS. |
+| `apps/safety/tests/test_client_ip.py` | **Create.** Pin last-hop behaviour under both App Gateway and ALB headers. |
+| `config/settings.py` | **Add** `AWS_MEDIA_*`, SES and `ECS_*` blocks across tasks 1–3. Azure blocks stay. |
+| `config/urls.py` | **Add** an S3 branch ahead of the existing Azure branch. |
+| `Dockerfile` | **Untouched.** Azure needs the `CMD` migrate chain; AWS overrides `command` per task definition. |
+| `requirements.txt` | **Add** `boto3` + `django-storages[s3]` in Task 5. The four `azure-*` packages stay. |
 
 ---
 
-### Task 1: S3 media storage and range-aware server
-
-**Files:**
-
-- Create: `apps/media_library/s3_media.py`
-- Create: `apps/media_library/tests/__init__.py`
-- Create: `apps/media_library/tests/test_s3_media.py`
-- Delete: `apps/media_library/blob_media.py`
-- Delete: `apps/media_library/tests.py`
-- Modify: `config/settings.py:287-301` (the Azure blob block)
-- Modify: `config/urls.py:69-77` (the media route)
-
-**Interfaces:**
-
-- Consumes: nothing from earlier tasks.
-- Produces: `apps.media_library.s3_media.S3MediaStorage` (a `Storage` subclass whose `.url(name)` returns `/media/<name>`), and `apps.media_library.s3_media.serve_media(request, path) -> HttpResponse`. Task 5 relies on `blob_media.py` no longer existing.
-
-The existing `serve_media` in `blob_media.py` contains production-proven Range and content-type logic. Port it **verbatim** apart from the three Azure calls. In particular keep the rule that a stored content type of `application/octet-stream` loses to an extension-based guess — bulk-migrated files land as octet-stream and browsers would otherwise download PDFs instead of rendering them.
-
-- [ ] **Step 1: Create the tests package and write the failing tests**
-
-Create `apps/media_library/tests/__init__.py` as an empty file, then `apps/media_library/tests/test_s3_media.py`:
-
-```python
-"""S3 media serving — Range, content-type, and fallback behaviour."""
-from __future__ import annotations
-
-import re
-
-import pytest
-from django.http import Http404
-from django.test import RequestFactory, override_settings
-
-from apps.media_library import s3_media
-
-
-class _FakeBody:
-    """Stands in for botocore's StreamingBody."""
-
-    def __init__(self, data: bytes):
-        self._data = data
-
-    def iter_chunks(self, chunk_size: int = 8192):
-        for i in range(0, len(self._data), chunk_size):
-            yield self._data[i:i + chunk_size]
-
-
-class _FakeS3:
-    """Minimal S3 client: head_object + ranged get_object."""
-
-    def __init__(self, objects: dict[str, tuple[bytes, str | None]]):
-        self.objects = objects
-        self.ranges_requested: list[str | None] = []
-
-    def head_object(self, Bucket, Key):  # noqa: N803 — boto3 casing
-        if Key not in self.objects:
-            raise KeyError(Key)
-        data, content_type = self.objects[Key]
-        head = {"ContentLength": len(data)}
-        if content_type is not None:
-            head["ContentType"] = content_type
-        return head
-
-    def get_object(self, Bucket, Key, Range=None):  # noqa: N803
-        self.ranges_requested.append(Range)
-        data, _ = self.objects[Key]
-        if Range:
-            m = re.match(r"bytes=(\d+)-(\d+)", Range)
-            start, end = int(m.group(1)), int(m.group(2))
-            data = data[start:end + 1]
-        return {"Body": _FakeBody(data)}
-
-
-BODY = b"0123456789A"  # 11 bytes
-
-
-@pytest.fixture
-def fake_s3(monkeypatch):
-    client = _FakeS3({"doc.pdf": (BODY, "application/octet-stream")})
-    monkeypatch.setattr(s3_media, "_s3_client", lambda: client)
-    return client
-
-
-@pytest.fixture
-def rf():
-    return RequestFactory()
-
-
-def _drain(response) -> bytes:
-    return b"".join(response.streaming_content)
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_full_request_returns_200_with_length_and_accept_ranges(fake_s3, rf):
-    response = s3_media.serve_media(rf.get("/media/doc.pdf"), "doc.pdf")
-
-    assert response.status_code == 200
-    assert response["Content-Length"] == "11"
-    assert response["Accept-Ranges"] == "bytes"
-    assert "Content-Range" not in response
-    assert _drain(response) == BODY
-    assert fake_s3.ranges_requested == [None]
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_byte_range_returns_206_and_the_requested_slice(fake_s3, rf):
-    request = rf.get("/media/doc.pdf", HTTP_RANGE="bytes=2-5")
-    response = s3_media.serve_media(request, "doc.pdf")
-
-    assert response.status_code == 206
-    assert response["Content-Range"] == "bytes 2-5/11"
-    assert response["Content-Length"] == "4"
-    assert _drain(response) == b"2345"
-    assert fake_s3.ranges_requested == ["bytes=2-5"]
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_suffix_range_returns_the_last_n_bytes(fake_s3, rf):
-    request = rf.get("/media/doc.pdf", HTTP_RANGE="bytes=-4")
-    response = s3_media.serve_media(request, "doc.pdf")
-
-    assert response.status_code == 206
-    assert response["Content-Range"] == "bytes 7-10/11"
-    assert _drain(response) == b"789A"
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_open_ended_range_runs_to_the_final_byte(fake_s3, rf):
-    request = rf.get("/media/doc.pdf", HTTP_RANGE="bytes=8-")
-    response = s3_media.serve_media(request, "doc.pdf")
-
-    assert response.status_code == 206
-    assert response["Content-Range"] == "bytes 8-10/11"
-    assert _drain(response) == b"89A"
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-@pytest.mark.parametrize("header", ["bytes=abc", "bytes=-", "kilobytes=0-5"])
-def test_unparseable_range_is_a_400(fake_s3, rf, header):
-    request = rf.get("/media/doc.pdf", HTTP_RANGE=header)
-    response = s3_media.serve_media(request, "doc.pdf")
-
-    assert response.status_code == 400
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_range_beyond_the_object_is_a_416_with_the_real_size(fake_s3, rf):
-    request = rf.get("/media/doc.pdf", HTTP_RANGE="bytes=50-60")
-    response = s3_media.serve_media(request, "doc.pdf")
-
-    assert response.status_code == 416
-    assert response["Content-Range"] == "bytes */11"
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_generic_stored_content_type_loses_to_the_extension_guess(fake_s3, rf):
-    """Bulk-migrated objects arrive as application/octet-stream; serving a PDF
-    with that type makes browsers download it instead of rendering it."""
-    response = s3_media.serve_media(rf.get("/media/doc.pdf"), "doc.pdf")
-
-    assert response["Content-Type"] == "application/pdf"
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_specific_stored_content_type_is_respected(monkeypatch, rf):
-    client = _FakeS3({"clip.bin": (BODY, "video/mp4")})
-    monkeypatch.setattr(s3_media, "_s3_client", lambda: client)
-
-    response = s3_media.serve_media(rf.get("/media/clip.bin"), "clip.bin")
-
-    assert response["Content-Type"] == "video/mp4"
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_missing_object_falls_back_to_the_filesystem(fake_s3, rf, tmp_path):
-    with override_settings(MEDIA_ROOT=str(tmp_path)):
-        with pytest.raises(Http404):
-            s3_media.serve_media(rf.get("/media/nope.pdf"), "nope.pdf")
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_filesystem_fallback_serves_a_local_file(fake_s3, rf, tmp_path):
-    (tmp_path / "local.txt").write_bytes(b"local")
-
-    with override_settings(MEDIA_ROOT=str(tmp_path)):
-        response = s3_media.serve_media(rf.get("/media/local.txt"), "local.txt")
-
-    assert response.status_code == 200
-
-
-@override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-def test_path_traversal_is_refused(fake_s3, rf, tmp_path):
-    with override_settings(MEDIA_ROOT=str(tmp_path)):
-        with pytest.raises(Http404):
-            s3_media.serve_media(rf.get("/media/x"), "../../etc/passwd")
-
-
-@override_settings(MEDIA_URL="media/")
-def test_storage_url_points_at_our_own_domain_never_at_s3():
-    """School networks allowlist only our domain, so .url() must not leak an
-    S3 hostname or a presigned URL."""
-
-    class _Bare(s3_media.S3MediaStorage):
-        def __init__(self):  # skip the parent __init__, which needs boto3
-            pass
-
-    assert _Bare().url("a/b.png") == "/media/a/b.png"
-```
-
-- [ ] **Step 2: Run the tests to verify they fail**
-
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/media_library/tests/test_s3_media.py -v`
-
-Expected: collection error — `ModuleNotFoundError: No module named 'apps.media_library.s3_media'`.
-
-If instead you get `import file mismatch` for `tests`, you left `apps/media_library/tests.py` in place. Delete it — a module and a package of the same name cannot coexist.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `apps/media_library/s3_media.py`:
-
-```python
-"""S3 media storage plus a range-capable, school-network-friendly server.
-
-Why this exists
----------------
-School networks allowlist ``www.seselai.sc`` only — they block ``*.amazonaws.com``
-the same way they block YouTube — and the bucket is private with no anonymous
-access. So media must be SERVED from our own domain rather than handed out as
-a bucket URL or a presigned link.
-
-This module:
-  * ``S3MediaStorage`` — django-storages S3 backend whose ``.url()`` returns
-    ``/media/<name>`` (our domain) instead of an S3 URL.
-  * ``serve_media`` — streams ``/media/<path>`` from the private bucket with
-    HTTP Range support so videos can be scrubbed. Falls back to ``MEDIA_ROOT``
-    for anything not in the bucket, which keeps local development working.
-"""
-from __future__ import annotations
-
-import mimetypes
-import os
-import re
-
-from django.conf import settings
-from django.http import (
-    FileResponse,
-    Http404,
-    HttpResponse,
-    HttpResponseBadRequest,
-    StreamingHttpResponse,
-)
-
-_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
-_CHUNK_BYTES = 8 * 1024 * 1024
-
-
-def _media_url_prefix() -> str:
-    u = settings.MEDIA_URL or "media/"
-    if not u.startswith("/"):
-        u = "/" + u
-    if not u.endswith("/"):
-        u = u + "/"
-    return u
-
-
-# django-storages is only installed where S3 media is used. Guard the import so
-# this module stays importable in a bare dev environment; the class below is
-# only instantiated when settings.USE_S3_MEDIA is true.
-try:
-    from storages.backends.s3 import S3Storage as _S3Storage
-except Exception:  # pragma: no cover - package absent in local dev
-    _S3Storage = object
-
-
-class S3MediaStorage(_S3Storage):
-    """Media stored in S3; URLs point back at our own domain so they work on
-    school networks and stay behind the WAF (we serve via serve_media, never a
-    bucket URL or a presigned link)."""
-
-    def __init__(self, **kwargs):
-        super().__init__(
-            bucket_name=settings.AWS_MEDIA_BUCKET,
-            region_name=settings.AWS_MEDIA_REGION,
-            querystring_auth=False,
-            file_overwrite=False,
-            **kwargs,
-        )
-
-    def url(self, name, *a, **k):
-        return _media_url_prefix() + str(name).lstrip("/")
-
-
-def _s3_client():
-    """boto3 S3 client. Credentials come from the ECS task role."""
-    import boto3
-
-    return boto3.client("s3", region_name=settings.AWS_MEDIA_REGION)
-
-
-def _filesystem_fallback(path: str):
-    """Serve from MEDIA_ROOT for anything not in the bucket."""
-    full = os.path.join(settings.MEDIA_ROOT, path)
-    root = os.path.abspath(settings.MEDIA_ROOT)
-    if not os.path.abspath(full).startswith(root) or not os.path.isfile(full):
-        raise Http404(path)
-    return FileResponse(open(full, "rb"))
-
-
-def serve_media(request, path):
-    """Stream `/media/<path>` from S3 (range-aware), fall back to MEDIA_ROOT."""
-    path = path.lstrip("/")
-    bucket = settings.AWS_MEDIA_BUCKET
-    client = _s3_client()
-    try:
-        head = client.head_object(Bucket=bucket, Key=path)
-    except Exception:
-        # Not in the bucket (or S3 unreachable) → try the local filesystem.
-        return _filesystem_fallback(path)
-
-    size = head["ContentLength"]
-    # Prefer the extension guess when S3 has no stored type OR a generic one.
-    # Bulk-migrated files land as ``application/octet-stream``, which would make
-    # browsers download PDFs instead of rendering them inline.
-    stored_ct = head.get("ContentType")
-    guessed_ct = mimetypes.guess_type(path)[0]
-    if guessed_ct and (not stored_ct or stored_ct == "application/octet-stream"):
-        content_type = guessed_ct
-    else:
-        content_type = stored_ct or "application/octet-stream"
-
-    range_header = request.headers.get("Range", "")
-    start, end = 0, size - 1
-    is_range = False
-    if range_header:
-        m = _RANGE_RE.match(range_header)
-        if not m:
-            return HttpResponseBadRequest("Invalid Range")
-        g0, g1 = m.group(1), m.group(2)
-        if g0 == "" and g1 == "":
-            return HttpResponseBadRequest("Invalid Range")
-        if g0 == "":  # suffix: last N bytes
-            length = int(g1)
-            start = max(0, size - length)
-            end = size - 1
-        else:
-            start = int(g0)
-            end = int(g1) if g1 else size - 1
-        end = min(end, size - 1)
-        if start > end:
-            resp = HttpResponse(status=416)
-            resp["Content-Range"] = f"bytes */{size}"
-            return resp
-        is_range = True
-
-    length = end - start + 1
-    get_kwargs = {"Bucket": bucket, "Key": path}
-    if is_range:
-        get_kwargs["Range"] = f"bytes={start}-{end}"
-    body = client.get_object(**get_kwargs)["Body"]
-
-    resp = StreamingHttpResponse(
-        body.iter_chunks(_CHUNK_BYTES),
-        status=206 if is_range else 200,
-        content_type=content_type,
-    )
-    resp["Accept-Ranges"] = "bytes"
-    resp["Content-Length"] = str(length)
-    if is_range:
-        resp["Content-Range"] = f"bytes {start}-{end}/{size}"
-    return resp
-```
-
-- [ ] **Step 4: Run the tests to verify they pass**
-
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/media_library/tests/test_s3_media.py -v`
-
-Expected: all tests PASS.
-
-- [ ] **Step 5: Swap the settings block**
-
-In `config/settings.py`, replace the Azure blob block at lines 287-301 with:
-
-```python
-# ── Media on S3 ────────────────────────────────────────────────────────────
-# Private bucket. Media is served through Django at /media/<path> (see
-# apps.media_library.s3_media.serve_media) so school networks only need our
-# own domain allowlisted — never a bucket URL, never a presigned link.
-AWS_MEDIA_BUCKET = os.getenv('AWS_MEDIA_BUCKET', '')
-AWS_MEDIA_REGION = os.getenv('AWS_MEDIA_REGION', 'us-east-1')
-USE_S3_MEDIA = bool(AWS_MEDIA_BUCKET)
-
-if USE_S3_MEDIA:
-    STORAGES['default'] = {
-        'BACKEND': 'apps.media_library.s3_media.S3MediaStorage',
-    }
-```
-
-`STORAGES` is defined as a dict literal at lines 278-285 with `default` and `staticfiles` keys, and the Azure block mutated `STORAGES['default']` in exactly this shape — so this is a like-for-like replacement, not a restructure.
-
-- [ ] **Step 6: Repoint the media route**
-
-In `config/urls.py`, change the import and the conditional at lines 69-77 from `USE_BLOB_MEDIA` / `apps.media_library.blob_media` to `USE_S3_MEDIA` / `apps.media_library.s3_media`. The route shape does not change.
-
-- [ ] **Step 7: Delete the Azure module and the stub test file**
-
-```bash
-git rm apps/media_library/blob_media.py apps/media_library/tests.py
-```
-
-- [ ] **Step 8: Verify nothing still references the deleted module**
-
-Run: `grep -rn "blob_media\|USE_BLOB_MEDIA\|AZURE_BLOB_MEDIA" --include="*.py" --include="*.html" apps/ config/`
-
-Expected: no matches. If any appear, fix them before committing.
-
-- [ ] **Step 9: Run the full media_library and dashboard suites for regressions**
-
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/media_library apps/curriculum -q`
-
-Expected: no new failures compared with the pre-change baseline. Record the baseline first with `git stash` if you are unsure.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add apps/media_library config/settings.py config/urls.py
-git commit -m "media: serve from S3 instead of Azure Blob
-
-Ports serve_media to boto3, keeping the Range and content-type logic
-verbatim — including the rule that a stored application/octet-stream
-loses to the extension guess, which is what stops browsers downloading
-migrated PDFs instead of rendering them.
-
-.url() still returns /media/<name> so media stays on our own domain;
-school networks allowlist that and nothing else.
-
-Refs: docs/superpowers/specs/2026-08-07-aws-migration-design.md"
-```
+### Task 1: S3 media storage and range-aware server — ✅ DONE (commit `92625cb`)
+
+Shipped as an **addition**: `apps/media_library/s3_media.py` sits beside
+`blob_media.py`, and `config/settings.py` / `config/urls.py` pick a backend at
+runtime (S3 when `AWS_MEDIA_BUCKET` is set, Azure Blob when the blob account
+and key are, filesystem otherwise). Nothing on the Azure path changed.
+
+15 tests in `apps/media_library/tests/test_s3_media.py`, all passing under
+`./venv/bin/python manage.py test apps.media_library.tests.test_s3_media`.
+Twelve cover S3 serving — full reads, byte/suffix/open-ended ranges, 400 on an
+unparseable range, 416 beyond the object, the octet-stream-loses-to-extension
+rule, and the filesystem fallback including path traversal. Three exist purely
+to guard the Azure path: that `blob_media` still imports, that its `.url()`
+still returns our own domain, and that both `serve_media` functions keep
+identical signatures, since `config/urls.py` binds them by the same name.
+
+`apps/media_library/tests.py` (an empty 3-line Django stub) was deleted because
+a `tests.py` module and a `tests/` package cannot coexist. It contained no
+tests, so nothing was lost.
+
+**Two discoveries from executing this task, now folded into Global Constraints:**
+`pytest-django` is not installed — the suite runs under `manage.py test`, and
+CLAUDE.md is wrong about `pytest`. And function-style pytest tests cannot work
+here: whichever runs first in a session dies inside `override_settings`, so
+tests must be `SimpleTestCase` subclasses like the other 165 files.
 
 ---
 
@@ -487,7 +79,7 @@ Refs: docs/superpowers/specs/2026-08-07-aws-migration-design.md"
 
 **Files:**
 
-- Modify: `apps/safety/email_backends.py` (full rewrite, 154 lines)
+- Modify: `apps/safety/email_backends.py` (APPEND a second backend; `AzureCommunicationEmailBackend` and `_bare_email` stay exactly as they are)
 - Create: `apps/safety/tests/__init__.py`
 - Create: `apps/safety/tests/test_ses_email.py`
 - Modify: `config/settings.py:366-395` (the ACS block)
@@ -663,9 +255,9 @@ Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety/tests
 
 Expected: `ImportError: cannot import name 'SESEmailBackend'`.
 
-- [ ] **Step 3: Rewrite the backend**
+- [ ] **Step 3: Append the SES backend**
 
-Replace the whole of `apps/safety/email_backends.py`:
+**Do not replace the file.** `AzureCommunicationEmailBackend` serves live users. Add `_ses_client` and `SESEmailBackend` below it, reusing the existing module-level `_bare_email` rather than redefining it. Update the module docstring to say it now hosts both backends. The code below shows the additions only:
 
 ```python
 """Django email backend that talks to Amazon SES (SESv2).
@@ -865,9 +457,9 @@ Leave `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMA
 
 - [ ] **Step 6: Verify nothing still references the Azure names**
 
-Run: `grep -rn "AzureCommunication\|AZURE_COMMUNICATION" --include="*.py" apps/ config/`
+Run: `./venv/bin/python manage.py test apps.safety.tests.test_ses_email`
 
-Expected: no matches.
+Expected: OK, and `AzureCommunicationEmailBackend` still importable — the Azure guard test in this file asserts it.
 
 - [ ] **Step 7: Run the safety suite**
 
@@ -1063,7 +655,7 @@ are all set, use ECS; otherwise fall back to subprocess.
 """
 ```
 
-Then replace `_azure_settings` (lines 24-31) with:
+Then add `_ecs_settings` beside the existing `_azure_settings` (which stays untouched):
 
 ```python
 def _ecs_settings():
@@ -1085,12 +677,15 @@ And rewrite the body of `dispatch_material_job` (lines 41-44) as:
     ecs_cfg = _ecs_settings()
     if ecs_cfg:
         return _dispatch_via_ecs(upload_id, mode, *ecs_cfg)
+    azure_cfg = _azure_settings()
+    if azure_cfg:
+        return _dispatch_via_azure_sdk(upload_id, mode, *azure_cfg)
     return _dispatch_via_subprocess(upload_id, mode)
 ```
 
-- [ ] **Step 4: Replace the Azure backend with the ECS one**
+- [ ] **Step 4: Add the ECS backend beside the Azure one**
 
-Delete `_dispatch_via_azure_sdk` entirely (lines 47-159 of the original file) and put this in its place:
+**Leave `_dispatch_via_azure_sdk` exactly as it is** — Azure dispatches live material jobs through it. Add the following alongside. The selector in Step 3 must try ECS first, then Azure, then the subprocess fallback, so each cloud picks its own path from its own env vars:
 
 ```python
 def _ecs_client():
@@ -1171,9 +766,9 @@ Expected: all tests PASS.
 
 - [ ] **Step 6: Verify no Azure job references survive**
 
-Run: `grep -rn "AZURE_RESOURCE_GROUP\|AZURE_MATERIAL_JOB_NAME\|AZURE_SUBSCRIPTION_ID\|appcontainers" --include="*.py" apps/ config/`
+Run: `grep -n "_dispatch_via_azure_sdk\|_azure_settings" apps/dashboard/job_dispatch.py`
 
-Expected: no matches.
+Expected: both still present. Their removal would break live Azure material processing.
 
 - [ ] **Step 7: Check the callers still line up**
 
@@ -1335,83 +930,65 @@ Refs: docs/superpowers/specs/2026-08-07-aws-migration-design.md"
 
 ---
 
-### Task 5: Drop Azure dependencies and split migrations out of the image CMD
+### Task 5: Add the AWS dependencies
 
 **Files:**
 
-- Modify: `requirements.txt:182-189`
-- Modify: `Dockerfile:29-31`
+- Modify: `requirements.txt` (additions only)
+- Create: `ops/migrate_and_seed.sh`
 
 **Interfaces:**
 
-- Consumes: tasks 1–3 must be complete — the Azure packages cannot be removed while anything still imports them.
-- Produces: an image whose `CMD` runs Gunicorn only. The infrastructure plan's migrate task definition depends on the seed command chain being available as a documented entrypoint.
+- Consumes: tasks 1-3, whose modules import `boto3` lazily inside functions and so already pass their tests without it installed.
+- Produces: `boto3` and `django-storages[s3]` available at runtime, and `ops/migrate_and_seed.sh` as the command the infrastructure plan points its migrate task definition at.
 
-The `CMD` currently chains `migrate` plus six seed commands ahead of Gunicorn. Container Apps single-revision mode serialised that by accident; ECS running more than one task would execute it concurrently on every task, racing the migrations. The chain moves to a one-shot task that CI runs and waits on before updating the service.
+**This task does NOT remove the Azure packages and does NOT touch the Dockerfile.** Both were in an earlier draft and both would break the live Azure deployment. `azure-communication-email`, `azure-identity`, `azure-mgmt-appcontainers` and `django-storages[azure]` all stay.
 
-- [ ] **Step 1: Confirm no Azure imports remain**
+The migration race is real but it is an AWS-only problem: Container Apps single-revision mode serialises the `CMD` chain, whereas ECS would run it on every task at once. The fix is for the ECS **web** task definition to override `command` to Gunicorn alone, and for CI to run the seed chain as a separate one-shot task. Azure keeps using `CMD` exactly as it does today. Nothing in the image changes.
 
-Run: `grep -rn "^import azure\|^from azure\|import azure\.\|from azure\." --include="*.py" apps/ config/`
+- [ ] **Step 1: Add the two packages**
 
-Expected: no matches. If any appear, the corresponding task above is incomplete — go back and finish it. Do not proceed.
-
-- [ ] **Step 2: Swap the dependencies**
-
-In `requirements.txt`, remove these four lines:
-
-```text
-azure-communication-email
-azure-identity
-azure-mgmt-appcontainers
-django-storages[azure]>=1.14
-```
-
-(the exact pins are at lines 182-189 — read them before deleting, and keep any unrelated neighbours)
-
-and add in their place:
+In `requirements.txt`, add next to the existing `django-storages[azure]>=1.14` line:
 
 ```text
 boto3>=1.34
 django-storages[s3]>=1.14
 ```
 
-Leave `requirements-core.txt`, `requirements-jetson.txt`, and `requirements-jetson.lock.txt` alone for now. They carry the same four Azure packages, but the Jetson lock file has to be regenerated on the Jetson toolchain and that is out of scope here. Note it as follow-up work.
+Both extras of `django-storages` can coexist — they pull different optional dependencies onto the same package. Do not delete the `[azure]` line.
 
-- [ ] **Step 3: Install and verify the app still imports**
+- [ ] **Step 2: Install and verify BOTH cloud paths still import**
 
 ```bash
 ./venv/bin/pip install -r requirements.txt
-DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/python -c "import django; django.setup(); import apps.media_library.s3_media, apps.safety.email_backends, apps.dashboard.job_dispatch; print('imports OK')"
+./venv/bin/python -c "
+import django, os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+from apps.media_library import s3_media, blob_media
+from apps.safety import email_backends
+from apps.dashboard import job_dispatch
+assert hasattr(email_backends, 'SESEmailBackend')
+assert hasattr(email_backends, 'AzureCommunicationEmailBackend')
+print('both cloud paths import OK')
+"
 ```
 
-Expected: `imports OK`.
+Expected: `both cloud paths import OK`. If the Azure names are missing, an earlier task deleted something it should not have.
 
-- [ ] **Step 4: Reduce the Dockerfile CMD to Gunicorn**
+- [ ] **Step 3: Extract the seed chain for the ECS migrate task**
 
-In `Dockerfile`, replace lines 29-31 with:
-
-```dockerfile
-# Migrations and seeding run as a one-shot ECS task before the service is
-# updated (see .github/workflows/deploy.yml). Running them here would race
-# across tasks — Container Apps only got away with it because single-revision
-# mode serialised the rollout.
-EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", \
-     "--workers", "4", "--threads", "4", "--timeout", "120"]
-```
-
-Keep the existing `EXPOSE 8000` if it is already on its own line above — do not duplicate it.
-
-- [ ] **Step 5: Record the migrate command chain where the infrastructure plan can find it**
-
-Create `ops/migrate_and_seed.sh`:
+Create `ops/migrate_and_seed.sh` with the chain copied verbatim out of the Dockerfile `CMD`:
 
 ```bash
 #!/usr/bin/env sh
-# Migration + seed chain, lifted verbatim out of the Dockerfile CMD.
-# Run as a ONE-SHOT ECS task before the web service is updated. Running this
-# concurrently across tasks would race the migrations.
+# Migration + seed chain, copied from the Dockerfile CMD.
+#
+# Azure Container Apps still runs this via CMD, where single-revision mode
+# serialises it. On ECS it must run as a ONE-SHOT task before the service is
+# updated -- running it on every task would race the migrations.
+#
+# The Dockerfile is deliberately unchanged so the Azure path keeps working.
 set -eu
 
 python manage.py migrate
@@ -1425,7 +1002,7 @@ python manage.py build_help_index --with-source
 
 Then `chmod +x ops/migrate_and_seed.sh`.
 
-- [ ] **Step 6: Verify the chain still runs against a scratch database**
+- [ ] **Step 4: Verify the chain runs against a scratch database**
 
 ```bash
 PROBE_DB="$(mktemp -d)/probe.sqlite3"
@@ -1435,46 +1012,41 @@ PATH="$PWD/venv/bin:$PATH" \
   sh ops/migrate_and_seed.sh
 ```
 
-`PATH` is prefixed so the script's bare `python` resolves to the virtualenv interpreter, matching how it will resolve inside the container.
+Expected: every command completes without error. `PATH` is prefixed so the script's bare `python` resolves to the virtualenv interpreter, matching how it resolves inside the container.
 
-Expected: every command completes without error. Some seed commands are no-ops on an empty database; that is fine, but a traceback is not.
+This exercises SQLite, so the pgvector migration paths are skipped by their vendor guard. Real pgvector verification belongs to the infrastructure plan's RDS rehearsal.
 
-Note this exercises SQLite, so the pgvector-specific migration paths are skipped by their vendor guard. Real pgvector verification belongs to the infrastructure plan's RDS rehearsal.
-
-- [ ] **Step 7: Build the image to prove the Dockerfile is valid**
+- [ ] **Step 5: Confirm the Dockerfile and Azure workflows are untouched**
 
 ```bash
-docker build --platform linux/amd64 -t aitutor:aws-migration-check .
+git diff --name-only HEAD | grep -E "Dockerfile|\.github/workflows/(deploy|deploy-staging|cert-renew)\.yml" && echo "STOP: an Azure-critical file changed" || echo "Azure-critical files untouched"
 ```
 
-Expected: the build succeeds. This is a large image (roughly 4.7 GB) and an uncached build takes a while — that is expected, and the CI cache work belongs to the CI/CD plan.
+Expected: `Azure-critical files untouched`.
 
-If Docker is unavailable in this environment, skip this step and say so explicitly in the commit body rather than silently omitting it.
-
-- [ ] **Step 8: Run the full test suite**
-
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest -q`
-
-Expected: no new failures against the baseline. The suite was reported at 631 passing as of commit `ebb4657`; confirm the count has grown by the tests added in tasks 1–4 and that nothing previously passing now fails.
-
-- [ ] **Step 9: Commit**
+- [ ] **Step 6: Run the suites touched by this plan**
 
 ```bash
-git add requirements.txt Dockerfile ops/migrate_and_seed.sh
-git commit -m "build: drop the Azure SDKs and take migrations out of CMD
+./venv/bin/python manage.py test apps.media_library apps.safety apps.dashboard
+```
 
-Nothing imports azure-* any more after the S3, SES and ECS ports, so the
-four packages come out and boto3 plus django-storages[s3] go in.
+Expected: OK. Run each app individually if the multi-label discovery quirk bites.
 
-CMD now starts gunicorn and nothing else. The migrate-and-seed chain moves
-to ops/migrate_and_seed.sh, which CI runs as a one-shot ECS task before
-updating the service — running it in CMD would race across tasks, which
-Container Apps only avoided because single-revision mode serialised the
-rollout.
+- [ ] **Step 7: Commit**
 
-requirements-core / requirements-jetson still carry the Azure packages;
-the Jetson lock has to be regenerated on that toolchain, so it is tracked
-as follow-up rather than done blind here.
+```bash
+git add requirements.txt ops/migrate_and_seed.sh
+git commit -m "build: add boto3 and django-storages[s3] for the AWS path
+
+Additions only. The four azure-* packages stay -- Azure serves live users
+and still needs them, and both django-storages extras coexist on the same
+package.
+
+The Dockerfile is deliberately unchanged. Its CMD migrate chain is what
+Azure relies on, and Container Apps single-revision mode serialises it.
+ECS solves the same race differently: the web task definition overrides
+command to gunicorn alone and CI runs ops/migrate_and_seed.sh as a
+one-shot task.
 
 Refs: docs/superpowers/specs/2026-08-07-aws-migration-design.md"
 ```

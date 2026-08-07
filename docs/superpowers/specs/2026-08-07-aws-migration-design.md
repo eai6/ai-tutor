@@ -1,17 +1,32 @@
-# AWS Migration Design — Azure Container Apps → ECS Fargate
+# AWS Deployment Design — ECS Fargate alongside Azure Container Apps
 
 **Date:** 2026-08-07
 **Branch:** `aws_deployment`
 **Status:** Design — awaiting approval
 
+> **This is not a cutover.** Azure Container Apps serves live users and stays
+> running untouched. AWS is built as a second, parallel deployment of the same
+> image. Any change that would disrupt Azure is out of scope by definition.
+
 ## 1. Decisions taken
 
 | Decision | Choice | Consequence |
 | --- | --- | --- |
+| **Deployment model** | **Azure and AWS run side by side** | **Azure serves live users and must not be disrupted. AWS is stood up alongside it, not cut over to. Nothing Azure-specific may be deleted, downgraded, or made conditional on AWS being present.** |
 | Region | `us-east-1` | Cheapest region, full service coverage, and ACM certs live here already if CloudFront is added later. Latency to the Seychelles and Tanzania pilots is the trade accepted. |
-| Media storage | S3, with the storage backend rewritten | `apps/media_library/blob_media.py` is rewritten against S3 rather than lifted onto EFS. Removes the shared-mount dependency between web and material-processing tasks. |
-| Scope | Full parity in one cut | ECS, RDS, S3, ALB, ACM, AWS WAF, SES, the material-processing job, and a staging environment all land before cutover. No dual-cloud period. |
-| DNS | Stays at name.com | One ACM validation CNAME added by hand; a CNAME points `www.seselai.sc` at the ALB. ACM still auto-renews, so `cert-renew.yml` is deleted regardless. |
+| Media storage | S3, added beside the Azure Blob backend | `apps/media_library/s3_media.py` is added next to `blob_media.py`; the configured backend wins at runtime. Removes the shared-mount dependency between web and material-processing tasks on the AWS side. |
+| Scope | Full AWS parity in one build-out | ECS, RDS, S3, ALB, ACM, AWS WAF, SES, the material-processing job, and a staging environment all land together — but as a second live environment, not a replacement. |
+| DNS | Stays at name.com | One ACM validation CNAME added by hand, and a separate hostname for AWS. `www.seselai.sc` keeps pointing at Azure. |
+
+### What "side by side" means in practice
+
+The application ships as **one image that runs on both clouds**, choosing its backend from whichever environment variables are present. That constraint shapes every task below:
+
+- Azure modules, settings, dependencies, and workflows stay exactly where they are. Additions only.
+- `cert-renew.yml` is **not** deleted — Azure's Application Gateway still depends on that Let's Encrypt certificate landing in Key Vault every week.
+- The Dockerfile `CMD` is **not** changed. Azure relies on the migrate-and-seed chain running there. AWS overrides the command in its ECS task definitions instead, which is where the migration race gets solved without touching Azure.
+- AWS gets its **own** GitHub Actions workflows. The existing `deploy.yml` and `deploy-staging.yml` are left untouched.
+- AWS needs its own hostname for testing. `www.seselai.sc` continues to resolve to Azure until you explicitly decide otherwise.
 
 ## 2. What exists on Azure today
 
@@ -148,16 +163,18 @@ ECR with `scanOnPush` and a lifecycle policy retaining 20 images. That policy re
 
 ## 4. Application code changes
 
+Every row is an **addition**. No Azure module is deleted or rewritten in place.
+
 | File | Change |
 | --- | --- |
-| `apps/media_library/blob_media.py` | `AzureStorage` → `S3Storage`; `serve_media` rewritten to stream from S3 with Range support |
-| `apps/safety/email_backends.py` | `AzureCommunicationEmailBackend` → `SESEmailBackend` on boto3 SESv2, keeping the class shape |
-| `apps/dashboard/job_dispatch.py` | `azure.mgmt.appcontainers` → `boto3` `ecs.run_task` |
-| `apps/safety/client_ip.py` | Docstring only — the last-hop logic is correct for ALB. ALB omits the `:port` suffix by default, which `_normalize_ip` already tolerates |
-| `config/settings.py` | `AZURE_BLOB_MEDIA_*` → `AWS_MEDIA_*`; ACS variables → SES; Azure job variables → `ECS_*` |
-| `config/urls.py` | Same route shape, pointing at the S3-backed `serve_media` |
-| `Dockerfile` | `CMD` reduced to Gunicorn alone; the migrate-and-seed chain moves to the migrate task |
-| `requirements*.txt` | Drop `azure-communication-email`, `azure-identity`, `azure-mgmt-appcontainers`, `django-storages[azure]`; add `django-storages[s3]`, `boto3`, `django-ses` |
+| `apps/media_library/s3_media.py` | **New.** `S3MediaStorage` plus a Range-capable `serve_media`, ported from `blob_media.py`. Both modules stay. |
+| `apps/safety/email_backends.py` | **Add** `SESEmailBackend` on boto3 SESv2 beside the existing `AzureCommunicationEmailBackend`. |
+| `apps/dashboard/job_dispatch.py` | **Add** an ECS `RunTask` backend beside the Azure ARM one; the existing selector already falls through cleanly. |
+| `apps/safety/client_ip.py` | Docstring and tests only — the last-hop logic is already correct for both App Gateway and ALB. |
+| `config/settings.py` | **Add** `AWS_MEDIA_*`, SES, and `ECS_*` variables. The `AZURE_*` variables stay and keep working. |
+| `config/urls.py` | Route gains an S3 branch ahead of the existing Azure branch. |
+| `Dockerfile` | **Unchanged.** Azure depends on the `CMD` migrate chain; AWS overrides `command` in its ECS task definitions instead. |
+| `requirements.txt` | **Add** `boto3` and `django-storages[s3]`. The four `azure-*` packages stay — Azure still needs them. |
 
 `azure_openai` remains a valid **LLM provider** choice in `apps/llm/models.py`. That is a model-vendor decision, unrelated to hosting, and is left alone.
 
@@ -188,7 +205,9 @@ The Azure program's `ignore_changes` on container env and image encodes a real d
 
 ## 6. CI/CD
 
-`deploy.yml` and `deploy-staging.yml` are rewritten against AWS; `cert-renew.yml` is **deleted** because ACM auto-renews.
+AWS gets **new** workflows — `deploy-aws.yml` and `deploy-aws-staging.yml`. The existing `deploy.yml`, `deploy-staging.yml`, and `cert-renew.yml` are left exactly as they are, because they keep the live Azure deployment running. ACM auto-renews the AWS certificate, but that is no reason to touch Azure's acme.sh renewal.
+
+Both clouds therefore deploy from the same `main` merge, independently. If you later want a single pipeline, that is a decision to take once AWS has proven itself — not now.
 
 Authentication moves to **GitHub OIDC** with `aws-actions/configure-aws-credentials@v4` and separate prod and staging roles carrying branch trust conditions. This removes the long-lived `AZURE_CREDENTIALS` service-principal JSON, which today is shared across prod, staging, and Key Vault.
 
@@ -209,13 +228,18 @@ Two jobs are deleted rather than ported: `post_deploy_pgvector_port` in both wor
 
 ## 7. Data migration and cutover
 
-1. **Rehearse first.** `pg_dump` from Azure into a scratch RDS instance and run the full application against it before touching production. The dump carries the `vector` extension and the HNSW index; verify both survive.
-2. **Sync media** from the Azure Files share and blob container to S3, then re-sync immediately before cutover to capture the delta.
-3. **Lower DNS TTL at name.com** to 60 seconds at least 24 hours ahead.
-4. **Add the ACM validation CNAME** and confirm the certificate issues. This gates everything and is manual.
-5. **Request SES production access.** Not on the critical path for serving traffic, but it is for email.
-6. **Cutover window:** stop writes on Azure, take a final `pg_dump`, restore to RDS, run the final media sync, flip the CNAME, watch.
-7. **Rollback:** point the CNAME back at Azure. Keep the Azure stack running and intact until AWS has been stable for at least a week.
+There is **no cutover** in this phase. AWS is populated from a copy of Azure's data and then runs in parallel on its own hostname.
+
+1. **Copy the database.** `pg_dump` from Azure, restore into RDS. The dump carries the `vector` extension and the HNSW index; verify both survive. This is a read-only operation against Azure — it does not interrupt anything.
+2. **Copy media.** Sync the Azure Files share and blob container into S3. Also read-only against Azure.
+3. **Add the ACM validation CNAME** for the AWS hostname and confirm the certificate issues. Manual, and it gates the HTTPS listener.
+4. **Point a new hostname at the ALB** — something like `aws.seselai.sc`. `www.seselai.sc` is not touched and keeps resolving to Azure.
+5. **Request SES production access.** New accounts start in sandbox; approval is usually under a day but is not guaranteed.
+6. **Run both and compare.** Exercise the AWS hostname against real lesson flows while Azure carries live traffic.
+
+**The two databases diverge the moment users keep working on Azure.** Everything above gives you a point-in-time copy for validation, not a synchronised replica. Any eventual switch needs a fresh dump taken in a quiet window — that is a separate decision with its own plan, and nothing here commits you to it.
+
+Keeping both live also means **paying for both**, and any writes made while testing AWS land only in the AWS copy.
 
 ## 8. Cost
 
@@ -243,7 +267,10 @@ Staging costs about $220 in the same shape. Two levers, both recommended: run st
 | SES sandbox blocks real email | Request production access at the start of the work, not at cutover |
 | WAF managed rules false-positive on teacher dashboard input | Deploy in `COUNT`, observe, then flip to `BLOCK` |
 | ALB 60s default idle timeout severs LLM requests | Explicitly set to 120s; covered by a smoke test that exercises a slow path |
-| Rotating `SECRET_KEY` invalidates 30-day mobile JWTs | Carry the existing value across unchanged |
+| Rotating `SECRET_KEY` invalidates 30-day mobile JWTs | Use the same value on both clouds, so a token minted on either is accepted by both |
+| An AWS change breaks the live Azure deployment | Additions only. Tests pin the Azure path in every task that touches shared code, and `deploy.yml`, `cert-renew.yml` and the Dockerfile `CMD` are not modified at all |
+| The two databases silently diverge once both are live | Treat AWS's copy as a validation snapshot, never as a second source of truth. Any real switch needs a fresh dump in a quiet window |
+| Paying for two full stacks | Expected and accepted for the parallel period. Staging on Fargate Spot and scaled to zero out of hours keeps the increment down |
 | Scaling metric is a rate standing in for concurrency | Ship with a CPU backstop policy and calibrate against real traffic |
 | Migration race across ECS tasks | Migrations move out of `CMD` into a one-shot task that CI waits on |
 | Dropping `?sslmode=require` silently disables TLS to the database | Assert it in the DSN construction and cover it with a test |
