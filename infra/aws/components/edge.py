@@ -85,11 +85,21 @@ def create_edge(
     )
 
     # ── WAF ────────────────────────────────────────────────────────────────
-    # Deployed in COUNT mode first. Azure runs OWASP CRS in Prevention mode, so
-    # this is briefly weaker — deliberately. The common rule set false-positives
-    # on rich-text teacher dashboard input, and discovering that by blocking
-    # real teachers is the wrong way to find out. Flip waf-block-mode to true
-    # once the sampled logs are clean; that flip is tracked work, not optional.
+    # Shipped in COUNT mode, switched to BLOCK on 2026-08-07 (waf-block-mode).
+    #
+    # The original note said to flip only once the sampled logs were clean,
+    # because the common rule set false-positives on rich-text teacher
+    # dashboard input and blocking real teachers is the wrong way to find that
+    # out. That reasoning still holds — it just does not apply yet. This
+    # environment has no users, so the cost of a false positive today is a
+    # `curl` that fails instead of a classroom that stops, and the database is
+    # about to receive a copy of real student records. Better to have the rules
+    # live before the data lands than after.
+    #
+    # The teacher-dashboard false positive is therefore UNRESOLVED, not
+    # disproven. When real teachers first use this environment, check the
+    # AWSManagedRulesCommonRuleSet counter before believing a report that the
+    # dashboard is broken.
     override = (
         aws.wafv2.WebAclRuleOverrideActionArgs(none=aws.wafv2.WebAclRuleOverrideActionNoneArgs())
         if waf_block_mode
@@ -102,6 +112,50 @@ def create_edge(
         ("AWSManagedRulesSQLiRuleSet", 30),
     ]
 
+    # Rate limit, priority 0 so it is evaluated before the managed groups.
+    #
+    # This is the ONLY rate limit on unauthenticated traffic anywhere in the
+    # system. apps/safety's RateLimiter keys on user id
+    # (apps/safety/__init__.py:277), so it cannot see a request that has not
+    # logged in yet — /, /accounts/login/ and /health/ are entirely unrated.
+    # That is the gap a credential-stuffing run against student accounts walks
+    # through, and it is the reason this rule exists.
+    #
+    # 2000 per 5 minutes per IP is deliberately loose: a classroom behind one
+    # school NAT shares a source address, so a tight limit throttles a whole
+    # class rather than an attacker. It stops automation, not browsing.
+    RATE_LIMIT_PER_5_MIN = 2000
+
+    # Counts rather than blocks when waf-block-mode is off, so flipping the flag
+    # back for debugging silences every rule instead of leaving this one armed.
+    rate_action = (
+        aws.wafv2.WebAclRuleActionArgs(block=aws.wafv2.WebAclRuleActionBlockArgs())
+        if waf_block_mode
+        else aws.wafv2.WebAclRuleActionArgs(count=aws.wafv2.WebAclRuleActionCountArgs())
+    )
+
+    rate_rule = aws.wafv2.WebAclRuleArgs(
+        name="RateLimitPerIP",
+        priority=0,
+        action=rate_action,
+        statement=aws.wafv2.WebAclRuleStatementArgs(
+            rate_based_statement=aws.wafv2.WebAclRuleStatementRateBasedStatementArgs(
+                limit=RATE_LIMIT_PER_5_MIN,
+                # IP, not FORWARDED_IP. The ALB appends the client address as
+                # the last X-Forwarded-For hop and WAF sits in front of the
+                # ALB, so the source address it sees is already the real one —
+                # and unlike the header, it cannot be spoofed. Same reasoning
+                # as apps/safety/client_ip.py:51-59.
+                aggregate_key_type="IP",
+            )
+        ),
+        visibility_config=aws.wafv2.WebAclRuleVisibilityConfigArgs(
+            cloudwatch_metrics_enabled=True,
+            metric_name="RateLimitPerIP",
+            sampled_requests_enabled=True,
+        ),
+    )
+
     web_acl = aws.wafv2.WebAcl(
         f"{prefix}-waf",
         name=f"{prefix}-waf",
@@ -109,7 +163,8 @@ def create_edge(
         default_action=aws.wafv2.WebAclDefaultActionArgs(
             allow=aws.wafv2.WebAclDefaultActionAllowArgs()
         ),
-        rules=[
+        rules=[rate_rule]
+        + [
             aws.wafv2.WebAclRuleArgs(
                 name=group,
                 priority=priority,

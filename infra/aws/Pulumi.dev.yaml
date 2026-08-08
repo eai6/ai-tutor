@@ -2,6 +2,7 @@ encryptionsalt: v1:9rhV8Oh82OM=:v1:w+3+g2xlGU9wH0Tq:E7cRynMkHBLdWDsgwt4LtfK8qCS1
 config:
   aws:region: us-east-1
   aitutor-aws:enable-ecs: "true"
+  aitutor-aws:waf-block-mode: "true"
   aitutor-aws:django-secret-key:
     secure: v1:1updoLUFh7U2eaoU:ky+tpORjIYK+y/mY0qgls3GnxsV3YHDliYI816u+Z1DJMdKOnolfQQkVoBonDbHGt/c4N0WSfIAhNKgdlqzDw6HaqIgkufEnqGLH3xQX+4LfRjBdOoGtwW+vESzJBB1tjYPXJuHw
   aitutor-aws:anthropic-api-key:
