@@ -148,3 +148,62 @@ session.
   worked before a student finds out.
 - **Azure unharmed**: the Azure deploy workflow still green after the Dockerfile
   change.
+
+---
+
+## Outcome — 2026-08-08 (all parts DONE)
+
+Azure production data is live in AWS RDS at `https://migration.edwardamoah.com`.
+
+Final counts, all at or above the drill figures (the source kept growing):
+`tutoring_sessionturn` 37,107 · `tutoring_tutorsession` 1,148 ·
+`curriculum_lesson` 354 · `auth_user` 396 · `curriculum_curriculumchunk` 1,007 ·
+`accounts_institution` 13. `vector` extension present, 0 tables without a
+primary key.
+
+### Two things the plan did not anticipate
+
+**The base image had moved to trixie.** Part 2 pinned the PGDG suite to
+`bookworm`, but `python:3.12-slim` is now Debian 13, so apt was offered packages
+built for a different release and could not resolve `libpq5`. The suite is now
+read from `/etc/os-release` instead of hardcoded. Installed:
+`pg_restore 16.14 (Debian 16.14-1.pgdg13+1)`.
+
+**Scaling the service to 0 does not make the database idle.** The first restore
+failed creating `support_supportchunk_pkey` — `Key (id)=(10) is duplicated` —
+even though the dump was clean (816 rows, 816 distinct ids, one `TABLE DATA`
+entry). Cause: a deploy's one-off migrate task was still running
+`build_help_index`. One-off tasks hold connections and are invisible to
+`desiredCount`. `DROP DATABASE` cut it off, Django reconnected to the new empty
+database, and its upserts landed in `support_supportchunk` while `pg_restore`
+was loading the dump's own rows. Blast radius was that one table only —
+`apps/support/kb.py:86` is the sole writer, and it is derived data.
+`restore_from_dump.sh` now waits for the cluster to be genuinely idle and
+refuses to proceed if it is not.
+
+### The step that is easy to miss
+
+The AWS web task definition overrides `command` to gunicorn alone, so migrations
+run ONLY via the one-shot `aitutor-dev-migrate` task. A dump from Azure carries
+Azure's schema, which is behind this branch — `/staff/login/` returned 500 on
+`column accounts_platformterms.locale does not exist` until the migrate task ran
+(13 migrations applied). **Restoring an Azure dump is always a two-step
+operation: restore, then run the migrate task.**
+
+### Fernet / SECRET_KEY — a non-issue
+
+All 60 `ModelConfig` rows have an empty `api_key_encrypted`; production keeps
+provider keys in env vars. Nothing depended on the `SECRET_KEY` copy for API
+access. The tutoring config resolves to `anthropic/claude-opus-4-7` with a live
+key from Secrets Manager. `SECRET_KEY` still matters for session and signing
+cookies.
+
+### Still open
+
+- **Media files.** Out of scope as planned. `/media/platform_logos/...` 404s —
+  the database holds paths, the Azure SMB share holds the bytes.
+- No end-to-end tutoring turn was taken. It needs a login, and the accounts in
+  this database are real students — worth a throwaway account rather than
+  impersonating one.
+- The `aws_deployment` push trigger still deploys on every push now that real
+  student data is here. Worth narrowing to manual dispatch.

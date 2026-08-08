@@ -63,6 +63,33 @@ restore_service() {
 }
 trap restore_service EXIT
 
+# Scaling the service is not enough on its own. One-off tasks — the migrate
+# task a deploy launches, or a hand-run task — connect to the same database and
+# are invisible to `desiredCount`. On 2026-08-08 a deploy's migrate task was
+# still running `build_help_index` when the restore began: DROP DATABASE cut it
+# off, Django reconnected to the freshly-created empty database, and its upserts
+# started landing in support_supportchunk at the same time pg_restore was
+# loading the dump's own rows. Both wrote id=10, so the primary key could not be
+# created and the restore aborted.
+#
+# Wait for the cluster to be genuinely idle. Nothing is running at this point,
+# so any task found here belongs to someone else.
+echo "==> waiting for other tasks in ${CLUSTER} to finish"
+IDLE_DEADLINE=$((SECONDS + 900))
+while [ $SECONDS -lt $IDLE_DEADLINE ]; do
+  OTHERS=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status RUNNING \
+    --query 'length(taskArns)' --output text)
+  PENDING=$(aws ecs list-tasks --cluster "$CLUSTER" --desired-status PENDING \
+    --query 'length(taskArns)' --output text)
+  [ "$OTHERS" = "0" ] && [ "$PENDING" = "0" ] && break
+  echo "    ${OTHERS} running / ${PENDING} pending — waiting"
+  sleep 15
+done
+if [ "$OTHERS" != "0" ] || [ "$PENDING" != "0" ]; then
+  echo "cluster still busy after 15m; refusing to restore into a live database" >&2
+  exit 1
+fi
+
 # ── 2. Stage the dump ──────────────────────────────────────────────────────
 echo "==> uploading to s3://${OPS_BUCKET}/${KEY}"
 aws s3 cp "$DUMP_FILE" "s3://${OPS_BUCKET}/${KEY}" --only-show-errors
