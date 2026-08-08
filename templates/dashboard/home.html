@@ -179,84 +179,102 @@
         </div>
     </div>
 
-    <!-- 2. Cohort trend -->
+    <!-- Compare two explicit periods -->
     <div class="card" style="margin-top:1.5rem;">
         <div class="card-header">
-            <h2 class="card-title">{% trans "Average score over time" %}</h2>
+            <h2 class="card-title">{% trans "Compare two periods" %}</h2>
         </div>
         <div class="card-body">
-            {% if prog.trend %}
-            <div id="trend-wrap" style="display:flex; gap:0.4rem; height:200px;">
-                <div id="trend-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:24px; font-size:0.7rem; color:var(--gray-500); min-width:2rem; user-select:none;"></div>
-                <div id="trend-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
-                    <div id="trend-gridlines" style="position:absolute; inset:0 0 24px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;"></div>
-                    <div id="trend-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;"></div>
-                    <div id="trend-x-axis" style="display:flex; gap:4px; height:24px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);"></div>
+            {# Its own form. The page-level picker sets the overall window; #}
+            {# these two ranges are a question asked INSIDE it, and the #}
+            {# hidden fields keep that window when this form is submitted. #}
+            <form method="get" style="display:flex; align-items:flex-end; gap:1.25rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+                <input type="hidden" name="start" value="{{ activity_start }}">
+                <input type="hidden" name="end" value="{{ activity_end }}">
+                <div style="display:flex; align-items:flex-end; gap:0.4rem;">
+                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); padding-bottom:0.35rem;">{% trans "Period A" %}</div>
+                    <input type="date" name="a_start" value="{{ compare.a_start }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+                    <span style="color:var(--gray-400); padding-bottom:0.3rem;">–</span>
+                    <input type="date" name="a_end" value="{{ compare.a_end }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
                 </div>
-            </div>
-            <div style="margin-top:0.5rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "Mean exit-ticket score per period. Hover a bar for the number of attempts behind it — early periods with few attempts move sharply." %}
-            </div>
-            {% else %}
-            <div class="empty-state"><p>{% trans "No attempts in this period." %}</p></div>
-            {% endif %}
-        </div>
-    </div>
+                <div style="display:flex; align-items:flex-end; gap:0.4rem;">
+                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); padding-bottom:0.35rem;">{% trans "Period B" %}</div>
+                    <input type="date" name="b_start" value="{{ compare.b_start }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+                    <span style="color:var(--gray-400); padding-bottom:0.3rem;">–</span>
+                    <input type="date" name="b_end" value="{{ compare.b_end }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Compare" %}</button>
+            </form>
 
-    <!-- 3. Per-student movement -->
-    <div class="card" style="margin-top:1.5rem;">
-        <div class="card-header" style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-            <h2 class="card-title">{% trans "Student progress" %}</h2>
-            {% if prog.per_student.tracked %}
-            <div style="font-size:0.78rem; color:var(--gray-500);">
-                {% blocktrans with n=prog.per_student.tracked %}{{ n }} students with 2+ attempts{% endblocktrans %} ·
-                <span style="color:var(--success); font-weight:600;">{{ prog.per_student.improved }} {% trans "up" %}</span> ·
-                {{ prog.per_student.flat }} {% trans "flat" %} ·
-                <span style="color:var(--danger); font-weight:600;">{{ prog.per_student.declined }} {% trans "down" %}</span>
-            </div>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            {% if prog.per_student.tracked %}
+            {% if compare.a.attempts or compare.b.attempts %}
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
                 <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:var(--danger); margin-bottom:0.5rem;">{% trans "Falling — worth a look" %}</div>
-                    {% for m in prog.per_student.falling %}
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--gray-100); font-size:0.85rem;">
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ m.student }}</span>
-                        <span style="white-space:nowrap; color:var(--gray-500);">
-                            {{ m.first }}% → {{ m.last }}%
-                            <strong style="color:{% if m.delta < 0 %}var(--danger){% else %}var(--success){% endif %}; margin-left:0.4rem;">{% if m.delta > 0 %}+{% endif %}{{ m.delta }}</strong>
-                        </span>
+                    <div style="font-size:0.75rem; font-weight:600; color:var(--gray-500); margin-bottom:0.35rem;">{% trans "Everyone who took a ticket" %}</div>
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">A</div>
+                            {# An empty period is "no data", not a score of zero — showing 0% #}
+                            {# there made a delta of +90 appear out of nothing. #}
+                            <div style="font-size:1.75rem; font-weight:700; color:var(--gray-500);">{% if compare.a.attempts %}{{ compare.a.avg_pct }}%{% else %}—{% endif %}</div>
+                            <div style="font-size:0.68rem; color:var(--gray-400);">{% blocktrans with n=compare.a.attempts s=compare.a.students %}{{ n }} attempts · {{ s }} students{% endblocktrans %}</div>
+                        </div>
+                        <div style="font-size:1.25rem; color:var(--gray-400);">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">B</div>
+                            <div style="font-size:1.75rem; font-weight:700;">{% if compare.b.attempts %}{{ compare.b.avg_pct }}%{% else %}—{% endif %}</div>
+                            <div style="font-size:0.68rem; color:var(--gray-400);">{% blocktrans with n=compare.b.attempts s=compare.b.students %}{{ n }} attempts · {{ s }} students{% endblocktrans %}</div>
+                        </div>
+                        {% if compare.a.attempts and compare.b.attempts %}
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">{% trans "Change" %}</div>
+                            <div style="font-size:1.75rem; font-weight:700; color:{% if compare.cohort_delta < 0 %}var(--danger){% else %}var(--success){% endif %};">{% if compare.cohort_delta > 0 %}+{% endif %}{{ compare.cohort_delta }}</div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% empty %}
-                    <div style="font-size:0.82rem; color:var(--gray-400); padding:0.4rem 0;">{% trans 'No student is scoring lower.' %}</div>
-                    {% endfor %}
                 </div>
+
                 <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:var(--success); margin-bottom:0.5rem;">{% trans "Rising" %}</div>
-                    {% for m in prog.per_student.rising %}
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--gray-100); font-size:0.85rem;">
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ m.student }}</span>
-                        <span style="white-space:nowrap; color:var(--gray-500);">
-                            {{ m.first }}% → {{ m.last }}%
-                            <strong style="color:var(--success); margin-left:0.4rem;">+{{ m.delta }}</strong>
-                        </span>
+                    <div style="font-size:0.75rem; font-weight:600; color:var(--gray-500); margin-bottom:0.35rem;">
+                        {% trans "Same students in both" %}
                     </div>
-                    {% empty %}
-                    <div style="font-size:0.82rem; color:var(--gray-400); padding:0.4rem 0;">{% trans 'No student is scoring higher yet.' %}</div>
-                    {% endfor %}
+                    {% if compare.matched %}
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">A</div>
+                            <div style="font-size:1.75rem; font-weight:700; color:var(--gray-500);">{{ compare.matched_a_pct }}%</div>
+                        </div>
+                        <div style="font-size:1.25rem; color:var(--gray-400);">→</div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">B</div>
+                            <div style="font-size:1.75rem; font-weight:700;">{{ compare.matched_b_pct }}%</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:0.68rem; color:var(--gray-500);">{% trans "Change" %}</div>
+                            <div style="font-size:1.75rem; font-weight:700; color:{% if compare.matched_delta < 0 %}var(--danger){% else %}var(--success){% endif %};">{% if compare.matched_delta > 0 %}+{% endif %}{{ compare.matched_delta }}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:0.72rem; color:var(--gray-500); margin-top:0.35rem;">
+                        {% blocktrans with n=compare.matched %}{{ n }} students took a ticket in both periods{% endblocktrans %} ·
+                        <span style="color:var(--success); font-weight:600;">{{ compare.improved }} {% trans "up" %}</span> ·
+                        {{ compare.same }} {% trans "flat" %} ·
+                        <span style="color:var(--danger); font-weight:600;">{{ compare.declined }} {% trans "down" %}</span>
+                    </div>
+                    {% else %}
+                    <div style="font-size:0.82rem; color:var(--gray-400);">{% trans "No student took a ticket in both periods." %}</div>
+                    {% endif %}
                 </div>
             </div>
-            <div style="margin-top:0.75rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "First versus most recent exit-ticket score in this period. Students with a single attempt are excluded — one score is a point, not a trajectory." %}
+            <div style="margin-top:0.9rem; font-size:0.72rem; color:var(--gray-500);">
+                {% trans "The left figure can move simply because a different set of students showed up in period B. The right one restricts to students present in both, so a change there is the same people doing better or worse — that is the number to trust." %}
             </div>
             {% else %}
-            <div class="empty-state"><p>{% trans "No students with two or more attempts in this period." %}</p></div>
+            <div class="empty-state"><p>{% trans "No exit ticket attempts in either period." %}</p></div>
             {% endif %}
         </div>
     </div>
 
+    
+    
 </div>
 
 {% endblock %}
@@ -454,54 +472,5 @@
         });
     }
 
-    // ── Average score over time ─────────────────────────────────────────
-    // Fixed 0-100% axis, unlike the sessions chart's auto-scaled counts: a
-    // percentage axis that rescales makes a flat cohort look volatile.
-    const trendData = {{ trend_data|safe }};
-    const trendBars = document.getElementById('trend-bars');
-
-    if (trendBars && trendData && trendData.length > 0) {
-        const ticks = [100, 75, 50, 25, 0];
-        const yAxis = document.getElementById('trend-y-axis');
-        const grid = document.getElementById('trend-gridlines');
-        ticks.forEach((t, i) => {
-            const el = document.createElement('div');
-            el.textContent = t + '%';
-            yAxis.appendChild(el);
-            const line = document.createElement('div');
-            line.style.borderTop = (i === ticks.length - 1)
-                ? '1px solid var(--gray-300)'
-                : '1px dashed var(--gray-200)';
-            grid.appendChild(line);
-        });
-
-        const xAxis = document.getElementById('trend-x-axis');
-        const labelEvery = Math.max(1, Math.ceil(trendData.length / 12));
-        trendData.forEach((d, idx) => {
-            const wrap = document.createElement('div');
-            wrap.style.cssText = 'flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:0;';
-            const bar = document.createElement('div');
-            bar.style.width = '100%';
-            // Same 80% pass line as the distribution chart, so the two read
-            // together rather than each inventing its own colour scheme.
-            bar.style.background = (d.avg >= 80) ? 'var(--success)' : 'var(--primary)';
-            bar.style.opacity = (d.avg >= 80) ? '1' : '0.55';
-            bar.style.borderRadius = '4px 4px 0 0';
-            bar.style.height = d.avg + '%';
-            bar.style.minHeight = '2px';
-            bar.title = `${d.date}: ${d.avg}% mean over ${d.n} attempt${d.n === 1 ? '' : 's'}`;
-            wrap.appendChild(bar);
-            trendBars.appendChild(wrap);
-
-            const lbl = document.createElement('div');
-            lbl.style.cssText = 'flex:1; text-align:center; min-width:0; white-space:nowrap;';
-            if (idx % labelEvery === 0) {
-                lbl.textContent = d.date;
-                lbl.style.overflow = 'visible';
-            }
-            lbl.title = d.date;
-            xAxis.appendChild(lbl);
-        });
-    }
 </script>
 {% endblock %}
