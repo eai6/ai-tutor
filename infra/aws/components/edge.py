@@ -9,14 +9,19 @@ Two settings here are easy to miss and expensive to discover late:
 * **Deregistration delay 120s.** So in-flight tutoring turns drain on deploy
   rather than being dropped mid-answer.
 
-HTTP only for now. AWS serves no users yet and has no hostname, and a public
-ACM certificate cannot be issued for an AWS-owned ELB domain anyway. The 443
-listener arrives with a real domain — see the spec.
+HTTPS is conditional on ``domain-name`` being set. Without it the stack stays
+HTTP-only, because a public ACM certificate cannot be issued for an AWS-owned
+ELB domain — the hostname has to be one you control.
+
+With a domain, port 80 becomes a 301 redirect rather than a second way in.
+Serving the same content on both is how a session cookie marked Secure gets
+sent over plaintext anyway by a client that followed an old http:// link.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pulumi
 import pulumi_aws as aws
 
 APP_PORT = 8000
@@ -27,6 +32,8 @@ class Edge:
     alb: aws.lb.LoadBalancer
     target_group: aws.lb.TargetGroup
     web_acl: aws.wafv2.WebAcl
+    certificate: "aws.acm.Certificate | None" = None
+    validation_records: "object | None" = None
 
 
 def create_edge(
@@ -36,6 +43,7 @@ def create_edge(
     alb_sg_id,
     waf_block_mode: bool,
     tags: dict,
+    domain_name: "str | None" = None,
 ) -> Edge:
     alb = aws.lb.LoadBalancer(
         f"{prefix}-alb",
@@ -72,17 +80,94 @@ def create_edge(
         tags={**tags, "Name": f"{prefix}-tg"},
     )
 
-    aws.lb.Listener(
-        f"{prefix}-http",
-        load_balancer_arn=alb.arn,
-        port=80,
-        protocol="HTTP",
-        default_actions=[
-            aws.lb.ListenerDefaultActionArgs(
-                type="forward", target_group_arn=target_group.arn
-            )
-        ],
-    )
+    # ── Certificate + HTTPS ────────────────────────────────────────────────
+    # DNS validation, not email: email validation needs a mailbox at the
+    # domain and cannot renew unattended. The zone for seselai.sc is at
+    # name.com rather than Route 53, so the validation record is added by
+    # hand once — the CNAME name/value are exported for that purpose.
+    #
+    # ACM re-validates on renewal using the same record, so it has to STAY in
+    # the zone. Removing it after issuance silently breaks the renewal ~11
+    # months later, which is the classic way a certificate expires on a
+    # Saturday.
+    certificate = None
+    validation_records = None
+    if domain_name:
+        certificate = aws.acm.Certificate(
+            f"{prefix}-cert",
+            domain_name=domain_name,
+            validation_method="DNS",
+            tags={**tags, "Name": f"{prefix}-cert"},
+            opts=pulumi.ResourceOptions(
+                # A cert cannot be edited in place; replacing before deleting
+                # keeps the listener serving throughout.
+                delete_before_replace=False,
+            ),
+        )
+        validation_records = certificate.domain_validation_options
+
+        # Blocks until ACM sees the CNAME and issues. Both listener changes
+        # below depend on this, which is the whole point: without it Pulumi
+        # would flip port 80 to redirect at a 443 listener that failed to
+        # create (ACM refuses an unissued cert), taking the site down until
+        # someone added a DNS record by hand.
+        #
+        # Expect this to sit waiting while you add the record at name.com. If
+        # it times out, nothing has changed — the site is still served on 80.
+        cert_validation = aws.acm.CertificateValidation(
+            f"{prefix}-cert-validation",
+            certificate_arn=certificate.arn,
+            opts=pulumi.ResourceOptions(custom_timeouts=pulumi.CustomTimeouts(create="45m")),
+        )
+
+    if domain_name:
+        # Port 80 redirects rather than serving. Two live ways in is how a
+        # Secure-marked session cookie ends up travelling in plaintext because
+        # something followed an old http:// link.
+        aws.lb.Listener(
+            f"{prefix}-http",
+            load_balancer_arn=alb.arn,
+            port=80,
+            protocol="HTTP",
+            default_actions=[
+                aws.lb.ListenerDefaultActionArgs(
+                    type="redirect",
+                    redirect=aws.lb.ListenerDefaultActionRedirectArgs(
+                        protocol="HTTPS", port="443", status_code="HTTP_301"
+                    ),
+                )
+            ],
+            opts=pulumi.ResourceOptions(depends_on=[cert_validation]),
+        )
+
+        aws.lb.Listener(
+            f"{prefix}-https",
+            load_balancer_arn=alb.arn,
+            port=443,
+            protocol="HTTPS",
+            # TLS 1.2 floor. TLS13-1-2-2021-06 offers 1.3 and keeps 1.2 for
+            # older Android handsets, which the Seychelles pilot has.
+            ssl_policy="ELBSecurityPolicy-TLS13-1-2-2021-06",
+            certificate_arn=certificate.arn,
+            default_actions=[
+                aws.lb.ListenerDefaultActionArgs(
+                    type="forward", target_group_arn=target_group.arn
+                )
+            ],
+            opts=pulumi.ResourceOptions(depends_on=[cert_validation]),
+        )
+    else:
+        aws.lb.Listener(
+            f"{prefix}-http",
+            load_balancer_arn=alb.arn,
+            port=80,
+            protocol="HTTP",
+            default_actions=[
+                aws.lb.ListenerDefaultActionArgs(
+                    type="forward", target_group_arn=target_group.arn
+                )
+            ],
+        )
 
     # ── WAF ────────────────────────────────────────────────────────────────
     # Shipped in COUNT mode, switched to BLOCK on 2026-08-07 (waf-block-mode).
@@ -197,4 +282,10 @@ def create_edge(
         web_acl_arn=web_acl.arn,
     )
 
-    return Edge(alb=alb, target_group=target_group, web_acl=web_acl)
+    return Edge(
+        alb=alb,
+        target_group=target_group,
+        web_acl=web_acl,
+        certificate=certificate,
+        validation_records=validation_records,
+    )

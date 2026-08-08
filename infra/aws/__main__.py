@@ -46,6 +46,8 @@ azs = config.get_object("availability-zones") or [f"{region}a", f"{region}b"]
 db_instance_class = config.get("db-instance-class") or "db.t4g.medium"
 db_storage_gb = config.get_int("db-storage-gb") or 50
 waf_block_mode = config.get_bool("waf-block-mode") or False
+# Unset -> HTTP only. A public ACM cert cannot be issued for an ELB hostname.
+domain_name = config.get("domain-name")
 
 network = create_network(prefix, azs, region, tags)
 storage = create_storage(prefix, account_id, tags)
@@ -65,6 +67,7 @@ edge = create_edge(
     network.alb_sg.id,
     waf_block_mode,
     tags,
+    domain_name=domain_name,
 )
 
 # ECS cluster is unblocked (only task definitions need PassRole), so it is
@@ -129,7 +132,10 @@ task_environment = (
             "ECS_SECURITY_GROUPS": a[2],
             # No TLS yet: browsers refuse Secure cookies over plain HTTP, which
             # would silently bounce every login back to the login page.
-            "HTTPS_EDGE": "false",
+            # Secure cookies require TLS. With a domain the edge terminates HTTPS,
+        # so Django should mark them; without one it must not, or the browser
+        # withholds the cookie and login silently fails.
+        "HTTPS_EDGE": "true" if domain_name else "false",
             "ALLOWED_HOSTS": "*",
             "CSRF_TRUSTED_ORIGINS": f"http://{a[4]}",
             "EMBEDDING_BACKEND": "local",
@@ -181,4 +187,29 @@ else:
         "(1) build and push an image to the ecr_repository_url above, "
         "(2) pulumi config set --secret <key> for the app secrets, "
         "(3) pulumi config set enable-ecs true && pulumi up.",
+    )
+
+# ── Certificate validation ─────────────────────────────────────────────────
+# seselai.sc is served by name.com, not Route 53, so this record is added by
+# hand. It must STAY there: ACM reuses it to re-validate on renewal, and
+# deleting it after issuance breaks the renewal about eleven months later.
+if domain_name:
+    pulumi.export("certificate_arn", edge.certificate.arn)
+    pulumi.export("certificate_status", edge.certificate.status)
+    pulumi.export(
+        "dns_validation_record",
+        edge.validation_records.apply(
+            lambda opts: {
+                "add_this_CNAME_at_name_com": {
+                    "name": opts[0].resource_record_name,
+                    "value": opts[0].resource_record_value,
+                }
+            }
+            if opts
+            else {}
+        ),
+    )
+    pulumi.export(
+        "point_the_domain_here",
+        edge.alb.dns_name.apply(lambda d: f"CNAME {domain_name} -> {d}"),
     )

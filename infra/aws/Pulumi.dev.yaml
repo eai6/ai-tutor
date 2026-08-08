@@ -16,3 +16,4 @@ config:
   aitutor-aws:image-tag: 6f74ffd
   aitutor-aws:db-password:
     secure: v1:GgdflfJ5STqjlmib:BNAbiD9O2qkaCyA99vjcJMduhL1FinuIJTtSrNv+q038ACBBQYTGLBKjhcIDIO79
+  aitutor-aws:domain-name: migration.seselai.sc
