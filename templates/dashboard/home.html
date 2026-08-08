@@ -80,6 +80,42 @@
     </div>
 </div>
 
+<!-- Score distribution — directly under learning gain: the gain figure
+ is a mean, and this is the shape behind it. -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header" style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <h2 class="card-title">{% trans "Exit ticket score distribution" %}</h2>
+        <div style="font-size:0.78rem; color:var(--gray-500);">
+            {% blocktrans with n=et.attempts %}{{ n }} attempts{% endblocktrans %}
+            &nbsp;·&nbsp;
+            <span style="color:var(--primary); font-weight:600;">{% trans "mean" %} {{ et.avg_pct }}%</span>
+            &nbsp;·&nbsp;
+            <span style="color:var(--accent, #7c3aed); font-weight:600;">{% trans "median" %} {{ et.median_pct }}%</span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if et.attempts %}
+        <div id="dist-wrap" style="display:flex; gap:0.4rem; height:200px;">
+            <div id="dist-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:34px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;"></div>
+            <div id="dist-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
+                <div id="dist-gridlines" style="position:absolute; inset:0 0 34px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;"></div>
+                {# Markers sit in this layer so they can be positioned by #}
+                {# percentage across the full 0-100% axis, independent of #}
+                {# the bar flexbox below. #}
+                <div id="dist-markers" style="position:absolute; inset:0 0 34px 0; pointer-events:none; z-index:2;"></div>
+                <div id="dist-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;"></div>
+                <div id="dist-x-axis" style="display:flex; gap:4px; height:34px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);"></div>
+            </div>
+        </div>
+        <div style="margin-top:0.5rem; font-size:0.72rem; color:var(--gray-500);">
+            {% trans "Score on each attempt, as a percentage. Includes failed attempts and retries." %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>{% trans "No exit ticket attempts in this period." %}</p></div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
@@ -145,40 +181,6 @@
         </div>
     </div>
 
-    <!-- Exit ticket score distribution -->
-    <div class="card" style="margin-top:1.5rem;">
-        <div class="card-header" style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-            <h2 class="card-title">{% trans "Exit ticket score distribution" %}</h2>
-            <div style="font-size:0.78rem; color:var(--gray-500);">
-                {% blocktrans with n=et.attempts %}{{ n }} attempts{% endblocktrans %}
-                &nbsp;·&nbsp;
-                <span style="color:var(--primary); font-weight:600;">{% trans "mean" %} {{ et.avg_pct }}%</span>
-                &nbsp;·&nbsp;
-                <span style="color:var(--accent, #7c3aed); font-weight:600;">{% trans "median" %} {{ et.median_pct }}%</span>
-            </div>
-        </div>
-        <div class="card-body">
-            {% if et.attempts %}
-            <div id="dist-wrap" style="display:flex; gap:0.4rem; height:200px;">
-                <div id="dist-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:34px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;"></div>
-                <div id="dist-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
-                    <div id="dist-gridlines" style="position:absolute; inset:0 0 34px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;"></div>
-                    {# Markers sit in this layer so they can be positioned by #}
-                    {# percentage across the full 0-100% axis, independent of #}
-                    {# the bar flexbox below. #}
-                    <div id="dist-markers" style="position:absolute; inset:0 0 34px 0; pointer-events:none; z-index:2;"></div>
-                    <div id="dist-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;"></div>
-                    <div id="dist-x-axis" style="display:flex; gap:4px; height:34px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);"></div>
-                </div>
-            </div>
-            <div style="margin-top:0.5rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "Score on each attempt, as a percentage. Includes failed attempts and retries." %}
-            </div>
-            {% else %}
-            <div class="empty-state"><p>{% trans "No exit ticket attempts in this period." %}</p></div>
-            {% endif %}
-        </div>
-    </div>
 
 
 
