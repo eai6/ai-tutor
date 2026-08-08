@@ -48,6 +48,9 @@ db_storage_gb = config.get_int("db-storage-gb") or 50
 waf_block_mode = config.get_bool("waf-block-mode") or False
 # Unset -> HTTP only. A public ACM cert cannot be issued for an ELB hostname.
 domain_name = config.get("domain-name")
+# Set it and the validation + alias records are managed here; leave it unset
+# and the CNAMEs must be added by hand wherever the zone lives.
+hosted_zone_id = config.get("hosted-zone-id")
 
 network = create_network(prefix, azs, region, tags)
 storage = create_storage(prefix, account_id, tags)
@@ -68,6 +71,7 @@ edge = create_edge(
     waf_block_mode,
     tags,
     domain_name=domain_name,
+    hosted_zone_id=hosted_zone_id,
 )
 
 # ECS cluster is unblocked (only task definitions need PassRole), so it is
@@ -196,7 +200,8 @@ else:
 if domain_name:
     pulumi.export("certificate_arn", edge.certificate.arn)
     pulumi.export("certificate_status", edge.certificate.status)
-    pulumi.export(
+    if not hosted_zone_id:
+      pulumi.export(
         "dns_validation_record",
         edge.validation_records.apply(
             lambda opts: {
@@ -209,7 +214,4 @@ if domain_name:
             else {}
         ),
     )
-    pulumi.export(
-        "point_the_domain_here",
-        edge.alb.dns_name.apply(lambda d: f"CNAME {domain_name} -> {d}"),
-    )
+    pulumi.export("site_url", f"https://{domain_name}")

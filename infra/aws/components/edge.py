@@ -44,6 +44,7 @@ def create_edge(
     waf_block_mode: bool,
     tags: dict,
     domain_name: "str | None" = None,
+    hosted_zone_id: "str | None" = None,
 ) -> Edge:
     alb = aws.lb.LoadBalancer(
         f"{prefix}-alb",
@@ -114,9 +115,29 @@ def create_edge(
         #
         # Expect this to sit waiting while you add the record at name.com. If
         # it times out, nothing has changed — the site is still served on 80.
+        # With a hosted zone in this account, the validation record is created
+        # here rather than by hand at a registrar. That matters beyond
+        # convenience: ACM re-validates on RENEWAL using this record, so a
+        # hand-added one that someone later tidies up breaks the renewal
+        # roughly eleven months later, long after anyone connects the two.
+        # Under Pulumi it cannot silently disappear.
+        validation_fqdns = None
+        if hosted_zone_id:
+            validation_record = aws.route53.Record(
+                f"{prefix}-cert-validation-record",
+                zone_id=hosted_zone_id,
+                name=certificate.domain_validation_options[0].resource_record_name,
+                type=certificate.domain_validation_options[0].resource_record_type,
+                records=[certificate.domain_validation_options[0].resource_record_value],
+                ttl=60,
+                allow_overwrite=True,
+            )
+            validation_fqdns = [validation_record.fqdn]
+
         cert_validation = aws.acm.CertificateValidation(
             f"{prefix}-cert-validation",
             certificate_arn=certificate.arn,
+            validation_record_fqdns=validation_fqdns,
             opts=pulumi.ResourceOptions(custom_timeouts=pulumi.CustomTimeouts(create="45m")),
         )
 
@@ -281,6 +302,24 @@ def create_edge(
         resource_arn=alb.arn,
         web_acl_arn=web_acl.arn,
     )
+
+    # Alias, not CNAME: an ALIAS resolves to the ALB's addresses directly, is
+    # free to query, and unlike a CNAME may sit at a zone apex if this is ever
+    # moved to one.
+    if domain_name and hosted_zone_id:
+        aws.route53.Record(
+            f"{prefix}-alias",
+            zone_id=hosted_zone_id,
+            name=domain_name,
+            type="A",
+            aliases=[
+                aws.route53.RecordAliasArgs(
+                    name=alb.dns_name,
+                    zone_id=alb.zone_id,
+                    evaluate_target_health=True,
+                )
+            ],
+        )
 
     return Edge(
         alb=alb,
