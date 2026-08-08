@@ -40,10 +40,34 @@
 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
     <!-- Sessions chart -->
     <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">{% trans "Sessions (Last 14 Days)" %}</h2>
+        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+            {# Caption follows the data. A fixed "Last 14 Days" heading over an #}
+            {# arbitrary range is how someone reads July and reports a bug. #}
+            <h2 class="card-title">{% trans "Sessions" %} — {{ activity_label }}</h2>
+            <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                {% for key, label, days in activity_presets %}
+                <a href="?preset={{ key }}"
+                   class="btn {% if activity_preset == key %}btn-primary{% else %}btn-secondary{% endif %}"
+                   style="padding:0.2rem 0.55rem; font-size:0.75rem;">{{ label }}</a>
+                {% endfor %}
+            </div>
         </div>
         <div class="card-body">
+            {# GET, so a chosen window is in the URL and can be shared or #}
+            {# reloaded. No JS: the server owns the range. #}
+            <form method="get" style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
+                    {% trans "From" %}
+                    <input type="date" name="start" value="{{ activity_start }}"
+                           style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+                </label>
+                <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
+                    {% trans "To" %}
+                    <input type="date" name="end" value="{{ activity_end }}"
+                           style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+                </label>
+                <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Apply" %}</button>
+            </form>
             <div id="activity-chart-wrap" style="display:flex; gap:0.4rem; height:240px;">
                 <div id="activity-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:24px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;">
                     <!-- Y-axis tick labels rendered by JS -->
@@ -165,7 +189,11 @@
         // Bars
         const barsEl = document.getElementById('activity-bars');
         const xAxisEl = document.getElementById('activity-x-axis');
-        activityData.forEach(d => {
+        // Thin the labels so they never collide. At 14 bars every bar is
+        // labelled as before; over a long range only every Nth is, which is
+        // what keeps a 12-month window legible instead of a grey smear.
+        const labelEvery = Math.max(1, Math.ceil(activityData.length / 14));
+        activityData.forEach((d, idx) => {
             const barWrap = document.createElement('div');
             barWrap.style.flex = '1';
             barWrap.style.display = 'flex';
@@ -192,9 +220,23 @@
             dateLabel.style.minWidth = '0';
             dateLabel.style.overflow = 'hidden';
             dateLabel.style.whiteSpace = 'nowrap';
-            // Show only day-of-month on narrow widths; full label on hover.
+            // Day-of-month alone is ambiguous once the window spans months —
+            // "01" appears for every month. Show the month on the first
+            // labelled bar and whenever the month changes.
             const parts = d.date.split(' ');
-            dateLabel.textContent = parts[1] || d.date;
+            if (idx % labelEvery === 0) {
+                const prev = idx > 0 ? activityData[idx - 1].date.split(' ')[0] : null;
+                dateLabel.textContent = (prev === null || prev !== parts[0])
+                    ? d.date            // "Jul 01"
+                    : (parts[1] || d.date);  // "08"
+                // Each cell is only as wide as its bar. Over a long window that
+                // is ~19px, which clips "Sep 01" to "Se". The neighbouring
+                // cells are deliberately blank, so let the text spill into
+                // them rather than truncating it.
+                dateLabel.style.overflow = 'visible';
+            } else {
+                dateLabel.textContent = '';
+            }
             dateLabel.title = d.date;
             xAxisEl.appendChild(dateLabel);
         });

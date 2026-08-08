@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import zoneinfo
-from datetime import timedelta
+from datetime import date as _date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -21,7 +21,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Avg, Q, F, Max
 from django.db.models.functions import TruncDate
 from django.utils import timezone
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy as _lazy
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 
@@ -239,6 +239,148 @@ def switch_school(request):
 # Dashboard Home
 # ============================================================================
 
+# Presets offered beside the custom range. (query value, label, days back).
+# `days` counts back from today INCLUSIVE, so 14 renders 14 bars, not 15 — the
+# old loop said range(14, -1, -1) and quietly drew 15 under a "Last 14 Days"
+# heading.
+# _lazy, not _: these are evaluated at import time, before a request has set
+# the active language. Plain gettext here would freeze whatever locale the
+# worker booted in — English labels over a Portuguese dashboard on pt-MZ.
+_ACTIVITY_PRESETS = [
+    ('14d', _lazy('Last 14 days'), 14),
+    ('30d', _lazy('Last 30 days'), 30),
+    ('90d', _lazy('Last 90 days'), 90),
+]
+_ACTIVITY_DEFAULT_DAYS = 14
+
+# A year of daily bars is already unreadable; beyond it someone is probing.
+_ACTIVITY_MAX_DAYS = 366
+
+# Past this many days the bars are thinner than the gaps between them, so
+# switch to weekly totals rather than rendering a picket fence.
+_ACTIVITY_WEEKLY_ABOVE_DAYS = 92
+
+
+def _parse_chart_date(raw):
+    """YYYY-MM-DD -> date, or None. Never raises.
+
+    Deliberately tolerant: a bad value falls back to the default window rather
+    than 500ing. `reports_overview` (views.py, `int(request.GET.get('days'))`)
+    is the counter-example — `?days=abc` there is an uncaught ValueError.
+    """
+    s = (raw or '').strip()
+    if not s:
+        return None
+    try:
+        return _date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def _activity_chart(request, institution, today):
+    """Session counts per bucket for the overview chart.
+
+    Reads `?start=`/`?end=` (YYYY-MM-DD), falling back to the last
+    ``_ACTIVITY_DEFAULT_DAYS``. Returns the points plus the resolved window, so
+    the template can show what is actually being displayed rather than a fixed
+    caption that may not match the data.
+
+    One grouped query, not one per day. The previous loop issued a COUNT per
+    bar, which was 15 queries for a fortnight and would have been 366 for a
+    year — the reason an arbitrary range needs this rewritten rather than just
+    parameterised.
+    """
+    start = _parse_chart_date(request.GET.get('start'))
+    end = _parse_chart_date(request.GET.get('end'))
+    preset = (request.GET.get('preset') or '').strip()
+
+    preset_days = {key: days for key, _label, days in _ACTIVITY_PRESETS}
+    if preset in preset_days:
+        start, end = None, None  # an explicit preset wins over stale start/end
+        days = preset_days[preset]
+        start = today - timedelta(days=days - 1)
+        end = today
+    elif start is None and end is None:
+        preset = f'{_ACTIVITY_DEFAULT_DAYS}d'
+        start = today - timedelta(days=_ACTIVITY_DEFAULT_DAYS - 1)
+        end = today
+    else:
+        # A half-open custom range is a normal thing to type. Fill the other
+        # side rather than rejecting it.
+        preset = ''
+        if end is None:
+            end = today
+        if start is None:
+            start = end - timedelta(days=_ACTIVITY_DEFAULT_DAYS - 1)
+        if start > end:
+            start, end = end, start
+
+    if (end - start).days + 1 > _ACTIVITY_MAX_DAYS:
+        start = end - timedelta(days=_ACTIVITY_MAX_DAYS - 1)
+
+    span_days = (end - start).days + 1
+    weekly = span_days > _ACTIVITY_WEEKLY_ABOVE_DAYS
+
+    rows = (
+        filter_by_institution(
+            TutorSession.objects.filter(
+                started_at__date__gte=start, started_at__date__lte=end
+            ),
+            institution,
+        )
+        .annotate(day=TruncDate('started_at'))
+        .values('day')
+        .annotate(n=Count('id'))
+    )
+    by_day = {r['day']: r['n'] for r in rows if r['day'] is not None}
+
+    # Emit every bucket in the window, including empty ones — a gap in the DB
+    # is a zero bar, not a missing bar.
+    points = []
+    if weekly:
+        cursor = start
+        while cursor <= end:
+            bucket_end = min(cursor + timedelta(days=6), end)
+            total = sum(
+                by_day.get(cursor + timedelta(days=i), 0)
+                for i in range((bucket_end - cursor).days + 1)
+            )
+            points.append({
+                'date': cursor.strftime('%b %d'),
+                'iso': cursor.isoformat(),
+                'sessions': total,
+            })
+            cursor = bucket_end + timedelta(days=1)
+    else:
+        cursor = start
+        while cursor <= end:
+            points.append({
+                'date': cursor.strftime('%b %d'),
+                'iso': cursor.isoformat(),
+                'sessions': by_day.get(cursor, 0),
+            })
+            cursor += timedelta(days=1)
+
+    if preset:
+        # str() resolves the lazy label against the request's active language.
+        label = str(dict((k, lbl) for k, lbl, _d in _ACTIVITY_PRESETS)[preset])
+    elif start.year == end.year:
+        label = f"{start.strftime('%b %d')} – {end.strftime('%b %d, %Y')}"
+    else:
+        label = f"{start.strftime('%b %d, %Y')} – {end.strftime('%b %d, %Y')}"
+    if weekly:
+        label = '{} ({})'.format(label, _('weekly'))
+
+    return {
+        'points': points,
+        'start': start,
+        'end': end,
+        'label': label,
+        'bucket': 'week' if weekly else 'day',
+        'preset': preset,
+    }
+
+
 @staff_required
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
@@ -361,19 +503,9 @@ def dashboard_home(request):
                 ([primary.username] if primary else []) + [u.username for u in others]
             )
 
-    # Activity chart data (last 14 days)
-    activity_data = []
-    for i in range(14, -1, -1):
-        date = today - timedelta(days=i)
-        count = filter_by_institution(
-            TutorSession.objects.filter(started_at__date=date),
-            institution
-        ).count()
-        activity_data.append({
-            'date': date.strftime('%b %d'),
-            'sessions': count
-        })
-    
+    # Activity chart — window chosen by the viewer, default the last 14 days.
+    chart = _activity_chart(request, institution, today)
+
     context = {
         **request.staff_ctx,
         'total_students': total_students,
@@ -385,7 +517,13 @@ def dashboard_home(request):
         'avg_competency': avg_competency,
         'at_risk_count': at_risk_students,
         'recent_sessions': recent_sessions,
-        'activity_data': json.dumps(activity_data),
+        'activity_data': json.dumps(chart['points']),
+        'activity_start': chart['start'].isoformat(),
+        'activity_end': chart['end'].isoformat(),
+        'activity_label': chart['label'],
+        'activity_bucket': chart['bucket'],
+        'activity_preset': chart['preset'],
+        'activity_presets': _ACTIVITY_PRESETS,
         'progress_stats': progress_stats,
     }
 
