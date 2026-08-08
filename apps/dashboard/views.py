@@ -472,37 +472,6 @@ def dashboard_home(request):
     ).aggregate(avg=Avg('best_score'))
     avg_competency = round((avg_competency_data['avg'] or 0.0) * 100)
 
-    # Students at risk (started but no activity in 7 days)
-    at_risk_students = filter_by_institution(
-        TutorSession.objects.filter(student_id__in=student_ids),
-        institution
-    ).exclude(
-        started_at__date__gte=week_ago
-    ).values('student').distinct().count()
-
-    # Recent activity
-    recent_sessions = filter_by_institution(
-        TutorSession.objects.all(), institution
-    ).select_related('student', 'lesson').prefetch_related(
-        'participants__student'
-    ).order_by('-started_at')[:10]
-    # Annotate each session with its active participant usernames so the
-    # template can show the full list under group sessions without an
-    # N+1 query (G6 polish).
-    for s in recent_sessions:
-        active_users = [
-            p.student for p in s.participants.all() if p.is_active
-        ]
-        s.active_participant_users = active_users
-        if len(active_users) > 1:
-            primary = next(
-                (u for u in active_users if u.id == s.student_id), None,
-            )
-            others = [u for u in active_users if u.id != s.student_id]
-            s.group_label = ", ".join(
-                ([primary.username] if primary else []) + [u.username for u in others]
-            )
-
     # Activity chart — window chosen by the viewer, default the last 14 days.
     chart = _activity_chart(request, institution, today)
 
@@ -515,8 +484,6 @@ def dashboard_home(request):
         'mastery_sessions': mastery_sessions,
         'avg_mastery': avg_mastery,
         'avg_competency': avg_competency,
-        'at_risk_count': at_risk_students,
-        'recent_sessions': recent_sessions,
         'activity_data': json.dumps(chart['points']),
         'activity_start': chart['start'].isoformat(),
         'activity_end': chart['end'].isoformat(),

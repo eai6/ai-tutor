@@ -25,20 +25,17 @@
         <div class="progress-bar" style="margin-top: 0.5rem;">
             <div class="progress-fill success" style="width: {{ avg_competency }}%;"></div>
         </div>
-        <div class="stat-change" title="{% trans 'Of students who have attempted any lesson, the % who have mastered at least one.' %}">{% blocktrans with pct=avg_mastery %}{{ pct }}% of active students mastered ≥1 lesson{% endblocktrans %}</div>
-    </div>
-
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Students At Risk" %}</div>
-        <div class="stat-value" style="color: {% if at_risk_count > 0 %}var(--danger){% else %}var(--success){% endif %};">
-            {{ at_risk_count }}
-        </div>
-        <div class="stat-change">{% trans "No activity in 7+ days" %}</div>
+        {# "active students" was wrong: the denominator is every student who has #}
+        {# ever attempted a lesson, all-time, including ones whose membership is #}
+        {# no longer active — so it does not match the Total Students tile. The #}
+        {# tooltip already said this; the visible text contradicted it. #}
+        <div class="stat-change" title="{% trans 'Average best exit-ticket score across every student-lesson with a score, all-time.' %}">{% blocktrans with pct=avg_mastery %}{{ pct }}% of students who attempted a lesson mastered ≥1{% endblocktrans %}</div>
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
-    <!-- Sessions chart -->
+<div>
+    <!-- Sessions chart — full width since the Recent Activity panel beside
+         it was removed to keep this page on high-level figures. -->
     <div class="card">
         <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
             {# Caption follows the data. A fixed "Last 14 Days" heading over an #}
@@ -87,50 +84,6 @@
         </div>
     </div>
 
-    <!-- Recent Activity -->
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">{% trans "Recent Activity" %}</h2>
-        </div>
-        <div class="card-body" style="padding: 0;">
-            {% if recent_sessions %}
-                {% for session in recent_sessions %}
-                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; gap: 0.75rem;">
-                    <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
-                        {{ session.student.first_name|slice:":1"|upper }}{{ session.student.last_name|slice:":1"|upper }}
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            {{ session.student.first_name }} {{ session.student.last_name }}
-                            {% if session.is_group %}<span class="badge" title="{{ session.group_label|default:'' }}" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;cursor:help;">👥 +{{ session.active_participant_users|length|add:'-1' }}</span>{% endif %}
-                        </div>
-                        <div style="font-size: 0.8125rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            {{ session.lesson.title }}
-                        </div>
-                        {% if session.is_group %}
-                        <div style="font-size: 0.75rem; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.15rem;">
-                            {% trans "with" %} {% for u in session.active_participant_users %}{% if u.id != session.student_id %}{{ u.username }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div>
-                        {% if session.mastery_achieved %}
-                            <span class="badge badge-success">✓</span>
-                        {% elif session.status == 'completed' %}
-                            <span class="badge badge-warning">—</span>
-                        {% else %}
-                            <span class="badge badge-info">⏳</span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>{% trans "No recent activity" %}</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
 </div>
 
 {% endblock %}
