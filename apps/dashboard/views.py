@@ -453,6 +453,119 @@ def _exit_ticket_stats(sessions_qs):
     }
 
 
+def _progression_stats(institution, win_start, win_end, weekly):
+    """Learning progression over the window, three ways.
+
+    Keyed on the ATTEMPT date, not the session start, because these answer
+    "did learning happen between two points in time" — the opposite question
+    from the reach-rate tiles, which need a session cohort.
+
+    1. PRE/POST GAIN. There are no baseline/final attempts in this data (both
+       purposes are empty), but `diagnostic` IS a pre-lesson assessment, so a
+       diagnostic and a practice attempt on the same student+lesson form a
+       genuine before/after pair. Earliest diagnostic vs latest practice.
+    2. TREND. Mean practice score per bucket, so a cohort's direction is
+       visible rather than collapsed into one number.
+    3. PER-STUDENT. First vs latest practice score, which is what identifies
+       who is stuck — an average cannot.
+    """
+    from apps.tutoring.models import ExitTicketAttempt
+
+    qs = filter_by_institution(
+        ExitTicketAttempt.objects.filter(
+            completed_at__date__gte=win_start,
+            completed_at__date__lte=win_end,
+            purpose__in=['practice', 'retake', 'diagnostic'],
+            completed_at__isnull=False,
+        ),
+        institution,
+        field='session__institution',
+    )
+    rows = list(qs.values_list(
+        'student_id', 'exit_ticket__lesson_id', 'purpose', 'score',
+        'exit_ticket__questions_per_attempt', 'completed_at',
+        'student__first_name', 'student__last_name', 'student__username',
+    ))
+
+    pre, post, by_student, trend_raw = {}, {}, {}, {}
+    names = {}
+    for sid, lid, purpose, score, per, when, first, last, uname in rows:
+        if not per or when is None:
+            continue
+        frac = min(score / per, 1.0)
+        names[sid] = (f'{first} {last}'.strip() or uname)
+        if purpose == 'diagnostic':
+            if lid is not None and ((sid, lid) not in pre or when < pre[(sid, lid)][0]):
+                pre[(sid, lid)] = (when, frac)
+            continue
+        # practice / retake
+        if lid is not None and ((sid, lid) not in post or when > post[(sid, lid)][0]):
+            post[(sid, lid)] = (when, frac)
+        by_student.setdefault(sid, []).append((when, frac))
+        d = when.date()
+        key = d - timedelta(days=d.weekday()) if weekly else d
+        bucket = trend_raw.setdefault(key, [])
+        bucket.append(frac)
+
+    # ── 1. pre/post gain ────────────────────────────────────────────────
+    paired = set(pre) & set(post)
+    gains = sorted(post[k][1] - pre[k][1] for k in paired)
+    n_pair = len(gains)
+    gain = {
+        'pairs': n_pair,
+        'pre_pct': round(sum(pre[k][1] for k in paired) / n_pair * 100) if n_pair else 0,
+        'post_pct': round(sum(post[k][1] for k in paired) / n_pair * 100) if n_pair else 0,
+        'mean_gain': round(sum(gains) / n_pair * 100) if n_pair else 0,
+        'median_gain': round(gains[n_pair // 2] * 100) if n_pair else 0,
+        'improved': sum(1 for g in gains if g > 0),
+        'same': sum(1 for g in gains if g == 0),
+        'declined': sum(1 for g in gains if g < 0),
+    }
+
+    # ── 2. cohort trend ─────────────────────────────────────────────────
+    trend = [
+        {
+            'date': k.strftime('%b %d'),
+            'iso': k.isoformat(),
+            'avg': round(sum(v) / len(v) * 100),
+            'n': len(v),
+        }
+        for k, v in sorted(trend_raw.items())
+    ]
+
+    # ── 3. per-student first vs latest ──────────────────────────────────
+    movers = []
+    for sid, entries in by_student.items():
+        if len(entries) < 2:
+            continue          # one attempt is a point, not a trajectory
+        entries.sort()
+        first_pct, last_pct = entries[0][1] * 100, entries[-1][1] * 100
+        movers.append({
+            'student': names.get(sid, str(sid)),
+            'first': round(first_pct),
+            'last': round(last_pct),
+            'delta': round(last_pct - first_pct),
+            'attempts': len(entries),
+        })
+    movers.sort(key=lambda m: m['delta'])
+    per_student = {
+        'tracked': len(movers),
+        'improved': sum(1 for m in movers if m['delta'] > 0),
+        'flat': sum(1 for m in movers if m['delta'] == 0),
+        'declined': sum(1 for m in movers if m['delta'] < 0),
+        # Filter by direction rather than slicing the ends of the list. Taking
+        # movers[:5] and movers[-5:] put the SAME student in both columns when
+        # few are tracked, and listed a student at +0 under "Falling".
+        'falling': [m for m in movers if m['delta'] < 0][:5],
+        'rising': sorted(
+            (m for m in movers if m['delta'] > 0),
+            key=lambda m: m['delta'], reverse=True,
+        )[:5],
+    }
+
+    return {'gain': gain, 'trend': trend, 'per_student': per_student}
+
+
 @staff_required
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
@@ -493,6 +606,11 @@ def dashboard_home(request):
 
     # Reach-rate + score distribution for the sessions started in this window.
     et_stats = _exit_ticket_stats(_scoped_sessions)
+
+    # Learning progression: pre/post gain, cohort trend, per-student movement.
+    prog = _progression_stats(
+        institution, win_start, win_end, weekly=(chart['bucket'] == 'week'),
+    )
 
     # Passes now come from _exit_ticket_stats, which counts them over the SAME
     # session set as the reach-rate and the average. The previous version keyed
@@ -559,6 +677,8 @@ def dashboard_home(request):
         'total_sessions': total_sessions,
         'et': et_stats,
         'score_distribution': json.dumps(et_stats['distribution']),
+        'prog': prog,
+        'trend_data': json.dumps(prog['trend']),
         # All-time, best-score-per-student-lesson. Kept because it answers a
         # different question from et.avg_pct ("how well do students do at their
         # best, ever" vs "how did attempts in this window go"), and the two
