@@ -411,8 +411,13 @@ def respond(
     # at the end, so a turn could still start with nothing in flight and get
     # the TEACH-remediation shape, which on an MCQ-only build hands the student
     # a typing box and grades nothing.
-    from apps.tutoring.simple_tutor.exit_ticket import ensure_remediation_question
-    ensure_remediation_question(session)
+    # OFFLINE ONLY. Online keeps the production shape, where the model is asked
+    # to pose and does.
+    # No cfg passed: turn_config is not resolved until later in this function,
+    # so the predicate resolves the model itself here.
+    if _is_offline_session(session):
+        from apps.tutoring.simple_tutor.exit_ticket import ensure_remediation_question
+        ensure_remediation_question(session)
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
     question_pool = build_question_pool(session)
@@ -821,8 +826,13 @@ def respond(
     # for this and does not get it — same finding as remediation posing, which
     # went 0/4 on instruction alone. Runs BEFORE the remediation follow-up so a
     # pivot counts as "a question is in flight" and the follow-up stands down.
+    # OFFLINE ONLY — see _is_offline_session. Online keeps production's shape,
+    # where the ladder is the model's to run.
     from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
-    _pivoted = maybe_pivot_stalled_question(session)
+    _pivoted = (
+        maybe_pivot_stalled_question(session)
+        if _is_offline_session(session, turn_config) else None
+    )
     if _pivoted is not None:
         lines = [(_pivoted.question_text or '').strip()]
         for _L in ('A', 'B', 'C', 'D'):
@@ -835,8 +845,12 @@ def respond(
     # ─── 9c. Remediation follow-up (server-owned) ────────────────────
     # Runs AFTER the completion check, so the last recovered objective ends
     # remediation instead of posing a seventh question into a finished set.
+    # OFFLINE ONLY — see _is_offline_session.
     from apps.tutoring.simple_tutor.exit_ticket import maybe_pose_remediation_next
-    _follow_up = maybe_pose_remediation_next(session)
+    _follow_up = (
+        maybe_pose_remediation_next(session)
+        if _is_offline_session(session, turn_config) else None
+    )
     if _follow_up:
         text_reply = f"{(text_reply or '').rstrip()}\n\n{_follow_up}".strip()
 
@@ -3313,6 +3327,38 @@ def _remediation_progress_payload(session) -> dict | None:
     except Exception:                              # noqa: BLE001
         logger.warning("remediation progress failed", exc_info=True)
         return None
+
+
+def _is_offline_session(session, cfg=None) -> bool:
+    """True when this session is running the local (offline) model.
+
+    The gate for OFFLINE-ONLY engine behaviour. Server-owned question control —
+    pivoting a stalled question, keeping a remediation question in flight — was
+    built because a 4B will not act on a conditional instruction. It ran for
+    every session for a while, cloud included, on the reasoning that who owns
+    question state is an architecture decision rather than a per-model one.
+
+    Reversed 2026-08-08: the hosted tutor should behave exactly as production
+    does, and offline requirements should not be pushed onto it. The offline
+    engine keeps its safety nets; the online engine keeps the shape it has been
+    running and evaluated against. See auto-memory/project_offline_first_priority.md.
+
+    Fail-soft to False — a lookup error must leave the ONLINE path untouched,
+    which is the conservative direction now.
+    """
+    try:
+        from apps.tutoring.simple_tutor.model_choice import (
+            LOCAL_PROVIDER, resolve_for_session,
+        )
+        if cfg is None:
+            cfg = resolve_for_session(session)
+        if cfg is None:
+            from apps.llm.models import ModelConfig
+            cfg = ModelConfig.get_for('tutoring')
+        return cfg is not None and str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
+    except Exception:                              # noqa: BLE001
+        logger.warning("offline-session check failed", exc_info=True)
+        return False
 
 
 def _uses_answer_picker(session, slot, cfg=None) -> bool:
