@@ -61,7 +61,12 @@
                 </div>
             </div>
             <div style="font-size:0.8rem; color:var(--gray-600); line-height:1.6;">
-                {% blocktrans with n=prog.gain.pairs med=prog.gain.median_gain %}{{ n }} lesson attempts with both a before and after measure · median gain +{{ med }} points{% endblocktrans %}<br>
+                {# "lesson attempts" read as sessions, which this is not. The unit #}
+                {# is one student paired with one lesson: a student who did three #}
+                {# lessons contributes three pairs, and retaking one lesson is #}
+                {# still ONE pair even though it is two sessions. The tiles above #}
+                {# count sessions, so the page was mixing units without saying so. #}
+                {% blocktrans with n=prog.gain.pairs med=prog.gain.median_gain %}{{ n }} student–lesson pairs with both a before and after measure · median gain +{{ med }} points{% endblocktrans %}<br>
                 <span style="color:var(--success); font-weight:600;">{{ prog.gain.improved }} {% trans "improved" %}</span> ·
                 {{ prog.gain.same }} {% trans "unchanged" %} ·
                 <span style="color:var(--danger); font-weight:600;">{{ prog.gain.declined }} {% trans "declined" %}</span>
