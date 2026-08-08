@@ -418,17 +418,43 @@ def dashboard_home(request):
 
     total_sessions = filter_by_institution(_in_window, institution).count()
 
-    # status='completed' is set in exactly one place — simple_tutor/exit_ticket.py,
-    # and ONLY when the student PASSES the exit ticket, on the same line as
-    # mastery_achieved=True. So this has never counted "completed sessions"; it
-    # counts passes. A session whose ticket is failed, or that is abandoned
-    # part-way, stays 'active' indefinitely — there is no finished-but-not-
-    # passed transition, which is why the overwhelming majority of rows are
-    # 'active'. The label now says what the number is instead of implying a
-    # completion rate the data cannot support.
-    mastered_sessions = filter_by_institution(
-        _in_window.filter(status='completed'), institution
-    ).count()
+    # Lesson passes, counted from the ATTEMPT record rather than session status.
+    #
+    # TutorSession.status is session bookkeeping and is wrong for this twice
+    # over. It is written 'completed' only on a pass (simple_tutor/exit_ticket.py),
+    # so a failed or abandoned session stays 'active' forever — but worse,
+    # chat_restart_session (tutoring/views.py) flips ANY prior session for the
+    # lesson, including a COMPLETED one, to 'abandoned'. A student revisiting a
+    # lesson they had already passed therefore made this number go DOWN.
+    # Counting it off started_at compounded it: a session begun in June and
+    # passed in July was attributed to June.
+    #
+    # ExitTicketAttempt is the durable record — restart explicitly preserves
+    # every attempt row — and completed_at is when the pass actually happened,
+    # so it lands in the right window. Distinct student+lesson, so a retake of
+    # the same lesson is one pass, not two.
+    #
+    # PRACTICE/RETAKE only: baseline, final and diagnostic attempts are
+    # course-level assessments, not "passed this lesson".
+    from apps.tutoring.models import ExitTicketAttempt
+    mastered_sessions = (
+        filter_by_institution(
+            ExitTicketAttempt.objects.filter(
+                passed=True,
+                completed_at__date__gte=win_start,
+                completed_at__date__lte=win_end,
+                purpose__in=[
+                    ExitTicketAttempt.Purpose.PRACTICE,
+                    ExitTicketAttempt.Purpose.RETAKE,
+                ],
+            ),
+            institution,
+            field='session__institution',
+        )
+        .values('student_id', 'exit_ticket__lesson_id')
+        .distinct()
+        .count()
+    )
 
     # Progress stats
     progress_stats = filter_by_institution(
