@@ -18,6 +18,7 @@ import pulumi_aws as aws
 class Storage:
     media_bucket: aws.s3.BucketV2
     ecr_repo: aws.ecr.Repository
+    ops_bucket: aws.s3.BucketV2
 
 
 def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
@@ -66,6 +67,72 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
         ],
     )
 
+    # ── Ops bucket ─────────────────────────────────────────────────────────
+    # Database dumps and other operational payloads. Deliberately SEPARATE from
+    # the media bucket, and the reason matters more than the cost of a second
+    # bucket:
+    #
+    # apps/media_library/s3_media.py::serve_media streams objects out of the
+    # media bucket at /media/<path>, and that route has no auth gate. An object
+    # dropped in there is reachable over the internet by anyone who can guess
+    # the key. A production database dump is the last thing that should live
+    # one URL guess away — the whole point of restoring from inside the VPC is
+    # that the data never becomes internet-reachable.
+    #
+    # Nothing in the application knows this bucket exists. It is only ever read
+    # by a one-off ECS task.
+    ops_bucket = aws.s3.BucketV2(
+        f"{prefix}-ops",
+        bucket=f"{prefix}-ops-{account_id}",
+        tags={**tags, "Name": f"{prefix}-ops"},
+    )
+
+    aws.s3.BucketPublicAccessBlock(
+        f"{prefix}-ops-pab",
+        bucket=ops_bucket.id,
+        block_public_acls=True,
+        block_public_policy=True,
+        ignore_public_acls=True,
+        restrict_public_buckets=True,
+    )
+
+    aws.s3.BucketServerSideEncryptionConfigurationV2(
+        f"{prefix}-ops-sse",
+        bucket=ops_bucket.id,
+        rules=[
+            aws.s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
+                apply_server_side_encryption_by_default=aws.s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+                    sse_algorithm="AES256"
+                ),
+                bucket_key_enabled=True,
+            )
+        ],
+    )
+
+    aws.s3.BucketLifecycleConfigurationV2(
+        f"{prefix}-ops-lifecycle",
+        bucket=ops_bucket.id,
+        rules=[
+            # A dump that someone forgets to delete deletes itself. Student
+            # records should not accumulate in a bucket because a restore was
+            # interrupted and nobody came back to tidy up.
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="expire-ops-payloads",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                expiration=aws.s3.BucketLifecycleConfigurationV2RuleExpirationArgs(days=7),
+            ),
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="abort-incomplete-multipart",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                abort_incomplete_multipart_upload=aws.s3.BucketLifecycleConfigurationV2RuleAbortIncompleteMultipartUploadArgs(
+                    days_after_initiation=1
+                ),
+            ),
+        ],
+    )
+
     # ECR. The lifecycle policy replaces Azure's `acr purge` CI step outright —
     # that registry reached 2.3 TB (~$180/mo) before pruning was added, and a
     # declarative rule removes the failure mode instead of scripting around it.
@@ -101,4 +168,4 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
         ),
     )
 
-    return Storage(media_bucket=bucket, ecr_repo=repo)
+    return Storage(media_bucket=bucket, ecr_repo=repo, ops_bucket=ops_bucket)

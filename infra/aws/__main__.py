@@ -164,6 +164,7 @@ if enable_ecs:
         image=storage.ecr_repo.repository_url.apply(lambda u: f"{u}:{image_tag}"),
         log_group=log_group,
         media_bucket=storage.media_bucket,
+        ops_bucket_arn=storage.ops_bucket.arn,
         secret_arns={
             "database-url": data.database_url_secret.arn,
             **{k: v.arn for k, v in data.app_secrets.items()},

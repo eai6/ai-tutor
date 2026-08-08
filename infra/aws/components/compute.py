@@ -52,6 +52,7 @@ def create_compute(
     image: str,
     log_group,
     media_bucket,
+    ops_bucket_arn,
     secret_arns: dict,
     task_environment: dict,
     private_subnet_ids,
@@ -118,7 +119,9 @@ def create_compute(
     aws.iam.RolePolicy(
         f"{prefix}-task-policy",
         role=task_role.id,
-        policy=pulumi.Output.all(media_bucket.arn, task_role.arn, execution_role.arn).apply(
+        policy=pulumi.Output.all(
+            media_bucket.arn, task_role.arn, execution_role.arn, ops_bucket_arn
+        ).apply(
             lambda a: json.dumps(
                 {
                     "Version": "2012-10-17",
@@ -131,6 +134,17 @@ def create_compute(
                                 "s3:DeleteObject", "s3:ListBucket",
                             ],
                             "Resource": [a[0], f"{a[0]}/*"],
+                        },
+                        {
+                            # Read-only, and read-only on purpose: the restore
+                            # task consumes a dump someone else uploaded. A
+                            # container that can WRITE here could exfiltrate the
+                            # database to a bucket the application never
+                            # otherwise touches.
+                            "Sid": "OpsBucketReadOnly",
+                            "Effect": "Allow",
+                            "Action": ["s3:GetObject", "s3:ListBucket"],
+                            "Resource": [a[3], f"{a[3]}/*"],
                         },
                         {
                             "Sid": "TransactionalEmail",
