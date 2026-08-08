@@ -386,10 +386,15 @@ def dashboard_home(request):
     """Main dashboard with overview metrics."""
     institution = request.staff_ctx['institution']
 
-    # Date ranges
     today = timezone.now().date()
-    week_ago = today - timedelta(days=7)
-    month_ago = today - timedelta(days=30)
+
+    # The window is resolved FIRST, because the tiles below follow it. It used
+    # to be per-widget and hardcoded — 7 days for "active", 30 for sessions,
+    # all-time for competency — three windows side by side under labels that
+    # did not say so. With a picker on the page that reads as a contradiction:
+    # set it to July and a neighbouring tile still reports a rolling 30 days.
+    chart = _activity_chart(request, institution, today)
+    win_start, win_end = chart['start'], chart['end']
 
     # Get all students in institution (or all if aggregated)
     student_memberships = filter_by_institution(
@@ -398,28 +403,31 @@ def dashboard_home(request):
     ).select_related('user')
 
     student_ids = list(student_memberships.values_list('user_id', flat=True))
+    # Roster size, deliberately NOT windowed: "how many students do we have"
+    # is not a question about a date range.
     total_students = len(student_ids)
 
-    # Active students (had session in last 7 days)
+    _in_window = TutorSession.objects.filter(
+        started_at__date__gte=win_start, started_at__date__lte=win_end,
+    )
+
+    # Students who ran a session inside the window.
     active_students = filter_by_institution(
-        TutorSession.objects.filter(student_id__in=student_ids, started_at__date__gte=week_ago),
-        institution
+        _in_window.filter(student_id__in=student_ids), institution
     ).values('student').distinct().count()
 
-    # Sessions stats
-    total_sessions = filter_by_institution(
-        TutorSession.objects.filter(started_at__date__gte=month_ago),
-        institution
-    ).count()
+    total_sessions = filter_by_institution(_in_window, institution).count()
 
-    completed_sessions = filter_by_institution(
-        TutorSession.objects.filter(status='completed', started_at__date__gte=month_ago),
-        institution
-    ).count()
-
-    mastery_sessions = filter_by_institution(
-        TutorSession.objects.filter(status='completed', mastery_achieved=True, started_at__date__gte=month_ago),
-        institution
+    # status='completed' is set in exactly one place — simple_tutor/exit_ticket.py,
+    # and ONLY when the student PASSES the exit ticket, on the same line as
+    # mastery_achieved=True. So this has never counted "completed sessions"; it
+    # counts passes. A session whose ticket is failed, or that is abandoned
+    # part-way, stays 'active' indefinitely — there is no finished-but-not-
+    # passed transition, which is why the overwhelming majority of rows are
+    # 'active'. The label now says what the number is instead of implying a
+    # completion rate the data cannot support.
+    mastered_sessions = filter_by_institution(
+        _in_window.filter(status='completed'), institution
     ).count()
 
     # Progress stats
@@ -472,16 +480,12 @@ def dashboard_home(request):
     ).aggregate(avg=Avg('best_score'))
     avg_competency = round((avg_competency_data['avg'] or 0.0) * 100)
 
-    # Activity chart — window chosen by the viewer, default the last 14 days.
-    chart = _activity_chart(request, institution, today)
-
     context = {
         **request.staff_ctx,
         'total_students': total_students,
         'active_students': active_students,
         'total_sessions': total_sessions,
-        'completed_sessions': completed_sessions,
-        'mastery_sessions': mastery_sessions,
+        'mastered_sessions': mastered_sessions,
         'avg_mastery': avg_mastery,
         'avg_competency': avg_competency,
         'activity_data': json.dumps(chart['points']),

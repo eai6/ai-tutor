@@ -5,18 +5,56 @@
 {% block page_title %}{% trans "Dashboard Overview" %}{% endblock %}
 
 {% block content %}
+{# Page-level, above everything, because it governs every figure below — not #}
+{# just the chart. Sitting inside the chart card it read as a chart control. #}
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-body" style="display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding-top:1rem; padding-bottom:1rem;">
+        <form method="get" style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap; margin:0;">
+            <div>
+                <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); margin-bottom:0.35rem;">{% trans "Showing" %}</div>
+                <div style="font-weight:600; font-size:1rem;">{{ activity_label }}</div>
+            </div>
+            <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem; margin-left:0.75rem;">
+                {% trans "From" %}
+                <input type="date" name="start" value="{{ activity_start }}"
+                       style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+            </label>
+            <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
+                {% trans "To" %}
+                <input type="date" name="end" value="{{ activity_end }}"
+                       style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
+            </label>
+            <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Apply" %}</button>
+        </form>
+        <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+            {% for key, label, days in activity_presets %}
+            <a href="?preset={{ key }}"
+               class="btn {% if activity_preset == key %}btn-primary{% else %}btn-secondary{% endif %}"
+               style="padding:0.2rem 0.55rem; font-size:0.75rem;">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-label">{% trans "Total Students" %}</div>
         <div class="stat-value">{{ total_students }}</div>
-        <div class="stat-change positive">{% blocktrans with count=active_students %}{{ count }} active this week{% endblocktrans %}</div>
+        {# Roster size is not windowed — "how many students do we have" is not #}
+        {# a question about a date range. The line beneath it is. #}
+        <div class="stat-change positive">{% blocktrans with count=active_students %}{{ count }} active in this period{% endblocktrans %}</div>
     </div>
 
     <div class="stat-card">
-        <div class="stat-label">{% trans "Sessions (30 days)" %}</div>
+        <div class="stat-label">{% trans "Sessions" %}</div>
         <div class="stat-value">{{ total_sessions }}</div>
-        <div class="stat-change">{% blocktrans with count=completed_sessions %}{{ count }} completed{% endblocktrans %}</div>
+        {# Was "N completed". status='completed' is set only when a student #}
+        {# PASSES the exit ticket (simple_tutor/exit_ticket.py), so it counts #}
+        {# passes, not completions — a failed or abandoned session stays #}
+        {# 'active' forever. Calling it "completed" made the engine look broken #}
+        {# when the number was really a mastery count. #}
+        <div class="stat-change" title="{% trans 'Sessions where the student passed the exit ticket. Sessions that are failed or abandoned are not counted.' %}">{% blocktrans with count=mastered_sessions %}{{ count }} passed the exit ticket{% endblocktrans %}</div>
     </div>
 
     <div class="stat-card">
@@ -37,34 +75,12 @@
     <!-- Sessions chart — full width since the Recent Activity panel beside
          it was removed to keep this page on high-level figures. -->
     <div class="card">
-        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-            {# Caption follows the data. A fixed "Last 14 Days" heading over an #}
-            {# arbitrary range is how someone reads July and reports a bug. #}
-            <h2 class="card-title">{% trans "Sessions" %} — {{ activity_label }}</h2>
-            <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
-                {% for key, label, days in activity_presets %}
-                <a href="?preset={{ key }}"
-                   class="btn {% if activity_preset == key %}btn-primary{% else %}btn-secondary{% endif %}"
-                   style="padding:0.2rem 0.55rem; font-size:0.75rem;">{{ label }}</a>
-                {% endfor %}
-            </div>
+        <div class="card-header">
+            {# Controls live at the top of the page now — they govern the tiles #}
+            {# too, and repeating them here would imply they are chart-only. #}
+            <h2 class="card-title">{% trans "Sessions over time" %}</h2>
         </div>
         <div class="card-body">
-            {# GET, so a chosen window is in the URL and can be shared or #}
-            {# reloaded. No JS: the server owns the range. #}
-            <form method="get" style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
-                <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
-                    {% trans "From" %}
-                    <input type="date" name="start" value="{{ activity_start }}"
-                           style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                </label>
-                <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
-                    {% trans "To" %}
-                    <input type="date" name="end" value="{{ activity_end }}"
-                           style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                </label>
-                <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Apply" %}</button>
-            </form>
             <div id="activity-chart-wrap" style="display:flex; gap:0.4rem; height:240px;">
                 <div id="activity-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:24px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;">
                     <!-- Y-axis tick labels rendered by JS -->
