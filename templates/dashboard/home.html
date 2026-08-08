@@ -47,27 +47,28 @@
     </div>
 
     <div class="stat-card">
-        <div class="stat-label">{% trans "Sessions" %}</div>
+        <div class="stat-label">{% trans "Sessions started" %}</div>
         <div class="stat-value">{{ total_sessions }}</div>
-        {# Was "N completed". status='completed' is set only when a student #}
-        {# PASSES the exit ticket (simple_tutor/exit_ticket.py), so it counts #}
-        {# passes, not completions — a failed or abandoned session stays #}
-        {# 'active' forever. Calling it "completed" made the engine look broken #}
-        {# when the number was really a mastery count. #}
-        <div class="stat-change" title="{% trans 'Sessions where the student passed the exit ticket. Sessions that are failed or abandoned are not counted.' %}">{% blocktrans with count=mastered_sessions %}{{ count }} passed the exit ticket{% endblocktrans %}</div>
+        {# The drop-off is the point: a session that never reaches the exit #}
+        {# ticket produced no assessment evidence at all. #}
+        <div class="stat-change" title="{% trans 'Sessions that got as far as the exit ticket. The rest stopped during the lesson.' %}">
+            {% blocktrans with n=et.sessions_reached pct=et.reach_pct %}{{ n }} reached the exit ticket ({{ pct }}%){% endblocktrans %}
+        </div>
     </div>
 
     <div class="stat-card">
-        <div class="stat-label">{% trans "Avg Lesson Competency" %}</div>
-        <div class="stat-value">{{ avg_competency }}%</div>
+        <div class="stat-label">{% trans "Avg Exit Ticket Score" %}</div>
+        <div class="stat-value">{{ et.avg_pct }}%</div>
         <div class="progress-bar" style="margin-top: 0.5rem;">
-            <div class="progress-fill success" style="width: {{ avg_competency }}%;"></div>
+            <div class="progress-fill success" style="width: {{ et.avg_pct }}%;"></div>
         </div>
-        {# "active students" was wrong: the denominator is every student who has #}
-        {# ever attempted a lesson, all-time, including ones whose membership is #}
-        {# no longer active — so it does not match the Total Students tile. The #}
-        {# tooltip already said this; the visible text contradicted it. #}
-        <div class="stat-change" title="{% trans 'Average best exit-ticket score across every student-lesson with a score, all-time.' %}">{% blocktrans with pct=avg_mastery %}{{ pct }}% of students who attempted a lesson mastered ≥1{% endblocktrans %}</div>
+        {# Every attempt in the window, not best-score-per-student. The old #}
+        {# tile averaged StudentLessonProgress.best_score, which is monotonic #}
+        {# and all-time, so it excluded failures and retries by construction — #}
+        {# it read 81% where July's attempts actually averaged 74%. #}
+        <div class="stat-change" title="{% trans 'Mean across every practice/retake attempt from sessions started in this period. Includes failed attempts and retries.' %}">
+            {% blocktrans with n=et.attempts med=et.median_pct %}{{ n }} attempts · median {{ med }}%{% endblocktrans %}
+        </div>
     </div>
 </div>
 
@@ -97,6 +98,41 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Exit ticket score distribution -->
+    <div class="card" style="margin-top:1.5rem;">
+        <div class="card-header" style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+            <h2 class="card-title">{% trans "Exit ticket score distribution" %}</h2>
+            <div style="font-size:0.78rem; color:var(--gray-500);">
+                {% blocktrans with n=et.attempts %}{{ n }} attempts{% endblocktrans %}
+                &nbsp;·&nbsp;
+                <span style="color:var(--primary); font-weight:600;">{% trans "mean" %} {{ et.avg_pct }}%</span>
+                &nbsp;·&nbsp;
+                <span style="color:var(--accent, #7c3aed); font-weight:600;">{% trans "median" %} {{ et.median_pct }}%</span>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if et.attempts %}
+            <div id="dist-wrap" style="display:flex; gap:0.4rem; height:200px;">
+                <div id="dist-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:34px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;"></div>
+                <div id="dist-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
+                    <div id="dist-gridlines" style="position:absolute; inset:0 0 34px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;"></div>
+                    {# Markers sit in this layer so they can be positioned by #}
+                    {# percentage across the full 0-100% axis, independent of #}
+                    {# the bar flexbox below. #}
+                    <div id="dist-markers" style="position:absolute; inset:0 0 34px 0; pointer-events:none; z-index:2;"></div>
+                    <div id="dist-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;"></div>
+                    <div id="dist-x-axis" style="display:flex; gap:4px; height:34px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);"></div>
+                </div>
+            </div>
+            <div style="margin-top:0.5rem; font-size:0.72rem; color:var(--gray-500);">
+                {% trans "Score on each attempt, as a percentage. Includes failed attempts and retries." %}
+            </div>
+            {% else %}
+            <div class="empty-state"><p>{% trans "No exit ticket attempts in this period." %}</p></div>
+            {% endif %}
         </div>
     </div>
 
@@ -208,6 +244,92 @@
             }
             dateLabel.title = d.date;
             xAxisEl.appendChild(dateLabel);
+        });
+    }
+
+    // ── Exit ticket score distribution ──────────────────────────────────
+    // Frequency of attempts per 10% band, with mean and median drawn on top
+    // so the shape and the averages are read together — a mean alone hides
+    // whether the class is bimodal (a group nailing it, a group lost).
+    const distData = {{ score_distribution|safe }};
+    const distMean = {{ et.avg_pct|default:0 }};
+    const distMedian = {{ et.median_pct|default:0 }};
+    const distBars = document.getElementById('dist-bars');
+
+    if (distBars && distData && distData.length > 0) {
+        const rawMax = Math.max(...distData.map(d => d.count), 1);
+        const yMax = niceCeil(rawMax);          // shared with the sessions chart
+        const tickCount = 5;
+        const rawTicks = [];
+        for (let i = tickCount - 1; i >= 0; i--) {
+            rawTicks.push(Math.round((yMax * i) / (tickCount - 1)));
+        }
+        // Counts are integers, so a small yMax rounds several ticks to the same
+        // value — a 2-attempt window rendered "2, 2, 1, 1, 0". Dedupe rather
+        // than always drawing five.
+        const ticks = [...new Set(rawTicks)];
+
+        const yAxis = document.getElementById('dist-y-axis');
+        ticks.forEach(t => {
+            const el = document.createElement('div');
+            el.textContent = t;
+            yAxis.appendChild(el);
+        });
+
+        const grid = document.getElementById('dist-gridlines');
+        ticks.forEach((_, i) => {
+            const line = document.createElement('div');
+            line.style.borderTop = (i === ticks.length - 1)
+                ? '1px solid var(--gray-300)'
+                : '1px dashed var(--gray-200)';
+            grid.appendChild(line);
+        });
+
+        const xAxis = document.getElementById('dist-x-axis');
+        distData.forEach(d => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:0;';
+
+            const bar = document.createElement('div');
+            bar.style.width = '100%';
+            // Tint the failing bands so the pass line is visible without a
+            // legend. 80% is the configured passing_score on these tickets.
+            bar.style.background = (d.lo >= 80) ? 'var(--success)' : 'var(--primary)';
+            bar.style.opacity = (d.lo >= 80) ? '1' : '0.55';
+            bar.style.borderRadius = '4px 4px 0 0';
+            bar.style.height = ((d.count / yMax) * 100) + '%';
+            bar.style.minHeight = d.count > 0 ? '2px' : '0';
+            bar.title = `${d.label}%: ${d.count} attempt${d.count === 1 ? '' : 's'}`;
+            wrap.appendChild(bar);
+            distBars.appendChild(wrap);
+
+            const lbl = document.createElement('div');
+            lbl.style.cssText = 'flex:1; text-align:center; min-width:0; white-space:nowrap;';
+            lbl.textContent = d.lo;      // 0, 10, 20 … band lower edge
+            xAxis.appendChild(lbl);
+        });
+
+        // Mean / median rules. Positioned by percentage across the axis, which
+        // is why they live in their own absolutely-positioned layer rather
+        // than inside the bar flexbox.
+        const markers = document.getElementById('dist-markers');
+        [
+            { pct: distMean, color: 'var(--primary)', label: 'mean' },
+            { pct: distMedian, color: 'var(--accent, #7c3aed)', label: 'median' },
+        ].forEach((m, idx) => {
+            const line = document.createElement('div');
+            line.style.cssText = `position:absolute; top:0; bottom:0; left:${m.pct}%;`
+                + `border-left:2px dashed ${m.color};`;
+            markers.appendChild(line);
+
+            const tag = document.createElement('div');
+            // Stagger vertically so mean and median stay readable when close.
+            tag.style.cssText = `position:absolute; left:${m.pct}%; top:${idx * 16}px;`
+                + `transform:translateX(-50%); font-size:0.65rem; font-weight:600;`
+                + `color:${m.color}; background:var(--white,#fff); padding:0 3px;`
+                + `border-radius:3px; white-space:nowrap;`;
+            tag.textContent = `${m.label} ${m.pct}%`;
+            markers.appendChild(tag);
         });
     }
 </script>

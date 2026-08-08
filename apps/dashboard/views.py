@@ -381,6 +381,78 @@ def _activity_chart(request, institution, today):
     }
 
 
+def _exit_ticket_stats(sessions_qs):
+    """Reach-rate and score distribution for the sessions in ``sessions_qs``.
+
+    Everything here keys off the SESSION, so the denominator is stable: of the
+    sessions started in this window, how many got as far as the assessment, and
+    how did those go. Keying the scores off the attempt date instead would let
+    a session started in June contribute its score to July and make the two
+    figures describe different populations.
+
+    Why not StudentLessonProgress.best_score, which the old competency tile
+    used: best_score is monotonic — it keeps the high-water mark and never
+    drops — so averaging it silently excludes every failure and weak retry, and
+    it is not windowed at all. On July's data it read 81% where the attempts
+    actually averaged 74%.
+
+    ``score`` is a raw correct-count, so the denominator is the ticket's
+    questions_per_attempt. Read per attempt rather than assumed to be 10:
+    tickets configure it, and a wrong denominator silently rescales everything.
+    """
+    from apps.tutoring.models import ExitTicketAttempt
+
+    attempts = ExitTicketAttempt.objects.filter(
+        session__in=sessions_qs,
+        purpose__in=[
+            ExitTicketAttempt.Purpose.PRACTICE,
+            ExitTicketAttempt.Purpose.RETAKE,
+        ],
+    )
+
+    started = sessions_qs.count()
+    reached = sessions_qs.filter(
+        exit_ticket_attempts__purpose__in=['practice', 'retake']
+    ).distinct().count()
+
+    rows = attempts.values_list(
+        'score', 'exit_ticket__questions_per_attempt', 'passed',
+    )
+    fractions, passed = [], 0
+    for score, per_attempt, did_pass in rows:
+        if not per_attempt:
+            continue          # misconfigured ticket: no denominator to divide by
+        fractions.append(min(score / per_attempt, 1.0))
+        if did_pass:
+            passed += 1
+
+    # Deciles. 100% lands in the last bucket rather than an 11th of its own.
+    buckets = [0] * 10
+    for f in fractions:
+        buckets[min(int(f * 10), 9)] += 1
+
+    fractions.sort()
+    n = len(fractions)
+    mean = (sum(fractions) / n) if n else 0.0
+    median = fractions[n // 2] if n else 0.0
+
+    return {
+        'sessions_started': started,
+        'sessions_reached': reached,
+        'reach_pct': round(reached / started * 100) if started else 0,
+        'attempts': n,
+        'passed': passed,
+        'avg_pct': round(mean * 100),
+        'median_pct': round(median * 100),
+        # Bars for the frequency chart: label, count, and the bucket midpoint
+        # so the template can place the mean/median markers.
+        'distribution': [
+            {'label': f'{i * 10}–{i * 10 + 10}', 'count': c, 'lo': i * 10}
+            for i, c in enumerate(buckets)
+        ],
+    }
+
+
 @staff_required
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
@@ -416,45 +488,19 @@ def dashboard_home(request):
         _in_window.filter(student_id__in=student_ids), institution
     ).values('student').distinct().count()
 
-    total_sessions = filter_by_institution(_in_window, institution).count()
+    _scoped_sessions = filter_by_institution(_in_window, institution)
+    total_sessions = _scoped_sessions.count()
 
-    # Lesson passes, counted from the ATTEMPT record rather than session status.
-    #
-    # TutorSession.status is session bookkeeping and is wrong for this twice
-    # over. It is written 'completed' only on a pass (simple_tutor/exit_ticket.py),
-    # so a failed or abandoned session stays 'active' forever — but worse,
-    # chat_restart_session (tutoring/views.py) flips ANY prior session for the
-    # lesson, including a COMPLETED one, to 'abandoned'. A student revisiting a
-    # lesson they had already passed therefore made this number go DOWN.
-    # Counting it off started_at compounded it: a session begun in June and
-    # passed in July was attributed to June.
-    #
-    # ExitTicketAttempt is the durable record — restart explicitly preserves
-    # every attempt row — and completed_at is when the pass actually happened,
-    # so it lands in the right window. Distinct student+lesson, so a retake of
-    # the same lesson is one pass, not two.
-    #
-    # PRACTICE/RETAKE only: baseline, final and diagnostic attempts are
-    # course-level assessments, not "passed this lesson".
-    from apps.tutoring.models import ExitTicketAttempt
-    mastered_sessions = (
-        filter_by_institution(
-            ExitTicketAttempt.objects.filter(
-                passed=True,
-                completed_at__date__gte=win_start,
-                completed_at__date__lte=win_end,
-                purpose__in=[
-                    ExitTicketAttempt.Purpose.PRACTICE,
-                    ExitTicketAttempt.Purpose.RETAKE,
-                ],
-            ),
-            institution,
-            field='session__institution',
-        )
-        .values('student_id', 'exit_ticket__lesson_id')
-        .distinct()
-        .count()
-    )
+    # Reach-rate + score distribution for the sessions started in this window.
+    et_stats = _exit_ticket_stats(_scoped_sessions)
+
+    # Passes now come from _exit_ticket_stats, which counts them over the SAME
+    # session set as the reach-rate and the average. The previous version keyed
+    # passes on completed_at while sessions keyed on started_at, so the two
+    # described different populations: on July's data the tile said 479 passed
+    # against 475 attempts-from-July-sessions, the gap being four passes whose
+    # session began in June. One denominator is worth more than a marginally
+    # more precise numerator.
 
     # Progress stats
     progress_stats = filter_by_institution(
@@ -511,7 +557,12 @@ def dashboard_home(request):
         'total_students': total_students,
         'active_students': active_students,
         'total_sessions': total_sessions,
-        'mastered_sessions': mastered_sessions,
+        'et': et_stats,
+        'score_distribution': json.dumps(et_stats['distribution']),
+        # All-time, best-score-per-student-lesson. Kept because it answers a
+        # different question from et.avg_pct ("how well do students do at their
+        # best, ever" vs "how did attempts in this window go"), and the two
+        # legitimately differ — 81% vs 74% on July.
         'avg_mastery': avg_mastery,
         'avg_competency': avg_competency,
         'activity_data': json.dumps(chart['points']),
