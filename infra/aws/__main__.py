@@ -134,14 +134,23 @@ task_environment = (
             "ECS_MATERIAL_CONTAINER_NAME": "material-processor",
             "ECS_SUBNETS": ",".join(a[1]),
             "ECS_SECURITY_GROUPS": a[2],
-            # No TLS yet: browsers refuse Secure cookies over plain HTTP, which
-            # would silently bounce every login back to the login page.
-            # Secure cookies require TLS. With a domain the edge terminates HTTPS,
-        # so Django should mark them; without one it must not, or the browser
-        # withholds the cookie and login silently fails.
-        "HTTPS_EDGE": "true" if domain_name else "false",
+            # Secure cookies require TLS. With a domain the edge terminates
+            # HTTPS, so Django should mark them; without one it must not, or
+            # the browser withholds the cookie and login silently fails.
+            "HTTPS_EDGE": "true" if domain_name else "false",
             "ALLOWED_HOSTS": "*",
-            "CSRF_TRUSTED_ORIGINS": f"http://{a[4]}",
+            # Must follow the domain, like HTTPS_EDGE above. This read
+            # `f"http://{a[4]}"` unconditionally until 2026-08-08 — the raw ALB
+            # hostname over http — even after the site moved to a domain on
+            # HTTPS. Django only tolerated it because SECURE_PROXY_SSL_HEADER
+            # makes request.is_secure() true, so _origin_verified() matches the
+            # Origin against the request's own scheme+host and never consults
+            # this list. Any request arriving WITHOUT an Origin header falls
+            # through to the referer check, which does consult it, and gets a
+            # 403 that looks like nothing else in the system.
+            "CSRF_TRUSTED_ORIGINS": (
+                f"https://{domain_name}" if domain_name else f"http://{a[4]}"
+            ),
             "EMBEDDING_BACKEND": "local",
         }
     )

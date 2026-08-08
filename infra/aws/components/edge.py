@@ -218,6 +218,66 @@ def create_edge(
         ("AWSManagedRulesSQLiRuleSet", 30),
     ]
 
+    # SizeRestrictions_BODY blocks any request body over 8 KB. That is not a
+    # tuning preference — it broke EVERY upload in the product the moment block
+    # mode went on: platform logos, curriculum PDFs, material uploads, feedback
+    # screenshots. Confirmed 2026-08-08 by posting to /dashboard/settings/ at
+    # increasing sizes: 2 KB reached Django, 32 KB and above came back as the
+    # WAF's own block page, and the sampled request named
+    # AWS#AWSManagedRulesCommonRuleSet#SizeRestrictions_BODY.
+    #
+    # Count, not a scope-down to the upload paths. WAF only inspects the first
+    # 8 KB of a body regardless, so on an upload route the rule cannot evaluate
+    # what it is nominally protecting against — it just measures length. The
+    # size limit that matters is Django's DATA_UPLOAD_MAX_MEMORY_SIZE, which
+    # applies to every route rather than a list someone has to remember to
+    # extend. Counting keeps the metric so oversized bodies stay visible.
+    #
+    # The rest of the group keeps blocking. This is one rule, not the group.
+    # CrossSiteScripting_BODY is the same story one rule along. With
+    # SizeRestrictions_BODY counting, real logo uploads were still blocked —
+    # 3 for 3 in the sampled requests on 2026-08-08. Compressed image bytes
+    # match the XSS signatures often enough to be effectively always: random
+    # test payloads tripped it about one time in five, a real PNG every time.
+    #
+    # The rule inspects the first 8 KB of the body looking for markup. On a
+    # multipart image upload there is no markup to find, only binary that
+    # sometimes resembles it — so every block here is a false positive by
+    # construction.
+    #
+    # Cost of counting it: WAF no longer screens request BODIES for reflected
+    # XSS. Django still auto-escapes template output, which is where stored XSS
+    # would surface, and the URI/query-string XSS rules in this same group keep
+    # blocking. Defense in depth is reduced, not removed.
+    #
+    # TIGHTER OPTION, if that trade is unwanted: give the managed group a
+    # scope_down_statement that skips requests whose Content-Type is
+    # multipart/form-data. Uploads bypass the group entirely; JSON and
+    # form-encoded posts keep full body inspection. More precise, more moving
+    # parts — deliberately not done under time pressure.
+    group_rule_overrides = {
+        "AWSManagedRulesCommonRuleSet": [
+            "SizeRestrictions_BODY",
+            "CrossSiteScripting_BODY",
+        ],
+    }
+
+    def _rule_action_overrides(group: str):
+        """Force named rules in ``group`` to Count while the group blocks."""
+        if not waf_block_mode:
+            # The whole group is already counting; per-rule overrides would be
+            # redundant, and AWS rejects an override that matches the group.
+            return None
+        return [
+            aws.wafv2.WebAclRuleStatementManagedRuleGroupStatementRuleActionOverrideArgs(
+                name=rule_name,
+                action_to_use=aws.wafv2.WebAclRuleStatementManagedRuleGroupStatementRuleActionOverrideActionToUseArgs(
+                    count=aws.wafv2.WebAclRuleStatementManagedRuleGroupStatementRuleActionOverrideActionToUseCountArgs()
+                ),
+            )
+            for rule_name in group_rule_overrides.get(group, [])
+        ] or None
+
     # Rate limit, priority 0 so it is evaluated before the managed groups.
     #
     # This is the ONLY rate limit on unauthenticated traffic anywhere in the
@@ -279,6 +339,7 @@ def create_edge(
                     managed_rule_group_statement=aws.wafv2.WebAclRuleStatementManagedRuleGroupStatementArgs(
                         name=group,
                         vendor_name="AWS",
+                        rule_action_overrides=_rule_action_overrides(group),
                     )
                 ),
                 visibility_config=aws.wafv2.WebAclRuleVisibilityConfigArgs(
