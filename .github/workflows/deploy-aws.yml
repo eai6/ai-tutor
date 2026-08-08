@@ -237,14 +237,25 @@ jobs:
           HOST=$(aws elbv2 describe-load-balancers \
             --names "${{ steps.names.outputs.alb_name }}" \
             --query 'LoadBalancers[0].DNSName' --output text)
-          echo "Health: http://${HOST}/health/"
+          echo "Health: https://${HOST}/health/"
 
-          # The ALB may serve briefly from draining targets, so allow retries.
+          # HTTPS with -k, deliberately.
+          #
+          # Port 80 is a 301 to HTTPS since the certificate landed, so the old
+          # http:// check got an empty redirect body and failed the jq test —
+          # rolling back a deployment that was actually fine.
+          #
+          # -k skips certificate verification because the cert is issued for
+          # migration.seselai.sc and we are connecting by the ALB's own
+          # hostname, which it deliberately does not cover. That is the cert
+          # behaving correctly, not a problem to route around: this check is
+          # asking "did the app come up", and the TLS identity of the edge is
+          # verified separately by connecting to the real domain.
           for attempt in 1 2 3 4 5 6; do
-            if BODY=$(curl -fsS --max-time 30 "http://${HOST}/health/"); then
+            if BODY=$(curl -fsSk --max-time 30 "https://${HOST}/health/"); then
               echo "$BODY"
               echo "$BODY" | jq -e '.status == "ok"' >/dev/null \
-                && { echo "url=http://${HOST}" >> "$GITHUB_OUTPUT"; exit 0; }
+                && { echo "url=https://${HOST}" >> "$GITHUB_OUTPUT"; exit 0; }
             fi
             echo "  attempt ${attempt} failed; retrying"
             sleep 10
