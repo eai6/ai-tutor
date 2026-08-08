@@ -488,6 +488,7 @@ def _progression_stats(institution, win_start, win_end, weekly):
     ))
 
     pre, post, by_student, trend_raw = {}, {}, {}, {}
+    first_practice, practice_count = {}, {}
     names = {}
     for sid, lid, purpose, score, per, when, first, last, uname in rows:
         if not per or when is None:
@@ -499,8 +500,14 @@ def _progression_stats(institution, win_start, win_end, weekly):
                 pre[(sid, lid)] = (when, frac)
             continue
         # practice / retake
-        if lid is not None and ((sid, lid) not in post or when > post[(sid, lid)][0]):
-            post[(sid, lid)] = (when, frac)
+        if lid is not None:
+            if (sid, lid) not in post or when > post[(sid, lid)][0]:
+                post[(sid, lid)] = (when, frac)
+            # Earliest practice, kept as the fallback "before" for lessons that
+            # have no diagnostic — see the pairing step below.
+            if (sid, lid) not in first_practice or when < first_practice[(sid, lid)][0]:
+                first_practice[(sid, lid)] = (when, frac)
+            practice_count[(sid, lid)] = practice_count.get((sid, lid), 0) + 1
         by_student.setdefault(sid, []).append((when, frac))
         d = when.date()
         key = d - timedelta(days=d.weekday()) if weekly else d
@@ -508,12 +515,32 @@ def _progression_stats(institution, win_start, win_end, weekly):
         bucket.append(frac)
 
     # ── 1. pre/post gain ────────────────────────────────────────────────
-    paired = set(pre) & set(post)
-    gains = sorted(post[k][1] - pre[k][1] for k in paired)
+    # A diagnostic is the cleanest "before" — taken before any teaching. Where
+    # there is none, the student's FIRST attempt at that lesson's exit ticket
+    # serves instead: it is still a measurement taken before the later ones, so
+    # the delta is still learning between two points. It is a weaker baseline
+    # (some teaching already happened) and will understate the gain, so the two
+    # sources are counted separately and the weaker one is labelled in the UI.
+    #
+    # A single attempt gives no "before" at all and is excluded either way.
+    befores = {}
+    n_from_diagnostic = n_from_first_attempt = 0
+    for key in post:
+        if key in pre:
+            befores[key] = pre[key][1]
+            n_from_diagnostic += 1
+        elif practice_count.get(key, 0) >= 2:
+            befores[key] = first_practice[key][1]
+            n_from_first_attempt += 1
+
+    paired = set(befores)
+    gains = sorted(post[k][1] - befores[k] for k in paired)
     n_pair = len(gains)
     gain = {
         'pairs': n_pair,
-        'pre_pct': round(sum(pre[k][1] for k in paired) / n_pair * 100) if n_pair else 0,
+        'from_diagnostic': n_from_diagnostic,
+        'from_first_attempt': n_from_first_attempt,
+        'pre_pct': round(sum(befores[k] for k in paired) / n_pair * 100) if n_pair else 0,
         'post_pct': round(sum(post[k][1] for k in paired) / n_pair * 100) if n_pair else 0,
         'mean_gain': round(sum(gains) / n_pair * 100) if n_pair else 0,
         'median_gain': round(gains[n_pair // 2] * 100) if n_pair else 0,

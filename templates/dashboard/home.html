@@ -167,10 +167,14 @@
                 </div>
             </div>
             <div style="margin-top:0.75rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "Before = the pre-lesson diagnostic. After = the exit ticket for the same student and lesson. Only pairs where both exist are counted." %}
+                {% trans "After = the student's latest exit ticket for that lesson." %}
+                {% blocktrans with d=prog.gain.from_diagnostic f=prog.gain.from_first_attempt %}Before = the pre-lesson diagnostic where one exists ({{ d }} pairs), otherwise the student's first attempt at that exit ticket ({{ f }} pairs).{% endblocktrans %}
+                {% if prog.gain.from_first_attempt %}
+                <br>{% trans "A first attempt is a weaker baseline than a diagnostic — some teaching has already happened — so those pairs understate the gain." %}
+                {% endif %}
             </div>
             {% else %}
-            <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs both a diagnostic and an exit ticket." %}</p></div>
+            <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>
             {% endif %}
         </div>
     </div>
