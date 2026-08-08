@@ -20,6 +20,34 @@ RUN mkdir -p /models/piper && \
 # Stage 2: Runtime
 FROM python:3.12-slim
 WORKDIR /app
+
+# psql / pg_dump / pg_restore. psycopg2-binary is a driver and ships no
+# executables, so without this there is no way to run a restore from inside the
+# VPC — and RDS is deliberately not publicly accessible, so from inside the VPC
+# is the only safe place to do it.
+#
+# Must be in the RUNTIME stage. Only /usr/local, the HF cache and /models/piper
+# are copied forward from the builder, and Debian puts these in /usr/bin.
+#
+# Pinned to 16 to match the RDS engine. pg_restore cannot read an archive
+# produced by a NEWER pg_dump than itself, and our dumps come off a Postgres 16
+# server — so the plain `postgresql-client` package is not good enough here:
+# Debian bookworm (which python:3.12-slim is built on) ships 15, and a v15
+# pg_restore fails on a v16 archive. Hence the PGDG repo rather than the
+# distro's.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
+ && install -d /usr/share/postgresql-common/pgdg \
+ && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+ && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-client-16 \
+ && apt-get purge -y --auto-remove curl gnupg \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
 COPY --from=builder /models/piper /models/piper
