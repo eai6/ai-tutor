@@ -47,15 +47,27 @@ def create_data(
         tags={**tags, "Name": f"{prefix}-db-subnets"},
     )
 
-    # Generated rather than configured: nothing outside this stack needs to know
-    # it, and it lands in Secrets Manager as part of the DSN below.
-    db_password = random.RandomPassword(
-        f"{prefix}-db-password",
-        length=32,
-        special=True,
-        # RDS rejects /, @, ", and space in master passwords.
-        override_special="!#$%&*()-_=+[]{}<>:?",
-    )
+    # Read from config, not generated.
+    #
+    # This was a random.RandomPassword. That works exactly once — on the first
+    # `pulumi up` — and is unrecoverable afterwards. When the stack had to be
+    # re-keyed on 2026-08-07 (the original passphrase was lost with the machine
+    # that created it), importing the RandomPassword was not enough: Pulumi
+    # cannot read override_special back out of an imported random resource, so
+    # every preview showed a REPLACE. Applying it would have generated a new
+    # password, set it on the live instance with apply_immediately, and left
+    # the running task holding the old DSN from Secrets Manager — the database
+    # would have been unreachable by the only thing that uses it.
+    #
+    # A generated secret that no human ever sees is a good default right up to
+    # the moment state is lost, and then it is the thing that makes recovery
+    # destructive. The value is now config, seeded from the password already in
+    # use, so an import is a no-op rather than a rotation.
+    #
+    # To rotate deliberately: pulumi config set --secret aitutor-aws:db-password
+    # then `up` — and update the running task, since it reads the DSN from
+    # Secrets Manager at start.
+    db_password_value = config.require_secret("db-password")
 
     instance = aws.rds.Instance(
         f"{prefix}-db",
@@ -69,7 +81,7 @@ def create_data(
         storage_encrypted=True,
         db_name=DB_NAME,
         username=DB_USER,
-        password=db_password.result,
+        password=db_password_value,
         port=DB_PORT,
         db_subnet_group_name=subnet_group.name,
         vpc_security_group_ids=[rds_sg_id],
@@ -91,7 +103,7 @@ def create_data(
     # available extensions, and apps/curriculum/migrations/0029 creates it.
     # (Azure Flexible Server required an azure.extensions allowlist first.)
 
-    database_url = pulumi.Output.all(instance.address, db_password.result).apply(
+    database_url = pulumi.Output.all(instance.address, db_password_value).apply(
         # The password MUST be percent-encoded. The generated charset includes
         # #, ?, : and & — all of which are URL-structural, so an unencoded
         # password makes dj_database_url raise ParseError at import time and
