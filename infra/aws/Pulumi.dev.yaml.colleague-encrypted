@@ -1,0 +1,14 @@
+encryptionsalt: v1:9rhV8Oh82OM=:v1:w+3+g2xlGU9wH0Tq:E7cRynMkHBLdWDsgwt4LtfK8qCS1SA==
+config:
+  aws:region: us-east-1
+  aitutor-aws:enable-ecs: "true"
+  aitutor-aws:waf-block-mode: "true"
+  aitutor-aws:django-secret-key:
+    secure: v1:1updoLUFh7U2eaoU:ky+tpORjIYK+y/mY0qgls3GnxsV3YHDliYI816u+Z1DJMdKOnolfQQkVoBonDbHGt/c4N0WSfIAhNKgdlqzDw6HaqIgkufEnqGLH3xQX+4LfRjBdOoGtwW+vESzJBB1tjYPXJuHw
+  aitutor-aws:anthropic-api-key:
+    secure: v1:POiRgFKhO70iCPwI:rft5mGZ2NNw0NL3AF5vJ3wXYCdwkzO+ZWU182+zrIugV/ryU/qnkTGZktle8B/UUjQLKvCK79d6Q1gB4H5RCQKJdCOiYjNG2+Vr5B9zKPJBgxd9yXd/v+1bSA3VD/6fMxHBX4aNBfgfgKkF8nGbQAMszZdktg2oQxqIjOA==
+  aitutor-aws:google-api-key:
+    secure: v1:ycjMx13wk5k7azCi:3+ZX3GZlz+MZu9QeJrGgv8UT8bKgUoEwi7rZIQrCPn1IceiH/QXLHkrBGCWG2ehh3N16pHwneA==
+  aitutor-aws:elevenlabs-api-key:
+    secure: v1:C0GtzAhwDho24jPV:FyQm527TZdMyV9A2URW4pV2Tfhi5TYCOKXaBYdmsKaWQ8VyEZYTj7eDWVJEkl7I1GfZqIngTIwybVbR/LO6w1hBbmQ==
+  aitutor-aws:image-tag: 6f74ffd
