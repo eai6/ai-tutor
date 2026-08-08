@@ -36,6 +36,50 @@
     </div>
 </div>
 
+<!-- Learning gain — first thing on the page: it is the only figure here
+ that answers "is the tutoring working", so it leads. -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">{% trans "Learning gain" %}</h2>
+    </div>
+    <div class="card-body">
+        {% if prog.gain.pairs %}
+        <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="text-align:center;">
+                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Before" %}</div>
+                    <div style="font-size:2rem; font-weight:700; color:var(--gray-500);">{{ prog.gain.pre_pct }}%</div>
+                </div>
+                <div style="font-size:1.5rem; color:var(--gray-400);">→</div>
+                <div style="text-align:center;">
+                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "After" %}</div>
+                    <div style="font-size:2rem; font-weight:700; color:var(--success);">{{ prog.gain.post_pct }}%</div>
+                </div>
+                <div style="text-align:center; margin-left:0.5rem;">
+                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Mean gain" %}</div>
+                    <div style="font-size:2rem; font-weight:700; color:var(--success);">+{{ prog.gain.mean_gain }}</div>
+                </div>
+            </div>
+            <div style="font-size:0.8rem; color:var(--gray-600); line-height:1.6;">
+                {% blocktrans with n=prog.gain.pairs med=prog.gain.median_gain %}{{ n }} lesson attempts with both a before and after measure · median gain +{{ med }} points{% endblocktrans %}<br>
+                <span style="color:var(--success); font-weight:600;">{{ prog.gain.improved }} {% trans "improved" %}</span> ·
+                {{ prog.gain.same }} {% trans "unchanged" %} ·
+                <span style="color:var(--danger); font-weight:600;">{{ prog.gain.declined }} {% trans "declined" %}</span>
+            </div>
+        </div>
+        <div style="margin-top:0.75rem; font-size:0.72rem; color:var(--gray-500);">
+            {% trans "After = the student's latest exit ticket for that lesson." %}
+            {% blocktrans with d=prog.gain.from_diagnostic f=prog.gain.from_first_attempt %}Before = the pre-lesson diagnostic where one exists ({{ d }} pairs), otherwise the student's first attempt at that exit ticket ({{ f }} pairs).{% endblocktrans %}
+            {% if prog.gain.from_first_attempt %}
+            <br>{% trans "A first attempt is a weaker baseline than a diagnostic — some teaching has already happened — so those pairs understate the gain." %}
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
@@ -136,142 +180,7 @@
         </div>
     </div>
 
-    <!-- 1. Learning gain: pre-lesson diagnostic vs post-lesson exit ticket -->
-    <div class="card" style="margin-top:1.5rem;">
-        <div class="card-header">
-            <h2 class="card-title">{% trans "Learning gain" %}</h2>
-        </div>
-        <div class="card-body">
-            {% if prog.gain.pairs %}
-            <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; gap:1rem;">
-                    <div style="text-align:center;">
-                        <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Before" %}</div>
-                        <div style="font-size:2rem; font-weight:700; color:var(--gray-500);">{{ prog.gain.pre_pct }}%</div>
-                    </div>
-                    <div style="font-size:1.5rem; color:var(--gray-400);">→</div>
-                    <div style="text-align:center;">
-                        <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "After" %}</div>
-                        <div style="font-size:2rem; font-weight:700; color:var(--success);">{{ prog.gain.post_pct }}%</div>
-                    </div>
-                    <div style="text-align:center; margin-left:0.5rem;">
-                        <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Mean gain" %}</div>
-                        <div style="font-size:2rem; font-weight:700; color:var(--success);">+{{ prog.gain.mean_gain }}</div>
-                    </div>
-                </div>
-                <div style="font-size:0.8rem; color:var(--gray-600); line-height:1.6;">
-                    {% blocktrans with n=prog.gain.pairs med=prog.gain.median_gain %}{{ n }} lesson attempts with both a before and after measure · median gain +{{ med }} points{% endblocktrans %}<br>
-                    <span style="color:var(--success); font-weight:600;">{{ prog.gain.improved }} {% trans "improved" %}</span> ·
-                    {{ prog.gain.same }} {% trans "unchanged" %} ·
-                    <span style="color:var(--danger); font-weight:600;">{{ prog.gain.declined }} {% trans "declined" %}</span>
-                </div>
-            </div>
-            <div style="margin-top:0.75rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "After = the student's latest exit ticket for that lesson." %}
-                {% blocktrans with d=prog.gain.from_diagnostic f=prog.gain.from_first_attempt %}Before = the pre-lesson diagnostic where one exists ({{ d }} pairs), otherwise the student's first attempt at that exit ticket ({{ f }} pairs).{% endblocktrans %}
-                {% if prog.gain.from_first_attempt %}
-                <br>{% trans "A first attempt is a weaker baseline than a diagnostic — some teaching has already happened — so those pairs understate the gain." %}
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>
-            {% endif %}
-        </div>
-    </div>
 
-    <!-- Compare two explicit periods -->
-    <div class="card" style="margin-top:1.5rem;">
-        <div class="card-header">
-            <h2 class="card-title">{% trans "Compare two periods" %}</h2>
-        </div>
-        <div class="card-body">
-            {# Its own form. The page-level picker sets the overall window; #}
-            {# these two ranges are a question asked INSIDE it, and the #}
-            {# hidden fields keep that window when this form is submitted. #}
-            <form method="get" style="display:flex; align-items:flex-end; gap:1.25rem; flex-wrap:wrap; margin-bottom:1.25rem;">
-                <input type="hidden" name="start" value="{{ activity_start }}">
-                <input type="hidden" name="end" value="{{ activity_end }}">
-                <div style="display:flex; align-items:flex-end; gap:0.4rem;">
-                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); padding-bottom:0.35rem;">{% trans "Period A" %}</div>
-                    <input type="date" name="a_start" value="{{ compare.a_start }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                    <span style="color:var(--gray-400); padding-bottom:0.3rem;">–</span>
-                    <input type="date" name="a_end" value="{{ compare.a_end }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                </div>
-                <div style="display:flex; align-items:flex-end; gap:0.4rem;">
-                    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); padding-bottom:0.35rem;">{% trans "Period B" %}</div>
-                    <input type="date" name="b_start" value="{{ compare.b_start }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                    <span style="color:var(--gray-400); padding-bottom:0.3rem;">–</span>
-                    <input type="date" name="b_end" value="{{ compare.b_end }}" style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-                </div>
-                <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Compare" %}</button>
-            </form>
-
-            {% if compare.a.attempts or compare.b.attempts %}
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
-                <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:var(--gray-500); margin-bottom:0.35rem;">{% trans "Everyone who took a ticket" %}</div>
-                    <div style="display:flex; align-items:center; gap:1rem;">
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">A</div>
-                            {# An empty period is "no data", not a score of zero — showing 0% #}
-                            {# there made a delta of +90 appear out of nothing. #}
-                            <div style="font-size:1.75rem; font-weight:700; color:var(--gray-500);">{% if compare.a.attempts %}{{ compare.a.avg_pct }}%{% else %}—{% endif %}</div>
-                            <div style="font-size:0.68rem; color:var(--gray-400);">{% blocktrans with n=compare.a.attempts s=compare.a.students %}{{ n }} attempts · {{ s }} students{% endblocktrans %}</div>
-                        </div>
-                        <div style="font-size:1.25rem; color:var(--gray-400);">→</div>
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">B</div>
-                            <div style="font-size:1.75rem; font-weight:700;">{% if compare.b.attempts %}{{ compare.b.avg_pct }}%{% else %}—{% endif %}</div>
-                            <div style="font-size:0.68rem; color:var(--gray-400);">{% blocktrans with n=compare.b.attempts s=compare.b.students %}{{ n }} attempts · {{ s }} students{% endblocktrans %}</div>
-                        </div>
-                        {% if compare.a.attempts and compare.b.attempts %}
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">{% trans "Change" %}</div>
-                            <div style="font-size:1.75rem; font-weight:700; color:{% if compare.cohort_delta < 0 %}var(--danger){% else %}var(--success){% endif %};">{% if compare.cohort_delta > 0 %}+{% endif %}{{ compare.cohort_delta }}</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div>
-                    <div style="font-size:0.75rem; font-weight:600; color:var(--gray-500); margin-bottom:0.35rem;">
-                        {% trans "Same students in both" %}
-                    </div>
-                    {% if compare.matched %}
-                    <div style="display:flex; align-items:center; gap:1rem;">
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">A</div>
-                            <div style="font-size:1.75rem; font-weight:700; color:var(--gray-500);">{{ compare.matched_a_pct }}%</div>
-                        </div>
-                        <div style="font-size:1.25rem; color:var(--gray-400);">→</div>
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">B</div>
-                            <div style="font-size:1.75rem; font-weight:700;">{{ compare.matched_b_pct }}%</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:0.68rem; color:var(--gray-500);">{% trans "Change" %}</div>
-                            <div style="font-size:1.75rem; font-weight:700; color:{% if compare.matched_delta < 0 %}var(--danger){% else %}var(--success){% endif %};">{% if compare.matched_delta > 0 %}+{% endif %}{{ compare.matched_delta }}</div>
-                        </div>
-                    </div>
-                    <div style="font-size:0.72rem; color:var(--gray-500); margin-top:0.35rem;">
-                        {% blocktrans with n=compare.matched %}{{ n }} students took a ticket in both periods{% endblocktrans %} ·
-                        <span style="color:var(--success); font-weight:600;">{{ compare.improved }} {% trans "up" %}</span> ·
-                        {{ compare.same }} {% trans "flat" %} ·
-                        <span style="color:var(--danger); font-weight:600;">{{ compare.declined }} {% trans "down" %}</span>
-                    </div>
-                    {% else %}
-                    <div style="font-size:0.82rem; color:var(--gray-400);">{% trans "No student took a ticket in both periods." %}</div>
-                    {% endif %}
-                </div>
-            </div>
-            <div style="margin-top:0.9rem; font-size:0.72rem; color:var(--gray-500);">
-                {% trans "The left figure can move simply because a different set of students showed up in period B. The right one restricts to students present in both, so a change there is the same people doing better or worse — that is the number to trust." %}
-            </div>
-            {% else %}
-            <div class="empty-state"><p>{% trans "No exit ticket attempts in either period." %}</p></div>
-            {% endif %}
-        </div>
-    </div>
 
     
     

@@ -593,79 +593,6 @@ def _progression_stats(institution, win_start, win_end, weekly):
     return {'gain': gain, 'trend': trend, 'per_student': per_student}
 
 
-def _period_comparison(request, institution, win_start, win_end):
-    """Compare exit-ticket performance between two explicit date ranges.
-
-    Answers "were they better in late July than early July", which the
-    per-lesson gain card cannot: that one pairs a before and after WITHIN a
-    lesson, so it measures the effect of a lesson. This measures the cohort
-    across time, whatever lessons they happened to be doing.
-
-    Both a cohort figure and a MATCHED one are reported. The cohort average can
-    move purely because a different set of students showed up in the second
-    period; the matched figure restricts to students present in both, so a
-    change there is the same people doing better or worse.
-
-    Defaults split the selected window in half, so the card is populated
-    without anyone filling anything in.
-    """
-    from apps.tutoring.models import ExitTicketAttempt
-
-    span = (win_end - win_start).days
-    mid = win_start + timedelta(days=span // 2)
-    a_start = _parse_chart_date(request.GET.get('a_start')) or win_start
-    a_end = _parse_chart_date(request.GET.get('a_end')) or mid
-    b_start = _parse_chart_date(request.GET.get('b_start')) or (mid + timedelta(days=1))
-    b_end = _parse_chart_date(request.GET.get('b_end')) or win_end
-    if a_start > a_end:
-        a_start, a_end = a_end, a_start
-    if b_start > b_end:
-        b_start, b_end = b_end, b_start
-
-    def measure(start, end):
-        rows = filter_by_institution(
-            ExitTicketAttempt.objects.filter(
-                completed_at__date__gte=start, completed_at__date__lte=end,
-                completed_at__isnull=False, purpose__in=['practice', 'retake'],
-            ),
-            institution, field='session__institution',
-        ).values_list('student_id', 'score', 'exit_ticket__questions_per_attempt')
-        per_student, all_fracs = {}, []
-        for sid, score, per in rows:
-            if not per:
-                continue
-            f = min(score / per, 1.0)
-            all_fracs.append(f)
-            per_student.setdefault(sid, []).append(f)
-        return {
-            'start': start, 'end': end,
-            'attempts': len(all_fracs),
-            'students': len(per_student),
-            'avg_pct': round(sum(all_fracs) / len(all_fracs) * 100) if all_fracs else 0,
-            'per_student': {s: sum(v) / len(v) for s, v in per_student.items()},
-        }
-
-    a, b = measure(a_start, a_end), measure(b_start, b_end)
-
-    both = set(a['per_student']) & set(b['per_student'])
-    deltas = [b['per_student'][s] - a['per_student'][s] for s in both]
-    n = len(deltas)
-
-    return {
-        'a': a, 'b': b,
-        'cohort_delta': b['avg_pct'] - a['avg_pct'],
-        'matched': n,
-        'matched_a_pct': round(sum(a['per_student'][s] for s in both) / n * 100) if n else 0,
-        'matched_b_pct': round(sum(b['per_student'][s] for s in both) / n * 100) if n else 0,
-        'matched_delta': round(sum(deltas) / n * 100) if n else 0,
-        'improved': sum(1 for d in deltas if d > 0),
-        'same': sum(1 for d in deltas if d == 0),
-        'declined': sum(1 for d in deltas if d < 0),
-        'a_start': a_start.isoformat(), 'a_end': a_end.isoformat(),
-        'b_start': b_start.isoformat(), 'b_end': b_end.isoformat(),
-    }
-
-
 @staff_required
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
@@ -711,7 +638,6 @@ def dashboard_home(request):
     prog = _progression_stats(
         institution, win_start, win_end, weekly=(chart['bucket'] == 'week'),
     )
-    compare = _period_comparison(request, institution, win_start, win_end)
 
     # Passes now come from _exit_ticket_stats, which counts them over the SAME
     # session set as the reach-rate and the average. The previous version keyed
@@ -779,7 +705,6 @@ def dashboard_home(request):
         'et': et_stats,
         'score_distribution': json.dumps(et_stats['distribution']),
         'prog': prog,
-        'compare': compare,
         # All-time, best-score-per-student-lesson. Kept because it answers a
         # different question from et.avg_pct ("how well do students do at their
         # best, ever" vs "how did attempts in this window go"), and the two
