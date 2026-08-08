@@ -31,17 +31,22 @@ WORKDIR /app
 #
 # Pinned to 16 to match the RDS engine. pg_restore cannot read an archive
 # produced by a NEWER pg_dump than itself, and our dumps come off a Postgres 16
-# server — so the plain `postgresql-client` package is not good enough here:
-# Debian bookworm (which python:3.12-slim is built on) ships 15, and a v15
-# pg_restore fails on a v16 archive. Hence the PGDG repo rather than the
-# distro's.
+# server — so whatever the base image happens to ship is not good enough.
+# Hence the PGDG repo.
+#
+# The suite is read from /etc/os-release rather than hardcoded. The first
+# attempt said "bookworm" and the build failed resolving libpq5, because
+# python:3.12-slim has moved to trixie — apt was being handed packages built
+# for a different Debian release. Deriving it means the next base-image bump
+# does not break this again.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
  && install -d /usr/share/postgresql-common/pgdg \
  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
- && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
-https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+ && . /etc/os-release \
+ && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc]\
+ https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
       > /etc/apt/sources.list.d/pgdg.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends postgresql-client-16 \
