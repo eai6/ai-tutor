@@ -4,21 +4,7 @@
 # environment and are deliberately untouched. Azure and AWS run the same image
 # in parallel; this pipeline only ever talks to AWS.
 #
-# MANUAL DISPATCH ONLY:
-#
-#   gh workflow run deploy-aws.yml --ref aws_deployment -f stack=dev
-#
-# This deployed on every push to aws_deployment until 2026-08-08, when Azure
-# production data was restored into the AWS database. Every push then meant
-# running migrations against real student records and replacing the running
-# service — for commits that could not affect what runs there. Pushing now only
-# stores code; deploying is a separate, deliberate act.
-#
-# The "Run workflow" button does NOT appear in the Actions UI: GitHub only lists
-# dispatchable workflows whose file is on the default branch, and this one lives
-# only on aws_deployment. The CLI dispatches against a ref regardless. Copying
-# this file to main would restore the button, and with no push trigger left it
-# could not cause a deploy from main — deliberate change, not a side effect.
+# Deploys on every push to aws_deployment, and on demand.
 #
 # NOT on main. main deploys Azure, which serves live users; this branch has
 # diverged from it substantially. Adding main here would point two pipelines at
@@ -46,8 +32,16 @@ on:
         description: Skip the migrate task (use only if migrations already ran)
         type: boolean
         default: false
-  # No `push:` trigger — see the header. It deployed on every push to
-  # aws_deployment until the AWS database held real student data.
+  push:
+    branches: [aws_deployment]
+    paths-ignore:
+      # Docs and the Azure infra program cannot change what runs on AWS, so
+      # they should not trigger a ~20 minute image build.
+      - 'docs/**'
+      - 'memory/**'
+      - 'infra/__main__.py'
+      - 'infra/Pulumi.*.yaml'
+      - '**/*.md'
 
 concurrency:
   # Serialise: a second deploy mid-rollout races the service update.
