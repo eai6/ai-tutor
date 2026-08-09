@@ -702,3 +702,81 @@ class EmailVerificationToken(models.Model):
         if status.verified_at is None:
             status.verified_at = _tz.now()
             status.save(update_fields=['verified_at'])
+
+
+class Device(models.Model):
+    """A desktop installation enrolled against one institution.
+
+    Lives here rather than in apps/desktop because this row exists on the
+    SERVER. apps/desktop is the code that runs on the machine itself and its
+    models are per-install; this is the cloud's record that such a machine
+    exists and is allowed to push.
+
+    Enrolment is deliberately two-step. A teacher generates a short code in the
+    dashboard and types it into the device once; the device exchanges it for a
+    token it keeps. The alternative — shipping a long-lived secret inside the
+    installer — would put the same credential on every laptop and make
+    revocation meaningless.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Awaiting enrolment'
+        ACTIVE = 'active', 'Active'
+        REVOKED = 'revoked', 'Revoked'
+
+    institution = models.ForeignKey(
+        'accounts.Institution', on_delete=models.CASCADE, related_name='devices',
+    )
+    # The device's own UUID (DeviceState.device_id), learned at enrolment. Not
+    # a secret and not sufficient to authenticate — it identifies, the token
+    # authorises.
+    device_id = models.UUIDField(null=True, blank=True, db_index=True)
+    name = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text='Whatever a teacher will recognise: "Lab laptop 3".',
+    )
+
+    enrolment_code = models.CharField(
+        max_length=12, unique=True, db_index=True,
+        help_text='Short code typed into the device once. Single use.',
+    )
+    # Stored hashed. A leaked token table should not let anyone push as a
+    # school's device; the same reasoning as password storage.
+    token_hash = models.CharField(max_length=128, blank=True, default='')
+
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    enrolled_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Last successful sync. How a teacher spots a device that has stopped reporting.',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name or "device"} @ {self.institution.name} ({self.status})'
+
+    @staticmethod
+    def generate_code() -> str:
+        """A short code a teacher can read aloud and type without ambiguity.
+
+        No 0/O or 1/I/L — those are the characters people mistype off a screen,
+        and a failed enrolment in a classroom is a support call.
+        """
+        import secrets
+        alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+        return '-'.join(
+            ''.join(secrets.choice(alphabet) for _ in range(4)) for _ in range(2)
+        )
+
+    @staticmethod
+    def hash_token(raw: str) -> str:
+        import hashlib
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    @property
+    def is_usable(self) -> bool:
+        return self.status == self.Status.ACTIVE and self.revoked_at is None

@@ -15,6 +15,7 @@ from apps.api.views import sessions as session_views
 from apps.api.views import offline_pack as offline_views
 from apps.api.views import mobile_models as mobile_model_views
 from apps.api.views import sync as sync_views
+from apps.api.views import devices
 
 
 app_name = 'api'
@@ -42,6 +43,11 @@ urlpatterns = [
     path('sessions/<int:session_id>/exit-ticket/', session_views.submit_exit_ticket, name='session_exit_ticket'),
     path('sessions/<int:session_id>/review/', session_views.start_review, name='session_review'),
     path('sessions/<int:session_id>/sync/', sync_views.sync, name='session_sync'),
+
+    # Desktop devices. Enrolment is unauthenticated by design — the one-time
+    # code IS the credential; see apps/api/views/devices.py.
+    path('devices/enrol/', devices.enrol, name='device_enrol'),
+    path('devices/check/', devices.device_check, name='device_check'),
     path('sessions/<int:session_id>/turns/', resource_views.SessionTurnList.as_view(), name='session_turns'),
 
     # Progress

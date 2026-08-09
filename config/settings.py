@@ -493,6 +493,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '60/min',
         'user': '300/min',
+            'device_enrol': '10/hour',
     },
 }
 
