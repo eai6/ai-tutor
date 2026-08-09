@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Who are you?" %}{% endblock %}
+{% block content %}
+{# Loopback-only page. The student picks their name from the roster the #}
+{# content pack shipped; that binds this local login to the server user id #}
+{# their work will sync under. See apps/desktop/views.py::claim_page. #}
+<div style="max-width:34rem;margin:2rem auto;padding:0 1rem;">
+  <h1 style="font-size:1.5rem;margin-bottom:.25rem;">{% trans "Find your name" %}</h1>
+  <p style="color:#6b7280;margin-top:0;">
+    {% trans "Pick your name from your school's list, then choose a password. You'll use that password to sign in from now on." %}
+  </p>
+
+  {% if error %}
+  <div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="get" style="margin-bottom:1rem;display:flex;gap:.5rem;">
+    <input type="search" name="q" value="{{ query|default:'' }}"
+           placeholder="{% trans 'Search your name' %}"
+           style="flex:1;padding:.5rem .6rem;border:1px solid #d1d5db;border-radius:6px;">
+    <button class="btn btn-secondary" type="submit">{% trans "Search" %}</button>
+  </form>
+
+  {% if entries %}
+  <form method="post" action="{% url 'desktop:claim_submit' %}">
+    {% csrf_token %}
+    <div style="max-height:22rem;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:1rem;">
+      {% for e in entries %}
+      <label style="display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;border-bottom:1px solid #f3f4f6;cursor:pointer;">
+        <input type="radio" name="server_user_id" value="{{ e.server_user_id }}" required>
+        <span>
+          <strong>{{ e.display_name }}</strong>
+          {% if e.grade_level %}<span style="color:#6b7280;font-size:.85rem;"> · {{ e.grade_level }}</span>{% endif %}
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+
+    <label style="display:block;font-size:.85rem;color:#374151;margin-bottom:.25rem;">
+      {% trans "Choose a password" %}
+    </label>
+    <input type="password" name="password" required minlength="4"
+           style="width:100%;padding:.5rem .6rem;border:1px solid #d1d5db;border-radius:6px;margin-bottom:1rem;">
+
+    <button class="btn btn-primary" type="submit" style="width:100%;padding:.6rem;">
+      {% trans "That's me — start learning" %}
+    </button>
+  </form>
+  {% elif query %}
+  <p>{% trans "No match. Check the spelling, or ask your teacher." %}</p>
+  {% else %}
+  <p>{% trans "Everyone on this device's list has already been set up." %}</p>
+  {% endif %}
+
+  <p style="font-size:.8rem;color:#6b7280;margin-top:1.5rem;">
+    {% blocktrans with claimed=claimed_total total=unclaimed_total %}{{ claimed }} set up · {{ total }} still to go{% endblocktrans %}
+    · <a href="{% url 'accounts:student_login' %}">{% trans "Already set up? Sign in" %}</a>
+  </p>
+</div>
+{% endblock %}
