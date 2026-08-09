@@ -278,8 +278,12 @@ jobs:
         if: steps.gate.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/desktop-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.dmg
-            dist/*.zip
+          # This job builds ONE platform, so glob its own artifact. Listing
+          # both dist/*.dmg and dist/*.zip failed the macOS job on the zip and
+          # would have failed Windows on the dmg — each job only ever produces
+          # one of them. Both jobs append to the same release.
+          files: dist/AI-Tutor-${{ matrix.slug }}.*
+          # Kept strict on purpose: an empty match here means the packaging
+          # step silently produced nothing, which is worth failing on.
           fail_on_unmatched_files: true
           generate_release_notes: true
