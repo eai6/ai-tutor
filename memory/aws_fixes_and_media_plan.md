@@ -225,3 +225,50 @@ Design:
 Part 0 → Part 1 (both unblock you and are small) → Part 3 (self-contained,
 testable locally) → Part 2 (largest, and the only one whose duration is unknown
 until the inventory is done).
+
+---
+
+## Part 2 — Media copy: DONE 2026-08-08
+
+**10,521 objects / 9.97 GB** in `aitutor-dev-media-968025288404`.
+`rclone check --one-way --size-only` reports **0 differences**, per-prefix counts
+match Azure exactly, and sampled keys return 200 through
+`https://migration.edwardamoah.com/media/<key>`.
+
+### The plan's premise was stale
+
+It said the File Share was authoritative because the 2026-06-09 Blob migration
+was stopped mid-flight. Reality: **Blob holds everything** — 10,520 files across
+`media/` (10,408), `material_uploads/` (79), `feedback_screenshots/` (19),
+`curriculum_uploads/` (10), `institution_logos/` (2), `platform_logos/`, `help/`.
+The File Share had only two directories left, and only ONE file that Blob did
+not have: `platform_logos/Coat_of_arms_of_Seychelles.svg` — which was already in
+S3 because it had been re-uploaded through the fixed settings page.
+
+Lesson: inventory both ends before trusting an archived plan's account of what
+lives where.
+
+### Tooling
+
+**AzCopy cannot do this** — it copies S3 → Azure, not Azure → S3. Used `rclone`
+(installed via brew) streaming Blob → S3 directly, no local staging.
+
+Two failures worth remembering:
+
+1. **`InvalidStorageClass`.** rclone passes the Azure blob's access tier through
+   as an S3 storage class and S3 rejects it. Fixed with
+   `--s3-storage-class STANDARD`.
+2. **`ExpiredToken`, ~1,300 of them.** `aws login` issues short-lived
+   credentials; rclone captures them once at startup. A full pass takes longer
+   than the token lives, so it died at ~36% and a refresh-between-passes loop
+   never got to refresh because pass 1 never ended. Fixed with
+   **`--max-duration 8m`** so each pass ends inside the credential lifetime and
+   the loop re-exports fresh ones. `rclone copy` skips what is already there, so
+   passes are cheap and it converges. Script: `/tmp/media_copy_loop.sh`.
+
+### Still true
+
+`/media/<path>` has **no auth gate** on any backend (`config/urls.py`). Student
+feedback screenshots and curriculum uploads are now readable by anyone with the
+URL on AWS, exactly as on Azure. Unchanged by this work, but it is now real
+student content in a second place.
