@@ -165,7 +165,9 @@
     </div>
 </div>
 
-<div>
+{# Bottom padding clears the fixed Help/Feedback button, which otherwise #}
+{# sits on top of the last chart's x-axis and hides the final labels. #}
+<div style="padding-bottom:5rem;">
     <!-- Sessions chart — full width since the Recent Activity panel beside
          it was removed to keep this page on high-level figures. -->
     <div class="card">
@@ -261,6 +263,7 @@
         // labelled as before; over a long range only every Nth is, which is
         // what keeps a 12-month window legible instead of a grey smear.
         const labelEvery = Math.max(1, Math.ceil(activityData.length / 14));
+        let lastLabelledMonth = null;
         activityData.forEach((d, idx) => {
             const barWrap = document.createElement('div');
             barWrap.style.flex = '1';
@@ -289,14 +292,21 @@
             dateLabel.style.overflow = 'hidden';
             dateLabel.style.whiteSpace = 'nowrap';
             // Day-of-month alone is ambiguous once the window spans months —
-            // "01" appears for every month. Show the month on the first
-            // labelled bar and whenever the month changes.
+            // "07" could be any of them. Carry the month on the first labelled
+            // bar of each month.
+            //
+            // Compared against the last LABELLED month, not the immediately
+            // preceding bar. Labels are thinned, so the true first-of-month bar
+            // is usually not labelled: the old check compared against its
+            // neighbour, found the same month, and printed a bare day — which
+            // is why a 90-day axis read "May 12, 19, 26, 02, 09" with no hint
+            // that 02 was June.
             const parts = d.date.split(' ');
             if (idx % labelEvery === 0) {
-                const prev = idx > 0 ? activityData[idx - 1].date.split(' ')[0] : null;
-                dateLabel.textContent = (prev === null || prev !== parts[0])
-                    ? d.date            // "Jul 01"
-                    : (parts[1] || d.date);  // "08"
+                dateLabel.textContent = (lastLabelledMonth !== parts[0])
+                    ? d.date            // "Jun 02"
+                    : (parts[1] || d.date);  // "09"
+                lastLabelledMonth = parts[0];
                 // Each cell is only as wide as its bar. Over a long window that
                 // is ~19px, which clips "Sep 01" to "Se". The neighbouring
                 // cells are deliberately blank, so let the text spill into
