@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  The public download page for the AI Tutor desktop app.
+
+  Uploaded to the downloads bucket's public/ prefix by ops/publish_download_page.sh.
+  Kept as a file in the repo rather than generated inside the workflow YAML so it
+  can be reviewed and edited like anything else.
+
+  The Gatekeeper / SmartScreen instructions are NOT optional detail. The builds
+  are unsigned, so macOS says the app "is damaged and can't be opened" — which
+  reads as a corrupt download, not a security prompt. Anyone sent this link
+  without that explanation will conclude the file is broken.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AI Tutor — Desktop app</title>
+<style>
+  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8; --warn:#92400e; --warnbg:#fffbeb; --warnline:#fcd34d; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2.5rem 1.25rem 4rem; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:#f9fafb; }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size:1.75rem; margin:0 0 .25rem; }
+  .sub { color:var(--muted); margin:0 0 2rem; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:1rem; margin-bottom:2.5rem; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:1.25rem; }
+  .card h2 { font-size:1rem; margin:0 0 .15rem; }
+  .card p { color:var(--muted); font-size:.85rem; margin:0 0 1rem; }
+  a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none; padding:.6rem 1rem; border-radius:8px; font-weight:600; font-size:.9rem; }
+  a.btn:hover { filter:brightness(1.08); }
+  .note { background:var(--warnbg); border:1px solid var(--warnline); border-radius:12px; padding:1.25rem; margin-bottom:2rem; }
+  .note h2 { font-size:1rem; margin:0 0 .5rem; color:var(--warn); }
+  .note ol { margin:.5rem 0 0; padding-left:1.25rem; }
+  .note li { margin-bottom:.4rem; }
+  code { background:#f3f4f6; padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
+  h3 { font-size:.95rem; margin:1.25rem 0 .35rem; }
+  footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line); padding-top:1rem; margin-top:2.5rem; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --warnbg:#3b2f0b; --warnline:#a16207; --warn:#fcd34d; }
+    body { background:#111827; }
+    .card { background:#1f2937; }
+    code { background:#374151; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>AI Tutor — Desktop app</h1>
+  <p class="sub">Runs offline. No internet needed once installed.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h2>macOS</h2>
+      <p>Apple Silicon (M1 and newer)</p>
+      <a class="btn" href="./AI-Tutor-macos-arm64.dmg">Download .dmg</a>
+    </div>
+    <div class="card">
+      <h2>Windows</h2>
+      <p>64-bit Windows 10 or 11</p>
+      <a class="btn" href="./AI-Tutor-windows-x64.zip">Download .zip</a>
+    </div>
+  </div>
+
+  <div class="note">
+    <h2>Read this first — your computer will warn you</h2>
+    <p style="margin:.25rem 0 0; color:inherit; font-size:.9rem;">
+      These builds are not yet code-signed, so macOS and Windows treat them as
+      unrecognised software. The warnings are expected and do not mean the
+      download failed.
+    </p>
+
+    <h3>macOS — "AI Tutor is damaged and can't be opened"</h3>
+    <ol>
+      <li>Open the <code>.dmg</code> and drag <strong>AI Tutor</strong> to Applications.</li>
+      <li>In Applications, <strong>right-click</strong> AI Tutor and choose <strong>Open</strong> (do not double-click).</li>
+      <li>Click <strong>Open</strong> in the dialog. You only do this once.</li>
+    </ol>
+    <p style="font-size:.85rem; margin:.5rem 0 0;">
+      Still blocked? In Terminal:
+      <code>xattr -d com.apple.quarantine "/Applications/AI Tutor.app"</code>
+    </p>
+
+    <h3>Windows — "Windows protected your PC"</h3>
+    <ol>
+      <li>Unzip the folder, then run <code>AI-Tutor.exe</code>.</li>
+      <li>On the blue SmartScreen dialog click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+    </ol>
+  </div>
+
+  <h3>First launch</h3>
+  <p style="font-size:.9rem; margin-top:.25rem;">
+    The first start takes a few minutes — it sets up its database and loads the
+    language model. Later launches are quick. The app opens in its own window;
+    there is nothing to configure.
+  </p>
+
+  <footer>
+    Version <strong>__VERSION__</strong> · published __DATE__<br>
+    Internal testing build. Please report problems rather than passing this link on.
+  </footer>
+</main>
+</body>
+</html>

@@ -1,4 +1,4 @@
-name: Desktop app (Windows / macOS / Linux)
+name: Desktop app (Windows / macOS)
 
 # Builds the offline desktop tutor for all three platforms.
 #
@@ -16,7 +16,9 @@ name: Desktop app (Windows / macOS / Linux)
 #   - PyInstaller does not cross-compile. A macOS .app must be built on macOS.
 #   - Ollama is a native binary, staged per-platform by `manage.py stage_ollama`.
 #   - pywebview binds the platform's own webview: WKWebView (macOS),
-#     WebView2 (Windows), WebKitGTK (Linux, which needs system GTK packages).
+#     WebView2 (Windows). Linux was dropped 2026-08-08 — the pilot machines are
+#     Windows and macOS, and the GTK/WebKitGTK path cost a runner-disk workaround
+#     and a PyGObject pin for a target nobody was installing on.
 #
 # What the build does NOT include, by design:
 #   - The 2.5 GB tutor model. Installers stay ~150-250 MB; the app acquires the
@@ -35,7 +37,7 @@ on:
         description: 'Which platforms to build'
         type: choice
         default: 'all'
-        options: [all, macos, windows, linux]
+        options: [all, macos, windows]
   push:
     # `desktop-v*`, NOT `v*`. deploy.yml triggers on `v[0-9]+.[0-9]+.[0-9]+`,
     # so a plain `v*` pattern here would overlap it: tagging v0.1.0 to cut a
@@ -45,7 +47,10 @@ on:
     tags: ['desktop-v*']
 
 permissions:
-  contents: read
+  # `contents: write` creates the GitHub Release; `id-token: write` is the OIDC
+  # handshake that gets us into AWS without a stored access key.
+  contents: write
+  id-token: write
 
 jobs:
   build:
@@ -53,8 +58,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
-      # One platform failing should not cancel the others — a Linux GTK problem
-      # says nothing about whether the macOS build is sound.
+      # One platform failing should not cancel the others — a Windows
+      # packaging problem says nothing about whether the macOS build is sound.
       fail-fast: false
       matrix:
         include:
@@ -66,10 +71,6 @@ jobs:
             label: Windows (x64)
             slug: windows-x64
             selector: windows
-          - os: ubuntu-22.04
-            label: Linux (x64)
-            slug: linux-x64
-            selector: linux
 
     steps:
       - uses: actions/checkout@v4
@@ -90,18 +91,6 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         with:
           python-version: '3.12'
-
-      # pywebview on Linux is a GTK/WebKitGTK binding, not a self-contained
-      # wheel. Without these the import succeeds and the window fails at
-      # runtime, which is a much worse failure than a missing package.
-      - name: Install GTK + WebKit (Linux)
-        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgirepository1.0-dev libcairo2-dev pkg-config python3-dev \
-            gir1.2-gtk-3.0 gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0
-
       - name: Install Python dependencies
         if: steps.gate.outputs.run == 'true'
         shell: bash
@@ -112,19 +101,7 @@ jobs:
           # torch + onnx are build-only: needed to EXPORT the encoder, never to
           # run it. The spec excludes them from the bundle.
           pip install -r requirements-ml.txt -r requirements-build.txt
-          # pywebview's Linux backend needs PyGObject, which is an optional
-          # extra rather than a hard dependency. Install the extra rather than
-          # naming PyGObject ourselves: pywebview pins PyGObject==3.50.0, which
-          # is the version it is actually tested against.
           #
-          # This also avoids the run-1 failure. Current PyGObject (3.52+)
-          # requires girepository-2.0, which ubuntu-22.04 does not ship — it
-          # has girepository-1.0 — so an unpinned install dies at metadata
-          # generation with "Dependency 'girepository-2.0' is required but not
-          # found". Staying on 22.04 rather than moving to 24.04 is deliberate:
-          # its older glibc makes the built binary run on more of the older
-          # classroom machines this is aimed at.
-          if [ "${{ runner.os }}" = "Linux" ]; then pip install "pywebview[gtk]==6.2.1"; fi
 
       # Deterministic: exported from the same weights the parity test pins,
       # so every platform ships an identical encoder.
@@ -136,7 +113,7 @@ jobs:
       # Ollama is a native binary and cannot be cross-copied, so each runner
       # installs it and stages its own. This is what makes the installed app
       # independent of any system Ollama on the target machine.
-      # macOS and Linux need different treatment. ollama.com/install.sh on
+      # macOS needs different treatment from Windows. ollama.com/install.sh on
       # macOS installs Ollama.app into /Applications and then tries to LAUNCH
       # it, which on a headless runner dies with "Unable to find application
       # named 'Ollama'" and exits 1. Homebrew is preinstalled on the macOS
@@ -148,39 +125,6 @@ jobs:
         run: |
           brew install ollama
           python manage.py stage_ollama --force
-
-      # The Linux runner ships ~14 GB free, and by this point torch (~2.5 GB)
-      # and the rest of the ML stack are already installed. Ollama's Linux
-      # install then pulls GPU runner libraries totalling several GB, which on
-      # run test3 killed the job outright: the step started, never completed,
-      # and the job ended with NO step marked failed — the signature of a dead
-      # runner rather than a failing command. Reclaiming the preinstalled
-      # toolchains we do not use frees ~20 GB.
-      - name: Free disk space (Linux)
-        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
-        shell: bash
-        run: |
-          echo "before:"; df -h / | tail -1
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
-                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
-          echo "after:"; df -h / | tail -1
-
-      - name: Install + stage Ollama (Linux)
-        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
-        shell: bash
-        run: |
-          curl -fsSL https://ollama.com/install.sh | sh
-          echo "disk after ollama install:"; df -h / | tail -1
-          python manage.py stage_ollama --force
-          du -sh vendor/ollama/* || true
-
-      # Use the portable ZIP, NOT OllamaSetup.exe. On run test3 the installer
-      # under `Start-Process -Wait` with /VERYSILENT never returned: the step
-      # ran 56 minutes and was killed by the job timeout. Installers on
-      # headless runners wait on things that are not there. The ZIP is just the
-      # binary, which is all `stage_ollama` needs — same reasoning that moved
-      # macOS off install.sh.
-      - name: Install + stage Ollama (Windows)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
         shell: pwsh
         timeout-minutes: 15
@@ -239,10 +183,8 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
             BIN="dist/AI Tutor.app/Contents/MacOS/AI-Tutor"
-          elif [ "${{ runner.os }}" = "Windows" ]; then
-            BIN="dist/AI-Tutor/AI-Tutor.exe"
           else
-            BIN="dist/AI-Tutor/AI-Tutor"
+            BIN="dist/AI-Tutor/AI-Tutor.exe"
           fi
           echo "serving from: $BIN"
           "$BIN" --serve --port 8799 > serve.log 2>&1 &
@@ -281,11 +223,6 @@ jobs:
         run: |
           hdiutil create -volname "AI Tutor" -srcfolder "dist/AI Tutor.app" \
             -ov -format UDZO "dist/AI-Tutor-${{ matrix.slug }}.dmg"
-
-      - name: Package (Linux tarball)
-        if: steps.gate.outputs.run == 'true' && runner.os == 'Linux'
-        run: tar -czf "dist/AI-Tutor-${{ matrix.slug }}.tar.gz" -C dist AI-Tutor
-
       - name: Package (Windows zip)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
         shell: pwsh
@@ -298,6 +235,47 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
-            dist/*.tar.gz
           if-no-files-found: error
           retention-days: 14
+
+      # ── Publish ──────────────────────────────────────────────────────────
+      # Two destinations, on purpose.
+      #
+      # S3 is how people actually download this. The repo is PRIVATE, so a
+      # GitHub Release only reaches accounts with repo access — which is not
+      # the audience. The bucket's public/ prefix is world-readable.
+      #
+      # The Release is the internal record: which commit produced which
+      # installer. Nobody outside the repo needs to see it.
+      - name: Configure AWS credentials (OIDC)
+        if: steps.gate.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Upload the installer to the public download bucket
+        if: steps.gate.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        env:
+          BUCKET: ${{ secrets.AWS_DOWNLOADS_BUCKET }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          FILE=$(ls dist/AI-Tutor-${{ matrix.slug }}.* | head -1)
+          echo "publishing $FILE for $TAG"
+          # Versioned copy is the archive; latest/ is the link we hand out, so
+          # the download page never needs editing when a new build ships.
+          aws s3 cp "$FILE" "s3://${BUCKET}/public/desktop/releases/${TAG}/$(basename "$FILE")"
+          aws s3 cp "$FILE" "s3://${BUCKET}/public/desktop/latest/$(basename "$FILE")" \
+            --cache-control 'no-cache, max-age=60'
+
+      - name: Add to the GitHub Release
+        if: steps.gate.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
