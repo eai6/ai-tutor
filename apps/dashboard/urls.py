@@ -95,6 +95,8 @@ urlpatterns = [
     path('content-edits/dashboard/', views.content_edit_dashboard, name='content_edit_dashboard'),
     path('content-edits/<int:event_id>/', views.content_edit_event_detail, name='content_edit_event_detail'),
     path('content-edits/export.csv', views.content_edit_events_export_csv, name='content_edit_events_export_csv'),
+    # Aggregate metrics for sharing outside the platform (no student data).
+    path('reports/aggregate-export.csv', views.aggregate_export_csv, name='aggregate_export_csv'),
     path('content-edits/export.jsonl', views.content_edit_events_export_jsonl, name='content_edit_events_export_jsonl'),
     path('curriculum/lesson/<int:lesson_id>/prerequisites/', views.lesson_prerequisite_edit, name='lesson_prerequisite_edit'),
     

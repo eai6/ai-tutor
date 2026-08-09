@@ -9572,3 +9572,127 @@ def weekly_assignment_save(request, course_id):
         f"Weekly assignment {verb} — {len(final_ids)} lesson{'s' if len(final_ids) != 1 else ''} for week of {monday.isoformat()}.",
     )
     return redirect('dashboard:course_detail', course_id=course.id)
+
+
+# ─── Aggregate export (for sharing outside the platform) ────────────────
+#
+# Built for handing figures to a ministry or partner. The design constraint is
+# that NOTHING identifying leaves: no student names, usernames, emails, ids, or
+# free text — only counts and averages over groups. That is what makes this
+# shareable without a data-transfer agreement, and it is asserted by a test
+# rather than left to reviewer discipline.
+#
+# Student-level export is a different mechanism with different controls; see
+# docs/aws-self-hosting.md and the discussion of IAM-scoped transfer.
+
+AGGREGATE_MIN_GROUP = 5
+
+
+def _aggregate_rows(institution, win_start, win_end, group_by):
+    """Per-school or per-lesson metrics for the window. No student rows."""
+    from apps.accounts.models import Institution
+    from apps.curriculum.models import Lesson
+
+    rows = []
+    if group_by == 'lesson':
+        scope = filter_by_institution(
+            TutorSession.objects.filter(
+                started_at__date__gte=win_start, started_at__date__lte=win_end),
+            institution,
+        )
+        lesson_ids = list(scope.values_list('lesson_id', flat=True).distinct())
+        lessons = {l.id: l for l in Lesson.objects.filter(id__in=lesson_ids)
+                   .select_related('unit__course')}
+        for lid in lesson_ids:
+            lesson = lessons.get(lid)
+            if lesson is None:
+                continue
+            sessions = scope.filter(lesson_id=lid)
+            et = _exit_ticket_stats(sessions)
+            rows.append({
+                'group': 'lesson',
+                'lesson_id': lid,
+                'lesson_title': lesson.title,
+                'course': getattr(getattr(lesson.unit, 'course', None), 'title', ''),
+                'students': sessions.values('student_id').distinct().count(),
+                'sessions_started': et['sessions_started'],
+                'sessions_reached_exit_ticket': et['sessions_reached'],
+                'reach_pct': et['reach_pct'],
+                'attempts': et['attempts'],
+                'passed': et['passed'],
+                'avg_score_pct': et['avg_pct'],
+                'median_score_pct': et['median_pct'],
+            })
+    else:
+        institutions = ([institution] if institution is not None
+                        else list(Institution.objects.all()))
+        for inst in institutions:
+            sessions = TutorSession.objects.filter(
+                institution=inst,
+                started_at__date__gte=win_start, started_at__date__lte=win_end)
+            et = _exit_ticket_stats(sessions)
+            prog = _progression_stats(inst, win_start, win_end, weekly=False)
+            rows.append({
+                'group': 'school',
+                'school': inst.name,
+                'students': sessions.values('student_id').distinct().count(),
+                'sessions_started': et['sessions_started'],
+                'sessions_reached_exit_ticket': et['sessions_reached'],
+                'reach_pct': et['reach_pct'],
+                'attempts': et['attempts'],
+                'passed': et['passed'],
+                'avg_score_pct': et['avg_pct'],
+                'median_score_pct': et['median_pct'],
+                'gain_pairs': prog['gain']['pairs'],
+                'gain_before_pct': prog['gain']['pre_pct'],
+                'gain_after_pct': prog['gain']['post_pct'],
+                'gain_mean_points': prog['gain']['mean_gain'],
+            })
+
+    # Suppress small groups. A "lesson" with two students, a mean and a pass
+    # count is close to describing an individual — the standard disclosure
+    # control for published education statistics, and cheap to apply.
+    suppressed = [r for r in rows if r['students'] < AGGREGATE_MIN_GROUP]
+    kept = [r for r in rows if r['students'] >= AGGREGATE_MIN_GROUP]
+    return kept, len(suppressed)
+
+
+@staff_required
+def aggregate_export_csv(request):
+    """Aggregate metrics as CSV, for sharing outside the platform."""
+    import csv
+    from django.http import HttpResponse
+
+    institution = request.staff_ctx['institution']
+    today = timezone.now().date()
+    start = _parse_chart_date(request.GET.get('start')) or (today - timedelta(days=30))
+    end = _parse_chart_date(request.GET.get('end')) or today
+    if start > end:
+        start, end = end, start
+    group_by = 'lesson' if request.GET.get('group') == 'lesson' else 'school'
+
+    rows, suppressed = _aggregate_rows(institution, start, end, group_by)
+
+    filename = f'ai-tutor-{group_by}-metrics-{start}-to-{end}.csv'
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    # A reader three months from now needs to know what window this covers and
+    # that rows are missing by design, or they will draw the wrong conclusion
+    # from a total that does not add up.
+    writer.writerow([f'# AI Tutor aggregate metrics, {start} to {end}'])
+    writer.writerow([f'# Grouped by {group_by}. Aggregate only — no student-level data.'])
+    writer.writerow([f'# Groups with fewer than {AGGREGATE_MIN_GROUP} students are '
+                     f'omitted ({suppressed} omitted here).'])
+    writer.writerow([])
+
+    if rows:
+        headers = list(rows[0].keys())
+        writer.writerow(headers)
+        for r in rows:
+            writer.writerow([r.get(h, '') for h in headers])
+    else:
+        writer.writerow(['no groups met the minimum size for this window'])
+
+    return response
