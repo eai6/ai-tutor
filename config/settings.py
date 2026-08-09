@@ -301,6 +301,11 @@ AZURE_BLOB_MEDIA_KEY = os.getenv('AZURE_BLOB_MEDIA_KEY', '')
 AZURE_BLOB_MEDIA_CONTAINER = os.getenv('AZURE_BLOB_MEDIA_CONTAINER', 'media')
 USE_BLOB_MEDIA = bool(AZURE_BLOB_MEDIA_ACCOUNT and AZURE_BLOB_MEDIA_KEY)
 
+# Public installer downloads. Separate bucket from media on purpose — this
+# one is world-readable; media and ops are not. See infra/aws/components/storage.py.
+AWS_DOWNLOADS_BUCKET = os.getenv('AWS_DOWNLOADS_BUCKET', '')
+DESKTOP_APP_VERSION = os.getenv('DESKTOP_APP_VERSION', '')
+
 AWS_MEDIA_BUCKET = os.getenv('AWS_MEDIA_BUCKET', '')
 AWS_MEDIA_REGION = os.getenv('AWS_MEDIA_REGION', 'us-east-1')
 USE_S3_MEDIA = bool(AWS_MEDIA_BUCKET)

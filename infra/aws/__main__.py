@@ -117,6 +117,7 @@ pulumi.export(
 task_environment = (
     pulumi.Output.all(
         storage.media_bucket.bucket,
+        storage.downloads_bucket.bucket,
         network.private_subnet_ids,
         network.tasks_sg.id,
         cluster.name,
@@ -126,22 +127,23 @@ task_environment = (
             "DEBUG": "False",
             "AWS_REGION": region,
             "AWS_MEDIA_BUCKET": a[0],
+            "AWS_DOWNLOADS_BUCKET": a[1],
             "AWS_MEDIA_REGION": region,
             "AWS_SES_REGION": region,
             # Set once an SES identity is verified; absent means console email.
             "AWS_SES_SENDER": "",
-            "ECS_CLUSTER": a[3],
+            "ECS_CLUSTER": a[4],
             "ECS_MATERIAL_TASK_DEFINITION": f"{prefix}-material",
             "ECS_MATERIAL_CONTAINER_NAME": "material-processor",
-            "ECS_SUBNETS": ",".join(a[1]),
-            "ECS_SECURITY_GROUPS": a[2],
+            "ECS_SUBNETS": ",".join(a[2]),
+            "ECS_SECURITY_GROUPS": a[3],
             # Secure cookies require TLS. With a domain the edge terminates
             # HTTPS, so Django should mark them; without one it must not, or
             # the browser withholds the cookie and login silently fails.
             "HTTPS_EDGE": "true" if domain_name else "false",
             "ALLOWED_HOSTS": "*",
             # Must follow the domain, like HTTPS_EDGE above. This read
-            # `f"http://{a[4]}"` unconditionally until 2026-08-08 — the raw ALB
+            # `f"http://{a[5]}"` unconditionally until 2026-08-08 — the raw ALB
             # hostname over http — even after the site moved to a domain on
             # HTTPS. Django only tolerated it because SECURE_PROXY_SSL_HEADER
             # makes request.is_secure() true, so _origin_verified() matches the
@@ -150,7 +152,7 @@ task_environment = (
             # through to the referer check, which does consult it, and gets a
             # 403 that looks like nothing else in the system.
             "CSRF_TRUSTED_ORIGINS": (
-                f"https://{domain_name}" if domain_name else f"http://{a[4]}"
+                f"https://{domain_name}" if domain_name else f"http://{a[5]}"
             ),
             "EMBEDDING_BACKEND": "local",
         }

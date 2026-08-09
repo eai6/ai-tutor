@@ -39,6 +39,9 @@ def service_worker(_request):
 
 urlpatterns = [
     path('health/', health_check),
+    # Public installer download page. No auth: someone who has never logged
+    # in has to be able to install the app.
+    path('download/', include('apps.desktop.download_urls')),
     path('admin/', admin.site.urls),
     path('api/v1/', include('apps.api.urls', namespace='api')),
     # Bootstrap status for the offline desktop shell's splash screen.
