@@ -21,6 +21,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from apps.accounts.models import Device
+from apps.api.device_auth import DeviceTokenAuthentication
 
 
 class EnrolThrottle(AnonRateThrottle):
@@ -105,3 +106,105 @@ def device_check(request):
         'institution_id': device.institution_id,
         'device_name': device.name,
     })
+
+
+@api_view(['POST'])
+@authentication_classes([DeviceTokenAuthentication])
+@permission_classes([])
+def device_sync(request):
+    """Accept one outbox item from an enrolled device.
+
+    One item per request rather than a batch: a classroom uplink drops
+    mid-request often enough that an all-or-nothing batch would retry work that
+    already landed. Per-item, a dropped connection costs one row's retry, and
+    the client_uuid makes that retry free.
+
+    Authenticated as a DEVICE (request.auth), never as a user. The device says
+    which student the work belongs to via server_user_id, and the server checks
+    that student is actually in the device's institution — a compromised device
+    must not be able to write into another school.
+    """
+    from django.db import IntegrityError, transaction
+    from apps.accounts.models import Membership
+    from apps.tutoring.models import TutorSession, SessionTurn
+
+    device = request.auth
+    if device is None:
+        return Response({'detail': 'Device authentication required.'},
+                        status=status.HTTP_401_UNAUTHORIZED)
+
+    payload = request.data or {}
+    client_uuid = (payload.get('client_uuid') or '').strip()
+    kind = (payload.get('kind') or '').strip()
+    server_user_id = payload.get('server_user_id')
+    body = payload.get('payload') or {}
+
+    if not client_uuid or not kind:
+        return Response({'detail': 'client_uuid and kind are required.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    # Resolve the student, and refuse anyone outside this device's institution.
+    student = None
+    if server_user_id:
+        membership = (
+            Membership.objects
+            .filter(user_id=server_user_id, institution_id=device.institution_id,
+                    is_active=True)
+            .select_related('user').first()
+        )
+        if membership is None:
+            # Not "not found" — the device asked to write for someone who is
+            # not its school's student. Worth refusing loudly.
+            return Response(
+                {'detail': 'That student does not belong to this device\'s institution.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        student = membership.user
+
+    if kind == 'session':
+        if student is None:
+            return Response({'detail': 'server_user_id is required for a session.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        lesson_id = body.get('lesson_id')
+        if not lesson_id:
+            return Response({'detail': 'lesson_id is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # The session itself is deduped on the outbox's client_uuid, carried
+        # onto its first turn. A device that retries after a lost response must
+        # not create a second session for the same lesson sitting.
+        existing = SessionTurn.objects.filter(client_uuid=client_uuid).first()
+        if existing:
+            return Response({'detail': 'already recorded',
+                             'session_id': existing.session_id},
+                            status=status.HTTP_409_CONFLICT)
+
+        try:
+            with transaction.atomic():
+                session = TutorSession.objects.create(
+                    student=student,
+                    lesson_id=lesson_id,
+                    institution_id=device.institution_id,
+                    status=body.get('status') or TutorSession.Status.ACTIVE,
+                )
+                for i, turn in enumerate(body.get('turns') or []):
+                    SessionTurn.objects.create(
+                        session=session,
+                        role=turn.get('role') or 'student',
+                        content=turn.get('content') or '',
+                        # Only the first turn carries the outbox uuid; the rest
+                        # are unique by their own client ids if supplied.
+                        client_uuid=client_uuid if i == 0 else (turn.get('client_uuid') or None),
+                        generated_offline=True,
+                        metadata={'source': 'desktop_offline',
+                                  'device_id': str(device.device_id or '')},
+                    )
+        except IntegrityError:
+            return Response({'detail': 'already recorded'},
+                            status=status.HTTP_409_CONFLICT)
+
+        return Response({'session_id': session.id}, status=status.HTTP_201_CREATED)
+
+    return Response({'detail': f'Unsupported kind: {kind}'},
+                    status=status.HTTP_400_BAD_REQUEST)

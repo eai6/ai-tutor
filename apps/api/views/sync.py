@@ -20,6 +20,7 @@ only turns, etc.) so the client can sync incrementally.
 from datetime import datetime
 
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -65,6 +66,7 @@ def sync(request, session_id):
         'turns_skipped_duplicate': 0,
         'state_updated': False,
         'exit_attempt_created': False,
+        'exit_attempt_duplicate': False,
     }
 
     # ── Turns (append-only, dedupe on metadata.client_uuid) ──
@@ -76,29 +78,39 @@ def sync(request, session_id):
         if role not in {'student', 'tutor', 'system'} or not content:
             continue
         client_uuid = turn.get('client_uuid') or ''
-        if client_uuid:
-            existing = SessionTurn.objects.filter(
-                session=session, metadata__client_uuid=client_uuid,
-            ).exists()
-            if existing:
-                summary['turns_skipped_duplicate'] += 1
-                continue
+        if client_uuid and SessionTurn.objects.filter(client_uuid=client_uuid).exists():
+            # Fast path only. The real guarantee is the unique constraint and
+            # the IntegrityError below — this check just avoids the exception
+            # in the common case. Checking alone is NOT enough: two concurrent
+            # syncs both see "absent" and both insert.
+            summary['turns_skipped_duplicate'] += 1
+            continue
         meta = turn.get('metadata') or {}
         if not isinstance(meta, dict):
             meta = {}
         if client_uuid:
             meta['client_uuid'] = client_uuid
         meta.setdefault('source', 'mobile_offline')
-        SessionTurn.objects.create(
-            session=session,
-            role=role,
-            content=content,
-            metadata=meta,
-            generated_offline=bool(turn.get('generated_offline', True)),
-            offline_model_id=turn.get('offline_model_id', '') or '',
-            client_generated_at=_parse_iso(turn.get('client_generated_at')),
-        )
-        summary['turns_created'] += 1
+        try:
+            # atomic() so an IntegrityError does not poison the surrounding
+            # transaction — without it, every later write in this request
+            # fails with "current transaction is aborted".
+            with transaction.atomic():
+                SessionTurn.objects.create(
+                    session=session,
+                    role=role,
+                    content=content,
+                    metadata=meta,
+                    client_uuid=client_uuid or None,
+                    generated_offline=bool(turn.get('generated_offline', True)),
+                    offline_model_id=turn.get('offline_model_id', '') or '',
+                    client_generated_at=_parse_iso(turn.get('client_generated_at')),
+                )
+            summary['turns_created'] += 1
+        except IntegrityError:
+            # Lost the race with a concurrent sync of the same turn. That is a
+            # success from the caller's point of view: the row exists.
+            summary['turns_skipped_duplicate'] += 1
 
     # ── engine_state (last-write-wins, gated on client timestamp) ──
     if isinstance(state_in, dict) and state_at is not None:
@@ -126,16 +138,26 @@ def sync(request, session_id):
                 participants = []
             if not participants:
                 participants = [session.student]
-            for participant in participants:
-                ExitTicketAttempt.objects.create(
-                    exit_ticket=exit_ticket,
-                    student=participant,
-                    session=session,
-                    score=score,
-                    passed=passed,
-                    answers=answers,
-                    completed_at=completed_at,
-                )
-            summary['exit_attempt_created'] = True
+            attempt_uuid = exit_attempt.get('client_uuid') or ''
+            for idx, participant in enumerate(participants):
+                # One client_uuid covers the push, but a group session writes
+                # one row per participant — so it is suffixed per participant
+                # to stay unique while still deduping a re-push.
+                row_uuid = f'{attempt_uuid}:{participant.id}' if attempt_uuid else None
+                try:
+                    with transaction.atomic():
+                        ExitTicketAttempt.objects.create(
+                            exit_ticket=exit_ticket,
+                            student=participant,
+                            session=session,
+                            score=score,
+                            passed=passed,
+                            answers=answers,
+                            completed_at=completed_at,
+                            client_uuid=row_uuid,
+                        )
+                    summary['exit_attempt_created'] = True
+                except IntegrityError:
+                    summary['exit_attempt_duplicate'] = True
 
     return Response(summary, status=status.HTTP_200_OK)

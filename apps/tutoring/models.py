@@ -313,8 +313,28 @@ class SessionTurn(models.Model):
     is_flagged = models.BooleanField(default=False)
     flag_type = models.CharField(max_length=50, blank=True)
 
+
+    # Idempotency key for sync. A device that pushes, loses the response and
+    # retries must not create the row twice — and the previous approach, an
+    # .exists() check against metadata['client_uuid'], is not atomic: two
+    # concurrent syncs both see "absent" and both insert. This is a real column
+    # with a database constraint so the race is impossible rather than
+    # unlikely. Null for anything created online, where there is no client.
+    client_uuid = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True,
+        help_text='Client-generated id for offline sync dedup.',
+    )
+
     class Meta:
         ordering = ['created_at']
+        constraints = [
+            # Partial: only rows that carry a client id are constrained, so
+            # every online turn (client_uuid NULL) is unaffected.
+            models.UniqueConstraint(
+                fields=['client_uuid'], name='uniq_sessionturn_client_uuid',
+                condition=models.Q(client_uuid__isnull=False),
+            ),
+        ]
         verbose_name = "Session Turn"
 
     def __str__(self):
@@ -913,8 +933,26 @@ class ExitTicketAttempt(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
+
+    # Idempotency key for sync. A device that pushes, loses the response and
+    # retries must not create the row twice — and the previous approach, an
+    # .exists() check against metadata['client_uuid'], is not atomic: two
+    # concurrent syncs both see "absent" and both insert. This is a real column
+    # with a database constraint so the race is impossible rather than
+    # unlikely. Null for anything created online, where there is no client.
+    client_uuid = models.CharField(
+        max_length=64, null=True, blank=True, db_index=True,
+        help_text='Client-generated id for offline sync dedup.',
+    )
+
     class Meta:
         ordering = ['-started_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['client_uuid'], name='uniq_attempt_client_uuid',
+                condition=models.Q(client_uuid__isnull=False),
+            ),
+        ]
 
     def __str__(self):
         if self.exit_ticket.lesson_id:

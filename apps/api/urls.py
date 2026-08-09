@@ -48,6 +48,7 @@ urlpatterns = [
     # code IS the credential; see apps/api/views/devices.py.
     path('devices/enrol/', devices.enrol, name='device_enrol'),
     path('devices/check/', devices.device_check, name='device_check'),
+    path('devices/sync/', devices.device_sync, name='device_sync'),
     path('sessions/<int:session_id>/turns/', resource_views.SessionTurnList.as_view(), name='session_turns'),
 
     # Progress

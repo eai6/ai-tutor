@@ -44,6 +44,13 @@ class DeviceState(models.Model):
     )
     last_sync_at = models.DateTimeField(null=True, blank=True)
 
+    # Set once at enrolment, in exchange for a one-time code. Stored in the
+    # clear because it lives in the device's own SQLite alongside the student
+    # data it protects — hashing it here would guard nothing an attacker with
+    # this file does not already have.
+    sync_token = models.CharField(max_length=255, blank=True, default='')
+    enrolled_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         verbose_name = 'device state'
         verbose_name_plural = 'device state'
@@ -119,3 +126,68 @@ class RosterEntry(models.Model):
 
     def __str__(self):
         return f'{self.display_name} (server #{self.server_user_id})'
+
+
+class SyncOutbox(models.Model):
+    """Work waiting to be pushed to the cloud.
+
+    A table, not an in-memory queue. The device is a classroom laptop that gets
+    closed mid-lesson and reopened days later; anything held in memory is lost
+    exactly when it matters. Rows are enqueued as tutoring writes happen, so a
+    lesson taught with no internet is still queued when the machine next sees a
+    network.
+
+    Payloads are self-contained JSON rather than foreign keys to local rows.
+    The server has never heard of this device's integer PKs — what it can
+    resolve is ``server_user_id`` from the roster and the ``client_uuid`` that
+    makes a re-push idempotent. Freezing the payload at enqueue time also means
+    a later edit cannot silently change what gets sent.
+    """
+
+    class Kind(models.TextChoices):
+        SESSION = 'session', 'Tutoring session + turns'
+        EXIT_TICKET = 'exit_ticket', 'Exit ticket attempt'
+        PROGRESS = 'progress', 'Lesson progress'
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Waiting to send'
+        SENT = 'sent', 'Delivered'
+        FAILED = 'failed', 'Given up'
+
+    # Client-generated so the row can be referenced, and deduped by the server,
+    # before the server has ever seen it.
+    client_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    payload = models.JSONField(default=dict)
+
+    # Which student this belongs to, in the SERVER's terms. Null means the
+    # student self-registered and has no roster entry; those rows still sync,
+    # flagged for a teacher to reconcile, rather than being dropped.
+    server_user_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+
+    status = models.CharField(max_length=10, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text='Backoff gate. The worker skips rows until this passes.',
+    )
+    last_error = models.TextField(blank=True, default='')
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    # Five attempts then park it. Retrying forever against a server that will
+    # never accept the row burns battery and buries the real failures; a parked
+    # row stays readable so a teacher can be told something needs attention.
+    MAX_ATTEMPTS = 5
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name_plural = 'sync outbox'
+        indexes = [
+            models.Index(fields=['status', 'next_attempt_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.kind} {self.client_uuid} ({self.status})'

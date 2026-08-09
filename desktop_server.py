@@ -260,6 +260,16 @@ def main() -> int:
     if not args.no_setup:
         _first_run_setup()
 
+    # Drain whatever the last session queued. Started AFTER migrations, since
+    # it reads the outbox table, and daemonised so it can never hold the app
+    # open on exit. Failing to start it must not stop the tutor from running —
+    # a device with no sync is still a working device.
+    try:
+        from apps.desktop.sync import start_worker
+        start_worker()
+    except Exception as exc:                             # noqa: BLE001
+        print(f'[Desktop] sync worker not started: {exc}', flush=True)
+
     port = args.port or _free_port()
     url = f'http://127.0.0.1:{port}{LANDING_PATH}'
 

@@ -303,6 +303,10 @@ USE_BLOB_MEDIA = bool(AZURE_BLOB_MEDIA_ACCOUNT and AZURE_BLOB_MEDIA_KEY)
 
 # Public installer downloads. Separate bucket from media on purpose — this
 # one is world-readable; media and ops are not. See infra/aws/components/storage.py.
+# Where an enrolled desktop device pushes its work. Empty on the server
+# itself and on any build that should never phone home.
+SYNC_SERVER_URL = os.getenv('SYNC_SERVER_URL', '')
+
 AWS_DOWNLOADS_BUCKET = os.getenv('AWS_DOWNLOADS_BUCKET', '')
 DESKTOP_APP_VERSION = os.getenv('DESKTOP_APP_VERSION', '')
 
