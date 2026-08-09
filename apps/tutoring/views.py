@@ -2593,6 +2593,10 @@ def lesson_pretest(request, lesson_id):
                 'concept_tag': tag,
                 'student_answer': answer_str,
                 'correct': is_correct,
+                # Recorded so a later analysis can check like-for-like. Its
+                # ABSENCE is why the format contamination above could not be
+                # measured from the data and had to be inferred from the query.
+                'question_type': q.question_type or 'mcq',
             })
             results.append({
                 'index': index,
@@ -2670,9 +2674,21 @@ def lesson_pretest(request, lesson_id):
 
     # GET — sample 10 questions and render. Sample anew each visit so a
     # student abandoning + retrying doesn't see the same set.
+    # Same formats the tutoring path and the exit ticket serve — NOT the whole
+    # bank. Until 2026-08-09 this excluded only data_interpretation, so ~43% of
+    # a pre-test was fill_in_blank / matching / short_answer / short_numeric,
+    # formats the exit ticket never uses (_allowed_tutoring_types() is MCQ).
+    #
+    # That made before/after comparison invalid: a 4-option MCQ has a 25%
+    # guessing floor and free response has roughly none, so the pre-test score
+    # was depressed by format alone and the measured "gain" was partly an
+    # artefact of changing the instrument.
+    from apps.tutoring.simple_tutor.tools import _allowed_tutoring_types
     pool = list(
-        ExitTicketQuestion.objects.filter(exit_ticket=exit_ticket)
-        .exclude(question_type='data_interpretation')
+        ExitTicketQuestion.objects.filter(
+            exit_ticket=exit_ticket,
+            question_type__in=_allowed_tutoring_types(),
+        )
     )
     if len(pool) < PRETEST_SIZE:
         django_messages.warning(

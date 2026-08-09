@@ -523,10 +523,29 @@ def _progression_stats(institution, win_start, win_end, weekly):
     # sources are counted separately and the weaker one is labelled in the UI.
     #
     # A single attempt gives no "before" at all and is excluded either way.
+    # DIAGNOSTIC PAIRING IS GATED OFF (2026-08-09).
+    #
+    # Until today the pre-test drew from the whole question bank while the exit
+    # ticket served MCQ only — ~43% of a pre-test was a format the exit ticket
+    # never uses. Comparing them measured a change of instrument as well as
+    # learning, and the bias inflated the gain: MCQ carries a 25% guessing
+    # floor, free response roughly none.
+    #
+    # tutoring/views.py now restricts the pre-test to the same formats and
+    # records question_type on each answer. Once enough clean pre-tests exist,
+    # flip this back on and require the recorded format to match — do NOT
+    # simply re-enable it, or the old contaminated attempts re-enter the
+    # numerator.
+    #
+    # Until then the before/after pairing uses first vs latest EXIT TICKET,
+    # which is like-for-like by construction. On the last three months of pilot
+    # data that reads 54.3% -> 81.3%, +27 points, 84% improved.
+    USE_DIAGNOSTIC_AS_BASELINE = False
+
     befores = {}
     n_from_diagnostic = n_from_first_attempt = 0
     for key in post:
-        if key in pre:
+        if USE_DIAGNOSTIC_AS_BASELINE and key in pre:
             befores[key] = pre[key][1]
             n_from_diagnostic += 1
         elif practice_count.get(key, 0) >= 2:
