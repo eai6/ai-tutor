@@ -125,6 +125,10 @@ jobs:
         run: |
           brew install ollama
           python manage.py stage_ollama --force
+
+      # Windows has no installer script worth using here — download the release
+      # zip and stage the binary directly.
+      - name: Install + stage Ollama (Windows)
         if: steps.gate.outputs.run == 'true' && runner.os == 'Windows'
         shell: pwsh
         timeout-minutes: 15
