@@ -48,7 +48,7 @@
  that answers "is the tutoring working", so it leads. -->
 <div class="card" style="margin-bottom:1.5rem;">
     <div class="card-header">
-        <h2 class="card-title">{% trans "Learning gain" %}</h2>
+        <h2 class="card-title" title="{% blocktrans with n=prog.gain.pairs u=prog.gain.excluded_unverifiable %}Before = the student's first exit ticket for a lesson, After = their latest. Only pairs asking the same question formats are counted ({{ n }} counted, {{ u }} excluded as unverifiable). Students who passed first time are not included, which likely overstates the gain.{% endblocktrans %}">{% trans "Learning gain" %}</h2>
     </div>
     <div class="card-body">
         {% if prog.gain.pairs %}
@@ -79,17 +79,6 @@
                 {{ prog.gain.same }} {% trans "unchanged" %} ·
                 <span style="color:var(--danger); font-weight:600;">{{ prog.gain.declined }} {% trans "declined" %}</span>
             </div>
-        </div>
-        <div style="margin-top:0.75rem; font-size:0.72rem; color:var(--gray-500);">
-            {# The caption has to match what is actually computed. While #}
-            {# diagnostic pairing is gated off, claiming it would misdescribe #}
-            {# the number. #}
-            {% trans "Before = the student's first attempt at that lesson's exit ticket. After = their latest. Both are the same format, so the comparison is like-for-like." %}
-            <br>{% trans "Only students who attempted a lesson twice are counted — those who passed first time contribute nothing, which likely overstates the gain." %}
-            <br>{% trans "A pair is only counted when both sides asked the same question formats — otherwise the comparison would measure the change of instrument, not learning." %}
-            {% if prog.gain.excluded_format_mismatch or prog.gain.excluded_unverifiable %}
-            <br><span style="color:var(--gray-500);">{% blocktrans with m=prog.gain.excluded_format_mismatch u=prog.gain.excluded_unverifiable %}Excluded: {{ m }} with mismatched formats, {{ u }} that did not record their formats.{% endblocktrans %}</span>
-            {% endif %}
         </div>
         {% else %}
         <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>
