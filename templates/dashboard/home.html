@@ -86,7 +86,10 @@
             {# the number. #}
             {% trans "Before = the student's first attempt at that lesson's exit ticket. After = their latest. Both are the same format, so the comparison is like-for-like." %}
             <br>{% trans "Only students who attempted a lesson twice are counted — those who passed first time contribute nothing, which likely overstates the gain." %}
-            <br>{% trans "The pre-lesson diagnostic is not used as a baseline at present: it served question formats the exit ticket does not, so comparing them measured the change of format as well as learning." %}
+            <br>{% trans "A pair is only counted when both sides asked the same question formats — otherwise the comparison would measure the change of instrument, not learning." %}
+            {% if prog.gain.excluded_format_mismatch or prog.gain.excluded_unverifiable %}
+            <br><span style="color:var(--gray-500);">{% blocktrans with m=prog.gain.excluded_format_mismatch u=prog.gain.excluded_unverifiable %}Excluded: {{ m }} with mismatched formats, {{ u }} that did not record their formats.{% endblocktrans %}</span>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>

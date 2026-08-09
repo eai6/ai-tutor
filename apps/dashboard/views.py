@@ -453,6 +453,32 @@ def _exit_ticket_stats(sessions_qs):
     }
 
 
+def _format_signature(answers):
+    """The set of question formats an attempt actually served, or None.
+
+    A before/after comparison is only valid if both sides asked the same KIND
+    of question. A 4-option MCQ carries a 25% guessing floor; fill-in-the-blank
+    carries roughly none. Pairing one against the other measures the change of
+    instrument and reports it as learning.
+
+    None means "cannot verify" — the attempt did not record its formats. Those
+    pairs are excluded rather than assumed to match: every diagnostic taken
+    before 2026-08-09 is in that state, and those are exactly the ones known to
+    be mixed-format.
+    """
+    if not isinstance(answers, dict):
+        return None
+    per_q = answers.get('per_question')
+    if not isinstance(per_q, list) or not per_q:
+        return None
+    formats = {
+        (q.get('question_type') or '').strip().lower()
+        for q in per_q if isinstance(q, dict)
+    }
+    formats.discard('')
+    return frozenset(formats) or None
+
+
 def _progression_stats(institution, win_start, win_end, weekly):
     """Learning progression over the window, three ways.
 
@@ -485,28 +511,30 @@ def _progression_stats(institution, win_start, win_end, weekly):
         'student_id', 'exit_ticket__lesson_id', 'purpose', 'score',
         'exit_ticket__questions_per_attempt', 'completed_at',
         'student__first_name', 'student__last_name', 'student__username',
+        'answers',
     ))
 
     pre, post, by_student, trend_raw = {}, {}, {}, {}
     first_practice, practice_count = {}, {}
     names = {}
-    for sid, lid, purpose, score, per, when, first, last, uname in rows:
+    for sid, lid, purpose, score, per, when, first, last, uname, answers in rows:
         if not per or when is None:
             continue
         frac = min(score / per, 1.0)
+        sig = _format_signature(answers)
         names[sid] = (f'{first} {last}'.strip() or uname)
         if purpose == 'diagnostic':
             if lid is not None and ((sid, lid) not in pre or when < pre[(sid, lid)][0]):
-                pre[(sid, lid)] = (when, frac)
+                pre[(sid, lid)] = (when, frac, sig)
             continue
         # practice / retake
         if lid is not None:
             if (sid, lid) not in post or when > post[(sid, lid)][0]:
-                post[(sid, lid)] = (when, frac)
+                post[(sid, lid)] = (when, frac, sig)
             # Earliest practice, kept as the fallback "before" for lessons that
             # have no diagnostic — see the pairing step below.
             if (sid, lid) not in first_practice or when < first_practice[(sid, lid)][0]:
-                first_practice[(sid, lid)] = (when, frac)
+                first_practice[(sid, lid)] = (when, frac, sig)
             practice_count[(sid, lid)] = practice_count.get((sid, lid), 0) + 1
         by_student.setdefault(sid, []).append((when, frac))
         d = when.date()
@@ -540,17 +568,41 @@ def _progression_stats(institution, win_start, win_end, weekly):
     # Until then the before/after pairing uses first vs latest EXIT TICKET,
     # which is like-for-like by construction. On the last three months of pilot
     # data that reads 54.3% -> 81.3%, +27 points, 84% improved.
-    USE_DIAGNOSTIC_AS_BASELINE = False
-
+    # THE RULE: a pair is only counted when both sides asked the same question
+    # formats, and both sides recorded what they asked. Anything else is
+    # excluded and counted, so the exclusion is visible rather than silent.
+    #
+    # This replaces the blanket diagnostic gate. It is strictly better: it also
+    # catches a mixed-format EXIT TICKET, it lets diagnostics back in
+    # automatically once they are recorded and aligned, and it states the
+    # actual requirement instead of naming one source that happened to break it.
     befores = {}
     n_from_diagnostic = n_from_first_attempt = 0
+    n_excluded_mismatch = n_excluded_unverifiable = 0
+
     for key in post:
-        if USE_DIAGNOSTIC_AS_BASELINE and key in pre:
-            befores[key] = pre[key][1]
-            n_from_diagnostic += 1
-        elif practice_count.get(key, 0) >= 2:
-            befores[key] = first_practice[key][1]
-            n_from_first_attempt += 1
+        after_sig = post[key][2]
+
+        candidates = []
+        if key in pre:
+            candidates.append(('diagnostic', pre[key]))
+        if practice_count.get(key, 0) >= 2:
+            candidates.append(('first_attempt', first_practice[key]))
+
+        for source, before in candidates:
+            before_sig = before[2]
+            if before_sig is None or after_sig is None:
+                n_excluded_unverifiable += 1
+                continue
+            if before_sig != after_sig:
+                n_excluded_mismatch += 1
+                continue
+            befores[key] = before[1]
+            if source == 'diagnostic':
+                n_from_diagnostic += 1
+            else:
+                n_from_first_attempt += 1
+            break
 
     paired = set(befores)
     gains = sorted(post[k][1] - befores[k] for k in paired)
@@ -559,6 +611,8 @@ def _progression_stats(institution, win_start, win_end, weekly):
         'pairs': n_pair,
         'from_diagnostic': n_from_diagnostic,
         'from_first_attempt': n_from_first_attempt,
+        'excluded_format_mismatch': n_excluded_mismatch,
+        'excluded_unverifiable': n_excluded_unverifiable,
         'pre_pct': round(sum(befores[k] for k in paired) / n_pair * 100) if n_pair else 0,
         'post_pct': round(sum(post[k][1] for k in paired) / n_pair * 100) if n_pair else 0,
         'mean_gain': round(sum(gains) / n_pair * 100) if n_pair else 0,
