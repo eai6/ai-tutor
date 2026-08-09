@@ -19,7 +19,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.http import Http404
 from django.shortcuts import render
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_http_methods
 from django.views.decorators.cache import cache_control
 from django.shortcuts import redirect
 
@@ -39,7 +39,9 @@ def _bucket_url(filename: str) -> str:
     return f'https://{bucket}.s3.{region}.amazonaws.com/{_PREFIX}/{filename}'
 
 
-@require_GET
+# GET and HEAD: require_GET rejects HEAD with 405, and link previewers,
+# download managers and uptime checks all probe with HEAD first.
+@require_http_methods(["GET", "HEAD"])
 @cache_control(max_age=300, public=True)
 def download_page(request):
     """The page itself — small, cacheable, no auth."""
@@ -50,7 +52,7 @@ def download_page(request):
     })
 
 
-@require_GET
+@require_http_methods(["GET", "HEAD"])
 def download_installer(request, platform: str):
     """302 to the installer in S3.
 
