@@ -293,7 +293,15 @@
                         {% if lesson.status != 'completed' %}
                         <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
                         {% endif %}
-                        <span class="arrow">{% if lesson.status == 'completed' %}{% trans "Review" %} &rarr;{% else %}&rarr;{% endif %}</span>
+                        {# The bare arrow is gone. The whole row is already a #}
+                        {# link, so it added no affordance — but rendered as a #}
+                        {# blue block beside the real "Quick check" pill it #}
+                        {# read as a second button, and one that appeared to do #}
+                        {# nothing when clicked. "Review" stays for completed #}
+                        {# lessons because it says something the row does not. #}
+                        {% if lesson.status == 'completed' %}
+                        <span class="review-hint">{% trans "Review" %}</span>
+                        {% endif %}
                     </div>
                 </a>
                 {% endif %}
@@ -702,10 +710,10 @@
         font-weight: 600;
     }
     
-    .lesson-meta .arrow {
+    .lesson-meta .review-hint {
         color: var(--primary);
-        font-weight: bold;
-        font-size: 1.25rem;
+        font-weight: 600;
+        font-size: 0.75rem;
     }
     
     /* Empty state */
