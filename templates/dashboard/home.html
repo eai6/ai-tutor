@@ -32,6 +32,14 @@
                class="btn {% if activity_preset == key %}btn-primary{% else %}btn-secondary{% endif %}"
                style="padding:0.2rem 0.55rem; font-size:0.75rem;">{{ label }}</a>
             {% endfor %}
+            {# Carries the window that is on screen, so "export" means "export #}
+            {# what I am looking at" rather than some other period. #}
+            <a href="{% url 'dashboard:aggregate_export_csv' %}?start={{ activity_start }}&amp;end={{ activity_end }}"
+               class="btn btn-secondary"
+               title="{% trans 'Anonymised session and exit-ticket rows for this period. Every chart above can be rebuilt from it.' %}"
+               style="padding:0.2rem 0.55rem; font-size:0.75rem; margin-left:0.5rem;">
+                ⬇ {% trans "Export data" %}
+            </a>
         </div>
     </div>
 </div>

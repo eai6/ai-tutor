@@ -9659,40 +9659,122 @@ def _aggregate_rows(institution, win_start, win_end, group_by):
 
 @staff_required
 def aggregate_export_csv(request):
-    """Aggregate metrics as CSV, for sharing outside the platform."""
+    """Raw event rows, anonymised — enough to rebuild every dashboard chart.
+
+    Two tables: one row per session, one row per exit-ticket attempt. From
+    those an analyst reproduces the whole page — sessions over time by counting
+    sessions per date, the reach rate from the reached flag, the score
+    histogram and mean/median from the attempt scores, learning gain by pairing
+    each student's diagnostic against their later practice attempt, and the
+    per-school and per-lesson tables by grouping.
+
+    Summaries are deliberately NOT included. A number someone cannot recompute
+    is a number they have to take on trust, and this file exists to be checked.
+
+    ANONYMISATION. No names, usernames, emails, real ids or free text. Students
+    appear as a salted hash, and the salt is regenerated per export, so:
+      - rows for the same student can be linked WITHIN one file, which is what
+        makes paired learning gain computable at all;
+      - they cannot be linked ACROSS two exports, or back to a roster.
+    Dates are day-resolution: an exact timestamp is close to a fingerprint when
+    combined with a class timetable.
+
+    This is pseudonymised, not anonymous. It is a real step up in disclosure
+    risk from the aggregate tables, and it is the minimum that satisfies
+    "reproduce the charts". Share it under an agreement, not on a public link.
+    """
     import csv
+    import hashlib
+    import secrets
     from django.http import HttpResponse
 
     institution = request.staff_ctx['institution']
     today = timezone.now().date()
-    start = _parse_chart_date(request.GET.get('start')) or (today - timedelta(days=30))
-    end = _parse_chart_date(request.GET.get('end')) or today
-    if start > end:
-        start, end = end, start
-    group_by = 'lesson' if request.GET.get('group') == 'lesson' else 'school'
+    chart = _activity_chart(request, institution, today)
+    win_start, win_end = chart['start'], chart['end']
 
-    rows, suppressed = _aggregate_rows(institution, start, end, group_by)
+    salt = secrets.token_hex(16)
 
-    filename = f'ai-tutor-{group_by}-metrics-{start}-to-{end}.csv'
+    def key(value, prefix):
+        return prefix + hashlib.sha256(f'{salt}:{value}'.encode()).hexdigest()[:12]
+
+    sessions = (
+        filter_by_institution(
+            TutorSession.objects.filter(
+                started_at__date__gte=win_start, started_at__date__lte=win_end),
+            institution,
+        )
+        .select_related('lesson', 'institution')
+        .order_by('started_at')
+    )
+
+    from apps.tutoring.models import ExitTicketAttempt
+    attempts = (
+        filter_by_institution(
+            ExitTicketAttempt.objects.filter(
+                completed_at__date__gte=win_start,
+                completed_at__date__lte=win_end,
+                completed_at__isnull=False,
+            ),
+            institution, field='session__institution',
+        )
+        .select_related('exit_ticket__lesson', 'session__institution')
+        .order_by('completed_at')
+    )
+
+    reached = set(
+        sessions.filter(exit_ticket_attempts__purpose__in=['practice', 'retake'])
+        .values_list('id', flat=True)
+    )
+
+    filename = f'ai-tutor-data-{win_start}-to-{win_end}.csv'
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    writer = csv.writer(response)
+    w = csv.writer(response)
 
-    # A reader three months from now needs to know what window this covers and
-    # that rows are missing by design, or they will draw the wrong conclusion
-    # from a total that does not add up.
-    writer.writerow([f'# AI Tutor aggregate metrics, {start} to {end}'])
-    writer.writerow([f'# Grouped by {group_by}. Aggregate only — no student-level data.'])
-    writer.writerow([f'# Groups with fewer than {AGGREGATE_MIN_GROUP} students are '
-                     f'omitted ({suppressed} omitted here).'])
-    writer.writerow([])
+    w.writerow(['# AI Tutor data export'])
+    w.writerow([f'# Period: {win_start} to {win_end}'])
+    w.writerow([f'# Scope: {institution.name if institution else "All schools"}'])
+    w.writerow([f'# Generated: {timezone.now().date()}'])
+    w.writerow(['# Anonymised: student_key is a salted hash, re-salted per export.'])
+    w.writerow(['# Linkable within this file only. No names, ids or free text.'])
 
-    if rows:
-        headers = list(rows[0].keys())
-        writer.writerow(headers)
-        for r in rows:
-            writer.writerow([r.get(h, '') for h in headers])
-    else:
-        writer.writerow(['no groups met the minimum size for this window'])
+    w.writerow([])
+    w.writerow(['## SESSIONS'])
+    w.writerow(['session_key', 'student_key', 'school', 'lesson_id',
+                'lesson_title', 'started_on', 'reached_exit_ticket'])
+    for sess in sessions.iterator():
+        w.writerow([
+            key(sess.id, 's_'),
+            key(sess.student_id, 'u_'),
+            sess.institution.name if sess.institution else '',
+            sess.lesson_id,
+            sess.lesson.title if sess.lesson else '',
+            sess.started_at.date().isoformat(),
+            'yes' if sess.id in reached else 'no',
+        ])
+
+    w.writerow([])
+    w.writerow(['## EXIT_TICKET_ATTEMPTS'])
+    w.writerow(['attempt_key', 'student_key', 'school', 'lesson_id',
+                'lesson_title', 'purpose', 'completed_on',
+                'score_correct', 'questions', 'score_pct', 'passed'])
+    for att in attempts.iterator():
+        per = getattr(att.exit_ticket, 'questions_per_attempt', None) or 0
+        lesson = getattr(att.exit_ticket, 'lesson', None)
+        inst = getattr(getattr(att, 'session', None), 'institution', None)
+        w.writerow([
+            key(att.id, 'a_'),
+            key(att.student_id, 'u_'),
+            inst.name if inst else '',
+            getattr(lesson, 'id', ''),
+            getattr(lesson, 'title', ''),
+            att.purpose,
+            att.completed_at.date().isoformat(),
+            att.score,
+            per,
+            round(min(att.score / per, 1.0) * 100) if per else '',
+            'yes' if att.passed else 'no',
+        ])
 
     return response
