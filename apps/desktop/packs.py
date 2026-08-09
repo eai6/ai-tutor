@@ -46,12 +46,14 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 MANIFEST_NAME = 'manifest.json'
+ROSTER_NAME = 'roster.json'
 
 # Bumped when the pack layout changes in a way an older importer would
 # mis-read. Distinct from schema_rev, which tracks Django migrations.
 PACK_FORMAT_VERSION = 1
 
-PARTS = ('institution.json', 'curriculum.json', 'tickets.json', 'kb_chunks.json')
+PARTS = ('institution.json', 'curriculum.json', 'tickets.json', 'kb_chunks.json',
+         ROSTER_NAME)
 
 
 def _sha256(path: Path) -> str:
@@ -110,6 +112,45 @@ def _institution_querysets(institution_id: int):
     }
 
 
+def build_roster(institution_id: int) -> list[dict]:
+    """The institution's students, as the device's identity source.
+
+    Sync is meaningless without this. Every device keeps its own auth_user
+    table with device-local integer PKs, so a student who registers on two
+    laptops is two unrelated users and `StudentLessonProgress.unique_together
+    ('student', 'lesson')` does not recognise them as the same person. Rows
+    pushed from a device could not be attributed to anyone on the server.
+
+    Shipping the SERVER's user id in the pack means the device can stamp its
+    work with an identity the cloud already knows, without the device ever
+    having been online.
+
+    Deliberately NOT included: password hashes, email addresses. A pack travels
+    on a USB stick between schools; it carries the minimum needed to show a
+    student their own name in a list and to label their work. Authentication on
+    the device stays local.
+    """
+    from apps.accounts.models import Membership
+
+    memberships = (
+        Membership.objects
+        .filter(institution_id=institution_id, role='student', is_active=True)
+        .select_related('user')
+        .order_by('user__first_name', 'user__last_name', 'user__username')
+    )
+    roster = []
+    for m in memberships:
+        u = m.user
+        display = f'{u.first_name} {u.last_name}'.strip() or u.username
+        roster.append({
+            'server_user_id': u.id,
+            'username': u.username,
+            'display_name': display,
+            'grade_level': getattr(getattr(u, 'student_profile', None), 'grade_level', '') or '',
+        })
+    return roster
+
+
 def build_pack(institution_id: int, out_dir: Path, include_media: bool = True) -> dict:
     """Write a content pack. Returns the manifest dict."""
     from django.conf import settings
@@ -149,6 +190,15 @@ def build_pack(institution_id: int, out_dir: Path, include_media: bool = True) -
                                   stream=handle, indent=None)
         dump('kb_chunks.json', qs['chunks'])
 
+        # Plain JSON, not a serialized queryset: these are NOT rows to load into
+        # the device's auth_user table. They are a lookup list the student picks
+        # their name from, and the server id they pick becomes the label on
+        # everything they do. Deserializing real User rows onto the device would
+        # import password hashes and let local ids collide with server ids.
+        roster = build_roster(institution_id)
+        with open(staging / 'roster.json', 'w', encoding='utf-8') as handle:
+            json.dump(roster, handle)
+
         media_files = 0
         media_bytes = 0
         if include_media:
@@ -168,7 +218,8 @@ def build_pack(institution_id: int, out_dir: Path, include_media: bool = True) -
             'version': version,
             'built_at': timezone.now().isoformat(),
             'schema_rev': _latest_migration(),
-            'counts': {k: v.count() for k, v in qs.items()},
+            'counts': {**{k: v.count() for k, v in qs.items()},
+                       'roster': len(roster)},
             'media_files': media_files,
             'media_bytes': media_bytes,
             'checksums': {name: _sha256(staging / name) for name in PARTS},
@@ -192,6 +243,39 @@ def build_pack(institution_id: int, out_dir: Path, include_media: bool = True) -
         chunk_count=manifest['counts']['chunks'],
     )
     return manifest
+
+
+def _import_roster(path: Path, pack_version: int) -> int:
+    """Upsert the roster, keyed on the SERVER's user id.
+
+    Upsert rather than replace. A student who has already claimed their entry
+    on this device keeps that link across pack updates — wiping and reloading
+    would orphan every local account the next time a teacher imported a newer
+    pack, which is the sort of thing that only shows up mid-lesson.
+
+    Entries that vanish from a later pack (a student who left) are left in
+    place rather than deleted: their work is still on this device and still
+    needs an identity to sync under.
+    """
+    from apps.desktop.models import RosterEntry
+
+    if not path.exists():          # packs built before roster support
+        return 0
+
+    with open(path, encoding='utf-8') as handle:
+        entries = json.load(handle)
+
+    for e in entries:
+        RosterEntry.objects.update_or_create(
+            server_user_id=e['server_user_id'],
+            defaults={
+                'username': e.get('username', ''),
+                'display_name': e.get('display_name') or e.get('username', ''),
+                'grade_level': e.get('grade_level', '') or '',
+                'pack_version': pack_version,
+            },
+        )
+    return len(entries)
 
 
 # ─── Import (device side) ───────────────────────────────────────────────
@@ -275,9 +359,16 @@ def import_pack(archive: Path, *, force: bool = False,
 
         with transaction.atomic():
             for name in PARTS:
+                # roster.json is a plain list, not serialized model instances —
+                # deserialize() would raise on it. Handled below, and kept in
+                # PARTS so it still gets a checksum like everything else.
+                if name == ROSTER_NAME:
+                    continue
                 with open(staging / name, encoding='utf-8') as handle:
                     for obj in serializers.deserialize('json', handle):
                         obj.save()
+
+            _import_roster(staging / ROSTER_NAME, manifest['version'])
 
             media_src = staging / 'media'
             if media_src.exists():

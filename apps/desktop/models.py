@@ -69,3 +69,53 @@ class DeviceState(models.Model):
     @property
     def is_provisioned(self) -> bool:
         return self.pack_version is not None
+
+
+class RosterEntry(models.Model):
+    """A student from the institution's roster, shipped in the content pack.
+
+    This is NOT an auth_user row. It is the list a student picks their name
+    from at first launch, and the carrier of the one field that makes sync
+    possible: ``server_user_id``.
+
+    The problem it solves: every device has its own auth_user table with
+    device-local integer PKs, so the same real student registering on two
+    laptops becomes two unrelated users, and nothing the device pushes can be
+    attributed to a person the server knows. Pairing a local account with a
+    roster entry stamps that student's work with an identity the cloud already
+    has — decided offline, on a machine that may never have been online.
+
+    Deliberately carries no password hash and no email. A pack travels on a USB
+    stick between schools; it holds the minimum needed to show someone their
+    own name. Authentication stays local.
+    """
+
+    server_user_id = models.PositiveIntegerField(
+        unique=True,
+        help_text="The student's primary key on the SERVER. Never a local id.",
+    )
+    username = models.CharField(max_length=150)
+    display_name = models.CharField(max_length=300)
+    grade_level = models.CharField(max_length=50, blank=True, default='')
+
+    # Null until someone claims this entry on this device. Claiming is what
+    # binds a local login to a server identity; SET_NULL rather than CASCADE so
+    # deleting a local account releases the entry instead of erasing the
+    # roster row the next sync needs.
+    local_user = models.OneToOneField(
+        'auth.User', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='roster_entry',
+    )
+    claimed_at = models.DateTimeField(null=True, blank=True)
+
+    pack_version = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Pack version this entry last arrived in.',
+    )
+
+    class Meta:
+        ordering = ['display_name']
+        verbose_name_plural = 'roster entries'
+
+    def __str__(self):
+        return f'{self.display_name} (server #{self.server_user_id})'
