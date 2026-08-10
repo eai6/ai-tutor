@@ -248,3 +248,51 @@ class OpenAIReasoningEffortTest(TestCase):
         self.assertEqual(kw['max_tokens'], 1024)
         self.assertEqual(kw['temperature'], 0.3)
         self.assertNotIn('reasoning_effort', kw)
+
+
+class OpenAIModelProfileTest(TestCase):
+    """The five mt100 OpenAI arms must each have an EXACT profile entry.
+
+    Asserted against MODEL_PROFILES directly rather than through
+    get_model_profile(): the resolver falls back to FAMILY_PATTERNS, and a
+    silent fallback is exactly how these arms previously ended up with
+    family=None and the engine's bare 1024 default — running a different
+    harness configuration from every other arm on the board. Same blind spot
+    QwenInstructModeTest guards against for the local tags.
+    """
+
+    ARMS = (
+        'openai/gpt-5.6-sol',
+        'openai/gpt-5.6-terra',
+        'openai/gpt-5.6-luna',
+        'openai/gpt-5.4-mini',
+        'openai/gpt-5.4-nano',
+    )
+
+    def test_each_arm_has_an_exact_entry_with_the_openai_family(self):
+        from apps.llm.model_profiles import MODEL_PROFILES
+        for spec in self.ARMS:
+            self.assertIn(spec, MODEL_PROFILES,
+                          f'{spec}: no exact entry (would fall back to family=None)')
+            self.assertEqual(MODEL_PROFILES[spec].family, 'openai', spec)
+
+    def test_budget_is_large_enough_for_reasoning_plus_answer(self):
+        # 8192, not the engine's 1024 fallback: GPT-5.x bills reasoning tokens
+        # against the same budget as the answer, so a small ceiling returns
+        # done_reason=length with empty content and no tool call.
+        from apps.llm.model_profiles import MODEL_PROFILES
+        for spec in self.ARMS:
+            self.assertEqual(MODEL_PROFILES[spec].max_tokens, 8192, spec)
+
+    def test_no_sampling_is_set_because_the_client_would_discard_it(self):
+        # _build_completion_kwargs routes every gpt-5* name through the
+        # new-generation branch, which sends only max_completion_tokens. The API
+        # also rejects a custom temperature on gpt-5.6-*. Sampling here would be
+        # inert and would misrepresent how these arms actually run.
+        from apps.llm.model_profiles import MODEL_PROFILES
+        for spec in self.ARMS:
+            p = MODEL_PROFILES[spec]
+            self.assertIsNone(p.temperature, spec)
+            self.assertIsNone(p.top_p, spec)
+            self.assertIsNone(p.top_k, spec)
+            self.assertEqual(p.sampling_dict(), {}, spec)

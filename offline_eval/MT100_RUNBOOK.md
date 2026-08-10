@@ -18,6 +18,7 @@ clean.
 
 ## 1. Smoke pass — every arm, one scenario, throwaway results dir
 
+    TUTOR_CALL_MODE=two \
     MODE="--multi-turn --subset v2 --sample 1" \
     RESULTS_DIR=/tmp/mt100_smoke \
     CLOUD_MODELS_FILE="$PWD/offline_eval/cloud_models_mt100.txt" \
@@ -50,6 +51,7 @@ when the board is aggregated.
 
 ## 2. API leg — 14 arms, locally
 
+    TUTOR_CALL_MODE=two \
     RESULTS_DIR="$PWD/offline_eval/multi_turn_results/mt100" \
     CLOUD_MODELS_FILE="$PWD/offline_eval/cloud_models_mt100.txt" \
     MODE="--multi-turn --subset v2" \
@@ -127,87 +129,84 @@ above, matching the pattern Leg 1 already uses.
 
 ### Engine call mode is not uniform across the board
 
-`TUTOR_CALL_MODE` is unset everywhere in this runbook, so every arm falls
-back to its default, `'auto'`. `_call_mode()`
-(`apps/tutoring/simple_tutor/engine.py:2417`) resolves `'auto'` to `'two'`
-when `not family` **or** when `family` is in `_FORCE_POSE_EXEMPT_FAMILIES`
-(`== frozenset({'anthropic'})`), and to `'one'` otherwise.
-
-Measured across the 19 mt100 arms, that split is:
-
-| Call mode | Count | Arms |
-|---|---|---|
-| **two-call** | 10 | the 5 Anthropic arms (deliberate exemption) + the 5 OpenAI arms (**accidental** — see below) |
-| **one-call** | 9 | the 4 Google arms + the 5 local Qwen arms |
+**Resolved 2026-08-10: `TUTOR_CALL_MODE=two` is pinned board-wide.** Both
+legs set it — the `run_cloud.sh` invocations in steps 1 and 2 above, and Cell 9
+of the Colab notebook. `_call_mode()`
+(`apps/tutoring/simple_tutor/engine.py:2417`) returns the pinned value
+verbatim before it ever consults `family`, so all 19 arms run the same
+protocol and the per-family `'auto'` resolution below is bypassed entirely.
 
 Two-call means Call 1 picks tools, the platform grades, and Call 2 writes the
 reply *knowing the verdict*. One-call means the model writes its reply in
 Call 1, before grading, and `_align_reply_polarity` cleans up contradictions
-afterward. **These are two different protocols, and rows are not directly
-comparable on this axis** — a two-call Anthropic row and a one-call Gemini row
-are not measuring the same task shape, independent of anything about the
-models themselves.
+afterward. Those are different task shapes, which is why mixing them across
+rows would not have been defensible.
 
-Pinning `TUTOR_CALL_MODE=one` or `TUTOR_CALL_MODE=two` board-wide is an
-available, unexercised option that would remove this confound — neither
-`run_cloud.sh` nor the Colab notebook sets it. Nobody has decided whether to
-pin it; that decision was escalated during implementation and intentionally
-left for whoever runs the sweep. If board results need to be defensible
-cross-row, decide this before running Leg 1.
+Why `two` and not `one`: it is the configuration production actually ships for
+Anthropic, so the Anthropic rows stay production-representative, and it matches
+the `TUTOR_CALL_MODE=two` pin the mt30/mt50 OSS boards used — so the 30 `v1`
+scenarios inside this 100 remain comparable to those earlier boards on protocol
+as well as on scenario set. That continuity is the whole reason the selection
+algorithm forces all 30 `v1` scenarios into the draw.
 
-### The five OpenAI arms have no ModelProfile entry at all
+The cost is real and worth planning for: the nine arms that `'auto'` would have
+run one-call (4 Google + 5 Qwen) now make two LLM calls per turn, so budget
+roughly double the per-turn latency and token spend on those rows — including
+`gemini-3.1-pro-preview`, the most expensive arm on the board.
 
-`apps/llm/model_profiles.py` has no exact key and no `FAMILY_PATTERNS` regex
-matching `gpt`/`openai`, so `get_model_profile()` returns `None` for all five
-OpenAI specs in `cloud_models_mt100.txt` (`gpt-5.6-sol`, `gpt-5.6-terra`,
-`gpt-5.6-luna`, `gpt-5.4-mini`, `gpt-5.4-nano`), and `family` is `None` for
-all five. Consequences, stated plainly:
+Had it been left unpinned, `'auto'` would have resolved to `'two'` for the 5
+Anthropic arms (via `_FORCE_POSE_EXEMPT_FAMILIES == frozenset({'anthropic'})`)
+and the 5 OpenAI arms (via the `not family` fallback, before they had
+profiles), and `'one'` for the 4 Google and 5 Qwen arms — a 10/9 split with no
+principle behind it.
 
-- They land in two-call mode via the `not family` fallback in `_call_mode()`
-  above — **by accident**, not by the same deliberate choice that exempts
-  Anthropic.
-- Sampling overrides would be moot even if a profile existed:
-  `_build_completion_kwargs` discards sampling parameters for new-gen models.
-- **`max_tokens` is 1024, not 8192/2048/1024 like everyone else.**
+### The five OpenAI arms now have ModelProfile entries
+
+**Resolved 2026-08-10.** `apps/llm/model_profiles.py` previously had no exact
+key and no `FAMILY_PATTERNS` regex matching `gpt`/`openai`, so
+`get_model_profile()` returned `None` for all five OpenAI specs and `family`
+was `None`. Exact entries now exist for `openai/gpt-5.6-sol`, `-terra`,
+`-luna`, `openai/gpt-5.4-mini` and `-nano`, all `family="openai"`,
+`max_tokens=8192`. What that fixed:
+
+- **`max_tokens` was 1024, against 8192 for Gemini and 2048 for Anthropic.**
   `engine.py:2153` — `max_tokens = profile.max_tokens if profile else 1024` —
-  falls back to 1024 whenever `profile` is `None`, which is every OpenAI arm.
-  For comparison: Gemini arms run at 8192, Anthropic at 2048, Qwen at 1024 (a
-  deliberate choice for the Qwen arms; accidental for OpenAI). `gpt-5.4-mini`
-  and `gpt-5.4-nano` send no `reasoning_effort` at all (only the gpt-5.6-*
-  arms do, and only to satisfy the tool-calling restriction), and reasoning
-  tokens are billed against that same 1024-token budget — so mini/nano can
-  spend the whole budget thinking and come back with `finish_reason=length`,
-  empty content, and no tool call, which reads as a harness failure rather
-  than a model failure unless you know to look for it.
-- **They skip the family-gated eval-repair paths.** `_should_force_pose` and
-  `_should_force_grade` (`engine.py`) only engage `if not family or family in
-  _FORCE_POSE_EXEMPT_FAMILIES: return False` — with `family=None`, OpenAI
-  arms hit that same early return and never get Call 1 forced onto
-  `pose_question`/`record_answer` the way Gemini and Qwen arms do (the fix
-  built for Gemini's "question narrated as prose, nothing to grade" failure
-  mode and extended to every non-Anthropic family). They also render Block 0
-  from the unmodified base XML template — `build_family_block_0` gives Qwen a
-  Markdown variant and Gemini a targeted XML variant, but `family=None` falls
-  into the same "everyone else, incl. Anthropic/production" branch as
-  Anthropic itself, so OpenAI arms are prompted with an Anthropic-shaped
-  system block, not a family-matched one.
-- **No OpenAI arm has ever been run through this harness before.** Every
-  other vendor on this board (Anthropic, Gemini, Qwen) has prior eval runs to
-  sanity-check against; the five OpenAI rows are first-contact — treat early
-  anomalies as "could be the harness" until a second run confirms them.
+  fell back to 1024 whenever `profile` was `None`. `gpt-5.4-mini` and
+  `gpt-5.4-nano` send no `reasoning_effort` (only the gpt-5.6-* arms do, and
+  only to satisfy the tool-calling restriction), and reasoning tokens bill
+  against that same budget, so mini/nano could spend the whole 1024 thinking
+  and return `finish_reason=length` with empty content and no tool call —
+  reading as a near-zero tutoring score for a purely harness reason. This was
+  the most likely way the OpenAI rows would have come back uninterpretable.
+- **They skipped the family-gated eval-repair paths.** `_should_force_pose`,
+  `_should_force_grade`, polarity alignment, auto-grade fallback, stuck-slot
+  pivot and ensure-posed-question all early-return on
+  `if not family or family in _FORCE_POSE_EXEMPT_FAMILIES` — which `family=None`
+  satisfied. The OpenAI arms therefore ran an unscaffolded configuration while
+  Gemini and Qwen arms received all six repairs. With `family="openai"` they
+  now get the same treatment as every other non-Anthropic family.
 
-Taken together, **an OpenAI-vs-Gemini comparison on this board is not valid
-until OpenAI `ModelProfile` entries exist** — the OpenAI rows differ from
-every other row on call mode, `max_tokens` budget, prompt family, and
-eval-repair coverage, all for the same underlying reason (no profile), not
-because of anything about the models being compared.
+Two things deliberately did NOT change:
 
-Adding OpenAI `ModelProfile` entries would flip these five arms to one-call
-and start applying a `family_prompt_delta` — i.e. it would change what the
-board measures, not just clean up a gap. Treat it as a decision that needs to
-be made deliberately, not a pre-sweep chore. **Do not add these profile
-entries or pin `TUTOR_CALL_MODE` as part of running this board** — both are
-pending human decisions, not implementation gaps to close along the way.
+- **No sampling is set on these profiles.** `_build_completion_kwargs` routes
+  every `gpt-5*` name through its new-generation branch, which sends only
+  `max_completion_tokens` and drops temperature/top_p/top_k. The API enforces
+  it too — gpt-5.6-* reject a custom temperature outright. Sampling here would
+  be inert and would misrepresent how these arms run.
+- **The prompt block is unchanged.** `build_family_block_0` branches only for
+  `qwen` (Markdown), `gemini`/`gemma` and `kimi` (targeted XML appendices);
+  every other family, including `openai` and the previous `None`, gets the base
+  XML template. So adding the family did not alter what these models are
+  prompted with — only their budget and their repair coverage.
+
+Call mode is no longer affected either way: `TUTOR_CALL_MODE=two` is pinned
+board-wide, so the `family`-driven `'auto'` resolution never runs.
+
+**Still true: no OpenAI arm has ever been run through this harness before.**
+Every other vendor here (Anthropic, Gemini, Qwen) has prior eval runs to
+sanity-check against; the five OpenAI rows are first-contact. Treat early
+anomalies as "could be the harness" until a second run confirms them, and lean
+on the step-1 smoke pass rather than assuming a clean first sweep.
 
 ### gpt-5.6-luna: one dropped tool call observed in development
 

@@ -97,6 +97,7 @@ _MT_THINKING = 32768
 _MT_ANTHROPIC = 2048     # raise the eval ceiling above the legacy 1024 (Claude rarely hits it)
 _MT_GEMINI_THINK = 8192
 _MT_GROK_THINK = 8192
+_MT_OPENAI = 8192        # GPT-5.x bills reasoning against the SAME budget as the answer
 
 # DeepSeek-chat (non-thinking) toggle on the OpenAI-compatible Vertex endpoint.
 _DEEPSEEK_NO_THINK = {"chat_template_kwargs": {"thinking": False}}
@@ -115,6 +116,57 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     ),
     "anthropic/claude-haiku-4-5-20251001": ModelProfile(
         family="anthropic", mode="instruct", max_tokens=_MT_ANTHROPIC,
+    ),
+
+    # --- OpenAI GPT-5.x (added for the mt100 board, 2026-08-10) ---
+    #
+    # WHY THESE EXIST. Before this, no openai/* spec had a profile and none of
+    # the FAMILY_PATTERNS regexes matched `gpt`, so get_model_profile() returned
+    # None for every OpenAI arm. Two consequences, both measured:
+    #
+    #   1. max_tokens fell to the engine's bare default of 1024
+    #      (simple_tutor/engine.py: `profile.max_tokens if profile else 1024`),
+    #      against 8192 for Gemini. GPT-5.x bills reasoning tokens against the
+    #      SAME budget as the answer, so a reasoning model on 1024 can exhaust
+    #      it mid-deliberation and return done_reason=length with empty content
+    #      and no tool call — which scores as "the tutor stopped responding"
+    #      rather than as truncation. Same failure mode documented on
+    #      qwen3-4b-thinking-jetson below.
+    #   2. `family=None` skipped every family-gated eval repair path in the
+    #      engine (force-pose, force-grade, polarity alignment, auto-grade
+    #      fallback, stuck-slot pivot, ensure-posed-question), which Gemini and
+    #      Qwen arms all receive. The OpenAI rows measured a different harness
+    #      configuration from the rest of the board.
+    #
+    # SAMPLING IS DELIBERATELY ABSENT. OpenAIClient._build_completion_kwargs
+    # routes every `gpt-5*` name through its new-generation branch, which sends
+    # only max_completion_tokens and drops temperature/top_p/top_k entirely.
+    # The API enforces this: gpt-5.6-* reject a custom temperature outright.
+    # Setting sampling here would be inert and misleading.
+    #
+    # mode reflects what actually runs: the 5.6 tags are driven with
+    # reasoning_effort='none' (the only way they accept function tools on
+    # /v1/chat/completions), so they behave as instruct; 5.4-mini/nano reason at
+    # the API default.
+    "openai/gpt-5.6-sol": ModelProfile(
+        family="openai", mode="instruct", max_tokens=_MT_OPENAI,
+        notes="reasoning_effort='none' (required for function tools); reasoning off.",
+    ),
+    "openai/gpt-5.6-terra": ModelProfile(
+        family="openai", mode="instruct", max_tokens=_MT_OPENAI,
+        notes="reasoning_effort='none' (required for function tools); reasoning off.",
+    ),
+    "openai/gpt-5.6-luna": ModelProfile(
+        family="openai", mode="instruct", max_tokens=_MT_OPENAI,
+        notes="reasoning_effort='none' (required for function tools); reasoning off.",
+    ),
+    "openai/gpt-5.4-mini": ModelProfile(
+        family="openai", mode="thinking", max_tokens=_MT_OPENAI,
+        notes="Reasons at the API default; budget shared with the answer.",
+    ),
+    "openai/gpt-5.4-nano": ModelProfile(
+        family="openai", mode="thinking", max_tokens=_MT_OPENAI,
+        notes="Reasons at the API default; budget shared with the answer.",
     ),
 
     # --- Gemini (framework §3.5: leave temperature at provider default = 1.0) ---
