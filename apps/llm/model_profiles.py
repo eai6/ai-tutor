@@ -324,8 +324,38 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     "local_ollama/qwen3:8b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, num_gpu=99, ollama_think=False,
+        notes="5.2 GB weights. Comfortable on a 19 GB laptop alongside the app. Hybrid template: think suppressed.",
+    ),
+
+    # mt100 board, 8B arm. Modelfile-pinned sibling of the bare qwen3:8b entry
+    # above, for the same reason every other jetson tag exists: a Modelfile
+    # PARAMETER reaches the OpenAI-compatible endpoint the grader's verifier
+    # uses, and the profile does not — a bare tag spawns a second 4096-ctx
+    # runner and evicts the tutor.
+    #
+    # ollama_think=False because qwen3:8b is a HYBRID template that gates on
+    # the Think flag (see the ModelProfile.ollama_think docstring). Unlike
+    # qwen3:4b-Thinking, the flag genuinely suppresses reasoning here.
+    "local_ollama/qwen3-8b-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=1024,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, num_gpu=99, ollama_think=False,
+        notes="mt100 8B arm. 5.2 GB weights; hybrid template, think suppressed.",
+    ),
+
+    # mt100 board, 30B arm — Qwen3-30B-A3B, an MoE with ~3B active params, so
+    # decode cost tracks a 3B model while capacity tracks 30B.
+    #
+    # Built FROM the instruct-2507 checkpoint, NOT the bare qwen3:30b-a3b
+    # hybrid. Same rule as qwen3-4b-jetson: instruct enforced by the BASE
+    # MODEL, not a runtime flag, so there is no ollama_think here and adding
+    # one would be wrong.
+    "local_ollama/qwen3-30b-a3b-jetson": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=1024,
+        temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, num_gpu=99,
-        notes="5.2 GB weights. Comfortable on a 19 GB laptop alongside the app.",
+        notes="mt100 30B arm: Qwen3-30B-A3B-Instruct-2507 (MoE, ~3B active).",
     ),
 
     # 9.3 GB of weights plus a 16K KV cache is roughly 12-13 GB resident. On a

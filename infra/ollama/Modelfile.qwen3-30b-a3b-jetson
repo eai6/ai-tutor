@@ -1,0 +1,28 @@
+# qwen3-30b-a3b-jetson — Qwen3-30B-A3B-Instruct-2507 for the mt100 board
+#
+# Build:   ollama create qwen3-30b-a3b-jetson -f infra/ollama/Modelfile.qwen3-30b-a3b-jetson
+# Profile: apps/llm/model_profiles.py ("local_ollama/qwen3-30b-a3b-jetson")
+#
+# The 30B arm of the mt100 size ladder. A3B = ~3B active parameters per token,
+# so decode cost tracks a 3B model while capacity tracks 30B. Laptop/Colab
+# class, NOT the 8 GB Jetson — read its numbers as a capacity ceiling, not a
+# deployment candidate.
+#
+# INSTRUCT MODE comes from the BASE MODEL, not a runtime flag. The bare
+# qwen3:30b-a3b tag is the hybrid checkpoint; instruct-2507 has no thinking to
+# suppress, so the profile deliberately sets no ollama_think. This is the same
+# rule Modelfile.qwen3-4b-jetson states: enforce instruct with the checkpoint
+# where one exists, because ollama_think=False only disables Ollama's parser on
+# templates that open <think> unconditionally.
+#
+# NOTE the -q4 suffix: ollama publishes instruct-2507 only as -fp16 / -q4 / -q8,
+# with no unquantised alias. q4 matches the Q4_K_M quantisation the other tags
+# on this board use.
+FROM qwen3:30b-a3b-instruct-2507-q4
+
+# Must match local_ollama/qwen3-30b-a3b-jetson in apps/llm/model_profiles.py.
+PARAMETER num_ctx 16384
+
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20

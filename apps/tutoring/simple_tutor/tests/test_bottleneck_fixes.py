@@ -1494,3 +1494,42 @@ class ToolNameNormalisationOrdersDispatchTest(DjangoTestCase):
 # were removed with _filter_reveals (2026-08-06). Leak prevention is now
 # the prompt's job — post-processing the tutor's reply was dropped as
 # unreliable. See the note where _filter_reveals used to live in engine.py.
+
+
+class QwenInstructModeTest(SimpleTestCase):
+    """Every Qwen arm on the mt100 board must run instruct, not thinking."""
+
+    ARMS = (
+        'local_ollama/qwen3.5-2b-jetson',
+        'local_ollama/qwen3-4b-jetson',
+        'local_ollama/qwen3-8b-jetson',
+        'local_ollama/qwen3.6-27b-instruct',
+        'local_ollama/qwen3-30b-a3b-jetson',
+    )
+    # Tags whose BASE checkpoint is instruct — no runtime flag needed, and
+    # setting one would be wrong (it only toggles Ollama's parser).
+    BASE_INSTRUCT = {
+        'local_ollama/qwen3-4b-jetson',
+        'local_ollama/qwen3-30b-a3b-jetson',
+    }
+
+    def test_every_arm_has_a_profile_in_instruct_mode(self):
+        from apps.llm.model_profiles import get_model_profile
+        for spec in self.ARMS:
+            p = get_model_profile(spec)
+            self.assertIsNotNone(p, f'{spec}: no profile')
+            self.assertEqual(p.mode, 'instruct', spec)
+
+    def test_hybrid_arms_suppress_thinking_and_base_instruct_arms_do_not(self):
+        from apps.llm.model_profiles import get_model_profile
+        for spec in self.ARMS:
+            p = get_model_profile(spec)
+            if spec in self.BASE_INSTRUCT:
+                self.assertIsNone(p.ollama_think, f'{spec}: flag not needed')
+            else:
+                self.assertIs(p.ollama_think, False, f'{spec}: hybrid needs False')
+
+    def test_bare_qwen3_8b_profile_also_suppresses_thinking(self):
+        # The pre-existing entry claimed instruct without the flag.
+        from apps.llm.model_profiles import MODEL_PROFILES
+        self.assertIs(MODEL_PROFILES['local_ollama/qwen3:8b'].ollama_think, False)

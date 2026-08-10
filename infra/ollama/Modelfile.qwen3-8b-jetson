@@ -1,0 +1,31 @@
+# qwen3-8b-jetson — Qwen3-8B for the mt100 board, instruct mode
+#
+# Build:   ollama create qwen3-8b-jetson -f infra/ollama/Modelfile.qwen3-8b-jetson
+# Profile: apps/llm/model_profiles.py ("local_ollama/qwen3-8b-jetson")
+#
+# WHY A TAG AND NOT JUST THE PROFILE — model_profiles can only pin num_ctx on
+# requests built by our own Ollama client. The grader's Tier-2 verifier reaches
+# Ollama through instructor.from_provider('ollama'), i.e. the OpenAI-compatible
+# /v1/chat/completions endpoint, which has no num_ctx field. Ollama keys a
+# runner on (model, params), so the verifier's call lands at the 4096 default —
+# a different runner from the tutor's 16384 — and under
+# OLLAMA_MAX_LOADED_MODELS=1 that evicts the tutor and reloads it. A Modelfile
+# PARAMETER applies on every endpoint, which is the only fix that covers paths
+# we do not construct requests for.
+#
+# INSTRUCT MODE. qwen3:8b is a HYBRID template that gates on the Think flag, so
+# the profile's ollama_think=False genuinely suppresses reasoning here (unlike
+# qwen3:4b Thinking-2507, where the flag only disables Ollama's parser). There
+# is no separate qwen3:8b-instruct tag to build from, so the flag is the
+# mechanism — keep the profile and this file in agreement.
+FROM qwen3:8b
+
+# Must match local_ollama/qwen3-8b-jetson in apps/llm/model_profiles.py.
+# If the two disagree, the disagreement IS the bug.
+PARAMETER num_ctx 16384
+
+# Qwen3's recommended instruct sampling, restated so the tag is
+# self-describing and the OpenAI-compatible path gets them too.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
