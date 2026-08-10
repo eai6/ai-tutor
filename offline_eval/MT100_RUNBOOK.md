@@ -119,7 +119,7 @@ misconfigured arm will otherwise burn its full 100-scenario budget confounded
 before anyone notices.
 
 **The 30B arm may not fit a T4.** `qwen3-30b-a3b-jetson`'s base
-(`qwen3:30b-a3b-instruct-2507-q4`) is roughly 18 GB, and its profile sets
+(`qwen3:30b-a3b-instruct-2507-q4_K_M`) is 18.6 GB, and its profile sets
 `num_gpu=99` (force full GPU offload) — do not change that. A Colab T4 has
 16 GB VRAM, so a T4 runtime is likely to OOM on this arm specifically. This is
 why it gets its own group: run the `C_30b` tab on an **A100 or L4** runtime

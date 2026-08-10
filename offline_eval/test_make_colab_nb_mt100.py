@@ -5,6 +5,10 @@ import pathlib
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
+
+import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GEN = ROOT / 'offline_eval' / '_make_colab_nb_mt100.py'
@@ -205,3 +209,55 @@ def test_group_dropdown_offers_every_group_plus_all():
     offered = {o.strip().strip('"') for o in m.group(1).split(',')}
     assert offered == set(groups) | {'ALL'}, (
         f'dropdown {sorted(offered)} != groups {sorted(groups)} + ALL')
+
+
+# --- Modelfile base tags must actually exist on the Ollama registry ----------
+#
+# run_matrix.sh does `ollama pull $base` for the FROM line before `ollama create`.
+# A base tag that does not resolve fails with "pull model manifest: file does
+# not exist", run_matrix.sh prints "pull failed — skipping", and the arm is
+# silently absent from the board. On a Colab runtime that costs the whole
+# session; on the 30B arm it costs an A100 session.
+#
+# This happened on 2026-08-10: Modelfile.qwen3-30b-a3b-jetson shipped
+# `qwen3:30b-a3b-instruct-2507-q4`, missing the `_K_M`, because the tag was
+# taken from an HTML scrape whose character class excluded underscores. Nothing
+# caught it until a Colab tab burned a build. File-existence checks cannot catch
+# it — only asking the registry can.
+
+def _registry_status(base: str) -> int:
+    library, _, tag = base.partition(':')
+    url = f'https://registry.ollama.ai/v2/library/{library}/manifests/{tag or "latest"}'
+    req = urllib.request.Request(url, method='GET')
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+
+
+def test_modelfile_from_tags_resolve_on_the_registry():
+    """Every mt100 arm's Modelfile FROM tag must return 200 from the registry.
+
+    Network-dependent by necessity — the failure mode being guarded is
+    precisely "this string is not a real tag", which no local check can see.
+    Skips (rather than fails) when the registry is unreachable, so an offline
+    run does not produce a misleading red.
+    """
+    modelfiles = [ROOT / 'infra' / 'ollama' / f'Modelfile.{tag}' for tag in ARMS]
+    try:
+        _registry_status('qwen3:8b')
+    except (urllib.error.URLError, OSError) as exc:      # no network / DNS
+        pytest.skip(f'ollama registry unreachable: {exc}')
+
+    broken = []
+    for mf in modelfiles:
+        assert mf.is_file(), f'{mf} missing'
+        base = next(line.split()[1] for line in mf.read_text().splitlines()
+                    if line.startswith('FROM '))
+        if _registry_status(base) != 200:
+            broken.append(f'{mf.name}: FROM {base}')
+    assert not broken, (
+        'Modelfile base tags that do not resolve on the Ollama registry — '
+        '`ollama pull` will 404 and run_matrix.sh will skip the arm:\n  '
+        + '\n  '.join(broken))
