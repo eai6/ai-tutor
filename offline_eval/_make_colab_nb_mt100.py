@@ -10,14 +10,27 @@ combined board.
 **What is and isn't controlled across all 19 arms (both legs):** the judge,
 student-sim, scenario set, and `v2` subset are constant. The engine's
 tutor-side call mode is NOT pinned anywhere in this notebook or in
-`run_cloud.sh` — it resolves per-family via `TUTOR_CALL_MODE=auto`
-(apps/tutoring/simple_tutor/engine.py), which is two-call ONLY for family
-`anthropic` (`_FORCE_POSE_EXEMPT_FAMILIES`) and one-call for everything else.
-Concretely: the 5 Anthropic cloud arms run two-call; the 9 OpenAI/Google
-cloud arms AND all 5 Qwen arms here run one-call. This asymmetry sits inside
-the cloud leg too, not just between legs — weigh it when comparing rows on
-the combined board. Pinning `TUTOR_CALL_MODE` is a deliberate open decision
-left to the human running the board, not something this generator decides.
+`run_cloud.sh` — it resolves per-family via `_call_mode()`
+(apps/tutoring/simple_tutor/engine.py:2417), which reads
+`TUTOR_CALL_MODE=auto` (unset) and returns two-call when
+`not family or family in _FORCE_POSE_EXEMPT_FAMILIES` (that frozenset is
+just `{'anthropic'}`), one-call otherwise. Verified per-arm by calling
+`get_model_profile()` on every spec in `offline_eval/cloud_models_mt100.txt`
+plus these five Qwen keys: the real split is **10 two-call vs. 9 one-call**,
+not a clean per-vendor line —
+  - two-call: the 5 `anthropic/*` arms (`family='anthropic'`, the deliberate
+    branch) AND the 5 `openai/*` gpt-5.x arms — NOT deliberate: no
+    `MODEL_PROFILES` entry exists for any gpt-5.x spec, so
+    `get_model_profile()` returns `None`, `family` is `None`, and the
+    `not family` fallback silently lands on two-call.
+  - one-call: the 4 `google/*` gemini arms (`family='gemini'`) and all 5
+    Qwen arms here (`family='qwen'`).
+This asymmetry sits inside the cloud leg itself, not just between legs, and
+half of it (the OpenAI side) is an accidental fallback rather than a chosen
+setting — weigh both facts when comparing rows on the combined board.
+Pinning `TUTOR_CALL_MODE` (and adding OpenAI `ModelProfile` entries) are
+open decisions left to the human running the board, not something this
+generator decides.
 
 Three deliberate choices, so the numbers mean something:
 
@@ -124,11 +137,18 @@ the same 100 scenarios so both legs sit on one combined board.
 **Call-mode caveat — read before comparing rows across the board.** Judge,
 student-sim, scenario set, and the `v2` subset are held constant across all
 19 arms. Engine call mode is NOT — it is `TUTOR_CALL_MODE=auto` everywhere
-(unpinned, by design left to the human), which resolves to two-call only for
-the `anthropic` family and one-call for everything else. So the 5 Anthropic
-cloud arms run two-call while the 9 OpenAI/Google cloud arms AND all 5 Qwen
-arms here run one-call. This is not apples-to-apples on call mode — factor
-it in when reading the leaderboard.
+(unpinned, left to the human), which resolves to two-call when
+`family` is `anthropic` **or missing entirely**, one-call otherwise. The
+real split, verified per-arm via `get_model_profile()`, is **10 two-call vs.
+9 one-call**:
+- **Two-call:** the 5 `anthropic/*` arms (deliberate — this is the intended
+  default), PLUS the 5 `openai/*` gpt-5.x arms (NOT deliberate — no
+  `MODEL_PROFILES` entry exists for gpt-5.x, so `family` resolves to `None`
+  and the `not family` fallback lands on two-call by accident).
+- **One-call:** the 4 `google/*` gemini arms and all 5 Qwen arms here.
+
+This is not apples-to-apples on call mode, and the OpenAI side of it isn't
+even an intentional setting — factor both in when reading the leaderboard.
 
 | tag | note |
 | --- | --- |
@@ -366,8 +386,12 @@ is scored on the same `v2` 100 scenarios via `run_cloud.sh` / a separate
 notebook — Task 8 aggregates both legs onto one combined board.
 
 **Remember the call-mode caveat from the top of this notebook:** call mode is
-unpinned (`TUTOR_CALL_MODE=auto`) on both legs — the 5 Anthropic cloud arms
-run two-call, the 9 OpenAI/Google cloud arms and all 5 Qwen arms here run
+unpinned (`TUTOR_CALL_MODE=auto`) on both legs. Verified per-arm: it's
+**10 two-call vs. 9 one-call**, not a clean per-leg or per-vendor split —
+the 5 `anthropic/*` arms run two-call deliberately, the 5 `openai/*` gpt-5.x
+arms ALSO run two-call but only because no `MODEL_PROFILES` entry exists for
+them (`family=None` triggers the same fallback as Anthropic, by accident,
+not by design), and the 4 `google/*` arms plus all 5 Qwen arms here run
 one-call. Judge, student-sim, scenario set, and subset are the only things
 held constant across all 19 rows; call mode is not one of them.
 """)
