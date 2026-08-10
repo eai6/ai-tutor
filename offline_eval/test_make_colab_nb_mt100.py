@@ -87,3 +87,65 @@ def test_every_arm_has_a_real_modelfile_on_disk():
     for arm in ARMS:
         mf = ROOT / 'infra' / 'ollama' / f'Modelfile.{arm}'
         assert mf.is_file(), f'{mf} does not exist on disk'
+
+
+# --- fix round 3: none of the checks above catch a models.txt column-order
+# bug. `test_builds_every_arm_from_its_modelfile` only proves the arm names
+# appear SOMEWHERE in the notebook text (they do — inside Cell 8.5's
+# hardcoded MODEL_PROFILES-key list, which correctly keeps the
+# `local_ollama/` prefix per run_matrix.sh:1's own contract for THAT column).
+# It says nothing about what Cell 8 actually writes to models.txt, which is a
+# separate string with a separate, easy-to-invert column order. This test
+# extracts that exact write() payload and parses it exactly the way
+# run_matrix.sh's `while read -r tag tier _rest` loop does, so it fails if
+# column 1 is ever provider-prefixed (or otherwise not a bare tag) again.
+
+def _models_txt_payload(nb_source_cells):
+    """Extract the string literal Cell 8 writes to offline_eval/models.txt."""
+    for cell in nb_source_cells:
+        if cell['cell_type'] != 'code':
+            continue
+        text = ''.join(cell['source'])
+        if "offline_eval/models.txt', 'w').write(" not in text:
+            continue
+        m = re.search(r"\.write\('''(.*?)'''\)", text, re.DOTALL)
+        assert m, 'found the models.txt write() call but could not parse its payload'
+        return m.group(1)
+    raise AssertionError('no code cell writes offline_eval/models.txt')
+
+
+def _parse_like_run_matrix(payload: str) -> list[str]:
+    """Mirror run_matrix.sh's `while read -r tag tier _rest` loop: first
+    whitespace-delimited field of each non-blank, non-comment line is the tag
+    run_matrix.sh builds `local_ollama/$tag` and `Modelfile.$tag` from."""
+    tags = []
+    for line in payload.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        tags.append(stripped.split()[0])
+    return tags
+
+
+def test_models_txt_column_1_is_a_bare_tag_with_a_real_modelfile():
+    """Parses the ACTUAL models.txt payload the notebook writes, using
+    run_matrix.sh's own parsing contract (first field = tag; `Modelfile.$tag`
+    resolved directly, no provider prefix stripped). Must fail if column 1 is
+    `local_ollama/<tag>` (or anything else run_matrix.sh wouldn't resolve to
+    an existing Modelfile) — that shape makes run_matrix.sh look for
+    `Modelfile.local_ollama/<tag>`, miss, fall through to a bare
+    `ollama pull local_ollama/<tag>`, 404, and skip the arm."""
+    subprocess.run([sys.executable, str(GEN)], cwd=ROOT, check=True)
+    nb = json.loads(NB.read_text())
+    payload = _models_txt_payload(nb['cells'])
+    tags = _parse_like_run_matrix(payload)
+    assert tags, 'no model rows parsed out of the models.txt payload'
+    assert set(tags) == set(ARMS), f'expected exactly {sorted(ARMS)}, parsed {sorted(tags)}'
+    for tag in tags:
+        mf = ROOT / 'infra' / 'ollama' / f'Modelfile.{tag}'
+        assert mf.is_file(), (
+            f'models.txt column 1 {tag!r} has no matching {mf} — this is '
+            'exactly the run_matrix.sh contract violation that silently '
+            'skips every arm (Modelfile lookup misses, falls through to a '
+            "bare `ollama pull`, 404s, 'pull failed — skipping')"
+        )

@@ -77,22 +77,32 @@ RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 # No --sample cap: the v2 subset IS the 100 — every arm sees all 100.
 MODE = os.environ.get('MT100_MODE', '--multi-turn --subset v2')
 
-# The five arms under test (tag tier, run_matrix.sh shape). Every tag is
-# Modelfile-pinned — see infra/ollama/Modelfile.<tag> for each.
+# The five arms under test (tag tier, run_matrix.sh shape — see run_matrix.sh:
+# `while read -r tag tier _rest`, then `MODELFILE="$ROOT/infra/ollama/
+# Modelfile.$tag"` and `TUTOR_MODEL_OVERRIDE="local_ollama/$tag"`). Column 1
+# is therefore the BARE tag, never provider-prefixed — run_matrix.sh prepends
+# `local_ollama/` itself when it invokes the eval; a prefixed column 1 makes
+# it look for a nonexistent `Modelfile.local_ollama/<tag>`, fall through to a
+# bare `ollama pull local_ollama/<tag>`, 404, and skip the arm silently (all
+# five, in this list). Every tag is Modelfile-pinned — see
+# infra/ollama/Modelfile.<tag> for each.
 QWEN_MODELS = os.environ.get('MT100_MODELS') or """\
 # mt100 OSS leg — five Qwen sizes, every one in INSTRUCT mode.
 # 2b/8b/27b are hybrid templates with think suppressed via the profile's
 # ollama_think=False; 4b and 30b are instruct CHECKPOINTS with nothing to
 # suppress. Do not ""fix"" the asymmetry — see the Modelfiles.
-local_ollama/qwen3.5-2b-jetson       qwen3.5-2b-jetson
-local_ollama/qwen3-4b-jetson         qwen3-4b-jetson
-local_ollama/qwen3-8b-jetson         qwen3-8b-jetson
-local_ollama/qwen3.6-27b-instruct    qwen3.6-27b-instruct
-local_ollama/qwen3-30b-a3b-jetson    qwen3-30b-a3b-jetson
+qwen3.5-2b-jetson        jetson
+qwen3-4b-jetson          jetson
+qwen3-8b-jetson          jetson
+qwen3.6-27b-instruct     jetson
+qwen3-30b-a3b-jetson     jetson
 """
 
 # Sanity at generation time: the v2 tag must select exactly 100 multi-turn
-# scenarios, and every model's Modelfile must exist.
+# scenarios, and every model's Modelfile must exist. Parses QWEN_MODELS the
+# same way run_matrix.sh does — `read -r tag tier _rest` — so this check
+# validates the actual contract the shell script relies on, not the
+# generator's own assumption about the format.
 import re as _re
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -106,8 +116,7 @@ _ARM_TAGS = []
 for _line in QWEN_MODELS.strip().splitlines():
     if not _line.strip() or _line.strip().startswith('#'):
         continue
-    _spec, _tag = _line.split()[0], _line.split()[1]
-    assert _spec.startswith('local_ollama/'), f'unexpected spec format: {_spec}'
+    _tag = _line.split()[0]
     _mf = _ROOT / 'infra' / 'ollama' / f'Modelfile.{_tag}'
     assert _mf.exists(), f'missing {_mf}'
     _ARM_TAGS.append(_tag)
