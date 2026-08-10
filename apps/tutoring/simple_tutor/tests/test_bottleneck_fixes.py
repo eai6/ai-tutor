@@ -1513,6 +1513,52 @@ class QwenInstructModeTest(SimpleTestCase):
         'local_ollama/qwen3-30b-a3b-jetson',
     }
 
+    # Expected num_ctx per arm, straight from the MODEL_PROFILES entries. NOT
+    # a single value: qwen3.6-27b-instruct is laptop-class and pins 32768,
+    # every jetson tag pins 16384. The point of asserting this field isn't
+    # that it's uniform — it's that the generic r"qwen3" FAMILY_PATTERNS
+    # fallback NEVER sets num_ctx (leaves it None, i.e. Ollama's 4096
+    # default), so pinning the real value per arm catches an exact-key
+    # deletion that the mode/ollama_think assertions alone would miss.
+    NUM_CTX = {
+        'local_ollama/qwen3.5-2b-jetson': 16384,
+        'local_ollama/qwen3-4b-jetson': 16384,
+        'local_ollama/qwen3-8b-jetson': 16384,
+        'local_ollama/qwen3.6-27b-instruct': 32768,
+        'local_ollama/qwen3-30b-a3b-jetson': 16384,
+    }
+    # num_gpu only where the entry actually sets it (qwen3.6-27b-instruct
+    # leaves it on Ollama's autofit — laptop-class, not the Jetson memory
+    # pressure the other four tags are pinned against).
+    NUM_GPU = {
+        'local_ollama/qwen3.5-2b-jetson': 99,
+        'local_ollama/qwen3-4b-jetson': 99,
+        'local_ollama/qwen3-8b-jetson': 99,
+        'local_ollama/qwen3-30b-a3b-jetson': 99,
+    }
+
+    def test_arms_have_exact_dict_entries_not_just_a_resolved_profile(self):
+        """get_model_profile() falls through to the generic r"qwen3" regex
+        pattern when an exact key is missing from MODEL_PROFILES, and for a
+        tail like "qwen3-30b-a3b-jetson" that fallback happens to return
+        mode="instruct" with ollama_think=None — exactly the shape a
+        BASE_INSTRUCT arm is supposed to have. So the two tests below would
+        stay green even if the real entry were deleted, while num_ctx
+        silently reverted to None (Ollama's 4096 default) and the
+        runner-eviction/thrash bug this task exists to prevent came back
+        with no test noticing. Assert against MODEL_PROFILES directly (not
+        the resolver), and pin num_ctx/num_gpu — fields the fallback never
+        sets — so a deleted entry fails loudly here instead of silently
+        passing the mode/ollama_think checks via the fallback."""
+        from apps.llm.model_profiles import MODEL_PROFILES
+        for spec in self.ARMS:
+            self.assertIn(spec, MODEL_PROFILES, f'{spec}: no exact profile entry (would fall through to the qwen3 regex)')
+            p = MODEL_PROFILES[spec]
+            self.assertEqual(p.num_ctx, self.NUM_CTX[spec], f'{spec}: num_ctx')
+            expected_gpu = self.NUM_GPU.get(spec)
+            if expected_gpu is not None:
+                self.assertEqual(p.num_gpu, expected_gpu, f'{spec}: num_gpu')
+
     def test_every_arm_has_a_profile_in_instruct_mode(self):
         from apps.llm.model_profiles import get_model_profile
         for spec in self.ARMS:
