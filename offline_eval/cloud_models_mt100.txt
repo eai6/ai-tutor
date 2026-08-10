@@ -1,0 +1,40 @@
+# mt100 board — API fleet, multi-turn, the 100-scenario `v2` subset.
+# Run:
+#   RESULTS_DIR="$PWD/offline_eval/multi_turn_results/mt100" \
+#   CLOUD_MODELS_FILE="$PWD/offline_eval/cloud_models_mt100.txt" \
+#   MODE="--multi-turn --subset v2" \
+#   bash offline_eval/run_cloud.sh
+#
+# The Colab OSS qwen leg writes into the SAME sweep name (mt100) on Drive —
+# download it into the same local folder and aggregate.py boards all 19 arms
+# together. Judge (Sonnet 4.6) + student-sim (Haiku) stay constant across rows.
+#
+# Rows run sequentially and are resume-safe per model, so this can be stopped
+# between arms and restarted. Extrapolating from the mt50 notes (~1.5-2.5 h
+# fast instruct, ~4-6 h Gemini Pro at FIFTY scenarios), budget roughly double
+# per row here.
+
+# --- Anthropic ---
+anthropic/claude-opus-5                 claude-opus-5
+anthropic/claude-sonnet-5               claude-sonnet-5
+anthropic/claude-haiku-4-5-20251001     claude-haiku-4-5
+anthropic/claude-opus-4-7               claude-opus-4-7
+anthropic/claude-sonnet-4-6             claude-sonnet-4-6
+
+# --- OpenAI ---
+# gpt-5.6-* run with reasoning_effort='none' (apps/llm/client.py) because the
+# Chat Completions endpoint refuses function tools with reasoning enabled.
+# These three rows therefore measure gpt-5.6 with reasoning DISABLED — do not
+# compare them to the 5.4 rows as though the setting were equal.
+openai/gpt-5.6-sol                      gpt-5.6-sol
+openai/gpt-5.6-terra                    gpt-5.6-terra
+openai/gpt-5.6-luna                     gpt-5.6-luna
+openai/gpt-5.4-mini                     gpt-5.4-mini
+openai/gpt-5.4-nano                     gpt-5.4-nano
+
+# --- Google ---
+# gemini-3.1-pro-preview is the full served id; `gemini-3.1-pro` 404s.
+google/gemini-3.5-flash                 gemini-3.5-flash
+google/gemini-3.1-pro-preview           gemini-3.1-pro
+google/gemini-2.5-flash                 gemini-2.5-flash
+google/gemini-2.5-pro                   gemini-2.5-pro
