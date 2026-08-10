@@ -80,17 +80,43 @@ MODE = os.environ.get('MT100_MODE', '--multi-turn --subset v2')
 # bare `ollama pull local_ollama/<tag>`, 404, and skip the arm silently (all
 # five, in this list). Every tag is Modelfile-pinned — see
 # infra/ollama/Modelfile.<tag> for each.
-QWEN_MODELS = os.environ.get('MT100_MODELS') or """\
-# mt100 OSS leg — five Qwen sizes, every one in INSTRUCT mode.
-# 2b/8b/27b are hybrid templates with think suppressed via the profile's
-# ollama_think=False; 4b and 30b are instruct CHECKPOINTS with nothing to
-# suppress. Do not ""fix"" the asymmetry — see the Modelfiles.
-qwen3.5-2b-jetson        jetson
-qwen3-4b-jetson          jetson
-qwen3-8b-jetson          jetson
-qwen3.6-27b-instruct     jetson
-qwen3-30b-a3b-jetson     jetson
-"""
+# The five arms, split into three groups so they can run in three CONCURRENT
+# Colab tabs. Cell 2 exposes a dropdown; each tab picks a different group.
+#
+# Split by memory footprint, not by count, because that is what decides which
+# Colab runtime a tab needs:
+#   A — 2b/4b/8b, all comfortable on a free T4.
+#   B — 27b, needs a larger runtime.
+#   C — 30b-a3b (~18 GB at q4, and the profile forces full GPU offload with
+#       num_gpu=99), needs A100/L4. Isolated so its runtime choice and its
+#       failure mode do not cost the other four arms a session.
+#
+# Concurrency is safe: run_matrix.sh takes no lock, and each arm writes its own
+# <tag>.json into the shared Drive sweep folder, so three tabs on disjoint
+# groups never contend. Do NOT run the same group in two tabs — that WOULD race
+# on one JSON.
+ARM_GROUPS = {
+    'A_small_2b_4b_8b': ['qwen3.5-2b-jetson', 'qwen3-4b-jetson', 'qwen3-8b-jetson'],
+    'B_27b': ['qwen3.6-27b-instruct'],
+    'C_30b': ['qwen3-30b-a3b-jetson'],
+}
+_GROUP_RUNTIME = {
+    'A_small_2b_4b_8b': 'free T4 is fine',
+    'B_27b': 'L4 / A100 — 27B does not fit a T4',
+    'C_30b': 'A100 or L4 — ~18 GB at q4, `num_gpu=99` forces full offload',
+}
+
+# Instruct-mode note that travels with the list: 2b/8b/27b are hybrid templates
+# with think suppressed via the profile's ollama_think=False; 4b and 30b are
+# instruct CHECKPOINTS with nothing to suppress. Do not "fix" the asymmetry —
+# see the Modelfiles.
+#
+# QWEN_MODELS is the FULL five-arm list in run_matrix.sh's `tag tier` shape. It
+# is what the generation-time sanity check below validates; the notebook itself
+# writes only the selected group's subset.
+QWEN_MODELS = os.environ.get('MT100_MODELS') or "\n".join(
+    f"{tag:24s} jetson" for grp in ARM_GROUPS.values() for tag in grp
+) + "\n"
 
 # Sanity at generation time: the v2 tag must select exactly 100 multi-turn
 # scenarios, and every model's Modelfile must exist. Parses QWEN_MODELS the
@@ -175,6 +201,42 @@ would have run one-call.
    - `ANTHROPIC_API_KEY` — **required** (student-sim + rubric judge).
    - `GOOGLE_API_KEY`, `OPENAI_API_KEY` — grader/judge fallback cascade.
 """)
+
+_group_opts = list(ARM_GROUPS) + ['ALL']
+_group_rows = "\n".join(
+    f"| `{g}` | {', '.join('`' + t + '`' for t in tags)} | {_GROUP_RUNTIME[g]} |"
+    for g, tags in ARM_GROUPS.items()
+)
+md(rf"""## Cell 0 — pick the arm group for THIS tab
+
+Run this notebook in **three tabs**, one per group, to evaluate the five Qwen
+arms concurrently. Set the dropdown below before anything else — it decides
+which GPU you should pick in Cell 1.
+
+| group | arms | runtime it needs |
+| --- | --- | --- |
+{_group_rows}
+| `ALL` | all five, sequentially | A100/L4 (because of 30b) |
+
+The groups are disjoint and `run_matrix.sh` takes no lock, so three tabs never
+contend — each arm writes its own `<tag>.json` into the same Drive sweep
+folder and Cell 10 boards whatever has landed so far. **Do not run the same
+group in two tabs**: that races two writers onto one JSON.
+
+Pick `ALL` only if you are running a single tab.""")
+code(rf'''
+#@title Arm group for this tab {{ display-mode: "form" }}
+GROUP = "{_group_opts[0]}"  #@param [{", ".join('"' + g + '"' for g in _group_opts)}]
+
+ARM_GROUPS = {ARM_GROUPS!r}
+ARMS_THIS_TAB = (
+    [t for g in ARM_GROUPS.values() for t in g] if GROUP == "ALL"
+    else ARM_GROUPS[GROUP]
+)
+print(f"this tab runs group {{GROUP}}: {{len(ARMS_THIS_TAB)}} arm(s)")
+for _t in ARMS_THIS_TAB:
+    print("  -", _t)
+''')
 
 md("## Cell 1 — GPU + mount Drive")
 code(r"""
@@ -273,13 +335,16 @@ done = sorted(os.path.basename(p)[:-5] for p in glob.glob('{RESULTS}/*.json'))
 print('already scored:', done or '(none yet)')
 """)
 
-md("## Cell 8 — write the model list (all five Qwen arms, Modelfile-pinned tags)\n"
-   "run_matrix.sh detects `infra/ollama/Modelfile.<tag>` and builds the tag "
-   "via `ollama create` from its registry base instead of pulling it — never "
-   "a bare `ollama pull <tag>` for these five.")
-code(rf"""
-open('offline_eval/models.txt', 'w').write('''# Qwen mt100 — Modelfile-pinned local tags
-{QWEN_MODELS}''')
+md("## Cell 8 — write the model list for THIS tab's group\n"
+   "Writes only the arms `GROUP` selected in Cell 0. Column 1 is the BARE tag: "
+   "run_matrix.sh reads `tag tier`, detects `infra/ollama/Modelfile.<tag>` and "
+   "builds it via `ollama create` from its registry base — never a bare "
+   "`ollama pull <tag>` — then prepends `local_ollama/` itself for "
+   "`TUTOR_MODEL_OVERRIDE`.")
+code(r"""
+rows = "\n".join(f"{tag:24s} jetson" for tag in ARMS_THIS_TAB)
+open('offline_eval/models.txt', 'w').write(
+    f"# Qwen mt100 — group {GROUP}, Modelfile-pinned local tags\n{rows}\n")
 print(open('offline_eval/models.txt').read())
 """)
 

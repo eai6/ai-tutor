@@ -74,10 +74,38 @@ every arm fails from the first `ollama create` (missing Modelfile) onward.
 
     ./venv/bin/python offline_eval/_make_colab_nb_mt100.py
 
-Upload `offline_eval/colab_mt100_qwen.ipynb` to Colab and run it. It builds all
-five tags from their Modelfiles and writes to
-`MyDrive/ai-tutor-eval-multiturn/mt100/`. Download that folder into the local
-results dir when it finishes.
+Upload `offline_eval/colab_mt100_qwen.ipynb` to Colab. Every tag is built from
+its Modelfile and results are written to
+`MyDrive/ai-tutor-eval-multiturn/mt100/`; download that folder into the local
+results dir when the arms finish.
+
+### Run it in three tabs
+
+**Cell 0 is a dropdown.** Open the notebook in three Colab tabs and set a
+different `GROUP` in each — the arms are split by memory footprint, so each
+tab can request the runtime it actually needs:
+
+| `GROUP` | arms | runtime |
+| --- | --- | --- |
+| `A_small_2b_4b_8b` | `qwen3.5-2b-jetson`, `qwen3-4b-jetson`, `qwen3-8b-jetson` | free T4 is fine |
+| `B_27b` | `qwen3.6-27b-instruct` | L4 / A100 |
+| `C_30b` | `qwen3-30b-a3b-jetson` | A100 or L4 |
+| `ALL` | all five, sequentially | A100/L4 — single-tab only |
+
+Set it before Cell 1, because it determines which GPU to request.
+
+This is safe to parallelise: `run_matrix.sh` takes no lock, the groups are
+disjoint, and each arm writes its own `<tag>.json` into the shared Drive
+folder, so three tabs never contend. Cell 10 boards whatever has landed so
+far, so a tab that finishes early gives you partial results immediately.
+
+**Do not run the same group in two tabs** — that races two writers onto one
+JSON. `test_groups_partition_the_five_arms_exactly` enforces the disjointness
+of the group definitions themselves, but nothing can stop two tabs being set
+to the same value by hand.
+
+Isolating `C_30b` also means the 30B arm's runtime choice and its failure mode
+(see below) cost only its own session rather than the other four arms'.
 
 **Check `identity.log` after the first Qwen arm completes.** Cell 9 runs
 `run_matrix.sh`, which probes each arm's model identity (thinks vs. answers
@@ -93,13 +121,12 @@ before anyone notices.
 **The 30B arm may not fit a T4.** `qwen3-30b-a3b-jetson`'s base
 (`qwen3:30b-a3b-instruct-2507-q4`) is roughly 18 GB, and its profile sets
 `num_gpu=99` (force full GPU offload) — do not change that. A Colab T4 has
-16 GB VRAM, so a T4 runtime is likely to OOM on this arm specifically. It is
-also last in `models.txt`, so on a T4 it fails only after the other four arms
-have already consumed most of the session. Two ways to make that cheap:
-either request an **A100 or L4** runtime (Runtime → Change runtime type) for
-this notebook, which fits the model comfortably, or reorder `models.txt` so
-`qwen3-30b-a3b-jetson` runs **first**, so an OOM is discovered in minutes
-rather than at the end of a multi-hour session.
+16 GB VRAM, so a T4 runtime is likely to OOM on this arm specifically. This is
+why it gets its own group: run the `C_30b` tab on an **A100 or L4** runtime
+(Runtime → Change runtime type), which fits it comfortably. Because it is
+alone in that group it is also the first and only arm that tab builds, so an
+OOM shows up in minutes rather than after a multi-hour session — the failure
+mode that made this worth isolating in the first place.
 
 ## 4. Board
 

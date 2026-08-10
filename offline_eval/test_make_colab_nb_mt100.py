@@ -1,4 +1,5 @@
 """Guards the generated notebook against the mistakes that cost a Colab run."""
+import ast
 import json
 import pathlib
 import re
@@ -100,17 +101,34 @@ def test_every_arm_has_a_real_modelfile_on_disk():
 # run_matrix.sh's `while read -r tag tier _rest` loop does, so it fails if
 # column 1 is ever provider-prefixed (or otherwise not a bare tag) again.
 
-def _models_txt_payload(nb_source_cells):
-    """Extract the string literal Cell 8 writes to offline_eval/models.txt."""
+def _arm_groups(nb_source_cells) -> dict:
+    """Extract the ARM_GROUPS dict Cell 0 embeds.
+
+    Since the group dropdown landed, Cell 8 no longer writes a literal payload —
+    it builds models.txt at runtime from ARMS_THIS_TAB, which is derived from
+    ARM_GROUPS and the selected GROUP. So the tags run_matrix.sh will actually
+    receive are the ones in this dict, and that is what has to be checked.
+    """
     for cell in nb_source_cells:
         if cell['cell_type'] != 'code':
             continue
         text = ''.join(cell['source'])
-        if "offline_eval/models.txt', 'w').write(" not in text:
-            continue
-        m = re.search(r"\.write\('''(.*?)'''\)", text, re.DOTALL)
-        assert m, 'found the models.txt write() call but could not parse its payload'
-        return m.group(1)
+        m = re.search(r"^ARM_GROUPS = (\{.*?\})$", text, re.DOTALL | re.MULTILINE)
+        if m:
+            groups = ast.literal_eval(m.group(1))
+            assert isinstance(groups, dict) and groups, 'ARM_GROUPS is not a non-empty dict'
+            return groups
+    raise AssertionError('no code cell defines ARM_GROUPS')
+
+
+def _models_txt_row_format(nb_source_cells) -> str:
+    """The f-string Cell 8 uses to build each models.txt row."""
+    for cell in nb_source_cells:
+        text = ''.join(cell['source'])
+        if cell['cell_type'] == 'code' and "offline_eval/models.txt', 'w').write(" in text:
+            m = re.search(r'rows = "\\n"\.join\((f"[^"]+")', text)
+            assert m, 'found the models.txt write but could not parse the row format'
+            return m.group(1)
     raise AssertionError('no code cell writes offline_eval/models.txt')
 
 
@@ -137,15 +155,53 @@ def test_models_txt_column_1_is_a_bare_tag_with_a_real_modelfile():
     `ollama pull local_ollama/<tag>`, 404, and skip the arm."""
     subprocess.run([sys.executable, str(GEN)], cwd=ROOT, check=True)
     nb = json.loads(NB.read_text())
-    payload = _models_txt_payload(nb['cells'])
-    tags = _parse_like_run_matrix(payload)
-    assert tags, 'no model rows parsed out of the models.txt payload'
-    assert set(tags) == set(ARMS), f'expected exactly {sorted(ARMS)}, parsed {sorted(tags)}'
+    groups = _arm_groups(nb['cells'])
+    tags = [t for g in groups.values() for t in g]
+    assert tags, 'no tags in ARM_GROUPS'
+    assert set(tags) == set(ARMS), f'expected exactly {sorted(ARMS)}, got {sorted(tags)}'
+
+    # Column 1 must be the bare tag. run_matrix.sh does `read -r tag tier`,
+    # then Modelfile.$tag and local_ollama/$tag — so a provider-prefixed
+    # column 1 misses the Modelfile, falls through to a bare
+    # `ollama pull local_ollama/<tag>`, 404s, and skips the arm silently.
+    row_fmt = _models_txt_row_format(nb['cells'])
+    assert row_fmt.startswith('f"{tag'), (
+        f'models.txt rows must start with the bare tag, got {row_fmt!r}')
+    assert 'local_ollama' not in row_fmt, (
+        f'models.txt column 1 must not be provider-prefixed, got {row_fmt!r}')
+
     for tag in tags:
         mf = ROOT / 'infra' / 'ollama' / f'Modelfile.{tag}'
         assert mf.is_file(), (
-            f'models.txt column 1 {tag!r} has no matching {mf} — this is '
+            f'ARM_GROUPS tag {tag!r} has no matching {mf} — this is '
             'exactly the run_matrix.sh contract violation that silently '
             'skips every arm (Modelfile lookup misses, falls through to a '
             "bare `ollama pull`, 404s, 'pull failed — skipping')"
         )
+
+
+def test_groups_partition_the_five_arms_exactly():
+    """Three tabs on disjoint groups is the whole point. An overlap means two
+    tabs build and evaluate the same tag and race on one <tag>.json in the
+    shared Drive folder; a gap means an arm silently never runs."""
+    subprocess.run([sys.executable, str(GEN)], cwd=ROOT, check=True)
+    groups = _arm_groups(json.loads(NB.read_text())['cells'])
+    assert len(groups) == 3, f'expected 3 groups, got {sorted(groups)}'
+    flat = [t for g in groups.values() for t in g]
+    assert len(flat) == len(set(flat)), f'groups overlap: {sorted(flat)}'
+    assert set(flat) == set(ARMS), f'groups do not cover the arms: {sorted(flat)}'
+
+
+def test_group_dropdown_offers_every_group_plus_all():
+    """The Cell 0 #@param list must stay in sync with ARM_GROUPS — a dropdown
+    option that is not a key raises KeyError at ARM_GROUPS[GROUP], and a key
+    missing from the dropdown is an arm nobody can select."""
+    subprocess.run([sys.executable, str(GEN)], cwd=ROOT, check=True)
+    cells = json.loads(NB.read_text())['cells']
+    groups = _arm_groups(cells)
+    src = '\n'.join(''.join(c['source']) for c in cells if c['cell_type'] == 'code')
+    m = re.search(r'GROUP = "[^"]+"\s+#@param \[([^\]]+)\]', src)
+    assert m, 'no #@param dropdown found for GROUP'
+    offered = {o.strip().strip('"') for o in m.group(1).split(',')}
+    assert offered == set(groups) | {'ALL'}, (
+        f'dropdown {sorted(offered)} != groups {sorted(groups)} + ALL')
