@@ -9,6 +9,7 @@ from apps.llm.client import (
     VertexModelGardenClient,
     LLMResponse,
     get_llm_client,
+    OpenAIClient,
 )
 
 # Real shapes captured from the live Vertex MaaS endpoint (2026-06-17).
@@ -214,3 +215,36 @@ class VertexFactoryTests(SimpleTestCase):
                               model_name="deepseek-ai/deepseek-v3.2-maas")
             client = get_llm_client(cfg)
         assert isinstance(client, VertexModelGardenClient)
+
+
+def _openai_client(model_name):
+    cfg = ModelConfig(provider='openai', model_name=model_name,
+                      purpose='tutoring', max_tokens=2048, temperature=0.2)
+    with patch.object(OpenAIClient, '__init__', lambda self, c: None):
+        client = OpenAIClient(cfg)
+    client.config = cfg
+    return client
+
+
+class OpenAIReasoningEffortTest(TestCase):
+    def test_gpt_5_6_sends_reasoning_effort_none(self):
+        for name in ('gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'):
+            kw = _openai_client(name)._build_completion_kwargs(
+                max_tokens=2048, temperature=None)
+            self.assertEqual(kw.get('reasoning_effort'), 'none', name)
+            self.assertEqual(kw.get('max_completion_tokens'), 2048, name)
+            self.assertNotIn('temperature', kw, name)
+
+    def test_other_gpt5_models_do_not_send_reasoning_effort(self):
+        for name in ('gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.2'):
+            kw = _openai_client(name)._build_completion_kwargs(
+                max_tokens=2048, temperature=None)
+            self.assertNotIn('reasoning_effort', kw, name)
+            self.assertEqual(kw.get('max_completion_tokens'), 2048, name)
+
+    def test_legacy_models_keep_max_tokens_and_temperature(self):
+        kw = _openai_client('gpt-4o-mini')._build_completion_kwargs(
+            max_tokens=1024, temperature=0.3)
+        self.assertEqual(kw['max_tokens'], 1024)
+        self.assertEqual(kw['temperature'], 0.3)
+        self.assertNotIn('reasoning_effort', kw)

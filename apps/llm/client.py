@@ -1905,6 +1905,17 @@ class OpenAIClient(BaseLLMClient):
     # GPT-4 family + GPT-4o + GPT-4.1 still use the legacy params.
     _NEW_GEN_PREFIXES = ("gpt-5", "o1", "o3", "o4", "o5")
 
+    # gpt-5.6-* reject function tools on /v1/chat/completions unless reasoning
+    # is switched off entirely:
+    #   "Function tools with reasoning_effort are not supported for
+    #    gpt-5.6-sol in /v1/chat/completions. To use function tools, use
+    #    /v1/responses or set reasoning_effort to 'none'."
+    # The tutor is tool-driven, so every turn 400s without this. Measured
+    # 2026-08-10; 'minimal' and 'low' are both rejected, only 'none' works.
+    # NOTE: these arms therefore measure gpt-5.6 with reasoning DISABLED. The
+    # fair-reasoning path is /v1/responses, which this client does not speak.
+    _NO_REASONING_PREFIXES = ("gpt-5.6",)
+
     def __init__(self, config: ModelConfig):
         super().__init__(config)
         if not self.api_key:
@@ -2028,7 +2039,11 @@ class OpenAIClient(BaseLLMClient):
         resolved_max = max_tokens or self.config.max_tokens
         if self._is_new_generation():
             # New-gen — only max_completion_tokens, no temperature/sampling.
-            return {"max_completion_tokens": resolved_max}
+            out = {"max_completion_tokens": resolved_max}
+            name = (self.config.model_name or "").strip().lower()
+            if any(name.startswith(p) for p in self._NO_REASONING_PREFIXES):
+                out["reasoning_effort"] = "none"
+            return out
         sampling = sampling or {}
         # Legacy: max_tokens + temperature (sampling overrides when present)
         if sampling.get("temperature") is not None:
