@@ -37,8 +37,17 @@ results dir when it finishes.
 
 ## 3. Board
 
-    ./venv/bin/python offline_eval/aggregate.py \
-      --results offline_eval/multi_turn_results/mt100
+    RESULTS_DIR="$PWD/offline_eval/multi_turn_results/mt100" \
+    ./venv/bin/python offline_eval/aggregate.py
+
+`offline_eval/aggregate.py` has no argparse and ignores CLI flags entirely —
+it only reads the `RESULTS_DIR` env var (falling back to
+`offline_eval/single_turn_results/results`, the SINGLE-turn board, if unset).
+A `--results ...` flag is silently swallowed: the script would either print
+"no results" or, worse, board stale single-turn data as if it were the mt100
+multi-turn results — and that failure surfaces only after both legs have
+already burned their paid API hours. Use the `RESULTS_DIR=...` env-var form
+above, matching the pattern Leg 1 already uses.
 
 ## Reading the board
 
