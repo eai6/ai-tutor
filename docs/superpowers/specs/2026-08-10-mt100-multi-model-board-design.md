@@ -132,22 +132,41 @@ google/gemini-2.5-flash        google/gemini-2.5-pro
 `gemini-3.1-pro-preview` is the full ID — `gemini-3.1-pro` alone is not served.
 All four already have or closely match existing `ModelProfile` entries.
 
-### Qwen, local (5)
+### Qwen, local (5) — all arms in instruct mode
 
-| Size | Tag | Status |
-|---|---|---|
-| 2b | `local_ollama/qwen3.5-2b-jetson` | Modelfile + profile exist |
-| 4b | `local_ollama/qwen3-4b-jetson` | Modelfile + profile exist |
-| 8b | `local_ollama/qwen3-8b-jetson` | **new** Modelfile, FROM `qwen3:8b` |
-| 27b | `local_ollama/qwen3.6-27b-instruct` | Modelfile + profile exist |
-| 30b | `local_ollama/qwen3-30b-a3b-jetson` | **new** Modelfile, FROM `qwen3:30b-a3b` |
+Every Qwen arm must run instruct, not thinking. Two mechanisms achieve that,
+and the repo already states a preference between them: on `qwen3-4b-jetson`,
+"Instruct only. Enforced by the BASE MODEL, not a runtime flag". A base model
+with no thinking beats a hybrid model with the flag off, because the flag only
+disables Ollama's thinking *parser* on templates that open `<think>`
+unconditionally. Prefer an instruct checkpoint; fall back to
+`ollama_think=False` only on genuinely hybrid templates.
 
-Two corrections to the original request. `qwen3.6:30b-a3b` does not exist — the
-current-generation MoE is `qwen3.6:35b-a3b`, and the genuine 30B is
-`qwen3:30b-a3b` (Qwen3-30B-A3B), verified on the Ollama tags page. And 8b/30b
-had no pinned tag, so they would have run bare; bare tags spawn a second
-4096-ctx runner via the grader verifier's `/v1` endpoint and evict the tutor.
-Both get a Modelfile pinning `num_ctx`, matching the existing jetson tags.
+| Size | Tag | How instruct is enforced | Status |
+|---|---|---|---|
+| 2b | `local_ollama/qwen3.5-2b-jetson` | hybrid + `ollama_think=False` | correct today |
+| 4b | `local_ollama/qwen3-4b-jetson` | base model — `FROM qwen3:4b-instruct` | correct today |
+| 8b | `local_ollama/qwen3-8b-jetson` | hybrid + `ollama_think=False` | **new** Modelfile `FROM qwen3:8b`; **profile bug to fix** |
+| 27b | `local_ollama/qwen3.6-27b-instruct` | hybrid + `ollama_think=False` | correct today |
+| 30b | `local_ollama/qwen3-30b-a3b-jetson` | base model — `FROM qwen3:30b-a3b-instruct-2507-q4` | **new** Modelfile + profile |
+
+**Pre-existing bug this run must fix.** `local_ollama/qwen3:8b` declares
+`mode="instruct"` but sets no `ollama_think`. `qwen3:8b` is a hybrid template
+that gates on the Think flag — the dataclass docstring names it explicitly as a
+case where `ollama_think=False` works — so with the flag absent the arm runs
+*thinking* while its profile claims instruct. Any past 8b number is therefore
+mislabelled. The new `qwen3-8b-jetson` profile sets `ollama_think=False`, and
+the existing `local_ollama/qwen3:8b` entry gets the same fix so old specs stop
+lying.
+
+Three corrections to the original request. `qwen3.6:30b-a3b` does not exist —
+the current-generation MoE is `qwen3.6:35b-a3b`, and the genuine 30B is
+`qwen3:30b-a3b` (Qwen3-30B-A3B), verified on the Ollama tags page. For the
+instruct requirement the 30B arm takes `qwen3:30b-a3b-instruct-2507-q4` rather
+than the bare hybrid tag, so instruct comes from the checkpoint. And 8b/30b had
+no pinned tag, so they would have run bare; bare tags spawn a second 4096-ctx
+runner via the grader verifier's `/v1` endpoint and evict the tutor. Both get a
+Modelfile pinning `num_ctx`, matching the existing jetson tags.
 
 Mixed generations across sizes (3, 3.5, 3.6) mean the size ladder is a
 size-and-generation confound, not a clean scaling curve. Stated here so the
@@ -202,6 +221,11 @@ survives interruption and can be stopped between models without losing work.
   catches the GPT-5.6 tool problem class before 60 hours of API time.
 - New Modelfiles verified with `ollama show --modelfile` against the built tag,
   confirming `num_ctx` is baked, as was done for `qwen3-4b-thinking-jetson`.
+- **Instruct-mode assertion per Qwen arm.** For each of the five tags, one live
+  turn is captured and checked for an empty `message.thinking` and no `<think>`
+  in `message.content`. This is the only check that actually proves instruct
+  mode — `mode="instruct"` in the profile is a label, and the 8b bug above is
+  exactly what happens when nobody verifies it. Run before the sweep starts.
 
 ## 5. Out of scope
 
