@@ -4,8 +4,20 @@ multi-turn scenarios (tag `v2`), the OSS leg of the mt100 board.
 
 Purpose: score every Jetson-deployable Qwen size the offline tutor could ship
 on — 2b/4b/8b/27b/30b-a3b — against the same 100-scenario subset the cloud
-arms (Task 5's API model list) are scored on, so the board is one apples-to-
-apples leaderboard across both legs.
+arms (Task 5's API model list) are scored on, so both legs sit on one
+combined board.
+
+**What is and isn't controlled across all 19 arms (both legs):** the judge,
+student-sim, scenario set, and `v2` subset are constant. The engine's
+tutor-side call mode is NOT pinned anywhere in this notebook or in
+`run_cloud.sh` — it resolves per-family via `TUTOR_CALL_MODE=auto`
+(apps/tutoring/simple_tutor/engine.py), which is two-call ONLY for family
+`anthropic` (`_FORCE_POSE_EXEMPT_FAMILIES`) and one-call for everything else.
+Concretely: the 5 Anthropic cloud arms run two-call; the 9 OpenAI/Google
+cloud arms AND all 5 Qwen arms here run one-call. This asymmetry sits inside
+the cloud leg too, not just between legs — weigh it when comparing rows on
+the combined board. Pinning `TUTOR_CALL_MODE` is a deliberate open decision
+left to the human running the board, not something this generator decides.
 
 Three deliberate choices, so the numbers mean something:
 
@@ -107,7 +119,16 @@ md(rf"""
 Runs the five Jetson-deployable Qwen tutor sizes against the representative-100
 multi-turn scenarios (tag `v2`, selected by Task 1, no sampling). This is the
 OSS leg of the mt100 board — the cloud leg (Task 5's model list) is scored on
-the same 100 scenarios so both legs sit on one leaderboard.
+the same 100 scenarios so both legs sit on one combined board.
+
+**Call-mode caveat — read before comparing rows across the board.** Judge,
+student-sim, scenario set, and the `v2` subset are held constant across all
+19 arms. Engine call mode is NOT — it is `TUTOR_CALL_MODE=auto` everywhere
+(unpinned, by design left to the human), which resolves to two-call only for
+the `anthropic` family and one-call for everything else. So the 5 Anthropic
+cloud arms run two-call while the 9 OpenAI/Google cloud arms AND all 5 Qwen
+arms here run one-call. This is not apples-to-apples on call mode — factor
+it in when reading the leaderboard.
 
 | tag | note |
 | --- | --- |
@@ -342,7 +363,13 @@ in `offline_eval/models.txt` against `MODEL_PROFILES` in
 
 This is the OSS leg only. The cloud leg (14 arms across three vendors, Task 5)
 is scored on the same `v2` 100 scenarios via `run_cloud.sh` / a separate
-notebook — Task 8 aggregates both legs onto one leaderboard.
+notebook — Task 8 aggregates both legs onto one combined board.
+
+**Remember the call-mode caveat from the top of this notebook:** call mode is
+unpinned (`TUTOR_CALL_MODE=auto`) on both legs — the 5 Anthropic cloud arms
+run two-call, the 9 OpenAI/Google cloud arms and all 5 Qwen arms here run
+one-call. Judge, student-sim, scenario set, and subset are the only things
+held constant across all 19 rows; call mode is not one of them.
 """)
 
 nb = {
