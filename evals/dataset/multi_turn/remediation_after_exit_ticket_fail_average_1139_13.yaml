@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1139
-tags: [multi_turn, math, average, remediation, exit_ticket]
+tags: [multi_turn, math, average, remediation, exit_ticket, v2]
 
 mode: multi_turn
 max_turns: 30

@@ -4,7 +4,7 @@ description: >
 persona: error_prone
 subject: math
 lesson_id: 1138
-tags: [multi_turn, math, error_prone, bea_coverage, v1]
+tags: [multi_turn, math, error_prone, bea_coverage, v1, v2]
 mode: multi_turn
 max_turns: 30
 

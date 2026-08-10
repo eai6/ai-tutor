@@ -6,7 +6,7 @@ description: >
 persona: non_responder
 subject: math
 lesson_id: 1141
-tags: [multi_turn, math, non_responder, refusal, repetition, banned_opener]
+tags: [multi_turn, math, non_responder, refusal, repetition, banned_opener, v2]
 
 mode: multi_turn
 max_turns: 30

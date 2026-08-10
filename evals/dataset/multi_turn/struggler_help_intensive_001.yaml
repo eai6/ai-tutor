@@ -6,7 +6,7 @@ description: >
 persona: struggler
 subject: math
 lesson_id: 1138
-tags: [multi_turn, scaffolding, repetition, math, struggler, v1]
+tags: [multi_turn, scaffolding, repetition, math, struggler, v1, v2]
 
 mode: multi_turn
 max_turns: 30

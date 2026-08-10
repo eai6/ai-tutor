@@ -6,7 +6,7 @@ description: >
 persona: probe_resistant
 subject: math
 lesson_id: 1144
-tags: [multi_turn, math, probe_resistant, pace, edge_case]
+tags: [multi_turn, math, probe_resistant, pace, edge_case, v2]
 
 mode: multi_turn
 max_turns: 6

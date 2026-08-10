@@ -5,7 +5,7 @@ description: >
 persona: average
 subject: math
 lesson_id: 1137
-tags: [multi_turn, baseline, math, average, v1]
+tags: [multi_turn, baseline, math, average, v1, v2]
 mode: multi_turn
 max_turns: 30
 assertions:

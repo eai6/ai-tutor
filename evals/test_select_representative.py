@@ -1,5 +1,6 @@
 import collections
-from evals.select_representative import load_scenarios, select
+import yaml
+from evals.select_representative import load_scenarios, select, SUBSET_TAG
 
 AXES = ('persona', 'subject', 'kind')
 
@@ -37,3 +38,11 @@ def test_covers_every_lesson():
     rows = load_scenarios()
     chosen = select(rows)
     assert {r['lesson'] for r in chosen} == {r['lesson'] for r in rows}
+
+
+def test_v2_tag_is_written_to_exactly_100_files():
+    rows = load_scenarios()
+    tagged = [r for r in rows if SUBSET_TAG in
+              set(yaml.safe_load(r['path'].read_text()).get('tags') or [])]
+    assert len(tagged) == 100
+    assert {r['id'] for r in tagged} == {r['id'] for r in select(rows)}

@@ -6,7 +6,7 @@ description: >
 persona: average
 subject: geography
 lesson_id: 1469
-tags: [multi_turn, geography, average, self_correction, correction]
+tags: [multi_turn, geography, average, self_correction, correction, v2]
 
 mode: multi_turn
 max_turns: 15

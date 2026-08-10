@@ -6,7 +6,7 @@ description: >
 persona: capable
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, long_session, capable, edge_case, v1]
+tags: [multi_turn, long_session, capable, edge_case, v1, v2]
 
 mode: multi_turn
 max_turns: 30

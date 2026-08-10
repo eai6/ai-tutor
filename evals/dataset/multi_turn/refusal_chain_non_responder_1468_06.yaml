@@ -6,7 +6,7 @@ description: >
 persona: non_responder
 subject: geography
 lesson_id: 1468
-tags: [multi_turn, geography, non_responder, refusal, repetition, banned_opener]
+tags: [multi_turn, geography, non_responder, refusal, repetition, banned_opener, v2]
 
 mode: multi_turn
 max_turns: 15
