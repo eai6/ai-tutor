@@ -139,9 +139,21 @@ class ForcePoseGateTests(SimpleTestCase):
         for fam in ('deepseek', 'glm', 'kimi', 'mistral', 'grok', 'llama'):
             self.assertTrue(engine._should_force_pose(fam, 'POSE', 'answer_or_other'), fam)
 
-    def test_only_pose_mode_is_forced(self):
-        for mode in ('GRADE', 'REMEDIATION'):
+    def test_grading_modes_are_never_forced(self):
+        """A turn with a live question must grade it, not pose over it."""
+        for mode in ('GRADE', 'REMEDIATION+GRADE'):
             self.assertFalse(engine._should_force_pose('qwen', mode, 'answer_or_other'))
+
+    def test_remediation_is_forced_like_pose(self):
+        """REMEDIATION is the same shape as POSE — nothing in flight and a pool
+        to pose from — and was excluded only because the gate predates
+        remediation having a pool at all.
+
+        Unforced, a remediation turn could end with a question narrated in
+        prose and no gradable slot, which on an MCQ-only build leaves the
+        student a text box and nothing the picker can answer.
+        """
+        self.assertTrue(engine._should_force_pose('qwen', 'REMEDIATION', 'answer_or_other'))
 
     def test_conversational_intents_are_never_forced(self):
         for intent in ('clarification', 'pushback', 'off_topic'):

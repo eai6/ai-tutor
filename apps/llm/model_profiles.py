@@ -305,6 +305,42 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # bites truncates mid-sentence, which reads worse to a student than a reply
     # that was merely long. The <reply_length> budget in prompts.py does the
     # actual work.
+    # ── Larger local models, laptop-class only ───────────────────────────────
+    #
+    # Pulled 2026-08-06 to measure how much of the tutoring failure is model
+    # CAPACITY versus engine design. Neither fits the 8 GB Jetson that is the
+    # actual offline target — these are a quality ceiling, not a deployment
+    # candidate. Read any result from them that way.
+    #
+    # num_ctx=16384 is not copied from the 4b out of habit: the qwen Block-0 the
+    # tutor ships is ~20.8K characters (~5.2K tokens) before the question pool,
+    # KB chunks and recent-turn window are added, so a smaller window would
+    # silently truncate the instructions rather than the reply. 16384 leaves
+    # room for that plus num_predict.
+    #
+    # num_gpu=99 for the reason given on the 4b entries: unpinned, Ollama
+    # autofits against free memory AT LOAD TIME, so the layer split — and
+    # therefore decode speed — depends on whatever else happened to be running.
+    "local_ollama/qwen3:8b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=1024,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, num_gpu=99,
+        notes="5.2 GB weights. Comfortable on a 19 GB laptop alongside the app.",
+    ),
+
+    # 9.3 GB of weights plus a 16K KV cache is roughly 12-13 GB resident. On a
+    # 19 GB machine that leaves little for macOS, the Django server and a
+    # browser, so expect it to be the point where turn latency starts tracking
+    # memory pressure rather than model size. If turns suddenly get 4-5x slower
+    # mid-run, that is the signature — check free memory before blaming the
+    # model (the same confound that invalidated a whole eval arm on 2026-07-30).
+    "local_ollama/qwen3:14b": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=1024,
+        temperature=0.7, top_p=0.8, top_k=20,
+        num_ctx=16384, num_gpu=99,
+        notes="9.3 GB weights. Largest that runs usefully on 19 GB; not Jetson-viable.",
+    ),
+
     "local_ollama/qwen3.5:4b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,

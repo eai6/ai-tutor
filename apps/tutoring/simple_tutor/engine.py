@@ -155,7 +155,12 @@ def _should_force_pose(family: str | None, mode: str, student_intent: str | None
     """
     if not family or family in _FORCE_POSE_EXEMPT_FAMILIES:
         return False
-    if mode != 'POSE':
+    # 'REMEDIATION' is the same shape as 'POSE' — nothing in flight, a pool to
+    # pose from — and it was excluded only because the gate was written before
+    # remediation had a pool at all. Excluding it is why a remediation turn
+    # could end with a question narrated in prose and no gradable slot, leaving
+    # the student a text box on an MCQ-only build.
+    if mode not in ('POSE', 'REMEDIATION'):
         return False
     return (student_intent or '') not in _NON_POSING_INTENTS
 
@@ -400,6 +405,14 @@ def respond(
     # REMEDIATION mode — its job is to re-teach the failed enabling
     # objectives surfaced in the attempt's per-question results.
     from apps.tutoring.models import InFlightQuestion
+    # Remediation always has a question outstanding — the pool holds exactly
+    # the unrecovered ones and the mode ends when that set empties. Enforce it
+    # BEFORE the mode is resolved, not just after the turn: the backstop poses
+    # at the end, so a turn could still start with nothing in flight and get
+    # the TEACH-remediation shape, which on an MCQ-only build hands the student
+    # a typing box and grades nothing.
+    from apps.tutoring.simple_tutor.exit_ticket import ensure_remediation_question
+    ensure_remediation_question(session)
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
     question_pool = build_question_pool(session)
@@ -444,7 +457,9 @@ def respond(
     # courses simultaneously. See memory/multi_locale_architecture_research.md.
     course_locale = _course_locale(session)
 
-    from apps.tutoring.simple_tutor.prompts import build_system_prompt
+    from apps.tutoring.simple_tutor.prompts import (
+        ANSWER_MODE_FREE_TEXT, ANSWER_MODE_PICKER, build_system_prompt,
+    )
 
     # Resolve the student's offline/online model preference ONCE per turn.
     #
@@ -509,6 +524,15 @@ def respond(
         student_intent=student_intent,
         locale=course_locale,
         family=_family,
+        # The hint ladder assumes the student can type back. When the buttons
+        # are their only input it has to stop asking things — same predicate
+        # the frontend uses to render them, and `turn_config` is the model we
+        # already resolved above.
+        answer_mode=(
+            ANSWER_MODE_PICKER
+            if _uses_answer_picker(session, in_flight, turn_config)
+            else ANSWER_MODE_FREE_TEXT
+        ),
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -791,6 +815,30 @@ def respond(
     # moved. See memory/tool_surface_reduction_plan.md.
     from apps.tutoring.simple_tutor.tools import maybe_complete_remediation
     maybe_complete_remediation(session)
+
+    # ─── 9b2. Pivot a stalled question (server-owned) ────────────────
+    # Two hints have not worked, so a third will not either. The prompt asks
+    # for this and does not get it — same finding as remediation posing, which
+    # went 0/4 on instruction alone. Runs BEFORE the remediation follow-up so a
+    # pivot counts as "a question is in flight" and the follow-up stands down.
+    from apps.tutoring.simple_tutor.tools import maybe_pivot_stalled_question
+    _pivoted = maybe_pivot_stalled_question(session)
+    if _pivoted is not None:
+        lines = [(_pivoted.question_text or '').strip()]
+        for _L in ('A', 'B', 'C', 'D'):
+            _opt = (getattr(_pivoted, f'option_{_L.lower()}', '') or '').strip()
+            if _opt:
+                lines.append(f'{_L}) {_opt}')
+        text_reply = f"{(text_reply or '').rstrip()}\n\n" + "\n".join(lines)
+        text_reply = text_reply.strip()
+
+    # ─── 9c. Remediation follow-up (server-owned) ────────────────────
+    # Runs AFTER the completion check, so the last recovered objective ends
+    # remediation instead of posing a seventh question into a finished set.
+    from apps.tutoring.simple_tutor.exit_ticket import maybe_pose_remediation_next
+    _follow_up = maybe_pose_remediation_next(session)
+    if _follow_up:
+        text_reply = f"{(text_reply or '').rstrip()}\n\n{_follow_up}".strip()
 
     return {
         'content': text_reply or '',
@@ -2931,6 +2979,8 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
         'probe': None,
         'pending_question': None,
         'follow_up_message': None,
+        'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
     }
 
 
@@ -3170,11 +3220,32 @@ def start_for_view(session) -> dict:
        to ``start()`` and let the engine decide via mode detection
        (POSE / TEACH / REMEDIATION).
     """
+    from django.utils import translation
+
     from apps.curriculum.models import LessonStep
     from apps.tutoring.models import InFlightQuestion, SessionTurn
 
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     has_prior_turns = SessionTurn.objects.filter(session=session).exists()
+
+    # A completed session must not re-pose. Existing sessions were left with a
+    # live slot by the pass path (fixed at source in exit_ticket.py), and
+    # re-posing there sends the student to a question chat_respond will refuse
+    # to grade. Clear it rather than only skipping the branch, so the picker
+    # and every other slot reader agree the lesson is over.
+    if _is_completed(session):
+        InFlightQuestion.objects.filter(session=session).delete()
+        payload = _project_start_payload(
+            session,
+            translation.gettext(
+                "This lesson is complete. Open Review to go back over it."),
+        )
+        payload['is_complete'] = True
+        payload['answer_choices'] = None
+        logger.info(
+            "[simple_tutor] start on a COMPLETED session=%s — returning the "
+            "completion state, not a tutoring turn", session.pk)
+        return payload
 
     if in_flight is not None and has_prior_turns:
         message = _build_resume_message(in_flight, _course_locale(session))
@@ -3193,6 +3264,16 @@ def start_for_view(session) -> dict:
 
     out = start(session)
     return _project_start_payload(session, out.get('content', ''))
+
+
+def _is_completed(session) -> bool:
+    """True when the lesson is finished, so nothing should be posed or graded."""
+    try:
+        from apps.tutoring.models import TutorSession
+        return str(getattr(session, 'status', '')) == str(
+            TutorSession.Status.COMPLETED)
+    except Exception:                              # noqa: BLE001
+        return False
 
 
 def _build_resume_message(slot, locale: str = 'en-us') -> str:
@@ -3220,6 +3301,95 @@ def _build_resume_message(slot, locale: str = 'en-us') -> str:
         for letter, opt in zip(('A', 'B', 'C', 'D'), slot.options):
             parts.append(f"{letter}) {opt}")
     return "\n".join(p for p in parts if p is not None).strip()
+
+
+def _remediation_progress_payload(session) -> dict | None:
+    """``{'recovered': n, 'total': m}`` so the header can show where the
+    student is inside remediation. None outside it — the chip is left alone.
+    """
+    try:
+        from apps.tutoring.simple_tutor.tools import remediation_progress
+        return remediation_progress(session)
+    except Exception:                              # noqa: BLE001
+        logger.warning("remediation progress failed", exc_info=True)
+        return None
+
+
+def _uses_answer_picker(session, slot, cfg=None) -> bool:
+    """True when the A-D buttons are the student's ONLY way to answer ``slot``.
+
+    Two callers, and they must never disagree: ``_answer_choices_payload``
+    decides whether the buttons render, and the system prompt's
+    ``<answer_surface>`` block tells the tutor a hint may not ask anything
+    because they did. If the frontend shows buttons the prompt doesn't know
+    about, you get device session 30 — the tutor hinted "Now try this: what
+    does the horizontal axis represent?" while the buttons on screen still
+    belonged to the vertical-axis question. That failure is invisible from
+    either side alone, which is why the condition lives in one function.
+
+    ``cfg`` lets the turn path pass the model it already resolved rather than
+    resolving twice.
+    """
+    try:
+        from apps.tutoring.simple_tutor.model_choice import (
+            LOCAL_PROVIDER, resolve_for_session,
+        )
+
+        if slot is None or (slot.question_type or '').strip().lower() != 'mcq':
+            return False
+        if len([o for o in (slot.options or []) if str(o).strip()]) < 2:
+            return False
+        if cfg is None:
+            cfg = resolve_for_session(session)
+        if cfg is None:
+            from apps.llm.models import ModelConfig
+            cfg = ModelConfig.get_for('tutoring')
+        return (
+            cfg is not None
+            and str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
+        )
+    except Exception:                              # noqa: BLE001
+        # Free text is the safe default on both sides: the student keeps a
+        # way to reply, and the tutor keeps the ladder it has always had.
+        logger.warning("answer picker check failed", exc_info=True)
+        return False
+
+
+def _answer_choices_payload(session) -> dict | None:
+    """The live MCQ's options, when the student should CLICK rather than type.
+
+    Returned only for a session running a LOCAL model. Typing is fine online:
+    a cloud tutor reads "northing" as option B without difficulty. The local 4B
+    does not, and the failure is expensive — device session 29, the student
+    typed "northing" against "B) The northing or vertical distance", nothing
+    graded it, and the question was simply asked again.
+
+    Offline is already MCQ-only (TUTORING_QUESTION_TYPES defaults to 'mcq'), so
+    a letter picker covers every question the offline tutor can ask. Clicking a
+    letter sends "B", which the deterministic fast path grades in ~0.1 ms with
+    no model call and no parsing — the whole class of "student phrased it
+    differently" failures stops existing rather than being handled.
+
+    None when: no live question, not an MCQ, or the session is on a cloud
+    model. The frontend renders nothing in that case and typing is unchanged.
+    """
+    try:
+        from apps.tutoring.models import InFlightQuestion
+
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        if not _uses_answer_picker(session, slot):
+            return None
+        options = list(slot.options or [])
+        return {
+            'letters': [
+                {'letter': L, 'text': str(t).strip()}
+                for L, t in zip('ABCD', options) if str(t).strip()
+            ],
+        }
+    except Exception:                              # noqa: BLE001
+        # A missing picker costs the student a click, never the turn.
+        logger.warning("answer choices payload failed", exc_info=True)
+        return None
 
 
 def _project_start_payload(session, message: str) -> dict:
@@ -3317,6 +3487,8 @@ def _project_start_payload(session, message: str) -> dict:
         'probe': None,
         'pending_question': None,
         'follow_up_message': None,
+        'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
     }
 
 

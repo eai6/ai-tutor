@@ -50,6 +50,13 @@ if TYPE_CHECKING:
 # settled on — see memory/tutor_engine_research.md.
 
 
+# What the student can physically send back this turn. Offline sessions answer
+# an MCQ by tapping one of four buttons and have no text box at all, which
+# changes what a hint is allowed to be — see _ANSWER_SURFACE_PICKER.
+ANSWER_MODE_FREE_TEXT = 'free_text'
+ANSWER_MODE_PICKER = 'letter_picker'
+
+
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "pose_question",
@@ -434,6 +441,21 @@ of such attempts.
 # static prefix (and don't read them as competing with TUTORING-mode
 # rules). When this block IS present, it sits late in the prompt next
 # to the <exit_ticket_review> data — the model reads them together.
+# Two forms, because only the Qwen (offline) template has a REMEDIATION mode
+# section in Block 0.
+#
+# The long form is what production has always shipped and is unchanged. The
+# offline path uses the flag instead, because its Block 0 now defines
+# remediation as a fourth mode alongside GRADE / CONVERSATIONAL / POSE, and
+# carrying both meant two procedures for one turn: Block 0 said "correct ->
+# pose the next question in the SAME turn" while this block said "1. re-explain
+# 2. pose 3. grade". Measured on the 4B, it did step 1 and stopped — 0/4 turns
+# posed anything, and remediation dead-ended after one correct answer.
+#
+# Do NOT collapse these into one. Changing the long form changes the hosted
+# Anthropic prompt, which has no Block-0 section to fall back on.
+_REMEDIATION_FLAG = """<remediation_mode active="true"/>"""
+
 _REMEDIATION_INSTRUCTIONS = """<remediation_mode>
 The student has just submitted the exit ticket and an \
 ``<exit_ticket_review>`` block is present below. Your job this turn \
@@ -443,10 +465,9 @@ mini-step:
   1. Pick one missed objective the student hasn't recovered yet.
   2. Briefly re-explain the concept (1-3 sentences) using fresh \
 phrasing — do not just re-read the previous lesson script.
-  3. Call pose_question with a NEW question targeting that same \
-enabling_objective (you may adapt from <question_pool> or author \
-your own). Surface the stem + options in your text reply per the \
-POSE rules above.
+  3. Call pose_question with an index from <question_pool>, which now \
+holds questions on the missed objectives. Introduce it in your reply; \
+the platform renders the stem and options itself.
   4. Grade with record_answer as usual. On correct, move to the next \
 missed objective. On incorrect, hint per the ladder.
 Skip objectives in ``<mastered_objectives>`` — the student already \
@@ -515,6 +536,7 @@ def build_system_prompt(
     student_intent: str | None = None,
     locale: str = 'en-us',
     family: str | None = None,
+    answer_mode: str = ANSWER_MODE_FREE_TEXT,
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -545,6 +567,11 @@ def build_system_prompt(
             from the returned tools list.
         recent_window: last N SessionTurns of this step, oldest → newest.
         step_summaries: one-line summary per completed step.
+        answer_mode: what the student can physically send back this turn.
+            ``letter_picker`` (offline sessions) means the A-D buttons are
+            their only input, so the hint ladder's sub-questions and
+            micro-steps are unanswerable — see _ANSWER_SURFACE_PICKER.
+            Defaults to free text, which is every hosted session.
 
     Returns:
         (system_blocks, tools)
@@ -613,7 +640,10 @@ def build_system_prompt(
     if summaries_text:
         dynamic_parts.append(summaries_text)
 
-    recent_text = _render_recent_turns_block(recent_window)
+    recent_text = _render_recent_turns_block(
+        recent_window,
+        trim_tutor_turns=(family or '').strip().lower() == 'qwen',
+    )
     if recent_text:
         dynamic_parts.append(recent_text)
 
@@ -623,10 +653,13 @@ def build_system_prompt(
         # data so the model reads the mode-switch and the failing
         # objectives in one window. Kept out of Block 0 (static
         # prefix) to keep non-remediation turns clean.
-        dynamic_parts.append(_REMEDIATION_INSTRUCTIONS)
+        dynamic_parts.append(
+            _REMEDIATION_FLAG if (family or '').strip().lower() == 'qwen'
+            else _REMEDIATION_INSTRUCTIONS
+        )
         dynamic_parts.append(review_text)
 
-    in_flight_text = _render_in_flight_block(in_flight_question)
+    in_flight_text = _render_in_flight_block(in_flight_question, answer_mode)
     if in_flight_text:
         dynamic_parts.append(in_flight_text)
 
@@ -649,7 +682,19 @@ def build_system_prompt(
     # pedagogy (affirm in one clause, one teaching sentence, name the slip).
     # This is the arithmetic version of the same rule, restated where the model
     # will actually still be attending to it.
-    dynamic_parts.append(_render_length_budget())
+    # Offline only: the Qwen Block 0 has had its four mode sections removed in
+    # favour of this. Every other family still carries all four in its own
+    # Block 0, so rendering here as well would duplicate them.
+    if (family or '').strip().lower() == 'qwen':
+        dynamic_parts.append(_render_active_mode(
+            in_flight_question, student_intent, exit_ticket_review))
+
+    dynamic_parts.append(_render_length_budget(
+        answer_mode,
+        has_live_question=in_flight_question is not None,
+        remediating=bool(
+            exit_ticket_review and not exit_ticket_review.get('passed')),
+    ))
 
     if dynamic_parts:
         blocks.append({
@@ -760,11 +805,19 @@ def _render_current_step_block(
     (exit-ticket mode — engine handles separately).
 
     The block carries the step's phase + objective + teacher_script +
-    a <question_pool> of catalog questions the LLM CAN draw from. The
-    LLM is NOT required to pose from the pool — it's context only.
+    a <question_pool> of catalog questions the LLM poses from by index.
     """
     if step is None:
-        return ""
+        # No step, but there may still be questions: remediation runs PAST the
+        # last step, and its pool comes from the missed objectives instead
+        # (tools._remediation_question_pool).
+        #
+        # Returning "" here dropped <question_pool> out of the prompt entirely,
+        # so pose_question(question_index=N) had no N to name even once the
+        # pool was populated — the model could see no questions and wrote one
+        # in prose. Emit the pool on its own: the step fields are genuinely
+        # absent, the questions are not.
+        return _render_question_pool(question_pool) if question_pool else ""
 
     phase = (getattr(step, 'phase', '') or '').capitalize() or "Unspecified"
     order_index = getattr(step, 'order_index', None)
@@ -813,6 +866,15 @@ def _render_question_pool(pool) -> str:
         qtype = (getattr(q, 'question_type', '') or '').strip() or 'short_answer'
         stem = (getattr(q, 'question_text', '') or '').strip()
         parts.append(f'  <question index="{i}" type="{qtype}">')
+        # Difficulty has been on ExitTicketQuestion all along (easy/medium/hard,
+        # and populated — 2601/2463/2395 across the device catalog) but was
+        # never rendered. The hint ladder says "pivot to an EASIER pool
+        # question" and the model had no way to tell which one that is; it was
+        # picking blind. Surfacing the field costs one line and makes the
+        # instruction executable.
+        diff = (getattr(q, 'difficulty', '') or '').strip()
+        if diff:
+            parts.append(f'    <difficulty>{_escape_xml(diff)}</difficulty>')
         if stem:
             parts.append(f'    <stem>{_escape_xml(stem)}</stem>')
 
@@ -981,7 +1043,12 @@ _INTENT_GUIDANCE = {
 }
 
 
-def _render_length_budget() -> str:
+def _render_length_budget(
+    answer_mode: str = ANSWER_MODE_FREE_TEXT,
+    *,
+    has_live_question: bool = True,
+    remediating: bool = False,
+) -> str:
     """The per-turn reply-length budget, in sentences.
 
     Sentences rather than tokens or words: the model cannot count its own
@@ -993,14 +1060,45 @@ def _render_length_budget() -> str:
 
     Stated as what TO do. The family prompts already say what not to do and
     the small local models read straight past it; see the call site.
+
+    Line 3 is answer-mode-aware, and that is not cosmetic. This block renders
+    DEAD LAST, after <answer_surface>, so on the first offline run the final
+    thing the 4B read was "3. The next question, if you are posing one." — and
+    it duly wrote one, in prose, under buttons belonging to the old question.
+    Two live rules with the closer one winning is the expected outcome, not a
+    surprise. The distinction that actually matters is prose-vs-tool: a
+    question written into the text strands the student, while pose_question
+    swaps the buttons for its own and is always fine.
     """
+    if remediating:
+        # Remediation replies ran long in testing: the model treats
+        # "re-teach the objective" as licence to lecture, and the platform's
+        # question is already queued underneath whatever it writes. Two
+        # sentences is the whole job here — there is no question to introduce.
+        return (
+            "<reply_length>\n"
+            "Write ONE or TWO sentences. Three is the absolute maximum.\n"
+            "  1. One clause on what the student just did.\n"
+            "  2. One sentence re-teaching the idea in fresh words.\n"
+            "Do not add a third unless it is genuinely needed, and never add a "
+            "question — the platform posts one below your reply.\n"
+            "</reply_length>"
+        )
+    if answer_mode == ANSWER_MODE_PICKER and has_live_question:
+        third = (
+            "  3. A next question ONLY if you are calling pose_question this "
+            "turn — that swaps the buttons for its own. Otherwise stop after "
+            "2: the buttons on screen are already how the student replies.\n"
+        )
+    else:
+        third = "  3. The next question, if you are posing one.\n"
     return (
         "<reply_length>\n"
         "Write 2-3 sentences, then stop. That is the whole visible reply.\n"
         "Budget them like this:\n"
         "  1. One clause reacting to what the student just said.\n"
         "  2. One sentence that teaches — the rule, the step, or the slip.\n"
-        "  3. The next question, if you are posing one.\n"
+        f"{third}"
         "A reply that runs past 3 sentences is too long, however good it is.\n"
         "</reply_length>"
     )
@@ -1027,7 +1125,155 @@ def _render_message_intent_block(student_intent: str | None) -> str:
     )
 
 
-def _render_in_flight_block(in_flight_question) -> str:
+# Appended INSIDE <in_flight_question> when the student's only answer surface is
+# the A-D button row (offline sessions — see engine._uses_answer_picker).
+#
+# Every hint-ladder instruction we ship assumes the student can type back:
+# "ask a clarifying sub-question" (family_prompts.py:623), "carry at most ONE
+# micro-step per hint ... once the student answers it" (:880), and both
+# hint-vs-reveal examples are themselves questions (:888). With a letter picker
+# that guidance is not merely unhelpful, it is unanswerable — device session 30
+# hinted "Now try this: what does the horizontal axis represent?" while the
+# buttons on screen still belonged to the vertical-axis question. The student
+# had four options for a question nobody asked.
+#
+# So this is not a nudge, it is a mode switch, and it overrides the ladder for
+# the reply text only. Placed here rather than in Block 0 because it is a
+# property of THIS turn's slot, and because the dynamic block renders last —
+# closest to the student's message, where instruction-following is strongest
+# (prompting-fundamentals: instructions last in long context).
+_ANSWER_SURFACE_PICKER = """  <answer_surface mode="letter_picker">
+The student answers by TAPPING one of the option buttons above.
+Reference the options by their letter key to know exactly which one the
+student selected.</answer_surface>"""
+
+
+# One mode per turn, chosen by the server.
+#
+# Block 0 used to carry all four and ask the model to work out which applied
+# from <in_flight_question>, <message_intent> and <exit_ticket_review>. The
+# platform already knows all three — they are arguments to build_system_prompt
+# — so that asked a 4B to re-derive a fact we hold, with three wrong answers
+# available and nothing gained by getting it right.
+#
+# Rendered into the DYNAMIC block, not Block 0: the applicable mode changes per
+# turn, and Block 0 is the cached prefix. Moving it out shrinks the cached
+# prefix by ~2,500 chars AND cuts what the model reads each turn to the quarter
+# that applies.
+_MODE_GRADE = """## This turn: GRADE
+
+The student answered the question in <in_flight_question>.
+
+1. Call `record_answer` with their literal answer. The platform already holds
+   the reference, the type, and the options.
+2. Read the verdict it returns, then write your reply:
+   - **CORRECT** — acknowledge in one clause, teach one sentence, and call
+     `pose_question` for the next question in the SAME turn.
+   - **INCORRECT** — hint, and pose nothing. The question stays live until it
+     is answered correctly or you pivot."""
+
+_MODE_POSE = """## This turn: POSE / TEACH
+
+Nothing is in flight. Teach, or pose a question, or both.
+
+Call `pose_question` with an index from <question_pool>. The platform writes
+that question to the slot and renders its stem and options to the student.
+Exactly one call this turn — a second swaps the question out from under them.
+
+Match the phase in <current_step>: **Engage** opens with curiosity, **Explore**
+asks what they notice, **Explain** teaches the procedure from <teaching_notes>
+and ends with a check question, **Elaborate** extends to a harder case,
+**Evaluate** poses and grades."""
+
+# Remediation gets its own bodies rather than a suffix appended to the lesson
+# ones. The suffix approach put "call pose_question" twelve lines above "the
+# platform poses the next one for you", and the model resolved it by writing a
+# question in prose without the tool call — so the server posed too and the
+# student read two questions with buttons for the second.
+#
+# In remediation the server ALWAYS poses (exit_ticket.maybe_pose_remediation_next
+# fires on every turn with no live slot), so the model's job here is teaching
+# only. Saying that once, with nothing to argue against, is the whole fix.
+# One block. Remediation is the tutoring loop with a different pool — there is
+# no second shape to describe, and splitting it into GRADE/TEACH variants only
+# gave the model more surface to pick the wrong half of.
+#
+# A question is ALWAYS in flight here: the pool holds exactly the unrecovered
+# missed questions, ensure_remediation_question guarantees one at the start of
+# every turn, and the mode ends when that set empties.
+_MODE_REMEDIATION = """## This turn: REMEDIATION
+
+The student failed the quiz. You are working back through the questions they
+got wrong, and <question_pool> holds exactly those — worst objective first,
+with the ones they have since recovered already removed.
+
+This is the lesson loop with a different pool. Nothing else changes:
+
+1. Call `record_answer` with their literal answer to <in_flight_question>.
+2. Then write your reply:
+   - **CORRECT** — say so in one clause, one sentence re-explaining the idea in
+     fresh words, and call `pose_question` for the next pool entry.
+   - **INCORRECT** — name the error and give one hint. The question stays live.
+
+Everything in the pool is still outstanding, so there is no wrong choice of
+next question. Re-explain in fresh words rather than replaying the wording they
+already failed to learn from, and write no wrap-up when the last one is
+recovered — the platform re-opens the quiz itself, and a summary lands in front
+of a quiz that is already opening."""
+
+_ANSWERING_INTENTS = {'', 'answer', 'answer_or_other'}
+
+
+def _render_active_mode(
+    in_flight_question, student_intent, exit_ticket_review,
+) -> str:
+    """The one mode block that applies this turn.
+
+    ``student_intent`` is accepted and deliberately unused: offline, a live
+    question means the picker is showing and the typing box is not, so the
+    student can only send a letter and the intent is always an answer. It stays
+    in the signature because the caller has it and a future non-picker offline
+    surface would need it back.
+    """
+    _ = student_intent
+    remediating = bool(
+        exit_ticket_review and not exit_ticket_review.get('passed'))
+
+    if remediating:
+        # One block regardless of intent or slot. A question is always in
+        # flight (ensure_remediation_question), and CONVERSATIONAL's
+        # instruction — record_answer with an empty extracted_answer — is
+        # unchanged from the lesson, so there is nothing to branch on.
+        return _MODE_REMEDIATION
+
+    # No CONVERSATIONAL branch. It is defined as "a question is in flight AND
+    # the message is not an answer", and offline that state cannot occur: a
+    # live question means the picker is on screen and the typing box is not, so
+    # the only thing the student can send is a letter. Rendering a mode the
+    # student's input can never select just gave the model a fourth shape to
+    # pick the wrong one of.
+    #
+    # (This renderer is offline-only — build_system_prompt calls it for
+    # family='qwen'. Every other family still carries all four modes in its own
+    # Block 0, where typing IS possible and CONVERSATIONAL is reachable.)
+    if in_flight_question is None:
+        return _MODE_POSE
+    return _MODE_GRADE
+
+
+# Three hints, then pivot (2026-08-06: raised from 2 after the pivot was
+# confirmed working — two was cutting students off before the scaffolding had
+# a fair run). Must match the Block-0 ladder's top rung AND
+# tools.PIVOT_AFTER_ATTEMPTS: this block renders at the point of decision, so a
+# higher threshold here means the slot says nothing on the exact turn the
+# ladder calls for a pivot, and a lower one asks for a pivot the server will
+# not perform.
+_PIVOT_AFTER_ATTEMPTS = 3
+
+
+def _render_in_flight_block(
+    in_flight_question, answer_mode: str = ANSWER_MODE_FREE_TEXT,
+) -> str:
     """Render the ``<in_flight_question>`` block — the platform's
     persisted slot of the question the student is currently answering.
 
@@ -1039,6 +1285,10 @@ def _render_in_flight_block(in_flight_question) -> str:
 
     The reference_answer is included so the LLM can compose a
     grading-aware hint without revealing it to the student.
+
+    ``answer_mode`` describes what the student can physically send back.
+    ``letter_picker`` means the A-D buttons are their only input, which
+    changes what a hint is allowed to be — see _ANSWER_SURFACE_PICKER.
     """
     if in_flight_question is None:
         return ""
@@ -1070,16 +1320,29 @@ def _render_in_flight_block(in_flight_question) -> str:
         parts.append(
             f'  <reference_answer>{_escape_xml(ref)}</reference_answer>'
         )
-    if attempts >= 3:
+    # Only when the buttons are actually on screen: the frontend renders them
+    # for a local session with a live MCQ carrying options, which is the same
+    # condition engine._uses_answer_picker checks. If the two ever disagree,
+    # the bug is silent and looks exactly like session 30 — so they share it.
+    if answer_mode == ANSWER_MODE_PICKER and qtype == 'mcq' and options:
+        parts.append(_ANSWER_SURFACE_PICKER)
+    if attempts >= _PIVOT_AFTER_ATTEMPTS:
         # Cycle-8: without this, sessions ground 15+ turns re-scaffolding
         # one hard question against a disengaged student. The anti-desync
         # guard already permits replacing a question after a wrong attempt.
+        #
+        # Threshold was 3, while the hint ladder in Block 0 says rung "2+ —
+        # pivot". So the block that fires at the point of decision stayed
+        # silent on the exact turn the ladder called for a pivot, and only
+        # spoke up a turn later. Device transcript: three wrong answers on one
+        # question, no pivot. Two hints then pivot means this fires at 2.
         parts.append(
             '  <pivot_guidance>This question has had '
-            f'{attempts} unsuccessful attempts. Stop re-explaining it. '
-            'Pivot now: call pose_question with a strictly simpler '
-            'question on the same skill (it replaces this one), or '
-            'continue to the next piece of content.</pivot_guidance>'
+            f'{attempts} wrong attempts — three hints have not worked, so a '
+            'fourth will not either. Pivot NOW, this turn: call pose_question '
+            'with a lower-<difficulty> entry from <question_pool> on the same '
+            'objective. That call replaces this question. Do not write another '
+            'hint.</pivot_guidance>'
         )
     parts.append("</in_flight_question>")
     return "\n".join(parts)
@@ -1122,7 +1385,40 @@ def _render_history_summary_block(summaries: list[str] | None) -> str:
     return "\n".join(parts)
 
 
-def _render_recent_turns_block(recent_window: list | None) -> str:
+_TUTOR_TURN_HEAD_CHARS = 180
+
+
+def _trim_tutor_turn(content: str) -> str:
+    """Keep the head of a tutor turn; drop the tail.
+
+    The small local models copy their own previous reply forward. Device
+    session 127 carried "Next, let's practice identifying the northing value…"
+    in SEVEN consecutive tutor turns, word-identical — a sentence that appears
+    nowhere in the prompt. The model wrote it once, <recent_turns> handed it
+    back, and it kept handing it back.
+
+    What gets copied is always the TAIL: the hand-off to the next question is
+    the last thing in a reply and the last thing the model reads of it. The
+    head — the reaction and the teaching sentence — is what the next turn
+    genuinely needs to avoid repeating itself. So keep the head and cut the
+    rest, which removes the copyable part and keeps the useful part.
+
+    Cutting on a sentence boundary rather than mid-word: a truncated fragment
+    is itself something to copy, and a dangling half-sentence reads as
+    something to complete.
+    """
+    text = ' '.join((content or '').split())
+    if len(text) <= _TUTOR_TURN_HEAD_CHARS:
+        return text
+    window = text[:_TUTOR_TURN_HEAD_CHARS]
+    cut = max(window.rfind('. '), window.rfind('! '), window.rfind('? '))
+    head = window[:cut + 1] if cut > 40 else window.rsplit(' ', 1)[0]
+    return f'{head.rstrip()} […]'
+
+
+def _render_recent_turns_block(
+    recent_window: list | None, trim_tutor_turns: bool = False,
+) -> str:
     """Render the <recent_turns> block — last N turns of the current
     step, verbatim. The latest student turn is excluded — it goes in
     the user message instead.
@@ -1148,6 +1444,8 @@ def _render_recent_turns_block(recent_window: list | None) -> str:
         content = (getattr(turn, 'content', '') or '').strip()
         if not content:
             continue
+        if trim_tutor_turns and role == 'tutor':
+            content = _trim_tutor_turn(content)
         attrs = f'role="{role}"'
         if role == 'tutor':
             jo = getattr(turn, 'judge_outputs', None) or {}

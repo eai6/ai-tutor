@@ -79,13 +79,18 @@ class RemediationOpenerTest(DjangoTestCase):
         for letter in ('A)', 'B)', 'C)', 'D)'):
             self.assertIn(letter, out)
 
-    def test_prefers_a_question_the_student_did_not_just_fail(self):
+    def test_opens_on_a_question_the_student_actually_failed(self):
+        """Reversed 2026-08-06. This used to prefer a sibling they had NOT
+        failed, to avoid re-asking an identical item — but remediation is meant
+        to work back through the missed questions, and completion now counts
+        them. Opening on a sibling left the item that tripped them up
+        unaddressed and the counter unable to move."""
         session, questions = _session_with_bank(3)
         failed = questions[0]
         out = _remediation_opening_question(
             session, _competency(failed_ids=[failed.pk]))
         slot = InFlightQuestion.objects.get(session=session)
-        self.assertNotEqual(slot.question_text, failed.question_text)
+        self.assertEqual(slot.question_text, failed.question_text)
         self.assertIn(slot.question_text, out)
 
     def test_never_reopens_on_a_question_already_answered_correctly(self):

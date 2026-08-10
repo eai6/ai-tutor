@@ -254,6 +254,15 @@ def submit_exit_ticket(session, answers: list) -> dict:
         session.ended_at = timezone.now()
         session.completed_lesson_at = timezone.now()
         session.mastery_achieved = True
+        # Retire whatever was still in flight when the quiz was passed.
+        # Without this the completed session keeps a live question the
+        # student can never answer: resume re-poses it ("Welcome back! You
+        # were working on this question"), they answer, and chat_respond's
+        # completed-session branch replies "This lesson is already complete!"
+        # without grading. Offline it is worse — the picker renders buttons
+        # for a question whose session will refuse every one of them.
+        from apps.tutoring.models import InFlightQuestion
+        InFlightQuestion.objects.filter(session=session).delete()
     es = session.engine_state or {}
     es['exit_ticket_score'] = correct_count
     es['exit_ticket_total'] = total
@@ -303,10 +312,24 @@ def submit_exit_ticket(session, answers: list) -> dict:
             if opener:
                 message = f"{message}\n\n{opener}"
 
+    # The third payload site. respond_for_view and _project_start_payload both
+    # carry answer_choices; this one did not, and the remediation opener is
+    # exactly where it matters — it deletes the lesson's stale slot and poses a
+    # fresh question, so the buttons on screen belong to a question that no
+    # longer exists. Device session 81: the review text asked about two
+    # villages while the picker still offered "Locate northing 29 and mark
+    # where the lines intersect" from the pre-quiz question. The slot was
+    # correct the whole time; nothing told the frontend to repaint it.
+    from apps.tutoring.simple_tutor.engine import (
+        _answer_choices_payload, _remediation_progress_payload,
+    )
+
     return {
         'message': message,
         'phase': 'exit_ticket',
         'is_complete': passed,
+        'answer_choices': _answer_choices_payload(session),
+        'remediation_progress': _remediation_progress_payload(session),
         'exit_ticket': {
             'results': results_list,
             'score': correct_count,
@@ -343,6 +366,116 @@ def _try_number(s) -> float | None:
         return float(str(s).strip().replace(',', ''))
     except (TypeError, ValueError):
         return None
+
+
+def ensure_remediation_question(session) -> bool:
+    """Guarantee a live question whenever remediation is running.
+
+    Remediation always has one outstanding: the pool holds exactly the missed
+    questions not yet recovered, and the mode ends the moment that set empties.
+    So a remediation turn with nothing in flight is an invariant violation, not
+    a state to write instructions for.
+
+    It was reachable because the backstop poses at the END of a turn — a turn
+    could still START without a slot if a pose failed, or on resume. Then the
+    tutor got the TEACH-remediation shape, the student got a typing box on an
+    MCQ-only build, and nothing graded what they sent.
+
+    Returns True if it posed one. Cheap when a slot already exists: one
+    existence check.
+    """
+    from apps.tutoring.models import InFlightQuestion
+
+    try:
+        if InFlightQuestion.objects.filter(session=session).exists():
+            return False
+        return bool(_pose_next_remediation_slot(session))
+    except Exception:  # noqa: BLE001 — never break the turn
+        logger.warning(
+            "[simple_tutor] ensure_remediation_question failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return False
+
+
+def _pose_next_remediation_slot(session):
+    """Pose the next remediation question, or None. Assumes no live slot.
+
+    Shared by ensure_remediation_question (start of turn, silent) and
+    maybe_pose_remediation_next (end of turn, returns text to append), so the
+    two can never disagree about which question is next.
+    """
+    from apps.tutoring.simple_tutor.tools import (
+        build_question_pool, handle_pose_question_by_index,
+    )
+
+    es = getattr(session, 'engine_state', None) or {}
+    if isinstance(es, dict) and es.get('remediation_complete'):
+        return None
+    from apps.tutoring.simple_tutor.engine import _build_exit_ticket_review
+    review = _build_exit_ticket_review(session)
+    if not review or review.get('passed') or not review.get('missed_objectives'):
+        return None
+
+    pool = build_question_pool(session)
+    if not pool:
+        return None
+    chosen = pool[0]
+    result = handle_pose_question_by_index(
+        session, question_index=1, question_pool=[chosen])
+    if not result.get('posed'):
+        logger.warning(
+            "[simple_tutor] remediation pose failed session=%s: %s",
+            session.pk, result.get('error'))
+        return None
+    return chosen
+
+
+def maybe_pose_remediation_next(session) -> str:
+    """Pose the next remediation question server-side, or '' if not needed.
+
+    Remediation ends the moment a turn leaves no question in flight: there is
+    no step to advance to and no warm-up to fall back on, so the student is
+    handed a compliment and a dead end.
+
+    That is what happens. Measured over 4 offline turns answering the opener
+    correctly, the tutor posed a follow-up 0 times — it wrote "Well done, you
+    correctly identified..." and stopped. Neither an empty pool (fixed), nor
+    the prompt licensing prose (fixed), nor moving the remediation rules into
+    Block 0 as a mode (tried) changed it: a 4B does not reliably make a second
+    tool call in the same turn, and remediation is the one mode where missing
+    it terminates the session rather than costing a beat.
+
+    So the server poses instead. This is the codebase's existing position —
+    tool calls are hints, the server owns question state
+    (auto-memory/feedback_server_owns_question_state.md) — and the opener
+    already works this way; this is the same move for every turn after it.
+
+    Returns the rendered stem + options to append to the reply, or '' when a
+    question is already in flight, remediation is over, or the pool is dry.
+    """
+    from apps.tutoring.models import InFlightQuestion
+
+    try:
+        if InFlightQuestion.objects.filter(session=session).exists():
+            return ''      # the model posed one itself — leave it alone
+        chosen = _pose_next_remediation_slot(session)
+        if chosen is None:
+            return ''
+
+        lines = [(chosen.question_text or '').strip()]
+        for letter in ('A', 'B', 'C', 'D'):
+            opt = (getattr(chosen, f'option_{letter.lower()}', '') or '').strip()
+            if opt:
+                lines.append(f'{letter}) {opt}')
+        logger.info(
+            "[simple_tutor] remediation follow-up posed server-side "
+            "session=%s q=%s", session.pk, chosen.pk)
+        return '\n'.join(lines)
+    except Exception:  # noqa: BLE001 — a missing follow-up must not lose the turn
+        logger.warning(
+            "[simple_tutor] remediation follow-up failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return ''
 
 
 def _remediation_opening_question(session, eo_competency_map: dict) -> str:
@@ -414,11 +547,13 @@ def _remediation_opening_question(session, eo_competency_map: dict) -> str:
         ]
         pool_for_pick = unseen or candidates
 
-        # Prefer an item they have NOT already failed: a sibling on the same
-        # objective is what remediation is for. Re-asking the identical failed
-        # question is the fallback, not the goal.
-        fresh = [q for q in pool_for_pick if q.pk not in failed_ids]
-        chosen = (fresh or pool_for_pick)[0]
+        # Open on a question they actually got wrong. Remediation is meant to
+        # work back through the missed items, and the completion check counts
+        # them — so opening on a sibling they never failed leaves the item that
+        # tripped them up unaddressed and the counter unable to move.
+        # Reverses the earlier "prefer a fresh sibling" preference.
+        failed_first = [q for q in pool_for_pick if q.pk in failed_ids]
+        chosen = (failed_first or pool_for_pick)[0]
 
         # Retire the lesson's leftover in-flight question first. Submitting the
         # exit ticket ends the lesson phase, so a slot still open from it is
@@ -467,10 +602,19 @@ def _remediation_opening_question(session, eo_competency_map: dict) -> str:
 
 
 def _empty_payload(message: str) -> dict:
+    """Bail-out payload for a lesson with no exit ticket or no questions.
+
+    ``answer_choices`` is explicitly None rather than absent. Both callers
+    return before anything is posed, so there is genuinely nothing in flight —
+    but the frontend clears the picker on a null and leaves it alone on an
+    undefined, and 'happens to be falsy' is how the stale picker in device
+    session 81 survived. Say it, don't imply it.
+    """
     return {
         'message': message,
         'phase': 'exit_ticket',
         'is_complete': False,
+        'answer_choices': None,
         'exit_ticket': {
             'results': [], 'score': 0, 'passed': False,
             'total': 0, 'passing_score': 0,

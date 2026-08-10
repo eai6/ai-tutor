@@ -60,10 +60,31 @@ def get_instructor_from_client(llm_client) -> Optional[Any]:
     provider_key = _PROVIDER_INSTRUCTOR_MAP.get(
         str(config.provider).lower(), str(config.provider).lower()
     )
+    # Local models get JSON mode, not tool-calling mode.
+    #
+    # instructor defaults to TOOLS on OpenAI-compatible endpoints, and the
+    # local qwen models emit DUPLICATE tool calls — the same behaviour that
+    # produced 31 record_answer calls in one tutoring response. instructor
+    # rejects that outright: "Instructor does not support multiple tool calls,
+    # use List[Model]". Measured on the desktop 2026-08-06, every offline grade
+    # failed this way, returned None, and the student's answer came back
+    # unresolved.
+    #
+    # JSON mode constrains the output to the schema instead of routing it
+    # through a tool call, which is what Ollama's own `format` field does — the
+    # same mechanism already used for constrained tool calls in
+    # apps/llm/client.py, measured there at 0.41 s with clean single-field
+    # output.
+    kwargs = {'api_key': config.get_api_key()}
+    if provider_key == 'ollama':
+        try:
+            kwargs['mode'] = instructor.Mode.JSON
+        except AttributeError:      # older instructor without Mode.JSON
+            pass
     try:
         return instructor.from_provider(
             f"{provider_key}/{config.model_name}",
-            api_key=config.get_api_key(),
+            **kwargs,
         )
     except Exception as exc:
         logger.warning(

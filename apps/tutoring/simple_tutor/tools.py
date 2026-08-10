@@ -33,6 +33,7 @@ must always flow — failures get logged + return error dicts, never block.
 from __future__ import annotations
 
 import logging
+import random
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
@@ -275,7 +276,17 @@ def build_question_pool(
         .first()
     )
     if step is None:
-        return []
+        # Past the last step. That is remediation: the exit ticket has been
+        # submitted and failed, and there is no LessonStep to key a pool off.
+        #
+        # This returned [] and the consequences were invisible from here.
+        # pose_question(question_index=N) had nothing to select, so the only
+        # way the tutor could ask anything at all was to write a question in
+        # prose — which creates no slot, so nothing grades, and offline the
+        # student gets no letter buttons either. The prompt licensed exactly
+        # that ("or author your own"), so the instruction and the empty pool
+        # were the same bug arriving from two directions.
+        return _remediation_question_pool(session, lesson, max_questions)
 
     # Drop questions whose text has already been graded in this session.
     # Without this, the LLM keeps seeing the just-answered question in
@@ -289,6 +300,28 @@ def build_question_pool(
 
     allowed_types = _allowed_tutoring_types()
     pool: list = []
+
+    # Per-session question order.
+    #
+    # The DB order (order_index, id) is the authoring order and it never
+    # varied, so every student on a given step met the same question first,
+    # and a student retaking a lesson met it again. That was survivable while
+    # the tutor authored and adapted its own questions; since catalog-only
+    # (f59bdb7) it selects a pool INDEX, so the authoring order became the
+    # teaching order verbatim.
+    #
+    # Seeded on session.pk, exactly like the exit-ticket sub-sample in
+    # engine._build_exit_ticket_payload. Different session → different pk →
+    # different order, which is the variety the student sees; a retake is a
+    # new session, so a retake gets a new order.
+    #
+    # Seeded rather than free rng deliberately. One turn builds the pool once
+    # and threads the same list to both the prompt and the dispatcher
+    # (engine.py:405), so pose_question(question_index=N) is safe either way —
+    # but a free shuffle would reorder the pool the model reads on EVERY turn,
+    # so the question it saw at index 2 last turn is somewhere else now. That
+    # churn is exactly what makes a 4B lose track of what it already asked.
+    rng = random.Random(getattr(session, 'pk', None) or 0)
 
     # Source 1 — LessonStep.question (one entry max). StepQuestion
     # produces short_numeric or short_answer; skip when the allowlist
@@ -304,7 +337,12 @@ def build_question_pool(
     # Source 2 — ETQs matching this step's enabling_objective.
     objective = (getattr(step, 'enabling_objective', '') or '').strip()
     if objective and len(pool) < max_questions:
-        for q in (
+        # Shuffled WITHIN the tier, never across tiers. The tiers encode
+        # pedagogy — this step's objective outranks the rest of the lesson —
+        # and a global shuffle would let an off-objective question take the
+        # last slot from an on-objective one. What varies is which of the
+        # objective's own questions the student meets first.
+        candidates = list(
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
@@ -312,7 +350,9 @@ def build_question_pool(
                 question_type__in=allowed_types,
             )
             .order_by('order_index', 'id')
-        ):
+        )
+        rng.shuffle(candidates)
+        for q in candidates:
             if _is_already_graded(q):
                 continue
             pool.append(q)
@@ -321,7 +361,7 @@ def build_question_pool(
 
     # Source 3 — ANY allowed ETQ on the lesson (fills the rest).
     if len(pool) < max_questions:
-        for q in (
+        candidates = list(
             ExitTicketQuestion.objects
             .filter(
                 exit_ticket__lesson=lesson,
@@ -332,13 +372,111 @@ def build_question_pool(
                 if getattr(p, 'source', '') != 'lesson_step'
             ])
             .order_by('order_index', 'id')
-        ):
+        )
+        rng.shuffle(candidates)
+        for q in candidates:
             if _is_already_graded(q):
                 continue
             pool.append(q)
             if len(pool) >= max_questions:
                 break
 
+    return pool
+
+
+def _remediation_question_pool(session, lesson, max_questions: int) -> list:
+    """Pool for a failed-exit-ticket session: the questions they actually missed.
+
+    Remediation is meant to work back through every question the exit ticket
+    marked wrong, so the pool IS that list, minus the ones already re-answered
+    correctly. Ordered worst-objective-first, since the model takes index 1 and
+    index 1 should be the objective they understood least.
+
+    This reverses the earlier "prefer a sibling they did NOT fail" preference.
+    That was written to avoid re-asking an identical item, but it meant a
+    student could finish remediation without ever revisiting a question they
+    got wrong, and it left the completion check — which counts missed questions
+    — unable to ever reach zero.
+
+    Falls back to any question on the missed objectives when the failed items
+    are exhausted, so the tutor is never handed an empty pool mid-session.
+    Returns [] when there is no completed attempt or nothing was missed, which
+    puts the tutor back in plain TEACH mode rather than posing at random.
+    """
+    from apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
+
+    attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    if attempt is None:
+        return []
+    eo_competency = (attempt.answers or {}).get('eo_competency') or {}
+
+    missed = [
+        (eo, b) for eo, b in eo_competency.items()
+        if eo and isinstance(b, dict)
+        and int(b.get('asked') or 0) > 0
+        and int(b.get('correct') or 0) < int(b.get('asked') or 0)
+    ]
+    if not missed:
+        return []
+    missed.sort(key=lambda kv: (
+        int(kv[1].get('correct') or 0) / max(int(kv[1].get('asked') or 1), 1),
+        kv[0],
+    ))
+
+    _, covered_ids = _remediation_question_sets(session)
+    allowed_types = _allowed_tutoring_types()
+    rng = random.Random(getattr(session, 'pk', None) or 0)
+
+    pool: list = []
+    seen: set[int] = set()
+
+    def _take(queryset):
+        for q in queryset:
+            if len(pool) >= max_questions:
+                return
+            if q.pk in seen or q.pk in covered_ids:
+                continue
+            seen.add(q.pk)
+            pool.append(q)
+
+    # Pass 1 — the failed questions themselves, worst objective first.
+    for objective, bucket in missed:
+        if len(pool) >= max_questions:
+            break
+        ids = [q for q in (bucket.get('failed_question_ids') or [])
+               if isinstance(q, int)]
+        if not ids:
+            continue
+        rows = list(
+            ExitTicketQuestion.objects
+            .filter(pk__in=ids, question_type__in=allowed_types)
+            .order_by('order_index', 'id')
+        )
+        rng.shuffle(rows)
+        _take(rows)
+
+    # Pass 2 — anything else on the missed objectives, once the failures run
+    # out. Without this the pool empties as the student recovers items and the
+    # tutor is left with nothing to pose.
+    for objective, _bucket in missed:
+        if len(pool) >= max_questions:
+            break
+        rows = list(
+            ExitTicketQuestion.objects
+            .filter(
+                exit_ticket__lesson=lesson,
+                enabling_objective=objective,
+                question_type__in=allowed_types,
+            )
+            .order_by('order_index', 'id')
+        )
+        rng.shuffle(rows)
+        _take(rows)
     return pool
 
 
@@ -1017,6 +1155,9 @@ def handle_record_answer(
         'question_type': in_flight.question_type,
         'attempt_count_before': in_flight.attempt_count,
     }
+    # Read off the row before the correct-verdict branch deletes it.
+    in_flight_options = list(in_flight.options or [])
+    in_flight_type = in_flight.question_type
 
     if verdict == 'correct':
         # Remember this stem BEFORE deleting the slot, so an exact re-ask on a
@@ -1041,11 +1182,51 @@ def handle_record_answer(
         snapshot['attempt_count_before'] + (0 if verdict == 'correct' else 1),
     )
 
-    return {
+    payload = {
         'recorded': True,
         **snapshot,
         **result.to_dict(),
     }
+    choice = _resolve_student_choice(in_flight_options, in_flight_type, extracted)
+    if choice is not None:
+        payload['student_choice'] = choice
+    return payload
+
+
+def _resolve_student_choice(
+    options: list, question_type: str, extracted_answer: str,
+) -> dict | None:
+    """``{'letter': 'D', 'text': '...'}`` for the option the student picked.
+
+    The tutor already knows the letter — it passed it in — and has the option
+    list in its prompt, so on paper this is redundant. In practice the lookup
+    is ~7,000 tokens up in a 30k-char prompt and the 4B gets it wrong. Device
+    session 30: the student clicked D ("It shows the compass direction between
+    the two points") and the tutor answered "it doesn't help pick grid
+    squares", which refutes option A. The student was told why an option they
+    did not choose was wrong.
+
+    Resolving it here costs nothing and removes the lookup rather than asking
+    the model to be more careful about it. Returns None for a non-MCQ or an
+    answer that isn't a letter (someone typing prose online), where there is
+    no option to name and inventing one would be worse than silence.
+    """
+    if (question_type or '').strip().lower() != 'mcq':
+        return None
+    opts = [str(o).strip() for o in (options or [])]
+    if len(opts) < 2:
+        return None
+    try:
+        from apps.tutoring.simple_tutor.grader import _extract_letter_forms
+        letter = _extract_letter_forms(extracted_answer or '')
+    except Exception:                              # noqa: BLE001
+        return None
+    if not letter:
+        return None
+    idx = 'ABCD'.find(letter)
+    if idx < 0 or idx >= len(opts) or not opts[idx]:
+        return None
+    return {'letter': letter, 'text': opts[idx]}
 
 
 class _TransientQuestion:
@@ -1169,6 +1350,161 @@ def handle_request_figure(
     }
 
 
+def remediation_progress(session: 'TutorSession') -> dict | None:
+    """``{'recovered': int, 'total': int}`` in QUESTIONS, while remediating.
+
+    Counts the questions the student got wrong on the exit ticket, not the
+    objectives behind them. Score 0/10 means ten questions to work back
+    through, and that is the denominator the student should see — an objective
+    count reads as 1/6 when there are ten items left, which understates the
+    work rather than orienting them.
+
+    During remediation the header's step chip is blanked (there is no lesson
+    step to count), so without this a student has no idea whether they are one
+    item from the retake or nine.
+
+    None outside remediation, so the caller leaves the chip alone.
+    """
+    try:
+        missed, covered = _remediation_question_sets(session)
+        if missed is None:
+            return None
+        return {'recovered': len(missed & covered), 'total': len(missed)}
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _remediation_question_sets(session) -> tuple[set | None, set]:
+    """(missed_question_ids, covered_question_ids) for the latest failed attempt.
+
+    Remediation goes over every question the student missed, so both sets are
+    ExitTicketQuestion PKs. ``failed_question_ids`` on each eo_competency
+    bucket is the authoritative list of what was wrong.
+
+    ``covered`` is matched by normalised stem against the grader payload,
+    because SessionTurn.step is NULL on every remediation turn — remediation
+    runs past the last step, so there is no step to attach. Reading the
+    objective off the step FK is what made the retake unreachable: `covered`
+    was empty on every session and the completion check never fired.
+
+    ``missed`` is None when there is nothing to remediate — no completed
+    attempt, a passed one, or a fail with no recorded failures.
+    """
+    from apps.tutoring.models import (
+        ExitTicketAttempt, ExitTicketQuestion, SessionTurn,
+    )
+
+    attempt = (
+        ExitTicketAttempt.objects
+        .filter(session=session, completed_at__isnull=False)
+        .order_by('-completed_at')
+        .first()
+    )
+    if attempt is None or attempt.passed:
+        return None, set()
+
+    missed: set[int] = set()
+    for bucket in ((attempt.answers or {}).get('eo_competency') or {}).values():
+        if not isinstance(bucket, dict):
+            continue
+        for qid in (bucket.get('failed_question_ids') or []):
+            if isinstance(qid, int):
+                missed.add(qid)
+    if not missed:
+        return None, set()
+
+    stem_to_id = {
+        _norm_q(q.question_text or ''): q.pk
+        for q in ExitTicketQuestion.objects.filter(
+            exit_ticket__lesson=session.lesson)
+        if (q.question_text or '').strip()
+    }
+
+    covered: set[int] = set()
+    turns = (
+        SessionTurn.objects
+        .filter(session=session, role='tutor',
+                created_at__gt=attempt.completed_at)
+        .exclude(judge_outputs={})
+    )
+    for turn in turns:
+        grader = (turn.judge_outputs or {}).get('grader') or {}
+        if grader.get('verdict') != 'correct':
+            continue
+        qid = stem_to_id.get(_norm_q(grader.get('question_text') or ''))
+        if qid is not None:
+            covered.add(qid)
+    return missed, covered
+
+
+PIVOT_AFTER_ATTEMPTS = 3
+
+
+def maybe_pivot_stalled_question(session: 'TutorSession'):
+    """Replace a question the student has failed twice, server-side.
+
+    The prompt asks for this at rung 2+ of the hint ladder and
+    <pivot_guidance> repeats it inside the slot. Neither reliably fires: a 4B
+    does not act on a conditional instruction, which is the same finding that
+    took remediation posing from 0/4 on prompt alone to 4/4 once the server
+    did it. Device transcript: three wrong answers on one question, three
+    hints, no pivot.
+
+    So the server pivots. Prefers a strictly easier question on the same
+    objective; falls back to any unasked pool entry, because a third hint on
+    an item they have failed twice is worse than a sideways move.
+
+    Returns the ExitTicketQuestion posed, or None when nothing needed doing —
+    fewer than two attempts, no slot, or a pool with nothing else in it.
+    """
+    from apps.tutoring.models import ExitTicketQuestion, InFlightQuestion
+
+    _RANK = {'easy': 0, 'medium': 1, 'hard': 2}
+    try:
+        slot = InFlightQuestion.objects.filter(session=session).first()
+        if slot is None:
+            return None
+        if (slot.attempt_count or 0) < PIVOT_AFTER_ATTEMPTS:
+            return None
+
+        current_rank = _RANK.get(
+            (ExitTicketQuestion.objects
+             .filter(pk=slot.catalog_question_id)
+             .values_list('difficulty', flat=True).first() or 'medium'), 1)
+
+        pool = [q for q in build_question_pool(session)
+                if _norm_q(q.question_text or '') != _norm_q(slot.question_text or '')]
+        if not pool:
+            return None
+        easier = [q for q in pool
+                  if _RANK.get((q.difficulty or 'medium'), 1) < current_rank]
+        easier.sort(key=lambda q: _RANK.get((q.difficulty or 'medium'), 1))
+        chosen = (easier or pool)[0]
+
+        # Retire the stalled slot first: handle_pose_question_by_index refuses
+        # to pose over a live one, which is the guard that stops the model
+        # swapping a question out from under the student mid-answer.
+        InFlightQuestion.objects.filter(session=session).delete()
+        result = handle_pose_question_by_index(
+            session, question_index=1, question_pool=[chosen])
+        if not result.get('posed'):
+            logger.warning(
+                "[simple_tutor] pivot could not pose session=%s: %s",
+                session.pk, result.get('error'))
+            return None
+        logger.info(
+            "[simple_tutor] pivoted after %d attempts session=%s "
+            "%s -> %s (difficulty %s)",
+            slot.attempt_count, session.pk, slot.catalog_question_id,
+            chosen.pk, chosen.difficulty)
+        return chosen
+    except Exception:  # noqa: BLE001 — a missed pivot must not lose the turn
+        logger.warning(
+            "[simple_tutor] pivot failed session=%s",
+            getattr(session, 'pk', None), exc_info=True)
+        return None
+
+
 def maybe_complete_remediation(session: 'TutorSession') -> bool:
     """Set ``engine_state['remediation_complete']`` once the student has
     recovered every objective they failed on their last exit-ticket attempt.
@@ -1192,63 +1528,20 @@ def maybe_complete_remediation(session: 'TutorSession') -> bool:
     Returns True when it flipped the flag this call. Never raises — a failure
     here must not break the turn.
     """
-    from apps.tutoring.models import ExitTicketAttempt, SessionTurn
-
     try:
-        attempt = (
-            ExitTicketAttempt.objects
-            .filter(session=session, completed_at__isnull=False)
-            .order_by('-completed_at')
-            .first()
-        )
-        # Nothing submitted, or they already passed → no remediation to finish.
-        if attempt is None or attempt.passed:
-            return False
-
         es = getattr(session, 'engine_state', None) or {}
         if not isinstance(es, dict):
             es = {}
         if es.get('remediation_complete'):
             return False        # already signalled; consumer clears it
 
-        # Same source of truth _build_exit_ticket_review groups on. Read it
-        # directly rather than importing from engine.py — tools.py is imported
-        # BY engine.py, and this keeps the dependency one-way.
-        eo_competency = (attempt.answers or {}).get('eo_competency') or {}
-        missed = set()
-        for eo, bucket in eo_competency.items():
-            if not eo or not isinstance(bucket, dict):
-                continue
-            asked = int(bucket.get('asked') or 0)
-            correct = int(bucket.get('correct') or 0)
-            if asked > 0 and correct < asked:
-                missed.add(eo)
-        if not missed:
-            # Failed on score but no objective is individually incomplete —
-            # nothing for remediation to target, so don't gate the retake on it.
+        missed, covered = _remediation_question_sets(session)
+        if missed is None:
             return False
-
-        covered = set()
-        turns = (
-            SessionTurn.objects
-            .filter(
-                session=session, role='tutor',
-                created_at__gt=attempt.completed_at,
-            )
-            .exclude(judge_outputs={})
-            .select_related('step')
-        )
-        for turn in turns:
-            grader = (turn.judge_outputs or {}).get('grader') or {}
-            if grader.get('verdict') != 'correct':
-                continue
-            eo = (getattr(turn.step, 'enabling_objective', '') or '').strip()
-            if eo:
-                covered.add(eo)
 
         if not missed.issubset(covered):
             logger.info(
-                "maybe_complete_remediation: session=%s %d/%d objectives "
+                "maybe_complete_remediation: session=%s %d/%d questions "
                 "recovered — not yet complete",
                 session.pk, len(missed & covered), len(missed),
             )
@@ -1258,7 +1551,7 @@ def maybe_complete_remediation(session: 'TutorSession') -> bool:
         session.engine_state = es
         session.save(update_fields=['engine_state'])
         logger.info(
-            "maybe_complete_remediation: session=%s all %d missed objectives "
+            "maybe_complete_remediation: session=%s all %d missed questions "
             "recovered — exit ticket re-opened",
             session.pk, len(missed),
         )

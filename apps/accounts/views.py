@@ -700,12 +700,35 @@ def settings(request):
             # nothing to set and the form is not rendered for them.
             choice = (request.POST.get('tutor_mode') or '').strip()
             valid = {c for c, _label in StudentProfile.TutorMode.choices}
-            if choice in valid:
-                student_profile.tutor_mode = choice
-                student_profile.save(update_fields=['tutor_mode'])
-                messages.success(request, _('Tutor preference saved.'))
-            else:
+            if choice not in valid:
                 messages.error(request, _('That tutor option is not available.'))
+                return redirect('accounts:settings')
+
+            fields = ['tutor_mode']
+            student_profile.tutor_mode = choice
+
+            # Which offline model, when the device has more than one. Validated
+            # against the installed set rather than trusting the posted id — a
+            # stale form or a hand-edited request must not point a student at a
+            # model that is not there.
+            if 'offline_model' in request.POST:
+                from apps.tutoring.simple_tutor.model_choice import local_options
+                raw = (request.POST.get('offline_model') or '').strip()
+                if not raw:
+                    student_profile.offline_model = None
+                    fields.append('offline_model')
+                else:
+                    allowed = {str(o.pk): o for o in local_options()}
+                    picked = allowed.get(raw)
+                    if picked is None:
+                        messages.error(
+                            request, _('That offline tutor is not installed.'))
+                        return redirect('accounts:settings')
+                    student_profile.offline_model = picked
+                    fields.append('offline_model')
+
+            student_profile.save(update_fields=fields)
+            messages.success(request, _('Tutor preference saved.'))
             return redirect('accounts:settings')
 
     # Dropdown choices for the form.

@@ -139,7 +139,19 @@
                     <button type="button" onclick="insertChatSymbol('θ')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">θ</button>
                 </div>
                 {% endif %}
-                <div class="input-wrapper">
+                {% comment %}
+                Answer picker — offline (local model) MCQ only. Populated by
+                renderAnswerChoices() from the turn payload's answer_choices,
+                which swaps this in and the typing box out. Hidden by default
+                and whenever there is no live MCQ.
+
+                This is a comment tag and not a hash-brace comment because
+                Django only treats the latter as a comment on a SINGLE line —
+                a multi-line one renders as literal text to the student.
+                Caught here by the screenshot check.
+                {% endcomment %}
+                <div id="answer-choices" class="answer-choices" style="display:none;"></div>
+                <div class="input-wrapper" id="input-wrapper">
                     <textarea
                         id="user-input"
                         placeholder="{% trans 'Type your answer...' %}"
@@ -887,6 +899,51 @@ body {
 }
 
 /* ── Input Area ── */
+/* Offline answer picker. This REPLACES the typing box rather than sitting
+   above it, so it is the student's only control and gets sized like one:
+   full-width rows at the same 768px column as .input-wrapper, one option per
+   line. A wrapped row of chips was the first version and it read as a hint
+   strip next to the "real" input — wrong signal when it IS the input, and it
+   truncated the longer options. */
+.answer-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-width: 768px;
+    margin: 0 auto;
+}
+.answer-choice-btn {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.7rem 1rem;
+    background: #fff;
+    border: 1.5px solid #e4e4e7;
+    border-radius: 0.9rem;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    line-height: 1.4;
+    text-align: left;
+    transition: border-color .12s, background .12s;
+}
+.answer-choice-btn:hover:not(:disabled) { border-color: #f97316; background: #fff7ed; }
+.answer-choice-btn:focus-visible {
+    outline: none;
+    border-color: #a1a1aa;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
+.answer-choice-btn:disabled { opacity: .5; cursor: default; }
+.answer-choice-btn .letter {
+    font-weight: 700;
+    color: #ea580c;
+    flex: 0 0 auto;
+}
+.answer-choice-btn .opt-text {
+    color: #374151;
+    overflow-wrap: anywhere;
+}
 .chat-input-area {
     flex-shrink: 0;
     padding: 0.75rem 1rem 1rem;
@@ -1492,6 +1549,17 @@ function phaseLabel(phase) {
 }
 
 function updateStepProgress(data) {
+    // Remediation first: there is no lesson step to count, so the chip used to
+    // be blanked — and a student working through six missed objectives had no
+    // idea whether they were one away from the retake or nowhere near it.
+    // The server counts recovered objectives (tools.remediation_progress), the
+    // same set that decides when the quiz re-opens, so the number the student
+    // reads is the one that actually gates them.
+    const rp = data.remediation_progress;
+    if (rp && rp.total) {
+        stepProgress.textContent = rp.recovered + '/' + rp.total;
+        return;
+    }
     if (data.step_number && data.total_steps) {
         if (data.phase === 'exit_ticket' || data.phase === 'completed' || data.phase === 'remediation') {
             stepProgress.textContent = '';
@@ -2134,6 +2202,9 @@ function handleResponse(data) {
     // Add tutor message
     addMessage('tutor', data.message, data.media, data.artifact_html, data.probe || null);
 
+    // Offline MCQ picker for the question just posed (null online → cleared).
+    renderAnswerChoices(data.answer_choices);
+
     // R5 (2026-05-15): if a bank question is awaiting answer (set on
     // session resume by chat_start_session), re-render it in the
     // artifact panel + show a "welcome back" banner so the student
@@ -2550,6 +2621,10 @@ function applyTutorResponse(data) {
     }
     stopCurrentAudio();
     addMessage('tutor', data.message, data.media || [], data.artifact_html, data.probe || null);
+    // This is the answer-turn path (sendMessage), distinct from the start
+    // path above — the picker has to render on BOTH or it disappears after
+    // the first answer.
+    renderAnswerChoices(data.answer_choices);
     if (data.is_correct) showCorrectFeedback(data.streak_count);
     if (data.milestone) showMilestone(data.milestone, data.step_number, data.total_steps);
     if (data.phase) phaseBadge.textContent = phaseLabel(data.phase);
@@ -2586,6 +2661,76 @@ function applyTutorResponse(data) {
     }
 }
 
+
+// ── Answer picker (offline MCQ) ──────────────────────────────────────────────
+// The offline 4B cannot reliably read "northing" as option B — device session
+// 29: the student typed exactly that, nothing graded it, and the question was
+// re-asked. Offline is already MCQ-only, so a letter picker covers every
+// question the offline tutor can ask, and a clicked letter grades
+// deterministically with no model call.
+//
+// Online sessions get answer_choices = null and this renders nothing, so
+// typing is unchanged where it works.
+//
+// The picker REPLACES the typing box rather than sitting beside it. Leaving
+// both meant the student could still type prose at an offline MCQ and get it
+// marked wrong for phrasing — which is the whole failure this exists to
+// remove, so offering the broken path alongside the working one defeats it.
+// The typing box comes back the moment there is no live MCQ (a teaching turn,
+// a completed lesson), since a reply that isn't being graded can't be graded
+// wrong, and leaving the student with no input at all would strand them.
+//
+// `opts.preserveInput` clears the picker and leaves the typing box exactly as
+// it is — used while a turn is in flight, where the arriving payload decides
+// what comes next. Without it, clicking a letter would pop "Type your
+// answer..." open for the length of an offline turn (measured at 43 s on this
+// machine), inviting the student to do the one thing the picker exists to
+// prevent. On a turn where typing was already the input, it stays. Every path
+// that ends a turn WITHOUT a payload — the catch block, the offline queue —
+// must call this plainly, or the student is left with no way to reply at all.
+function renderAnswerChoices(choices, opts) {
+    const box = document.getElementById('answer-choices');
+    if (!box) return;
+    const typing = document.getElementById('input-wrapper');
+    box.innerHTML = '';
+    const letters = (choices && choices.letters) || [];
+    if (!letters.length) {
+        box.style.display = 'none';
+        if (typing && !(opts && opts.preserveInput)) typing.style.display = '';
+        return;
+    }
+    if (typing) typing.style.display = 'none';
+
+    letters.forEach(function (opt) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'answer-choice-btn';
+        btn.setAttribute('aria-label', opt.letter + ': ' + opt.text);
+        const l = document.createElement('span');
+        l.className = 'letter';
+        l.textContent = opt.letter;
+        const t = document.createElement('span');
+        t.className = 'opt-text';
+        t.textContent = opt.text;      // textContent, never innerHTML — option
+        t.style.pointerEvents = 'none'; // text is authored content, not markup
+        l.style.pointerEvents = 'none';
+        btn.appendChild(l);
+        btn.appendChild(t);
+        btn.addEventListener('click', function () {
+            // Disable the whole row immediately: a double-tap would otherwise
+            // send two answers and the second would grade against a slot the
+            // first already cleared.
+            Array.prototype.forEach.call(
+                box.querySelectorAll('button'), function (b) { b.disabled = true; });
+            const input = document.getElementById('user-input');
+            input.value = opt.letter;
+            sendMessage();
+        });
+        box.appendChild(btn);
+    });
+    box.style.display = 'flex';
+}
+
 async function sendMessage() {
     // R8 (2026-05-15): if the mic is currently recording, treat the
     // Send click as "stop & send". mediaRecorder.stop() fires onstop
@@ -2602,6 +2747,12 @@ async function sendMessage() {
     isSending = true;
     sendBtn.disabled = true;
 
+    // The previous question's options are stale the instant an answer is
+    // sent — leaving them clickable invites answering a question that is no
+    // longer live. preserveInput: the arriving payload decides what the
+    // student gets next; don't pop a typing box open for the length of the wait.
+    renderAnswerChoices(null, {preserveInput: true});
+
     // Add student message bubble immediately (optimistic UI).
     const bubble = addMessage('student', text);
     userInput.value = '';
@@ -2614,6 +2765,7 @@ async function sendMessage() {
         markBubbleQueued(bubble, queueId);
         isSending = false;
         sendBtn.disabled = false;
+        renderAnswerChoices(null);   // no payload coming — give typing back
         userInput.focus();
         return;
     }
@@ -2631,6 +2783,9 @@ async function sendMessage() {
         showTyping(false);
         sendBtn.disabled = false;
         isSending = false;
+        // The turn died, so no payload will restore the input. Without this
+        // the student is left with neither a picker nor a typing box.
+        renderAnswerChoices(null);
         // Network died mid-send — queue it instead of losing the
         // student's work.
         if (window.NetHelpers && !window.NetHelpers.isOnline()) {
@@ -2955,10 +3110,17 @@ function continueAfterExit() {
     document.getElementById('exit-modal').style.display = 'none';
     if (data && data.is_complete) {
         const gam = data.exit_ticket && data.exit_ticket.gamification ? data.exit_ticket.gamification : null;
+        renderAnswerChoices(null);   // lesson over — nothing left to answer
         showCompletion(data.message, gam);
     } else if (data) {
         document.getElementById('input-area').style.display = 'block';
         addMessage('tutor', data.message);
+        // The one path back into tutoring that never repainted the picker.
+        // Remediation retires the lesson's slot and poses a fresh question, so
+        // without this the student reads the new question and is handed the
+        // OLD question's buttons — device session 81. Every other path routes
+        // through applyTutorResponse, which does this; this one does not.
+        renderAnswerChoices(data.answer_choices);
     }
 }
 

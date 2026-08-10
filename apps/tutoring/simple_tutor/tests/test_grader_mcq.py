@@ -101,10 +101,11 @@ class NonLetterRepliesEscalateTest(TestCase):
     """
 
     def test_deterministic_layer_defers_on_non_letter(self):
+        # '2' is positional shorthand, not an option's text or value here, so
+        # neither fast path resolves it. Unresolved is not wrong.
         r = _grade_mcq(_mcq('B'), '2')
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
-        self.assertEqual(r.confidence, 0.6, 'signals "unresolved", not "wrong"')
-        self.assertIn('no A-D letter', r.justification)
+        self.assertNotEqual(r.verdict, Verdict.INCORRECT)
+        self.assertTrue(r.needs_followup, 'signals "unresolved", not "wrong"')
 
     def test_grade_answer_escalates_a_bare_number(self):
         with _stub_llm('correct'):
@@ -146,13 +147,14 @@ class NonLetterRepliesEscalateTest(TestCase):
         self.assertEqual(r.tier, 'mcq')
         self.assertEqual(called['n'], 0, 'a correct letter must not cost a call')
 
-    def test_falls_back_to_defensive_incorrect_when_no_grader(self):
-        """No provider, or every provider failed. Grading must never block."""
+    def test_no_grader_reachable_reports_unresolved_not_wrong(self):
+        """No provider, or every provider failed. Grading must never block —
+        and must not invent a verdict either."""
         with patch('apps.tutoring.simple_tutor.grader._llm_grade',
                    lambda *a, **k: None):
-            r = grade_answer(question=_mcq('B'), student_answer='Exports')
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
-        self.assertEqual(r.confidence, 0.6)
+            r = grade_answer(question=_mcq('B'), student_answer='sort of the second one')
+        self.assertNotEqual(r.verdict, Verdict.INCORRECT)
+        self.assertTrue(r.needs_followup)
 
 
 class WrongLetterTest(TestCase):
@@ -185,25 +187,29 @@ class EmptyAnswerTest(TestCase):
 
 
 class UnparseableTest(TestCase):
+    """Unresolvable is NOT wrong.
+
+    These asserted INCORRECT until 2026-08-06. That contract was the bug: a
+    student who typed an option verbatim was told they were wrong with
+    "no A-D letter extractable", because nothing had graded them. Students do
+    not always answer with a letter, so this path is ordinary — the grader now
+    says "unresolved" and the engine keeps the question live.
+    """
+
     def test_unrelated_text(self):
-        # "I don't know" — no A-D letter, no option text match → defensive
-        # INCORRECT with lower confidence (signal that the engine may want
-        # to treat this as confusion, not a definite wrong answer).
         r = _grade_mcq(_mcq('B'), "I don't know")
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
-        self.assertEqual(r.confidence, 0.6)
-        self.assertIn('extractable', r.justification)
+        self.assertNotEqual(r.verdict, Verdict.INCORRECT)
+        self.assertTrue(r.needs_followup)
 
     def test_two_letters_in_text(self):
-        # "I'm between A or B" — ambiguous. Should NOT match (more than
-        # one letter present), low confidence.
+        # "I'm between A or B" — genuinely ambiguous, must not be guessed.
         r = _grade_mcq(_mcq('B'), "I'm between A or B")
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
-        self.assertEqual(r.confidence, 0.6)
+        self.assertNotEqual(r.verdict, Verdict.INCORRECT)
+        self.assertTrue(r.needs_followup)
 
     def test_random_punctuation(self):
         r = _grade_mcq(_mcq('B'), '???')
-        self.assertEqual(r.verdict, Verdict.INCORRECT)
+        self.assertTrue(r.needs_followup)
 
 
 class MultiLetterNonAmbiguousTest(TestCase):
@@ -221,7 +227,7 @@ class MultiLetterNonAmbiguousTest(TestCase):
 
     def test_deterministic_layer_does_not_guess_at_it(self):
         r = _grade_mcq(_mcq('B'), "I think it's B because of trade balance")
-        self.assertEqual(r.confidence, 0.6, 'unresolved, escalate rather than guess')
+        self.assertTrue(r.needs_followup, 'unresolved, escalate rather than guess')
 
 
 # ============================================================================
@@ -305,7 +311,7 @@ class GradeResultToDictTest(TestCase):
 
 
 class NeedsFollowupDefaultTest(TestCase):
-    """MCQ grader never returns needs_followup=True — there's no middle band."""
+    """A resolved MCQ grade is definite; an UNRESOLVED one asks for followup."""
 
     def test_correct_no_followup(self):
         r = _grade_mcq(_mcq('B'), 'B')
@@ -315,14 +321,101 @@ class NeedsFollowupDefaultTest(TestCase):
         r = _grade_mcq(_mcq('B'), 'A')
         self.assertFalse(r.needs_followup)
 
-    def test_unparseable_no_followup(self):
-        # Even the 0.6-confidence "no letter extractable" case has
-        # needs_followup=False — the engine treats it as INCORRECT and
-        # moves on; clarification mode is the LLM's job, not the grader's.
+    def test_unparseable_DOES_want_followup(self):
+        """Changed 2026-08-06. This used to assert needs_followup=False, i.e.
+        "treat it as INCORRECT and move on". That is what told a student they
+        were wrong when nothing had graded them."""
         r = _grade_mcq(_mcq('B'), 'nonsense')
-        self.assertFalse(r.needs_followup)
+        self.assertTrue(r.needs_followup)
 
 
 # ValueToLetterCycle8Test was removed with the value matcher it covered
 # (2026-08-06). A bare value like "225" now escalates to the LLM —
 # see NonLetterRepliesEscalateTest.
+
+
+class ExactOptionFastPathTest(TestCase):
+    """An option quoted verbatim must not cost an LLM call.
+
+    Measured on device sessions 2026-08-06: "39" — the exact text of option B —
+    took a full LLM round trip, and "The scale of the map", an option quoted
+    verbatim, never reached a grader at all and was returned as INCORRECT at
+    confidence 0.6 with "no A-D letter extractable". Offline that model call is
+    on the same local model the tutor is already waiting on, which is what made
+    grading feel slow.
+
+    The line is recognising vs interpreting. Exact equality is recognising.
+    Fuzzy matching (distinctive-substring, LCS overlap) is interpreting, was
+    deleted for marking correct answers wrong, and is not coming back — the
+    paraphrase tests below hold that line.
+    """
+
+    def _q(self, correct, **opts):
+        return SimpleNamespace(
+            pk=1, question_type='mcq', question_text='Which?',
+            correct_answer=correct, answer_data={},
+            option_a=opts.get('a', ''), option_b=opts.get('b', ''),
+            option_c=opts.get('c', ''), option_d=opts.get('d', ''),
+        )
+
+    def test_exact_option_text_resolves_without_the_llm(self):
+        q = self._q('B', a='The easting or horizontal distance',
+                    b='The northing or vertical distance',
+                    c='The scale of the map', d='The longitude lines')
+        r = _grade_mcq(q, 'The scale of the map')
+        self.assertEqual(r.tier, 'mcq')
+        self.assertEqual(r.confidence, 1.0, 'resolved, so grade_answer must not escalate')
+        self.assertEqual(r.verdict, Verdict.INCORRECT)   # option C, correct is B
+
+    def test_exact_match_is_case_and_space_insensitive(self):
+        q = self._q('C', a='Imports', b='Exports', c='  ThE  ScAlE ', d='Other')
+        self.assertEqual(_grade_mcq(q, 'the scale').verdict, Verdict.CORRECT)
+
+    def test_numeric_option_value_resolves_without_the_llm(self):
+        q = self._q('B', a='47', b='39', c='3 and 9', d='4 and 7')
+        r = _grade_mcq(q, '39')
+        self.assertEqual(r.tier, 'mcq')
+        self.assertEqual(r.confidence, 1.0)
+        self.assertEqual(r.verdict, Verdict.CORRECT)
+
+    def test_unresolvable_is_not_reported_as_wrong(self):
+        """A parse failure is not a verdict.
+
+        Device session 22: a student typed an option verbatim, nothing graded
+        it, and they were told INCORRECT with "no A-D letter extractable".
+        Students do not always reply with a letter — that path is ordinary,
+        and telling them they are wrong when the grader could not be reached
+        is worse than saying nothing.
+        """
+        q = self._q('B', a='47', b='39', c='3 and 9', d='4 and 7')
+        r = _grade_mcq(q, 'the second pair I think, not sure')
+        self.assertNotEqual(r.verdict, Verdict.INCORRECT,
+                            'must not assert wrongness it did not establish')
+        self.assertTrue(r.needs_followup, 'engine must see this as unresolved')
+
+    def test_a_paraphrase_still_escalates(self):
+        """The case the fuzzy matchers got wrong. It must reach the LLM, not
+        be resolved by a string rule."""
+        q = self._q('C', a='Two digits', b='Three digits',
+                    c='Four digits (two for easting, two for northing)',
+                    d='Six digits')
+        r = _grade_mcq(q, 'two for easting, then two for northing')
+        self.assertTrue(r.needs_followup, 'must escalate, not be guessed at')
+        self.assertNotEqual(r.verdict, Verdict.CORRECT)
+
+    def test_reasoning_then_answering_still_escalates(self):
+        q = self._q('B', a='47', b='39', c='3 and 9', d='4 and 7')
+        self.assertTrue(_grade_mcq(q, '39 is the easting value').needs_followup)
+
+    def test_two_options_with_the_same_value_are_not_guessed(self):
+        """Ambiguity falls through rather than picking one."""
+        from apps.tutoring.simple_tutor.grader import _exact_option_match
+        q = self._q('A', a='39', b='39', c='x', d='y')
+        self.assertIsNone(_exact_option_match(q, '39'))
+        self.assertTrue(_grade_mcq(q, '39').needs_followup)
+
+    def test_a_bare_number_does_not_loosely_match_a_longer_one(self):
+        """"3" must not match an option reading "3947"."""
+        from apps.tutoring.simple_tutor.grader import _exact_option_match
+        q = self._q('A', a='3947', b='4756', c='x', d='y')
+        self.assertIsNone(_exact_option_match(q, '3'))
