@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import random
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -336,12 +337,19 @@ def stratum_of(session) -> str:
 
 
 def candidate_sessions(*, institution=None, min_turns: int = 4):
-    """Real, finished-enough sessions, newest first.
+    """Real, not-yet-sampled, finished-enough sessions, newest first.
 
     ``is_synthetic=False`` is not a safety gate — simulator sessions carry no
     child-protection risk at all. It is a validity one: this study is about
     what the tutor does with real students, and a synthetic session would tell
     us about the persona generator instead.
+
+    Already-sampled sessions are excluded HERE rather than skipped later, and
+    that placement is the whole point. Ordering is stable, so if they stayed in
+    the pool they would land in their strata buckets first, consume the
+    per-stratum quota, and then be dropped by the duplicate check — leaving a
+    run that screens 20 sessions, pays for 20 LLM calls and creates nothing.
+    Observed exactly that on 2026-08-11 before this filter existed.
     """
     from django.db.models import Count
 
@@ -349,6 +357,7 @@ def candidate_sessions(*, institution=None, min_turns: int = 4):
 
     qs = (TutorSession.objects
           .filter(is_synthetic=False)
+          .exclude(eval_items__isnull=False)
           .select_related('student', 'lesson__unit__course')
           .annotate(n_turns=Count('turns'))
           .filter(n_turns__gte=min_turns)
@@ -358,34 +367,29 @@ def candidate_sessions(*, institution=None, min_turns: int = 4):
     return qs
 
 
-def sample(sessions, per_stratum: int = 3) -> tuple[list, dict]:
-    """Round-robin across strata so no single shape dominates.
+def sample(sessions, keep: int = 20, seed: int = 0) -> tuple[list, dict]:
+    """Screen everything, then draw `keep` uniformly at random.
 
     Returns (selected, rejections) where rejections maps reason → count. The
     counts are reported rather than discarded: "we screened 400 sessions and
     kept 60" is a fact the study needs, and a rejection rate that suddenly
     moves is how we would notice the redactor breaking.
     """
-    from collections import defaultdict
-
-    buckets: dict[str, list] = defaultdict(list)
-    rejections: dict[str, int] = defaultdict(int)
-    prepared: dict[int, dict] = {}
+    survivors, rejections, prepared = [], {}, {}
 
     for session in sessions:
         record = screen_and_prepare(session)
         if record['reject_reason']:
-            rejections[record['reject_reason']] += 1
+            reason = record['reject_reason']
+            rejections[reason] = rejections.get(reason, 0) + 1
             continue
         prepared[session.id] = record
-        buckets[stratum_of(session)].append(session)
+        survivors.append(session)
 
-    selected = []
-    for stratum, members in sorted(buckets.items()):
-        for session in members[:per_stratum]:
-            selected.append((session, stratum, prepared[session.id]))
-
-    return selected, dict(rejections)
+    rng = random.Random(seed)
+    rng.shuffle(survivors)
+    selected = [(s, stratum_of(s), prepared[s.id]) for s in survivors[:keep]]
+    return selected, rejections
 
 
 # ── Gate 2b: LLM name detection ─────────────────────────────────────────
@@ -505,3 +509,128 @@ def llm_name_candidates(transcript: list[dict], llm_client=None) -> tuple[list[s
             if len(part) >= 3:
                 names.add(part)
     return sorted(names), ''
+
+
+# ── Dashboard-triggered sampling ────────────────────────────────────────
+
+# Selection is a uniform random draw over everything that clears screening.
+#
+# Stratified selection (a quota per subject|engine|outcome) was built and then
+# removed on 2026-08-11. It buys guaranteed coverage of rare conditions, which
+# matters when one stratum dominates — but it over-represents those rare strata
+# by construction, so a pass rate over a stratified set is NOT an estimate of
+# the production pass rate. Reporting "the tutor passes X% of sessions" is the
+# goal here, and random sampling is the statistically correct way to get it.
+#
+# Bring stratification back only for a different question — comparing
+# conditions ("is `simple` better than `v1`?") rather than measuring the whole.
+
+
+def run_sample_job(run_id: int, limit: int, keep: int,
+                   institution_id=None) -> None:
+    """Body of a dashboard-triggered sampling run. Executes in a thread.
+
+    Reports progress into the SessionSampleRun row as it goes, because the
+    LLM name pass makes this minutes-long and a page that says nothing for
+    five minutes looks broken.
+
+    Never raises: a thread that dies with the row still RUNNING would block
+    the button until reclaim_stale() times it out, so every exit path closes
+    the row.
+    """
+    from django.db import connection
+    from django.utils import timezone
+
+    from apps.benchmark.models import SessionEvalItem, SessionSampleRun
+
+    connection.close()          # threads must not share the request's handle
+    run = SessionSampleRun.objects.filter(pk=run_id).first()
+    if run is None:
+        return
+
+    try:
+        institution = None
+        if institution_id:
+            from apps.accounts.models import Institution
+            institution = Institution.objects.filter(pk=institution_id).first()
+
+        candidates = list(candidate_sessions(institution=institution)[:limit])
+        run.candidates = len(candidates)
+        run.save(update_fields=['candidates'])
+
+        survivors: list = []
+        rejections: dict[str, int] = {}
+        prepared: dict[int, dict] = {}
+
+        for index, session in enumerate(candidates, start=1):
+            try:
+                record = screen_and_prepare(session)
+            except Exception as exc:
+                # One bad session must not abort the run — record and move on.
+                logger.warning('[SessionEval] screening failed for %s: %s',
+                               session.id, exc)
+                rejections['screening_error'] = (
+                    rejections.get('screening_error', 0) + 1)
+                record = None
+
+            if record is not None:
+                if record['reject_reason']:
+                    reason = record['reject_reason']
+                    rejections[reason] = rejections.get(reason, 0) + 1
+                else:
+                    prepared[session.id] = record
+                    survivors.append(session)
+
+            # Progress every few items rather than every one — this is a
+            # write per update and the page polls, not streams.
+            if index % 5 == 0 or index == len(candidates):
+                run.screened = index
+                run.rejections = rejections
+                run.save(update_fields=['screened', 'rejections'])
+
+        # Seeded from the run id, not the clock: re-running the same job picks
+        # the same sessions, which makes a failed run reproducible without
+        # reaching for a global seed.
+        rng = random.Random(run_id)
+        rng.shuffle(survivors)
+        chosen = survivors[:keep]
+
+        created = 0
+        if True:
+            for session in chosen:
+                stratum = stratum_of(session)
+                if SessionEvalItem.objects.filter(source_session=session).exists():
+                    continue
+                record = prepared[session.id]
+                subject = stratum.split('|')[0]
+                SessionEvalItem.objects.create(
+                    item_id=f'SESS_{subject.upper()[:8]}_{session.id}',
+                    source_session=session,
+                    session_key=record['session_key'],
+                    subject=subject,
+                    lesson_id=session.lesson_id,
+                    engine=session.engine,
+                    outcome=stratum.split('|')[-1],
+                    turn_count=len(record['transcript']),
+                    transcript=record['transcript'],
+                    redaction_report=record['redaction_report'],
+                    status=record['status'],
+                    stratum=stratum,
+                )
+                created += 1
+
+        run.created_items = created
+        run.rejections = rejections
+        run.screened = len(candidates)
+        run.status = SessionSampleRun.Status.COMPLETED
+        run.finished_at = timezone.now()
+        run.save()
+        logger.info('[SessionEval] sample run %s: %s created, %s rejected',
+                    run_id, created, sum(rejections.values()))
+
+    except Exception as exc:
+        logger.exception('[SessionEval] sample run %s failed', run_id)
+        run.status = SessionSampleRun.Status.FAILED
+        run.error = f'{type(exc).__name__}: {exc}'
+        run.finished_at = timezone.now()
+        run.save()

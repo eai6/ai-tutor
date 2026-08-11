@@ -18,6 +18,8 @@ See ``memory/eval_benchmark_v2_simplified.md`` for the locked spec.
 from __future__ import annotations
 
 from django.conf import settings
+from datetime import timedelta
+from django.utils import timezone
 from django.db import models
 
 from apps.benchmark.labels import (
@@ -377,6 +379,11 @@ class SessionEvalItem(models.Model):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
+    # Descriptive only — 'subject|engine|outcome', recorded so a slice can be
+    # cut later. Sampling does NOT use it: sessions are drawn uniformly at
+    # random, so the pass rate over a sample IS an estimate of the production
+    # rate. Stratified selection was considered and dropped as unnecessary
+    # complexity; see memory/session_eval_framework_plan.md.
     stratum = models.CharField(max_length=64, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -469,3 +476,92 @@ class SessionEvalAnnotation(models.Model):
     def passes(self) -> bool:
         from apps.benchmark import pedagogy as P
         return P.session_passes(self.values())
+
+
+class SessionSampleRun(models.Model):
+    """One invocation of session sampling, started from the dashboard.
+
+    Sampling is not a cheap DB query: it makes one LLM call per candidate
+    session for the free-text name pass, so 200 sessions is minutes, not
+    milliseconds. It therefore runs in a background thread and reports back
+    through this row.
+
+    Two failure modes are designed for rather than discovered later:
+
+    **Two replicas starting at once.** The web service runs more than one ECS
+    task, so an `.exists()` check before starting is not atomic — both replicas
+    can see "nothing running" and both start, double-sampling and doubling the
+    LLM spend. The partial unique constraint below makes a second concurrent
+    RUNNING row impossible at the database level rather than merely unlikely.
+    Same reasoning as `SessionTurn.client_uuid`.
+
+    **A run abandoned mid-flight.** A deploy or a crash kills the thread with
+    the row still RUNNING, and nothing would ever clear it — exactly the
+    `content_status='generating'` trap that CLAUDE.md says must be reset by
+    hand today. `reclaim_stale()` closes that: a RUNNING row past
+    STALE_AFTER is marked failed automatically, so the feature recovers on its
+    own instead of needing a shell.
+    """
+
+    class Status(models.TextChoices):
+        RUNNING = 'running', 'Running'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    # Generous: 500 sessions × a judge call each can legitimately run long.
+    # Short enough that a killed task does not block sampling for a working day.
+    STALE_AFTER = timedelta(minutes=45)
+
+    status = models.CharField(max_length=16, choices=Status.choices,
+                              default=Status.RUNNING, db_index=True)
+    requested_limit = models.PositiveIntegerField(
+        default=0, help_text='How many candidates were screened.')
+    keep_count = models.PositiveIntegerField(
+        default=20, help_text='How many of the survivors to keep.')
+
+    screened = models.PositiveIntegerField(
+        default=0, help_text='Candidates processed so far — drives progress.')
+    candidates = models.PositiveIntegerField(default=0)
+    created_items = models.PositiveIntegerField(default=0)
+    rejections = models.JSONField(default=dict, help_text='reason → count.')
+    error = models.TextField(blank=True, default='')
+
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    started_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['-started_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['status'], condition=models.Q(status='running'),
+                name='only_one_running_session_sample',
+            ),
+        ]
+
+    def __str__(self):
+        return f'sample run {self.pk} ({self.status})'
+
+    @property
+    def progress_pct(self) -> int:
+        if not self.candidates:
+            return 0
+        return min(100, round(100 * self.screened / self.candidates))
+
+    @classmethod
+    def reclaim_stale(cls):
+        """Fail any RUNNING row whose thread is evidently gone.
+
+        Called before starting a run, so an abandoned one never permanently
+        blocks the button.
+        """
+        cutoff = timezone.now() - cls.STALE_AFTER
+        return cls.objects.filter(
+            status=cls.Status.RUNNING, started_at__lt=cutoff,
+        ).update(
+            status=cls.Status.FAILED, finished_at=timezone.now(),
+            error='Abandoned — the worker stopped without finishing '
+                  '(deploy or crash). Safe to start another run.',
+        )

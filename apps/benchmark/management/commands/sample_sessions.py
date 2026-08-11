@@ -1,6 +1,6 @@
 """Sample production sessions for session-level pedagogical evaluation.
 
-    python manage.py sample_sessions --limit 200 --per-stratum 3
+    python manage.py sample_sessions --limit 200 --keep 20
     python manage.py sample_sessions --dry-run          # screen, write nothing
 
 Every sampled session lands at status='pending_review'. NOTHING this command
@@ -24,8 +24,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--limit', type=int, default=200,
                             help='How many candidate sessions to screen.')
-        parser.add_argument('--per-stratum', type=int, default=3,
-                            help='Max sessions kept per subject|engine|outcome.')
+        parser.add_argument('--keep', type=int, default=20,
+                            help='How many of the screened survivors to keep '
+                                 '(drawn uniformly at random).')
         parser.add_argument('--institution', type=int, default=None,
                             help='Institution id to restrict to.')
         parser.add_argument('--prefix', default='SESS',
@@ -60,11 +61,11 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Screening {len(candidates)} sessions…')
 
-        # sample() screens everything, then picks per stratum.
+        # sample() screens everything, then draws uniformly at random.
         selected, rejections = S.sample(
-            candidates, per_stratum=opts['per_stratum'],
+            candidates, keep=opts['keep'],
         ) if not opts['no_llm'] else _sample_no_llm(
-            candidates, opts['per_stratum'],
+            candidates, opts['keep'],
         )
 
         self.stdout.write('')
@@ -77,7 +78,8 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(self.style.MIGRATE_HEADING(
-            f'Selected {len(selected)} sessions'))
+            f'Selected {len(selected)} sessions (uniform random draw)'))
+        # Reported, not selected on — a wildly lopsided draw is worth seeing.
         strata = {}
         for _, stratum, _ in selected:
             strata[stratum] = strata.get(stratum, 0) + 1
@@ -121,22 +123,21 @@ class Command(BaseCommand):
         )
 
 
-def _sample_no_llm(candidates, per_stratum):
+def _sample_no_llm(candidates, keep):
     """--no-llm variant of S.sample(). Kept out of the library so the library
     default can never be the weaker path."""
-    from collections import defaultdict
+    import random
 
-    buckets, rejections, prepared = defaultdict(list), defaultdict(int), {}
+    survivors, rejections, prepared = [], {}, {}
     for session in candidates:
         record = S.screen_and_prepare(session, use_llm=False)
         if record['reject_reason']:
-            rejections[record['reject_reason']] += 1
+            rejections[record['reject_reason']] = (
+                rejections.get(record['reject_reason'], 0) + 1)
             continue
         prepared[session.id] = record
-        buckets[S.stratum_of(session)].append(session)
+        survivors.append(session)
 
-    selected = []
-    for stratum, members in sorted(buckets.items()):
-        for session in members[:per_stratum]:
-            selected.append((session, stratum, prepared[session.id]))
-    return selected, dict(rejections)
+    random.Random(0).shuffle(survivors)
+    selected = [(s, S.stratum_of(s), prepared[s.id]) for s in survivors[:keep]]
+    return selected, rejections

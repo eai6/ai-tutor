@@ -70,6 +70,44 @@
 
     .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
 
+    .sample-card {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem;
+        display:flex; gap:1.25rem; align-items:flex-end; flex-wrap:wrap;
+    }
+    .sample-card .left { flex:1; min-width:220px; }
+    .sample-card .count { font-size:1.3rem; font-weight:700; color:#111; line-height:1.1; }
+    .sample-card .label-row { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+    .sample-card form { display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap; }
+    .sample-card label { display:block; font-size:0.7rem; color:#6b7280;
+                         text-transform:uppercase; letter-spacing:0.04em;
+                         margin-bottom:0.2rem; }
+    .sample-card input[type=number] {
+        width:92px; padding:0.4rem 0.55rem; border:1px solid #d1d5db;
+        border-radius:6px; font-size:0.9rem; font-family:inherit;
+    }
+    .sample-card button {
+        padding:0.5rem 1rem; border:none; border-radius:6px; background:#5b21b6;
+        color:#fff; font-size:0.88rem; font-weight:600; cursor:pointer;
+        font-family:inherit;
+    }
+    .sample-card button[disabled] { background:#c4b5fd; cursor:not-allowed; }
+
+    .run-card {
+        background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.85rem;
+        color:#4c1d95;
+    }
+    .run-card.failed { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+    .run-card.done { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+    .progress { height:8px; border-radius:4px; background:#ddd6fe;
+                overflow:hidden; margin-top:0.5rem; }
+    .progress span { display:block; height:100%; background:#5b21b6;
+                     transition:width 0.4s ease; }
+    .run-detail { margin-top:0.5rem; font-size:0.78rem; opacity:0.9; }
+    .run-detail code { background:rgba(0,0,0,0.05); padding:0.05rem 0.3rem;
+                       border-radius:4px; }
+
     .pager { display:flex; gap:0.5rem; align-items:center; justify-content:center;
              margin-top:1rem; font-size:0.85rem; color:#6b7280; }
     .pager a { color:#5b21b6; text-decoration:none; padding:0.3rem 0.6rem;
@@ -107,6 +145,60 @@
         <span class="k">Matching filter</span>
     </div>
 </div>
+
+<div class="sample-card">
+    <div class="left">
+        <div class="count">{{ eligible }}</div>
+        <div class="label-row">
+            real sessions not yet sampled, long enough to judge.
+            {{ already_sampled }} already sampled and excluded, so running this
+            again picks up new sessions rather than re-screening old ones.
+            <br>Screened, then <strong>drawn uniformly at random</strong> — so a
+            pass rate over the sample estimates the real one.
+        </div>
+    </div>
+    <form method="post" action="{% url 'dashboard:benchmark:session_sample_create' %}">
+        {% csrf_token %}
+        <div>
+            <label for="s-limit">Screen up to</label>
+            <input type="number" id="s-limit" name="limit" value="200"
+                   min="1" max="{{ limit_max }}" {% if run_active %}disabled{% endif %}>
+        </div>
+        <div>
+            <label for="s-keep">Keep</label>
+            <input type="number" id="s-keep" name="keep" value="20"
+                   min="1" max="{{ keep_max }}" {% if run_active %}disabled{% endif %}>
+        </div>
+        <button type="submit" {% if run_active %}disabled{% endif %}>
+            {% if run_active %}Sampling…{% else %}Sample sessions{% endif %}
+        </button>
+    </form>
+</div>
+
+{% if latest_run %}
+<div class="run-card {% if latest_run.status == 'failed' %}failed{% elif latest_run.status == 'completed' %}done{% endif %}">
+    {% if latest_run.status == 'running' %}
+        <strong>Sampling in progress</strong> — screened
+        {{ latest_run.screened }} of {{ latest_run.candidates }}.
+        Every session goes through the LLM redaction pass, so this takes a few
+        minutes. The page refreshes itself.
+        <div class="progress"><span style="width:{{ latest_run.progress_pct }}%"></span></div>
+    {% elif latest_run.status == 'completed' %}
+        <strong>Last run:</strong> screened {{ latest_run.screened }} session(s),
+        created {{ latest_run.created_items }} new item(s) for review.
+        {% if latest_run.rejections %}
+        <div class="run-detail">
+            Rejected —
+            {% for reason, n in latest_run.rejections.items %}<code>{{ reason }} × {{ n }}</code> {% endfor %}
+            <br>Rejections are the system working; a rate that moves suddenly
+            is worth a look.
+        </div>
+        {% endif %}
+    {% else %}
+        <strong>Last run failed.</strong> {{ latest_run.error }}
+    {% endif %}
+</div>
+{% endif %}
 
 <form method="get" class="filters">
     <div>
@@ -194,8 +286,8 @@
     <div class="empty">
         <p>No sessions match.</p>
         <p style="font-size:0.85rem;">
-            Sample some with
-            <code>python manage.py sample_sessions --limit 200</code>.
+            Use <strong>Sample sessions</strong> above, or clear the filters if
+            you have sampled already.
         </p>
     </div>
     {% endif %}
@@ -211,6 +303,14 @@
     <a href="?page={{ page.next_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}">Next</a>
     {% endif %}
 </div>
+{% endif %}
+{% if run_active %}
+<script>
+    // Reload while sampling runs. Deliberately not SSE — Azure/ALB buffering
+    // makes streaming unreliable in production, and this page only needs a
+    // number every few seconds.
+    setTimeout(function () { window.location.reload(); }, 5000);
+</script>
 {% endif %}
 <div id="block-content-tail"></div>
 {% endblock %}

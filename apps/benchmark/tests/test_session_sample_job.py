@@ -1,0 +1,547 @@
+"""Dashboard-triggered sampling.
+
+Sampling from a button is not the same problem as sampling from a shell. Three
+things only bite in the web version, and each has a test here:
+
+- **Two replicas.** The service runs more than one ECS task, so checking
+  "is a run in progress?" before inserting is not atomic. A partial unique
+  constraint makes the second insert fail instead.
+- **An abandoned run.** A deploy kills the worker mid-flight and the row stays
+  RUNNING forever — the same trap as `content_status='generating'`, which
+  CLAUDE.md says still needs a manual reset today. Here it self-heals.
+- **One bad session.** A single screening failure must not abort a 200-session
+  run and lose the work already done.
+
+Plan: memory/session_eval_framework_plan.md
+"""
+from __future__ import annotations
+
+from datetime import timedelta
+
+import pytest
+from django.contrib.auth.models import User
+from django.db import IntegrityError, transaction
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.accounts.models import Institution, Membership
+from apps.benchmark import session_sampling as S
+from apps.benchmark.models import SessionEvalItem, SessionSampleRun
+from apps.curriculum.models import Course, Lesson, Unit
+from apps.tutoring.models import SessionTurn, TutorSession
+
+
+@pytest.fixture
+def staff(db):
+    return User.objects.create_user(username='sampler', password='x',
+                                    is_staff=True, is_superuser=True)
+
+
+@pytest.fixture
+def school(db):
+    return Institution.objects.create(name='School', slug='job-school')
+
+
+@pytest.fixture
+def lesson(school):
+    course = Course.objects.create(title='Geo', institution=school,
+                                   subject_type='geography')
+    unit = Unit.objects.create(course=course, title='Maps', order_index=1)
+    return Lesson.objects.create(unit=unit, title='Maps', objective='o',
+                                 order_index=1, is_published=True)
+
+
+def make_session(school, lesson, username):
+    user = User.objects.create_user(username=username)
+    Membership.objects.create(user=user, institution=school, role='student',
+                              is_active=True)
+    session = TutorSession.objects.create(student=user, lesson=lesson,
+                                          institution=school)
+    for role, text in [('tutor', 'What does the scale bar show?'),
+                       ('student', 'distance'),
+                       ('tutor', 'Right. Read the number on it.'),
+                       ('student', 'ok 1:50000')]:
+        SessionTurn.objects.create(session=session, role=role, content=text)
+    return session
+
+
+@pytest.fixture
+def no_llm(monkeypatch):
+    """Stub the LLM name pass — these tests must not make network calls."""
+    monkeypatch.setattr(S, 'llm_name_candidates',
+                        lambda transcript, llm_client=None: ([], ''))
+
+
+@pytest.fixture(autouse=True)
+def captured_async(monkeypatch):
+    """Never let a view start a real thread during tests.
+
+    A real thread touches the SQLite test database from outside the test's
+    transaction and dies with "database table is locked" — and worse, it can
+    leave rows behind that make an unrelated later test flaky. View tests
+    record the call instead; the job body is exercised directly in TestTheJob.
+    """
+    calls = []
+    monkeypatch.setattr('apps.dashboard.background_tasks.run_async',
+                        lambda f, *a, **k: calls.append(a))
+    return calls
+
+
+@pytest.mark.django_db
+class TestOnlyOneRunAtATime:
+    def test_a_second_running_row_is_rejected_by_the_database(self):
+        """An .exists() check would not survive two replicas racing. This is a
+        constraint, so the race is impossible rather than unlikely."""
+        SessionSampleRun.objects.create(requested_limit=10)
+
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                SessionSampleRun.objects.create(requested_limit=10)
+
+    def test_finished_runs_do_not_block_a_new_one(self):
+        """The constraint is partial — only RUNNING rows are exclusive."""
+        SessionSampleRun.objects.create(
+            requested_limit=10, status=SessionSampleRun.Status.COMPLETED)
+        SessionSampleRun.objects.create(
+            requested_limit=10, status=SessionSampleRun.Status.FAILED)
+
+        SessionSampleRun.objects.create(requested_limit=10)   # must not raise
+
+        assert SessionSampleRun.objects.count() == 3
+
+    def test_the_view_reports_a_conflict_instead_of_a_500(
+            self, client, staff, no_llm):
+        SessionSampleRun.objects.create(requested_limit=10)
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_sample_create'),
+            {'limit': 10}, follow=True)
+
+        assert response.status_code == 200
+        assert any('already in progress' in str(m)
+                   for m in response.context['messages'])
+        assert SessionSampleRun.objects.count() == 1
+
+
+@pytest.mark.django_db
+class TestStaleRunsSelfHeal:
+    def test_an_abandoned_run_is_reclaimed(self):
+        """A deploy kills the worker mid-run. Without this the button is dead
+        forever and the only fix is a shell — the exact trap that
+        content_status='generating' still has."""
+        run = SessionSampleRun.objects.create(requested_limit=10)
+        SessionSampleRun.objects.filter(pk=run.pk).update(
+            started_at=timezone.now() - SessionSampleRun.STALE_AFTER
+            - timedelta(minutes=1))
+
+        SessionSampleRun.reclaim_stale()
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.FAILED
+        assert 'Abandoned' in run.error
+
+    def test_a_recent_run_is_left_alone(self):
+        """Reclaiming an in-flight run would let a second start alongside it."""
+        run = SessionSampleRun.objects.create(requested_limit=10)
+
+        SessionSampleRun.reclaim_stale()
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.RUNNING
+
+    def test_the_list_page_reclaims_on_read(self, client, staff):
+        """Otherwise the page shows 'Sampling…' indefinitely and the only way
+        to discover it is stuck is to try to start another."""
+        run = SessionSampleRun.objects.create(requested_limit=10)
+        SessionSampleRun.objects.filter(pk=run.pk).update(
+            started_at=timezone.now() - SessionSampleRun.STALE_AFTER
+            - timedelta(minutes=1))
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'))
+
+        assert response.context['run_active'] is False
+        run.refresh_from_db()
+        assert run.status == SessionSampleRun.Status.FAILED
+
+    def test_a_stale_run_does_not_block_starting_a_new_one(
+            self, client, staff, no_llm):
+        old = SessionSampleRun.objects.create(requested_limit=10)
+        SessionSampleRun.objects.filter(pk=old.pk).update(
+            started_at=timezone.now() - SessionSampleRun.STALE_AFTER
+            - timedelta(minutes=1))
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 5})
+
+        assert SessionSampleRun.objects.count() == 2
+
+
+@pytest.mark.django_db
+class TestTheJob:
+    def test_it_creates_items_and_records_the_run(self, school, lesson, no_llm):
+        for i in range(3):
+            make_session(school, lesson, f'pupil{i}')
+        run = SessionSampleRun.objects.create(requested_limit=10, keep_count=5)
+
+        S.run_sample_job(run.id, limit=10, keep=5)
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.COMPLETED
+        assert run.created_items == 3
+        assert run.candidates == 3
+        assert run.screened == 3
+        assert run.finished_at is not None
+        assert SessionEvalItem.objects.count() == 3
+
+    def test_everything_it_creates_awaits_review(self, school, lesson, no_llm):
+        """The whole point of the gate: a button press must not be able to
+        produce something an annotator can open."""
+        make_session(school, lesson, 'pupilA')
+        run = SessionSampleRun.objects.create(requested_limit=10)
+
+        S.run_sample_job(run.id, limit=10, keep=5)
+
+        assert set(SessionEvalItem.objects.values_list('status', flat=True)) == {
+            SessionEvalItem.Status.PENDING_REVIEW}
+
+    def test_it_does_not_resample_an_already_sampled_session(
+            self, school, lesson, no_llm):
+        """Sampling twice should find new sessions, not duplicate old ones."""
+        make_session(school, lesson, 'pupilB')
+
+        first = SessionSampleRun.objects.create(requested_limit=10)
+        S.run_sample_job(first.id, limit=10, keep=5)
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+
+        second = SessionSampleRun.objects.create(requested_limit=10)
+        S.run_sample_job(second.id, limit=10, keep=5)
+        second.refresh_from_db()
+
+        assert second.created_items == 0
+        assert SessionEvalItem.objects.count() == 1
+
+    def test_keep_caps_how_many_are_created(self, school, lesson, no_llm):
+        for i in range(5):
+            make_session(school, lesson, f'many{i}')
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=2)
+
+        S.run_sample_job(run.id, limit=50, keep=2)
+        run.refresh_from_db()
+
+        assert run.candidates == 5      # all screened…
+        assert run.created_items == 2   # …2 kept
+
+    def test_rejections_are_counted_not_silently_dropped(
+            self, school, lesson, no_llm):
+        """A rejection rate that moves is how we notice the redactor breaking,
+        so it has to be visible."""
+        flagged = make_session(school, lesson, 'flagged')
+        flagged.is_flagged = True
+        flagged.save()
+        make_session(school, lesson, 'clean')
+        run = SessionSampleRun.objects.create(requested_limit=10)
+
+        S.run_sample_job(run.id, limit=10, keep=5)
+        run.refresh_from_db()
+
+        assert run.rejections == {'safety:session_flagged': 1}
+        assert run.created_items == 1
+
+    def test_one_bad_session_does_not_abort_the_run(
+            self, school, lesson, monkeypatch):
+        """Losing 199 sessions' work because the 43rd raised would be a bad
+        trade, and the LLM pass is a network call — it will raise sometimes."""
+        make_session(school, lesson, 'ok1')
+        make_session(school, lesson, 'boom')
+        make_session(school, lesson, 'ok2')
+
+        calls = {'n': 0}
+        real = S.screen_and_prepare
+
+        def flaky(session, *args, **kwargs):
+            calls['n'] += 1
+            if calls['n'] == 2:
+                raise RuntimeError('provider exploded')
+            return real(session, use_llm=False)
+
+        monkeypatch.setattr(S, 'screen_and_prepare', flaky)
+        run = SessionSampleRun.objects.create(requested_limit=10)
+
+        S.run_sample_job(run.id, limit=10, keep=5)
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.COMPLETED
+        assert run.created_items == 2
+        assert run.rejections['screening_error'] == 1
+
+    def test_a_hard_failure_closes_the_run_rather_than_leaving_it_running(
+            self, school, lesson, monkeypatch):
+        """A thread that dies with the row RUNNING blocks the button until the
+        stale timeout. Every exit path must close the row."""
+        make_session(school, lesson, 'pupilC')
+        monkeypatch.setattr(
+            S, 'candidate_sessions',
+            lambda **kw: (_ for _ in ()).throw(RuntimeError('db gone')))
+        run = SessionSampleRun.objects.create(requested_limit=10)
+
+        S.run_sample_job(run.id, limit=10, keep=5)
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.FAILED
+        assert 'db gone' in run.error
+        assert run.finished_at is not None
+
+    def test_a_missing_run_row_is_survived(self):
+        """Deleted mid-flight; the thread must not raise into nothing."""
+        S.run_sample_job(999999, limit=10, keep=3)
+
+
+@pytest.mark.django_db
+class TestTheSampleForm:
+    def test_the_limit_is_clamped(self, client, staff, captured_async):
+        """An unbounded box is an unbounded bill — one LLM call per candidate."""
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': '999999', 'keep': '999'})
+
+        _run_id, limit, keep, _inst = captured_async[0]
+        assert limit == 500
+        assert keep == 200
+
+    def test_junk_input_falls_back_to_the_default(self, client, staff,
+                                                  captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 'abc', 'keep': ''})
+
+        _run_id, limit, keep, _inst = captured_async[0]
+        assert limit == 200
+        assert keep == 20
+
+    def test_a_zero_or_negative_limit_becomes_one(self, client, staff,
+                                                  captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': '-5'})
+
+        assert captured_async[0][1] == 1
+
+    def test_it_requires_staff(self, client):
+        response = client.post(
+            reverse('dashboard:benchmark:session_sample_create'), {'limit': 5})
+        assert response.status_code in (302, 403)
+        assert SessionSampleRun.objects.count() == 0
+
+    def test_get_is_not_allowed(self, client, staff):
+        client.force_login(staff)
+        response = client.get(
+            reverse('dashboard:benchmark:session_sample_create'))
+        assert response.status_code == 405
+
+    def test_the_page_offers_the_button_not_a_shell_command(
+            self, client, staff, school, lesson):
+        make_session(school, lesson, 'pupilD')
+        client.force_login(staff)
+
+        body = client.get(
+            reverse('dashboard:benchmark:session_list')).content.decode()
+
+        assert 'Sample sessions' in body
+        assert 'manage.py sample_sessions' not in body
+
+    def test_the_button_is_disabled_while_a_run_is_active(self, client, staff):
+        SessionSampleRun.objects.create(requested_limit=10)
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'))
+
+        assert response.context['run_active'] is True
+        assert 'Sampling…' in response.content.decode()
+
+    def test_a_conflict_leaves_the_transaction_usable(self, client, staff):
+        """The IntegrityError is caught inside a savepoint. Without one, on
+        PostgreSQL the surrounding transaction is poisoned and the very next
+        query — writing the warning message — raises TransactionManagementError,
+        turning a handled conflict into a 500. SQLite tolerates it, so this
+        needed reasoning rather than local observation."""
+        SessionSampleRun.objects.create(requested_limit=10)
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10})
+
+        # A query after the caught error must still work.
+        assert SessionSampleRun.objects.count() == 1
+
+
+@pytest.mark.django_db
+class TestRepeatedSamplingIsAdditive:
+    """The bug this class exists for, observed on 2026-08-11.
+
+    Already-sampled sessions used to stay in the candidate pool. Ordering is
+    stable, so they filled their strata buckets first, consumed the per-stratum
+    quota, and were then dropped by the duplicate check — a run that screened 20
+    sessions, paid for 20 LLM calls, and created nothing. Clicking Sample again
+    did nothing, forever, while the page claimed it would pick up new ones.
+    """
+
+    def test_a_second_run_picks_up_new_sessions(self, school, lesson, no_llm):
+        for i in range(3):
+            make_session(school, lesson, f'first{i}')
+
+        run1 = SessionSampleRun.objects.create(requested_limit=50, keep_count=3)
+        S.run_sample_job(run1.id, limit=50, keep=3)
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+        assert SessionEvalItem.objects.count() == 3
+
+        # New sessions arrive; the quota must be spent on them.
+        for i in range(3):
+            make_session(school, lesson, f'second{i}')
+
+        run2 = SessionSampleRun.objects.create(requested_limit=50, keep_count=3)
+        S.run_sample_job(run2.id, limit=50, keep=3)
+        run2.refresh_from_db()
+
+        assert run2.created_items == 3
+        assert SessionEvalItem.objects.count() == 6
+
+    def test_sampled_sessions_are_not_re_screened(self, school, lesson, no_llm):
+        """They should not even reach the LLM pass — that is the wasted spend."""
+        make_session(school, lesson, 'once')
+        run1 = SessionSampleRun.objects.create(requested_limit=50)
+        S.run_sample_job(run1.id, limit=50, keep=3)
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+
+        run2 = SessionSampleRun.objects.create(requested_limit=50)
+        S.run_sample_job(run2.id, limit=50, keep=3)
+        run2.refresh_from_db()
+
+        assert run2.candidates == 0
+        assert run2.screened == 0
+
+    def test_the_eligible_count_excludes_what_is_already_sampled(
+            self, client, staff, school, lesson, no_llm):
+        make_session(school, lesson, 'sampled')
+        make_session(school, lesson, 'fresh')
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=1)
+        S.run_sample_job(run.id, limit=50, keep=1)
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'))
+
+        assert response.context['already_sampled'] == 1
+        assert response.context['eligible'] == 1     # the one still untouched
+
+
+@pytest.mark.django_db
+class TestSelectionIsARandomDraw:
+    """Stratified selection was removed on 2026-08-11.
+
+    A quota per subject|engine|outcome guarantees coverage of rare conditions,
+    but over-represents them by construction — so a pass rate over such a
+    sample is not an estimate of the production rate, which is the number this
+    study reports. Selection is now uniform over everything that clears
+    screening.
+    """
+
+    def test_it_does_not_just_take_the_newest(self, school, lesson, no_llm):
+        """The candidate queryset is ordered -started_at. Taking a slice of it
+        would bias the sample toward whatever happened most recently — a
+        curriculum change or a bad week would dominate the gold set."""
+        sessions = [make_session(school, lesson, f'ord{i}') for i in range(10)]
+        newest_five = {s.id for s in sessions[-5:]}
+
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=5)
+        S.run_sample_job(run.id, limit=50, keep=5)
+
+        chosen = set(SessionEvalItem.objects.values_list(
+            'source_session_id', flat=True))
+        assert len(chosen) == 5
+        assert chosen != newest_five
+
+    def test_the_same_run_id_reproduces_the_same_draw(self, school, lesson,
+                                                      no_llm):
+        """Seeded from the run id, so a failed run can be re-run and examined
+        rather than producing a different sample each time."""
+        for i in range(8):
+            make_session(school, lesson, f'seed{i}')
+
+        run_a = SessionSampleRun.objects.create(requested_limit=50, keep_count=3)
+        S.run_sample_job(run_a.id, limit=50, keep=3)
+        first = set(SessionEvalItem.objects.values_list(
+            'source_session_id', flat=True))
+
+        SessionEvalItem.objects.all().delete()
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+        S.run_sample_job(run_a.id, limit=50, keep=3)
+        second = set(SessionEvalItem.objects.values_list(
+            'source_session_id', flat=True))
+
+        assert first == second
+
+    def test_different_runs_draw_differently(self, school, lesson, no_llm):
+        for i in range(12):
+            make_session(school, lesson, f'diff{i}')
+
+        run_a = SessionSampleRun.objects.create(requested_limit=50, keep_count=3)
+        S.run_sample_job(run_a.id, limit=50, keep=3)
+        first = set(SessionEvalItem.objects.values_list(
+            'source_session_id', flat=True))
+
+        SessionEvalItem.objects.all().delete()
+        SessionSampleRun.objects.all().update(
+            status=SessionSampleRun.Status.COMPLETED)
+        run_b = SessionSampleRun.objects.create(requested_limit=50, keep_count=3)
+        S.run_sample_job(run_b.id, limit=50, keep=3)
+        second = set(SessionEvalItem.objects.values_list(
+            'source_session_id', flat=True))
+
+        assert first != second
+
+    def test_a_rare_condition_is_not_given_an_artificial_quota(
+            self, school, no_llm):
+        """Under the old stratified rule, 1 rare session among 9 common ones
+        was guaranteed a slot. Under a uniform draw it is not — which is the
+        point: the sample should look like the population."""
+        from apps.curriculum.models import Course, Lesson, Unit
+
+        maths = Course.objects.create(title='Maths', institution=school,
+                                      subject_type='math')
+        m_unit = Unit.objects.create(course=maths, title='U', order_index=1)
+        rare_lesson = Lesson.objects.create(unit=m_unit, title='Rare',
+                                            objective='o', order_index=1)
+        geo = Course.objects.create(title='Geo', institution=school,
+                                    subject_type='geography')
+        g_unit = Unit.objects.create(course=geo, title='U', order_index=1)
+        common_lesson = Lesson.objects.create(unit=g_unit, title='Common',
+                                              objective='o', order_index=1)
+
+        make_session(school, rare_lesson, 'rare0')
+        for i in range(9):
+            make_session(school, common_lesson, f'common{i}')
+
+        # Repeat over several run ids; a quota would put the rare subject in
+        # every single draw.
+        appearances = 0
+        for run_id_seed in range(6):
+            SessionEvalItem.objects.all().delete()
+            SessionSampleRun.objects.all().delete()
+            run = SessionSampleRun.objects.create(requested_limit=50,
+                                                  keep_count=2)
+            S.run_sample_job(run.id, limit=50, keep=2)
+            if SessionEvalItem.objects.filter(subject='math').exists():
+                appearances += 1
+
+        assert appearances < 6

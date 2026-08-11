@@ -928,6 +928,7 @@ def benchmark_run_detail(request, run_id: int):
 # Plan: memory/session_eval_framework_plan.md
 
 from apps.benchmark import pedagogy as P
+from apps.benchmark import session_sampling as S_sampling
 from apps.benchmark.models import SessionEvalAnnotation, SessionEvalItem
 
 
@@ -994,6 +995,14 @@ def session_eval_list(request):
         for s in SessionEvalItem.Status
     }
 
+    from apps.benchmark.models import SessionSampleRun
+    # Clear an abandoned run on read, not only on POST — otherwise the page
+    # shows "running" forever after a deploy killed the worker, and the only
+    # way to find out is to try to start another.
+    SessionSampleRun.reclaim_stale()
+    latest_run = SessionSampleRun.objects.first()
+    eligible = S_sampling.candidate_sessions().count()
+
     return render(request, 'benchmark/session_list.html', {
         'rows': rows,
         'page': page,
@@ -1007,6 +1016,14 @@ def session_eval_list(request):
                 SessionEvalItem.objects.values_list('subject', flat=True))
             if s
         ),
+        'latest_run': latest_run,
+        'run_active': bool(latest_run and
+                           latest_run.status == SessionSampleRun.Status.RUNNING),
+        'eligible': eligible,
+        'already_sampled': SessionEvalItem.objects.exclude(
+            source_session=None).count(),
+        'limit_max': SAMPLE_LIMIT_MAX,
+        'keep_max': SAMPLE_KEEP_MAX,
     })
 
 
@@ -1242,3 +1259,67 @@ def session_eval_export_jsonl(request):
     response['Content-Disposition'] = (
         'attachment; filename=session_eval_annotations.jsonl')
     return response
+
+
+# Bounds on the sample form. Not arbitrary: every candidate costs one LLM call
+# for the free-text name pass, so an unbounded box is an unbounded bill and a
+# thread that runs for hours.
+SAMPLE_LIMIT_MAX = 500
+SAMPLE_KEEP_MAX = 200
+
+
+@staff_member_required
+@require_POST
+def session_eval_sample_create(request):
+    """Start a background sampling run.
+
+    Sampling makes one LLM call per candidate, so this cannot run inside the
+    request. It starts a thread and returns immediately; the list page polls
+    the SessionSampleRun row.
+    """
+    from django.db import IntegrityError, transaction
+
+    from apps.benchmark import session_sampling as S
+    from apps.benchmark.models import SessionSampleRun
+    from apps.dashboard.background_tasks import run_async
+
+    def _clamp(name, default, maximum):
+        try:
+            value = int(request.POST.get(name) or default)
+        except (TypeError, ValueError):
+            return default
+        return max(1, min(value, maximum))
+
+    limit = _clamp('limit', 200, SAMPLE_LIMIT_MAX)
+    keep = _clamp('keep', 20, SAMPLE_KEEP_MAX)
+    institution_id = (request.POST.get('institution') or '').strip() or None
+
+    # Free any run whose worker died, so a killed deploy does not leave the
+    # button permanently disabled.
+    SessionSampleRun.reclaim_stale()
+
+    try:
+        with transaction.atomic():
+            run = SessionSampleRun.objects.create(
+                requested_limit=limit, keep_count=keep,
+                started_by=request.user,
+            )
+    except IntegrityError:
+        # The partial unique constraint fired: another replica (or another
+        # tab) already has a run in flight. Not an error worth a 500.
+        messages.warning(
+            request,
+            'A sampling run is already in progress. Wait for it to finish '
+            'before starting another.',
+        )
+        return redirect('dashboard:benchmark:session_list')
+
+    run_async(S.run_sample_job, run.id, limit, keep, institution_id)
+
+    messages.success(
+        request,
+        f'Sampling started — screening up to {limit} sessions. This takes a '
+        f'few minutes because every session goes through the LLM redaction '
+        f'pass. Progress appears below.',
+    )
+    return redirect('dashboard:benchmark:session_list')

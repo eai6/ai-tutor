@@ -400,4 +400,76 @@ built here is what makes that call.
 The blocker for Phase 4 is not code — it is a human gold set. Nothing has been
 annotated yet: the 7 sampled items sit at `pending_review`.
 
-Commit: 0c286c0 (Phase 1), d67734d (Phase 2)
+---
+
+## Sampling from the dashboard + stratification removed (2026-08-11)
+
+### Sampling is now a button
+
+`SessionSampleRun` + `session_eval_sample_create` + a card on the list page.
+The empty state used to tell a dashboard user to run
+`python manage.py sample_sessions` — i.e. to open a shell. That is the failure
+`auto-memory/feedback_build_capability_not_record_surgery.md` warns about.
+
+It runs in a background thread (`run_async`, the existing pattern) because the
+LLM redaction pass means one model call per candidate: 200 sessions is minutes,
+not milliseconds. Two failure modes designed for rather than discovered:
+
+- **Two ECS replicas starting at once.** A partial unique constraint
+  (`UniqueConstraint(fields=['status'], condition=Q(status='running'))`) makes
+  the second insert fail, so the race is impossible rather than unlikely. Same
+  reasoning as `SessionTurn.client_uuid`.
+- **A run abandoned by a deploy.** `reclaim_stale()` fails any RUNNING row past
+  45 minutes, on both POST and page read. Without it the button dies forever —
+  the exact `content_status='generating'` trap CLAUDE.md still documents as
+  needing a manual reset.
+
+A caught `IntegrityError` is wrapped in `transaction.atomic()`. Without the
+savepoint, PostgreSQL poisons the surrounding transaction and the very next
+statement — writing the warning message — raises, turning a handled conflict
+into a 500. SQLite tolerates it, so this needed reasoning rather than local
+observation.
+
+### Bug found by clicking the button
+
+First real run: screened 20, created **0**. Already-sampled sessions stayed in
+the candidate pool; ordering is stable, so they filled the quota first and were
+then dropped by the duplicate check. Clicking Sample would have done nothing,
+forever, while the page claimed it picks up new sessions. Fixed by excluding
+them in `candidate_sessions()` — at the source, not at the end.
+
+### Stratification removed
+
+Selection was a quota per `subject|engine|outcome`. Removed on Edward's call
+after he asked what a stratum was for. The reasoning, recorded because it may
+need revisiting:
+
+- **For it:** local data was 85% one stratum, so a random draw of 10 would
+  likely contain zero sessions that reached an exit ticket. (That 85% is LOCAL
+  SQLite — production has ~882 sessions with 479 passing an exit ticket, so the
+  imbalance may not exist there. `project_geography_curriculum_exists.md` warns
+  against inferring scope from local data; I initially wrote "production" in a
+  code comment and had to correct it.)
+- **Against it, decisively:** a stratified sample over-represents rare strata by
+  construction, so a pass rate over it is NOT an estimate of the production pass
+  rate — and reporting "the tutor passes X% of sessions" is the goal. Random is
+  the statistically correct way to get that.
+- Two of the three axes were near-dead anyway: engine is almost all `v1`
+  historically, and `simple_tutor` is the only engine going forward.
+
+`stratum` survives as a **descriptive** field (recorded, exported, reported in
+the CLI summary) — nothing selects on it. Bring stratification back only for a
+different question: comparing conditions ("is `simple` better than `v1`?")
+rather than measuring the whole.
+
+Selection is seeded from the run id, so a failed run reproduces its draw.
+
+### Turn-level eval removed from the nav
+
+Session Evaluation is now "Tutoring Evaluation"; "Scoring Runs" and the
+turn-level list are gone from the sidebar. **The URLs, views, models and data
+are untouched** — those are research annotations, and the ask was to change what
+the dashboard focuses on, not to destroy a dataset. `/dashboard/benchmark/`
+still works for anyone with the link.
+
+Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3)
