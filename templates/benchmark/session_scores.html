@@ -1,0 +1,239 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Session Evaluation — scores{% endblock %}
+{% block page_title %}Session Evaluation — scores{% endblock %}
+
+{% block content %}
+<style>
+    .sc-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+               padding:1rem 1.1rem; margin-bottom:1rem; }
+    .sc-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
+                  color:#6b7280; margin:0 0 0.2rem; font-weight:600; }
+    .sc-card .lede { font-size:0.8rem; color:#6b7280; line-height:1.55;
+                     margin:0 0 0.8rem; }
+
+    .headline { display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-start; }
+    .headline .stat { display:flex; flex-direction:column; }
+    .headline .stat .n { font-size:1.8rem; font-weight:700; color:#111; line-height:1.1; }
+    .headline .stat .k { font-size:0.72rem; color:#6b7280; text-transform:uppercase;
+                         letter-spacing:0.04em; margin-top:0.15rem; }
+
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:0.5rem 0.7rem; text-align:left; font-size:0.85rem; }
+    thead th { background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.7rem;
+               text-transform:uppercase; letter-spacing:0.04em;
+               border-bottom:1px solid #e5e7eb; }
+    tbody tr { border-bottom:1px solid #f3f4f6; }
+    td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .tablewrap { overflow-x:auto; }
+    .tablewrap table { min-width:36rem; }
+
+    .bar { display:block; height:6px; border-radius:3px; background:#f3f4f6;
+           margin-top:0.25rem; overflow:hidden; min-width:6rem; }
+    .bar span { display:block; height:100%; background:#5b21b6; }
+
+    .muted { font-size:0.78rem; color:#6b7280; line-height:1.55; }
+    .none { color:#9ca3af; }
+    .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px;
+            padding:0.75rem 1.1rem; margin-bottom:1rem; font-size:0.84rem;
+            color:#78350f; line-height:1.55; }
+    .btn { display:inline-block; padding:0.5rem 0.9rem; border-radius:8px;
+           background:#5b21b6; color:#fff; font-size:0.85rem; font-weight:600;
+           text-decoration:none; }
+    .btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; }
+
+    #block-content-tail { height:5rem; }
+</style>
+
+{% if metrics.human_only.complete == 0 %}
+<div class="warn">
+    <strong>Nothing scored yet.</strong>
+    {{ pending_review }} session(s) await child-protection review and
+    {{ approved_unannotated }} approved session(s) have no annotation. Numbers
+    appear once complete human annotations exist.
+</div>
+{% endif %}
+
+<div class="sc-card">
+    <h3>Session pass rate — human annotators</h3>
+    <p class="lede">
+        A session passes only if <em>every applicable</em> dimension sits at its
+        desideratum. Eight conjunctive conditions, so this number sits low even
+        for a tutor that is doing well — the per-dimension table below is what
+        says where sessions are lost.
+    </p>
+    <div class="headline">
+        <div class="stat">
+            <span class="n">
+                {% if metrics.human_only.pass_rate is None %}—
+                {% else %}{{ metrics.human_only.pass_pct }}%{% endif %}
+            </span>
+            <span class="k">Pass rate</span>
+        </div>
+        <div class="stat">
+            <span class="n">{{ metrics.human_only.passed }}</span>
+            <span class="k">Passed</span>
+        </div>
+        <div class="stat">
+            <span class="n">{{ metrics.human_only.complete }}</span>
+            <span class="k">Complete annotations</span>
+        </div>
+        <div class="stat">
+            <span class="n">{{ metrics.human_only.incomplete }}</span>
+            <span class="k">Incomplete (not scored)</span>
+        </div>
+    </div>
+</div>
+
+<div class="sc-card">
+    <h3>Per dimension</h3>
+    <p class="lede">
+        The informative number, and what the source paper reports. N/A and
+        unanswered are in neither numerator nor denominator: the tutor is not
+        credited for a dimension that never arose, nor penalised for one an
+        annotator skipped.
+    </p>
+    <div class="tablewrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Dimension</th>
+                <th>Desired</th>
+                <th class="num">Pass</th>
+                <th class="num">Fail</th>
+                <th class="num">N/A</th>
+                <th class="num">Blank</th>
+                <th class="num">Pass rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in dimension_rows %}
+            <tr>
+                <td>{{ row.label }}</td>
+                <td class="muted">{{ row.desideratum }}</td>
+                <td class="num">{{ row.pass }}</td>
+                <td class="num">{{ row.fail }}</td>
+                <td class="num">{{ row.not_applicable }}</td>
+                <td class="num">{{ row.unanswered }}</td>
+                <td class="num">
+                    {% if row.pass_rate is None %}
+                    <span class="none">—</span>
+                    {% else %}
+                    {{ row.pass_pct }}%
+                    <span class="bar"><span style="width:{{ row.pass_pct }}%"></span></span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="sc-card">
+    <h3>Slices</h3>
+    <p class="lede">Whether a weakness is general or concentrated.</p>
+    <div class="tablewrap">
+    <table>
+        <thead>
+            <tr><th>Slice</th><th class="num">Complete</th>
+                <th class="num">Passed</th><th class="num">Pass rate</th></tr>
+        </thead>
+        <tbody>
+            {% for label, group in slices %}
+            <tr><td colspan="4" style="background:#f9fafb; font-size:0.7rem;
+                text-transform:uppercase; letter-spacing:0.04em; color:#6b7280;
+                font-weight:600;">{{ label }}</td></tr>
+            {% for key, stat in group.items %}
+            <tr>
+                <td>{{ key }}</td>
+                <td class="num">{{ stat.complete }}</td>
+                <td class="num">{{ stat.passed }}</td>
+                <td class="num">
+                    {% if stat.pass_rate is None %}<span class="none">—</span>
+                    {% else %}{{ stat.pass_pct }}%{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% empty %}
+            <tr><td colspan="4" class="muted">No annotations yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="sc-card">
+    <h3>Agreement — human vs LLM judge</h3>
+    <p class="lede">
+        Cohen's κ per dimension over the
+        {{ metrics.agreement.items_compared }} session(s) annotated by both.
+        κ is <strong>undefined</strong>, not zero, when both raters used a
+        single category throughout — which happens easily here (most sessions
+        are "No" on revealing the answer). Reporting 0 in that case would call
+        perfect agreement chance-level, so those rows show the raw agreement
+        and say why κ is absent.
+    </p>
+    <div class="tablewrap">
+    <table>
+        <thead>
+            <tr><th>Dimension</th><th class="num">n</th>
+                <th class="num">Raw agreement</th><th class="num">κ</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+            {% for row in agreement_rows %}
+            <tr>
+                <td>{{ row.label }}</td>
+                <td class="num">{{ row.n }}</td>
+                <td class="num">
+                    {% if row.observed is None %}<span class="none">—</span>
+                    {% else %}{{ row.observed|floatformat:2 }}{% endif %}
+                </td>
+                <td class="num">
+                    {% if row.kappa is None %}<span class="none">—</span>
+                    {% else %}{{ row.kappa|floatformat:2 }}{% endif %}
+                </td>
+                <td class="muted">{{ row.undefined_reason }}</td>
+            </tr>
+            {% endfor %}
+            <tr style="border-top:2px solid #e5e7eb;">
+                <td><strong>Session verdict</strong></td>
+                <td class="num">{{ metrics.agreement.session_verdict.n }}</td>
+                <td class="num">
+                    {% if metrics.agreement.session_verdict.observed is None %}<span class="none">—</span>
+                    {% else %}{{ metrics.agreement.session_verdict.observed|floatformat:2 }}{% endif %}
+                </td>
+                <td class="num">
+                    {% if metrics.agreement.session_verdict.kappa is None %}<span class="none">—</span>
+                    {% else %}{{ metrics.agreement.session_verdict.kappa|floatformat:2 }}{% endif %}
+                </td>
+                <td class="muted">{{ metrics.agreement.session_verdict.undefined_reason }}</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="sc-card">
+    <h3>Export</h3>
+    <p class="lede">
+        One JSON object per annotation, carrying the redacted transcript and the
+        eight values. No raw session id, no student, no annotator name.
+        <code>session_key</code> is a salted hash: it cannot be reversed to a
+        session without the salt, and a later sampling run gives the same
+        session a different key — so datasets from separate runs cannot be
+        linked. It is stable within one release, which it has to be for
+        annotations to join to sessions.
+    </p>
+    <a class="btn" href="{% url 'dashboard:benchmark:session_export_jsonl' %}">Download JSONL</a>
+    <a class="btn btn-secondary"
+       href="{% url 'dashboard:benchmark:session_export_jsonl' %}?complete=yes">Complete only</a>
+    <a class="btn btn-secondary"
+       href="{% url 'dashboard:benchmark:session_export_jsonl' %}?annotator_role=human">Human only</a>
+</div>
+
+<p class="muted">
+    <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
+</p>
+<div id="block-content-tail"></div>
+{% endblock %}

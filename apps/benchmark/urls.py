@@ -35,6 +35,9 @@ urlpatterns = [
     # memory/session_eval_framework_plan.md). Listed BEFORE the <item_id>
     # catch-all so 'sessions' does not resolve as a turn-level item_id.
     path('sessions/', views.session_eval_list, name='session_list'),
+    path('sessions/scores/', views.session_eval_scores, name='session_scores'),
+    path('sessions/export.jsonl', views.session_eval_export_jsonl,
+         name='session_export_jsonl'),
     path('sessions/<str:item_id>/review/', views.session_eval_review,
          name='session_review'),
     path('sessions/<str:item_id>/', views.session_eval_annotate,

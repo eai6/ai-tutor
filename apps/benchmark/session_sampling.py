@@ -57,9 +57,11 @@ logger = logging.getLogger(__name__)
 #
 # Here, ANY flagged turn disqualifies the session.
 
-# Salt for session_key. Regenerated per process: two sampling runs produce
-# different keys for the same session, so exports cannot be joined together
-# into a longitudinal record of one child.
+# Salt for session_key, regenerated per process. Two SAMPLING RUNS therefore
+# give the same session different keys, so datasets released from separate runs
+# cannot be linked into a longitudinal record of one child. Within a single run
+# the key is stable and stored on the item — it has to be, or annotations could
+# not be joined to sessions.
 _RUN_SALT = secrets.token_hex(16)
 
 

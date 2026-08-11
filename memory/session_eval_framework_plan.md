@@ -325,4 +325,79 @@ Phase 3: `session_scoring.py` — per-session and per-dimension pass rates,
 slices, Cohen's κ hook, JSONL export. **The export must drop
 `redaction_report`**: `advisory_names` is reviewer-facing, not release-facing.
 
-Commit: 0c286c0 (Phase 1)
+---
+
+## Phase 3 status — DONE (2026-08-11)
+
+Shipped: `apps/benchmark/session_scoring.py`, a scores page, a JSONL export,
+and `test_session_scoring.py`. 208 tests pass across benchmark + dashboard.
+
+### Denominators — the thing that would have misreported the study
+
+N/A and unanswered sit in **neither numerator nor denominator**, and are counted
+separately rather than collapsed together:
+
+- Counting N/A as failure penalises the tutor for the student never erring.
+- Counting unanswered as failure reports annotator throughput as tutor quality.
+- Collapsing the two hides an annotator who is skipping questions.
+
+A dimension with nothing scorable reports `None`, not 0% — 0% would say the
+tutor failed; `None` says we did not measure it. Same for the session pass rate.
+
+The headline pass rate is **human-only**. The paper found LLM judges unreliable
+on this taxonomy, so mixing roles would launder that uncertainty into the
+top-line number.
+
+### Cohen's κ is undefined, not zero, when both raters used one category
+
+po = pe = 1 gives 0/0. The common shortcut returns 0.0, which calls *perfect*
+agreement chance-level — the exact inversion. Not hypothetical here:
+`revealing_answer` is "No" for most well-behaved sessions, so two annotators in
+complete agreement produce this routinely. `kappa` is `None` with an
+`undefined_reason`, and the raw agreement is reported alongside. Confirmed on
+the rendered page: five dimensions showed "—" with `no_category_variance` while
+`revealing_answer` and `coherence` showed a real κ of 0.00 against raw
+agreement of 0.50.
+
+### A privacy claim I had to correct
+
+Three places — the module docstring, the export docstring and the page copy —
+originally said the salt "changes every run, so two exports cannot be joined
+into a longitudinal record". **That is false.** `session_key` is generated once
+at sampling time and stored on the item, so two exports of the same rows carry
+identical keys — and they must, or annotations could not be joined to sessions
+inside a release. What the per-process salt actually buys: the key cannot be
+reversed without the salt, and a *later sampling run* gives the same session a
+different key, so datasets from separate runs cannot be linked. Corrected in all
+three, and pinned by `TestSessionKeyClaims`. Overstating a privacy property in
+user-facing copy is worse than not claiming it — someone downstream will rely
+on it.
+
+### Export exclusions, all deliberate
+
+`redaction_report` (its `advisory_names` holds transcript tokens meant for the
+reviewer), the raw session id, the student, and the annotator's username — an
+opaque per-prefix index instead (`human_1`, `llm_1`). Verified over real HTTP,
+not only through the test client: 200, `application/x-ndjson`, no
+`redaction_report`, no `source_session`, no usernames.
+
+### Verified by mutation
+
+Six mutations, each breaking the expected tests: N/A counted as failure (2),
+κ returning 0.0 (1), incomplete annotations in the denominator (2), export
+carrying the redaction report (1), export naming the annotator (2), LLM rows in
+the human headline (1).
+
+### Next
+
+Phase 4 — the LLM judge — and it is gated, not scheduled. Add
+`annotator_role='llm_judge'` rows via a `score_session_dimensions()` emitting
+the 3-way scale, Sonnet-class at temperature 0. **Ship it only if per-dimension
+κ against the human gold set is acceptable.** The paper predicts it will not be;
+if so that is a publishable finding, not a failure. The agreement table already
+built here is what makes that call.
+
+The blocker for Phase 4 is not code — it is a human gold set. Nothing has been
+annotated yet: the 7 sampled items sit at `pending_review`.
+
+Commit: 0c286c0 (Phase 1), d67734d (Phase 2)

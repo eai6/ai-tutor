@@ -1167,3 +1167,78 @@ def session_eval_annotate(request, item_id: str):
         'annotator_model': annotator_model,
         'remaining': remaining,
     })
+
+
+@staff_member_required
+def session_eval_scores(request):
+    """Per-dimension and per-session pass rates, slices, agreement."""
+    from apps.benchmark import session_scoring as SS
+
+    annotations = list(
+        SessionEvalAnnotation.objects.select_related('item', 'annotator_user')
+    )
+    metrics = SS.compute_metrics(annotations)
+
+    # Ordered for the template — dicts keyed by dimension lose the paper's
+    # ordering, and the order is meaningful (it runs from what the tutor
+    # noticed to how it sounded).
+    dimension_rows = [
+        {'key': d.key, **metrics['dimensions'][d.key]} for d in P.DIMENSIONS
+    ]
+    agreement_rows = [
+        {'key': d.key, **metrics['agreement']['dimensions'][d.key]}
+        for d in P.DIMENSIONS
+    ]
+
+    # A list of (label, dict) pairs — a plain dict of dicts loses the ordering
+    # and the template cannot iterate it in a meaningful sequence.
+    slices = [
+        ('By subject', metrics['by_subject']),
+        ('By engine', metrics['by_engine']),
+        ('By outcome', metrics['by_outcome']),
+    ]
+    slices = [(label, group) for label, group in slices if group]
+
+    return render(request, 'benchmark/session_scores.html', {
+        'metrics': metrics,
+        'slices': slices,
+        'dimension_rows': dimension_rows,
+        'agreement_rows': agreement_rows,
+        'pending_review': SessionEvalItem.objects.filter(
+            status=SessionEvalItem.Status.PENDING_REVIEW).count(),
+        'approved_unannotated': (
+            SessionEvalItem.objects
+            .filter(status=SessionEvalItem.Status.APPROVED, annotations=None)
+            .count()
+        ),
+    })
+
+
+@staff_member_required
+def session_eval_export_jsonl(request):
+    """One JSON object per annotation. See session_scoring.export_rows for
+    what is deliberately excluded and why."""
+    import json
+
+    from django.http import StreamingHttpResponse
+
+    from apps.benchmark import session_scoring as SS
+
+    annotations = (SessionEvalAnnotation.objects
+                   .select_related('item').order_by('item__item_id', 'id'))
+    role = (request.GET.get('annotator_role') or '').strip()
+    if role in SessionEvalAnnotation.Annotator.values:
+        annotations = annotations.filter(annotator_role=role)
+    if (request.GET.get('complete') or '') == 'yes':
+        annotations = [a for a in annotations if a.complete]
+
+    rows = SS.export_rows(list(annotations))
+
+    def _stream():
+        for row in rows:
+            yield json.dumps(row, ensure_ascii=False) + '\n'
+
+    response = StreamingHttpResponse(_stream(), content_type='application/x-ndjson')
+    response['Content-Disposition'] = (
+        'attachment; filename=session_eval_annotations.jsonl')
+    return response

@@ -684,6 +684,12 @@
                         </svg>
                         {% trans "Session Evaluation" %}
                     </a>
+                    <a href="{% url 'dashboard:benchmark:session_scores' %}" class="nav-link {% if request.resolver_match.url_name == 'session_scores' %}active{% endif %}" style="padding-left:2.75rem;">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                        </svg>
+                        {% trans "Session Scores" %}
+                    </a>
                     {% if user.is_superuser %}
                     <a href="{% url 'dashboard:content_edit_dashboard' %}" class="nav-link {% if 'content_edit' in request.resolver_match.url_name %}active{% endif %}">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
