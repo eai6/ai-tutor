@@ -31,6 +31,14 @@ urlpatterns = [
     path('scores/run-now/', views.benchmark_score_now, name='score_now'),
     path('scores/<int:run_id>/', views.benchmark_run_detail,
          name='run_detail'),
+    # Session-level pedagogical evaluation (Phase 2 of
+    # memory/session_eval_framework_plan.md). Listed BEFORE the <item_id>
+    # catch-all so 'sessions' does not resolve as a turn-level item_id.
+    path('sessions/', views.session_eval_list, name='session_list'),
+    path('sessions/<str:item_id>/review/', views.session_eval_review,
+         name='session_review'),
+    path('sessions/<str:item_id>/', views.session_eval_annotate,
+         name='session_annotate'),
     path('<str:item_id>/', views.benchmark_annotate, name='annotate'),
     # Per-item delete — last so 'delete' doesn't shadow item_ids.
     path('<str:item_id>/delete/', views.benchmark_item_delete,

@@ -1,0 +1,214 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Session Evaluation{% endblock %}
+{% block page_title %}Session Evaluation — sampled sessions{% endblock %}
+
+{% block content %}
+<style>
+    .se-summary {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.9rem;
+        color:#374151; display:flex; gap:1.5rem; flex-wrap:wrap;
+        align-items:center;
+    }
+    .se-summary .stat { display:flex; flex-direction:column; }
+    .se-summary .stat .n { font-size:1.3rem; font-weight:700; color:#111; line-height:1.1; }
+    .se-summary .stat .k { font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
+
+    .se-note {
+        background:#fffbeb; border:1px solid #fde68a; border-radius:10px;
+        padding:0.75rem 1.1rem; margin-bottom:1rem; font-size:0.84rem;
+        color:#78350f; line-height:1.5;
+    }
+
+    .filters {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.75rem 1.1rem; margin-bottom:1rem;
+        display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;
+    }
+    .filters label { font-size:0.72rem; color:#6b7280; display:block; margin-bottom:0.2rem;
+                     text-transform:uppercase; letter-spacing:0.04em; }
+    .filters select {
+        padding:0.4rem 0.55rem; border:1px solid #d1d5db; border-radius:6px;
+        font-size:0.85rem; font-family:inherit; background:#fff;
+    }
+    .filters button {
+        padding:0.45rem 0.9rem; border:none; border-radius:6px;
+        background:#5b21b6; color:#fff; font-size:0.85rem; font-weight:600;
+        cursor:pointer; font-family:inherit;
+    }
+    .filters a.clear { font-size:0.8rem; color:#6b7280; text-decoration:none; padding-bottom:0.5rem; }
+
+    /* Eight columns overflow a narrow viewport. overflow:hidden (copied from
+       the turn-level list, which has fewer columns) silently CLIPPED the
+       Verdict column — the one thing this page exists to show. Scroll the
+       table inside its own box instead of clipping it or scrolling the page. */
+    .se-table { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+                overflow-x:auto; }
+    .se-table table { min-width:44rem; }
+    .se-table table { width:100%; border-collapse:collapse; }
+    .se-table th, .se-table td { padding:0.6rem 0.85rem; text-align:left; font-size:0.85rem; vertical-align:top; }
+    .se-table thead th {
+        background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.72rem;
+        text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid #e5e7eb;
+    }
+    .se-table tbody tr { border-bottom:1px solid #f3f4f6; }
+    .se-table tbody tr:hover { background:#fafafa; }
+    .se-table td a { color:#5b21b6; text-decoration:none; font-weight:500; }
+    .se-table td a:hover { text-decoration:underline; }
+
+    .pill { display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
+            font-size:0.7rem; font-weight:600; letter-spacing:0.02em; }
+    .pill-pending_review { background:#fef3c7; color:#92400e; white-space:nowrap; }
+    .pill-approved { background:#ecfdf5; color:#065f46; white-space:nowrap; }
+    .pill-rejected { background:#f3f4f6; color:#6b7280; white-space:nowrap; }
+    .pill-pass { background:#ecfdf5; color:#065f46; }
+    .pill-fail { background:#fef2f2; color:#991b1b; }
+    .pill-none { background:#f3f4f6; color:#6b7280; }
+    .pill-subj { background:#eff6ff; color:#1e40af; }
+    .pill-alert { background:#fef2f2; color:#991b1b; }
+
+    .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
+
+    .pager { display:flex; gap:0.5rem; align-items:center; justify-content:center;
+             margin-top:1rem; font-size:0.85rem; color:#6b7280; }
+    .pager a { color:#5b21b6; text-decoration:none; padding:0.3rem 0.6rem;
+               border:1px solid #e5e7eb; border-radius:6px; background:#fff; }
+
+    /* Clear the dashboard's fixed feedback button, which otherwise sits on
+       top of the last card — on the review page, on the Reject button. */
+    #block-content-tail { height:5rem; }
+</style>
+
+<div class="se-note">
+    <strong>Child protection.</strong> Sessions are sampled from real students.
+    Every one is safety-screened and redacted automatically, then must be
+    approved by a person before it can be annotated — the sampler cannot
+    produce an approved session on its own. Review the redacted transcript
+    yourself; the automated gates cannot catch a classmate's name they have
+    never seen.
+</div>
+
+<div class="se-summary">
+    <div class="stat">
+        <span class="n">{{ counts.pending_review|default:0 }}</span>
+        <span class="k">Awaiting review</span>
+    </div>
+    <div class="stat">
+        <span class="n">{{ counts.approved|default:0 }}</span>
+        <span class="k">Approved</span>
+    </div>
+    <div class="stat">
+        <span class="n">{{ counts.rejected|default:0 }}</span>
+        <span class="k">Rejected</span>
+    </div>
+    <div class="stat">
+        <span class="n">{{ total }}</span>
+        <span class="k">Matching filter</span>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <div>
+        <label for="f-status">Status</label>
+        <select name="status" id="f-status">
+            <option value="">All</option>
+            {% for value, label in statuses %}
+            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label for="f-subject">Subject</label>
+        <select name="subject" id="f-subject">
+            <option value="">All</option>
+            {% for s in distinct_subjects %}
+            <option value="{{ s }}" {% if filters.subject == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label for="f-annotated">Annotated</label>
+        <select name="annotated" id="f-annotated">
+            <option value="">All</option>
+            <option value="yes" {% if filters.annotated == 'yes' %}selected{% endif %}>Annotated</option>
+            <option value="no" {% if filters.annotated == 'no' %}selected{% endif %}>Not annotated</option>
+        </select>
+    </div>
+    <button type="submit">Filter</button>
+    <a href="{% url 'dashboard:benchmark:session_list' %}" class="clear">Clear</a>
+</form>
+
+<div class="se-table">
+    {% if rows %}
+    <table>
+        <thead>
+            <tr>
+                <th>Session</th>
+                <th>Subject</th>
+                <th>Engine</th>
+                <th>Outcome</th>
+                <th>Turns</th>
+                <th>Status</th>
+                <th>Annotations</th>
+                <th>Verdict</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    {% if row.item.status == 'approved' %}
+                    <a href="{% url 'dashboard:benchmark:session_annotate' row.item.item_id %}">{{ row.item.item_id }}</a>
+                    {% else %}
+                    <a href="{% url 'dashboard:benchmark:session_review' row.item.item_id %}">{{ row.item.item_id }}</a>
+                    {% endif %}
+                    {% if row.residual %}
+                    <br><span class="pill pill-alert">residual identifier</span>
+                    {% endif %}
+                </td>
+                <td>{% if row.item.subject %}<span class="pill pill-subj">{{ row.item.subject }}</span>{% endif %}</td>
+                <td>{{ row.item.engine|default:"—" }}</td>
+                <td>{{ row.item.outcome|default:"—" }}</td>
+                <td>{{ row.item.turn_count }}</td>
+                <td>
+                    <span class="pill pill-{{ row.item.status }}">{% if row.item.status == 'pending_review' %}Pending review{% else %}{{ row.item.get_status_display }}{% endif %}</span>
+                </td>
+                <td>{{ row.annotation_count }}</td>
+                <td>
+                    {% if row.passes is None %}
+                    <span class="pill pill-none">—</span>
+                    {% elif row.passes %}
+                    <span class="pill pill-pass">Pass</span>
+                    {% else %}
+                    <span class="pill pill-fail">Fail</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">
+        <p>No sessions match.</p>
+        <p style="font-size:0.85rem;">
+            Sample some with
+            <code>python manage.py sample_sessions --limit 200</code>.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+{% if page.has_other_pages %}
+<div class="pager">
+    {% if page.has_previous %}
+    <a href="?page={{ page.previous_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+    <a href="?page={{ page.next_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}">Next</a>
+    {% endif %}
+</div>
+{% endif %}
+<div id="block-content-tail"></div>
+{% endblock %}

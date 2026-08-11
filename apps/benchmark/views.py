@@ -911,3 +911,259 @@ def benchmark_run_detail(request, run_id: int):
         'subject_filter': subject_filter,
         'available_subjects': available_subjects,
     })
+
+
+# ─── Session-level pedagogical evaluation (Phase 2) ────────────────────
+#
+# Three views, mirroring the turn-level list → annotate shape above, with one
+# extra stage that has no turn-level equivalent: a review gate.
+#
+# The gate is the point. Sampling can only ever produce status='pending_review';
+# the ONLY way an item becomes annotatable is a person looking at the redacted
+# transcript and approving it. So `session_eval_annotate` refuses to render
+# anything that is not approved — that refusal is the last line of the
+# child-protection chain, and it is enforced in the view rather than in a
+# template condition, so a template change cannot bypass it.
+#
+# Plan: memory/session_eval_framework_plan.md
+
+from apps.benchmark import pedagogy as P
+from apps.benchmark.models import SessionEvalAnnotation, SessionEvalItem
+
+
+def _dimension_blocks(annotation=None) -> list[dict]:
+    """The eight dimensions shaped for the template.
+
+    Built from pedagogy.py rather than hardcoded in the template so the
+    annotator is asked exactly what the scorer counts.
+    """
+    blocks = []
+    for dim in P.DIMENSIONS:
+        current = getattr(annotation, dim.key, '') if annotation else ''
+        blocks.append({
+            'key': dim.key,
+            'label': dim.label,
+            'definition': dim.definition,
+            'guidance': dim.session_guidance,
+            'desideratum': dim.desideratum,
+            'options': [
+                {'value': value, 'label': label, 'checked': value == current,
+                 'is_desired': value == dim.desideratum}
+                for value, label in P.choices_for(dim.key)
+            ],
+        })
+    return blocks
+
+
+@staff_member_required
+def session_eval_list(request):
+    f_status = (request.GET.get('status') or '').strip()
+    f_subject = (request.GET.get('subject') or '').strip()
+    f_annotated = (request.GET.get('annotated') or '').strip()
+
+    qs = SessionEvalItem.objects.all()
+    if f_status:
+        qs = qs.filter(status=f_status)
+    if f_subject:
+        qs = qs.filter(subject=f_subject)
+    if f_annotated == 'yes':
+        qs = qs.annotate(_n=models.Count('annotations')).filter(_n__gt=0)
+    elif f_annotated == 'no':
+        qs = qs.annotate(_n=models.Count('annotations')).filter(_n=0)
+
+    # Paginated, unlike the turn-level list. A session transcript is 20-40
+    # turns; rendering every item on one page is a different proposition
+    # from rendering single turns.
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs.order_by('-created_at'), 25)
+    page = paginator.get_page(request.GET.get('page'))
+
+    rows = []
+    for item in page.object_list:
+        latest = item.annotations.order_by('-updated_at').first()
+        rows.append({
+            'item': item,
+            'annotation_count': item.annotations.count(),
+            'latest': latest,
+            'passes': latest.passes if (latest and latest.complete) else None,
+            'residual': item.redaction_report.get('residual') or [],
+        })
+
+    counts = {
+        s.value: SessionEvalItem.objects.filter(status=s.value).count()
+        for s in SessionEvalItem.Status
+    }
+
+    return render(request, 'benchmark/session_list.html', {
+        'rows': rows,
+        'page': page,
+        'counts': counts,
+        'total': paginator.count,
+        'filters': {'status': f_status, 'subject': f_subject,
+                    'annotated': f_annotated},
+        'statuses': SessionEvalItem.Status.choices,
+        'distinct_subjects': sorted(
+            s for s in set(
+                SessionEvalItem.objects.values_list('subject', flat=True))
+            if s
+        ),
+    })
+
+
+@staff_member_required
+def session_eval_review(request, item_id: str):
+    """The child-protection sign-off gate.
+
+    Shows the redacted transcript plus everything the automated gates found,
+    so the reviewer is deciding with evidence rather than vibes. Approve or
+    reject; a rejection requires a reason.
+    """
+    item = get_object_or_404(SessionEvalItem, item_id=item_id)
+
+    if request.method == 'POST':
+        from django.utils import timezone
+
+        decision = (request.POST.get('decision') or '').strip()
+        reason = (request.POST.get('reject_reason') or '').strip()
+
+        if decision == 'approve':
+            item.status = SessionEvalItem.Status.APPROVED
+            item.reject_reason = ''
+            messages.success(
+                request, f'{item.item_id} approved — now annotatable.')
+        elif decision == 'reject':
+            if not reason:
+                messages.error(request, 'A rejection needs a reason.')
+                return redirect('dashboard:benchmark:session_review',
+                                item_id=item.item_id)
+            item.status = SessionEvalItem.Status.REJECTED
+            item.reject_reason = reason
+            messages.success(request, f'{item.item_id} rejected.')
+        else:
+            messages.error(request, 'No decision submitted.')
+            return redirect('dashboard:benchmark:session_review',
+                            item_id=item.item_id)
+
+        item.reviewed_by = request.user
+        item.reviewed_at = timezone.now()
+        item.save(update_fields=['status', 'reject_reason', 'reviewed_by',
+                                 'reviewed_at'])
+
+        nxt = (SessionEvalItem.objects
+               .filter(status=SessionEvalItem.Status.PENDING_REVIEW)
+               .order_by('created_at').first())
+        if nxt:
+            return redirect('dashboard:benchmark:session_review',
+                            item_id=nxt.item_id)
+        return redirect('dashboard:benchmark:session_list')
+
+    report = item.redaction_report or {}
+    pending = SessionEvalItem.objects.filter(
+        status=SessionEvalItem.Status.PENDING_REVIEW).count()
+
+    return render(request, 'benchmark/session_review.html', {
+        'item': item,
+        'report': report,
+        'residual': report.get('residual') or [],
+        'advisory_names': report.get('advisory_names') or [],
+        'replacements': report.get('replacements') or [],
+        'pending_count': pending,
+    })
+
+
+@staff_member_required
+def session_eval_annotate(request, item_id: str):
+    """Judge one session on all eight dimensions.
+
+    Refuses anything not approved. That check lives here, not in the template:
+    a template is the wrong place for the last gate protecting children's
+    transcripts, because any later markup change could silently remove it.
+    """
+    item = get_object_or_404(SessionEvalItem, item_id=item_id)
+
+    if not item.is_annotatable:
+        messages.error(
+            request,
+            f'{item.item_id} has not passed child-protection review '
+            f'(status: {item.get_status_display()}). It cannot be annotated.',
+        )
+        return redirect('dashboard:benchmark:session_review',
+                        item_id=item.item_id)
+
+    # Same override pattern as the turn-level annotator, so a scripted
+    # annotator writes rows tagged llm_judge rather than masquerading as a
+    # human. Default is HUMAN on both GET and POST.
+    role_override = (request.GET.get('annotator_role')
+                     or request.POST.get('annotator_role') or '').strip().lower()
+    annotator_role = (role_override
+                      if role_override in SessionEvalAnnotation.Annotator.values
+                      else SessionEvalAnnotation.Annotator.HUMAN)
+    annotator_model = (request.GET.get('annotator_model')
+                       or request.POST.get('annotator_model') or '').strip()[:64]
+
+    existing = SessionEvalAnnotation.objects.filter(
+        item=item, annotator_role=annotator_role,
+        annotator_user=request.user, annotator_model=annotator_model,
+    ).first()
+
+    if request.method == 'POST':
+        values = {}
+        for key in P.DIMENSION_KEYS:
+            submitted = (request.POST.get(key) or '').strip()
+            # Drop anything not in the taxonomy rather than storing it —
+            # matches the turn-level label validation.
+            allowed = {v for v, _ in P.choices_for(key)}
+            values[key] = submitted if submitted in allowed else ''
+
+        annotation, _ = SessionEvalAnnotation.objects.update_or_create(
+            item=item, annotator_role=annotator_role,
+            annotator_user=request.user, annotator_model=annotator_model,
+            defaults={**values,
+                      'notes': (request.POST.get('notes') or '').strip()},
+        )
+
+        if annotation.complete:
+            verdict = 'PASS' if annotation.passes else 'FAIL'
+            messages.success(
+                request, f'Saved {item.item_id} — session verdict: {verdict}.')
+        else:
+            missing = [P.get_dimension(k).label
+                       for k, v in annotation.values().items() if not v]
+            messages.warning(
+                request,
+                f'Saved {item.item_id}, but {len(missing)} dimension(s) are '
+                f'unanswered: {", ".join(missing)}. An incomplete annotation '
+                f'is not scored.',
+            )
+
+        if request.POST.get('save_and_next'):
+            done = SessionEvalAnnotation.objects.filter(
+                annotator_role=annotator_role, annotator_user=request.user,
+            ).values_list('item_id', flat=True)
+            nxt = (SessionEvalItem.objects
+                   .filter(status=SessionEvalItem.Status.APPROVED)
+                   .exclude(id__in=list(done))
+                   .order_by('created_at').first())
+            if nxt:
+                return redirect('dashboard:benchmark:session_annotate',
+                                item_id=nxt.item_id)
+            messages.info(request, 'No more approved sessions to annotate.')
+            return redirect('dashboard:benchmark:session_list')
+
+        return redirect('dashboard:benchmark:session_annotate',
+                        item_id=item.item_id)
+
+    remaining = (SessionEvalItem.objects
+                 .filter(status=SessionEvalItem.Status.APPROVED)
+                 .exclude(annotations__annotator_user=request.user,
+                          annotations__annotator_role=annotator_role)
+                 .count())
+
+    return render(request, 'benchmark/session_annotate.html', {
+        'item': item,
+        'dimensions': _dimension_blocks(existing),
+        'annotation': existing,
+        'annotator_role': annotator_role,
+        'annotator_model': annotator_model,
+        'remaining': remaining,
+    })

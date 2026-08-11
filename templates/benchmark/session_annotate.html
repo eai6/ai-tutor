@@ -1,0 +1,166 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Annotate {{ item.item_id }}{% endblock %}
+{% block page_title %}{{ item.item_id }} — eight-dimension judgement{% endblock %}
+
+{% block content %}
+<style>
+    .an-grid { display:grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+               gap:1.25rem; align-items:start; }
+    @media (max-width: 1200px) { .an-grid { grid-template-columns: 1fr; } }
+
+    .an-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+               padding:1rem 1.1rem; margin-bottom:1rem; }
+    .an-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
+                  color:#6b7280; margin:0 0 0.6rem; font-weight:600; }
+
+    /* The transcript sticks while the eight dimensions scroll past it.
+       Judging a whole session means re-reading turns against each question;
+       a transcript that scrolls away with the form makes that a fight. */
+    .an-left { position:sticky; top:1rem; }
+    @media (max-width: 1200px) { .an-left { position:static; } }
+    .transcript { max-height:calc(100vh - 16rem); min-height:18rem;
+                  overflow-y:auto; border:1px solid #f3f4f6;
+                  border-radius:8px; padding:0.6rem; background:#fafafa; }
+    .turn { font-size:0.85rem; padding:0.5rem 0.6rem; border-radius:6px;
+            margin-bottom:0.35rem; white-space:pre-wrap; line-height:1.5; }
+    .turn .role { font-size:0.68rem; font-weight:700; text-transform:uppercase;
+                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:#6b7280; }
+    .turn-tutor { background:#fff; border:1px solid #e5e7eb; }
+    .turn-student { background:#f5f3ff; border:1px solid #ddd6fe; }
+
+    .dim { border:1px solid #e5e7eb; border-radius:8px; padding:0.75rem 0.85rem;
+           margin-bottom:0.7rem; }
+    .dim .name { font-size:0.92rem; font-weight:600; color:#111; margin-bottom:0.15rem; }
+    .dim .definition { font-size:0.8rem; color:#374151; line-height:1.5; margin-bottom:0.3rem; }
+    .dim .guidance { font-size:0.78rem; color:#6b7280; line-height:1.5;
+                     margin-bottom:0.55rem; border-left:2px solid #ddd6fe;
+                     padding-left:0.55rem; }
+    .dim .opts { display:flex; flex-direction:column; gap:0.3rem; }
+    .dim label { display:flex; gap:0.45rem; align-items:flex-start;
+                 font-size:0.85rem; color:#374151; cursor:pointer; }
+    .dim label input { margin-top:0.2rem; }
+    .dim .desired { font-size:0.66rem; font-weight:700; color:#065f46;
+                    background:#ecfdf5; border-radius:999px; padding:0.02rem 0.4rem;
+                    letter-spacing:0.03em; }
+
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
+    .meta-row strong { color:#111; font-weight:600; }
+    .pill { display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
+            font-size:0.7rem; font-weight:600; }
+    .pill-subj { background:#eff6ff; color:#1e40af; }
+    .pill-judge { background:#fef3c7; color:#92400e; }
+
+    textarea { width:100%; padding:0.5rem 0.6rem; border:1px solid #d1d5db;
+               border-radius:6px; font-size:0.85rem; font-family:inherit;
+               min-height:80px; resize:vertical; }
+    .actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.8rem; }
+    .btn { padding:0.6rem 1.1rem; border:none; border-radius:8px; font-size:0.9rem;
+           font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-primary { background:#5b21b6; color:#fff; }
+    .btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; }
+    .muted { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+
+    /* Clear the dashboard's fixed feedback button, which otherwise sits on
+       top of the last card — on the review page, on the Reject button. */
+    #block-content-tail { height:5rem; }
+
+    .rule { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px;
+            padding:0.75rem 1.1rem; margin-bottom:1rem; font-size:0.84rem;
+            color:#4c1d95; line-height:1.55; }
+</style>
+
+<div class="rule">
+    <strong>The pass rule is all-or-nothing.</strong> A session passes only if
+    every applicable dimension sits at its desideratum (marked
+    <span class="desired">desired</span> below). One dimension at "To some
+    extent" fails the session — that is deliberate, and the per-dimension rates
+    are what the analysis reports. Where a dimension genuinely never arose,
+    choose <em>Not applicable</em>; it is excluded from scoring rather than
+    counted as a failure. Leaving a dimension blank is not the same thing — an
+    incomplete annotation is not scored at all.
+</div>
+
+<div class="an-grid">
+    <div class="an-left">
+        <div class="an-card">
+            <h3>Session</h3>
+            <div class="meta-row">
+                <span>{% if item.subject %}<span class="pill pill-subj">{{ item.subject }}</span>{% endif %}</span>
+                <span>Engine <strong>{{ item.engine|default:"—" }}</strong></span>
+                <span>Outcome <strong>{{ item.outcome|default:"—" }}</strong></span>
+                <span>Turns <strong>{{ item.turn_count }}</strong></span>
+            </div>
+            {% if annotator_role != 'human' %}
+            <p style="margin-top:0.5rem;">
+                <span class="pill pill-judge">Annotating as {{ annotator_role }}
+                {% if annotator_model %}({{ annotator_model }}){% endif %}</span>
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="an-card">
+            <h3>Transcript (redacted)</h3>
+            <div class="transcript">
+                {% for turn in item.transcript %}
+                <div class="turn turn-{{ turn.role }}">
+                    <span class="role">{{ turn.role }}</span>{{ turn.content }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="annotator_role" value="{{ annotator_role }}">
+            <input type="hidden" name="annotator_model" value="{{ annotator_model }}">
+
+            <div class="an-card">
+                <h3>The eight dimensions</h3>
+                {% for dim in dimensions %}
+                <div class="dim">
+                    <div class="name">{{ dim.label }}</div>
+                    <div class="definition">{{ dim.definition }}</div>
+                    <div class="guidance">{{ dim.guidance }}</div>
+                    <div class="opts">
+                        {% for opt in dim.options %}
+                        <label>
+                            <input type="radio" name="{{ dim.key }}" value="{{ opt.value }}"
+                                   {% if opt.checked %}checked{% endif %}>
+                            <span>
+                                {{ opt.label }}
+                                {% if opt.is_desired %}<span class="desired">desired</span>{% endif %}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="an-card">
+                <h3>Notes</h3>
+                <textarea name="notes" placeholder="What decided the borderline calls?">{{ annotation.notes|default:"" }}</textarea>
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" name="save_and_next" value="1" class="btn btn-secondary">
+                        Save &amp; next
+                    </button>
+                </div>
+                <p class="muted" style="margin-top:0.6rem;">
+                    {{ remaining }} approved session(s) you have not annotated.
+                </p>
+            </div>
+        </form>
+
+        <p class="muted">
+            <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
+            &nbsp;·&nbsp;
+            <a href="{% url 'dashboard:benchmark:session_review' item.item_id %}">Review record</a>
+        </p>
+    </div>
+</div>
+<div id="block-content-tail"></div>
+{% endblock %}

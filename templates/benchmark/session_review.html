@@ -1,0 +1,169 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Review {{ item.item_id }}{% endblock %}
+{% block page_title %}Child-protection review — {{ item.item_id }}{% endblock %}
+
+{% block content %}
+<style>
+    .rv-grid { display:grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+               gap:1.25rem; align-items:start; }
+    @media (max-width: 1100px) { .rv-grid { grid-template-columns: 1fr; } }
+
+    .rv-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+               padding:1rem 1.1rem; margin-bottom:1rem; }
+    .rv-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
+                  color:#6b7280; margin:0 0 0.6rem; font-weight:600; }
+
+    .banner { border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem;
+              font-size:0.86rem; line-height:1.55; }
+    .banner-instruct { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; }
+    .banner-danger { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+
+    .transcript { max-height:620px; overflow-y:auto; border:1px solid #f3f4f6;
+                  border-radius:8px; padding:0.6rem; background:#fafafa; }
+    .turn { font-size:0.85rem; padding:0.5rem 0.6rem; border-radius:6px;
+            margin-bottom:0.35rem; white-space:pre-wrap; line-height:1.5; }
+    .turn .role { font-size:0.68rem; font-weight:700; text-transform:uppercase;
+                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:#6b7280; }
+    .turn-tutor { background:#fff; border:1px solid #e5e7eb; }
+    .turn-student { background:#f5f3ff; border:1px solid #ddd6fe; }
+
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
+    .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
+    .meta-row strong { color:#111; font-weight:600; }
+
+    .tag { display:inline-block; padding:0.12rem 0.5rem; border-radius:6px;
+           font-size:0.74rem; margin:0.12rem 0.15rem 0.12rem 0;
+           background:#f3f4f6; color:#374151; font-family:ui-monospace, monospace; }
+    .tag-alert { background:#fef2f2; color:#991b1b; }
+
+    .decide { display:flex; flex-direction:column; gap:0.6rem; }
+    .decide textarea { width:100%; padding:0.5rem 0.6rem; border:1px solid #d1d5db;
+                       border-radius:6px; font-size:0.85rem; font-family:inherit;
+                       min-height:70px; resize:vertical; }
+    .btn { padding:0.6rem 1rem; border:none; border-radius:8px; font-size:0.9rem;
+           font-weight:600; cursor:pointer; font-family:inherit; width:100%; }
+    .btn-approve { background:#059669; color:#fff; }
+    .btn-reject { background:#fff; color:#991b1b; border:1px solid #fecaca; }
+    .muted { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+
+    /* Clear the dashboard's fixed feedback button, which otherwise sits on
+       top of the last card — on the review page, on the Reject button. */
+    #block-content-tail { height:5rem; }
+</style>
+
+{% if residual %}
+<div class="banner banner-danger">
+    <strong>Automated gate found a residual identifier.</strong>
+    This session should not have reached review — the redactor missed something
+    it was able to look up. Reject it, and treat this as a bug in
+    <code>apps/benchmark/session_sampling.py</code>, not a borderline call.
+</div>
+{% else %}
+<div class="banner banner-instruct">
+    <strong>What you are checking.</strong> The automated gates removed contact
+    details, the student's own name, and names an LLM pass identified. They
+    cannot be sure about a <em>third party</em> — a classmate, sibling or
+    teacher named in free text. Read the transcript and approve only if it
+    carries no name, no personal identifier, and nothing that would distress or
+    expose the student. When in doubt, reject: we have more sessions than we
+    need annotators for.
+</div>
+{% endif %}
+
+<div class="rv-grid">
+    <div>
+        <div class="rv-card">
+            <h3>Redacted transcript — {{ item.turn_count }} turns</h3>
+            <div class="transcript">
+                {% for turn in item.transcript %}
+                <div class="turn turn-{{ turn.role }}">
+                    <span class="role">{{ turn.role }}</span>{{ turn.content }}
+                </div>
+                {% empty %}
+                <p class="muted">No transcript stored.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="rv-card">
+            <h3>Session</h3>
+            <div class="meta-row">
+                <span>Subject <strong>{{ item.subject|default:"—" }}</strong></span>
+                <span>Engine <strong>{{ item.engine|default:"—" }}</strong></span>
+                <span>Outcome <strong>{{ item.outcome|default:"—" }}</strong></span>
+                <span>Status <strong>{{ item.get_status_display }}</strong></span>
+            </div>
+            <p class="muted" style="margin-top:0.6rem;">
+                Key <code>{{ item.session_key }}</code> — a salted hash. The raw
+                session id is never exported.
+            </p>
+        </div>
+
+        <div class="rv-card">
+            <h3>What redaction did</h3>
+            {% if replacements %}
+                {% for r in replacements %}<span class="tag">{{ r }}</span>{% endfor %}
+            {% else %}
+                <p class="muted">Nothing was replaced — no contact details or
+                known names appeared.</p>
+            {% endif %}
+            {% if report.llm_names_found %}
+            <p class="muted" style="margin-top:0.5rem;">
+                The LLM pass found <strong>{{ report.llm_names_found }}</strong>
+                name(s) beyond the database lookup. The names themselves are not
+                stored — recording them here would put the identifiers straight
+                back into this page.
+            </p>
+            {% endif %}
+        </div>
+
+        {% if residual %}
+        <div class="rv-card">
+            <h3>Residual identifiers</h3>
+            {% for r in residual %}<span class="tag tag-alert">{{ r }}</span>{% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="rv-card">
+            <h3>Possible names — advisory</h3>
+            {% if advisory_names %}
+            <p class="muted" style="margin-bottom:0.5rem;">
+                Capitalised mid-sentence words the LLM pass did <em>not</em>
+                call personal names. Mostly places and subject terms — a
+                geography session is full of them. Shown so you can spot the one
+                that is a person.
+            </p>
+            {% for n in advisory_names %}<span class="tag">{{ n }}</span>{% endfor %}
+            {% else %}
+            <p class="muted">None flagged.</p>
+            {% endif %}
+        </div>
+
+        <div class="rv-card">
+            <h3>Decision</h3>
+            <form method="post" class="decide">
+                {% csrf_token %}
+                <button type="submit" name="decision" value="approve" class="btn btn-approve">
+                    Approve for annotation
+                </button>
+                <textarea name="reject_reason" placeholder="Reason (required to reject) — e.g. 'classmate named in turn 7'"></textarea>
+                <button type="submit" name="decision" value="reject" class="btn btn-reject">
+                    Reject
+                </button>
+            </form>
+            <p class="muted" style="margin-top:0.7rem;">
+                {{ pending_count }} session(s) awaiting review. Deciding moves
+                you to the next one.
+            </p>
+        </div>
+
+        <p class="muted">
+            <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
+        </p>
+    </div>
+</div>
+<div id="block-content-tail"></div>
+{% endblock %}

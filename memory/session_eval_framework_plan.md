@@ -262,4 +262,67 @@ Phase 2: review UI (`session_eval_review`) then annotation UI
 until the review UI exists — `sample_sessions` cannot produce an approved item
 by construction.
 
-Commit: 0c286c0
+---
+
+## Phase 2 status — DONE (2026-08-11)
+
+Shipped: `session_eval_list` / `session_eval_review` / `session_eval_annotate`
+in `apps/benchmark/views.py`, three templates, URLs, and a Developer nav entry.
+Tests in `test_session_eval_views.py`. 171 tests pass across benchmark +
+dashboard.
+
+### The gate is enforced in the view, not the template
+
+`session_eval_annotate` refuses any item that is not `approved` and redirects to
+review. Deliberately NOT a template condition: this is the last link in the
+child-protection chain, and a later markup edit must not be able to remove it.
+Two tests pin it — one for GET, one for POST, because a redirect on GET alone
+would still let a crafted form submission write an annotation.
+
+### Verified in the browser, not just in tests
+
+Walked the whole flow against real sampled production sessions on the dev
+server (screenshots taken at each step):
+
+- Redaction visibly worked on a v1-engine session: `Hi [STUDENT]!` — exactly the
+  name interpolation `conversational_tutor.py` puts in the system prompt.
+- The advisory-names panel listed Capitals, Geography, Humans, Nairobi, Natural,
+  Paris, Seychelles, Victoria — every one a place or subject term, no people.
+  That is the concrete case for why advisory names must NOT auto-reject: this
+  session would have been thrown away.
+- Approve → auto-advance to the next pending session works.
+- Annotated a real session; it returned `verdict: FAIL` on
+  revealing_answer=yes_correct + coherence=to_some_extent, which is the correct
+  reading of that transcript (the tutor states "The answer is **B**" after three
+  failed attempts, and re-greets mid-session).
+- Navigating straight to the annotate URL of a pending session showed the
+  refusal banner.
+
+### Three real bugs the screenshots caught, that the tests did not
+
+1. **Status pill did not render.** The CSS class was `.pill-pending` but the
+   status value is `pending_review`, so `pill-{{ status }}` matched nothing.
+2. **The Verdict column was clipped.** `.se-table { overflow:hidden }`, copied
+   from the turn-level list which has fewer columns, silently cut off the one
+   column the page exists to show. Now `overflow-x:auto` with a `min-width` on
+   the table, so it scrolls in its own box rather than clipping or scrolling
+   the page.
+3. **The fixed feedback button covered the Reject button.** Added a spacer.
+
+Also made the transcript pane sticky on the annotate page — judging a session
+means re-reading turns against each of eight questions, and a transcript that
+scrolls away with the form makes that a fight.
+
+### Known gap
+
+New UI strings are not in the translation catalogue, so the nav reads
+"Session Evaluation" among Portuguese siblings. Developer-only tooling, so this
+is cosmetic — but worth a `makemessages` pass if it ever goes wider.
+
+### Next
+
+Phase 3: `session_scoring.py` — per-session and per-dimension pass rates,
+slices, Cohen's κ hook, JSONL export. **The export must drop
+`redaction_report`**: `advisory_names` is reviewer-facing, not release-facing.
+
+Commit: 0c286c0 (Phase 1)
