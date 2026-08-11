@@ -261,3 +261,5 @@ Phase 2: review UI (`session_eval_review`) then annotation UI
 (`session_eval_annotate`), under dashboard → Developer. Nothing is annotatable
 until the review UI exists — `sample_sessions` cannot produce an approved item
 by construction.
+
+Commit: 0c286c0
