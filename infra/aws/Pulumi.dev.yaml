@@ -4,7 +4,7 @@ config:
   aitutor-aws:enable-ecs: "true"
   aitutor-aws:waf-block-mode: "true"
   aitutor-aws:django-secret-key:
-    secure: v1:GnI6e1kvnNO736wM:juiVCVYGnjS0JB1A+UV5CQdEewp5CRwmtFHtm9KYNokBci/Qt2cyWWyRXpBDE/JdVYqfZGxdKEhJzv2XjtZwKIVb7OSEG8bnqZt5kh0q4O8NsrUQpfgIIjL9W+Dfn4XMIhmvhDLM
+    secure: v1:ad3wo8DyMRrB5qv1:xvoHIFPCQNkFIZ0zkKBgXAKOpN1C8Bp7eNT/hxvzMhLPpdaBVoGiEP58G2+csYUK75GU+YFEaVrto7moETCUiAERan7hEoCsbQECDOgrWOa48lM=
   aitutor-aws:anthropic-api-key:
     secure: v1:/N9FKs5l2rrTgfNy:FVcTlBQEHTeuS7P+CUwxj2z6+lZdgR15hTkYVDU4IWw57NDdXUTLIJ9hSYR/YC8+f/YGxdUaWCpbhGPH4YgcFfewcKUakQSf1mKrkNZ5xX3CNdUBPLf626kT0cpslh7RNcjVXZc5oti2fr5awpGGr7AWh2Ie1JlTYYWW7w==
   aitutor-aws:openai-api-key:
