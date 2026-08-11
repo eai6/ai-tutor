@@ -1000,8 +1000,17 @@ def session_eval_list(request):
     # shows "running" forever after a deploy killed the worker, and the only
     # way to find out is to try to start another.
     SessionSampleRun.reclaim_stale()
-    latest_run = SessionSampleRun.objects.first()
+    latest_run = SessionSampleRun.objects.select_related('filter_course').first()
     eligible = S_sampling.candidate_sessions().count()
+
+    # Courses that actually have sampleable sessions — a dropdown listing
+    # courses you cannot sample from is just noise.
+    from apps.curriculum.models import Course
+    sampleable_course_ids = (S_sampling.candidate_sessions()
+                             .values_list('lesson__unit__course_id', flat=True)
+                             .distinct())
+    courses = Course.objects.filter(
+        id__in=list(sampleable_course_ids)).order_by('title')
 
     return render(request, 'benchmark/session_list.html', {
         'rows': rows,
@@ -1024,6 +1033,7 @@ def session_eval_list(request):
             source_session=None).count(),
         'limit_max': SAMPLE_LIMIT_MAX,
         'keep_max': SAMPLE_KEEP_MAX,
+        'courses': courses,
     })
 
 
@@ -1261,11 +1271,18 @@ def session_eval_export_jsonl(request):
     return response
 
 
-# Bounds on the sample form. Not arbitrary: every candidate costs one LLM call
-# for the free-text name pass, so an unbounded box is an unbounded bill and a
-# thread that runs for hours.
-SAMPLE_LIMIT_MAX = 500
-SAMPLE_KEEP_MAX = 200
+# Bounds on the sample form. Every candidate costs one LLM call for the
+# free-text name pass, so the box cannot be unbounded — but the old cap of 500
+# was doing real damage, not just controlling cost: the candidate queryset is
+# ordered -started_at, so screening "up to 500" of 1001 eligible sessions meant
+# the older half of the pilot could never be sampled at all. draw_pool now
+# shuffles before slicing, which makes this a pure cost control and leaves the
+# draw unbiased at any value.
+#
+# 5000 is high enough to cover the whole dataset for the foreseeable pilot,
+# with parallel screening making that ~10 minutes rather than hours.
+SAMPLE_LIMIT_MAX = 5000
+SAMPLE_KEEP_MAX = 1000
 
 
 @staff_member_required
@@ -1277,6 +1294,8 @@ def session_eval_sample_create(request):
     request. It starts a thread and returns immediately; the list page polls
     the SessionSampleRun row.
     """
+    from datetime import datetime
+
     from django.db import IntegrityError, transaction
 
     from apps.benchmark import session_sampling as S
@@ -1294,6 +1313,24 @@ def session_eval_sample_create(request):
     keep = _clamp('keep', 20, SAMPLE_KEEP_MAX)
     institution_id = (request.POST.get('institution') or '').strip() or None
 
+    def _date(name):
+        raw = (request.POST.get(name) or '').strip()
+        if not raw:
+            return None
+        try:
+            return datetime.strptime(raw, '%Y-%m-%d').date()
+        except ValueError:
+            return None      # a malformed date scopes to everything, not to nothing
+
+    start, end = _date('start'), _date('end')
+    if start and end and start > end:
+        start, end = end, start          # swapped inputs are a typo, not an error
+
+    try:
+        course_id = int(request.POST.get('course') or 0) or None
+    except (TypeError, ValueError):
+        course_id = None
+
     # Free any run whose worker died, so a killed deploy does not leave the
     # button permanently disabled.
     SessionSampleRun.reclaim_stale()
@@ -1302,6 +1339,7 @@ def session_eval_sample_create(request):
         with transaction.atomic():
             run = SessionSampleRun.objects.create(
                 requested_limit=limit, keep_count=keep,
+                filter_start=start, filter_end=end, filter_course_id=course_id,
                 started_by=request.user,
             )
     except IntegrityError:
@@ -1314,12 +1352,13 @@ def session_eval_sample_create(request):
         )
         return redirect('dashboard:benchmark:session_list')
 
-    run_async(S.run_sample_job, run.id, limit, keep, institution_id)
+    run_async(S.run_sample_job, run.id, limit, keep, institution_id,
+              start, end, course_id)
 
     messages.success(
         request,
-        f'Sampling started — screening up to {limit} sessions. This takes a '
-        f'few minutes because every session goes through the LLM redaction '
-        f'pass. Progress appears below.',
+        f'Sampling started — screening up to {limit} sessions drawn at random '
+        f'from everything matching the filters. This takes a few minutes '
+        f'because every session goes through the LLM redaction pass.',
     )
     return redirect('dashboard:benchmark:session_list')

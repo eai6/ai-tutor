@@ -336,7 +336,8 @@ def stratum_of(session) -> str:
     return f'{_subject(session) or "unknown"}|{session.engine}|{_outcome(session)}'
 
 
-def candidate_sessions(*, institution=None, min_turns: int = 4):
+def candidate_sessions(*, institution=None, min_turns: int = 4,
+                       start=None, end=None, course_id=None):
     """Real, not-yet-sampled, finished-enough sessions, newest first.
 
     ``is_synthetic=False`` is not a safety gate — simulator sessions carry no
@@ -364,7 +365,43 @@ def candidate_sessions(*, institution=None, min_turns: int = 4):
           .order_by('-started_at'))
     if institution is not None:
         qs = qs.filter(institution=institution)
+    if start is not None:
+        qs = qs.filter(started_at__date__gte=start)
+    if end is not None:
+        qs = qs.filter(started_at__date__lte=end)
+    if course_id:
+        qs = qs.filter(lesson__unit__course_id=course_id)
     return qs
+
+
+def draw_pool(qs, limit: int, seed: int) -> list:
+    """Pick which candidates to SCREEN — randomly, not the newest N.
+
+    This function exists because of a real bias bug. ``candidate_sessions`` is
+    ordered ``-started_at``, so slicing it (``[:limit]``) took the most recent
+    `limit` sessions and screened only those. With 1001 eligible sessions and a
+    limit of 500 that meant the sample could never contain anything from the
+    older half of the pilot — while the page claimed a uniform draw that
+    estimates the population. A curriculum change, a bad week, or a term
+    boundary would have silently defined the whole gold set.
+
+    Shuffling first makes `limit` a pure cost control: whatever it is set to,
+    the screened pool is a uniform random subset of everything that matches the
+    filters. That also means there is rarely any reason to screen the entire
+    dataset — screening 200 to keep 20 is just as unbiased as screening 1001,
+    and costs one LLM call per candidate instead of a thousand.
+
+    Ordering by primary key before shuffling makes the draw reproducible for a
+    given seed; ``-started_at`` is not a total order when timestamps collide.
+    """
+    ids = list(qs.order_by('pk').values_list('pk', flat=True))
+    rng = random.Random(seed)
+    rng.shuffle(ids)
+    chosen = ids[:limit]
+    # Re-fetch as a queryset so select_related still applies, then restore the
+    # shuffled order (the DB will not preserve it).
+    by_id = {s.id: s for s in qs.filter(pk__in=chosen)}
+    return [by_id[i] for i in chosen if i in by_id]
 
 
 def sample(sessions, keep: int = 20, seed: int = 0) -> tuple[list, dict]:
@@ -526,8 +563,31 @@ def llm_name_candidates(transcript: list[dict], llm_client=None) -> tuple[list[s
 # conditions ("is `simple` better than `v1`?") rather than measuring the whole.
 
 
+# Screening is one LLM call per candidate, so a 1000-session run is ~30 minutes
+# sequentially. These run concurrently. Kept modest deliberately: the judge
+# provider rate-limits, and each worker holds its own database connection.
+SCREEN_WORKERS = 6
+
+
+def _screen_workers() -> int:
+    """Concurrency for screening — 1 on SQLite.
+
+    SQLite serialises writers and locks the whole file, so concurrent workers
+    produce "database table is locked" rather than speed. This is not just a
+    test concern: the packaged desktop build runs this same Django app on
+    SQLite, and a teacher sampling there would hit it for real. Postgres (the
+    deployed configuration) has no such problem.
+    """
+    from django.db import connection
+
+    if connection.vendor == 'sqlite':
+        return 1
+    return SCREEN_WORKERS
+
+
 def run_sample_job(run_id: int, limit: int, keep: int,
-                   institution_id=None) -> None:
+                   institution_id=None, start=None, end=None,
+                   course_id=None) -> None:
     """Body of a dashboard-triggered sampling run. Executes in a thread.
 
     Reports progress into the SessionSampleRun row as it goes, because the
@@ -538,6 +598,9 @@ def run_sample_job(run_id: int, limit: int, keep: int,
     the button until reclaim_stale() times it out, so every exit path closes
     the row.
     """
+    import contextlib
+    from concurrent.futures import ThreadPoolExecutor
+
     from django.db import connection
     from django.utils import timezone
 
@@ -554,7 +617,12 @@ def run_sample_job(run_id: int, limit: int, keep: int,
             from apps.accounts.models import Institution
             institution = Institution.objects.filter(pk=institution_id).first()
 
-        candidates = list(candidate_sessions(institution=institution)[:limit])
+        # Randomised pool, NOT the newest `limit` — see draw_pool.
+        candidates = draw_pool(
+            candidate_sessions(institution=institution, start=start, end=end,
+                               course_id=course_id),
+            limit, seed=run_id,
+        )
         run.candidates = len(candidates)
         run.save(update_fields=['candidates'])
 
@@ -562,31 +630,64 @@ def run_sample_job(run_id: int, limit: int, keep: int,
         rejections: dict[str, int] = {}
         prepared: dict[int, dict] = {}
 
-        for index, session in enumerate(candidates, start=1):
-            try:
-                record = screen_and_prepare(session)
-            except Exception as exc:
-                # One bad session must not abort the run — record and move on.
-                logger.warning('[SessionEval] screening failed for %s: %s',
-                               session.id, exc)
-                rejections['screening_error'] = (
-                    rejections.get('screening_error', 0) + 1)
-                record = None
+        def _screen(session):
+            """Screen one session. Returns (session, record_or_None, error).
 
-            if record is not None:
-                if record['reject_reason']:
+            Never raises: one bad session must not take down a run that has
+            already paid for hundreds of LLM calls.
+            """
+            try:
+                return session, screen_and_prepare(session), None
+            except Exception as exc:
+                return session, None, exc
+
+        def _screen_in_worker(session):
+            try:
+                return _screen(session)
+            finally:
+                # Each worker holds its own thread-local connection; leaving it
+                # open leaks a DB handle per task for the life of the process.
+                connection.close()
+
+        workers = _screen_workers()
+        if workers == 1:
+            # Inline, in THIS thread — not a one-worker pool. A pool still
+            # executes on another thread with its own connection, which on
+            # SQLite blocks on any lock the caller holds and fails with
+            # "database table is locked" even with no concurrency at all.
+            results = map(_screen, candidates)
+            pool_ctx = contextlib.nullcontext()
+        else:
+            pool = ThreadPoolExecutor(max_workers=workers)
+            results = pool.map(_screen_in_worker, candidates)
+            pool_ctx = pool
+
+        done = 0
+        with pool_ctx:
+            for session, record, error in results:
+                done += 1
+                if error is not None:
+                    logger.warning('[SessionEval] screening failed for %s: %s',
+                                   session.id, error)
+                    rejections['screening_error'] = (
+                        rejections.get('screening_error', 0) + 1)
+                elif record['reject_reason']:
                     reason = record['reject_reason']
                     rejections[reason] = rejections.get(reason, 0) + 1
                 else:
                     prepared[session.id] = record
                     survivors.append(session)
 
-            # Progress every few items rather than every one — this is a
-            # write per update and the page polls, not streams.
-            if index % 5 == 0 or index == len(candidates):
-                run.screened = index
-                run.rejections = rejections
-                run.save(update_fields=['screened', 'rejections'])
+                # Every few items rather than every one — this is a write, and
+                # the page polls rather than streams. It doubles as the
+                # liveness heartbeat that stops reclaim_stale() killing a long
+                # but healthy run.
+                if done % 5 == 0 or done == len(candidates):
+                    run.screened = done
+                    run.rejections = rejections
+                    run.last_progress_at = timezone.now()
+                    run.save(update_fields=['screened', 'rejections',
+                                            'last_progress_at'])
 
         # Seeded from the run id, not the clock: re-running the same job picks
         # the same sessions, which makes a failed run reproducible without

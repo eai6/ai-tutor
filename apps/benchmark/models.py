@@ -508,9 +508,12 @@ class SessionSampleRun(models.Model):
         COMPLETED = 'completed', 'Completed'
         FAILED = 'failed', 'Failed'
 
-    # Generous: 500 sessions × a judge call each can legitimately run long.
-    # Short enough that a killed task does not block sampling for a working day.
-    STALE_AFTER = timedelta(minutes=45)
+    # Measured from the last PROGRESS update, not from the start. A
+    # 1000-session run legitimately outlives any fixed start-time cutoff, and
+    # reclaiming it mid-flight would mark a healthy run failed and let a second
+    # one start alongside it. Fifteen minutes without a single item screened
+    # means the worker is genuinely gone.
+    STALE_AFTER = timedelta(minutes=15)
 
     status = models.CharField(max_length=16, choices=Status.choices,
                               default=Status.RUNNING, db_index=True)
@@ -527,7 +530,21 @@ class SessionSampleRun(models.Model):
     error = models.TextField(blank=True, default='')
 
     started_at = models.DateTimeField(auto_now_add=True)
+    last_progress_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Liveness heartbeat — bumped as sessions are screened. '
+                  'Null until the first progress update; reclaim_stale falls '
+                  'back to started_at so a run that dies before its first '
+                  'batch is still reclaimed.')
     finished_at = models.DateTimeField(null=True, blank=True)
+
+    # What the run was scoped to, recorded so the list page can say what a
+    # given batch actually covered.
+    filter_start = models.DateField(null=True, blank=True)
+    filter_end = models.DateField(null=True, blank=True)
+    filter_course = models.ForeignKey(
+        'curriculum.Course', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+')
     started_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+')
@@ -557,10 +574,14 @@ class SessionSampleRun(models.Model):
         Called before starting a run, so an abandoned one never permanently
         blocks the button.
         """
+        from django.db.models.functions import Coalesce
+
         cutoff = timezone.now() - cls.STALE_AFTER
         return cls.objects.filter(
-            status=cls.Status.RUNNING, started_at__lt=cutoff,
-        ).update(
+            status=cls.Status.RUNNING,
+        ).annotate(
+            _alive=Coalesce('last_progress_at', 'started_at'),
+        ).filter(_alive__lt=cutoff).update(
             status=cls.Status.FAILED, finished_at=timezone.now(),
             error='Abandoned — the worker stopped without finishing '
                   '(deploy or crash). Safe to start another run.',

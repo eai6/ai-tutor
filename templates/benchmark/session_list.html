@@ -79,6 +79,11 @@
     .sample-card .count { font-size:1.3rem; font-weight:700; color:#111; line-height:1.1; }
     .sample-card .label-row { font-size:0.78rem; color:#6b7280; line-height:1.5; }
     .sample-card form { display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap; }
+    .sample-card input[type=date], .sample-card select {
+        padding:0.4rem 0.55rem; border:1px solid #d1d5db; border-radius:6px;
+        font-size:0.85rem; font-family:inherit; background:#fff;
+    }
+    .sample-card select { max-width:190px; }
     .sample-card label { display:block; font-size:0.7rem; color:#6b7280;
                          text-transform:uppercase; letter-spacing:0.04em;
                          margin-bottom:0.2rem; }
@@ -153,8 +158,12 @@
             real sessions not yet sampled, long enough to judge.
             {{ already_sampled }} already sampled and excluded, so running this
             again picks up new sessions rather than re-screening old ones.
-            <br>Screened, then <strong>drawn uniformly at random</strong> — so a
-            pass rate over the sample estimates the real one.
+            <br><strong>Screen up to</strong> is a cost control, not a
+            window: candidates are shuffled first, so whatever you set, the
+            sessions screened are a random subset of everything matching the
+            filters. Screening 200 to keep 20 is exactly as unbiased as
+            screening all {{ eligible }} — and costs one LLM call per session
+            screened, not per session kept.
         </div>
     </div>
     <form method="post" action="{% url 'dashboard:benchmark:session_sample_create' %}">
@@ -168,6 +177,25 @@
             <label for="s-keep">Keep</label>
             <input type="number" id="s-keep" name="keep" value="20"
                    min="1" max="{{ keep_max }}" {% if run_active %}disabled{% endif %}>
+        </div>
+        <div>
+            <label for="s-course">Course</label>
+            <select id="s-course" name="course" {% if run_active %}disabled{% endif %}>
+                <option value="">All courses</option>
+                {% for c in courses %}
+                <option value="{{ c.id }}">{{ c.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="s-start">From</label>
+            <input type="date" id="s-start" name="start"
+                   {% if run_active %}disabled{% endif %}>
+        </div>
+        <div>
+            <label for="s-end">To</label>
+            <input type="date" id="s-end" name="end"
+                   {% if run_active %}disabled{% endif %}>
         </div>
         <button type="submit" {% if run_active %}disabled{% endif %}>
             {% if run_active %}Sampling…{% else %}Sample sessions{% endif %}
@@ -186,6 +214,12 @@
     {% elif latest_run.status == 'completed' %}
         <strong>Last run:</strong> screened {{ latest_run.screened }} session(s),
         created {{ latest_run.created_items }} new item(s) for review.
+        {% if latest_run.filter_course or latest_run.filter_start or latest_run.filter_end %}
+        <span>(scoped to
+            {% if latest_run.filter_course %}{{ latest_run.filter_course.title }}{% endif %}
+            {% if latest_run.filter_start %}from {{ latest_run.filter_start }}{% endif %}
+            {% if latest_run.filter_end %}to {{ latest_run.filter_end }}{% endif %})</span>
+        {% endif %}
         {% if latest_run.rejections %}
         <div class="run-detail">
             Rejected —

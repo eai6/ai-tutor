@@ -29,6 +29,12 @@ class Command(BaseCommand):
                                  '(drawn uniformly at random).')
         parser.add_argument('--institution', type=int, default=None,
                             help='Institution id to restrict to.')
+        parser.add_argument('--course', type=int, default=None,
+                            help='Course id to restrict to.')
+        parser.add_argument('--start', default=None,
+                            help='Only sessions started on/after YYYY-MM-DD.')
+        parser.add_argument('--end', default=None,
+                            help='Only sessions started on/before YYYY-MM-DD.')
         parser.add_argument('--prefix', default='SESS',
                             help='item_id prefix.')
         parser.add_argument('--dry-run', action='store_true',
@@ -53,8 +59,26 @@ class Command(BaseCommand):
                 'in free text will not be caught. Do not use for a real sample.'
             ))
 
-        candidates = list(S.candidate_sessions(institution=institution)
-                          [:opts['limit']])
+        from datetime import datetime
+
+        def _date(key):
+            raw = opts.get(key)
+            if not raw:
+                return None
+            try:
+                return datetime.strptime(raw, '%Y-%m-%d').date()
+            except ValueError:
+                raise CommandError(f'--{key} must be YYYY-MM-DD, got {raw!r}')
+
+        # draw_pool shuffles before slicing. Slicing the queryset directly
+        # would take the NEWEST --limit sessions and silently exclude the
+        # older half of the dataset.
+        candidates = S.draw_pool(
+            S.candidate_sessions(institution=institution,
+                                 course_id=opts.get('course'),
+                                 start=_date('start'), end=_date('end')),
+            opts['limit'], seed=0,
+        )
         if not candidates:
             self.stdout.write('No candidate sessions.')
             return

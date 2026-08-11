@@ -472,4 +472,53 @@ are untouched** — those are research annotations, and the ask was to change wh
 the dashboard focuses on, not to destroy a dataset. `/dashboard/benchmark/`
 still works for anyone with the link.
 
-Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3)
+---
+
+## Sampling bias bug + filters (2026-08-11, after first production use)
+
+### The screening cap was silently biasing the sample
+
+Production showed 1001 eligible sessions and a form capped at 500. The cap was
+not merely restrictive — `candidate_sessions()` is ordered `-started_at`, and
+the job sliced it (`[:limit]`). Screening "up to 500" of 1001 therefore screened
+**the newest 500 and nothing else**: the older half of the pilot could never
+enter the gold set, while the page claimed a uniform draw that estimates the
+population. A term boundary or a curriculum change would have defined the whole
+dataset invisibly.
+
+`draw_pool()` now shuffles candidate ids before slicing. That makes the limit a
+pure cost control: at any value, the screened pool is a uniform random subset of
+everything matching the filters. Screening 200 to keep 20 is exactly as unbiased
+as screening all 1001 — and costs 200 LLM calls instead of 1001. Caps raised
+anyway (limit 5000, keep 1000) so the whole dataset is reachable.
+
+`test_slicing_the_queryset_directly_would_have_failed_this` pins the old
+behaviour as wrong, so nobody simplifies `draw_pool` back into a slice.
+
+### Date range and course filters
+
+`candidate_sessions(start=, end=, course_id=)`, wired to the form and to
+`sample_sessions --start/--end/--course`. `started_at__date__lte` so the end
+date includes the whole day rather than dropping afternoon sessions. A malformed
+date scopes to everything rather than nothing — returning zero looks identical
+to "no data" and sends someone hunting a bug that is not there. Swapped
+from/to dates are corrected rather than rejected. The run records what it was
+scoped to.
+
+### Two scaling fixes that 1000 sessions forced
+
+**Parallel screening.** One LLM call per candidate meant ~30 minutes sequential
+for 1000. Six workers now. On SQLite the worker count drops to 1 AND runs inline
+rather than through a one-worker pool — a pool still executes on another thread
+with its own connection, which blocks on any lock the caller holds and fails
+with "database table is locked" even at zero concurrency. This is not only a
+test concern: the packaged desktop build runs this same app on SQLite.
+
+**Heartbeat staleness.** `reclaim_stale()` measured from `started_at` with a
+45-minute cutoff, so a legitimate 1000-session run would have been marked failed
+mid-flight — and the partial unique constraint would then have let a *second*
+run start alongside it, doubling the spend. Now measured from `last_progress_at`,
+bumped every 5 screened sessions, with a 15-minute cutoff and a fallback to
+`started_at` for a run that dies before its first batch.
+
+Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3), 12045e8 (button)

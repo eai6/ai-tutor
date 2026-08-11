@@ -303,15 +303,18 @@ class TestTheJob:
 @pytest.mark.django_db
 class TestTheSampleForm:
     def test_the_limit_is_clamped(self, client, staff, captured_async):
-        """An unbounded box is an unbounded bill — one LLM call per candidate."""
+        """Still bounded — one LLM call per candidate screened, so an
+        unbounded box is an unbounded bill. The cap is high enough to cover the
+        whole dataset, and since draw_pool shuffles first, a lower value costs
+        precision in nothing but sample size."""
         client.force_login(staff)
 
         client.post(reverse('dashboard:benchmark:session_sample_create'),
-                    {'limit': '999999', 'keep': '999'})
+                    {'limit': '999999', 'keep': '99999'})
 
-        _run_id, limit, keep, _inst = captured_async[0]
-        assert limit == 500
-        assert keep == 200
+        _run_id, limit, keep, _inst, _start, _end, _course = captured_async[0]
+        assert limit == 5000
+        assert keep == 1000
 
     def test_junk_input_falls_back_to_the_default(self, client, staff,
                                                   captured_async):
@@ -320,7 +323,7 @@ class TestTheSampleForm:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': 'abc', 'keep': ''})
 
-        _run_id, limit, keep, _inst = captured_async[0]
+        _run_id, limit, keep, _inst, _start, _end, _course = captured_async[0]
         assert limit == 200
         assert keep == 20
 
@@ -331,7 +334,7 @@ class TestTheSampleForm:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': '-5'})
 
-        assert captured_async[0][1] == 1
+        assert captured_async[0][1] == 1     # limit
 
     def test_it_requires_staff(self, client):
         response = client.post(
@@ -545,3 +548,230 @@ class TestSelectionIsARandomDraw:
                 appearances += 1
 
         assert appearances < 6
+
+
+@pytest.mark.django_db
+class TestThePoolIsNotJustTheNewest:
+    """The bias bug, found in production on 2026-08-11.
+
+    `candidate_sessions` is ordered `-started_at`. Slicing it — which is what
+    `[:limit]` did — screened only the most recent `limit` sessions. With 1001
+    eligible and a cap of 500, the older half of the pilot could never be
+    sampled at all, while the page claimed a uniform draw that estimates the
+    population. A term boundary or a curriculum change would have silently
+    defined the entire gold set.
+
+    `draw_pool` shuffles before slicing, so `limit` controls cost and nothing
+    else.
+    """
+
+    def _spread(self, school, lesson, n):
+        """n sessions with distinct started_at, oldest first."""
+        made = []
+        for i in range(n):
+            s = make_session(school, lesson, f'spread{i}')
+            TutorSession.objects.filter(pk=s.pk).update(
+                started_at=timezone.now() - timedelta(days=n - i))
+            made.append(s)
+        return made
+
+    def test_a_limit_smaller_than_the_pool_still_reaches_old_sessions(
+            self, school, lesson):
+        sessions = self._spread(school, lesson, 20)
+        oldest_half = {s.id for s in sessions[:10]}
+
+        # Screen only 5 of 20, across several seeds.
+        reached_old = False
+        for seed in range(8):
+            pool = S.draw_pool(S.candidate_sessions(), 5, seed=seed)
+            if oldest_half & {s.id for s in pool}:
+                reached_old = True
+                break
+
+        assert reached_old, 'the pool never reached the older half'
+
+    def test_slicing_the_queryset_directly_would_have_failed_this(
+            self, school, lesson):
+        """Pins the old behaviour as wrong, so nobody 'simplifies' draw_pool
+        back into a slice."""
+        sessions = self._spread(school, lesson, 20)
+        oldest_half = {s.id for s in sessions[:10]}
+
+        naive = list(S.candidate_sessions()[:5])
+
+        assert not (oldest_half & {s.id for s in naive})
+
+    def test_the_draw_is_reproducible_for_a_seed(self, school, lesson):
+        self._spread(school, lesson, 15)
+
+        a = [s.id for s in S.draw_pool(S.candidate_sessions(), 5, seed=42)]
+        b = [s.id for s in S.draw_pool(S.candidate_sessions(), 5, seed=42)]
+
+        assert a == b
+
+    def test_different_seeds_draw_different_pools(self, school, lesson):
+        self._spread(school, lesson, 30)
+
+        a = {s.id for s in S.draw_pool(S.candidate_sessions(), 5, seed=1)}
+        b = {s.id for s in S.draw_pool(S.candidate_sessions(), 5, seed=2)}
+
+        assert a != b
+
+    def test_a_limit_above_the_pool_returns_everything(self, school, lesson):
+        self._spread(school, lesson, 6)
+
+        pool = S.draw_pool(S.candidate_sessions(), 500, seed=0)
+
+        assert len(pool) == 6
+
+
+@pytest.mark.django_db
+class TestFilters:
+    def _dated(self, school, lesson, username, days_ago):
+        s = make_session(school, lesson, username)
+        TutorSession.objects.filter(pk=s.pk).update(
+            started_at=timezone.now() - timedelta(days=days_ago))
+        return s
+
+    def test_start_and_end_scope_the_pool(self, school, lesson):
+        from datetime import date
+        self._dated(school, lesson, 'old', 60)
+        recent = self._dated(school, lesson, 'recent', 5)
+
+        today = timezone.now().date()
+        got = S.candidate_sessions(start=today - timedelta(days=30), end=today)
+
+        assert [s.id for s in got] == [recent.id]
+
+    def test_end_is_inclusive_of_the_whole_day(self, school, lesson):
+        """A session at 14:00 on the end date must be included — comparing a
+        datetime against a date would silently drop it."""
+        s = self._dated(school, lesson, 'sameday', 0)
+        day = TutorSession.objects.get(pk=s.pk).started_at.date()
+
+        assert S.candidate_sessions(start=day, end=day).count() == 1
+
+    def test_course_scopes_the_pool(self, school, lesson):
+        from apps.curriculum.models import Course, Lesson, Unit
+
+        other = Course.objects.create(title='Other', institution=school,
+                                      subject_type='math')
+        unit = Unit.objects.create(course=other, title='U', order_index=1)
+        other_lesson = Lesson.objects.create(unit=unit, title='L',
+                                             objective='o', order_index=1)
+        keep = make_session(school, lesson, 'inscope')
+        make_session(school, other_lesson, 'outofscope')
+
+        got = S.candidate_sessions(course_id=lesson.unit.course_id)
+
+        assert [s.id for s in got] == [keep.id]
+
+    def test_the_job_honours_the_filters(self, school, lesson, no_llm):
+        from apps.curriculum.models import Course, Lesson, Unit
+
+        other = Course.objects.create(title='Other', institution=school,
+                                      subject_type='math')
+        unit = Unit.objects.create(course=other, title='U', order_index=1)
+        other_lesson = Lesson.objects.create(unit=unit, title='L',
+                                             objective='o', order_index=1)
+        make_session(school, lesson, 'wanted')
+        make_session(school, other_lesson, 'unwanted')
+
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=50)
+        S.run_sample_job(run.id, limit=50, keep=50,
+                         course_id=lesson.unit.course_id)
+        run.refresh_from_db()
+
+        assert run.candidates == 1
+        assert run.created_items == 1
+        assert SessionEvalItem.objects.get().source_session.student.username == 'wanted'
+
+    def test_a_malformed_date_scopes_to_everything_not_nothing(
+            self, client, staff, captured_async):
+        """Returning no sessions for a typo looks identical to 'no data', which
+        would send someone hunting for a bug that isn't there."""
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'start': 'not-a-date'})
+
+        _run, _limit, _keep, _inst, start, end, _course = captured_async[0]
+        assert start is None and end is None
+
+    def test_swapped_dates_are_corrected_rather_than_returning_nothing(
+            self, client, staff, captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'start': '2026-08-01', 'end': '2026-07-01'})
+
+        _run, _limit, _keep, _inst, start, end, _course = captured_async[0]
+        assert start.isoformat() == '2026-07-01'
+        assert end.isoformat() == '2026-08-01'
+
+    def test_the_run_records_what_it_was_scoped_to(self, client, staff,
+                                                   captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'start': '2026-07-01', 'end': '2026-08-01'})
+
+        run = SessionSampleRun.objects.get()
+        assert run.filter_start.isoformat() == '2026-07-01'
+        assert run.filter_end.isoformat() == '2026-08-01'
+
+
+@pytest.mark.django_db
+class TestTheHeartbeat:
+    def test_a_long_but_healthy_run_is_not_reclaimed(self):
+        """The old rule measured from started_at, so a 1000-session run would
+        have been marked failed mid-flight — and a second run could then start
+        alongside it, doubling the LLM spend."""
+        run = SessionSampleRun.objects.create(requested_limit=1000)
+        SessionSampleRun.objects.filter(pk=run.pk).update(
+            started_at=timezone.now() - timedelta(hours=3),
+            last_progress_at=timezone.now(),        # still ticking
+        )
+
+        SessionSampleRun.reclaim_stale()
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.RUNNING
+
+    def test_a_silent_run_is_reclaimed(self):
+        run = SessionSampleRun.objects.create(requested_limit=1000)
+        SessionSampleRun.objects.filter(pk=run.pk).update(
+            started_at=timezone.now() - timedelta(hours=3),
+            last_progress_at=timezone.now() - SessionSampleRun.STALE_AFTER
+            - timedelta(minutes=1),
+        )
+
+        SessionSampleRun.reclaim_stale()
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.FAILED
+
+    def test_a_run_that_died_before_its_first_batch_is_reclaimed(self):
+        """last_progress_at is null until the first progress write; without the
+        started_at fallback such a run would never be reclaimed."""
+        run = SessionSampleRun.objects.create(requested_limit=1000)
+        SessionSampleRun.objects.filter(pk=run.pk).update(
+            started_at=timezone.now() - SessionSampleRun.STALE_AFTER
+            - timedelta(minutes=1),
+            last_progress_at=None,
+        )
+
+        SessionSampleRun.reclaim_stale()
+        run.refresh_from_db()
+
+        assert run.status == SessionSampleRun.Status.FAILED
+
+    def test_the_job_updates_the_heartbeat(self, school, lesson, no_llm):
+        for i in range(6):
+            make_session(school, lesson, f'beat{i}')
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=6)
+
+        S.run_sample_job(run.id, limit=50, keep=6)
+        run.refresh_from_db()
+
+        assert run.last_progress_at is not None
