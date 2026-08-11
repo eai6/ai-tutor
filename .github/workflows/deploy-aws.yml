@@ -36,12 +36,25 @@ on:
     branches: [aws_deployment]
     paths-ignore:
       # Docs and the Azure infra program cannot change what runs on AWS, so
-      # they should not trigger a ~20 minute image build.
+      # they should not trigger a ~20 minute image build. Neither can Pulumi
+      # stack config: this workflow never runs `pulumi` — it builds an image and
+      # updates the ECS service from the LIVE task definition, so a config edit
+      # only takes effect after someone runs `pulumi up` by hand.
+      #
+      # `*` does not cross a `/` in these patterns, so each directory needs its
+      # own line. The previous `infra/Pulumi.*.yaml` matched neither
+      # `infra/Pulumi.yaml` (no middle segment) nor anything under `infra/aws/`
+      # — which is where the AWS stack config actually lives, so every stack
+      # config edit was still costing a full build.
       - 'docs/**'
       - 'memory/**'
       - 'infra/__main__.py'
-      - 'infra/Pulumi.*.yaml'
-      - '**/*.md'
+      - 'infra/Pulumi*.yaml'
+      - 'infra/aws/Pulumi*.yaml'
+      # '**.md', not '**/*.md' — the latter reads as "a directory, then a .md
+      # file", which leaves root-level README.md / RELEASING.md triggering a
+      # build. GitHub documents '**.md' as the "markdown anywhere" form.
+      - '**.md'
 
 concurrency:
   # Serialise: a second deploy mid-rollout races the service update.
