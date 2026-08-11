@@ -26,6 +26,7 @@ from apps.benchmark.labels import (
     ISSUE_LABELS,
     FAILURE_CATEGORIES,
 )
+from apps.benchmark.pedagogy import choices_for as _pedagogy_choices
 
 
 class BenchmarkItem(models.Model):
@@ -300,3 +301,171 @@ class BenchmarkRun(models.Model):
         if not self.total_items:
             return 0.0
         return self.passed / self.total_items
+
+
+# ─── Session-level pedagogical evaluation ──────────────────────────────
+#
+# Separate from BenchmarkItem/BenchmarkAnnotation above, which annotate ONE
+# TURN against our 30-label internal rubric. These two annotate a WHOLE
+# SESSION against the eight-dimension taxonomy of Maurya et al. (NAACL 2025).
+# Different unit, different rubric, different question — so different tables
+# rather than overloading the existing ones.
+#
+# Plan: memory/session_eval_framework_plan.md
+
+class SessionEvalItem(models.Model):
+    """One production session, redacted and safety-screened, awaiting judgement.
+
+    The transcript is FROZEN at sampling time and stored redacted. It is never
+    re-derived from the live session, for two reasons: the source rows can
+    change or be deleted, and re-deriving would re-expose the un-redacted text
+    that the whole pipeline exists to keep away from an annotator.
+    """
+
+    class Status(models.TextChoices):
+        PENDING_REVIEW = 'pending_review', 'Awaiting child-protection review'
+        APPROVED = 'approved', 'Approved for annotation'
+        REJECTED = 'rejected', 'Rejected — not safe to annotate'
+
+    item_id = models.CharField(
+        max_length=64, unique=True,
+        help_text="Stable identifier, e.g. 'SESS_MATH_1014'.",
+    )
+    source_session = models.ForeignKey(
+        'tutoring.TutorSession', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='eval_items',
+        help_text='Nullable so a deleted session does not take the evaluation '
+                  'record with it — the frozen transcript remains valid.',
+    )
+    # Salted hash of the session id. Exports carry this and never the real id,
+    # so a released dataset cannot be joined back to a student.
+    session_key = models.CharField(max_length=32, db_index=True)
+
+    subject = models.CharField(max_length=32, blank=True, default='')
+    lesson_id = models.IntegerField(null=True, blank=True)
+    engine = models.CharField(
+        max_length=16, blank=True, default='',
+        help_text="Which tutoring engine produced it ('v1' / 'simple'). The v1 "
+                  'engine interpolated the student name into its prompt, so '
+                  'this materially changes redaction risk.',
+    )
+    outcome = models.CharField(
+        max_length=32, blank=True, default='',
+        help_text='passed_exit_ticket / failed_exit_ticket / no_exit_ticket.',
+    )
+    turn_count = models.PositiveIntegerField(default=0)
+
+    transcript = models.JSONField(
+        default=list,
+        help_text='REDACTED transcript: [{turn, role, content}].',
+    )
+    redaction_report = models.JSONField(
+        default=dict,
+        help_text='What was replaced and what the residual scan found. Kept so '
+                  'a reviewer can see WHY an item was cleared, not just that '
+                  'it was.',
+    )
+
+    status = models.CharField(
+        max_length=20, choices=Status.choices,
+        default=Status.PENDING_REVIEW, db_index=True,
+    )
+    reject_reason = models.TextField(blank=True, default='')
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    stratum = models.CharField(max_length=64, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', 'subject'])]
+
+    def __str__(self):
+        return f'{self.item_id} ({self.status})'
+
+    @property
+    def is_annotatable(self) -> bool:
+        """Only an approved item may be shown to an annotator."""
+        return self.status == self.Status.APPROVED
+
+
+class SessionEvalAnnotation(models.Model):
+    """One annotator's eight-dimension verdict on one session."""
+
+    class Annotator(models.TextChoices):
+        HUMAN = 'human', 'Human'
+        LLM_JUDGE = 'llm_judge', 'LLM judge'
+
+    item = models.ForeignKey(
+        SessionEvalItem, on_delete=models.CASCADE, related_name='annotations',
+    )
+    annotator_role = models.CharField(
+        max_length=16, choices=Annotator.choices, default=Annotator.HUMAN,
+    )
+    annotator_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='session_eval_annotations',
+    )
+    annotator_model = models.CharField(max_length=64, blank=True, default='')
+
+    # One field per dimension. Choices come from pedagogy.py so the form, the
+    # database and the scorer cannot disagree about the taxonomy.
+    mistake_identification = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('mistake_identification'))
+    mistake_location = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('mistake_location'))
+    revealing_answer = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('revealing_answer'))
+    providing_guidance = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('providing_guidance'))
+    actionability = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('actionability'))
+    coherence = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('coherence'))
+    tutor_tone = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('tutor_tone'))
+    human_likeness = models.CharField(
+        max_length=20, blank=True, default='',
+        choices=_pedagogy_choices('human_likeness'))
+
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['item', 'annotator_role', 'annotator_user', 'annotator_model'],
+                name='uniq_session_eval_annotation',
+            ),
+        ]
+
+    def __str__(self):
+        who = self.annotator_user or self.annotator_model or self.annotator_role
+        return f'{self.item.item_id} by {who}'
+
+    def values(self) -> dict:
+        from apps.benchmark import pedagogy as P
+        return {k: getattr(self, k, '') for k in P.DIMENSION_KEYS}
+
+    @property
+    def complete(self) -> bool:
+        """Every dimension answered. An unanswered dimension is not a 'No'."""
+        return all(bool(v) for v in self.values().values())
+
+    @property
+    def passes(self) -> bool:
+        from apps.benchmark import pedagogy as P
+        return P.session_passes(self.values())
