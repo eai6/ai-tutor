@@ -48,15 +48,22 @@ class TestTheTaxonomyMatchesThePaper:
         assert P.dimension_passes('tutor_tone', P.OFFENSIVE) is False
         assert P.dimension_passes('tutor_tone', P.ENCOURAGING) is True
 
-    def test_only_the_mistake_dimensions_allow_na(self):
-        """A session where the student never erred has no mistake to identify.
-        Everything else applies to any session."""
-        allowed = {d.key for d in P.DIMENSIONS if d.allows_na}
-        assert allowed == {'mistake_identification', 'mistake_location'}
+    def test_every_dimension_allows_na(self):
+        """Offered on the two mistake dimensions at first, on the reasoning
+        that coherence and tone apply to any session. That was the wrong trade:
+        withholding N/A does not make an annotator judge a dimension that never
+        arose, it makes them record something false — and a false "Yes"
+        inflates the pass rate. N/A only costs a smaller denominator."""
+        assert all(d.allows_na for d in P.DIMENSIONS)
 
-    def test_na_appears_in_choices_only_where_allowed(self):
-        assert P.NOT_APPLICABLE in dict(P.choices_for('mistake_identification'))
-        assert P.NOT_APPLICABLE not in dict(P.choices_for('coherence'))
+    def test_na_appears_in_the_choices_for_every_dimension(self):
+        for key in P.DIMENSION_KEYS:
+            assert P.NOT_APPLICABLE in dict(P.choices_for(key)), key
+
+    def test_na_is_last_so_it_is_not_the_easy_click(self):
+        """It should be reachable, not the default landing spot."""
+        for key in P.DIMENSION_KEYS:
+            assert P.choices_for(key)[-1][0] == P.NOT_APPLICABLE, key
 
     def test_every_dimension_carries_the_papers_definition(self):
         for d in P.DIMENSIONS:
@@ -98,6 +105,19 @@ class TestSessionPassRule:
         assert P.session_passes(values) is True
         assert P.dimension_passes('mistake_identification',
                                   P.NOT_APPLICABLE) is None
+
+    def test_na_is_excluded_on_every_dimension(self):
+        for key in P.DIMENSION_KEYS:
+            assert P.dimension_passes(key, P.NOT_APPLICABLE) is None, key
+            values = all_good()
+            values[key] = P.NOT_APPLICABLE
+            assert P.session_passes(values) is True, key
+
+    def test_an_all_na_session_does_not_pass_vacuously(self):
+        """Nothing was assessed, so nothing was demonstrated. Now reachable in
+        the UI, since every dimension offers N/A."""
+        assert P.session_passes(
+            {k: P.NOT_APPLICABLE for k in P.DIMENSION_KEYS}) is False
 
     def test_an_unanswered_dimension_is_not_a_pass(self):
         values = all_good()

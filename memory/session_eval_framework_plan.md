@@ -610,3 +610,33 @@ worse than no breakdown.
 
 Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3), 12045e8 (sample
 button), b632779 (bias fix + filters), d0d3580 (merged review + annotate)
+
+---
+
+## N/A on every dimension (2026-08-11)
+
+`allows_na=True` for all eight. It was originally offered only on the two
+mistake dimensions, reasoning that coherence and tone apply to any session and
+an opt-out would let an annotator dodge the dimension the session-level design
+exists to measure. `test_only_the_mistake_dimensions_allow_na` pinned that.
+
+**That was the wrong trade.** Withholding N/A does not make an annotator judge
+a dimension that never arose — it makes them record something false, and a
+false "Yes" INFLATES the pass rate. N/A is excluded from scoring, so it costs a
+smaller denominator and nothing else. A wrong number is worse than a missing
+one.
+
+Guards kept:
+
+- N/A is always **last** in the option list, so it is reachable rather than the
+  easy click (`test_na_is_last_so_it_is_not_the_easy_click`).
+- An all-N/A annotation is `complete` but does **not** pass — nothing was
+  assessed, so nothing was demonstrated. That state is now reachable in the UI
+  for the first time, so it is tested directly.
+- The per-dimension table already separates N/A from unanswered, so a
+  dimension being routinely marked N/A is visible rather than silently shrinking
+  the denominator.
+
+Migration `0008` alters choices on the six fields that did not previously allow
+it. Choices live in `pedagogy.py`, so the column, the form and the scorer cannot
+drift apart.

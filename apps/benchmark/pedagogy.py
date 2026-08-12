@@ -19,13 +19,24 @@ results knows what they are looking at:
    session — and a session is also the unit a teacher cares about. Definitions
    below are the paper's; the session-scope reading is in ``SESSION_GUIDANCE``.
 
-2. **N/A is available.** The paper's scale has no "not applicable", because a
-   response is only sampled once a student has erred. Over a whole session a
-   dimension can genuinely never arise (no mistake was ever made, so there was
-   nothing to identify). N/A is EXCLUDED from scoring rather than counted as a
-   failure — the same correction already made for the rubric scorer in
-   ``evals/scorers/llm_rubric.py``. Counting it as failure would penalise the
-   tutor for the student's competence.
+2. **N/A is available on every dimension.** The paper's scale has no "not
+   applicable", because a response is only sampled once a student has erred.
+   Over a whole session any dimension can genuinely fail to arise: no mistake
+   was ever made, so there was nothing to identify or locate; the student
+   needed no guidance; nothing was left unsolved to reveal.
+
+   It was first offered on the two mistake dimensions only, on the reasoning
+   that coherence and tone apply to any session and an opt-out would let an
+   annotator dodge the dimension this whole design exists to measure. That was
+   the wrong trade. Withholding N/A does not make an annotator judge a
+   dimension that did not arise — it makes them record something false, and a
+   false "Yes" INFLATES the pass rate. N/A is excluded from scoring, so it
+   costs a smaller denominator and nothing else. A wrong number is worse than a
+   missing one.
+
+   Excluded, not counted as failure — the same correction already made for the
+   rubric scorer in ``evals/scorers/llm_rubric.py``. Counting it as failure
+   would penalise the tutor for the student's competence.
 
 Everything else follows the paper: the three-way scale, the per-dimension value
 sets, and the desiderata.
@@ -81,7 +92,6 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         values=_THREE_WAY,
         desideratum=YES,
-        # A session in which the student never erred has nothing to identify.
         allows_na=True,
     ),
     Dimension(
@@ -113,7 +123,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         # The one dimension where the desired value is "No".
         desideratum=NO,
-        allows_na=False,
+        allows_na=True,
     ),
     Dimension(
         key='providing_guidance',
@@ -129,7 +139,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         values=_THREE_WAY,
         desideratum=YES,
-        allows_na=False,
+        allows_na=True,
     ),
     Dimension(
         key='actionability',
@@ -142,7 +152,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         values=_THREE_WAY,
         desideratum=YES,
-        allows_na=False,
+        allows_na=True,
     ),
     Dimension(
         key='coherence',
@@ -155,7 +165,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         values=_THREE_WAY,
         desideratum=YES,
-        allows_na=False,
+        allows_na=True,
     ),
     Dimension(
         key='tutor_tone',
@@ -172,7 +182,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
             (OFFENSIVE, 'Offensive'),
         ),
         desideratum=ENCOURAGING,
-        allows_na=False,
+        allows_na=True,
     ),
     Dimension(
         key='human_likeness',
@@ -185,7 +195,7 @@ DIMENSIONS: tuple[Dimension, ...] = (
         ),
         values=_THREE_WAY,
         desideratum=YES,
-        allows_na=False,
+        allows_na=True,
     ),
 )
 

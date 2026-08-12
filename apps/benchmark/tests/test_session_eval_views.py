@@ -212,19 +212,23 @@ class TestAnnotationForm:
         assert annotation.coherence == ''
         assert annotation.complete is False
 
-    def test_na_is_rejected_where_the_dimension_does_not_allow_it(
-            self, client, staff, approved):
-        """Only the two mistake dimensions may be N/A. Coherence always
-        applies — accepting N/A there would let an annotator opt out of the
-        dimension the whole session-level design exists to measure."""
+    def test_na_is_accepted_on_every_dimension(self, client, staff, approved):
+        """N/A was refused outside the two mistake dimensions, to stop an
+        annotator opting out of coherence. Wrong trade: withholding it does not
+        make someone judge a dimension that never arose, it makes them record
+        something false — and a false "Yes" inflates the pass rate."""
         client.force_login(staff)
-        payload = all_good_post()
-        payload['coherence'] = P.NOT_APPLICABLE
+        payload = {k: P.NOT_APPLICABLE for k in P.DIMENSION_KEYS}
 
         client.post(reverse('dashboard:benchmark:session_annotate',
                             args=[approved.item_id]), payload)
 
-        assert SessionEvalAnnotation.objects.get(item=approved).coherence == ''
+        annotation = SessionEvalAnnotation.objects.get(item=approved)
+        for key in P.DIMENSION_KEYS:
+            assert getattr(annotation, key) == P.NOT_APPLICABLE, key
+        # Answered everywhere, but nothing scorable — so it does not pass.
+        assert annotation.complete is True
+        assert annotation.passes is False
 
     def test_na_is_accepted_on_the_mistake_dimensions(
             self, client, staff, approved):
@@ -478,8 +482,7 @@ class TestApproveAndAnnotateInOneGo:
 
         assert SessionEvalAnnotation.objects.get(item=item).coherence == ''
 
-    def test_na_is_still_refused_where_the_dimension_forbids_it(
-            self, client, staff):
+    def test_na_is_accepted_on_any_dimension(self, client, staff):
         item = make_item()
         client.force_login(staff)
         payload = all_good_post()
@@ -489,7 +492,9 @@ class TestApproveAndAnnotateInOneGo:
             reverse('dashboard:benchmark:session_review', args=[item.item_id]),
             {'decision': 'approve', **payload})
 
-        assert SessionEvalAnnotation.objects.get(item=item).coherence == ''
+        annotation = SessionEvalAnnotation.objects.get(item=item)
+        assert annotation.coherence == P.NOT_APPLICABLE
+        assert annotation.passes is True     # excluded, not counted as failure
 
     def test_a_missing_rejection_reason_changes_nothing(self, client, staff):
         """RULE 3. The reason requirement survives the merge — and a failed
