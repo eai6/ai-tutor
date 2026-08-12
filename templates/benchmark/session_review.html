@@ -19,7 +19,13 @@
     .banner-instruct { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; }
     .banner-danger { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
 
-    .transcript { max-height:620px; overflow-y:auto; border:1px solid #f3f4f6;
+    /* The transcript sticks while the eight dimensions scroll past it. You
+       re-read turns against each question, so a transcript that scrolls away
+       with the form fights the task. */
+    .rv-left { position:sticky; top:1rem; }
+    @media (max-width: 1100px) { .rv-left { position:static; } }
+    .transcript { max-height:calc(100vh - 14rem); min-height:18rem;
+                  overflow-y:auto; border:1px solid #f3f4f6;
                   border-radius:8px; padding:0.6rem; background:#fafafa; }
     .turn { font-size:0.85rem; padding:0.5rem 0.6rem; border-radius:6px;
             margin-bottom:0.35rem; white-space:pre-wrap; line-height:1.5; }
@@ -38,14 +44,35 @@
     .tag-alert { background:#fef2f2; color:#991b1b; }
 
     .decide { display:flex; flex-direction:column; gap:0.6rem; }
-    .decide textarea { width:100%; padding:0.5rem 0.6rem; border:1px solid #d1d5db;
-                       border-radius:6px; font-size:0.85rem; font-family:inherit;
-                       min-height:70px; resize:vertical; }
+    .rv-card textarea { width:100%; padding:0.5rem 0.6rem;
+                        border:1px solid #d1d5db; border-radius:6px;
+                        font-size:0.85rem; font-family:inherit;
+                        min-height:70px; resize:vertical; box-sizing:border-box; }
     .btn { padding:0.6rem 1rem; border:none; border-radius:8px; font-size:0.9rem;
            font-weight:600; cursor:pointer; font-family:inherit; width:100%; }
     .btn-approve { background:#059669; color:#fff; }
     .btn-reject { background:#fff; color:#991b1b; border:1px solid #fecaca; }
     .muted { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+
+    .dim { border:1px solid #e5e7eb; border-radius:8px; padding:0.7rem 0.8rem;
+           margin-bottom:0.6rem; }
+    .dim .name { font-size:0.9rem; font-weight:600; color:#111; margin-bottom:0.12rem; }
+    .dim .definition { font-size:0.79rem; color:#374151; line-height:1.5;
+                       margin-bottom:0.28rem; }
+    .dim .guidance { font-size:0.77rem; color:#6b7280; line-height:1.5;
+                     margin-bottom:0.5rem; border-left:2px solid #ddd6fe;
+                     padding-left:0.5rem; }
+    .dim .opts { display:flex; flex-direction:column; gap:0.28rem; }
+    .dim label { display:flex; gap:0.45rem; align-items:flex-start;
+                 font-size:0.84rem; color:#374151; cursor:pointer; }
+    .dim label input { margin-top:0.2rem; }
+    .desired { font-size:0.65rem; font-weight:700; color:#065f46;
+               background:#ecfdf5; border-radius:999px; padding:0.02rem 0.4rem;
+               letter-spacing:0.03em; }
+    .rule { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px;
+            padding:0.6rem 0.8rem; margin-bottom:0.8rem; font-size:0.8rem;
+            color:#4c1d95; line-height:1.5; }
+    .btn-approve-judge { background:#5b21b6; color:#fff; }
 
     /* Clear the dashboard's fixed feedback button, which otherwise sits on
        top of the last card — on the review page, on the Reject button. */
@@ -71,8 +98,11 @@
 </div>
 {% endif %}
 
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="annotator_role" value="{{ annotator_role }}">
 <div class="rv-grid">
-    <div>
+    <div class="rv-left">
         <div class="rv-card">
             <h3>Redacted transcript — {{ item.turn_count }} turns</h3>
             <div class="transcript">
@@ -143,17 +173,49 @@
         </div>
 
         <div class="rv-card">
+            <h3>Judge it — the eight dimensions</h3>
+            <div class="rule">
+                Optional. Leave these blank to approve now and judge later.
+                A session passes only if <em>every applicable</em> dimension
+                sits at its <span class="desired">desired</span> value; where
+                one genuinely never arose choose <em>Not applicable</em>, which
+                is excluded from scoring rather than counted as a failure.
+                <strong>Rejecting discards anything entered here</strong> — a
+                session judged unsafe leaves no judgement behind.
+            </div>
+            {% for dim in dimensions %}
+            <div class="dim">
+                <div class="name">{{ dim.label }}</div>
+                <div class="definition">{{ dim.definition }}</div>
+                <div class="guidance">{{ dim.guidance }}</div>
+                <div class="opts">
+                    {% for opt in dim.options %}
+                    <label>
+                        <input type="radio" name="{{ dim.key }}" value="{{ opt.value }}"
+                               {% if opt.checked %}checked{% endif %}>
+                        <span>
+                            {{ opt.label }}
+                            {% if opt.is_desired %}<span class="desired">desired</span>{% endif %}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            <textarea name="notes" placeholder="Notes — what decided the borderline calls?">{{ annotation.notes|default:"" }}</textarea>
+        </div>
+
+        <div class="rv-card">
             <h3>Decision</h3>
-            <form method="post" class="decide">
-                {% csrf_token %}
-                <button type="submit" name="decision" value="approve" class="btn btn-approve">
-                    Approve for annotation
+            <div class="decide">
+                <button type="submit" name="decision" value="approve" class="btn btn-approve-judge">
+                    Approve &amp; save
                 </button>
                 <textarea name="reject_reason" placeholder="Reason (required to reject) — e.g. 'classmate named in turn 7'"></textarea>
                 <button type="submit" name="decision" value="reject" class="btn btn-reject">
                     Reject
                 </button>
-            </form>
+            </div>
             <p class="muted" style="margin-top:0.7rem;">
                 {{ pending_count }} session(s) awaiting review. Deciding moves
                 you to the next one.
@@ -165,5 +227,6 @@
         </p>
     </div>
 </div>
+</form>
 <div id="block-content-tail"></div>
 {% endblock %}

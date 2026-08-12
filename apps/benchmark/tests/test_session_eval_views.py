@@ -374,3 +374,195 @@ class TestListAndAccess:
 
         assert response.context['page'].paginator.num_pages == 2
         assert len(response.context['rows']) == 25
+
+
+@pytest.mark.django_db
+class TestApproveAndAnnotateInOneGo:
+    """Review and annotation merged onto one screen.
+
+    Two pages is the right shape when a safety reviewer and a subject annotator
+    are different people. With one person doing both it is navigation cost, so
+    a single submit approves and judges.
+
+    The risk of merging is that the safety decision degrades into a side effect
+    of the annotation. These tests pin the three rules that stop it.
+    """
+
+    def test_approving_with_dimensions_saves_both(self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'approve', **all_good_post()})
+
+        item.refresh_from_db()
+        assert item.status == SessionEvalItem.Status.APPROVED
+        annotation = SessionEvalAnnotation.objects.get(item=item)
+        assert annotation.complete is True
+        assert annotation.passes is True
+        assert annotation.annotator_user == staff
+
+    def test_rejecting_never_saves_an_annotation(self, client, staff):
+        """RULE 1. A session judged unsafe must leave no judgement behind, even
+        if the dimensions were filled in before the reviewer noticed the
+        problem."""
+        item = make_item()
+        client.force_login(staff)
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'reject', 'reject_reason': 'classmate named in turn 7',
+             **all_good_post()})
+
+        item.refresh_from_db()
+        assert item.status == SessionEvalItem.Status.REJECTED
+        assert SessionEvalAnnotation.objects.count() == 0
+
+    def test_rejecting_later_retracts_an_existing_annotation(self, client, staff):
+        """A session can be approved and judged, then found unsafe on a second
+        look. The annotation must not survive the retraction."""
+        item = make_item()
+        client.force_login(staff)
+        url = reverse('dashboard:benchmark:session_review', args=[item.item_id])
+
+        client.post(url, {'decision': 'approve', **all_good_post()})
+        assert SessionEvalAnnotation.objects.count() == 1
+
+        client.post(url, {'decision': 'reject',
+                          'reject_reason': 'sibling named in turn 3'})
+
+        assert SessionEvalAnnotation.objects.count() == 0
+        item.refresh_from_db()
+        assert item.status == SessionEvalItem.Status.REJECTED
+
+    def test_approving_with_no_dimensions_creates_no_annotation(
+            self, client, staff):
+        """RULE 2. A fast safety pass over many sessions must not litter the
+        table with empty rows, which the scorer would then count as
+        incomplete."""
+        item = make_item()
+        client.force_login(staff)
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'approve'})
+
+        item.refresh_from_db()
+        assert item.status == SessionEvalItem.Status.APPROVED
+        assert SessionEvalAnnotation.objects.count() == 0
+
+    def test_a_partial_annotation_saves_and_is_flagged_incomplete(
+            self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+        payload = all_good_post()
+        del payload['human_likeness']
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'approve', **payload})
+
+        annotation = SessionEvalAnnotation.objects.get(item=item)
+        assert annotation.complete is False
+
+    def test_values_outside_the_taxonomy_are_still_dropped(self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+        payload = all_good_post()
+        payload['coherence'] = 'sort_of'
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'approve', **payload})
+
+        assert SessionEvalAnnotation.objects.get(item=item).coherence == ''
+
+    def test_na_is_still_refused_where_the_dimension_forbids_it(
+            self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+        payload = all_good_post()
+        payload['coherence'] = P.NOT_APPLICABLE
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'approve', **payload})
+
+        assert SessionEvalAnnotation.objects.get(item=item).coherence == ''
+
+    def test_a_missing_rejection_reason_changes_nothing(self, client, staff):
+        """RULE 3. The reason requirement survives the merge — and a failed
+        rejection must not approve-by-accident or save an annotation."""
+        item = make_item()
+        client.force_login(staff)
+
+        client.post(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id]),
+            {'decision': 'reject', 'reject_reason': '', **all_good_post()})
+
+        item.refresh_from_db()
+        assert item.status == SessionEvalItem.Status.PENDING_REVIEW
+        assert SessionEvalAnnotation.objects.count() == 0
+
+    def test_it_advances_to_the_next_pending_session(self, client, staff):
+        """The point of the merge: judge one, land on the next."""
+        first = make_item('SESS_FIRST')
+        second = make_item('SESS_SECOND')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id]),
+            {'decision': 'approve', **all_good_post()})
+
+        assert second.item_id in response['Location']
+
+    def test_it_does_not_bounce_back_to_the_session_just_decided(
+            self, client, staff):
+        """The only pending item is the one being decided; it must not be
+        offered again."""
+        only = make_item('SESS_ONLY')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[only.item_id]),
+            {'decision': 'approve'})
+
+        assert only.item_id not in response['Location']
+
+    def test_the_form_prefills_an_existing_annotation(self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+        url = reverse('dashboard:benchmark:session_review', args=[item.item_id])
+        payload = all_good_post()
+        payload['tutor_tone'] = P.NEUTRAL
+        client.post(url, {'decision': 'approve', **payload})
+
+        response = client.get(url)
+
+        tone = next(d for d in response.context['dimensions']
+                    if d['key'] == 'tutor_tone')
+        checked = [o['value'] for o in tone['options'] if o['checked']]
+        assert checked == [P.NEUTRAL]
+
+    def test_the_page_renders_all_eight_dimensions(self, client, staff):
+        item = make_item()
+        client.force_login(staff)
+
+        body = client.get(reverse('dashboard:benchmark:session_review',
+                                  args=[item.item_id])).content.decode()
+
+        for dim in P.DIMENSIONS:
+            assert f'name="{dim.key}"' in body
+
+    def test_the_standalone_annotate_page_still_works(self, client, staff):
+        """Kept for re-annotating an already-approved session and for the
+        scripted llm_judge role, which never goes through review."""
+        item = make_item(status=SessionEvalItem.Status.APPROVED)
+        client.force_login(staff)
+
+        client.post(
+            reverse('dashboard:benchmark:session_annotate', args=[item.item_id]),
+            all_good_post())
+
+        assert SessionEvalAnnotation.objects.get(item=item).passes is True

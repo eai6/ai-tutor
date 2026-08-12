@@ -1039,13 +1039,36 @@ def session_eval_list(request):
 
 @staff_member_required
 def session_eval_review(request, item_id: str):
-    """The child-protection sign-off gate.
+    """The child-protection gate AND the annotation form, on one screen.
 
-    Shows the redacted transcript plus everything the automated gates found,
-    so the reviewer is deciding with evidence rather than vibes. Approve or
-    reject; a rejection requires a reason.
+    Split across two pages originally, which is the correct shape when a
+    safety reviewer and a subject annotator are different people. With one
+    person doing both it is pure navigation cost, so the eight dimensions live
+    here too and a single submit approves and judges.
+
+    The gate is NOT weakened by the merge, and the ordering below is what keeps
+    that true:
+
+    - A rejection NEVER saves an annotation, even if dimensions were filled in.
+      A session judged unsafe should leave no judgement behind.
+    - The annotation is written only after the item is actually APPROVED, so
+      there is no window where a row exists against an unreviewed session.
+    - Leaving the dimensions blank approves without creating an annotation, so
+      a fast safety pass over many sessions does not litter the table with
+      empty rows that would then count as "incomplete" in the scorer.
     """
     item = get_object_or_404(SessionEvalItem, item_id=item_id)
+
+    role_override = (request.GET.get('annotator_role')
+                     or request.POST.get('annotator_role') or '').strip().lower()
+    annotator_role = (role_override
+                      if role_override in SessionEvalAnnotation.Annotator.values
+                      else SessionEvalAnnotation.Annotator.HUMAN)
+
+    existing = SessionEvalAnnotation.objects.filter(
+        item=item, annotator_role=annotator_role,
+        annotator_user=request.user, annotator_model='',
+    ).first()
 
     if request.method == 'POST':
         from django.utils import timezone
@@ -1053,11 +1076,19 @@ def session_eval_review(request, item_id: str):
         decision = (request.POST.get('decision') or '').strip()
         reason = (request.POST.get('reject_reason') or '').strip()
 
+        # Collected before the branch, saved only on approval.
+        values, answered = {}, 0
+        for key in P.DIMENSION_KEYS:
+            submitted = (request.POST.get(key) or '').strip()
+            allowed = {v for v, _ in P.choices_for(key)}
+            values[key] = submitted if submitted in allowed else ''
+            if values[key]:
+                answered += 1
+        notes = (request.POST.get('notes') or '').strip()
+
         if decision == 'approve':
             item.status = SessionEvalItem.Status.APPROVED
             item.reject_reason = ''
-            messages.success(
-                request, f'{item.item_id} approved — now annotatable.')
         elif decision == 'reject':
             if not reason:
                 messages.error(request, 'A rejection needs a reason.')
@@ -1065,7 +1096,6 @@ def session_eval_review(request, item_id: str):
                                 item_id=item.item_id)
             item.status = SessionEvalItem.Status.REJECTED
             item.reject_reason = reason
-            messages.success(request, f'{item.item_id} rejected.')
         else:
             messages.error(request, 'No decision submitted.')
             return redirect('dashboard:benchmark:session_review',
@@ -1076,8 +1106,41 @@ def session_eval_review(request, item_id: str):
         item.save(update_fields=['status', 'reject_reason', 'reviewed_by',
                                  'reviewed_at'])
 
+        if decision == 'reject':
+            # Discard any dimensions that were filled in, and remove an earlier
+            # annotation if this session is being retracted after the fact.
+            deleted, _ = SessionEvalAnnotation.objects.filter(item=item).delete()
+            note = (' Any annotation on it was discarded.' if deleted else '')
+            messages.success(request, f'{item.item_id} rejected.{note}')
+        elif answered:
+            annotation, _ = SessionEvalAnnotation.objects.update_or_create(
+                item=item, annotator_role=annotator_role,
+                annotator_user=request.user, annotator_model='',
+                defaults={**values, 'notes': notes},
+            )
+            if annotation.complete:
+                verdict = 'PASS' if annotation.passes else 'FAIL'
+                messages.success(
+                    request,
+                    f'{item.item_id} approved and judged — verdict: {verdict}.')
+            else:
+                missing = [P.get_dimension(k).label
+                           for k, v in annotation.values().items() if not v]
+                messages.warning(
+                    request,
+                    f'{item.item_id} approved, but {len(missing)} dimension(s) '
+                    f'are unanswered: {", ".join(missing)}. An incomplete '
+                    f'annotation is not scored.',
+                )
+        else:
+            messages.success(
+                request,
+                f'{item.item_id} approved. No judgement recorded — open it '
+                f'again when you want to score it.')
+
         nxt = (SessionEvalItem.objects
                .filter(status=SessionEvalItem.Status.PENDING_REVIEW)
+               .exclude(pk=item.pk)
                .order_by('created_at').first())
         if nxt:
             return redirect('dashboard:benchmark:session_review',
@@ -1090,6 +1153,9 @@ def session_eval_review(request, item_id: str):
 
     return render(request, 'benchmark/session_review.html', {
         'item': item,
+        'dimensions': _dimension_blocks(existing),
+        'annotation': existing,
+        'annotator_role': annotator_role,
         'report': report,
         'residual': report.get('residual') or [],
         'advisory_names': report.get('advisory_names') or [],

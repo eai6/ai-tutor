@@ -521,4 +521,39 @@ run start alongside it, doubling the spend. Now measured from `last_progress_at`
 bumped every 5 screened sessions, with a 15-minute cutoff and a fallback to
 `started_at` for a run that dies before its first batch.
 
-Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3), 12045e8 (button)
+---
+
+## Review and annotation merged (2026-08-11)
+
+One screen: transcript, redaction report, the eight dimensions, and the
+approve/reject decision, submitted together. Two pages is the right shape when
+a safety reviewer and a subject annotator are different people; with one person
+doing both it was pure navigation cost.
+
+The risk of merging is that the child-protection decision degrades into a side
+effect of the annotation. Three rules stop that, each mutation-tested:
+
+1. **A rejection never saves an annotation** — even if the dimensions were
+   filled in before the reviewer spotted the problem. Rejecting a session that
+   was already approved and judged also DELETES the annotation, so a retraction
+   is complete rather than cosmetic.
+2. **The annotation is written only after the item is actually approved**, so
+   no row ever exists against an unreviewed session.
+3. **Blank dimensions approve without creating an annotation.** A fast safety
+   pass over many sessions would otherwise litter the table with empty rows
+   that the scorer counts as incomplete.
+
+The rejection-reason requirement survives, and a failed rejection changes
+nothing — it does not approve by accident.
+
+The standalone annotate page is kept: it is how an already-approved session gets
+re-judged, and how the scripted `llm_judge` role writes rows without going
+through review at all. Its gate is unchanged.
+
+Verified in the browser: filled the eight dimensions on a real transcript,
+pressed **Approve & save**, and the session was approved, judged FAIL
+(`revealing_answer=yes_correct`, `coherence=to_some_extent`), and the next
+pending session loaded — one submit, no navigation.
+
+Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3), 12045e8 (sample
+button), b632779 (bias fix + filters)
