@@ -496,3 +496,124 @@ class TestAnnotatorNumbering:
             SessionEvalAnnotation.objects.select_related('item').order_by('id')))
 
         assert {r['annotator'] for r in rows} == {'human_1', 'human_2', 'llm_1'}
+
+
+@pytest.mark.django_db
+class TestScopingTheAnalysis:
+    """Engine and completeness filters on the scores page.
+
+    The bug they close: a partial annotation used to contribute its answered
+    dimensions to the per-dimension table while being excluded from the pass
+    rate — so the two halves of the page were computed over different sets, and
+    a half-finished judgement quietly moved a dimension's number.
+    """
+
+    def _page(self, client, staff, **params):
+        client.force_login(staff)
+        return client.get(reverse('dashboard:benchmark:session_scores'), params)
+
+    def test_incomplete_annotations_are_excluded_from_every_number(
+            self, client, staff):
+        annotate(make_item('SESS_FULL'), staff)
+        # Answers only coherence — under the old behaviour this still moved
+        # the coherence pass rate.
+        annotate(make_item('SESS_PART'), staff,
+                 **{k: '' for k in P.DIMENSION_KEYS if k != 'coherence'},
+                 coherence=P.NO)
+
+        response = self._page(client, staff)
+        coherence = next(r for r in response.context['dimension_rows']
+                         if r['key'] == 'coherence')
+
+        assert response.context['analysed'] == 1
+        assert response.context['excluded_incomplete'] == 1
+        assert coherence['fail'] == 0          # the partial one is not counted
+        assert coherence['pass_rate'] == 1.0
+
+    def test_including_incomplete_brings_them_back(self, client, staff):
+        annotate(make_item('SESS_F2'), staff)
+        annotate(make_item('SESS_P2'), staff,
+                 **{k: '' for k in P.DIMENSION_KEYS if k != 'coherence'},
+                 coherence=P.NO)
+
+        response = self._page(client, staff, completeness='all')
+        coherence = next(r for r in response.context['dimension_rows']
+                         if r['key'] == 'coherence')
+
+        assert response.context['analysed'] == 2
+        assert coherence['fail'] == 1
+
+    def test_complete_only_is_the_default(self, client, staff):
+        annotate(make_item('SESS_D1'), staff, human_likeness='')
+
+        response = self._page(client, staff)
+
+        assert response.context['filters']['completeness'] == 'complete'
+        assert response.context['analysed'] == 0
+
+    def test_the_exclusion_is_reported_not_silent(self, client, staff):
+        """A scope that quietly shrinks the dataset is how a number ends up
+        meaning less than it appears to."""
+        annotate(make_item('SESS_R1'), staff, coherence='')
+        annotate(make_item('SESS_R2'), staff, coherence='')
+
+        body = self._page(client, staff).content.decode()
+
+        assert '2 incomplete annotation(s) excluded' in body
+
+    def test_the_engine_filter_scopes_the_analysis(self, client, staff):
+        annotate(make_item('SESS_E_S', engine='simple'), staff)
+        annotate(make_item('SESS_E_V', engine='v1'), staff, coherence=P.NO)
+
+        simple = self._page(client, staff, engine='simple')
+        everything = self._page(client, staff, engine='all')
+
+        assert simple.context['analysed'] == 1
+        assert simple.context['metrics']['human_only']['pass_pct'] == 100
+        assert everything.context['analysed'] == 2
+        assert everything.context['metrics']['human_only']['pass_pct'] == 50
+
+    def test_all_engines_is_the_default_on_the_analysis_page(
+            self, client, staff):
+        """Unlike the list, which defaults to the current engine. An analysis
+        surface silently scoped to a subset is how a partial figure gets
+        quoted as a whole one."""
+        annotate(make_item('SESS_DEF_V', engine='v1'), staff)
+
+        response = self._page(client, staff)
+
+        assert response.context['filters']['engine'] == 'all'
+        assert response.context['analysed'] == 1
+
+    def test_both_filters_compose(self, client, staff):
+        annotate(make_item('SESS_C_S', engine='simple'), staff)
+        annotate(make_item('SESS_C_SP', engine='simple'), staff, coherence='')
+        annotate(make_item('SESS_C_V', engine='v1'), staff)
+
+        response = self._page(client, staff, engine='simple')
+
+        assert response.context['analysed'] == 1
+        assert response.context['excluded_incomplete'] == 1
+
+    def test_an_unknown_filter_value_falls_back_safely(self, client, staff):
+        annotate(make_item('SESS_BAD'), staff)
+
+        response = self._page(client, staff, engine='nonsense',
+                              completeness='nonsense')
+
+        assert response.context['filters']['engine'] == 'all'
+        assert response.context['filters']['completeness'] == 'complete'
+
+    def test_the_agreement_stats_are_scoped_too(self, client, staff):
+        """Agreement over a different set than the pass rate would be
+        incomparable with it."""
+        item = make_item('SESS_AG', engine='simple')
+        annotate(item, staff)
+        annotate(item, role=SessionEvalAnnotation.Annotator.LLM_JUDGE, model='g')
+        other = make_item('SESS_AG_V', engine='v1')
+        annotate(other, staff)
+        annotate(other, role=SessionEvalAnnotation.Annotator.LLM_JUDGE, model='g')
+
+        response = self._page(client, staff, engine='simple')
+
+        assert response.context['metrics']['agreement']['items_compared'] == 1

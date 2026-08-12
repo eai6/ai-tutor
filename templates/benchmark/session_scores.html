@@ -43,7 +43,51 @@
     .btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; }
 
     #block-content-tail { height:5rem; }
+
+    .scope {
+        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        padding:0.75rem 1.1rem; margin-bottom:1rem;
+        display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;
+    }
+    .scope label { font-size:0.7rem; color:#6b7280; display:block;
+                   margin-bottom:0.2rem; text-transform:uppercase;
+                   letter-spacing:0.04em; }
+    .scope select { padding:0.4rem 0.55rem; border:1px solid #d1d5db;
+                    border-radius:6px; font-size:0.85rem; font-family:inherit;
+                    background:#fff; }
+    .scope button { padding:0.45rem 0.9rem; border:none; border-radius:6px;
+                    background:#5b21b6; color:#fff; font-size:0.85rem;
+                    font-weight:600; cursor:pointer; font-family:inherit; }
+    .scope .summary { margin-left:auto; font-size:0.8rem; color:#6b7280;
+                      text-align:right; line-height:1.5; }
 </style>
+
+<form method="get" class="scope">
+    <div>
+        <label for="sc-engine">Engine</label>
+        <select name="engine" id="sc-engine">
+            <option value="all" {% if filters.engine == 'all' %}selected{% endif %}>All engines</option>
+            {% for value, label in engines %}
+            <option value="{{ value }}" {% if filters.engine == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label for="sc-complete">Annotations</label>
+        <select name="completeness" id="sc-complete">
+            <option value="complete" {% if filters.completeness == 'complete' %}selected{% endif %}>Complete only</option>
+            <option value="all" {% if filters.completeness == 'all' %}selected{% endif %}>Include incomplete</option>
+        </select>
+    </div>
+    <button type="submit">Apply</button>
+    <div class="summary">
+        Analysing <strong>{{ analysed }}</strong> annotation(s){% if filters.engine != 'all' %}
+        on <strong>{{ filters.engine }}</strong>{% endif %}.
+        {% if excluded_incomplete %}
+        <br>{{ excluded_incomplete }} incomplete annotation(s) excluded.
+        {% endif %}
+    </div>
+</form>
 
 {% if metrics.human_only.complete == 0 %}
 <div class="warn">

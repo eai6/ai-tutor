@@ -1365,12 +1365,40 @@ def session_eval_annotate(request, item_id: str):
 
 @staff_member_required
 def session_eval_scores(request):
-    """Per-dimension and per-session pass rates, slices, agreement."""
+    """Per-dimension and per-session pass rates, slices, agreement.
+
+    Two filters scope everything on the page — not just the headline. An
+    annotation that is excluded is excluded from the per-dimension table and
+    the agreement stats too.
+
+    `completeness` defaults to complete-only. A partial annotation used to
+    contribute its answered dimensions to the per-dimension table while being
+    excluded from the pass rate, so the two halves of the page were computed
+    over different sets. Half-finished judgements are not data.
+    """
+    from apps.tutoring.models import TutorSession
+
     from apps.benchmark import session_scoring as SS
 
-    annotations = list(
-        SessionEvalAnnotation.objects.select_related('item', 'annotator_user')
-    )
+    f_engine = (request.GET.get('engine') or 'all').strip()
+    if f_engine not in list(TutorSession.Engine.values) + ['all']:
+        f_engine = 'all'
+    f_completeness = (request.GET.get('completeness') or 'complete').strip()
+    if f_completeness not in ('complete', 'all'):
+        f_completeness = 'complete'
+
+    qs = SessionEvalAnnotation.objects.select_related('item', 'annotator_user')
+    if f_engine != 'all':
+        qs = qs.filter(item__engine=f_engine)
+    annotations = list(qs)
+
+    total_before = len(annotations)
+    if f_completeness == 'complete':
+        # `complete` is a property, not a column — filtered in Python. The set
+        # is small (one row per session per annotator).
+        annotations = [a for a in annotations if a.complete]
+    excluded_incomplete = total_before - len(annotations)
+
     metrics = SS.compute_metrics(annotations)
 
     # Ordered for the template — dicts keyed by dimension lose the paper's
@@ -1396,6 +1424,12 @@ def session_eval_scores(request):
     return render(request, 'benchmark/session_scores.html', {
         'metrics': metrics,
         'slices': slices,
+        'filters': {'engine': f_engine, 'completeness': f_completeness},
+        'engines': TutorSession.Engine.choices,
+        # Reported rather than silently dropped: a scope that quietly shrinks
+        # the dataset is how a number ends up meaning less than it appears to.
+        'excluded_incomplete': excluded_incomplete,
+        'analysed': len(annotations),
         'dimension_rows': dimension_rows,
         'agreement_rows': agreement_rows,
         'pending_review': SessionEvalItem.objects.filter(
