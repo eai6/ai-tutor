@@ -58,9 +58,7 @@
     <h3>Session pass rate — human annotators</h3>
     <p class="lede">
         A session passes only if <em>every applicable</em> dimension sits at its
-        desideratum. Eight conjunctive conditions, so this number sits low even
-        for a tutor that is doing well — the per-dimension table below is what
-        says where sessions are lost.
+        desideratum.
     </p>
     <div class="headline">
         <div class="stat">
@@ -78,10 +76,6 @@
             <span class="n">{{ metrics.human_only.complete }}</span>
             <span class="k">Complete annotations</span>
         </div>
-        <div class="stat">
-            <span class="n">{{ metrics.human_only.incomplete }}</span>
-            <span class="k">Incomplete (not scored)</span>
-        </div>
     </div>
 </div>
 
@@ -91,7 +85,8 @@
         The informative number, and what the source paper reports. N/A and
         unanswered are in neither numerator nor denominator: the tutor is not
         credited for a dimension that never arose, nor penalised for one an
-        annotator skipped.
+        annotator skipped — the <strong>Blank</strong> column below is where an
+        unfinished annotation shows up.
     </p>
     <div class="tablewrap">
     <table>
