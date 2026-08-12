@@ -542,6 +542,7 @@ class SessionSampleRun(models.Model):
     # given batch actually covered.
     filter_start = models.DateField(null=True, blank=True)
     filter_end = models.DateField(null=True, blank=True)
+    filter_engine = models.CharField(max_length=16, blank=True, default='')
     filter_course = models.ForeignKey(
         'curriculum.Course', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+')

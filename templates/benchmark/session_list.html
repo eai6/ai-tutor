@@ -158,6 +158,13 @@
             real sessions not yet sampled, long enough to judge.
             {{ already_sampled }} already sampled and excluded, so running this
             again picks up new sessions rather than re-screening old ones.
+            {% if eligible_by_engine %}
+            <br>By engine —
+            {% for eng, n in eligible_by_engine.items %}<code>{{ eng }}: {{ n }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}.
+            <strong>simple</strong> is the current engine, but historical
+            sessions are <strong>v1</strong> — if simple shows 0 there is
+            nothing to sample from it yet, and that is data, not a fault.
+            {% endif %}
             <br><strong>Screen up to</strong> is a cost control, not a
             window: candidates are shuffled first, so whatever you set, the
             sessions screened are a random subset of everything matching the
@@ -177,6 +184,15 @@
             <label for="s-keep">Keep</label>
             <input type="number" id="s-keep" name="keep" value="20"
                    min="1" max="{{ keep_max }}" {% if run_active %}disabled{% endif %}>
+        </div>
+        <div>
+            <label for="s-engine">Engine</label>
+            <select id="s-engine" name="engine" {% if run_active %}disabled{% endif %}>
+                {% for value, label in engines %}
+                <option value="{{ value }}" {% if value == 'simple' %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+                <option value="">All engines</option>
+            </select>
         </div>
         <div>
             <label for="s-course">Course</label>
@@ -254,6 +270,15 @@
         </select>
     </div>
     <div>
+        <label for="f-engine">Engine</label>
+        <select name="engine" id="f-engine">
+            {% for value, label in engines %}
+            <option value="{{ value }}" {% if filters.engine == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+            <option value="all" {% if filters.engine == 'all' %}selected{% endif %}>All engines</option>
+        </select>
+    </div>
+    <div>
         <label for="f-annotated">Annotated</label>
         <select name="annotated" id="f-annotated">
             <option value="">All</option>
@@ -266,6 +291,14 @@
     <a href="{% url 'dashboard:benchmark:session_scores' %}" class="clear"
        style="margin-left:auto; color:#5b21b6; font-weight:600;">Scores &amp; export →</a>
 </form>
+
+{% if hidden_by_engine %}
+<div class="se-note" style="background:#eff6ff; border-color:#bfdbfe; color:#1e3a8a;">
+    Showing <strong>{{ filters.engine }}</strong> sessions only —
+    {{ hidden_by_engine }} session(s) on another engine are hidden.
+    <a href="?engine=all">Show all engines</a>.
+</div>
+{% endif %}
 
 <div class="se-table">
     {% if rows %}
@@ -330,11 +363,11 @@
 {% if page.has_other_pages %}
 <div class="pager">
     {% if page.has_previous %}
-    <a href="?page={{ page.previous_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}">Previous</a>
+    <a href="?page={{ page.previous_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}&engine={{ filters.engine }}">Previous</a>
     {% endif %}
     <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
     {% if page.has_next %}
-    <a href="?page={{ page.next_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}">Next</a>
+    <a href="?page={{ page.next_page_number }}&status={{ filters.status }}&subject={{ filters.subject }}&annotated={{ filters.annotated }}&engine={{ filters.engine }}">Next</a>
     {% endif %}
 </div>
 {% endif %}

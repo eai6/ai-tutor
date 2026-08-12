@@ -958,15 +958,25 @@ def _dimension_blocks(annotation=None) -> list[dict]:
 
 @staff_member_required
 def session_eval_list(request):
+    from apps.tutoring.models import TutorSession
+
     f_status = (request.GET.get('status') or '').strip()
     f_subject = (request.GET.get('subject') or '').strip()
     f_annotated = (request.GET.get('annotated') or '').strip()
+    # Defaults to the current engine. `?engine=all` shows everything — an
+    # explicit opt-out rather than an empty string, so a bookmarked URL that
+    # drops the parameter still lands on the intended default.
+    f_engine = (request.GET.get('engine') or 'simple').strip()
+    if f_engine not in list(TutorSession.Engine.values) + ['all']:
+        f_engine = 'simple'
 
     qs = SessionEvalItem.objects.all()
     if f_status:
         qs = qs.filter(status=f_status)
     if f_subject:
         qs = qs.filter(subject=f_subject)
+    if f_engine != 'all':
+        qs = qs.filter(engine=f_engine)
     if f_annotated == 'yes':
         qs = qs.annotate(_n=models.Count('annotations')).filter(_n__gt=0)
     elif f_annotated == 'no':
@@ -1018,7 +1028,15 @@ def session_eval_list(request):
         'counts': counts,
         'total': paginator.count,
         'filters': {'status': f_status, 'subject': f_subject,
-                    'annotated': f_annotated},
+                    'annotated': f_annotated, 'engine': f_engine},
+        'engines': TutorSession.Engine.choices,
+        # How many items the engine filter is currently hiding. Without this a
+        # v1 batch appears to have vanished.
+        'hidden_by_engine': (
+            0 if f_engine == 'all'
+            else SessionEvalItem.objects.exclude(engine=f_engine).count()
+        ),
+        'eligible_by_engine': S_sampling.eligible_by_engine(),
         'statuses': SessionEvalItem.Status.choices,
         'distinct_subjects': sorted(
             s for s in set(
@@ -1397,6 +1415,13 @@ def session_eval_sample_create(request):
     except (TypeError, ValueError):
         course_id = None
 
+    # 'simple' is the current engine, so it is the default. Empty means all —
+    # historical sessions are v1 and are still legitimate evaluation material.
+    from apps.tutoring.models import TutorSession
+    engine = (request.POST.get('engine') or '').strip()
+    if engine not in TutorSession.Engine.values:
+        engine = ''
+
     # Free any run whose worker died, so a killed deploy does not leave the
     # button permanently disabled.
     SessionSampleRun.reclaim_stale()
@@ -1406,7 +1431,7 @@ def session_eval_sample_create(request):
             run = SessionSampleRun.objects.create(
                 requested_limit=limit, keep_count=keep,
                 filter_start=start, filter_end=end, filter_course_id=course_id,
-                started_by=request.user,
+                filter_engine=engine, started_by=request.user,
             )
     except IntegrityError:
         # The partial unique constraint fired: another replica (or another
@@ -1419,7 +1444,7 @@ def session_eval_sample_create(request):
         return redirect('dashboard:benchmark:session_list')
 
     run_async(S.run_sample_job, run.id, limit, keep, institution_id,
-              start, end, course_id)
+              start, end, course_id, engine)
 
     messages.success(
         request,

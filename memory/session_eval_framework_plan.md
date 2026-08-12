@@ -555,5 +555,58 @@ pressed **Approve & save**, and the session was approved, judged FAIL
 (`revealing_answer=yes_correct`, `coherence=to_some_extent`), and the next
 pending session loaded — one submit, no navigation.
 
+---
+
+## Engine filter, defaulting to `simple` (2026-08-11)
+
+Engine filter on both the sample form and the list, defaulting to `simple` —
+the current engine.
+
+**There is no `tutoring_agentic_harness` engine.** `TutorSession.Engine` has
+exactly two values: `v1` (conversational_tutor) and `simple` (simple_tutor).
+The only `agentic` references in the codebase point at
+`memory/agentic_platform_architecture_plan.md`, a planning document. An unknown
+engine value now falls back to "all" rather than silently scoping to nothing.
+
+### Why the default needed guardrails, not just a default
+
+Local distribution when this was added:
+
+| pool | v1 | simple |
+|---|---|---|
+| all sessions | 200 | 749 |
+| real (non-synthetic) | 22 | 3 |
+| real + ≥4 turns | **20** | **0** |
+
+The 749 `simple` sessions are nearly all simulator runs, and the three real ones
+are too short to judge. So "simple only" legitimately matches nothing, and a
+bare zero is indistinguishable from a broken sampler. Two things surface it:
+
+- The sample card shows eligible counts **per engine**, with a line saying that
+  simple showing 0 is data rather than a fault.
+- The list says how many items the filter is hiding, with a link to show all
+  engines — otherwise a v1 batch appears to have vanished and the natural
+  conclusion is that sampling deleted it.
+
+Production distribution is unknown; it was not queried.
+
+### A counting bug the tests caught, twice
+
+`eligible_by_engine` first used `.values('engine').annotate(Count('id'))` on
+`candidate_sessions()`. Two distinct faults:
+
+1. `candidate_sessions()` annotates `Count('turns')`, so the queryset is joined
+   against SessionTurn and each session appears once per turn — the count
+   reported turns, not sessions (8 for two four-turn sessions).
+2. Adding `distinct=True` fixed that but not the real problem: chaining
+   `.values('engine')` **regroups** the queryset, so the `n_turns >= min_turns`
+   filter lands on the engine group rather than each session. It reported 18
+   across engines where the eligible count was 13.
+
+Now counted in two steps — materialise the ids (pinning per-session grouping),
+then count. `test_the_per_engine_counts_sum_to_the_eligible_count` pins the
+invariant that caught it: a breakdown that does not add up to the headline is
+worse than no breakdown.
+
 Commit: 0c286c0 (Phase 1), d67734d (Phase 2), 40e3ec3 (Phase 3), 12045e8 (sample
-button), b632779 (bias fix + filters)
+button), b632779 (bias fix + filters), d0d3580 (merged review + annotate)

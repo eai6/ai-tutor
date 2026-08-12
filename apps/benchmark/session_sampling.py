@@ -337,7 +337,7 @@ def stratum_of(session) -> str:
 
 
 def candidate_sessions(*, institution=None, min_turns: int = 4,
-                       start=None, end=None, course_id=None):
+                       start=None, end=None, course_id=None, engine=None):
     """Real, not-yet-sampled, finished-enough sessions, newest first.
 
     ``is_synthetic=False`` is not a safety gate — simulator sessions carry no
@@ -371,7 +371,33 @@ def candidate_sessions(*, institution=None, min_turns: int = 4,
         qs = qs.filter(started_at__date__lte=end)
     if course_id:
         qs = qs.filter(lesson__unit__course_id=course_id)
+    if engine:
+        qs = qs.filter(engine=engine)
     return qs
+
+
+def eligible_by_engine(**filters) -> dict:
+    """{engine: count} over the sampleable pool.
+
+    Surfaced on the page because "simple" is the current engine but most
+    HISTORICAL sessions are v1 — filtering to simple can legitimately return
+    nothing, and a bare zero is indistinguishable from a broken sampler.
+    """
+    from django.db.models import Count
+
+    from apps.tutoring.models import TutorSession
+
+    # Counted in two steps on purpose. candidate_sessions() annotates
+    # Count('turns') and filters on it, which makes the queryset GROUP BY the
+    # session. Chaining `.values('engine').annotate(...)` REGROUPS by engine,
+    # and the `n_turns >= min_turns` filter then applies to the engine group
+    # rather than to each session — which reported 18 across engines where the
+    # eligible count was 13. Materialising the ids first pins the per-session
+    # grouping, and the second query is a plain count.
+    ids = list(candidate_sessions(**filters).values_list('pk', flat=True))
+    rows = (TutorSession.objects.filter(pk__in=ids)
+            .values('engine').annotate(n=Count('id')).order_by('engine'))
+    return {r['engine']: r['n'] for r in rows}
 
 
 def draw_pool(qs, limit: int, seed: int) -> list:
@@ -587,7 +613,7 @@ def _screen_workers() -> int:
 
 def run_sample_job(run_id: int, limit: int, keep: int,
                    institution_id=None, start=None, end=None,
-                   course_id=None) -> None:
+                   course_id=None, engine=None) -> None:
     """Body of a dashboard-triggered sampling run. Executes in a thread.
 
     Reports progress into the SessionSampleRun row as it goes, because the
@@ -620,7 +646,7 @@ def run_sample_job(run_id: int, limit: int, keep: int,
         # Randomised pool, NOT the newest `limit` — see draw_pool.
         candidates = draw_pool(
             candidate_sessions(institution=institution, start=start, end=end,
-                               course_id=course_id),
+                               course_id=course_id, engine=engine),
             limit, seed=run_id,
         )
         run.candidates = len(candidates)

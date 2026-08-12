@@ -312,7 +312,8 @@ class TestTheSampleForm:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': '999999', 'keep': '99999'})
 
-        _run_id, limit, keep, _inst, _start, _end, _course = captured_async[0]
+        (_run_id, limit, keep, _inst, _start, _end, _course,
+         _engine) = captured_async[0]
         assert limit == 5000
         assert keep == 1000
 
@@ -323,7 +324,8 @@ class TestTheSampleForm:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': 'abc', 'keep': ''})
 
-        _run_id, limit, keep, _inst, _start, _end, _course = captured_async[0]
+        (_run_id, limit, keep, _inst, _start, _end, _course,
+         _engine) = captured_async[0]
         assert limit == 200
         assert keep == 20
 
@@ -695,7 +697,8 @@ class TestFilters:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': 10, 'start': 'not-a-date'})
 
-        _run, _limit, _keep, _inst, start, end, _course = captured_async[0]
+        (_run, _limit, _keep, _inst, start, end, _course,
+         _engine) = captured_async[0]
         assert start is None and end is None
 
     def test_swapped_dates_are_corrected_rather_than_returning_nothing(
@@ -705,7 +708,8 @@ class TestFilters:
         client.post(reverse('dashboard:benchmark:session_sample_create'),
                     {'limit': 10, 'start': '2026-08-01', 'end': '2026-07-01'})
 
-        _run, _limit, _keep, _inst, start, end, _course = captured_async[0]
+        (_run, _limit, _keep, _inst, start, end, _course,
+         _engine) = captured_async[0]
         assert start.isoformat() == '2026-07-01'
         assert end.isoformat() == '2026-08-01'
 
@@ -775,3 +779,168 @@ class TestTheHeartbeat:
         run.refresh_from_db()
 
         assert run.last_progress_at is not None
+
+
+@pytest.mark.django_db
+class TestEngineFilter:
+    """`simple` is the current engine and is the default everywhere.
+
+    The trap this class guards: most HISTORICAL sessions are v1, so a `simple`
+    default can legitimately match nothing. A silent zero is indistinguishable
+    from a broken sampler, and a default that hides an existing v1 batch looks
+    like data loss. Both are surfaced rather than left to be discovered.
+    """
+
+    def _simple(self, school, lesson, username):
+        s = make_session(school, lesson, username)
+        TutorSession.objects.filter(pk=s.pk).update(engine='simple')
+        return s
+
+    def test_the_pool_can_be_scoped_to_one_engine(self, school, lesson):
+        v1 = make_session(school, lesson, 'legacy')          # default engine
+        simple = self._simple(school, lesson, 'current')
+
+        assert [s.id for s in S.candidate_sessions(engine='simple')] == [simple.id]
+        assert [s.id for s in S.candidate_sessions(engine='v1')] == [v1.id]
+
+    def test_no_engine_means_all_engines(self, school, lesson):
+        make_session(school, lesson, 'legacy')
+        self._simple(school, lesson, 'current')
+
+        assert S.candidate_sessions().count() == 2
+
+    def test_the_job_honours_it(self, school, lesson, no_llm):
+        make_session(school, lesson, 'legacy')
+        self._simple(school, lesson, 'current')
+        run = SessionSampleRun.objects.create(requested_limit=50, keep_count=50)
+
+        S.run_sample_job(run.id, limit=50, keep=50, engine='simple')
+        run.refresh_from_db()
+
+        assert run.candidates == 1
+        assert SessionEvalItem.objects.get().engine == 'simple'
+
+    def test_the_per_engine_counts_expose_an_empty_pool(self, school, lesson):
+        """The number that stops 'simple: 0' looking like a bug."""
+        make_session(school, lesson, 'legacy')
+        make_session(school, lesson, 'legacy2')
+
+        counts = S.eligible_by_engine()
+
+        assert counts == {'v1': 2}
+        assert counts.get('simple', 0) == 0
+
+    def test_the_per_engine_counts_sum_to_the_eligible_count(self, school,
+                                                             lesson):
+        """The invariant that caught a real bug. Chaining
+        `.values('engine').annotate(...)` onto candidate_sessions REGROUPS the
+        queryset, so the min-turns filter lands on the engine group instead of
+        each session — it reported 18 across engines where eligible was 13.
+        A breakdown that does not add up to the headline is worse than none."""
+        for i in range(4):
+            make_session(school, lesson, f'sum_v1_{i}')
+        s = make_session(school, lesson, 'sum_simple')
+        TutorSession.objects.filter(pk=s.pk).update(engine='simple')
+        # A session too short to qualify, to make the min-turns filter matter.
+        short = TutorSession.objects.create(
+            student=User.objects.create_user(username='too_short'),
+            lesson=lesson, institution=school)
+        SessionTurn.objects.create(session=short, role='tutor', content='hi')
+
+        counts = S.eligible_by_engine()
+
+        assert sum(counts.values()) == S.candidate_sessions().count()
+        assert counts == {'simple': 1, 'v1': 4}
+
+    def test_the_sample_form_defaults_to_simple(self, client, staff,
+                                                captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'engine': 'simple'})
+
+        assert captured_async[0][7] == 'simple'
+
+    def test_an_unknown_engine_falls_back_to_all(self, client, staff,
+                                                 captured_async):
+        """A typo must not silently scope sampling to nothing."""
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'engine': 'tutoring_agentic_harness'})
+
+        assert captured_async[0][7] == ''
+
+    def test_the_run_records_the_engine_it_was_scoped_to(self, client, staff,
+                                                        captured_async):
+        client.force_login(staff)
+
+        client.post(reverse('dashboard:benchmark:session_sample_create'),
+                    {'limit': 10, 'engine': 'simple'})
+
+        assert SessionSampleRun.objects.get().filter_engine == 'simple'
+
+
+@pytest.mark.django_db
+class TestTheListEngineFilter:
+    def _item(self, item_id, engine):
+        return SessionEvalItem.objects.create(
+            item_id=item_id, session_key=f's_{item_id.lower()}',
+            engine=engine, turn_count=4,
+            transcript=[{'turn': 1, 'role': 'tutor', 'content': 'x'}])
+
+    def test_it_defaults_to_simple(self, client, staff):
+        self._item('SESS_V1', 'v1')
+        simple = self._item('SESS_SIMPLE', 'simple')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'))
+
+        assert response.context['filters']['engine'] == 'simple'
+        assert [r['item'].item_id for r in response.context['rows']] == [
+            simple.item_id]
+
+    def test_it_says_how_many_it_is_hiding(self, client, staff):
+        """Otherwise a v1 batch appears to have vanished and the natural
+        conclusion is that sampling deleted it."""
+        self._item('SESS_V1_A', 'v1')
+        self._item('SESS_V1_B', 'v1')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'))
+
+        assert response.context['hidden_by_engine'] == 2
+        assert 'are hidden' in response.content.decode()
+
+    def test_all_engines_shows_everything_and_hides_the_warning(
+            self, client, staff):
+        self._item('SESS_V1', 'v1')
+        self._item('SESS_SIMPLE', 'simple')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'),
+                              {'engine': 'all'})
+
+        assert len(response.context['rows']) == 2
+        assert response.context['hidden_by_engine'] == 0
+
+    def test_an_unknown_value_falls_back_to_the_default(self, client, staff):
+        self._item('SESS_SIMPLE', 'simple')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_list'),
+                              {'engine': 'tutoring_agentic_harness'})
+
+        assert response.context['filters']['engine'] == 'simple'
+
+    def test_pagination_keeps_the_engine_filter(self, client, staff):
+        """Page 2 resetting to the default would silently change the result
+        set mid-browse."""
+        for i in range(30):
+            self._item(f'SESS_V1_{i}', 'v1')
+        client.force_login(staff)
+
+        body = client.get(reverse('dashboard:benchmark:session_list'),
+                          {'engine': 'all'}).content.decode()
+
+        assert 'engine=all' in body
