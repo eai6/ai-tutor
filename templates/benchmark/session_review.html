@@ -74,6 +74,19 @@
             color:#4c1d95; line-height:1.5; }
     .btn-approve-judge { background:#5b21b6; color:#fff; }
 
+    /* Skip without deciding. Deliberately links, not submit buttons — inside
+       the one big form a button would post the annotation, and pressing
+       "Next" must never record a judgement by accident. */
+    .pager-bar { display:flex; gap:0.5rem; align-items:center;
+                 justify-content:space-between; margin-bottom:1rem;
+                 font-size:0.85rem; color:#6b7280; }
+    .pager-bar a, .pager-bar span.disabled {
+        padding:0.4rem 0.85rem; border:1px solid #e5e7eb; border-radius:8px;
+        background:#fff; text-decoration:none; color:#5b21b6; font-weight:600;
+    }
+    .pager-bar span.disabled { color:#d1d5db; background:#fafafa; }
+    .pager-bar .where { font-variant-numeric:tabular-nums; }
+
     /* Clear the dashboard's fixed feedback button, which otherwise sits on
        top of the last card — on the review page, on the Reject button. */
     #block-content-tail { height:5rem; }
@@ -98,9 +111,26 @@
 </div>
 {% endif %}
 
+<div class="pager-bar">
+    {% if prev_item %}
+    <a href="{% url 'dashboard:benchmark:session_review' prev_item.item_id %}{{ nav_qs }}">← Previous</a>
+    {% else %}<span class="disabled">← Previous</span>{% endif %}
+    <span class="where">
+        {{ position }} of {{ total_in_scope }}
+        {% if nav %}({% for k, v in nav.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}
+        — skipping does not record anything
+    </span>
+    {% if next_item %}
+    <a href="{% url 'dashboard:benchmark:session_review' next_item.item_id %}{{ nav_qs }}">Skip →</a>
+    {% else %}<span class="disabled">Skip →</span>{% endif %}
+</div>
+
 <form method="post">
 {% csrf_token %}
 <input type="hidden" name="annotator_role" value="{{ annotator_role }}">
+{% for key, value in nav.items %}
+<input type="hidden" name="{{ key }}" value="{{ value }}">
+{% endfor %}
 <div class="rv-grid">
     <div class="rv-left">
         <div class="rv-card">
@@ -217,13 +247,14 @@
                 </button>
             </div>
             <p class="muted" style="margin-top:0.7rem;">
-                {{ pending_count }} session(s) awaiting review. Deciding moves
-                you to the next one.
+                {{ pending_count }} session(s) awaiting review{% if nav %}
+                in this filter ({% for k, v in nav.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}.
+                Deciding moves you to the next one.
             </p>
         </div>
 
         <p class="muted">
-            <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
+            <a href="{% url 'dashboard:benchmark:session_list' %}{% if nav.engine %}?engine={{ nav.engine }}{% endif %}">← Back to the list</a>
         </p>
     </div>
 </div>

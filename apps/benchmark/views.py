@@ -927,9 +927,49 @@ def benchmark_run_detail(request, run_id: int):
 #
 # Plan: memory/session_eval_framework_plan.md
 
+from urllib.parse import urlencode
+
 from apps.benchmark import pedagogy as P
 from apps.benchmark import session_sampling as S_sampling
 from apps.benchmark.models import SessionEvalAnnotation, SessionEvalItem
+
+
+# Filters that scope a REVIEW/ANNOTATE working set, carried through the
+# review → next → review chain.
+#
+# Without this, "Save & next" jumps to whatever is globally oldest — so an
+# annotator working through `simple` sessions lands on a `v1` one, silently
+# leaving the set they chose. The filter is part of the task, not just a view
+# of the list.
+#
+# Only engine and subject: status and `annotated` describe which rows the LIST
+# shows, and the flow already implies them (review advances through pending,
+# annotate through approved-and-unannotated).
+NAV_FILTER_KEYS = ('engine', 'subject')
+
+
+def _nav_filters(request) -> dict:
+    """The active working-set filters, from either the query string or the
+    posted form. 'all' and empty both mean unscoped."""
+    out = {}
+    for key in NAV_FILTER_KEYS:
+        value = (request.GET.get(key) or request.POST.get(key) or '').strip()
+        if value and value != 'all':
+            out[key] = value
+    return out
+
+
+def _apply_nav_filters(qs, filters: dict):
+    return qs.filter(**filters) if filters else qs
+
+
+def _with_nav_filters(url: str, filters: dict) -> str:
+    """Append the working-set filters so the next page keeps the chain."""
+    if not filters:
+        return url
+    from urllib.parse import urlencode
+    sep = '&' if '?' in url else '?'
+    return f'{url}{sep}{urlencode(filters)}'
 
 
 def _dimension_blocks(annotation=None) -> list[dict]:
@@ -1156,18 +1196,44 @@ def session_eval_review(request, item_id: str):
                 f'{item.item_id} approved. No judgement recorded — open it '
                 f'again when you want to score it.')
 
-        nxt = (SessionEvalItem.objects
-               .filter(status=SessionEvalItem.Status.PENDING_REVIEW)
+        nav = _nav_filters(request)
+        nxt = (_apply_nav_filters(
+                   SessionEvalItem.objects.filter(
+                       status=SessionEvalItem.Status.PENDING_REVIEW), nav)
                .exclude(pk=item.pk)
                .order_by('created_at').first())
         if nxt:
-            return redirect('dashboard:benchmark:session_review',
-                            item_id=nxt.item_id)
-        return redirect('dashboard:benchmark:session_list')
+            return redirect(_with_nav_filters(
+                reverse('dashboard:benchmark:session_review',
+                        args=[nxt.item_id]), nav))
+        if nav:
+            messages.info(
+                request,
+                'No more sessions awaiting review in this filter '
+                f'({", ".join(f"{k}={v}" for k, v in nav.items())}).')
+        return redirect(_with_nav_filters(
+            reverse('dashboard:benchmark:session_list'), nav))
 
     report = item.redaction_report or {}
-    pending = SessionEvalItem.objects.filter(
-        status=SessionEvalItem.Status.PENDING_REVIEW).count()
+    nav = _nav_filters(request)
+
+    # Skip forward/back without deciding. Scoped to the SAME STATUS as the
+    # item being viewed as well as the working-set filter: browsing a pending
+    # session should walk pending ones, not drop you into an approved batch.
+    # Ordered by created_at to match the review queue's own order.
+    siblings = _apply_nav_filters(
+        SessionEvalItem.objects.filter(status=item.status), nav)
+    prev_item = (siblings.filter(created_at__lt=item.created_at)
+                 .order_by('-created_at').first())
+    next_item = (siblings.filter(created_at__gt=item.created_at)
+                 .order_by('created_at').first())
+    position = siblings.filter(created_at__lt=item.created_at).count() + 1
+    total_in_scope = siblings.count()
+    # Counted within the working set, or "959 awaiting review" appears while
+    # you are actually working through twelve.
+    pending = _apply_nav_filters(
+        SessionEvalItem.objects.filter(
+            status=SessionEvalItem.Status.PENDING_REVIEW), nav).count()
 
     return render(request, 'benchmark/session_review.html', {
         'item': item,
@@ -1179,6 +1245,12 @@ def session_eval_review(request, item_id: str):
         'advisory_names': report.get('advisory_names') or [],
         'replacements': report.get('replacements') or [],
         'pending_count': pending,
+        'nav': nav,
+        'prev_item': prev_item,
+        'next_item': next_item,
+        'position': position,
+        'total_in_scope': total_in_scope,
+        'nav_qs': ('?' + urlencode(nav)) if nav else '',
     })
 
 
@@ -1251,21 +1323,31 @@ def session_eval_annotate(request, item_id: str):
             done = SessionEvalAnnotation.objects.filter(
                 annotator_role=annotator_role, annotator_user=request.user,
             ).values_list('item_id', flat=True)
-            nxt = (SessionEvalItem.objects
-                   .filter(status=SessionEvalItem.Status.APPROVED)
+            nav = _nav_filters(request)
+            nxt = (_apply_nav_filters(
+                       SessionEvalItem.objects.filter(
+                           status=SessionEvalItem.Status.APPROVED), nav)
                    .exclude(id__in=list(done))
                    .order_by('created_at').first())
             if nxt:
-                return redirect('dashboard:benchmark:session_annotate',
-                                item_id=nxt.item_id)
-            messages.info(request, 'No more approved sessions to annotate.')
-            return redirect('dashboard:benchmark:session_list')
+                return redirect(_with_nav_filters(
+                    reverse('dashboard:benchmark:session_annotate',
+                            args=[nxt.item_id]), nav))
+            scope = (f' in this filter ({", ".join(f"{k}={v}" for k, v in nav.items())})'
+                     if nav else '')
+            messages.info(request,
+                          f'No more approved sessions to annotate{scope}.')
+            return redirect(_with_nav_filters(
+                reverse('dashboard:benchmark:session_list'), nav))
 
-        return redirect('dashboard:benchmark:session_annotate',
-                        item_id=item.item_id)
+        return redirect(_with_nav_filters(
+            reverse('dashboard:benchmark:session_annotate', args=[item.item_id]),
+            _nav_filters(request)))
 
-    remaining = (SessionEvalItem.objects
-                 .filter(status=SessionEvalItem.Status.APPROVED)
+    nav = _nav_filters(request)
+    remaining = (_apply_nav_filters(
+                     SessionEvalItem.objects.filter(
+                         status=SessionEvalItem.Status.APPROVED), nav)
                  .exclude(annotations__annotator_user=request.user,
                           annotations__annotator_role=annotator_role)
                  .count())
@@ -1277,6 +1359,7 @@ def session_eval_annotate(request, item_id: str):
         'annotator_role': annotator_role,
         'annotator_model': annotator_model,
         'remaining': remaining,
+        'nav': nav,
     })
 
 

@@ -571,3 +571,271 @@ class TestApproveAndAnnotateInOneGo:
             all_good_post())
 
         assert SessionEvalAnnotation.objects.get(item=item).passes is True
+
+
+@pytest.mark.django_db
+class TestNavigationRespectsTheFilter:
+    """Save & next must stay inside the set you are working through.
+
+    Reported from production: filtering to `simple` and annotating, then
+    pressing Save & next, landed on a `v1` session. With 959 pending and 114 on
+    another engine, an annotator would silently leave the set they chose and
+    only notice after judging several sessions from it.
+    """
+
+    def _item(self, item_id, engine='simple',
+              status=SessionEvalItem.Status.PENDING_REVIEW, subject='geography'):
+        return SessionEvalItem.objects.create(
+            item_id=item_id, session_key=f's_{item_id.lower()}',
+            engine=engine, subject=subject, turn_count=4, status=status,
+            transcript=[{'turn': 1, 'role': 'tutor', 'content': 'x'}])
+
+    def test_review_advances_within_the_engine_filter(self, client, staff):
+        first = self._item('SESS_S1', 'simple')
+        self._item('SESS_V1', 'v1')                 # older is irrelevant
+        second = self._item('SESS_S2', 'simple')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id])
+            + '?engine=simple',
+            {'decision': 'approve', 'engine': 'simple'})
+
+        assert second.item_id in response['Location']
+
+    def test_review_does_not_escape_into_another_engine(self, client, staff):
+        """The v1 session is the only one left; the chain must end rather than
+        hand over a session from outside the filter."""
+        only = self._item('SESS_ONLY_SIMPLE', 'simple')
+        self._item('SESS_STRAY_V1', 'v1')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[only.item_id]),
+            {'decision': 'approve', 'engine': 'simple'})
+
+        assert 'SESS_STRAY_V1' not in response['Location']
+        assert response['Location'].endswith('/sessions/?engine=simple')
+
+    def test_the_filter_survives_the_hop(self, client, staff):
+        """One hop keeping the filter is not enough — it has to persist, or
+        the chain silently widens at the second session."""
+        first = self._item('SESS_A', 'simple')
+        self._item('SESS_B', 'simple')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id]),
+            {'decision': 'approve', 'engine': 'simple'})
+
+        assert 'engine=simple' in response['Location']
+
+    def test_annotate_save_and_next_respects_the_filter(self, client, staff):
+        first = self._item('SESS_AS1', 'simple',
+                           SessionEvalItem.Status.APPROVED)
+        self._item('SESS_AV1', 'v1', SessionEvalItem.Status.APPROVED)
+        second = self._item('SESS_AS2', 'simple',
+                            SessionEvalItem.Status.APPROVED)
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_annotate',
+                    args=[first.item_id]),
+            {'save_and_next': '1', 'engine': 'simple', **all_good_post()})
+
+        assert second.item_id in response['Location']
+        assert 'engine=simple' in response['Location']
+
+    def test_a_plain_save_keeps_the_filter_too(self, client, staff):
+        """Saving without advancing re-renders the same page; losing the
+        filter there would break the NEXT Save & next."""
+        item = self._item('SESS_PLAIN', 'simple',
+                          SessionEvalItem.Status.APPROVED)
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_annotate', args=[item.item_id]),
+            {'engine': 'simple', **all_good_post()})
+
+        assert 'engine=simple' in response['Location']
+
+    def test_the_subject_filter_is_honoured_as_well(self, client, staff):
+        first = self._item('SESS_G1', subject='geography')
+        self._item('SESS_M1', subject='math')
+        second = self._item('SESS_G2', subject='geography')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id]),
+            {'decision': 'approve', 'subject': 'geography'})
+
+        assert second.item_id in response['Location']
+
+    def test_no_filter_still_walks_everything(self, client, staff):
+        """Unscoped navigation must not become accidentally scoped."""
+        first = self._item('SESS_N1', 'simple')
+        second = self._item('SESS_N2', 'v1')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id]),
+            {'decision': 'approve'})
+
+        assert second.item_id in response['Location']
+
+    def test_engine_all_means_unscoped(self, client, staff):
+        first = self._item('SESS_ALL1', 'simple')
+        second = self._item('SESS_ALL2', 'v1')
+        client.force_login(staff)
+
+        response = client.post(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id]),
+            {'decision': 'approve', 'engine': 'all'})
+
+        assert second.item_id in response['Location']
+
+    def test_the_pending_count_is_scoped_to_the_filter(self, client, staff):
+        """'959 awaiting review' while working through twelve is a lie about
+        how much work is left."""
+        item = self._item('SESS_C1', 'simple')
+        self._item('SESS_C2', 'simple')
+        for i in range(5):
+            self._item(f'SESS_CV{i}', 'v1')
+        client.force_login(staff)
+
+        response = client.get(
+            reverse('dashboard:benchmark:session_review', args=[item.item_id])
+            + '?engine=simple')
+
+        assert response.context['pending_count'] == 2
+
+    def test_the_remaining_count_is_scoped_too(self, client, staff):
+        item = self._item('SESS_R1', 'simple', SessionEvalItem.Status.APPROVED)
+        self._item('SESS_R2', 'simple', SessionEvalItem.Status.APPROVED)
+        self._item('SESS_RV', 'v1', SessionEvalItem.Status.APPROVED)
+        client.force_login(staff)
+
+        response = client.get(
+            reverse('dashboard:benchmark:session_annotate', args=[item.item_id])
+            + '?engine=simple')
+
+        assert response.context['remaining'] == 2
+
+    def test_the_list_links_carry_the_filter(self, client, staff):
+        self._item('SESS_LINK', 'simple')
+        client.force_login(staff)
+
+        body = client.get(reverse('dashboard:benchmark:session_list'),
+                          {'engine': 'simple'}).content.decode()
+
+        assert 'SESS_LINK/review/?engine=simple' in body
+
+
+@pytest.mark.django_db
+class TestSkipWithoutDeciding:
+    """Previous / Skip on the review page.
+
+    The hazard: the whole page is one form, so a submit button labelled "Next"
+    would post the annotation. These are links, and the tests assert that
+    skipping records nothing at all.
+    """
+
+    def _item(self, item_id, engine='simple',
+              status=SessionEvalItem.Status.PENDING_REVIEW):
+        return SessionEvalItem.objects.create(
+            item_id=item_id, session_key=f's_{item_id.lower()}',
+            engine=engine, turn_count=4, status=status,
+            transcript=[{'turn': 1, 'role': 'tutor', 'content': 'x'}])
+
+    def test_skipping_changes_nothing(self, client, staff):
+        first = self._item('SESS_P1')
+        second = self._item('SESS_P2')
+        client.force_login(staff)
+
+        client.get(reverse('dashboard:benchmark:session_review',
+                           args=[first.item_id]))
+        client.get(reverse('dashboard:benchmark:session_review',
+                           args=[second.item_id]))
+
+        first.refresh_from_db()
+        assert first.status == SessionEvalItem.Status.PENDING_REVIEW
+        assert first.reviewed_by is None
+        assert SessionEvalAnnotation.objects.count() == 0
+
+    def test_it_offers_the_neighbours_in_queue_order(self, client, staff):
+        first = self._item('SESS_Q1')
+        middle = self._item('SESS_Q2')
+        last = self._item('SESS_Q3')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_review',
+                                      args=[middle.item_id]))
+
+        assert response.context['prev_item'].item_id == first.item_id
+        assert response.context['next_item'].item_id == last.item_id
+        assert response.context['position'] == 2
+        assert response.context['total_in_scope'] == 3
+
+    def test_the_ends_have_no_neighbour(self, client, staff):
+        first = self._item('SESS_E1')
+        self._item('SESS_E2')
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_review',
+                                      args=[first.item_id]))
+
+        assert response.context['prev_item'] is None
+        assert response.context['next_item'] is not None
+
+    def test_skipping_stays_inside_the_engine_filter(self, client, staff):
+        first = self._item('SESS_SK1', 'simple')
+        self._item('SESS_SKV', 'v1')
+        third = self._item('SESS_SK2', 'simple')
+        client.force_login(staff)
+
+        response = client.get(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id])
+            + '?engine=simple')
+
+        assert response.context['next_item'].item_id == third.item_id
+        assert response.context['total_in_scope'] == 2
+
+    def test_the_skip_link_carries_the_filter_forward(self, client, staff):
+        first = self._item('SESS_CARRY1', 'simple')
+        self._item('SESS_CARRY2', 'simple')
+        client.force_login(staff)
+
+        body = client.get(
+            reverse('dashboard:benchmark:session_review', args=[first.item_id])
+            + '?engine=simple').content.decode()
+
+        assert 'SESS_CARRY2/review/?engine=simple' in body
+
+    def test_it_walks_the_same_status_not_a_mixed_queue(self, client, staff):
+        """Browsing pending sessions should not drop you into an approved
+        batch — they are different jobs."""
+        pending = self._item('SESS_ST1')
+        self._item('SESS_ST_APPROVED', status=SessionEvalItem.Status.APPROVED)
+        client.force_login(staff)
+
+        response = client.get(reverse('dashboard:benchmark:session_review',
+                                      args=[pending.item_id]))
+
+        assert response.context['next_item'] is None
+        assert response.context['total_in_scope'] == 1
+
+    def test_the_pager_is_links_not_submit_buttons(self, client, staff):
+        """A submit button inside the page-wide form would post the annotation.
+        Pressing Skip must never record a judgement."""
+        first = self._item('SESS_LINKS1')
+        self._item('SESS_LINKS2')
+        client.force_login(staff)
+
+        body = client.get(reverse('dashboard:benchmark:session_review',
+                                  args=[first.item_id])).content.decode()
+
+        # Split on the ELEMENT, not the string — the stylesheet mentions
+        # 'pager-bar' first.
+        pager = body.split('class="pager-bar"')[1].split('</div>')[0]
+        assert '<a href=' in pager
+        assert 'type="submit"' not in pager

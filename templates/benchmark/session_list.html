@@ -319,10 +319,15 @@
             {% for row in rows %}
             <tr>
                 <td>
+                    {% comment %}
+                        The engine/subject filters ride along so Save & next
+                        keeps working through the set you chose rather than
+                        jumping to whatever is globally oldest.
+                    {% endcomment %}
                     {% if row.item.status == 'approved' %}
-                    <a href="{% url 'dashboard:benchmark:session_annotate' row.item.item_id %}">{{ row.item.item_id }}</a>
+                    <a href="{% url 'dashboard:benchmark:session_annotate' row.item.item_id %}?engine={{ filters.engine }}&subject={{ filters.subject }}">{{ row.item.item_id }}</a>
                     {% else %}
-                    <a href="{% url 'dashboard:benchmark:session_review' row.item.item_id %}">{{ row.item.item_id }}</a>
+                    <a href="{% url 'dashboard:benchmark:session_review' row.item.item_id %}?engine={{ filters.engine }}&subject={{ filters.subject }}">{{ row.item.item_id }}</a>
                     {% endif %}
                     {% if row.residual %}
                     <br><span class="pill pill-alert">residual identifier</span>

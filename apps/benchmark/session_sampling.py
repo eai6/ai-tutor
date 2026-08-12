@@ -123,9 +123,40 @@ def safety_screen(session) -> ScreenResult:
 # Applied before the name pass. ContentSafetyFilter covers these too, but
 # running them here keeps redaction in one place and independent of that
 # class's other behaviour.
+_PHONE_CANDIDATE = re.compile(r'\b(?:\+?\d[\d\s().-]{7,}\d)\b')
+
+# A phone number has at least seven digits. Arithmetic does not.
+#
+# Found in production on 2026-08-12: a maths transcript rendered
+# "$b = 180 - 127 = 53°$" as "$b = [PHONE] = 53°$", because the digit-and-
+# separator pattern happily matches "180 - 127". That is worse than a cosmetic
+# bug — it corrupts the very material an annotator is judging for "providing
+# guidance", so the evaluation would score mangled working.
+#
+# Seychelles numbers ("248 251 4433", "+248 2514433") carry 8-10 digits, so a
+# seven-digit floor keeps every real number while excluding the arithmetic that
+# a maths tutor produces constantly.
+_MIN_PHONE_DIGITS = 7
+
+
+def _redact_phones(text: str) -> tuple[str, int]:
+    n = 0
+
+    def _replace(match):
+        nonlocal n
+        candidate = match.group(0)
+        if sum(c.isdigit() for c in candidate) < _MIN_PHONE_DIGITS:
+            return candidate            # arithmetic, not a phone number
+        if '=' in candidate:
+            return candidate            # an equation, whatever its length
+        n += 1
+        return '[PHONE]'
+
+    return _PHONE_CANDIDATE.sub(_replace, text), n
+
+
 _CONTACT_PATTERNS = (
     (re.compile(r'\b[\w.+-]+@[\w-]+\.[\w.]+\b'), '[EMAIL]'),
-    (re.compile(r'\b(?:\+?\d[\d\s().-]{7,}\d)\b'), '[PHONE]'),
     (re.compile(r'\b\d{1,4}\s+[A-Z][a-z]+\s+(?:Street|Road|Ave|Avenue|Lane|Drive)\b'), '[ADDRESS]'),
 )
 
@@ -156,6 +187,10 @@ def redact_text(text: str, name_variants: list[str]) -> tuple[str, list[str]]:
         if n:
             changed.append(f'{replacement}×{n}')
 
+    out, n = _redact_phones(out)
+    if n:
+        changed.append(f'[PHONE]×{n}')
+
     for variant in name_variants:
         pattern = re.compile(rf'\b{re.escape(variant)}\b', re.IGNORECASE)
         out, n = pattern.subn('[STUDENT]', out)
@@ -183,10 +218,13 @@ def residual_scan(transcript: list[dict], user) -> list[str]:
         if re.search(rf'\b{re.escape(variant)}\b', blob, re.IGNORECASE):
             findings.append(f'student_name_survived:{variant}')
 
-    for pattern, label in ((_CONTACT_PATTERNS[0][0], 'email'),
-                           (_CONTACT_PATTERNS[1][0], 'phone')):
-        if pattern.search(blob):
-            findings.append(f'contact_survived:{label}')
+    if _CONTACT_PATTERNS[0][0].search(blob):
+        findings.append('contact_survived:email')
+    # Same seven-digit rule as the redactor, or every maths transcript would
+    # report a surviving "phone number" and be auto-rejected.
+    _, n = _redact_phones(blob)
+    if n:
+        findings.append('contact_survived:phone')
 
     return findings
 
@@ -201,8 +239,16 @@ def advisory_name_candidates(transcript: list[dict], vocabulary: set) -> list[st
     """
     candidates = set()
     for turn in transcript:
-        for sentence in re.split(r'(?<=[.!?])\s+', turn.get('content') or ''):
-            for token in re.findall(r'\b[A-Z][a-z]{2,}\b', sentence)[1:]:
+        # Split on newlines and list markers as well as sentence enders.
+        # Without this, a markdown transcript ("**Step 3: Solve**", "- Now…")
+        # reports every line-initial word as a possible name, and the panel
+        # fills with Step / Problem / Recall / Now — burying the one token that
+        # might actually be a person, which is the only reason it exists.
+        chunks = re.split(r'(?<=[.!?])\s+|[\n\r]+|(?:^|\s)[-*\d]+[.)]\s+',
+                          turn.get('content') or '')
+        for chunk in chunks:
+            chunk = re.sub(r'^[\s*_#>|-]+', '', chunk or '')
+            for token in re.findall(r'\b[A-Z][a-z]{2,}\b', chunk)[1:]:
                 if token.lower() not in vocabulary:
                     candidates.add(token)
     return sorted(candidates)

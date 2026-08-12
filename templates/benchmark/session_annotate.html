@@ -116,6 +116,9 @@
             {% csrf_token %}
             <input type="hidden" name="annotator_role" value="{{ annotator_role }}">
             <input type="hidden" name="annotator_model" value="{{ annotator_model }}">
+            {% for key, value in nav.items %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
 
             <div class="an-card">
                 <h3>The eight dimensions</h3>
@@ -150,13 +153,14 @@
                     </button>
                 </div>
                 <p class="muted" style="margin-top:0.6rem;">
-                    {{ remaining }} approved session(s) you have not annotated.
+                    {{ remaining }} approved session(s) you have not annotated{% if nav %}
+                    in this filter ({% for k, v in nav.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}.
                 </p>
             </div>
         </form>
 
         <p class="muted">
-            <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
+            <a href="{% url 'dashboard:benchmark:session_list' %}{% if nav.engine %}?engine={{ nav.engine }}{% endif %}">← Back to the list</a>
             &nbsp;·&nbsp;
             <a href="{% url 'dashboard:benchmark:session_review' item.item_id %}">Review record</a>
         </p>

@@ -640,3 +640,56 @@ Guards kept:
 Migration `0008` alters choices on the six fields that did not previously allow
 it. Choices live in `pedagogy.py`, so the column, the form and the scorer cannot
 drift apart.
+
+---
+
+## Working-set navigation + a redaction bug found in production (2026-08-12)
+
+### Save & next now respects the filter
+
+Reported from production: filtering to `simple` and pressing **Save & next**
+landed on a `v1` session. With 959 pending and 114 on another engine, an
+annotator silently leaves the set they chose and only notices after judging
+several sessions from outside it.
+
+`engine` and `subject` are now carried through the review → next → review chain
+(query string on links, hidden fields on the form) and applied to the "next"
+lookup. The pending/remaining counts are scoped too — "959 awaiting review"
+while working through twelve is a lie about how much work is left. Status and
+`annotated` are deliberately NOT carried: they describe which rows the list
+shows, and the flow already implies them.
+
+### Previous / Skip on the review page
+
+Advance without deciding. Deliberately **links, not submit buttons** — the whole
+review page is one form, so a button labelled Next would post the annotation and
+record a judgement by accident. Scoped to the same status as the item being
+viewed, so browsing pending sessions never drops you into an approved batch.
+
+### The redactor was corrupting maths transcripts
+
+Found in a production transcript: `$b = 180 - 127 = 53°$` rendered as
+`$b = [PHONE] = 53°$`. The phone pattern
+(`\d[\d\s().-]{7,}\d`) matches digits separated by spaces and hyphens, which is
+exactly what arithmetic looks like.
+
+This is worse than cosmetic — it corrupts the material an annotator judges for
+"providing guidance", so a maths session would be scored on mangled working.
+
+Fixed with a **seven-digit floor** plus an equals-sign exclusion. Seychelles
+numbers carry 8-10 digits ("248 251 4433", "+248 2514433") so every real number
+still redacts, while `180 - 127` (six digits) does not. The residual scan uses
+the same rule — otherwise every maths transcript would report a surviving phone
+number and be auto-rejected.
+
+**Any maths session sampled before this fix has corrupted arithmetic in its
+stored transcript.** Transcripts are frozen at sampling time and never
+re-derived, so re-sampling is the only way to clean them.
+
+### Advisory names were unusable on markdown transcripts
+
+The panel listed `AnglesBeachBeauCheckFalseFour…` — every line-initial word,
+because the sentence splitter did not treat newlines or list markers as
+boundaries. The one token that might be a person was buried, which is the only
+reason the panel exists. Now splits on newlines and list markers: the same
+transcript drops from 20+ tokens to a handful.
