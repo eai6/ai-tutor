@@ -3,18 +3,13 @@
 For a ministry, school network, or partner that wants to run AI Tutor in its own
 AWS account, under its own control, with student data inside its own borders.
 
-Everything here is measured against a real running deployment
-(`migration.edwardamoah.com`, AWS account `968025288404`, `us-east-1`) as of
-**2026-08-09**, not estimated from a diagram.
-
 ---
 
 ## 1. What actually runs
 
 The platform is a single Django application in a container, a Postgres
-database, and the network plumbing that puts one in front of the other safely.
-There are no microservices and no message brokers — deliberately, because the
-whole thing has to be operable by whoever is on duty, not by a platform team.
+database.
+
 
 ```
                     Internet
@@ -54,33 +49,12 @@ whole thing has to be operable by whoever is on duty, not by a platform team.
 | **ECR** | Container registry, keeps the last 20 images. | Rollback targets. |
 | **Route 53 + ACM** | DNS and the TLS certificate. | Certificate renewal is automatic *because* the validation record is managed here. |
 
-### Deliberate omissions
-
-- **No Multi-AZ database.** Halves the bill; costs you a restore-from-backup on
-  an AZ failure. Reconsider once real classes depend on it.
-- **No CloudFront.** Media is small and served through the app.
-- **No Elasticache / queue / search cluster.** Background work runs in threads.
-- **No bastion host.** Database access is via a one-off ECS task inside the VPC.
 
 ---
 
 ## 2. What it costs
 
-Two things make published "AWS cost" figures misleading, and both apply here.
-
-**First: the account's historical bill is not the platform's bill.** This
-account also holds unrelated projects — a 1.2 TB bucket and a 279 GB bucket
-belonging to other work. They account for nearly all of the $33.51/month S3
-line. AI Tutor's own buckets total **~11 GB**.
-
-**Second: the platform only came up this month.** May–July show $44–61/month,
-but that was DNS, a domain registration and other projects' storage — no
-database, no containers, no load balancer.
-
-So the figures below are computed from the **measured resource sizes above** at
-`us-east-1` list prices, and are what a country should budget.
-
-### Fixed — you pay this whether or not anyone logs in
+### Fixed 
 
 | Item | Basis | Monthly (USD) |
 |---|---|---|
@@ -96,30 +70,16 @@ So the figures below are computed from the **measured resource sizes above** at
 | ECR | ~5 GB of images | **~0.50** |
 | **Fixed total** | | **≈ $259 / month** |
 
+- **≈ $259/month is the floor** for this shape. About $58 of it (NAT + ALB +
+  WAF) is *plumbing rather than capacity* — you pay it for a safe network and a
+  firewall, not for the ability to serve one more student.
+
 ### Variable — scales with use
 
 | Item | Driver | Rough shape |
 |---|---|---|
-| **LLM API calls** | Tutoring turns | **Usually the largest line, and it is not an AWS charge.** Billed by Anthropic / OpenAI / Google. Budget this first. |
-| NAT data processing | Outbound bytes (mostly LLM traffic) | ~$0.045/GB |
-| ALB LCUs | Connections, new requests | Single digits at pilot scale |
-| WAF requests | ~$0.60 per million | Cents at pilot scale |
-| S3 requests + egress | Media views, installer downloads | Small; installers are ~280 MB each and the download bucket is public — a widely shared link is the one line that can surprise you |
-| CloudWatch Logs | Log volume, 30-day retention | Single digits |
-| Extra Fargate tasks | Autoscaling to 4 | +$144/month per additional task |
+| **LLM API calls** | Tutoring turns | $600 for 4 schools
 
-### Honest notes on the total
-
-- **≈ $259/month is the floor** for this shape. About $58 of it (NAT + ALB +
-  WAF) is *plumbing rather than capacity* — you pay it for a safe network and a
-  firewall, not for the ability to serve one more student.
-- **The tutoring bill lives outside AWS.** Model choice dominates: the platform
-  routes per purpose (`llm.ModelConfig`), and a frontier tutoring model is
-  worth more than the entire AWS bill at modest volume. Decide the model before
-  the instance size.
-- **Cheaper is available if you accept trade-offs.** Fargate at 2 vCPU / 4 GB
-  halves the largest line; dropping the NAT gateway for VPC endpoints saves
-  ~$33 with more configuration; a `db.t4g.small` saves ~$24.
 - The **offline desktop build** exists precisely so classroom use does not
   depend on any of this.
 
@@ -167,13 +127,6 @@ pulumi config set --secret aitutor-aws:anthropic-api-key "sk-ant-..."
 pulumi config set --secret aitutor-aws:openai-api-key    "sk-..."
 pulumi config set --secret aitutor-aws:google-api-key    "..."
 ```
-
-> **Why you set the database password rather than generating it.** An earlier
-> version used a generated random password. That works exactly once: when the
-> Pulumi state was lost, the password could not be read back, and the next
-> `pulumi up` wanted to *rotate the live database password* while the running
-> container still held the old one. A value you control is a value you can
-> recover. See the comment in `infra/aws/components/data.py`.
 
 ### Step 2 — Bring up the infrastructure
 
@@ -238,14 +191,6 @@ pulumi config set aitutor-aws:waf-block-mode true
 pulumi up
 ```
 
-> **Check your uploads afterwards.** Two managed rules —
-> `SizeRestrictions_BODY` (8 KB) and `CrossSiteScripting_BODY` — block ordinary
-> file uploads: the first because any real file exceeds 8 KB, the second
-> because compressed image bytes resemble XSS signatures. Both are already
-> overridden to Count in `infra/aws/components/edge.py`, with the reasoning
-> written there. If you re-enable them, uploads stop working across the whole
-> product and the failure is a bare 403 that never reaches the application log.
-
 ### Step 6 — Verify
 
 ```bash
@@ -269,69 +214,3 @@ student's message goes to that provider. If that is unacceptable under your
 rules, the options are a regional provider endpoint, a self-hosted model, or
 the offline desktop build — which runs a local model and never calls out.
 
-### Backups
-
-RDS keeps 14 days of automated backups. Take a manual snapshot before any
-migration you cannot reverse. **Also back up two files that exist in one copy
-each**: your Pulumi state (`~/.pulumi/stacks/<project>/<stack>.json`) and the
-passphrase that encrypts it. Losing them does not destroy your infrastructure,
-but it makes it unmanageable — recovery means importing every resource by hand.
-
-### Routine operations
-
-| Task | How |
-|---|---|
-| Deploy a change | Push to `main` (CI), or `pulumi up` with a new `image-tag` |
-| Roll back | Point the service at the previous task definition revision |
-| Scale up | `pulumi config set aitutor-aws:min-tasks 2 && pulumi up` |
-| Read logs | CloudWatch log group `/ecs/<prefix>` |
-| Restore a dump | `./ops/restore_from_dump.sh <file>` — runs inside the VPC, since the database is not publicly reachable |
-| Rotate a key | `pulumi config set --secret ...` then `pulumi up`, then restart the service |
-
-### Two things that will catch you
-
-1. **A deploy does not carry configuration changes.** The CI pipeline copies the
-   running task definition and swaps only the image, so environment variables
-   changed in Pulumi do not reach the container until `pulumi up` runs *and*
-   the service is pointed at the new revision. This silently served a stale
-   `CSRF_TRUSTED_ORIGINS` for days.
-2. **`/media/<path>` has no authentication.** Anyone with a URL can fetch any
-   media file, including student-uploaded screenshots. This is a known,
-   deliberate simplification. If your rules do not permit it, gate that route
-   before going live.
-
----
-
-## 5. Reducing the bill
-
-In the order worth trying:
-
-1. **Right-size Fargate.** 2 vCPU / 4 GB halves the largest line. Watch memory —
-   the image carries CPU PyTorch and two speech models.
-2. **Replace the NAT gateway with VPC endpoints** for ECR, S3, Secrets Manager
-   and CloudWatch (~$33/month, more configuration). Only viable if the app does
-   not need general outbound internet — it does, for LLM APIs, so this is a
-   partial saving.
-3. **Smaller database.** `db.t4g.small` saves ~$24/month. It caps connections
-   lower, which has caused incidents before: `/health/` opens a connection and
-   returns 503 when it cannot, so exhausting the pool marks every replica
-   unhealthy at once.
-4. **Choose the model deliberately.** Cheaper models for judging and content
-   generation, the strong model only for tutoring. This is the biggest lever on
-   total cost and it is not an AWS setting.
-5. **Use the offline desktop build for classrooms.** No per-turn API cost and no
-   connectivity requirement.
-
----
-
-## Appendix — what a fresh deployment creates
-
-VPC across 2 AZs (public + private subnets, 1 NAT gateway) · security groups
-for ALB, tasks and RDS · ALB + target group + listeners · ACM certificate +
-Route 53 records · WAF web ACL with 4 rules · ECS cluster + 3 task definitions
-(web, migrate, material) + service · RDS PostgreSQL 16 · 3 S3 buckets (media,
-ops, downloads) · ECR repository · 6 Secrets Manager secrets · CloudWatch log
-group · IAM task and execution roles.
-
-Roughly 70 resources. `pulumi destroy` removes them all — including the
-database, so take a final snapshot first.
