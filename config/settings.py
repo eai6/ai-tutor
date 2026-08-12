@@ -9,17 +9,57 @@ Key architecture decisions:
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+_DEV_SECRET_KEY = 'dev-secret-key-change-in-production'
+SECRET_KEY = os.getenv('SECRET_KEY', _DEV_SECRET_KEY)
 
-DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+# DEBUG defaults to FALSE, so a deployment that forgets to set it gets the safe
+# value rather than tracebacks and ALLOWED_HOSTS=['*'] on a public address.
+#
+# LOCAL DEVELOPMENT: put `DEBUG=True` in your .env. Every real deployment
+# already sets this explicitly — AWS at infra/aws/__main__.py:127, Azure at
+# infra/__main__.py:647, the kiosk via its systemd unit, the desktop build in
+# config/settings_desktop.py — so flipping the default changes none of them.
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+
+# Refuse to boot with the publicly-known development signing key on anything
+# that is not in DEBUG. With that key an attacker forges session cookies and
+# password-reset tokens, and nothing in the logs would ever show it. Failing
+# loudly at startup is far better than serving.
+#
+# Three exemptions, each deliberate:
+#   * ALLOW_DEV_SECRET_KEY=1 — the offline builds set this before importing
+#     this module. They serve loopback (desktop) or an isolated access point
+#     (kiosk), ship no secret store, and are not reachable from a network an
+#     attacker is on. See config/settings_desktop.py and settings_kiosk.py.
+#   * running under pytest — Django forces DEBUG=False for tests and the suite
+#     supplies no key, so without this every test would fail at import.
+#   * `manage.py` housekeeping that never serves traffic, so that a fresh clone
+#     can still run migrations or collectstatic before secrets are configured.
+_NON_SERVING_COMMANDS = {'collectstatic', 'makemigrations', 'migrate', 'shell',
+                         'test', 'check', 'createsuperuser'}
+_ALLOW_DEV_KEY = (
+    os.getenv('ALLOW_DEV_SECRET_KEY') == '1'
+    or 'pytest' in sys.modules
+    or bool(set(sys.argv) & _NON_SERVING_COMMANDS)
+)
+if not DEBUG and SECRET_KEY == _DEV_SECRET_KEY and not _ALLOW_DEV_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY is still the development default while DEBUG is False. "
+        "Set a real one before serving traffic:\n\n"
+        "    python -c \"import secrets; print(secrets.token_urlsafe(64))\"\n\n"
+        "then put it in SECRET_KEY (see deploy/compose/.env.example). "
+        "For local development set DEBUG=True instead."
+    )
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 # In DEBUG, accept any host so LAN dev (mobile phone hitting Mac's IP) works.

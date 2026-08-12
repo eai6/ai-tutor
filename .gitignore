@@ -89,3 +89,7 @@ models/
 # Vendored native binaries for the desktop installer (manage.py stage_ollama).
 # ~31 MB per platform, reproducible from a released Ollama.
 vendor/
+
+# Self-hosted deployment backups. These contain student records — database
+# dumps and uploaded media. backup.sh writes here by default.
+deploy/compose/backups/

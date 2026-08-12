@@ -9,6 +9,18 @@ is load-bearing for the Azure production deployment (see CLAUDE.md). Nothing
 here can affect that deployment — it is reached only by setting
 DJANGO_SETTINGS_MODULE=config.settings_kiosk.
 """
+# The offline builds have no secret store and no operator to configure one, so
+# they run on the shared development SECRET_KEY. config/settings.py refuses to
+# boot on that key when DEBUG is False unless this is set, so it must be set
+# BEFORE the import below — a star-import runs the whole module.
+#
+# Accepted knowingly, and the risk is bounded by where these serve: a single-purpose isolated WiFi access point with no internet path.
+# An attacker who could forge a session cookie here would already be on that
+# network. It is still worth replacing with a per-installation generated key —
+# see memory/self_hosting_manual_plan.md.
+import os as _os  # noqa: E402
+_os.environ.setdefault('ALLOW_DEV_SECRET_KEY', '1')
+
 from config.settings import *  # noqa: F401,F403
 
 # config/settings.py:402 turns these on whenever DEBUG is False, which is right

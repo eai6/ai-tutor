@@ -1,0 +1,141 @@
+# AI Tutor — single-server deployment.
+#
+#   cp env.example .env && chmod 600 .env      # then fill it in
+#   docker compose up -d
+#
+# Three containers: the Django app, Postgres, and Caddy for TLS. Everything
+# else the platform needs (static files, the embedding model, speech models)
+# is baked into the application image.
+#
+# Full instructions: docs/self-hosting.md
+
+name: ai-tutor
+
+services:
+  db:
+    # pgvector, not plain postgres: the curriculum knowledge base is stored as
+    # vectors in this database rather than in a separate vector store. The
+    # extension is CREATEd by a Django migration
+    # (apps/curriculum/migrations/0029_curriculumchunk.py) — this image only
+    # has to make it available.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aitutor
+      POSTGRES_USER: aitutor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app's entrypoint migrates on start, so it must not start before
+      # the database can actually accept connections.
+      test: ["CMD-SHELL", "pg_isready -U aitutor -d aitutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    # No published port. The database is reachable only from the app container
+    # on the internal network — nothing on the host or the internet can dial it.
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      # Fargate and most servers are x86_64. On Apple Silicon an unqualified
+      # build produces an arm64 image that will not run there.
+      platforms:
+        - linux/amd64
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://aitutor:${POSTGRES_PASSWORD}@db:5432/aitutor
+
+      # `:?` makes compose refuse to start with a readable message rather than
+      # booting a misconfigured server. The app itself also refuses to run with
+      # the development signing key — see config/settings.py.
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env — see env.example}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS in .env}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?set CSRF_TRUSTED_ORIGINS in .env}
+
+      # Set explicitly rather than relying on defaults, so this deployment's
+      # behaviour is readable here and cannot drift with the codebase.
+      DEBUG: ${DEBUG:-False}
+      HTTPS_EDGE: ${HTTPS_EDGE:-true}
+
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-en-us}
+
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-AI Tutor <noreply@example.com>}
+
+    volumes:
+      # Uploaded figures and lesson images. AWS_MEDIA_BUCKET is deliberately
+      # unset, so Django writes here instead of S3 — and this is what
+      # backup.sh archives.
+      - media:/app/media
+
+    # Overrides the image's CMD for one reason: --timeout.
+    #
+    # The Dockerfile uses 120 s. A tutoring turn takes 20-90 s and longer on
+    # modest hardware or a cold model, so 120 is close enough to the edge to
+    # kill replies mid-generation under load. infra/systemd/ai-tutor.service
+    # uses 300 for the same reason and calls the default "load-bearing".
+    #
+    # The migrate + seed chain is kept exactly as the image defines it. Unlike
+    # ECS there is one app container here, so nothing races.
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_gamification &&
+             python manage.py backfill_progress &&
+             python manage.py classify_unit_grades &&
+             python manage.py seed_help_assistant_model &&
+             python manage.py generate_recent_updates &&
+             python manage.py build_help_index --with-source &&
+             gunicorn config.wsgi:application
+               --bind 0.0.0.0:8000
+               --workers 4 --threads 4
+               --timeout 300 --graceful-timeout 30
+               --access-logfile - --error-logfile -"
+
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # Generous: the first start runs migrations and builds the help index.
+      start_period: 300s
+    # No published port either — Caddy is the only way in.
+
+  caddy:
+    # Obtains and renews a Let's Encrypt certificate automatically, given a
+    # domain that resolves here and ports 80/443 reachable from the internet.
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing on next
+      # start, which is rate-limited by Let's Encrypt — keep it.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:

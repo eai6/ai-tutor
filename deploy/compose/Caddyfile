@@ -1,0 +1,67 @@
+# Caddy in front of the AI Tutor app container.
+#
+# Caddy is used rather than nginx for one reason: it obtains and RENEWS the TLS
+# certificate on its own. A certificate that silently expires eleven months
+# after launch is the most common way a self-hosted deployment goes down, and
+# the person who set it up is usually not the person on duty when it does.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_DOMAIN} {
+	# Certificate is requested on first start. Requirements: the domain must
+	# already resolve to this server, and ports 80 and 443 must be reachable
+	# from the internet. HTTP → HTTPS redirection is automatic.
+
+	encode gzip
+
+	reverse_proxy app:8000 {
+		# Django reads X-Forwarded-Proto to decide whether the original request
+		# was HTTPS (config/settings.py, SECURE_PROXY_SSL_HEADER). Caddy sets
+		# it, and because Caddy is the only route in, a client cannot forge it.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
+
+		# A tutoring turn takes 20-90 s. Caddy's default read timeout would cut
+		# the connection before the tutor replies; the student sees a blank
+		# response and the server log shows a completed request.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# ─────────────────────────────────────────────────────────────────────────
+# Plain HTTP, for an isolated network with no public domain
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Use this ONLY on a network with no internet path — a school LAN or a lab
+# whose traffic never leaves the building. Session and CSRF cookies travel in
+# the clear, so anyone on that network can read them.
+#
+# Replace the block above with the one below, AND set HTTPS_EDGE=false in .env.
+# Both are required: without the .env change Django marks its cookies Secure,
+# the browser refuses to send them over http://, and login fails with a bare
+# 403 and no explanation anywhere.
+#
+# :80 {
+# 	encode gzip
+# 	reverse_proxy app:8000 {
+# 		header_up X-Real-IP {remote_host}
+# 		transport http {
+# 			read_timeout 300s
+# 			write_timeout 300s
+# 		}
+# 	}
+# 	log {
+# 		output stdout
+# 		format console
+# 	}
+# }

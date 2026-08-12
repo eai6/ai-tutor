@@ -11,6 +11,18 @@ reviewable, and leaves the production path untouched.
 
 Plan: memory/desktop_offline_app_plan.md
 """
+# The offline builds have no secret store and no operator to configure one, so
+# they run on the shared development SECRET_KEY. config/settings.py refuses to
+# boot on that key when DEBUG is False unless this is set, so it must be set
+# BEFORE the import below — a star-import runs the whole module.
+#
+# Accepted knowingly, and the risk is bounded by where these serve: loopback only (127.0.0.1), never a network address.
+# An attacker who could forge a session cookie here would already be on that
+# network. It is still worth replacing with a per-installation generated key —
+# see memory/self_hosting_manual_plan.md.
+import os as _os  # noqa: E402
+_os.environ.setdefault('ALLOW_DEV_SECRET_KEY', '1')
+
 from config.settings import *  # noqa: F401,F403
 
 # ── Cookies over loopback HTTP ──────────────────────────────────────────
