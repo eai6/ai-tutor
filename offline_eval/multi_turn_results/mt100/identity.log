@@ -1,0 +1,6 @@
+2026-08-10T13:07:48Z >> identity: qwen3.5-2b-jetson digest=ccb528a5ba08 profile_think=False thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
+2026-08-10T13:10:28Z >> identity: qwen3.6-27b-instruct digest=a143a3530ccc profile_think=False thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
+2026-08-10T14:00:18Z >> identity: qwen3-30b-a3b-jetson digest=4b8e0c6311c4 profile_think=None thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
+2026-08-10T14:02:30Z >> identity: qwen3.6-27b-instruct digest=a143a3530ccc profile_think=False thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
+2026-08-10T18:43:05Z >> identity: qwen3-4b-jetson digest=b7c705adc68a profile_think=None thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
+2026-08-10T22:45:16Z >> identity: qwen3-8b-jetson digest=f43bba1057c7 profile_think=False thinking_chars=0 content_chars=1 -> answers directly (instruct-style)
