@@ -31,12 +31,29 @@ INSTALLERS = {
 }
 
 _PREFIX = 'public/desktop/latest'
+_SERVER_PREFIX = 'public/server/latest'
 
 
-def _bucket_url(filename: str) -> str:
+def server_artefacts() -> dict[str, str]:
+    """Downloadable server artefacts, keyed by a name safe to put in a URL.
+
+    Empty until SERVER_WHEEL_VERSION is set, because the filename must carry
+    the real version: pip parses the version out of the wheel's name, so a
+    stable alias like ai_tutor-latest-py3-none-any.whl is not installable.
+    """
+    version = getattr(settings, 'SERVER_WHEEL_VERSION', '')
+    if not version:
+        return {}
+    return {
+        'wheel': f'ai_tutor-{version}-py3-none-any.whl',
+        'sdist': f'ai_tutor-{version}.tar.gz',
+    }
+
+
+def _bucket_url(filename: str, prefix: str = _PREFIX) -> str:
     bucket = getattr(settings, 'AWS_DOWNLOADS_BUCKET', '')
     region = getattr(settings, 'AWS_MEDIA_REGION', 'us-east-1')
-    return f'https://{bucket}.s3.{region}.amazonaws.com/{_PREFIX}/{filename}'
+    return f'https://{bucket}.s3.{region}.amazonaws.com/{prefix}/{filename}'
 
 
 # GET and HEAD: require_GET rejects HEAD with 405, and link previewers,
@@ -46,9 +63,15 @@ def _bucket_url(filename: str) -> str:
 def download_page(request):
     """The page itself — small, cacheable, no auth."""
     configured = bool(getattr(settings, 'AWS_DOWNLOADS_BUCKET', ''))
+    artefacts = server_artefacts() if configured else {}
+    wheel = artefacts.get('wheel', '')
     return render(request, 'downloads/index.html', {
         'configured': configured,
         'version': getattr(settings, 'DESKTOP_APP_VERSION', ''),
+        # Empty until a wheel has been published, in which case the page offers
+        # Docker and the release list rather than a link that 404s.
+        'server_wheel': wheel,
+        'server_wheel_url': _bucket_url(wheel, _SERVER_PREFIX) if wheel else '',
     })
 
 
@@ -64,3 +87,17 @@ def download_installer(request, platform: str):
     if not filename or not getattr(settings, 'AWS_DOWNLOADS_BUCKET', ''):
         raise Http404('unknown platform')
     return redirect(_bucket_url(filename))
+
+
+@require_http_methods(["GET", "HEAD"])
+def download_server(request, artefact: str):
+    """302 to a server artefact (the wheel or the sdist) in S3.
+
+    Allowlisted for the same reason as the desktop installers: taking a
+    filename from the URL would let anyone redirect through this domain to an
+    arbitrary key in the bucket.
+    """
+    filename = server_artefacts().get(artefact)
+    if not filename or not getattr(settings, 'AWS_DOWNLOADS_BUCKET', ''):
+        raise Http404('unknown artefact')
+    return redirect(_bucket_url(filename, _SERVER_PREFIX))

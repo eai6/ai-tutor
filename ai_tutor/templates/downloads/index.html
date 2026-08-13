@@ -9,7 +9,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>AI Tutor — Desktop app</title>
+<title>AI Tutor — Downloads</title>
 <style>
   :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8; --warn:#92400e; --warnbg:#fffbeb; --warnline:#fcd34d; }
   * { box-sizing: border-box; }
@@ -29,19 +29,29 @@
   .note li { margin-bottom:.4rem; }
   code { background:#f3f4f6; padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
   h3 { font-size:.95rem; margin:1.25rem 0 .35rem; }
+  /* The install command contains a long bucket URL. Wrapping rather than
+     scrolling matters here: someone is copying it by eye onto a server. */
+  pre.cmd { background:#f3f4f6; border:1px solid var(--line); border-radius:8px;
+            padding:1rem; font-size:.8rem; margin:0 0 .5rem;
+            white-space:pre-wrap; overflow-wrap:anywhere; }
+  pre.cmd code { background:none; padding:0; }
   footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line); padding-top:1rem; margin-top:2.5rem; }
   @media (prefers-color-scheme: dark) {
     :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --warnbg:#3b2f0b; --warnline:#a16207; --warn:#fcd34d; }
     body { background:#111827; }
     .card { background:#1f2937; }
     code { background:#374151; }
+    pre.cmd { background:#0b1220; }
   }
 </style>
 </head>
 <body>
 <main>
-  <h1>AI Tutor — Desktop app</h1>
-  <p class="sub">Runs offline. No internet needed once installed.</p>
+  <h1>AI Tutor — Downloads</h1>
+  <p class="sub">For one classroom computer, or for a whole school's server.</p>
+
+  <h2 style="font-size:1.05rem;margin:0 0 .75rem">On a classroom computer</h2>
+  <p class="sub" style="margin:0 0 1rem">Runs offline. No internet needed once installed.</p>
 
   <div class="cards">
     <div class="card">
@@ -88,6 +98,42 @@
     language model. Later launches are quick. The app opens in its own window;
     there is nothing to configure.
   </p>
+
+  <h2 style="font-size:1.05rem;margin:2.5rem 0 .75rem">On a server, for a whole school</h2>
+  <p class="sub" style="margin:0 0 1rem">
+    Runs the full platform, with teacher dashboards and student accounts.
+    Two ways to install it — Docker is the shorter road.
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <h2>Docker <span style="color:var(--muted);font-weight:400">— recommended</span></h2>
+      <p>Brings its own database and certificates. Nothing else to install.</p>
+      <a class="btn" href="https://github.com/eai6/ai-tutor/blob/main/docs/self-hosting.md">Instructions</a>
+    </div>
+
+    <div class="card">
+      <h2>Python package</h2>
+      {% if server_wheel %}
+        <p>For a server where containers are not allowed. You supply PostgreSQL and TLS.</p>
+        <a class="btn" href="{% url 'downloads:server' 'wheel' %}">Download .whl</a>
+      {% else %}
+        <p>For a server where containers are not allowed. Published with each release.</p>
+        <a class="btn" href="https://github.com/eai6/ai-tutor/releases">Releases</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if server_wheel %}
+  <h3>Installing the Python package</h3>
+  <pre class="cmd"><code>python3.12 -m venv /opt/ai-tutor/venv
+/opt/ai-tutor/venv/bin/pip install {{ server_wheel_url }}
+/opt/ai-tutor/venv/bin/ai-tutor init</code></pre>
+  <p class="sub" style="font-size:.85rem">
+    Then follow Path C in the self-hosting manual. Needs Python 3.12 or newer,
+    PostgreSQL, and a reverse proxy for HTTPS.
+  </p>
+  {% endif %}
 
   <footer>
     {% if version %}Version <strong>{{ version }}</strong><br>{% endif %}

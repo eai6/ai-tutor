@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write        # to create the release and upload the wheel to it
+  id-token: write        # OIDC, to assume the role that writes to the bucket
 
 jobs:
   build:
@@ -127,6 +128,32 @@ jobs:
             || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
           gh release upload "$GITHUB_REF_NAME" dist_wheel/* --clobber
 
+      # Same destination and shape as desktop-build.yml uses for the
+      # installers: a versioned copy as the archive, and latest/ as the link
+      # the download page hands out, so the page needs no edit per release.
+      # The bucket's public/ prefix is world-readable; the wheel contains no
+      # secrets and no student data (checked above).
+      - name: Configure AWS credentials (OIDC)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Publish to the download bucket
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          BUCKET: ${{ secrets.AWS_DOWNLOADS_BUCKET }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          for FILE in dist_wheel/*.whl dist_wheel/*.tar.gz; do
+            aws s3 cp "$FILE" "s3://${BUCKET}/public/server/releases/${TAG}/$(basename "$FILE")"
+            aws s3 cp "$FILE" "s3://${BUCKET}/public/server/latest/$(basename "$FILE")" \
+              --cache-control 'no-cache, max-age=60'
+          done
+          echo "::notice title=Published::Set SERVER_WHEEL_VERSION=${TAG#v} on the web app so /download/ links to it."
+
       - name: Summary
         run: |
           {
@@ -145,4 +172,7 @@ jobs:
             echo '```'
             echo ''
             echo 'Then follow Path C in docs/self-hosting.md.'
+            echo ''
+            echo '**Remember:** set `SERVER_WHEEL_VERSION` on the web app, or'
+            echo 'the /download/ page keeps offering the previous version.'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -380,6 +380,13 @@ DESKTOP_BUILD = False
 AWS_DOWNLOADS_BUCKET = os.getenv('AWS_DOWNLOADS_BUCKET', '')
 DESKTOP_APP_VERSION = os.getenv('DESKTOP_APP_VERSION', '')
 
+# Version of the server wheel published to the downloads bucket. The filename
+# has to carry the real version — pip parses it out of the name and refuses
+# anything else — so the download page cannot link to a stable "latest" name
+# without knowing this. Unset, the page offers Docker and the release list
+# instead of a direct link, which is right: better no link than a broken one.
+SERVER_WHEEL_VERSION = os.getenv('SERVER_WHEEL_VERSION', '')
+
 AWS_MEDIA_BUCKET = os.getenv('AWS_MEDIA_BUCKET', '')
 AWS_MEDIA_REGION = os.getenv('AWS_MEDIA_REGION', 'us-east-1')
 USE_S3_MEDIA = bool(AWS_MEDIA_BUCKET)
