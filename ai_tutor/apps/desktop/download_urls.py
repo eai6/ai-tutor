@@ -10,5 +10,8 @@ urlpatterns = [
     # Server artefacts before the platform catch-all, or 'server' would be
     # read as a desktop platform name and 404.
     path('server/<str:artefact>/', public_views.download_server, name='server'),
+    # /download/self-hosting/ redirects to the canonical /self-hosting/ so a
+    # link written either way still lands.
+    path('self-hosting/', public_views.self_hosting, name='self_hosting_alias'),
     path('<str:platform>/', public_views.download_installer, name='installer'),
 ]

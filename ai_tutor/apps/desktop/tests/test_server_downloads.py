@@ -74,21 +74,94 @@ class TestPage:
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_offers_both_server_routes(self):
-        body = Client().get('/download/').content.decode()
+        """Both live on /self-hosting/ now — the desktop page just points there."""
+        body = Client().get('/self-hosting/').content.decode()
         assert 'Docker' in body
         assert 'Download .whl' in body
         assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
 
     @override_settings(SERVER_WHEEL_VERSION='', **BUCKET)
     def test_never_offers_a_link_it_cannot_serve(self):
-        """Before a release the page must send people to Docker and the release
-        list, not to a button that 404s."""
-        body = Client().get('/download/').content.decode()
+        """Before a release the page points at the manual's Path C rather than
+        a download button that 404s."""
+        body = Client().get('/self-hosting/').content.decode()
         assert 'Download .whl' not in body
-        assert 'Docker' in body
-        assert '/releases' in body
+        assert 'Read Path C' in body
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_still_offers_the_desktop_installers(self):
         body = Client().get('/download/').content.decode()
         assert 'macOS' in body and 'Windows' in body
+
+
+@pytest.mark.django_db
+class TestSelfHostingPage:
+    """The manual, served by the application.
+
+    It exists because the repository is private: a public download page cannot
+    route a ministry's instructions through a URL they cannot open.
+    """
+
+    def test_serves_the_whole_manual(self, client):
+        body = client.get('/self-hosting/').content.decode()
+        for section in ('Choosing a path', 'Path A', 'Path B',
+                        'Path C', 'What leaves your network'):
+            assert section in body, f'missing: {section}'
+
+    def test_renders_markdown_rather_than_showing_it(self, client):
+        body = client.get('/self-hosting/').content.decode()
+        assert '<table' in body and '<h2' in body
+        assert '| You provide |' not in body, 'markdown table left unrendered'
+
+    def test_every_in_page_anchor_resolves(self, client):
+        """markdown-it does not generate heading ids on its own, so without
+        the slugger every anchor on the page — including the buttons at the
+        top and the manual's own cross-references — is dead."""
+        import re
+        body = client.get('/self-hosting/').content.decode()
+        ids = set(re.findall(r'<h[1-6] id="([^"]+)"', body))
+        targets = {h[1:] for h in re.findall(r'href="(#[^"]+)"', body)}
+        assert targets, 'expected in-page links'
+        assert not (targets - ids), f'dangling anchors: {sorted(targets - ids)}'
+
+    def test_uses_github_slugs(self, client):
+        """The document is written and reviewed on GitHub and its own
+        cross-references are GitHub-style anchors."""
+        body = client.get('/self-hosting/').content.decode()
+        assert 'id="3-path-a--your-own-server"' in body
+
+    def test_renders_without_the_bucket_configured(self, client):
+        """The manual is the point of the page; the download buttons are not."""
+        with override_settings(AWS_DOWNLOADS_BUCKET='', SERVER_WHEEL_VERSION=''):
+            body = client.get('/self-hosting/').content.decode()
+        assert 'Choosing a path' in body
+        assert 'Download .whl' not in body
+
+    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
+    def test_offers_the_wheel_when_one_is_published(self, client):
+        body = client.get('/self-hosting/').content.decode()
+        assert 'Download .whl' in body
+        assert 'ai_tutor-1.2.0.tar.gz' in body
+
+    def test_the_two_pages_link_to_each_other(self, client):
+        """Separate audiences, but someone always lands on the wrong one."""
+        assert '/self-hosting/' in client.get('/download/').content.decode()
+        assert '/download/' in client.get('/self-hosting/').content.decode()
+
+    def test_the_desktop_page_no_longer_carries_server_instructions(self, client):
+        with override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET):
+            body = client.get('/download/').content.decode()
+        assert 'python3.12 -m venv' not in body
+        assert 'macOS' in body
+
+
+class TestSlug:
+
+    @pytest.mark.parametrize('heading,expected', [
+        ('3. Path A — your own server', '3-path-a--your-own-server'),
+        ('What leaves your network', 'what-leaves-your-network'),
+        ('Step 1 — Install', 'step-1--install'),
+    ])
+    def test_matches_github(self, heading, expected):
+        from ai_tutor.apps.desktop.public_views import _slug
+        assert _slug(heading) == expected

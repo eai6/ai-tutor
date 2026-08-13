@@ -224,6 +224,13 @@ packages = ["ai_tutor"]
 # rule matches.
 artifacts = ["ai_tutor/static/vendor/**/*"]
 
+# The self-hosting manual is served BY the application at /self-hosting/, so it
+# has to travel inside the wheel. force-include (rather than moving the file)
+# keeps docs/ as the single source of truth — the same document is read from
+# the repo, rendered on the site, and shipped to anyone who installs it.
+[tool.hatch.build.targets.wheel.force-include]
+"docs/self-hosting.md" = "ai_tutor/docs/self-hosting.md"
+
 # Non-Python files under ai_tutor/ are swept in by `packages` above — templates,
 # static, locale and the seed curriculum all ship inside the wheel. They are NOT
 # force-included: hatchling rejects force-include for paths already inside a
