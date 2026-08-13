@@ -303,6 +303,23 @@
         </form>
     </section>
 
+    {% if is_desktop_build %}
+        {% comment %}
+        This computer's server. Packaged offline builds only — on the hosted
+        web app there is no "this computer" to configure.
+        See apps/accounts/context_processors.py::desktop_build.
+        {% endcomment %}
+        <section class="panel">
+            <h2>{% trans "School server" %}</h2>
+            <p class="panel-sub">
+                {% trans "Where this computer sends finished work. Optional — it teaches without one." %}
+            </p>
+            <a href="{% url 'desktop:server' %}" class="btn btn-secondary">
+                {% trans "Change server address" %}
+            </a>
+        </section>
+    {% endif %}
+
     {# ── Sign out ──────────────────────────────────────────────── #}
     <section class="panel">
         <h2>{% trans "Session" %}</h2>

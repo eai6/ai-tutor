@@ -82,10 +82,48 @@ def _backoff(attempt: int) -> timedelta:
     return timedelta(seconds=base + random.uniform(0, 10))
 
 
-def _endpoint(path: str) -> str | None:
-    from django.conf import settings
-    base = (getattr(settings, 'SYNC_SERVER_URL', '') or '').rstrip('/')
+def _endpoint(path: str, state=None) -> str | None:
+    """Absolute URL on this device's server, or None if it has no server.
+
+    Reads DeviceState rather than the setting alone: a packaged desktop
+    application cannot be handed an environment variable, so the server is
+    normally chosen on the connection screen after install. The setting still
+    takes precedence for scripted rollouts — see DeviceState.server_url.
+    """
+    from apps.desktop.models import DeviceState
+
+    if state is None:
+        state = DeviceState.load()
+    base = state.effective_server_url
     return f'{base}{path}' if base else None
+
+
+def _refresh_access_token(state) -> bool:
+    """Trade the refresh token for a new access token. True if it worked.
+
+    Quiet on failure: an expired refresh is not an error to alarm anyone with,
+    it just means the student signs in again next time they are at the machine.
+    """
+    import requests
+
+    if not state.refresh_token:
+        return False
+    url = _endpoint('/api/v1/auth/refresh/', state)
+    if not url:
+        return False
+    try:
+        response = requests.post(url, json={'refresh': state.refresh_token},
+                                 timeout=REQUEST_TIMEOUT)
+    except Exception:                                        # noqa: BLE001
+        return False
+    if response.status_code != 200:
+        return False
+    access = (response.json() or {}).get('access') or ''
+    if not access:
+        return False
+    state.access_token = access
+    state.save(update_fields=['access_token'])
+    return True
 
 
 def send_one(item) -> bool:
@@ -94,18 +132,18 @@ def send_one(item) -> bool:
     from apps.desktop.models import DeviceState, SyncOutbox
 
     state = DeviceState.load()
-    token = getattr(state, 'sync_token', '') or ''
-    url = _endpoint('/api/v1/devices/sync/')
+    token = state.access_token or ''
+    url = _endpoint('/api/v1/sessions/upload/', state)
     if not url or not token:
-        return False                       # not enrolled yet; leave it queued
+        # No server, or nobody signed in yet. Both are normal: the work stays
+        # queued and goes up whenever someone does sign in.
+        return False
 
-    body = {
-        'client_uuid': str(item.client_uuid),
-        'kind': item.kind,
-        'server_user_id': item.server_user_id,
-        'device_id': str(state.device_id),
-        'payload': item.payload,
-    }
+    # The upload endpoint takes the session directly, authenticated as the
+    # student who did it. No device identity, no server_user_id — the token
+    # already says who this is, and the server will not accept a claim to be
+    # anyone else.
+    body = {'client_uuid': str(item.client_uuid), **item.payload}
 
     item.attempt_count += 1
     item.last_attempt_at = timezone.now()
@@ -113,8 +151,15 @@ def send_one(item) -> bool:
     try:
         response = requests.post(
             url, json=body, timeout=REQUEST_TIMEOUT,
-            headers={'Authorization': f'Device {token}'},
+            headers={'Authorization': f'Bearer {token}'},
         )
+        if response.status_code == 401 and _refresh_access_token(state):
+            # Access tokens are short-lived and a device is often asleep for
+            # longer than one lasts, so this is the common path, not an edge.
+            response = requests.post(
+                url, json=body, timeout=REQUEST_TIMEOUT,
+                headers={'Authorization': f'Bearer {state.access_token}'},
+            )
     except Exception as exc:                              # noqa: BLE001
         # Offline, DNS failure, captive portal. Not an error worth alarming
         # anyone about — it is the expected state.
@@ -135,13 +180,15 @@ def send_one(item) -> bool:
         return True
 
     if response.status_code in (401, 403):
-        # Revoked or unenrolled. Retrying cannot fix it, and hammering a server
-        # that is refusing us is worse than stopping.
+        # The sign-in is no longer good — password changed, account disabled,
+        # refresh expired. Retrying cannot fix it and hammering a server that
+        # is refusing us is worse than stopping. The student signs in again.
         item.status = SyncOutbox.Status.FAILED
-        item.last_error = f'HTTP {response.status_code}: device rejected'
+        item.last_error = f'HTTP {response.status_code}: sign in again'
         item.save(update_fields=['status', 'last_error', 'attempt_count',
                                  'last_attempt_at'])
-        logger.warning('[Sync] device rejected (%s) — stopping', response.status_code)
+        logger.warning('[Sync] rejected (%s) — student must sign in again',
+                       response.status_code)
         return True
 
     item.last_error = f'HTTP {response.status_code}: {response.text[:200]}'

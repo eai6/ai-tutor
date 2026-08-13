@@ -1,0 +1,157 @@
+{% comment %}
+Where this device sends work.
+
+Standalone like setup.html: reachable before any student has claimed a name on
+this device, so it cannot rely on base.html or a logged-in user.
+
+Optional by design. A device with no server set is a fully working offline
+tutor — the wording must never imply it is broken until someone fills this in.
+{% endcomment %}
+{% load i18n %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% trans "School server" %}</title>
+<style>
+  :root { color-scheme: light dark; --bg:#faf9f7; --fg:#1c1b19; --muted:#6b6862;
+          --line:#e5e1db; --card:#fff; --accent:#e8590c; --ok:#2f9e5f; --bad:#d1493f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17161a; --fg:#ece9e6; --muted:#9a958e; --line:#2c2a30; --card:#1f1e24; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system,
+         "Segoe UI",Inter,system-ui,sans-serif; padding:40px 20px; }
+  .wrap { max-width:600px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 6px; letter-spacing:-.02em; }
+  .lede { color:var(--muted); margin:0 0 28px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:22px; margin-bottom:16px; }
+  .card h2 { font-size:16px; margin:0 0 4px; }
+  .card p { color:var(--muted); font-size:13.5px; margin:0 0 16px; }
+  label { display:block; font-size:13px; font-weight:600; margin:0 0 6px; }
+  input[type=text] { width:100%; font:inherit; padding:10px 12px; border-radius:8px;
+         border:1px solid var(--line); background:var(--bg); color:var(--fg); margin-bottom:8px; }
+  .hint { color:var(--muted); font-size:12.5px; margin:0 0 16px; }
+  button { font:inherit; font-weight:600; border-radius:8px; padding:10px 16px;
+           border:1px solid var(--line); background:transparent; color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .msg { border-radius:8px; padding:12px 14px; margin:0 0 16px; font-size:14px; }
+  .msg.bad { background:rgba(209,73,63,.1); border:1px solid var(--bad); color:var(--bad); }
+  .msg.ok { background:rgba(47,158,95,.1); border:1px solid var(--ok); color:var(--ok); }
+  .current { font-size:14px; margin:0; }
+  .current code { background:var(--bg); border:1px solid var(--line); border-radius:5px;
+                  padding:2px 7px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>{% trans "School server" %}</h1>
+  <p class="lede">
+    {% blocktrans trimmed %}
+      Optional. This computer teaches without a connection — an address here
+      only lets finished work reach your school's server.
+    {% endblocktrans %}
+  </p>
+
+  {% if error %}<div class="msg bad">{{ error }}</div>{% endif %}
+  {% if notice %}<div class="msg ok">{{ notice }}</div>{% endif %}
+
+  {% if state.pinned_by_admin %}
+    {% comment %}
+    Pinned in the environment by whoever imaged this machine; a form here
+    would offer a choice the application cannot honour.
+    {% endcomment %}
+    <div class="card">
+      <h2>{% trans "Set by your administrator" %}</h2>
+      <p class="current" style="margin:0">
+        {% blocktrans trimmed with server=state.server_url %}
+          This computer is set to use <code>{{ server }}</code>. To change it,
+          contact whoever set it up.
+        {% endblocktrans %}
+      </p>
+    </div>
+  {% else %}
+    <form method="post" action="{% url 'desktop:server_save' %}">
+      {% csrf_token %}
+      <div class="card">
+        <h2>{% trans "Server address" %}</h2>
+        <p>{% trans "The web address teachers use to sign in. Your administrator has it." %}</p>
+
+        <label for="server_url">{% trans "Address" %}</label>
+        <input type="text" id="server_url" name="server_url" required
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               value="{{ state.server_url }}"
+               placeholder="tutor.education.gov.xx">
+        <p class="hint">{% trans "Example: tutor.education.gov.xx" %}</p>
+
+        <button type="submit" class="primary">{% trans "Save" %}</button>
+      </div>
+    </form>
+
+    {% if state.server_url %}
+      <form method="post" action="{% url 'desktop:server_signin' %}">
+        {% csrf_token %}
+        <div class="card">
+          <h2>
+            {% if state.signed_in %}{% trans "Signed in" %}{% else %}{% trans "Sign in" %}{% endif %}
+          </h2>
+          {% if state.signed_in %}
+            <p>{% blocktrans trimmed with who=state.server_username %}
+              Signed in as {{ who }}. Finished work is sent automatically.
+            {% endblocktrans %}</p>
+          {% else %}
+            <p>{% blocktrans trimmed %}
+              Use the same username and password you use on the school
+              website. After this you can sign in on this computer with no
+              internet.
+            {% endblocktrans %}</p>
+          {% endif %}
+
+          <label for="username">{% trans "Username" %}</label>
+          <input type="text" id="username" name="username" required
+                 autocapitalize="none" autocorrect="off" spellcheck="false"
+                 value="{{ state.server_username }}">
+
+          <label for="password">{% trans "Password" %}</label>
+          <input type="password" id="password" name="password" required
+                 style="width:100%;font:inherit;padding:10px 12px;border-radius:8px;
+                        border:1px solid var(--line);background:var(--bg);
+                        color:var(--fg);margin-bottom:16px">
+
+          <button type="submit" class="primary">
+            {% if state.signed_in %}{% trans "Sign in again" %}{% else %}{% trans "Sign in" %}{% endif %}
+          </button>
+        </div>
+      </form>
+
+      <form method="post" action="{% url 'desktop:server_clear' %}">
+        {% csrf_token %}
+        <div class="card">
+          <h2>{% trans "Work offline only" %}</h2>
+          <p>
+            {% blocktrans trimmed %}
+              Removes the address. Lessons and student work stay on this
+              computer.
+            {% endblocktrans %}
+          </p>
+          <button type="submit">{% trans "Clear address" %}</button>
+        </div>
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% comment %}
+  Without this the page is a dead end: the desktop shell has no address bar
+  and no back button.
+  {% endcomment %}
+  <p style="margin-top:24px">
+    <a href="{% url 'desktop:setup' %}"
+       style="color:var(--muted);font-size:14px">&larr; {% trans "Back to setup" %}</a>
+  </p>
+
+</div>
+</body>
+</html>

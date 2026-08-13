@@ -144,3 +144,15 @@ def baseline_recommendations(request):
         return {'baseline_recommended_courses': recommended}
     except Exception:
         return {'baseline_recommended_courses': []}  # fail-open
+
+
+def desktop_build(request):
+    """Expose ``is_desktop_build`` so templates can show device-only settings.
+
+    The school-server address belongs to one installed machine. On the hosted
+    web app there is no such thing, so the panel must not appear there — and
+    `apps.desktop` being installed everywhere means the template cannot tell
+    the difference by itself.
+    """
+    from django.conf import settings
+    return {'is_desktop_build': getattr(settings, 'DESKTOP_BUILD', False)}

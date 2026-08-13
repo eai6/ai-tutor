@@ -42,3 +42,23 @@ CSRF_COOKIE_SECURE = False
 # sending a header.
 SECURE_PROXY_SSL_HEADER = None
 SECURE_SSL_REDIRECT = False
+
+# HSTS must NOT be sent from here. config/settings.py enables it whenever
+# HTTPS_EDGE is true, which is its default — and this build serves plain HTTP.
+#
+# The damage is not theoretical and not recoverable: a browser that receives
+# HSTS remembers it, and will then refuse to load http:// from this host for a
+# year. There is no way to reach a student's laptop to undo that. Django's own
+# check calls it "serious, irreversible" for exactly this reason.
+#
+# SECURE_SSL_REDIRECT is already forced False above for the same family of
+# reason: redirecting to an https:// port nothing listens on serves nothing.
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+
+
+# This IS a packaged offline build, so device-only settings (the school
+# server address) are reachable from the in-app settings page. See
+# config/settings.py::DESKTOP_BUILD.
+DESKTOP_BUILD = True

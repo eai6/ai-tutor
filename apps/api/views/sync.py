@@ -19,6 +19,7 @@ only turns, etc.) so the client can sync incrementally.
 
 from datetime import datetime
 
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -161,3 +162,92 @@ def sync(request, session_id):
                     summary['exit_attempt_duplicate'] = True
 
     return Response(summary, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsInstitutionMember])
+def upload_session(request):
+    """POST /api/v1/sessions/upload/ — a whole session finished offline.
+
+    For a client that did the tutoring itself while disconnected, so there is
+    no server-side session to sync into yet. The offline desktop build is the
+    caller; `sync` above is for a session the server already knows about.
+
+    Authenticated as the STUDENT, not as a device. The session is created for
+    request.user and no one else — a client cannot upload work on behalf of
+    another account, which is the whole reason this is simpler than the device
+    path.
+
+        body = {"client_uuid": "...", "lesson_id": 12, "status": "completed",
+                "turns": [{"role": "student", "content": "...",
+                           "client_uuid": "..."}, ...]}
+
+    Idempotent on client_uuid: a retry after a lost response returns 409 rather
+    than creating the lesson twice. Retrying is free, which is what lets the
+    client be aggressive about it on a bad connection.
+    """
+    from apps.accounts.models import Institution
+    from apps.curriculum.models import Lesson
+
+    payload = request.data or {}
+    client_uuid = (payload.get('client_uuid') or '').strip()
+    lesson_id = payload.get('lesson_id')
+
+    if not client_uuid:
+        return Response({'detail': 'client_uuid is required.'}, status=400)
+    if not lesson_id:
+        return Response({'detail': 'lesson_id is required.'}, status=400)
+
+    # Already here from an earlier attempt whose response never arrived.
+    existing = SessionTurn.objects.filter(client_uuid=client_uuid).first()
+    if existing:
+        return Response({'detail': 'already recorded',
+                         'session_id': existing.session_id}, status=409)
+
+    # Same visibility rule as start_session: the student's own institutions,
+    # plus platform-wide content.
+    institution_ids = list(
+        request.user.memberships.filter(is_active=True)
+        .values_list('institution_id', flat=True)
+    )
+    lesson_qs = Lesson.objects.all()
+    if not request.user.is_staff:
+        lesson_qs = lesson_qs.filter(
+            Q(unit__course__institution_id__in=institution_ids)
+            | Q(unit__course__institution__isnull=True),
+        )
+    lesson = lesson_qs.filter(id=lesson_id).select_related('unit__course').first()
+    if lesson is None:
+        # Also what a lesson from another school gets. Not distinguished, so
+        # this cannot be used to probe which lesson ids exist.
+        return Response({'detail': 'No such lesson.'}, status=404)
+
+    session_institution = lesson.unit.course.institution or Institution.get_global()
+    status_in = payload.get('status') or TutorSession.Status.COMPLETED
+    if status_in not in dict(TutorSession.Status.choices):
+        return Response({'detail': 'Unknown status.'}, status=400)
+
+    try:
+        with transaction.atomic():
+            session = TutorSession.objects.create(
+                student=request.user, lesson=lesson,
+                institution=session_institution, status=status_in,
+            )
+            for i, turn in enumerate(payload.get('turns') or []):
+                SessionTurn.objects.create(
+                    session=session,
+                    role=turn.get('role') or 'student',
+                    content=turn.get('content') or '',
+                    # The first turn carries the session's uuid, which is what
+                    # makes the whole upload idempotent under the partial
+                    # unique index on client_uuid.
+                    client_uuid=client_uuid if i == 0 else (turn.get('client_uuid') or None),
+                    generated_offline=True,
+                    metadata={'source': 'desktop_offline'},
+                )
+    except IntegrityError:
+        # Two uploads raced; the other one won and the work is safely stored.
+        return Response({'detail': 'already recorded'}, status=409)
+
+    return Response({'session_id': session.id, 'turns': session.turns.count()},
+                    status=201)

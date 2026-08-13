@@ -14,4 +14,10 @@ urlpatterns = [
     # binding this local login to the server id their work syncs under.
     path('claim/', views.claim_page, name='claim'),
     path('claim/confirm/', views.claim_submit, name='claim_submit'),
+    # Address of the school's own server (a ministry's Docker deployment,
+    # typically). Optional: the device works offline without it.
+    path('server/', views.server_settings, name='server'),
+    path('server/save/', views.server_save, name='server_save'),
+    path('server/sign-in/', views.server_signin, name='server_signin'),
+    path('server/clear/', views.server_clear, name='server_clear'),
 ]

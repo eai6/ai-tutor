@@ -25,9 +25,11 @@ class FakeResponse:
 
 @pytest.fixture
 def enrolled(db, settings):
+    """A device pointed at a server with a student signed in."""
     settings.SYNC_SERVER_URL = 'https://example.test'
     state = DeviceState.load()
-    state.sync_token = 'a-token'
+    state.access_token = 'a-token'
+    state.refresh_token = 'a-refresh'
     state.save()
     return state
 
@@ -83,7 +85,7 @@ class TestDrain:
             sync_mod.drain()
         post.assert_not_called()
 
-    def test_a_rejected_device_stops_retrying(self, enrolled):
+    def test_a_rejected_sign_in_stops_retrying(self, enrolled):
         """401 cannot be fixed by trying again; hammering is worse."""
         sync_mod.enqueue('session', {'lesson_id': 1}, server_user_id=42)
         with patch('requests.post', return_value=FakeResponse(401)):
@@ -109,12 +111,14 @@ class TestDrain:
         post.assert_not_called()
         assert SyncOutbox.objects.get().status == SyncOutbox.Status.PENDING
 
-    def test_the_authorization_header_uses_the_device_scheme(self, enrolled):
+    def test_the_authorization_header_carries_the_student_token(self, enrolled):
         sync_mod.enqueue('session', {'lesson_id': 1}, server_user_id=42)
         with patch('requests.post', return_value=FakeResponse(201)) as post:
             sync_mod.drain()
         headers = post.call_args.kwargs['headers']
-        assert headers['Authorization'] == 'Device a-token'
+        # Bearer, not a device scheme: the desktop syncs as the student who
+        # did the work, exactly like any other client.
+        assert headers['Authorization'] == 'Bearer a-token'
 
     def test_drain_survives_one_bad_row(self, enrolled):
         """One poisoned item must not stop the queue behind it."""

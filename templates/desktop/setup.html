@@ -57,7 +57,8 @@ in place.
 <body>
 <div class="wrap">
   <h1>Set up AI Tutor</h1>
-  <p class="lede">This app runs entirely on this computer. Nothing is sent over the internet.</p>
+  <p class="lede">This app runs entirely on this computer. Nothing leaves it
+    unless you set a school server in step 3.</p>
 
   <!-- ── model ─────────────────────────────────────────────────────── -->
   <div class="card" id="model-card">
@@ -92,6 +93,19 @@ in place.
     <div class="err" id="pack-error" hidden></div>
     <div class="hint">Choose the setup drive folder, or the
       <code>content-pack-….tar.gz</code> file.</div>
+  </div>
+
+  {% comment %}
+  Optional, and last on purpose: the tutor is fully usable without it, and a
+  required-looking third step would imply this computer is not ready until
+  someone finds a server address.
+  {% endcomment %}
+  <div class="card">
+    <h2>3. School server <span style="font-weight:400;color:var(--muted)">— optional</span></h2>
+    <p>Send finished work to your school's server. Leave this out to work
+       entirely offline.</p>
+    <div class="row"><a class="launch" style="display:inline-block"
+       href="{% url 'desktop:server' %}">Set server address</a></div>
   </div>
 
   <div class="card done" id="finish" hidden>

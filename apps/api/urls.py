@@ -43,6 +43,9 @@ urlpatterns = [
     path('sessions/<int:session_id>/exit-ticket/', session_views.submit_exit_ticket, name='session_exit_ticket'),
     path('sessions/<int:session_id>/review/', session_views.start_review, name='session_review'),
     path('sessions/<int:session_id>/sync/', sync_views.sync, name='session_sync'),
+    # A whole session that happened offline, uploaded by the student who
+    # did it. The offline desktop build's only sync call.
+    path('sessions/upload/', sync_views.upload_session, name='session_upload'),
 
     # Desktop devices. Enrolment is unauthenticated by design — the one-time
     # code IS the credential; see apps/api/views/devices.py.

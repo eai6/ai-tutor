@@ -44,12 +44,54 @@ class DeviceState(models.Model):
     )
     last_sync_at = models.DateTimeField(null=True, blank=True)
 
-    # Set once at enrolment, in exchange for a one-time code. Stored in the
-    # clear because it lives in the device's own SQLite alongside the student
-    # data it protects — hashing it here would guard nothing an attacker with
-    # this file does not already have.
+    # Which server this device syncs to, e.g. https://tutor.education.gov.xx.
+    #
+    # A field rather than only the SYNC_SERVER_URL setting, because that setting
+    # comes from an environment variable and a packaged desktop application has
+    # no practical way to set one — the person installing it double-clicks an
+    # icon. Each ministry runs its own deployment on its own hostname, which
+    # cannot be known when the application is built.
+    #
+    # Blank is the normal state: a device with no server is a fully working
+    # offline tutor, not a half-finished install.
+    server_url = models.URLField(
+        max_length=255, blank=True, default='',
+        help_text="Base URL of the server this device syncs to. Blank = this "
+                  "device is offline-only.",
+    )
+
+    # The student's own login on the school server. One install, one student —
+    # this build does the tutoring itself and syncs as the person who did the
+    # work, exactly like a browser would. There is no device identity, and no
+    # administrator has to issue anything.
+    #
+    # Tokens are stored in the clear because they live in this device's own
+    # SQLite, beside the student work they protect. Hashing them here would
+    # guard nothing from anyone holding that file.
+    server_username = models.CharField(max_length=150, blank=True, default='')
+    server_user_id = models.PositiveIntegerField(null=True, blank=True)
+    access_token = models.TextField(blank=True, default='')
+    refresh_token = models.TextField(blank=True, default='')
+
+    # Legacy: the device-identity scheme this replaced. Kept so an installed
+    # device's row still loads; nothing writes it any more.
     sync_token = models.CharField(max_length=255, blank=True, default='')
     enrolled_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_signed_in(self) -> bool:
+        return bool(self.access_token and self.effective_server_url)
+
+    @property
+    def effective_server_url(self) -> str:
+        """The server this device talks to, or ''.
+
+        settings.SYNC_SERVER_URL wins when set, so an administrator rolling out
+        machines by script can pin the address and leave nothing to type.
+        """
+        from django.conf import settings
+        pinned = (getattr(settings, 'SYNC_SERVER_URL', '') or '').strip()
+        return (pinned or self.server_url or '').rstrip('/')
 
     class Meta:
         verbose_name = 'device state'

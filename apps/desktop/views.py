@@ -205,3 +205,65 @@ def claim_submit(request):
 
     login(request, user)
     return redirect('tutoring:catalog')
+
+
+# ── Server address ─────────────────────────────────────────────────────────
+#
+# Unauthenticated like the rest of this module: the server binds to loopback,
+# so the only caller is the shell on this machine.
+
+
+@never_cache
+def server_settings(request, error=None, notice=None):
+    """Show and change the address this device sends work to."""
+    from apps.desktop import server_config
+
+    return render(request, 'desktop/server.html', {
+        'state': server_config.status(),
+        'error': error,
+        'notice': notice,
+    }, status=400 if error else 200)
+
+
+@never_cache
+@require_POST
+def server_save(request):
+    from apps.desktop import server_config
+
+    try:
+        url = server_config.save(request.POST.get('server_url', ''))
+    except server_config.ServerConfigError as exc:
+        # Expected outcome for a typo, not an exception worth a traceback.
+        return server_settings(request, error=str(exc))
+
+    return server_settings(request, notice=_(
+        'Saved. Sign in below so your work can be sent to %(url)s.')
+        % {'url': url})
+
+
+@never_cache
+@require_POST
+def server_clear(request):
+    from apps.desktop import server_config
+
+    server_config.clear()
+    return server_settings(request, notice=_(
+        'Cleared. Lessons and student work stay on this computer and are not '
+        'sent anywhere.'))
+
+
+@never_cache
+@require_POST
+def server_signin(request):
+    """Sign the student in to the school server."""
+    from apps.desktop import server_config
+
+    try:
+        server_config.sign_in(request.POST.get('username', ''),
+                              request.POST.get('password', ''))
+    except server_config.ServerConfigError as exc:
+        return server_settings(request, error=str(exc))
+
+    return server_settings(request, notice=_(
+        'Signed in. Work finished on this computer will be sent to your '
+        'school automatically.'))

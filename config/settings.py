@@ -47,9 +47,10 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 #     can still run migrations or collectstatic before secrets are configured.
 _NON_SERVING_COMMANDS = {'collectstatic', 'makemigrations', 'migrate', 'shell',
                          'test', 'check', 'createsuperuser'}
+_RUNNING_TESTS = 'pytest' in sys.modules
 _ALLOW_DEV_KEY = (
     os.getenv('ALLOW_DEV_SECRET_KEY') == '1'
-    or 'pytest' in sys.modules
+    or _RUNNING_TESTS
     or bool(set(sys.argv) & _NON_SERVING_COMMANDS)
 )
 if not DEBUG and SECRET_KEY == _DEV_SECRET_KEY and not _ALLOW_DEV_KEY:
@@ -135,6 +136,11 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.safety.SafetyMiddleware',
+    # Content-Security-Policy. Report-only unless CSP_ENFORCE=1 — the templates
+    # still carry inline handlers, so a blocking policy would break the
+    # dashboard. See apps/safety/csp.py for the counts and the path to
+    # enforcing it.
+    'apps.safety.csp.ContentSecurityPolicyMiddleware',
     # Forces a password change after an admin reset (sets
     # Membership.password_reset_required=True). Must come AFTER
     # AuthenticationMiddleware (request.user must be set).
@@ -159,6 +165,7 @@ TEMPLATES = [
                 'apps.accounts.context_processors.email_verification_status',
                 'apps.accounts.context_processors.baseline_recommendations',
                 'apps.accounts.context_processors.staff_flag',
+                'apps.accounts.context_processors.desktop_build',
             ],
         },
     },
@@ -347,6 +354,13 @@ USE_BLOB_MEDIA = bool(AZURE_BLOB_MEDIA_ACCOUNT and AZURE_BLOB_MEDIA_KEY)
 # itself and on any build that should never phone home.
 SYNC_SERVER_URL = os.getenv('SYNC_SERVER_URL', '')
 
+# True only in the packaged offline builds (config/settings_desktop.py,
+# config/settings_kiosk.py). `apps.desktop` is installed everywhere — the
+# /desktop/ URLs are inert on a server — so templates cannot tell which build
+# they are rendering in without this. Used to show device-only settings, which
+# would be meaningless and confusing on the hosted web app.
+DESKTOP_BUILD = False
+
 AWS_DOWNLOADS_BUCKET = os.getenv('AWS_DOWNLOADS_BUCKET', '')
 DESKTOP_APP_VERSION = os.getenv('DESKTOP_APP_VERSION', '')
 
@@ -509,6 +523,40 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = HTTPS_EDGE
     CSRF_COOKIE_SECURE = HTTPS_EDGE
+
+    # Gated on HTTPS_EDGE, not on DEBUG alone. Both of these are actively
+    # harmful without TLS in front:
+    #
+    #   SECURE_SSL_REDIRECT on a plain-HTTP deployment redirects every request
+    #   to an https:// URL that nothing is listening on — the kiosk and the
+    #   desktop build would answer nothing at all.
+    #
+    #   HSTS is worse, because a browser REMEMBERS it. Sending it from a
+    #   plain-HTTP host tells every browser that reached it to refuse http://
+    #   for a year, and there is no way to reach those users to undo it. That is
+    #   why Django's own warning calls it "serious, irreversible".
+    #
+    # With TLS in front, both are correct and close security.W004 / W008.
+    if HTTPS_EDGE:
+        # ...except under pytest. Django forces DEBUG=False for tests, and the
+        # test client speaks http://testserver, so a redirect here turns every
+        # request in the suite into a 301 that never reaches a view. Observed:
+        # 155 of 541 tests failed on the first version of this block.
+        SECURE_SSL_REDIRECT = not _RUNNING_TESTS
+        # ...except the health check, which MUST keep answering 200 on plain
+        # HTTP. Load balancers health-check the container directly and do not
+        # send X-Forwarded-Proto, so without this exemption Django answers 301,
+        # the target group (matcher: 200) marks every task unhealthy, and the
+        # service is taken out of rotation. Verified against the ALB in front of
+        # the AWS deployment: HTTP GET /health/ on port 8000, matcher 200.
+        SECURE_REDIRECT_EXEMPT = [r'^health/$']
+        # One year, the value browsers expect before honouring a preload.
+        SECURE_HSTS_SECONDS = 31536000
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        # NOT preloaded. Submitting to the preload list is a one-way door for
+        # the whole domain — including subdomains nobody has built yet — and it
+        # is not this file's decision to make for a ministry's domain.
+        SECURE_HSTS_PRELOAD = False
 
 
 # =============================================================================
