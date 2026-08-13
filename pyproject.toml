@@ -233,4 +233,9 @@ artifacts = ["ai_tutor/static/vendor/**/*"]
 # there, because "it built" is not evidence that the assets came along.
 
 [tool.hatch.build.targets.sdist]
-include = ["ai_tutor", "manage.py", "README.md", "LICENSE", "requirements.txt"]
+include = ["ai_tutor", "manage.py", "README.md", "LICENSE", "requirements.txt", "tests"]
+
+# The same .gitignore `vendor/` rule bites here too, and worse: an sdist
+# without these builds a wheel without KaTeX, so the bug survives one level
+# down where the wheel tests cannot see it.
+artifacts = ["ai_tutor/static/vendor/**/*"]

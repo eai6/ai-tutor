@@ -150,13 +150,64 @@ still recommended. Compose supplies these and pip cannot:
 Phase 1 is the risky one and ships alone, with no packaging in it at all, so
 that a regression is unambiguously attributable.
 
-| Phase | Work | Size |
+| Phase | Work | Status |
 |---|---|---|
-| 1 | Namespace move to `ai_tutor/`. Update Dockerfile, compose, `infra/aws/components/compute.py`, systemd unit, `AI-Tutor.spec`, workflows, root scripts. Explicit `AppConfig.label` everywhere. No behaviour change. | ~1–1.5 days |
-| 2 | `pyproject.toml` (hatchling), package data for templates/static/locale/migrations/seed pack, wheel + sdist build, `ai-tutor --version` smoke test | ~0.5 day |
-| 3 | The CLI: `init`, `migrate`, `seed`, `serve`, `check`, `systemd`, plus the env-file loader and `AI_TUTOR_DATA_DIR` | ~1 day |
-| 4 | `docs/self-hosting.md` Path C; update "Choosing a path" table; state the Postgres/TLS gaps | ~0.5 day |
-| 5 | CI: build the wheel on tag, attach to the release. Optionally `pip download` bundle for air-gapped installs | ~0.5 day |
+| 1 | Namespace move to `ai_tutor/` | **Done** — `9b416c1`, merged `56ad0f1`, deployed |
+| 2 | `pyproject.toml`, assets into the package, `BASE_DIR`/`PACKAGE_DIR` split | **Done** — `aa20bba` |
+| 3 | The `ai-tutor` CLI + env-file loader | **Done** — `7ee8c11` |
+| 4 | `docs/self-hosting.md` Path C | **Done** — `968f9a4` |
+| 5 | CI builds wheel + sdist on tag, attaches to the release | **Done** — this commit |
+
+### What building it actually found
+
+Each of these was invisible to reading and fell out of running the thing:
+
+1. **The wheel shipped 9 of 88 static files.** `.gitignore` has a bare
+   `vendor/` rule matching `ai_tutor/static/vendor/`. Git tracks those files
+   anyway — tracking beats ignoring — but hatchling reads the pattern and
+   dropped all 78: KaTeX, DOMPurify, the fonts. It built, imported and served,
+   and would only have broken in a browser, on maths.
+2. **The same bug reappeared in the sdist** after being fixed for the wheel,
+   because `artifacts` is per-target. An sdist without them builds a
+   KaTeX-less wheel one level down, where the wheel tests cannot see it. Now
+   verified by building a wheel FROM the sdist and diffing the file lists:
+   862 files each, zero difference.
+3. **A crash-loop for fresh Docker deployments.** The bundled seed pack's
+   `schema_rev` predates migrations added this week, and in `--if-empty` mode
+   the refusal raised inside the `&&` chain ending in gunicorn. Startup now
+   warns and continues.
+4. **Two runtime paths were `BASE_DIR`-relative** and would have resolved into
+   the data directory once installed: the PWA service worker and the
+   translation catalog.
+5. **The generated systemd unit could not read its own configuration.** It
+   named the config file in a comment but never passed it, and
+   `ProtectHome=yes` hides `/home`.
+
+### Open questions — resolved
+
+1. **Postgres or SQLite for Path C?** Postgres documented as required;
+   SQLite explicitly allowed for one small school, with the pgvector
+   consequence stated.
+2. **Seed pack in the wheel?** Yes — 6.8 MB of an 11 MB wheel, and a first run
+   with no internet is the point.
+3. **Python floor?** `>=3.12`, decided by evidence rather than CLAUDE.md's
+   stale 3.11: Django 6.0 requires 3.12 and the Dockerfile is
+   `python:3.12-slim`.
+
+### Still outstanding
+
+- **`pip install ai-tutor` does not work** — nothing is on a public index. The
+  release carries a wheel to install by URL; claiming the PyPI name is a
+  separate decision (see Out of scope).
+- **The seed pack is stale.** A fresh install comes up with an empty
+  curriculum. It needs rebuilding from whichever source produced the original
+  (3 courses / 300 lessons); this checkout holds demo and eval content, so it
+  cannot be regenerated here.
+- **A full `pip install` with dependencies has never been executed.** Testing
+  used `--no-deps` against an existing environment because the dev machine had
+  ~4.6 GB free and the pinned set pulls 2-3 GB. The dependency list is guarded
+  by a drift test against `requirements.txt`, and the image build installs the
+  same list daily — but that is inference, not a run.
 
 ## Verification
 

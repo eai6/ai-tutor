@@ -1,0 +1,148 @@
+# Build the Python wheel and attach it to a GitHub release.
+#
+# This is how Path C in docs/self-hosting.md gets something to install. Until
+# the package is on a public index, `pip install ai-tutor` cannot work, so a
+# ministry installs from a URL:
+#
+#     pip install https://github.com/eai6/ai-tutor/releases/download/v1.0.0/ai_tutor-1.0.0-py3-none-any.whl
+#
+# DELIBERATELY SEPARATE from deploy-aws.yml and publish-image.yml. Those two
+# put running code in front of students; this one produces an artefact. Keeping
+# them apart means a release cannot fail a deploy, and a deploy cannot silently
+# publish.
+#
+# Not on every push: releasing is a decision, not a side effect of merging.
+name: Publish wheel
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write        # to create the release and upload the wheel to it
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Must match `requires-python` in pyproject.toml. Django 6 needs
+          # 3.12; building on anything older produces a wheel that refuses to
+          # install on the machine it was built for.
+          python-version: '3.12'
+
+      - name: Refuse a tag that disagrees with pyproject
+        # A release tagged v1.2.0 carrying ai_tutor-1.1.0.whl is the kind of
+        # thing nobody notices until they are trying to work out which version
+        # a school is actually running.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PROJECT=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "tag=$TAG  pyproject=$PROJECT"
+          if [ "$TAG" != "$PROJECT" ]; then
+            echo "::error title=Version mismatch::Tag v$TAG but pyproject.toml says $PROJECT. Bump the version, then tag."
+            exit 1
+          fi
+
+      - name: Confirm the seed curriculum carries no student data
+        # The same guard publish-image.yml applies to the image. A curriculum
+        # pack must never contain a roster — that would publish real students'
+        # names to anyone who downloads the wheel.
+        run: |
+          set -euo pipefail
+          PACK=ai_tutor/seed/curriculum-pack.tar.gz
+          if [ -f "$PACK" ]; then
+            if tar -tzf "$PACK" | grep -q 'roster.json'; then
+              echo "::error title=Roster in seed pack::$PACK contains roster.json (student data). Refusing to publish."
+              exit 1
+            fi
+            echo "seed pack: $(du -h "$PACK" | cut -f1), no roster"
+          else
+            echo "::warning title=No seed pack::Installs will start with an empty curriculum."
+          fi
+
+      - name: Build
+        run: |
+          python -m pip install --quiet build
+          python -m build --wheel --sdist --outdir dist_wheel
+          ls -lh dist_wheel/
+
+      - name: Check the wheel actually contains the application
+        # The reason this step exists: an earlier build shipped 9 of 88 static
+        # files. .gitignore has a bare `vendor/` rule, git tracked those files
+        # anyway, and the build backend dropped them — KaTeX, DOMPurify, the
+        # fonts. The wheel built, imported and served, and would only have
+        # broken in a browser, on maths.
+        #
+        # These tests compare the built artefact against `git ls-files`, so the
+        # same class of silent omission fails the release instead.
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pytest
+          python -m pytest tests/test_packaging.py -q
+
+      - name: Confirm it installs and the console script runs
+        # Installed with --no-deps: the point is that the package and its data
+        # files are well-formed, not that PyPI can resolve ~170 pinned
+        # dependencies, which the image build already proves daily.
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/probe
+          /tmp/probe/bin/pip install --quiet --no-deps dist_wheel/*.whl
+          test -x /tmp/probe/bin/ai-tutor
+          /tmp/probe/bin/python - <<'PY'
+          import pathlib, ai_tutor
+          root = pathlib.Path(ai_tutor.__file__).parent
+          missing = [a for a in ('templates/base.html',
+                                 'static/vendor/js/katex.min.js',
+                                 'locale/pt_MZ/LC_MESSAGES/django.po',
+                                 'config/wsgi.py')
+                     if not (root / a).exists()]
+          assert not missing, f'wheel is missing: {missing}'
+          print('wheel contents OK')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist_wheel/*
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist_wheel/* --clobber
+
+      - name: Summary
+        run: |
+          {
+            echo "### Wheel"
+            echo ''
+            echo '```'
+            ls -1 dist_wheel/
+            echo '```'
+            echo ''
+            echo 'Install it on a server that cannot run containers:'
+            echo ''
+            echo '```bash'
+            echo "python3.12 -m venv /opt/ai-tutor/venv"
+            echo "/opt/ai-tutor/venv/bin/pip install <url-of-the-wheel-above>"
+            echo "/opt/ai-tutor/venv/bin/ai-tutor init"
+            echo '```'
+            echo ''
+            echo 'Then follow Path C in docs/self-hosting.md.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -151,3 +151,40 @@ class TestBuiltWheel:
         """`apps` and `config` in site-packages is what the move existed to stop."""
         tops = {n.split('/')[0] for n in names}
         assert tops == {'ai_tutor', 'ai_tutor-0.1.0.dist-info'}
+
+
+def _built_sdist():
+    return next(iter(sorted(WHEEL_DIR.glob('*.tar.gz'))), None) if WHEEL_DIR.exists() else None
+
+
+@pytest.mark.skipif(_built_sdist() is None, reason='no sdist built')
+class TestBuiltSdist:
+    """A wheel built FROM the sdist has to be the same wheel.
+
+    The vendored-asset omission reappeared here after being fixed for the
+    wheel: `artifacts` is per-target, so the sdist shipped none of
+    static/vendor and would have produced a KaTeX-less wheel one level down,
+    where the wheel tests cannot see it.
+    """
+
+    @pytest.fixture(scope='class')
+    def names(self):
+        import tarfile
+        return set(tarfile.open(_built_sdist()).getnames())
+
+    def test_carries_the_vendored_assets(self, names):
+        vendored = [n for n in names if 'static/vendor' in n]
+        assert len(vendored) > 50, f'only {len(vendored)} vendored files in the sdist'
+
+    @pytest.mark.parametrize('probe', [
+        'ai_tutor/templates/base.html',
+        'ai_tutor/static/vendor/js/katex.min.js',
+        'ai_tutor/seed/curriculum-pack.tar.gz',
+        'ai_tutor/config/wsgi.py',
+    ])
+    def test_runtime_essentials_are_present(self, names, probe):
+        assert any(n.endswith(probe) for n in names)
+
+    def test_declares_the_artifacts_override(self, project):
+        artifacts = project['tool']['hatch']['build']['targets']['sdist']['artifacts']
+        assert any('static/vendor' in a for a in artifacts)
