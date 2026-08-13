@@ -22,20 +22,20 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 
 import django                                                    # noqa: E402
 django.setup()                                                   # noqa: E402
 
 
 def main() -> int:
-    from apps.curriculum.models import LessonStep
-    from apps.tutoring.models import InFlightQuestion, TutorSession
-    from apps.tutoring.simple_tutor.engine import _uses_answer_picker
-    from apps.tutoring.simple_tutor.prompts import (
+    from ai_tutor.apps.curriculum.models import LessonStep
+    from ai_tutor.apps.tutoring.models import InFlightQuestion, TutorSession
+    from ai_tutor.apps.tutoring.simple_tutor.engine import _uses_answer_picker
+    from ai_tutor.apps.tutoring.simple_tutor.prompts import (
         ANSWER_MODE_FREE_TEXT, ANSWER_MODE_PICKER, build_system_prompt,
     )
-    from apps.tutoring.simple_tutor.tools import build_question_pool
+    from ai_tutor.apps.tutoring.simple_tutor.tools import build_question_pool
 
     ap = argparse.ArgumentParser()
     ap.add_argument('--session', type=int, default=None,

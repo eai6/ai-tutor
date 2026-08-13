@@ -15,9 +15,9 @@ import sys
 
 def main() -> None:
     import django
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
     django.setup()
-    from apps.benchmark.models import BenchmarkRun
+    from ai_tutor.apps.benchmark.models import BenchmarkRun
 
     run = BenchmarkRun.objects.order_by('-id').first()
     if run is None:

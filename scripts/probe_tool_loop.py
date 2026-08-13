@@ -48,7 +48,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 os.environ.setdefault('TUTOR_MODEL_OVERRIDE', 'local_ollama/qwen3-4b-jetson')
 
 OUT_DIR = Path(__file__).resolve().parents[1] / 'eval-reports' / 'call_compliance'
@@ -256,7 +256,7 @@ INTENT_ARMS: dict[str, str | None] = {
 }
 
 try:                                      # keep in sync with the engine's text
-    from apps.tutoring.simple_tutor.prompts import _INTENT_GUIDANCE as _IG
+    from ai_tutor.apps.tutoring.simple_tutor.prompts import _INTENT_GUIDANCE as _IG
     INTENT_ARMS['as_answer'] = _IG['answer']
 except Exception:                         # pragma: no cover - probe convenience
     INTENT_ARMS['as_answer'] = (
@@ -383,7 +383,7 @@ def _pose_demo(captured_block_0: str) -> str:
 
 def system_arms(captured_block_0: str) -> dict[str, str]:
     """Return {arm: block-0 text}, each rendered with the captured fills."""
-    from apps.tutoring.simple_tutor import family_prompts as fp
+    from ai_tutor.apps.tutoring.simple_tutor import family_prompts as fp
 
     fills = _extract_fills(fp.MARKDOWN_BLOCK_0_TEMPLATE, captured_block_0)
 
@@ -454,7 +454,7 @@ def capture(lesson: int, persona: str, turns: int) -> int:
     import django
     django.setup()
 
-    from apps.tutoring.simple_tutor import engine
+    from ai_tutor.apps.tutoring.simple_tutor import engine
 
     real_call = engine._call_llm
     grabbed: list[dict] = []
@@ -505,7 +505,7 @@ def capture(lesson: int, persona: str, turns: int) -> int:
     os.environ['TUTOR_CALL_MODE'] = 'two'
     os.environ.pop('TUTOR_STREAMING', None)
 
-    from apps.tutoring.student_sim.driver import simulate_session
+    from ai_tutor.apps.tutoring.student_sim.driver import simulate_session
     try:
         simulate_session(lesson_id=lesson, persona=persona, max_turns=turns)
     finally:
@@ -515,7 +515,7 @@ def capture(lesson: int, persona: str, turns: int) -> int:
         print('no call captured', file=sys.stderr)
         return 1
 
-    from apps.llm.models import ModelConfig
+    from ai_tutor.apps.llm.models import ModelConfig
     cfg = ModelConfig.get_for('tutoring')
 
     # The greeting turn is not a graded exchange, so no mode was logged for it

@@ -24,7 +24,7 @@ from typing import Optional
 
 import django
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 
 
@@ -140,7 +140,7 @@ def _existing_keys() -> set:
 
 
 def _save_transcript(session_id: int, spec: ModelSpec, lesson_id: int, persona: str) -> tuple[str, int]:
-    from apps.tutoring.models import TutorSession
+    from ai_tutor.apps.tutoring.models import TutorSession
     sess = TutorSession.objects.get(id=session_id)
     lines = [
         f"# Transcript — model={spec.label}  lesson={lesson_id}  persona={persona}",
@@ -161,8 +161,8 @@ def _save_transcript(session_id: int, spec: ModelSpec, lesson_id: int, persona: 
 
 
 def run_cell(spec: ModelSpec, lesson_id: int, lesson_label: str, persona: str, max_turns: int = 20) -> CellResult:
-    from apps.tutoring.student_sim.driver import simulate_session
-    from apps.tutoring.models import TutorSession
+    from ai_tutor.apps.tutoring.student_sim.driver import simulate_session
+    from ai_tutor.apps.tutoring.models import TutorSession
 
     result = CellResult(
         model_key=spec.key, model_label=spec.label,
@@ -223,7 +223,7 @@ def run_cell(spec: ModelSpec, lesson_id: int, lesson_label: str, persona: str, m
 
 
 def main():
-    from apps.llm.models import ModelConfig
+    from ai_tutor.apps.llm.models import ModelConfig
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)

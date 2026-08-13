@@ -24,7 +24,7 @@ os.environ['AB_REPORT_DIR'] = os.environ.get(
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 
 _env = Path(__file__).resolve().parents[1] / '.env'
 if _env.exists():

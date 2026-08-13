@@ -867,7 +867,7 @@ container_app = app.ContainerApp(
 
 # ── 9. Container Apps Job — material processor ────────────────────────────
 # Runs `python manage.py process_material <upload_id>` for materials with
-# >=50 pages (the routing threshold lives in apps.dashboard.material_routing).
+# >=50 pages (the routing threshold lives in ai_tutor.apps.dashboard.material_routing).
 # Same image as the main app — every code deploy automatically updates the
 # Job's image too, since both reference `aitutor:latest` in ACR. The
 # main web app dispatches via `az containerapp job start` (or the Azure

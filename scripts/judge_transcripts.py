@@ -78,7 +78,7 @@ from typing import List, Tuple
 import django
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 
 # Load .env manually — Anthropic SDK reads ANTHROPIC_API_KEY from os.environ.
 _env = Path(__file__).resolve().parents[1] / '.env'

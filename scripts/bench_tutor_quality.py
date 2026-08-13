@@ -18,7 +18,7 @@ behaves when (1) the structure is in place — does it use the tool —
 and (2) when it has to compute by itself — is its math right.
 
 Usage:
-    DJANGO_SETTINGS_MODULE=config.settings venv/bin/python scripts/bench_tutor_quality.py
+    DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python scripts/bench_tutor_quality.py
 """
 from __future__ import annotations
 
@@ -37,11 +37,11 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 # Bootstrap Django so we can use the existing client classes
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 import django  # noqa: E402
 django.setup()
 
-from apps.llm.client import (  # noqa: E402
+from ai_tutor.apps.llm.client import (  # noqa: E402
     AnthropicClient, OpenAIClient, GeminiClient,
 )
 
@@ -170,7 +170,7 @@ def scenario_a_tools(real_schemas: bool = False) -> list[dict]:
     """
     if not real_schemas:
         return [POSE_QUESTION_TOOL]
-    from apps.tutoring.simple_tutor.prompts import TOOL_SCHEMAS
+    from ai_tutor.apps.tutoring.simple_tutor.prompts import TOOL_SCHEMAS
     return [dict(t) for t in TOOL_SCHEMAS]
 
 

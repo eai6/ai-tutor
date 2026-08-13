@@ -111,7 +111,7 @@ def main() -> int:
     # Fail the export rather than ship a graph that silently disagrees with
     # the encoder it replaces. The threshold matches the parity test in
     # apps/curriculum/tests/test_onnx_embedding_parity.py.
-    from apps.curriculum import kb_storage
+    from ai_tutor.apps.curriculum import kb_storage
     import numpy as np
 
     probes = [
@@ -138,7 +138,7 @@ def main() -> int:
 if __name__ == '__main__':
     sys.path.insert(0, str(ROOT))
     import os
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
     import django
     django.setup()
     raise SystemExit(main())

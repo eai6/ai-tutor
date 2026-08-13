@@ -113,9 +113,9 @@ cmd_status() {
         # `|| true` is load-bearing: this runs under `set -e`, so a failing
         # probe (venv missing, DB locked) would abort status entirely and print
         # nothing rather than reporting what it could.
-        m="$(cd "$ROOT" && DJANGO_SETTINGS_MODULE=config.settings .venv/bin/python -c "
+        m="$(cd "$ROOT" && DJANGO_SETTINGS_MODULE=ai_tutor.config.settings .venv/bin/python -c "
 import django; django.setup()
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.models import ModelConfig
 c = ModelConfig.get_for('tutoring')
 print(f'{c.provider}/{c.model_name}' if c else 'UNRESOLVED')" 2>/dev/null)" || true
         case "${m:-}" in

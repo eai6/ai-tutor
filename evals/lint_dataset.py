@@ -312,12 +312,12 @@ def _lint_fixture_questions() -> list[str]:
 
 
 def main() -> int:
-    # rule_registry reaches into apps.llm, which needs the app registry loaded.
+    # rule_registry reaches into ai_tutor.apps.llm, which needs the app registry loaded.
     # Under pytest, pytest-django has already done this.
     import os
 
     import django
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
     django.setup()
 
     errors = lint()

@@ -32,11 +32,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 
 def _known_labels() -> set[str]:
-    """Labels defined in apps.benchmark.labels. The runner normalises
+    """Labels defined in ai_tutor.apps.benchmark.labels. The runner normalises
     `must_label: ADVANCE` against `L.ADVANCE = 'advance'`, so both the
     UPPER constant name and the lowercase value count as 'known'.
     """
-    from apps.benchmark import labels as L
+    from ai_tutor.apps.benchmark import labels as L
     out: set[str] = set()
     for name in dir(L):
         if name.startswith('_'):
@@ -59,7 +59,7 @@ def _known_trajectory_verbs() -> set[str]:
 
 
 def _known_lessons() -> set[int]:
-    from apps.curriculum.models import Lesson
+    from ai_tutor.apps.curriculum.models import Lesson
     return set(Lesson.objects.values_list('pk', flat=True))
 
 
@@ -118,7 +118,7 @@ def main() -> int:
                 if label and label not in known_labels:
                     findings.append(
                         ('unknown_label', rel,
-                         f"{label_verb} references {label!r} — not in apps.benchmark.labels")
+                         f"{label_verb} references {label!r} — not in ai_tutor.apps.benchmark.labels")
                     )
                     by_finding['unknown_label'] += 1
 

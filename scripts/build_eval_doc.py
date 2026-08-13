@@ -235,13 +235,13 @@ pass_threshold: 0.7
 
     add_para(doc, 'multi_turn', bold=True)
     add_para(doc,
-        'The runner delegates to apps.tutoring.student_sim.simulate_session, '
+        'The runner delegates to ai_tutor.apps.tutoring.student_sim.simulate_session, '
         'which spins up a real persona LLM and lets it have a full '
         'conversation with the tutor — opening turn, persona reply, tutor '
         'response, persona reply, and so on until the session terminates '
         '(completed, exit ticket, deadlock, or max turns). The runner then '
         'reads back every SessionTurn from the database, derives per-turn '
-        'labels via apps.benchmark.autopopulate, and scores the whole '
+        'labels via ai_tutor.apps.benchmark.autopopulate, and scores the whole '
         'trajectory. Multi-turn scenarios catch session-level failure modes '
         '(banned-opener loops, premature advance, repetition) that no '
         'single-turn check can see.')
@@ -262,10 +262,10 @@ pass_threshold: 0.7
              'string operations.',
              'Free'],
             ['2 — Judge-derived labels',
-             'The production judge pipeline (apps.tutoring.judges.unified) '
+             'The production judge pipeline (ai_tutor.apps.tutoring.judges.unified) '
              'fires automatically when the tutor responds. Its output is '
              'mapped to the 30-label vocabulary via '
-             'apps.benchmark.autopopulate.derive_suggested_labels. Scenarios '
+             'ai_tutor.apps.benchmark.autopopulate.derive_suggested_labels. Scenarios '
              'assert which labels must/must-not appear.',
              'Same as a prod turn'],
             ['3 — LLM-as-judge rubric',

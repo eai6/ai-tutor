@@ -115,7 +115,7 @@ def _selected_spec() -> str:
     already put ROOT on sys.path and set DJANGO_SETTINGS_MODULE, and the module
     imports cleanly without django.setup().
     """
-    from apps.tutoring.management.commands.tutor_chat import MODEL_ALIASES
+    from ai_tutor.apps.tutoring.management.commands.tutor_chat import MODEL_ALIASES
 
     argv = sys.argv[1:]
     chosen = None
@@ -160,7 +160,7 @@ def main() -> int:
     _reexec_under_venv()
 
     sys.path.insert(0, str(ROOT))
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
     os.environ.setdefault('TUTOR_MODEL_OVERRIDE', DEFAULT_TUTOR_MODEL)
     for key, value in {**OLLAMA_DEFAULTS, **OFFLINE_DEFAULTS}.items():
         os.environ.setdefault(key, value)
@@ -169,7 +169,7 @@ def main() -> int:
     # the command module to read its alias table, and Django's logging
     # dictConfig resets propagate=True on loggers that already exist when it
     # runs (logging.config._handle_existing_loggers). Importing app code first
-    # therefore silently undoes apps.tutoring.cli.logs' propagate=False and
+    # therefore silently undoes ai_tutor.apps.tutoring.cli.logs' propagate=False and
     # prints every tutor reply twice — once rendered, once via the transcript
     # logger escaping to the 'apps' stderr handler. setup() is idempotent;
     # execute_from_command_line calls it again below and it is a no-op.

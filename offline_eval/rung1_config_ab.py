@@ -22,7 +22,7 @@ Both go through OllamaClient.generate_with_tools, so the derived num_ctx and
 the think flag are computed by the real code path rather than simulated.
 
 Usage:
-    AI_TUTOR_ROOT=$PWD DJANGO_SETTINGS_MODULE=config.settings \
+    AI_TUTOR_ROOT=$PWD DJANGO_SETTINGS_MODULE=ai_tutor.config.settings \
       .venv/bin/python offline_eval/rung1_config_ab.py --trials 30
 
     # narrow while iterating
@@ -48,13 +48,13 @@ os.chdir(ROOT)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 import django  # noqa: E402
 django.setup()
 
-from apps.llm.client import get_llm_client  # noqa: E402
-from apps.llm.model_profiles import get_model_profile  # noqa: E402
-from apps.llm.models import ModelConfig  # noqa: E402
+from ai_tutor.apps.llm.client import get_llm_client  # noqa: E402
+from ai_tutor.apps.llm.model_profiles import get_model_profile  # noqa: E402
+from ai_tutor.apps.llm.models import ModelConfig  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 from bench_tutor_quality import (  # noqa: E402

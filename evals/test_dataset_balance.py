@@ -18,7 +18,7 @@ import pytest
 # Self-sufficient: this suite reads YAML and the plan, and only touches Django for
 # rule_registry. Doing setup here means it runs under a bare `pytest` with no
 # pytest-django and no project-wide pytest config — neither of which this repo has.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 try:
     django.setup()
 except Exception:  # pragma: no cover — already configured by a plugin

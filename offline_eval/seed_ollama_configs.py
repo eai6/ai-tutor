@@ -16,11 +16,11 @@ from pathlib import Path
 # and made this script unrunnable anywhere else, including the Jetson.
 ROOT = os.environ.get('AI_TUTOR_ROOT') or str(Path(__file__).resolve().parent.parent)
 os.chdir(ROOT); sys.path.insert(0, ROOT)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 
-from apps.llm.models import ModelConfig
-from apps.accounts.models import Institution
+from ai_tutor.apps.llm.models import ModelConfig
+from ai_tutor.apps.accounts.models import Institution
 
 
 def load_tags(path):

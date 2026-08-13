@@ -22,8 +22,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from apps.llm.client import get_llm_client, call_with_transient_retry
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.client import get_llm_client, call_with_transient_retry
+from ai_tutor.apps.llm.models import ModelConfig
 
 logger = logging.getLogger(__name__)
 

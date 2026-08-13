@@ -5,7 +5,7 @@ Run: ./venv/bin/python tests/run_all_checks.py
 """
 import os, sys, django
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 django.setup()
 
@@ -24,7 +24,7 @@ def check(name, condition, detail=""):
 
 print("\n=== 1. SCHEMA CHECKS ===")
 
-from apps.curriculum.models import Lesson, Unit, LessonStep, SeychellesContext
+from ai_tutor.apps.curriculum.models import Lesson, Unit, LessonStep, SeychellesContext
 check("Unit.terminal_objectives field exists", hasattr(Unit, 'terminal_objectives'))
 check("Unit.enabling_objectives field exists", hasattr(Unit, 'enabling_objectives'))
 check("Lesson.enabling_objectives field exists", hasattr(Lesson, 'enabling_objectives'))
@@ -33,11 +33,11 @@ check("Lesson.teacher_approved field exists", hasattr(Lesson, 'teacher_approved'
 check("LessonStep.enabling_objective field exists", hasattr(LessonStep, 'enabling_objective'))
 check("SeychellesContext model exists", SeychellesContext.objects.model is not None)
 
-from apps.tutoring.models import ExitTicketQuestion
+from ai_tutor.apps.tutoring.models import ExitTicketQuestion
 check("ExitTicketQuestion.question_type field exists", hasattr(ExitTicketQuestion, 'question_type'))
 check("ExitTicketQuestion.answer_data field exists", hasattr(ExitTicketQuestion, 'answer_data'))
 
-from apps.tutoring.skills_models import Skill
+from ai_tutor.apps.tutoring.skills_models import Skill
 check("Skill.enabling_objective_text field exists", hasattr(Skill, 'enabling_objective_text'))
 check("Skill.is_enabling_objective field exists", hasattr(Skill, 'is_enabling_objective'))
 check("Skill.source_code field exists", hasattr(Skill, 'source_code'))
@@ -55,7 +55,7 @@ for cat in ['economic', 'geographic', 'trade', 'climate', 'population']:
 
 print("\n=== 3. COMPETENCY THRESHOLDS ===")
 
-from apps.accounts.models import PlatformConfig
+from ai_tutor.apps.accounts.models import PlatformConfig
 config = PlatformConfig.load()
 check("PlatformConfig.threshold_be_max exists", hasattr(config, 'threshold_be_max'))
 check(f"  BE threshold = {config.threshold_be_max}%", config.threshold_be_max == 50)
@@ -81,7 +81,7 @@ print("\n=== 4. GEOGRAPHY PARSER ===")
 
 try:
     import fitz
-    from apps.curriculum.curriculum_parser import parse_geography_curriculum
+    from ai_tutor.apps.curriculum.curriculum_parser import parse_geography_curriculum
 
     doc = fitz.open('seychelles_package/curriculum_materials/geography_document_pdf.pdf')
     text = ''.join(page.get_text() for page in doc)
@@ -111,7 +111,7 @@ except Exception as e:
 print("\n=== 5. MATH PARSER ===")
 
 try:
-    from apps.curriculum.curriculum_parser import parse_mathematics_curriculum
+    from ai_tutor.apps.curriculum.curriculum_parser import parse_mathematics_curriculum
 
     doc = fitz.open('seychelles_package/curriculum_materials/MATHEMATICS-in-the-National-Curriculum.pdf')
     text = ''.join(page.get_text() for page in doc)
@@ -133,7 +133,7 @@ except Exception as e:
 
 print("\n=== 6. SUBJECT DETECTION ===")
 
-from apps.curriculum.curriculum_parser import detect_subject
+from ai_tutor.apps.curriculum.curriculum_parser import detect_subject
 check("Math detection", detect_subject('mathematics algebra fractions') == 'Mathematics')
 check("Geography detection", detect_subject('geography map skills population settlement') == 'Geography')
 check("Provided subject override", detect_subject('random text', provided_subject='Chemistry') == 'Chemistry')
@@ -142,7 +142,7 @@ check("Unknown -> General", detect_subject('some random document') == 'General')
 
 print("\n=== 7. CONTENT QUALITY TIERS ===")
 
-from apps.curriculum.content_generator import LessonContentGenerator
+from ai_tutor.apps.curriculum.content_generator import LessonContentGenerator
 gen = LessonContentGenerator.__new__(LessonContentGenerator)
 
 t1 = gen._determine_content_quality({'related_content': ['text'], 'figure_descriptions': [{'d': 'fig'}], 'objectives': ['obj']})
@@ -157,7 +157,7 @@ check("Tier 4 detection (no context)", t4 == 'tier_4', f"Got {t4}")
 
 print("\n=== 8. EO SKILL EXTRACTION ===")
 
-from apps.tutoring.skill_extraction import SkillExtractionService
+from ai_tutor.apps.tutoring.skill_extraction import SkillExtractionService
 service = SkillExtractionService.__new__(SkillExtractionService)
 
 bloom_tests = [
@@ -177,7 +177,7 @@ for obj, expected in bloom_tests:
 print("\n=== 9. EXIT TICKET GRADING ===")
 
 from unittest.mock import MagicMock
-from apps.tutoring.conversational_tutor import ConversationalTutor
+from ai_tutor.apps.tutoring.conversational_tutor import ConversationalTutor
 
 tutor = ConversationalTutor.__new__(ConversationalTutor)
 

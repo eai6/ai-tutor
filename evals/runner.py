@@ -6,7 +6,7 @@ scores the result through three layers, and writes a per-run JSON blob to
 
 Scoring layers (memory/eval_harness_plan.md):
 - Layer 1 — deterministic phrase / structural checks
-- Layer 2 — judge-derived label set via apps.benchmark.autopopulate
+- Layer 2 — judge-derived label set via ai_tutor.apps.benchmark.autopopulate
 - Layer 3 — LLM-as-judge rubric (Haiku 4.5 @ temp=0 by default)
 
 A scenario passes iff layers 1+2 all pass AND the rubric mean (if present)
@@ -27,9 +27,9 @@ from typing import Any
 import yaml
 from django.contrib.auth.models import User
 
-from apps.accounts.models import Institution
-from apps.curriculum.models import Lesson
-from apps.tutoring.models import SessionTurn, TutorSession
+from ai_tutor.apps.accounts.models import Institution
+from ai_tutor.apps.curriculum.models import Lesson
+from ai_tutor.apps.tutoring.models import SessionTurn, TutorSession
 
 from evals.scorers import AssertionResult
 from evals.scorers import deterministic as deterministic_scorer
@@ -253,7 +253,7 @@ def _inject_inflight_question(
     """
     if not payload:
         return
-    from apps.tutoring.models import InFlightQuestion
+    from ai_tutor.apps.tutoring.models import InFlightQuestion
 
     qtext = str(payload.get('question_text', '') or '').strip()
     ref = str(payload.get('reference_answer', '') or '').strip()
@@ -335,9 +335,9 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
         # engine is wired in for the staging/prod deploy. Without this
         # the harness always exercised the legacy CT, even when the
         # live app was running on simple-tutor — biasing eval results.
-        from apps.tutoring import simple_tutor as _simple_tutor
+        from ai_tutor.apps.tutoring import simple_tutor as _simple_tutor
         if _simple_tutor.is_enabled():
-            from apps.tutoring.simple_tutor.engine import respond as _simple_respond
+            from ai_tutor.apps.tutoring.simple_tutor.engine import respond as _simple_respond
             out = _simple_respond(session, scenario.student_turn)
             tutor_text = (out.get('content') or '').strip()
         else:
@@ -346,7 +346,7 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
             # import coupled the whole eval harness to the legacy engine, so
             # anything that stopped conversational_tutor.py importing took out
             # `manage.py run_eval` and `pytest evals/` outright.
-            from apps.tutoring.conversational_tutor import ConversationalTutor
+            from ai_tutor.apps.tutoring.conversational_tutor import ConversationalTutor
             tutor = ConversationalTutor(session)
             msg = tutor.respond(scenario.student_turn)
             tutor_text = (msg.content or '').strip()
@@ -358,7 +358,7 @@ def _run_single_turn(scenario: Scenario) -> ScenarioResult:
         )
         suggested_labels: list[str] = []
         if last_tutor_turn is not None:
-            from apps.benchmark.autopopulate import derive_suggested_labels
+            from ai_tutor.apps.benchmark.autopopulate import derive_suggested_labels
             suggested_labels = derive_suggested_labels(
                 last_tutor_turn.metadata or {},
                 last_tutor_turn.judge_outputs or {},
@@ -480,7 +480,7 @@ def _tutor_model_spec() -> str:
     if spec:
         return spec
     try:
-        from apps.llm.models import ModelConfig
+        from ai_tutor.apps.llm.models import ModelConfig
         cfg = ModelConfig.objects.filter(
             purpose=ModelConfig.Purpose.TUTORING, is_active=True,
         ).first()
@@ -514,8 +514,8 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     session's engine_state with the scenario id for traceability, then
     score with the trajectory verbs.
     """
-    from apps.benchmark.autopopulate import derive_suggested_labels
-    from apps.tutoring.student_sim import simulate_session
+    from ai_tutor.apps.benchmark.autopopulate import derive_suggested_labels
+    from ai_tutor.apps.tutoring.student_sim import simulate_session
 
     inst, _user = _eval_institution_and_user()
 
@@ -661,7 +661,7 @@ def run(scenarios: list[Scenario]) -> RunResult:
                 error=f"{type(exc).__name__}: {str(exc)[:200]}",
             ))
     finished = dt.datetime.now(dt.timezone.utc)
-    from apps.tutoring import simple_tutor as _st
+    from ai_tutor.apps.tutoring import simple_tutor as _st
     engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
     return RunResult(
         started_at=started.isoformat(),

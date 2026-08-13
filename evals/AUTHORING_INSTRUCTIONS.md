@@ -62,7 +62,7 @@ Violating these makes a scenario worthless or literally unwinnable.
 ## Step 4 — verify
 
     ./venv/bin/python -c "
-    import django,os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings'); django.setup()
+    import django,os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','ai_tutor.config.settings'); django.setup()
     from evals.runner import Scenario
     from pathlib import Path
     bad=0

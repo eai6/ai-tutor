@@ -87,7 +87,7 @@ def main() -> int:
                         help='Tutor model spec (default: local Qwen on Ollama).')
     args = parser.parse_args()
 
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
     for key, value in DEFAULTS.items():
         os.environ.setdefault(key, value)
     if args.model:

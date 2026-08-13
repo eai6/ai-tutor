@@ -48,7 +48,7 @@ OLLAMA_HOST = os.environ.get('OLLAMA_HOST') or 'http://localhost:11434'
 # shelled out to another, a model would be installed into a store the running
 # server cannot see. Imported without Django, which has not started yet.
 sys.path.insert(0, str(ROOT))
-from apps.desktop.ollama_runtime import (  # noqa: E402
+from ai_tutor.apps.desktop.ollama_runtime import (  # noqa: E402
     resolve_binary as resolve_ollama, server_env as ollama_server_env,
 )
 

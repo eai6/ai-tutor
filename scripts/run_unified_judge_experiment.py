@@ -25,9 +25,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import django
 django.setup() if not django.apps.apps.ready else None
 
-from apps.tutoring.models import SessionTurn
-from apps.llm.models import ModelConfig
-from apps.llm.client import get_llm_client
+from ai_tutor.apps.tutoring.models import SessionTurn
+from ai_tutor.apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.client import get_llm_client
 
 
 OUTPUT_MD = Path('memory/deepmind_unified_judge_results.md')

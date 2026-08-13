@@ -315,7 +315,7 @@ git push origin main
       → cp /app/media/vectordb /tmp/vectordb
       → generate_recent_updates
       → build_help_index --with-source
-      → gunicorn config.wsgi:application
+      → gunicorn ai_tutor.config.wsgi:application
 ```
 
 Pulumi infra changes (`infra/__main__.py`) are **not** auto-deployed

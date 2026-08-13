@@ -250,7 +250,7 @@ def create_compute(
         "web", "web",
         # gunicorn ONLY — the Dockerfile CMD's migrate chain would race across
         # tasks. CI runs the migrate task definition below instead.
-        ["gunicorn", "config.wsgi:application", "--bind", f"0.0.0.0:{APP_PORT}",
+        ["gunicorn", "ai_tutor.config.wsgi:application", "--bind", f"0.0.0.0:{APP_PORT}",
          "--workers", "4", "--threads", "4", "--timeout", "120"],
         WEB_CPU, WEB_MEMORY,
     )

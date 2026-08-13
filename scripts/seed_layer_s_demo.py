@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 
 import django  # noqa: E402
 django.setup()
@@ -26,13 +26,13 @@ django.setup()
 from django.contrib.auth.models import User  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
-from apps.accounts.models import Institution, Membership  # noqa: E402
-from apps.curriculum.models import Course, Unit, Lesson, LessonStep  # noqa: E402
-from apps.tutoring.models import (  # noqa: E402
+from ai_tutor.apps.accounts.models import Institution, Membership  # noqa: E402
+from ai_tutor.apps.curriculum.models import Course, Unit, Lesson, LessonStep  # noqa: E402
+from ai_tutor.apps.tutoring.models import (  # noqa: E402
     SessionTurn,
     TutorSession,
 )
-from apps.tutoring.student_working_analyzer import analyze_working  # noqa: E402
+from ai_tutor.apps.tutoring.student_working_analyzer import analyze_working  # noqa: E402
 
 
 DEMO_SCHOOL_SLUG = "layer-s-demo-school"

@@ -324,9 +324,9 @@ print()
 !python offline_eval/seed_ollama_configs.py
 # Show the per-family sampling each model will use (from apps/llm/model_profiles).
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.llm.model_profiles import get_model_profile
+from ai_tutor.apps.llm.model_profiles import get_model_profile
 print(f"{'MODEL':<22} {'FAMILY':<9} {'MODE':<11} {'MAXTOK':>7}  SAMPLING")
 print('-' * 78)
 for line in open('offline_eval/models.txt'):

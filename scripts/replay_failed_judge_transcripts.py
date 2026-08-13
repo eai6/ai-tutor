@@ -36,13 +36,13 @@ except ImportError:
 
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 django.setup()
 
 from dataclasses import dataclass
 from typing import Optional
 
-from apps.tutoring.combined_judge import run_combined_judge
+from ai_tutor.apps.tutoring.combined_judge import run_combined_judge
 
 
 @dataclass
@@ -197,7 +197,7 @@ def _build_step_context(case: Case) -> dict:
 
     # Try numeric extraction via the engine's grader helper.
     try:
-        from apps.tutoring.grader import check_math_answer
+        from ai_tutor.apps.tutoring.grader import check_math_answer
         result = check_math_answer(
             case.student_input, case.expected_answer,
         )
@@ -254,9 +254,9 @@ def _make_judge_client():
     Also reports which ModelConfig was resolved so we can confirm we're
     hitting the same model production uses.
     """
-    from apps.llm.models import ModelConfig
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-    from apps.tutoring.models import TutorSession
+    from ai_tutor.apps.llm.models import ModelConfig
+    from ai_tutor.apps.tutoring.conversational_tutor import ConversationalTutor
+    from ai_tutor.apps.tutoring.models import TutorSession
 
     judge_cfg = ModelConfig.objects.filter(
         purpose=ModelConfig.Purpose.JUDGE, is_active=True,

@@ -2,13 +2,13 @@
 import os, sys, django
 ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 # Simulate what run_matrix.sh sets for one model:
 os.environ['TUTOR_MODEL_OVERRIDE'] = 'local_ollama/qwen2.5:0.5b'
 django.setup()
 
-from apps.llm.models import ModelConfig
-from apps.llm.client import get_llm_client
+from ai_tutor.apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.client import get_llm_client
 
 tut = ModelConfig.get_for('tutoring')
 judge = ModelConfig.get_for('judge')

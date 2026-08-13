@@ -217,9 +217,9 @@ open('offline_eval/models.txt', 'w').write(
 print(open('offline_eval/models.txt').read())
 !python offline_eval/seed_ollama_configs.py
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.llm.model_profiles import get_model_profile
+from ai_tutor.apps.llm.model_profiles import get_model_profile
 for line in open('offline_eval/models.txt'):
     tag = line.split('#')[0].split()[0] if line.split('#')[0].split() else ''
     if not tag:

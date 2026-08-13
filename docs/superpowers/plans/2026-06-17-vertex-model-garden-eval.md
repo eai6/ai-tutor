@@ -51,7 +51,7 @@ In `apps/llm/tests.py`, replace the stub body with:
 
 ```python
 from django.test import SimpleTestCase, TestCase
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.models import ModelConfig
 
 
 class VertexProviderEnumTests(SimpleTestCase):
@@ -137,7 +137,7 @@ git commit -m "llm: add vertex_model_garden provider enum + resolve_runtime wiri
 Append to `apps/llm/tests.py`:
 
 ```python
-from apps.llm.client import _adapt_openai_dict
+from ai_tutor.apps.llm.client import _adapt_openai_dict
 
 # Real shapes captured from the live Vertex MaaS endpoint (2026-06-17).
 DEEPSEEK_TEXT = {
@@ -290,7 +290,7 @@ Append to `apps/llm/tests.py`:
 import json
 import os
 from unittest.mock import patch, PropertyMock, MagicMock
-from apps.llm.client import VertexModelGardenClient, LLMResponse
+from ai_tutor.apps.llm.client import VertexModelGardenClient, LLMResponse
 
 
 class _FakeCreds:
@@ -604,7 +604,7 @@ git commit -m "llm: add VertexModelGardenClient (raw-JSON parse + empty-choices 
 Append to `apps/llm/tests.py`:
 
 ```python
-from apps.llm.client import get_llm_client
+from ai_tutor.apps.llm.client import get_llm_client
 
 
 class VertexFactoryTests(SimpleTestCase):

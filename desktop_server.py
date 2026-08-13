@@ -77,7 +77,7 @@ DEFAULTS = {
 # False, and a browser will not store a Secure cookie over http://127.0.0.1 —
 # so every POST, login included, fails CSRF verification. See
 # config/settings_desktop.py for the full reasoning.
-SETTINGS_MODULE = 'config.settings_desktop'
+SETTINGS_MODULE = 'ai_tutor.config.settings_desktop'
 
 LANDING_PATH = '/student/login/'
 
@@ -199,8 +199,8 @@ def _ensure_tutor_model_config() -> None:
     back on the next launch — which is why the guard is "is there an active
     tutoring config at all", not "is the local one active".
     """
-    from apps.accounts.models import Institution
-    from apps.llm.models import ModelConfig
+    from ai_tutor.apps.accounts.models import Institution
+    from ai_tutor.apps.llm.models import ModelConfig
 
     if ModelConfig.objects.filter(purpose='tutoring', is_active=True).exists():
         return
@@ -253,7 +253,7 @@ def main() -> int:
     django.setup()
 
     if args.probe:
-        from apps.desktop.bootstrap import status
+        from ai_tutor.apps.desktop.bootstrap import status
         emit('status', **status())
         return 0
 
@@ -265,7 +265,7 @@ def main() -> int:
     # open on exit. Failing to start it must not stop the tutor from running —
     # a device with no sync is still a working device.
     try:
-        from apps.desktop.sync import start_worker
+        from ai_tutor.apps.desktop.sync import start_worker
         start_worker()
     except Exception as exc:                             # noqa: BLE001
         print(f'[Desktop] sync worker not started: {exc}', flush=True)
