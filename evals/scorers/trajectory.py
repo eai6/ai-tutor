@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-from apps.tutoring.student_sim.driver import SimResult
+from ai_tutor.apps.tutoring.student_sim.driver import SimResult
 
 from evals.scorers import AssertionResult
 

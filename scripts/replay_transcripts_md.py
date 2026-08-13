@@ -45,10 +45,10 @@ except ImportError:
 
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 django.setup()
 
-from apps.tutoring.combined_judge import run_combined_judge
+from ai_tutor.apps.tutoring.combined_judge import run_combined_judge
 
 
 TRANSCRIPT_PATH = (
@@ -368,7 +368,7 @@ def _build_step_context(case: ReplayCase) -> dict:
     expected = case.expected_answer_guess
     if expected:
         try:
-            from apps.tutoring.grader import check_math_answer
+            from ai_tutor.apps.tutoring.grader import check_math_answer
             # Strip degree symbols + whitespace — `check_math_answer`'s
             # numeric extractor doesn't tolerate °, so "90°" vs "90"
             # would otherwise fall through to None.
@@ -419,9 +419,9 @@ def _build_step_context(case: ReplayCase) -> dict:
 
 
 def _resolve_judge_client():
-    from apps.llm.models import ModelConfig
-    from apps.tutoring.conversational_tutor import ConversationalTutor
-    from apps.tutoring.models import TutorSession
+    from ai_tutor.apps.llm.models import ModelConfig
+    from ai_tutor.apps.tutoring.conversational_tutor import ConversationalTutor
+    from ai_tutor.apps.tutoring.models import TutorSession
 
     judge_cfg = ModelConfig.objects.filter(
         purpose=ModelConfig.Purpose.JUDGE, is_active=True,

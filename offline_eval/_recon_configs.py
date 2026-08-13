@@ -2,9 +2,9 @@
 import os, sys, django
 ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.models import ModelConfig
 
 print("=== ALL ModelConfig rows (purpose | provider | model | active | inst) ===")
 for c in ModelConfig.objects.all().order_by('purpose', '-is_active', '-updated_at'):

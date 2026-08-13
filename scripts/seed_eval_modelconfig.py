@@ -31,11 +31,11 @@ from pathlib import Path
 import django
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 
-from apps.accounts.models import Institution  # noqa: E402
-from apps.llm.models import ModelConfig  # noqa: E402
+from ai_tutor.apps.accounts.models import Institution  # noqa: E402
+from ai_tutor.apps.llm.models import ModelConfig  # noqa: E402
 
 
 # (purpose, provider, model_name, temperature)

@@ -7,11 +7,11 @@ sweep only runs valid IDs (a wrong id would waste a full 60-scenario run).
 import os, sys, django
 ROOT = os.environ.get('AI_TUTOR_ROOT') or '/home/daniel/Documents/work/Nyansapo/web/ai-tutor'
 os.chdir(ROOT); sys.path.insert(0, ROOT)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 
-from apps.llm.models import ModelConfig
-from apps.llm.client import get_llm_client
+from ai_tutor.apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.client import get_llm_client
 
 CANDIDATES = [
     # Anthropic

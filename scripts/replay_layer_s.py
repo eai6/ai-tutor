@@ -26,10 +26,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 django.setup()
 
-from apps.tutoring.student_working_analyzer import (  # noqa: E402
+from ai_tutor.apps.tutoring.student_working_analyzer import (  # noqa: E402
     WorkingState,
     analyze_working,
     build_working_analysis_block,
@@ -132,8 +132,8 @@ def replay_db(limit: int = 50, verbose: bool = False) -> None:
     """Walk math SessionTurn rows in the local DB. Tiny DB → tiny
     sample, but the structure works against any DB if pointed at one
     with math data."""
-    from apps.curriculum.models import Course
-    from apps.tutoring.models import SessionTurn
+    from ai_tutor.apps.curriculum.models import Course
+    from ai_tutor.apps.tutoring.models import SessionTurn
 
     math_courses = [c for c in Course.objects.all() if c.is_math]
     if not math_courses:

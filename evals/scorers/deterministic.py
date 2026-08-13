@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-from apps.benchmark import labels as L
+from ai_tutor.apps.benchmark import labels as L
 
 from evals.scorers import AssertionResult
 
@@ -108,7 +108,7 @@ def _matches_any(patterns, text: str) -> str | None:
 
 
 def _normalize_labels(labels: list[str]) -> set[str]:
-    """Cast scenario-author label names to the canonical set in apps.benchmark.labels."""
+    """Cast scenario-author label names to the canonical set in ai_tutor.apps.benchmark.labels."""
     out: set[str] = set()
     for raw in labels:
         candidate = str(raw).strip()

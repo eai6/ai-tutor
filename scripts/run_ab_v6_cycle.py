@@ -39,7 +39,7 @@ from pathlib import Path
 os.environ['AB_REPORT_DIR'] = os.environ.get('AB_REPORT_DIR', 'ab-test-reports-v6')
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 
 _env = Path(__file__).resolve().parents[1] / '.env'
 if _env.exists():
@@ -56,14 +56,14 @@ django.setup()
 # (production code, single source of truth). The wrapper re-exports
 # the constant locally so existing tooling that greps for
 # `V6_TUTOR_SYSTEM_PROMPT_TEMPLATE` in this file still finds it.
-from apps.tutoring.prompts.variants import (  # noqa: E402
+from ai_tutor.apps.tutoring.prompts.variants import (  # noqa: E402
     V6_TUTOR_SYSTEM_PROMPT_TEMPLATE,
 )
 
 
 def _patch_prompt_templates() -> None:
-    from apps.tutoring.prompts import anthropic as _ant
-    from apps.tutoring.prompts import gemini as _gem
+    from ai_tutor.apps.tutoring.prompts import anthropic as _ant
+    from ai_tutor.apps.tutoring.prompts import gemini as _gem
     _ant.TUTOR_SYSTEM_PROMPT_TEMPLATE = V6_TUTOR_SYSTEM_PROMPT_TEMPLATE
     _gem.GEMINI_TUTOR_SYSTEM_PROMPT_TEMPLATE = V6_TUTOR_SYSTEM_PROMPT_TEMPLATE
     print(f"[v6] Patched prompt templates "

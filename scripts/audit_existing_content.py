@@ -47,18 +47,18 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 
 import django  # noqa: E402
 django.setup()
 
-from apps.curriculum.content_verifier import (  # noqa: E402
+from ai_tutor.apps.curriculum.content_verifier import (  # noqa: E402
     verify_exit_ticket_question,
     verify_lesson_step,
 )
-from apps.curriculum.models import Course, Lesson, LessonStep  # noqa: E402
-from apps.tutoring.models import ExitTicket, ExitTicketQuestion  # noqa: E402
-from apps.tutoring.question_validator import cross_check_question  # noqa: E402
+from ai_tutor.apps.curriculum.models import Course, Lesson, LessonStep  # noqa: E402
+from ai_tutor.apps.tutoring.models import ExitTicket, ExitTicketQuestion  # noqa: E402
+from ai_tutor.apps.tutoring.question_validator import cross_check_question  # noqa: E402
 
 
 _RESET = "\033[0m"

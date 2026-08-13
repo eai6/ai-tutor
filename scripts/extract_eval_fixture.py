@@ -23,14 +23,14 @@ from pathlib import Path
 import django
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 
 from django.core import serializers  # noqa: E402
 
-from apps.accounts.models import Institution  # noqa: E402
-from apps.curriculum.models import Course, Lesson, LessonStep, Unit  # noqa: E402
-from apps.tutoring.models import ExitTicket, ExitTicketQuestion  # noqa: E402
+from ai_tutor.apps.accounts.models import Institution  # noqa: E402
+from ai_tutor.apps.curriculum.models import Course, Lesson, LessonStep, Unit  # noqa: E402
+from ai_tutor.apps.tutoring.models import ExitTicket, ExitTicketQuestion  # noqa: E402
 
 
 LESSON_IDS = [1137, 1138, 1425, 540]  # 2 math + 2 geo — covers both deploy + full matrix modes

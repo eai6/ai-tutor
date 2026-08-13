@@ -12,10 +12,10 @@ User=eai6
 Group=eai6
 WorkingDirectory=/home/eai6/Documents/ai-tutor
 
-# config.settings_kiosk, not config.settings: the latter forces Secure cookies
+# ai_tutor.config.settings_kiosk, not ai_tutor.config.settings: the latter forces Secure cookies
 # whenever DEBUG is False, and a browser never returns those over the hotspot's
 # plain HTTP — login 403s and no session is ever established. See that module.
-Environment=DJANGO_SETTINGS_MODULE=config.settings_kiosk
+Environment=DJANGO_SETTINGS_MODULE=ai_tutor.config.settings_kiosk
 Environment=PYTHONUNBUFFERED=1
 
 # Without this the app resolves tutoring to the ACTIVE DB row —
@@ -74,7 +74,7 @@ ExecStartPre=/home/eai6/Documents/ai-tutor/.venv/bin/python manage.py collectsta
 # timeout 300 is load-bearing. gunicorn's default is 30 s and a tutoring turn
 # takes 20-90 s (longer on a cold model), so the default silently kills every
 # reply mid-generation.
-ExecStart=/home/eai6/Documents/ai-tutor/.venv/bin/gunicorn config.wsgi:application \
+ExecStart=/home/eai6/Documents/ai-tutor/.venv/bin/gunicorn ai_tutor.config.wsgi:application \
     --bind 0.0.0.0:80 \
     --workers 2 \
     --threads 4 \

@@ -27,7 +27,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=config.settings \
+    DJANGO_SETTINGS_MODULE=ai_tutor.config.settings \
     DEBUG=true \
     DATABASE_URL=sqlite:///./db.sqlite3
 

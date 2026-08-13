@@ -28,7 +28,7 @@ services:
       - "8000:8000"                 # exposed so you can also hit it from host
     environment:
       DEBUG: "true"
-      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SETTINGS_MODULE: ai_tutor.config.settings
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

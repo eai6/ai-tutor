@@ -5,7 +5,7 @@ and reports median latency, token counts, and whether the model called
 the pose_question tool.
 
 Usage:
-    DJANGO_SETTINGS_MODULE=config.settings venv/bin/python scripts/bench_tutoring_models.py
+    DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python scripts/bench_tutoring_models.py
 
 The script needs API keys via env vars (or active ModelConfig rows):
     ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY
@@ -28,11 +28,11 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 # Bootstrap Django so we can use the existing client classes
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 import django  # noqa: E402
 django.setup()
 
-from apps.llm.client import (  # noqa: E402
+from ai_tutor.apps.llm.client import (  # noqa: E402
     AnthropicClient, OpenAIClient, GeminiClient,
 )
 

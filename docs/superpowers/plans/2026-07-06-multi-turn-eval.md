@@ -198,8 +198,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 1: Investigate label liveness** — do per-turn `SessionTurn.judge_outputs`/`metadata` get populated during a simulated `simple_tutor` session (so `no_label_anywhere` is live)? Run one session and inspect:
 ```bash
 SIMPLE_TUTOR_ENGINE=1 TUTOR_MODEL_OVERRIDE="anthropic/claude-haiku-4-5-20251001" venv/bin/python manage.py shell -c "
-from apps.tutoring.student_sim import simulate_session
-from apps.tutoring.models import SessionTurn
+from ai_tutor.apps.tutoring.student_sim import simulate_session
+from ai_tutor.apps.tutoring.models import SessionTurn
 r = simulate_session(lesson_id=1137, persona='probe_resistant', max_turns=6)
 ts = SessionTurn.objects.filter(session_id=r.session_id, role='tutor').order_by('id')
 for t in ts: print(t.id, 'meta_keys=', sorted((t.metadata or {}).keys()), 'judge_keys=', sorted((t.judge_outputs or {}).keys()))

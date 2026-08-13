@@ -37,7 +37,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 
 # The kiosk's real tutoring model. Set before django.setup() because
 # model_profiles and ModelConfig.get_for both read it at call time.
@@ -129,7 +129,7 @@ class Recorder:
 
 def install(rec: Recorder):
     """Wrap the engine seams. Returns the patched respond_for_view."""
-    from apps.tutoring.simple_tutor import engine
+    from ai_tutor.apps.tutoring.simple_tutor import engine
 
     real_call_llm = engine._call_llm
     real_dispatch = engine._dispatch_tools
@@ -228,7 +228,7 @@ def _block_0_chars() -> int:
     read; recording the resolved length means the JSON itself shows whether the
     two arms differed.
     """
-    from apps.tutoring.simple_tutor.family_prompts import build_family_block_0
+    from ai_tutor.apps.tutoring.simple_tutor.family_prompts import build_family_block_0
     return len(build_family_block_0('qwen', 'BASE'))
 
 
@@ -252,7 +252,7 @@ def run_config(name: str, *, lesson: int, turns: int, persona: str) -> dict:
     rec = Recorder()
     install(rec)
 
-    from apps.tutoring.student_sim.driver import simulate_session
+    from ai_tutor.apps.tutoring.student_sim.driver import simulate_session
 
     t0 = time.time()
     sim = simulate_session(lesson_id=lesson, persona=persona, max_turns=turns)

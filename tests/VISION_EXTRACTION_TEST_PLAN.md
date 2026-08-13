@@ -21,7 +21,7 @@ Each pillar is informed by different document types:
 ### Test 1.1: S3 Geography Syllabus
 ```bash
 ./venv/bin/python -c "
-from apps.curriculum.curriculum_parser import extract_curriculum_with_vision
+from ai_tutor.apps.curriculum.curriculum_parser import extract_curriculum_with_vision
 result = extract_curriculum_with_vision(
     'seychelles_package/curriculum_materials/geography_document_pdf.pdf',
     'Geography', 'S3'
@@ -43,7 +43,7 @@ Same PDF, different grade. Should extract only S1 units (Units 1-7).
 ### Test 1.3: Mathematics Curriculum
 ```bash
 ./venv/bin/python -c "
-from apps.curriculum.curriculum_parser import extract_curriculum_with_vision
+from ai_tutor.apps.curriculum.curriculum_parser import extract_curriculum_with_vision
 result = extract_curriculum_with_vision(
     'seychelles_package/curriculum_materials/MATHEMATICS-in-the-National-Curriculum.pdf',
     'Mathematics', 'S1'
@@ -58,7 +58,7 @@ result = extract_curriculum_with_vision(
 ### Test 2.1: Geography Worksheet
 ```bash
 ./venv/bin/python -c "
-from apps.dashboard.material_tasks import extract_material_with_vision
+from ai_tutor.apps.dashboard.material_tasks import extract_material_with_vision
 items = extract_material_with_vision(
     'seychelles_package/worksheet/geography/Development-Trade-worksheet-2.pdf',
     material_type='worksheet',
@@ -89,7 +89,7 @@ Run on all worksheets in `seychelles_package/worksheet/geography/` and compare:
 ### Test 2.3: Math Worksheet
 ```bash
 ./venv/bin/python -c "
-from apps.dashboard.material_tasks import extract_material_with_vision
+from ai_tutor.apps.dashboard.material_tasks import extract_material_with_vision
 items = extract_material_with_vision(
     'seychelles_package/worksheet/mathematics/BIDMAS WORKSHEET_260318_152040.pdf',
     material_type='worksheet',
@@ -106,7 +106,7 @@ items = extract_material_with_vision(
 ### Test 3.1: S3 Geography Exam
 ```bash
 ./venv/bin/python -c "
-from apps.dashboard.material_tasks import extract_material_with_vision
+from ai_tutor.apps.dashboard.material_tasks import extract_material_with_vision
 items = extract_material_with_vision(
     'path/to/S3_Geography_Examination_2021.pdf',
     material_type='question_bank',
@@ -168,7 +168,7 @@ Target: >90% completeness, >85% type accuracy for worksheets and exams.
 
 # Quick check on one worksheet
 ./venv/bin/python -c "
-from apps.dashboard.material_tasks import extract_material_with_vision
+from ai_tutor.apps.dashboard.material_tasks import extract_material_with_vision
 items = extract_material_with_vision('path/to/file.pdf', 'worksheet', 'Geography', 'S3')
 print(f'Extracted {len(items)} items')
 for i in items[:5]:

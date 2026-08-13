@@ -35,16 +35,16 @@ IS_MAC = sys.platform == 'darwin'
 
 # ── Application code that is only ever imported by name ─────────────────
 DJANGO_APPS = [
-    'apps.accounts', 'apps.curriculum', 'apps.media_library', 'apps.tutoring',
-    'apps.llm', 'apps.safety', 'apps.dashboard', 'apps.api', 'apps.support',
-    'apps.benchmark', 'apps.desktop',
+    'ai_tutor.apps.accounts', 'ai_tutor.apps.curriculum', 'ai_tutor.apps.media_library', 'ai_tutor.apps.tutoring',
+    'ai_tutor.apps.llm', 'ai_tutor.apps.safety', 'ai_tutor.apps.dashboard', 'ai_tutor.apps.api', 'ai_tutor.apps.support',
+    'ai_tutor.apps.benchmark', 'ai_tutor.apps.desktop',
 ]
 
 hiddenimports = [
-    'config.settings',
-    'config.settings_desktop',
-    'config.urls',
-    'config.wsgi',
+    'ai_tutor.config.settings',
+    'ai_tutor.config.settings_desktop',
+    'ai_tutor.config.urls',
+    'ai_tutor.config.wsgi',
     'desktop_server',
     # Named as strings in settings: DATABASES['default']['ENGINE'] and the
     # serializer registry. Nothing imports them, so nothing pulls them in.

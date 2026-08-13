@@ -23,9 +23,9 @@ Expected: 176 pass, 4 fail (audio mock issues — pre-existing, unrelated).
 ```bash
 ./venv/bin/python -c "
 import fitz, django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.curriculum.curriculum_parser import parse_geography_curriculum
+from ai_tutor.apps.curriculum.curriculum_parser import parse_geography_curriculum
 
 doc = fitz.open('seychelles_package/curriculum_materials/geography_document_pdf.pdf')
 text = ''.join(page.get_text() for page in doc)
@@ -45,9 +45,9 @@ for grade in ['S1', 'S2', 'S3']:
 ```bash
 ./venv/bin/python -c "
 import fitz, django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.curriculum.curriculum_parser import parse_mathematics_curriculum
+from ai_tutor.apps.curriculum.curriculum_parser import parse_mathematics_curriculum
 
 doc = fitz.open('seychelles_package/curriculum_materials/MATHEMATICS-in-the-National-Curriculum.pdf')
 text = ''.join(page.get_text() for page in doc)
@@ -67,9 +67,9 @@ for grade in ['S1', 'S3']:
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.curriculum.curriculum_parser import detect_subject
+from ai_tutor.apps.curriculum.curriculum_parser import detect_subject
 
 print(detect_subject('This is a mathematics curriculum with algebra and fractions'))
 print(detect_subject('Geography and map skills for secondary students'))
@@ -87,9 +87,9 @@ print(detect_subject('', provided_subject='Chemistry'))
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.curriculum.models import SeychellesContext
+from ai_tutor.apps.curriculum.models import SeychellesContext
 
 print(f'Total entries: {SeychellesContext.objects.count()}')
 for cat in SeychellesContext.Category.values:
@@ -108,9 +108,9 @@ for cat in SeychellesContext.Category.values:
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.curriculum.content_generator import LessonContentGenerator
+from ai_tutor.apps.curriculum.content_generator import LessonContentGenerator
 
 gen = LessonContentGenerator.__new__(LessonContentGenerator)
 
@@ -134,9 +134,9 @@ print(gen._determine_content_quality({'related_content': [], 'objectives': []}))
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.tutoring.skill_extraction import SkillExtractionService
+from ai_tutor.apps.tutoring.skill_extraction import SkillExtractionService
 
 service = SkillExtractionService.__new__(SkillExtractionService)
 
@@ -156,9 +156,9 @@ for obj in ['Define population density', 'Explain the factors', 'List the main a
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.accounts.models import PlatformConfig
+from ai_tutor.apps.accounts.models import PlatformConfig
 
 config = PlatformConfig.load()
 print(f'Thresholds: BE<{config.threshold_be_max}%, AE<{config.threshold_ae_max}%, ME>={config.threshold_me_min}%, EE time<{config.threshold_ee_time_minutes}min, Move-on>={config.threshold_move_on}%')
@@ -178,10 +178,10 @@ for pct, time in [(30, None), (60, None), (90, None), (100, 3), (100, 10)]:
 ```bash
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
 from unittest.mock import MagicMock
-from apps.tutoring.conversational_tutor import ConversationalTutor
+from ai_tutor.apps.tutoring.conversational_tutor import ConversationalTutor
 
 tutor = ConversationalTutor.__new__(ConversationalTutor)
 

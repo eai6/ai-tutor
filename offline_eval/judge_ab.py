@@ -26,13 +26,13 @@ import django
 # Standalone-script launch (`python offline_eval/judge_ab.py`) puts offline_eval/
 # on sys.path, not the repo root, so `config.settings` isn't importable. Add it.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
 os.environ.setdefault("SIMPLE_TUTOR_ENGINE", "1")
 django.setup()
 
 from evals.runner import Scenario, _eval_institution_and_user  # noqa: E402
 from evals.scorers import llm_rubric  # noqa: E402
-from apps.tutoring.student_sim import simulate_session  # noqa: E402
+from ai_tutor.apps.tutoring.student_sim import simulate_session  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 DATASET = ROOT / "evals" / "dataset" / "multi_turn"

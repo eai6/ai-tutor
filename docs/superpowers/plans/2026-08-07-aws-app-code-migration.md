@@ -105,8 +105,8 @@ import pytest
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.test import override_settings
 
-from apps.safety import email_backends
-from apps.safety.email_backends import SESEmailBackend, _bare_email
+from ai_tutor.apps.safety import email_backends
+from ai_tutor.apps.safety.email_backends import SESEmailBackend, _bare_email
 
 
 class _FakeSES:
@@ -251,7 +251,7 @@ def test_bare_email_strips_display_names(raw, expected):
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety/tests/test_ses_email.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/safety/tests/test_ses_email.py -v`
 
 Expected: `ImportError: cannot import name 'SESEmailBackend'`.
 
@@ -431,7 +431,7 @@ Note that `EmailMultiAlternatives.alternatives` entries are named tuples in Djan
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety/tests/test_ses_email.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/safety/tests/test_ses_email.py -v`
 
 Expected: all tests PASS.
 
@@ -447,7 +447,7 @@ AWS_SES_REGION = os.getenv('AWS_SES_REGION', 'us-east-1')
 # Explicit EMAIL_BACKEND always wins; otherwise SES when configured, console
 # in development so nothing crashes without credentials.
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND') or (
-    'apps.safety.email_backends.SESEmailBackend'
+    'ai_tutor.apps.safety.email_backends.SESEmailBackend'
     if AWS_SES_SENDER
     else 'django.core.mail.backends.console.EmailBackend'
 )
@@ -463,7 +463,7 @@ Expected: OK, and `AzureCommunicationEmailBackend` still importable — the Azur
 
 - [ ] **Step 7: Run the safety suite**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety apps/accounts -q`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/safety apps/accounts -q`
 
 Expected: no new failures. `apps/accounts` is included because password reset goes through this backend.
 
@@ -513,7 +513,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.dashboard import job_dispatch
+from ai_tutor.apps.dashboard import job_dispatch
 
 
 class _FakeECS:
@@ -633,9 +633,9 @@ def test_partial_ecs_config_falls_back_rather_than_half_dispatching(monkeypatch)
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/dashboard/tests/test_job_dispatch.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/dashboard/tests/test_job_dispatch.py -v`
 
-Expected: `AttributeError: module 'apps.dashboard.job_dispatch' has no attribute '_ecs_client'`.
+Expected: `AttributeError: module 'ai_tutor.apps.dashboard.job_dispatch' has no attribute '_ecs_client'`.
 
 - [ ] **Step 3: Replace the module docstring and the selector**
 
@@ -760,7 +760,7 @@ Remove the now-unused `Optional` import from the `typing` line if nothing else u
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/dashboard/tests/test_job_dispatch.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/dashboard/tests/test_job_dispatch.py -v`
 
 Expected: all tests PASS.
 
@@ -826,7 +826,7 @@ from __future__ import annotations
 import pytest
 from django.test import RequestFactory
 
-from apps.safety.client_ip import get_client_ip
+from ai_tutor.apps.safety.client_ip import get_client_ip
 
 
 @pytest.fixture
@@ -878,7 +878,7 @@ def test_a_garbage_header_yields_none_rather_than_raising(rf):
 
 - [ ] **Step 2: Run the tests**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety/tests/test_client_ip.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/safety/tests/test_client_ip.py -v`
 
 Expected: all PASS immediately — this task documents and pins existing behaviour rather than changing it. If any test fails, stop: that is a real regression risk for the migration and needs investigating before proceeding.
 
@@ -909,7 +909,7 @@ Two things this gets right that the old ``split(',')[0]`` did not:
 
 - [ ] **Step 4: Re-run the tests**
 
-Run: `DJANGO_SETTINGS_MODULE=config.settings ./venv/bin/pytest apps/safety/tests/test_client_ip.py -v`
+Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings ./venv/bin/pytest apps/safety/tests/test_client_ip.py -v`
 
 Expected: still all PASS.
 
@@ -963,11 +963,11 @@ Both extras of `django-storages` can coexist — they pull different optional de
 ./venv/bin/pip install -r requirements.txt
 ./venv/bin/python -c "
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
 django.setup()
-from apps.media_library import s3_media, blob_media
-from apps.safety import email_backends
-from apps.dashboard import job_dispatch
+from ai_tutor.apps.media_library import s3_media, blob_media
+from ai_tutor.apps.safety import email_backends
+from ai_tutor.apps.dashboard import job_dispatch
 assert hasattr(email_backends, 'SESEmailBackend')
 assert hasattr(email_backends, 'AzureCommunicationEmailBackend')
 print('both cloud paths import OK')
@@ -1006,7 +1006,7 @@ Then `chmod +x ops/migrate_and_seed.sh`.
 
 ```bash
 PROBE_DB="$(mktemp -d)/probe.sqlite3"
-DJANGO_SETTINGS_MODULE=config.settings \
+DJANGO_SETTINGS_MODULE=ai_tutor.config.settings \
 DATABASE_URL="sqlite:///${PROBE_DB}" \
 PATH="$PWD/venv/bin:$PATH" \
   sh ops/migrate_and_seed.sh
