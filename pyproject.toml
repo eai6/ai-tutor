@@ -201,6 +201,12 @@ dependencies = [
     "django-storages[s3]>=1.14",
 ]
 
+# The whole point of phase 3: an installed wheel has no manage.py, so without
+# a console script the only way to run a management command is a
+# `python -c "from django.core.management import ..."` incantation.
+[project.scripts]
+ai-tutor = "ai_tutor.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/eai6/ai-tutor"
 Documentation = "https://github.com/eai6/ai-tutor/blob/main/docs/self-hosting.md"
