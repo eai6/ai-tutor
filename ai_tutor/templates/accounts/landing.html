@@ -292,6 +292,11 @@
         <p>
             <a href="{% url 'dashboard:help_index' %}">{% trans "Help & FAQ" %}</a>
             &nbsp;·&nbsp;
+            {# For a ministry or school evaluating whether to run this on their #}
+            {# own servers. Deliberately in the footer: students and teachers #}
+            {# arriving here want to sign in, not to deploy. #}
+            <a href="{% url 'self_hosting' %}">{% trans "Run it yourself" %}</a>
+            &nbsp;·&nbsp;
             <span style="display:inline-flex;gap:0.4rem;align-items:center;">
                 {% get_current_language as CURRENT_LANG %}
                 {% for code, label in LANGUAGES %}

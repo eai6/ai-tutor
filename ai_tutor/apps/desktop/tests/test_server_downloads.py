@@ -156,3 +156,22 @@ class TestSelfHostingPage:
             body = client.get('/download/').content.decode()
         assert 'python3.12 -m venv' not in body
         assert 'macOS' in body
+
+
+@pytest.mark.django_db
+class TestLandingPage:
+
+    def test_offers_self_hosting(self, client):
+        """A ministry evaluating the platform arrives at the root, not at
+        /download/. Without a link here they have no way to discover that
+        running it themselves is even possible."""
+        body = client.get('/').content.decode()
+        assert '/self-hosting/' in body
+
+    def test_it_is_in_the_footer_not_the_main_choice(self, client):
+        """Students and teachers land here to sign in. The two big cards stay
+        theirs; self-hosting sits with the other secondary links."""
+        import re
+        body = client.get('/').content.decode()
+        footer = re.search(r'<footer.*?</footer>', body, re.S)
+        assert footer and '/self-hosting/' in footer.group(0)
