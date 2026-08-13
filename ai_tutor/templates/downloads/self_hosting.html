@@ -152,15 +152,50 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</co
   </p>
 
   <div class="more">
-    <h2 style="margin-top:0">{% trans "The full manual" %}</h2>
+    <h2 style="margin-top:0">{% trans "Keep it running" %}</h2>
     <p class="need">
       {% blocktrans trimmed %}
-        Choosing between a server, AWS and pip; what each path does not give
-        you; backups; upgrades; and a troubleshooting table written from
-        symptoms rather than causes.
+        <strong>Back up both halves together.</strong> The database holds the
+        reference to every uploaded figure and the disk holds the file, so a
+        database restored against older media leaves lessons with broken
+        images and reports no error.
       {% endblocktrans %}
     </p>
-    <p><a class="btn" href="{% url 'self_hosting_manual' %}">{% trans "Read the manual" %}</a></p>
+
+<pre><code># Docker
+cd ai-tutor/deploy/compose &amp;&amp; ./backup.sh
+
+# pip
+pg_dump -Fc aitutor &gt; /mnt/backup/aitutor-$(date +%F).dump
+tar czf /mnt/backup/media-$(date +%F).tar.gz -C /var/lib/ai-tutor media</code></pre>
+
+    <p class="need">
+      {% blocktrans trimmed %}
+        A backup that only exists on the machine it backs up is not a backup,
+        and these contain student records — store them encrypted. Test a
+        restore once, before you need it.
+      {% endblocktrans %}
+    </p>
+
+    <h2>{% trans "Upgrading" %}</h2>
+<pre><code># Docker — migrations run on start
+docker compose pull &amp;&amp; docker compose up -d
+
+# pip — nothing is automatic here
+sudo /opt/ai-tutor/venv/bin/pip install --upgrade ai-tutor
+sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo systemctl restart ai-tutor</code></pre>
+
+    <h2>{% trans "If login returns 403 with no error" %}</h2>
+    <p class="need">
+      {% blocktrans trimmed %}
+        The commonest failure, and a silent one. Django marks the session and
+        CSRF cookies <code>Secure</code>, and a browser will not send those
+        over plain HTTP — so the login form simply bounces back. Finish the
+        HTTPS setup, or set <code>HTTPS_EDGE=false</code> if you are on an
+        isolated network with no TLS.
+      {% endblocktrans %}
+    </p>
 
     <p class="need" style="margin-top:1.5rem">
       <strong>{% trans "One thing to know before you start." %}</strong>

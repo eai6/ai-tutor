@@ -17,7 +17,6 @@ has never logged in can install the app.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from django.conf import settings
 from django.http import Http404
@@ -108,95 +107,6 @@ def download_server(request, artefact: str):
     return redirect(_bucket_url(filename, _SERVER_PREFIX))
 
 
-# ── The self-hosting manual ────────────────────────────────────────────────
-
-#: Rendered once per process. The document ships inside the wheel and cannot
-#: change at runtime, so re-parsing 683 lines of Markdown per request would buy
-#: nothing.
-_MANUAL_HTML: str | None = None
-
-
-def _manual_path() -> Path | None:
-    """Where the manual lives, in either layout, or None.
-
-    Installed from a wheel it sits inside the package (force-included at build
-    time). Running from a checkout — which is how the Docker image runs, since
-    the Dockerfile copies the repo — it is still at the repo root.
-
-    Anchored on PACKAGE_DIR's parent rather than BASE_DIR: BASE_DIR follows
-    AI_TUTOR_DATA_DIR, which points at writable state and holds no documents.
-    """
-    from django.conf import settings
-
-    package = Path(settings.PACKAGE_DIR)
-    for candidate in (package / 'docs' / 'self-hosting.md',
-                      package.parent / 'docs' / 'self-hosting.md'):
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def render_manual() -> str:
-    """The manual as HTML, or '' if this build did not ship it.
-
-    Rendered server-side rather than by a browser script: the page must work
-    for someone reading it on a locked-down ministry laptop, and the content
-    is ours — there is no user input here to sanitise.
-    """
-    global _MANUAL_HTML
-    if _MANUAL_HTML is not None:
-        return _MANUAL_HTML
-
-    path = _manual_path()
-    if path is None:
-        logger.warning('[downloads] self-hosting manual not found; '
-                       '/self-hosting/ will render without it')
-        _MANUAL_HTML = ''
-        return _MANUAL_HTML
-
-    from markdown_it import MarkdownIt
-
-    # commonmark + tables, NOT 'gfm-like': that preset turns on linkify, which
-    # needs linkify-it-py and raises at import if it is absent.
-    md = MarkdownIt('commonmark').enable(['table', 'strikethrough'])
-    tokens = md.parse(path.read_text(encoding='utf-8'))
-    _add_heading_ids(tokens)
-    _MANUAL_HTML = md.renderer.render(tokens, md.options, {})
-    return _MANUAL_HTML
-
-
-def _slug(text: str) -> str:
-    """GitHub's heading-anchor slug.
-
-    Matched to GitHub deliberately: the manual is written and reviewed on
-    GitHub, and its own cross-references ("see section 7") are GitHub-style
-    anchors. Any other scheme would render the document with its internal
-    links quietly broken.
-    """
-    import re
-    text = text.strip().lower()
-    text = re.sub(r'[^\w\s-]', '', text)     # drops '.', '—', '/', etc.
-    return re.sub(r'\s', '-', text)
-
-
-def _add_heading_ids(tokens) -> None:
-    """Give every heading an id, which markdown-it does not do on its own.
-
-    Without this the page renders perfectly and every anchor on it is dead —
-    including the buttons at the top of the page.
-    """
-    seen: dict[str, int] = {}
-    for i, tok in enumerate(tokens):
-        if tok.type != 'heading_open':
-            continue
-        inline = tokens[i + 1]
-        base = _slug(inline.content)
-        if not base:
-            continue
-        seen[base] = seen.get(base, 0) + 1
-        tok.attrSet('id', base if seen[base] == 1 else f'{base}-{seen[base] - 1}')
-
-
 def _artefact_context() -> dict:
     configured = bool(getattr(settings, 'AWS_DOWNLOADS_BUCKET', ''))
     artefacts = server_artefacts() if configured else {}
@@ -216,16 +126,10 @@ def self_hosting(request):
     for a teacher installing on one classroom machine, this is for whoever runs
     a ministry's servers.
 
-    Deliberately NOT the whole manual. Rendering all 683 lines here — AWS cost
-    tables, three architecture diagrams, a Pulumi walkthrough — buried the six
-    commands someone actually needs under everything they do not. The manual
-    lives one click away for when a decision or a symptom needs it.
+    Deliberately only the commands. An earlier version rendered the whole
+    683-line manual here — AWS cost tables, three architecture diagrams, a
+    Pulumi walkthrough — and buried the handful of commands someone actually
+    needs under everything they do not. docs/self-hosting.md remains the long
+    form for anyone with the repository.
     """
     return render(request, 'downloads/self_hosting.html', _artefact_context())
-
-
-@require_http_methods(["GET", "HEAD"])
-def self_hosting_manual(request):
-    """The full manual, for choosing between paths and diagnosing symptoms."""
-    return render(request, 'downloads/manual.html',
-                  {'manual_html': render_manual(), **_artefact_context()})

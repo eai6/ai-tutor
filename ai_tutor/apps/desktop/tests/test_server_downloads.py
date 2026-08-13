@@ -94,68 +94,57 @@ class TestPage:
 
 @pytest.mark.django_db
 class TestSelfHostingPage:
-    """The manual, served by the application.
+    """The one page that tells you how to deploy.
 
-    It exists because the repository is private: a public download page cannot
-    route a ministry's instructions through a URL they cannot open.
+    There is no separate manual page: rendering all 683 lines of
+    docs/self-hosting.md here buried the commands under AWS cost tables and a
+    Pulumi walkthrough. This page carries what a person types, and the few
+    operational facts they cannot safely leave without.
     """
 
-    def test_serves_the_whole_manual(self, client):
-        body = client.get('/self-hosting/manual/').content.decode()
-        for section in ('Choosing a path', 'Path A', 'Path B',
-                        'Path C', 'What leaves your network'):
-            assert section in body, f'missing: {section}'
+    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
+    def test_carries_the_actual_commands(self, client):
+        body = client.get('/self-hosting/').content.decode()
+        for cmd in ('docker compose up -d', 'ai-tutor init', 'ai-tutor migrate',
+                    'createsuperuser', 'systemctl enable --now ai-tutor'):
+            assert cmd in body, f'missing: {cmd}'
 
-    def test_renders_markdown_rather_than_showing_it(self, client):
-        body = client.get('/self-hosting/manual/').content.decode()
-        assert '<table' in body and '<h2' in body
-        assert '| You provide |' not in body, 'markdown table left unrendered'
+    def test_says_what_must_be_filled_in(self, client):
+        """The two 'now edit this file' moments are where a deploy stalls."""
+        body = client.get('/self-hosting/').content.decode()
+        for name in ('SECRET_KEY', 'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS'):
+            assert name in body
 
-    def test_every_in_page_anchor_resolves(self, client):
-        """markdown-it does not generate heading ids on its own, so without
-        the slugger every anchor on the page — including the buttons at the
-        top and the manual's own cross-references — is dead."""
-        import re
-        body = client.get('/self-hosting/manual/').content.decode()
-        ids = set(re.findall(r'<h[1-6] id="([^"]+)"', body))
-        targets = {h[1:] for h in re.findall(r'href="(#[^"]+)"', body)}
-        assert targets, 'expected in-page links'
-        assert not (targets - ids), f'dangling anchors: {sorted(targets - ids)}'
+    def test_covers_backups_and_upgrades(self, client):
+        """A ministry that deploys and never backs up loses a term of work."""
+        body = client.get('/self-hosting/').content.decode()
+        assert 'pg_dump' in body and 'backup.sh' in body
+        assert 'systemctl restart ai-tutor' in body
 
-    def test_uses_github_slugs(self, client):
-        """The document is written and reviewed on GitHub and its own
-        cross-references are GitHub-style anchors."""
-        body = client.get('/self-hosting/manual/').content.decode()
-        assert 'id="3-path-a--your-own-server"' in body
+    def test_warns_about_the_silent_failure(self, client):
+        """Login 403 with no error anywhere is the commonest way this is
+        misconfigured, and nothing in the logs says so."""
+        body = client.get('/self-hosting/').content.decode()
+        assert 'HTTPS_EDGE' in body
 
-    def test_renders_without_the_bucket_configured(self, client):
-        """The manual is the point of the page; the download buttons are not."""
+    def test_says_what_leaves_the_network(self, client):
+        """A ministry cannot evaluate this deployment without knowing it."""
+        body = client.get('/self-hosting/').content.decode()
+        assert 'Anthropic' in body and 'leaving your network' in body
+
+    def test_there_is_no_separate_manual_page(self, client):
+        assert client.get('/self-hosting/manual/').status_code == 404
+
+    def test_renders_without_a_published_wheel(self, client):
         with override_settings(AWS_DOWNLOADS_BUCKET='', SERVER_WHEEL_VERSION=''):
-            body = client.get('/self-hosting/manual/').content.decode()
-        assert 'Choosing a path' in body
-        assert 'Download .whl' not in body
+            body = client.get('/self-hosting/').content.decode()
+        assert 'docker compose up -d' in body
+        assert 'py3-none-any.whl' not in body
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_offers_the_wheel_when_one_is_published(self, client):
         body = client.get('/self-hosting/').content.decode()
         assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
-
-    def test_the_quick_start_is_short(self, client):
-        """It exists because rendering all 683 manual lines here buried the six
-        commands someone actually needs. If it grows back, that is a regression
-        in the thing the page is for."""
-        quick = len(client.get('/self-hosting/').content)
-        full = len(client.get('/self-hosting/manual/').content)
-        assert quick < full / 3, f'quick start {quick} vs manual {full}'
-
-    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
-    def test_the_quick_start_carries_the_actual_commands(self, client):
-        body = client.get('/self-hosting/').content.decode()
-        for cmd in ('docker compose up -d', 'ai-tutor init', 'createsuperuser'):
-            assert cmd in body, f'missing: {cmd}'
-
-    def test_the_quick_start_links_to_the_manual(self, client):
-        assert '/self-hosting/manual/' in client.get('/self-hosting/').content.decode()
 
     def test_the_two_pages_link_to_each_other(self, client):
         """Separate audiences, but someone always lands on the wrong one."""
@@ -167,15 +156,3 @@ class TestSelfHostingPage:
             body = client.get('/download/').content.decode()
         assert 'python3.12 -m venv' not in body
         assert 'macOS' in body
-
-
-class TestSlug:
-
-    @pytest.mark.parametrize('heading,expected', [
-        ('3. Path A — your own server', '3-path-a--your-own-server'),
-        ('What leaves your network', 'what-leaves-your-network'),
-        ('Step 1 — Install', 'step-1--install'),
-    ])
-    def test_matches_github(self, heading, expected):
-        from ai_tutor.apps.desktop.public_views import _slug
-        assert _slug(heading) == expected
