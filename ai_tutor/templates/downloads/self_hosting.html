@@ -1,62 +1,52 @@
 {% load i18n %}
-{# Served at /self-hosting/. The manual is rendered from the same #}
-{# docs/self-hosting.md that ships inside the wheel, so the page and the #}
-{# installed copy can never disagree. See apps/desktop/public_views.py. #}
+{# Served at /self-hosting/. The commands to deploy, and nothing else. #}
+{# Everything that is a decision or a symptom lives in the manual, one #}
+{# click away — see apps/desktop/public_views.py for why. #}
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>AI Tutor — Self-hosting</title>
+<title>AI Tutor — Run it yourself</title>
 <style>
   :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8;
-          --card:#fff; --bg:#f9fafb; --codebg:#f3f4f6; }
-  * { box-sizing: border-box; }
+          --card:#fff; --bg:#f9fafb; --codebg:#f3f4f6; --warnbg:#fffbeb;
+          --warnline:#fcd34d; --warn:#92400e; }
+  * { box-sizing:border-box; }
   body { margin:0; padding:2.5rem 1.25rem 5rem; color:var(--ink); background:var(--bg);
-         font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  main { max-width:52rem; margin:0 auto; }
-  h1 { font-size:1.85rem; margin:0 0 .25rem; letter-spacing:-.01em; }
+         font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  main { max-width:44rem; margin:0 auto; }
+  h1 { font-size:1.85rem; margin:0 0 .3rem; letter-spacing:-.01em; }
   .sub { color:var(--muted); margin:0 0 2rem; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:1rem; margin-bottom:1.5rem; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.25rem; }
-  .card h2 { font-size:1rem; margin:0 0 .15rem; border:0; padding:0; }
-  .card p { color:var(--muted); font-size:.85rem; margin:0 0 1rem; }
+  h2 { font-size:1.15rem; margin:2.5rem 0 .35rem; }
+  h2 .tag { font-size:.75rem; font-weight:600; color:#fff; background:var(--brand);
+            border-radius:99px; padding:.15rem .55rem; vertical-align:middle; margin-left:.4rem; }
+  .need { color:var(--muted); font-size:.87rem; margin:0 0 1rem; }
+  /* Wrap rather than scroll. These are commands someone is reading off the
+     screen and typing into a server; a wheel URL that runs off the right edge
+     is invisible, and horizontal scrollbars inside a code block go unnoticed.
+     Wrapping adds no characters, so copy-paste is unaffected. */
+  pre { background:var(--codebg); border:1px solid var(--line); border-radius:10px;
+        padding:1rem 1.1rem; font-size:.82rem; line-height:1.55; margin:0 0 .75rem;
+        white-space:pre-wrap; overflow-wrap:anywhere; }
+  code { font-size:.85em; }
+  pre code { font-size:1em; }
+  p code, li code { background:var(--codebg); padding:.1rem .35rem; border-radius:4px; }
+  a { color:var(--brand); }
   a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
-          padding:.6rem 1rem; border-radius:8px; font-weight:600; font-size:.9rem; }
-  a.btn:hover { filter:brightness(1.08); }
+          padding:.55rem .95rem; border-radius:8px; font-weight:600; font-size:.88rem; }
   a.btn.ghost { background:transparent; color:var(--brand); border:1px solid var(--brand); }
-
-  /* The rendered manual. Scoped so its headings do not fight the page chrome. */
-  .manual { background:var(--card); border:1px solid var(--line); border-radius:12px;
-            padding:1.75rem 2rem; margin-top:1.5rem; }
-  .manual h1 { display:none; }              /* the page already has one */
-  .manual h2 { font-size:1.25rem; margin:2.25rem 0 .75rem; padding-bottom:.35rem;
-               border-bottom:1px solid var(--line); }
-  .manual h2:first-child { margin-top:0; }
-  .manual h3 { font-size:1rem; margin:1.75rem 0 .5rem; }
-  .manual p, .manual li { font-size:.95rem; }
-  .manual code { background:var(--codebg); padding:.12rem .35rem; border-radius:4px; font-size:.85em; }
-  .manual pre { background:var(--codebg); border:1px solid var(--line); border-radius:8px;
-                padding:1rem; overflow-x:auto; font-size:.82rem; line-height:1.5; }
-  .manual pre code { background:none; padding:0; font-size:1em; }
-  /* Tables carry most of the operational content — the troubleshooting matrix,
-     the path comparison — so they have to stay readable on a narrow screen. */
-  .manual .tablewrap { overflow-x:auto; margin:.75rem 0 1.25rem; }
-  .manual table { border-collapse:collapse; width:100%; font-size:.87rem; }
-  .manual th, .manual td { border:1px solid var(--line); padding:.5rem .7rem; text-align:left;
-                           vertical-align:top; }
-  .manual th { background:var(--codebg); font-weight:600; }
-  .manual hr { border:0; border-top:1px solid var(--line); margin:2rem 0; }
-  .manual a { color:var(--brand); }
-  .manual blockquote { border-left:3px solid var(--line); margin:1rem 0; padding:.25rem 0 .25rem 1rem;
-                       color:var(--muted); }
+  .fill { background:var(--warnbg); border:1px solid var(--warnline); border-radius:10px;
+          padding:.9rem 1.1rem; margin:0 0 .75rem; font-size:.88rem; color:var(--warn); }
+  .fill code { background:rgba(0,0,0,.06); }
+  .more { border-top:1px solid var(--line); margin-top:3rem; padding-top:1.25rem; }
   footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line);
-           padding-top:1rem; margin-top:2.5rem; }
+           padding-top:1rem; margin-top:2rem; }
   footer a { color:var(--muted); }
   @media (prefers-color-scheme: dark) {
-    :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --card:#1f2937;
-            --bg:#111827; --codebg:#0b1220; --brand:#60a5fa; }
+    :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --card:#1f2937; --bg:#111827;
+            --codebg:#0b1220; --brand:#60a5fa; --warnbg:#3b2f0b; --warnline:#a16207; --warn:#fcd34d; }
   }
 </style>
 </head>
@@ -65,47 +55,122 @@
 
   <h1>{% trans "Run AI Tutor yourself" %}</h1>
   <p class="sub">
-    {% trans "Three ways to install it. The full manual is below." %}
+    {% blocktrans trimmed %}
+      On your own server, with student data inside your own borders.
+      Two ways to install it.
+    {% endblocktrans %}
   </p>
 
-  <div class="cards">
-    <div class="card">
-      <h2>{% trans "Docker" %} <span style="color:var(--muted);font-weight:400">— {% trans "recommended" %}</span></h2>
-      <p>{% trans "Brings its own database and certificates. Nothing else to install." %}</p>
-      <a class="btn" href="#3-path-a--your-own-server">{% trans "Read Path A" %}</a>
-    </div>
+  <h2>{% trans "With Docker" %}<span class="tag">{% trans "recommended" %}</span></h2>
+  <p class="need">
+    {% blocktrans trimmed %}
+      A Linux server with 4 vCPU, 8 GB RAM and 60 GB disk; Docker with the
+      Compose plugin; a domain pointing at it. Brings its own database and
+      certificates.
+    {% endblocktrans %}
+  </p>
 
-    <div class="card">
-      <h2>{% trans "Python package" %}</h2>
-      {% if server_wheel %}
-        <p>{% trans "For a server where containers are not allowed. You supply PostgreSQL and TLS." %}</p>
-        <a class="btn" href="{% url 'downloads:server' 'wheel' %}">{% trans "Download .whl" %}</a>
-        {# Which version, in the filename pip will see — an operator picking a #}
-        {# build should not have to download it to find out. #}
-        <p style="margin:.75rem 0 0"><code>{{ server_wheel }}</code></p>
-      {% else %}
-        <p>{% trans "For a server where containers are not allowed. Published with each release." %}</p>
-        <a class="btn ghost" href="#5-path-c--pip-install-no-docker">{% trans "Read Path C" %}</a>
-      {% endif %}
-    </div>
+<pre><code>mkdir -p ai-tutor &amp;&amp; cd ai-tutor
+
+# the deployment files ship inside the image, so they always match it
+docker run --rm ghcr.io/eai6/ai-tutor:latest \
+  tar -C /app/deploy/compose -c \
+      docker-compose.yml Caddyfile env.example backup.sh restore.sh | tar -x
+
+cp env.example .env &amp;&amp; chmod 600 .env</code></pre>
+
+  <div class="fill">
+    {% blocktrans trimmed %}
+      Now open <code>.env</code> and fill in the entries marked REQUIRED —
+      <code>SECRET_KEY</code>, <code>POSTGRES_PASSWORD</code>,
+      <code>ALLOWED_HOSTS</code>, <code>CSRF_TRUSTED_ORIGINS</code>, and one
+      provider API key. It will not start without them, on purpose.
+    {% endblocktrans %}
   </div>
 
-  {% if server_wheel %}
-    <p class="sub" style="font-size:.85rem;margin:0 0 1.5rem">
-      {% blocktrans trimmed %}
-        Or download the source archive:
-      {% endblocktrans %}
-      <a href="{% url 'downloads:server' 'sdist' %}"><code>{{ sdist }}</code></a>
-    </p>
-  {% endif %}
+<pre><code>docker compose pull        # ~7 GB, once
+docker compose up -d
+docker compose exec app python manage.py createsuperuser</code></pre>
 
-  {% if manual_html %}
-    <div class="manual">{{ manual_html|safe }}</div>
-  {% else %}
-    <div class="manual">
-      <p>{% trans "The manual is not available in this build." %}</p>
-    </div>
-  {% endif %}
+  <p class="need">
+    {% blocktrans trimmed %}
+      No API key? <code>docker compose --profile local-llm up -d</code> runs a
+      small model on the server instead. Weaker at tutoring than a cloud model,
+      and slower without a GPU — but it needs no account anywhere.
+    {% endblocktrans %}
+  </p>
+
+  <h2>{% trans "With pip, no Docker" %}</h2>
+  <p class="need">
+    {% blocktrans trimmed %}
+      For a server where containers are not allowed. Needs Python 3.12+ and
+      PostgreSQL with pgvector, and you run your own reverse proxy for HTTPS.
+    {% endblocktrans %}
+  </p>
+
+{% if server_wheel %}
+<pre><code>sudo python3.12 -m venv /opt/ai-tutor/venv
+sudo /opt/ai-tutor/venv/bin/pip install {{ server_wheel_url }}
+sudo /opt/ai-tutor/venv/bin/ai-tutor init</code></pre>
+
+  <div class="fill">
+    {% blocktrans trimmed %}
+      <code>init</code> writes <code>/etc/ai-tutor/ai-tutor.env</code> with a
+      generated <code>SECRET_KEY</code>. Set <code>ALLOWED_HOSTS</code>,
+      <code>CSRF_TRUSTED_ORIGINS</code>, <code>DATABASE_URL</code> and a
+      provider key in it.
+    {% endblocktrans %}
+  </div>
+
+<pre><code>sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo /opt/ai-tutor/venv/bin/ai-tutor seed
+sudo /opt/ai-tutor/venv/bin/ai-tutor createsuperuser
+
+# run it as a service
+sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</code></pre>
+
+  <p class="need">
+    <a href="{% url 'downloads:server' 'wheel' %}"><code>{{ server_wheel }}</code></a>
+    &middot;
+    <a href="{% url 'downloads:server' 'sdist' %}">{% trans "source archive" %}</a>
+  </p>
+{% else %}
+  <p class="need">
+    {% trans "No wheel has been published yet. Path C in the manual has the full procedure." %}
+  </p>
+{% endif %}
+
+  <h2>{% trans "Then, whichever you chose" %}</h2>
+  <p class="need">
+    {% blocktrans trimmed %}
+      Sign in at <code>/admin/</code>, point <strong>tutoring</strong> at a
+      provider under LLM → Model configs, and take one tutoring turn. That
+      exercises the database, the knowledge base, the credentials and media in
+      one action — a health check does not.
+    {% endblocktrans %}
+  </p>
+
+  <div class="more">
+    <h2 style="margin-top:0">{% trans "The full manual" %}</h2>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Choosing between a server, AWS and pip; what each path does not give
+        you; backups; upgrades; and a troubleshooting table written from
+        symptoms rather than causes.
+      {% endblocktrans %}
+    </p>
+    <p><a class="btn" href="{% url 'self_hosting_manual' %}">{% trans "Read the manual" %}</a></p>
+
+    <p class="need" style="margin-top:1.5rem">
+      <strong>{% trans "One thing to know before you start." %}</strong>
+      {% blocktrans trimmed %}
+        Student data stays on your server — but when a student sends a message
+        it goes to Anthropic, OpenAI or Google to be answered, leaving your
+        network. Run a local model instead if that is not acceptable.
+      {% endblocktrans %}
+    </p>
+  </div>
 
   <footer>
     <p>
@@ -115,18 +180,5 @@
   </footer>
 
 </main>
-
-<script>
-  // Tables in the manual carry the troubleshooting matrix and the path
-  // comparison; without a scroll container they force the whole page to scroll
-  // sideways on a phone. Done here rather than in the Markdown so the source
-  // document stays a plain document.
-  document.querySelectorAll('.manual table').forEach(function (t) {
-    var w = document.createElement('div');
-    w.className = 'tablewrap';
-    t.parentNode.insertBefore(w, t);
-    w.appendChild(t);
-  });
-</script>
 </body>
 </html>

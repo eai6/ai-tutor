@@ -197,20 +197,35 @@ def _add_heading_ids(tokens) -> None:
         tok.attrSet('id', base if seen[base] == 1 else f'{base}-{seen[base] - 1}')
 
 
-@require_http_methods(["GET", "HEAD"])
-def self_hosting(request):
-    """The whole self-hosting manual, plus the artefacts it refers to.
-
-    Separate from /download/ because the audiences do not overlap: that page is
-    for a teacher installing on one classroom machine, this is for whoever runs
-    a ministry's servers. Mixing them made both longer and neither clearer.
-    """
+def _artefact_context() -> dict:
     configured = bool(getattr(settings, 'AWS_DOWNLOADS_BUCKET', ''))
     artefacts = server_artefacts() if configured else {}
     wheel = artefacts.get('wheel', '')
-    return render(request, 'downloads/self_hosting.html', {
-        'manual_html': render_manual(),
+    return {
         'server_wheel': wheel,
         'server_wheel_url': _bucket_url(wheel, _SERVER_PREFIX) if wheel else '',
         'sdist': artefacts.get('sdist', ''),
-    })
+    }
+
+
+@require_http_methods(["GET", "HEAD"])
+def self_hosting(request):
+    """How to deploy, and nothing else.
+
+    Separate from /download/ because the audiences do not overlap: that page is
+    for a teacher installing on one classroom machine, this is for whoever runs
+    a ministry's servers.
+
+    Deliberately NOT the whole manual. Rendering all 683 lines here — AWS cost
+    tables, three architecture diagrams, a Pulumi walkthrough — buried the six
+    commands someone actually needs under everything they do not. The manual
+    lives one click away for when a decision or a symptom needs it.
+    """
+    return render(request, 'downloads/self_hosting.html', _artefact_context())
+
+
+@require_http_methods(["GET", "HEAD"])
+def self_hosting_manual(request):
+    """The full manual, for choosing between paths and diagnosing symptoms."""
+    return render(request, 'downloads/manual.html',
+                  {'manual_html': render_manual(), **_artefact_context()})

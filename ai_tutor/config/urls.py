@@ -49,6 +49,8 @@ urlpatterns = [
     # The self-hosting manual, served by the application. A public page
     # cannot route its instructions through a private repository.
     path('self-hosting/', desktop_public_views.self_hosting, name='self_hosting'),
+    path('self-hosting/manual/', desktop_public_views.self_hosting_manual,
+         name='self_hosting_manual'),
     path('admin/', admin.site.urls),
     path('api/v1/', include('ai_tutor.apps.api.urls', namespace='api')),
     # Bootstrap status for the offline desktop shell's splash screen.

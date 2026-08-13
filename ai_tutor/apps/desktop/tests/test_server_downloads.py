@@ -74,19 +74,17 @@ class TestPage:
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_offers_both_server_routes(self):
-        """Both live on /self-hosting/ now — the desktop page just points there."""
         body = Client().get('/self-hosting/').content.decode()
         assert 'Docker' in body
-        assert 'Download .whl' in body
         assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
 
     @override_settings(SERVER_WHEEL_VERSION='', **BUCKET)
     def test_never_offers_a_link_it_cannot_serve(self):
-        """Before a release the page points at the manual's Path C rather than
-        a download button that 404s."""
+        """Before a release the page must not show a pip command pointing at a
+        wheel that does not exist."""
         body = Client().get('/self-hosting/').content.decode()
-        assert 'Download .whl' not in body
-        assert 'Read Path C' in body
+        assert 'py3-none-any.whl' not in body
+        assert 'No wheel has been published yet' in body
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_still_offers_the_desktop_installers(self):
@@ -103,13 +101,13 @@ class TestSelfHostingPage:
     """
 
     def test_serves_the_whole_manual(self, client):
-        body = client.get('/self-hosting/').content.decode()
+        body = client.get('/self-hosting/manual/').content.decode()
         for section in ('Choosing a path', 'Path A', 'Path B',
                         'Path C', 'What leaves your network'):
             assert section in body, f'missing: {section}'
 
     def test_renders_markdown_rather_than_showing_it(self, client):
-        body = client.get('/self-hosting/').content.decode()
+        body = client.get('/self-hosting/manual/').content.decode()
         assert '<table' in body and '<h2' in body
         assert '| You provide |' not in body, 'markdown table left unrendered'
 
@@ -118,7 +116,7 @@ class TestSelfHostingPage:
         the slugger every anchor on the page — including the buttons at the
         top and the manual's own cross-references — is dead."""
         import re
-        body = client.get('/self-hosting/').content.decode()
+        body = client.get('/self-hosting/manual/').content.decode()
         ids = set(re.findall(r'<h[1-6] id="([^"]+)"', body))
         targets = {h[1:] for h in re.findall(r'href="(#[^"]+)"', body)}
         assert targets, 'expected in-page links'
@@ -127,21 +125,37 @@ class TestSelfHostingPage:
     def test_uses_github_slugs(self, client):
         """The document is written and reviewed on GitHub and its own
         cross-references are GitHub-style anchors."""
-        body = client.get('/self-hosting/').content.decode()
+        body = client.get('/self-hosting/manual/').content.decode()
         assert 'id="3-path-a--your-own-server"' in body
 
     def test_renders_without_the_bucket_configured(self, client):
         """The manual is the point of the page; the download buttons are not."""
         with override_settings(AWS_DOWNLOADS_BUCKET='', SERVER_WHEEL_VERSION=''):
-            body = client.get('/self-hosting/').content.decode()
+            body = client.get('/self-hosting/manual/').content.decode()
         assert 'Choosing a path' in body
         assert 'Download .whl' not in body
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_offers_the_wheel_when_one_is_published(self, client):
         body = client.get('/self-hosting/').content.decode()
-        assert 'Download .whl' in body
-        assert 'ai_tutor-1.2.0.tar.gz' in body
+        assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
+
+    def test_the_quick_start_is_short(self, client):
+        """It exists because rendering all 683 manual lines here buried the six
+        commands someone actually needs. If it grows back, that is a regression
+        in the thing the page is for."""
+        quick = len(client.get('/self-hosting/').content)
+        full = len(client.get('/self-hosting/manual/').content)
+        assert quick < full / 3, f'quick start {quick} vs manual {full}'
+
+    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
+    def test_the_quick_start_carries_the_actual_commands(self, client):
+        body = client.get('/self-hosting/').content.decode()
+        for cmd in ('docker compose up -d', 'ai-tutor init', 'createsuperuser'):
+            assert cmd in body, f'missing: {cmd}'
+
+    def test_the_quick_start_links_to_the_manual(self, client):
+        assert '/self-hosting/manual/' in client.get('/self-hosting/').content.decode()
 
     def test_the_two_pages_link_to_each_other(self, client):
         """Separate audiences, but someone always lands on the wrong one."""
