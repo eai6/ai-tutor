@@ -1,0 +1,126 @@
+# Publish the application image to GitHub Container Registry, so a ministry can
+# run AI Tutor without access to this repository.
+#
+# The repo is private; the PACKAGE is public. GitHub allows that combination,
+# and it is the point — self-hosters get the exact image we tested without
+# needing the source, a build toolchain, or 25 GB of build headroom.
+#
+# DELIBERATELY NOT on every push. The image is ~7 GB and takes minutes to build
+# and push; publishing a release is a decision, not a side effect of merging.
+# Tag a version, or run it by hand.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# FIRST RUN ONLY: the package is created private. Make it public once, at
+#   github.com/users/eai6/packages/container/ai-tutor/settings
+# Until then `docker pull` fails with "denied" for anyone outside the repo,
+# which reads like a broken image rather than a permissions setting.
+name: Publish image (GHCR)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish (e.g. v1.0.0, or 'latest' for a test build)
+        type: string
+        default: latest
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      # The only extra permission needed. GITHUB_TOKEN carries it — no
+      # long-lived registry credential to store or rotate.
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Android-SDK disk space (runner only)
+        # Same reason as deploy-aws.yml: the image is large and the hosted
+        # runner does not have room for it alongside the preinstalled SDKs.
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          df -h /
+
+      - name: Confirm the seed curriculum is present
+        # The image is expected to boot with content. Publishing one without it
+        # produces a deployment that silently starts empty, and the person who
+        # finds out is a teacher looking for their lessons.
+        run: |
+          PACK=deploy/seed/curriculum-pack.tar.gz
+          if [ ! -f "$PACK" ]; then
+            echo "::error title=No seed pack::$PACK is missing. Build one with"
+            echo "  python manage.py build_curriculum_pack --institution <id> --no-media"
+            exit 1
+          fi
+          echo "seed pack: $(du -h "$PACK" | cut -f1)"
+          # A curriculum pack must never contain a roster — that would publish
+          # real students' names to anyone who pulls the image.
+          if tar -tzf "$PACK" | grep -q 'roster.json'; then
+            echo "::error title=Roster in seed pack::The pack contains roster.json (user data). Refusing to publish."
+            exit 1
+          fi
+          echo "no roster.json in the pack — safe to publish"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # amd64 only. Nearly every server is x86_64, and the alternative —
+          # emulating arm64 on an amd64 runner — takes hours for an image this
+          # size. An ARM host can still build from source; the compose file has
+          # no platform pin precisely so that works.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo ""
+            echo "A self-hoster runs:"
+            echo ""
+            echo '```bash'
+            echo "cd deploy/compose"
+            echo "docker compose pull && docker compose up -d"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

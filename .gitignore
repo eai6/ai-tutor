@@ -93,3 +93,6 @@ vendor/
 # Self-hosted deployment backups. These contain student records — database
 # dumps and uploaded media. backup.sh writes here by default.
 deploy/compose/backups/
+
+# Local-verification compose override (native arch instead of amd64).
+deploy/compose/docker-compose.localtest.yml

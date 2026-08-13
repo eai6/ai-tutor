@@ -52,6 +52,15 @@ ROSTER_NAME = 'roster.json'
 # mis-read. Distinct from schema_rev, which tracks Django migrations.
 PACK_FORMAT_VERSION = 1
 
+#: What kind of pack this is. A desktop pack carries a ROSTER — the institution's
+#: students — because a device has to bind a local login to the server user id
+#: its work will sync under. That makes it unsafe to load onto another
+#: organisation's server, so the two pack kinds refuse each other rather than
+#: relying on whoever copies the file to pick the right one. Curriculum-only
+#: packs are built by `manage.py build_curriculum_pack`; see
+#: apps/curriculum/curriculum_pack.py.
+PACK_KIND = 'desktop'
+
 PARTS = ('institution.json', 'curriculum.json', 'tickets.json', 'kb_chunks.json',
          ROSTER_NAME)
 
@@ -213,6 +222,7 @@ def build_pack(institution_id: int, out_dir: Path, include_media: bool = True) -
 
         manifest = {
             'pack_format': PACK_FORMAT_VERSION,
+            'pack_kind': PACK_KIND,
             'institution_id': institution_id,
             'institution_name': institution.name,
             'version': version,
@@ -318,6 +328,20 @@ def import_pack(archive: Path, *, force: bool = False,
         raise PackError(
             f"Pack format v{manifest.get('pack_format')} is not supported by "
             f"this app (expects v{PACK_FORMAT_VERSION}). Update the app."
+        )
+
+    # A curriculum pack has no roster, so a device that accepted one would set
+    # up cleanly and then strand every student at an empty "pick your name"
+    # screen — a failure that surfaces in a classroom rather than here.
+    #
+    # Packs built before pack_kind existed have no kind and ARE desktop packs;
+    # treating a missing value as 'desktop' keeps them importable.
+    kind = manifest.get('pack_kind', PACK_KIND)
+    if kind != PACK_KIND:
+        raise PackError(
+            f"This is a '{kind}' pack, not a device content pack. It carries "
+            f"no student roster, so nobody could sign in on this machine. Use "
+            f"a pack built with `manage.py build_content_pack`."
         )
 
     state = DeviceState.load()

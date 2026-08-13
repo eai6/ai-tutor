@@ -38,13 +38,35 @@ services:
     # on the internal network — nothing on the host or the internet can dial it.
 
   app:
+    # Published to GitHub Container Registry, so a self-hoster never needs the
+    # source. `docker compose pull` fetches exactly the image we tested.
+    #
+    # `build:` stays as a fallback: run `docker compose build` to build from
+    # source instead — which is how an ARM server gets an image, since the
+    # published one is amd64 only.
+    #
+    # NOTE: `up` without a prior `pull` will BUILD, because build: is defined
+    # and the image is not local yet. Always `docker compose pull` first unless
+    # you mean to build.
+    image: ghcr.io/eai6/ai-tutor:${IMAGE_TAG:-latest}
     build:
       context: ../..
       dockerfile: Dockerfile
-      # Fargate and most servers are x86_64. On Apple Silicon an unqualified
-      # build produces an arm64 image that will not run there.
-      platforms:
-        - linux/amd64
+      # NO platform pin, deliberately.
+      #
+      # You build this on the machine you deploy it to, so the native
+      # architecture is always the right one — including ARM servers, which are
+      # increasingly what a cheap VPS is. Pinning linux/amd64 here would force
+      # every ARM host through emulation for no benefit.
+      #
+      # It also does not work: `build.platforms` (plural) puts BuildKit into
+      # multi-platform mode, which the default Docker driver refuses with
+      # "Multi-platform build is not supported for the docker driver". Verified
+      # 2026-08-12.
+      #
+      # The AWS path is the case that genuinely needs a pin — you build on a
+      # laptop and run on x86 Fargate — and it passes `--platform linux/amd64`
+      # explicitly. See docs/self-hosting.md, Path B step 4.
     restart: unless-stopped
     depends_on:
       db:
@@ -70,6 +92,11 @@ services:
 
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-en-us}
 
+      # Where the optional local model lives. Only consulted by
+      # `seed_local_tutor`, which is itself a no-op when a cloud key is set.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      LOCAL_TUTOR_MODEL: ${LOCAL_TUTOR_MODEL:-qwen3-4b-jetson}
+
       EMAIL_HOST: ${EMAIL_HOST:-}
       EMAIL_PORT: ${EMAIL_PORT:-587}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
@@ -91,22 +118,47 @@ services:
     #
     # The migrate + seed chain is kept exactly as the image defines it. Unlike
     # ECS there is one app container here, so nothing races.
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py seed_gamification &&
-             python manage.py backfill_progress &&
-             python manage.py classify_unit_grades &&
-             python manage.py seed_help_assistant_model &&
-             python manage.py generate_recent_updates &&
-             python manage.py build_help_index --with-source &&
-             gunicorn config.wsgi:application
-               --bind 0.0.0.0:8000
-               --workers 4 --threads 4
-               --timeout 300 --graceful-timeout 30
-               --access-logfile - --error-logfile -"
+    # Written as ONE line on purpose.
+    #
+    # A YAML folded block (`>`) does NOT fold lines that are indented deeper
+    # than the first — it keeps their newlines. An earlier multi-line version
+    # of this therefore reached the shell as separate commands, so gunicorn ran
+    # with no --bind and fell back to its default of 127.0.0.1:8000. The
+    # container looked healthy (its own healthcheck curls loopback) while Caddy
+    # could not reach it at all: every request 502s. Verified 2026-08-12 by
+    # curling app:8000 from another container — connection refused.
+    #
+    # Two additions to the image's own CMD, plus --timeout 300:
+    #
+    #   import_curriculum_pack --if-empty  seeds the bundled curriculum on the
+    #     first boot and does nothing on every boot after. The pack ships INSIDE
+    #     the image (deploy/seed/), so a first run needs no internet at all —
+    #     the same offline-first principle the desktop build is designed around.
+    #   seed_local_tutor  points the tutor at the local model when no cloud API
+    #     key is configured. Also a no-op when one is.
+    #
+    # The only change from the image's own CMD is --timeout 300. The Dockerfile
+    # uses 120; a tutoring turn takes 20-90 s and longer on modest hardware, so
+    # 120 cuts replies mid-generation under load. infra/systemd/ai-tutor.service
+    # uses 300 for the same reason and calls the default "load-bearing".
+    #
+    # The migrate + seed chain is kept exactly as the image defines it. Unlike
+    # ECS there is one app container here, so nothing races.
+    command: ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && python manage.py seed_help_assistant_model && python manage.py generate_recent_updates && python manage.py build_help_index --with-source && python manage.py import_curriculum_pack deploy/seed/curriculum-pack.tar.gz --if-empty && python manage.py seed_local_tutor && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 300 --graceful-timeout 30 --access-logfile - --error-logfile -"]
 
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')\""]
+      # Two assertions, because either alone hides a real failure.
+      #
+      #   1. TCP-connect to this container's OWN address — proves gunicorn is
+      #      bound to 0.0.0.0 and not just loopback. A check that only curls
+      #      127.0.0.1 passes happily while Caddy gets connection-refused, which
+      #      is exactly the bug this file shipped with until 2026-08-12.
+      #   2. HTTP-GET /health/ over loopback — proves Django actually answers.
+      #      Done over loopback on purpose: a request to the container's own
+      #      hostname carries a Host header that is not in ALLOWED_HOSTS, so
+      #      Django correctly answers 400 and the check would fail for the wrong
+      #      reason.
+      test: ["CMD-SHELL", "python -c \"import socket,urllib.request; s=socket.create_connection((socket.gethostbyname(socket.gethostname()),8000),3); s.close(); urllib.request.urlopen('http://127.0.0.1:8000/health/',timeout=5)\""]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -134,7 +186,74 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  # ── Optional local model ────────────────────────────────────────────────
+  #
+  # Started only with `--profile local-llm`, because it pulls ~2.6 GB and a
+  # deployment with cloud API keys has no use for it. With no keys at all this
+  # is what makes the tutor answer at all.
+  #
+  #   docker compose --profile local-llm up -d
+  #
+  # This is a fallback so the platform works with no keys at all, not an
+  # equivalent to the cloud models — see the note in docs/self-hosting.md.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    restart: unless-stopped
+    environment:
+      # Same knobs the Jetson deployment uses. KV cache at q8_0 roughly halves
+      # the memory the context window costs, which is what makes a 4B model fit
+      # beside the application on a modest box.
+      OLLAMA_FLASH_ATTENTION: 1
+      OLLAMA_KV_CACHE_TYPE: q8_0
+      # One request at a time. The app has 4 gunicorn workers, but the model
+      # serves them serially anyway — more parallelism just queues inside
+      # Ollama while using more memory.
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_MAX_LOADED_MODELS: 1
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # One-shot: builds the tutor model tag, then exits. Separate from the server
+  # so a restart of Ollama does not re-pull, and so a failed pull is visible as
+  # a failed container rather than a silently missing model.
+  ollama-init:
+    image: ollama/ollama:latest
+    profiles: ["local-llm"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      # The Modelfile pins Qwen3-4B-*Instruct*. Plain `qwen3:4b` resolves to the
+      # Thinking checkpoint, which opens <think> unconditionally and cannot be
+      # made to answer directly — see the Modelfile's own comment.
+      - ../../infra/ollama:/modelfiles:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        if ollama list | grep -q '${LOCAL_TUTOR_MODEL:-qwen3-4b-jetson}'; then
+          echo "model already present, nothing to do"
+          exit 0
+        fi
+        echo "Pulling the base model (~2.6 GB, first start only)..."
+        ollama pull qwen3:4b-instruct
+        echo "Creating the tutor tag..."
+        ollama create ${LOCAL_TUTOR_MODEL:-qwen3-4b-jetson} \
+          -f /modelfiles/Modelfile.qwen3-4b-jetson
+        echo "Done."
+    restart: "no"
+
 volumes:
+  ollama:
   pgdata:
   media:
   caddy_data:
