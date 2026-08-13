@@ -241,3 +241,112 @@ manual before any of the ZAP work lands.
 Write `deploy/compose/.env.example` first — it forces the full list of required
 configuration into the open, and the compose file and the manual's Path A both
 follow from it.
+
+---
+
+# Session log — 2026-08-12: what verification actually found
+
+Phases 1-2 are built and committed (`534075f`, `26dbf8d`). The value of this
+session was not the code; it was that **running the thing found seven bugs that
+reading it did not**. Recorded here because most would have reached a ministry.
+
+## Bugs found only by running it
+
+1. **Gunicorn bound to loopback.** A YAML folded block (`>`) does NOT fold lines
+   indented deeper than the first — it keeps their newlines. So
+   `--bind 0.0.0.0:8000` reached the shell as a separate command and gunicorn
+   fell back to `127.0.0.1:8000`. The container reported **healthy** throughout,
+   because its healthcheck curled loopback. Caddy would have 502'd every
+   request against a stack that said it was fine. Fixed by writing the command
+   as a single exec-form line.
+
+2. **The healthcheck could not detect that.** Rewritten to do both: TCP-connect
+   to the container's own address (proves the bind) *and* HTTP-GET loopback
+   (proves Django answers).
+
+3. **`ALLOWED_HOSTS` broke the healthcheck.** The check requests
+   `http://127.0.0.1:8000/health/`, and Django rejects unknown Hosts — so a
+   deployment following `env.example` (`ALLOWED_HOSTS=tutor.education.gov.xx`)
+   would be permanently unhealthy while serving perfectly. Compose now appends
+   `,127.0.0.1,localhost` to whatever the operator sets.
+
+4. **`ModelConfig.institution` is NOT NULL**, and a fresh install has no
+   institution — so `seed_local_tutor` crashed on precisely the deployment it
+   exists for. Uses `Institution.get_global()`, which exists for this.
+
+5. **`build.platforms` is rejected by the default Docker driver**
+   ("Multi-platform build is not supported"). The fix was to remove the pin
+   entirely: you build on the server you deploy to, so native is right, and
+   pinning amd64 would force every ARM host through emulation. Only the AWS
+   path needs a pin, and it passes `--platform` explicitly.
+
+6. **`datadump.json` was inside the image** — 4 `auth.user` rows with pbkdf2
+   password hashes and 3 email addresses, including the `admin` superuser.
+   `.dockerignore` excluded `db.sqlite3` but not a Django dumpdata of the same
+   data, nor `db.sqlite3-wal`/`-shm`, nor `build/` (135 MB). **This is the one
+   that mattered**: the image is published publicly, so those hashes would have
+   been world-readable for offline cracking. Image dropped 7 GB → 5.5 GB as a
+   side effect.
+
+7. **The manual told them to clone a private repo.** Caught while writing it.
+
+## Design decisions and why
+
+**Two pack kinds that refuse each other.** `apps/desktop/packs.py` ships a
+roster — real children's names, usernames, year groups — because a provisioned
+laptop must bind a local login to the server user id its work syncs under. That
+is correct there and a data-protection incident if the same file seeds another
+country's server. `apps/curriculum/curriculum_pack.py` carries content only.
+Each manifest declares `pack_kind`; each importer refuses the other's.
+
+The refusal is checked **twice** — the declared kind AND the actual member list
+— because the manifest is what a pack says about itself and only the member
+list catches one that was edited. Packs predating `pack_kind` are treated as
+desktop packs so devices in the field keep working.
+
+**Content ships inside the image, not downloaded.** 6.8 MB of text (3 courses,
+300 lessons, 1912 steps, 7023 questions, 1007 KB chunks). First run therefore
+needs no internet — the same offline-first principle the desktop build is
+designed around. Media is excluded: 142 MB against 6.8 MB, and
+`.dockerignore` already kept it out. **~73% of steps reference a figure**, so
+those read with a gap until media is added.
+
+**Deployment files are extracted from the image**, not fetched from the repo.
+They cannot drift from the image they configure, and no repository access is
+needed. Working from source stays documented — it is also how an ARM server
+gets an image.
+
+**Fail-safe settings defaults.** `DEBUG` now defaults False; the app refuses to
+boot with the published dev `SECRET_KEY` when DEBUG is off. Three exemptions,
+each deliberate: the offline builds (no secret store, loopback/isolated
+network), pytest (Django forces DEBUG=False and supplies no key), and
+non-serving `manage.py` commands.
+
+## Measured, not estimated
+
+| | |
+|---|---|
+| Image | **5.5 GB** after the ignore fix (7 GB before) |
+| Build headroom needed | ~25 GB; BuildKit cache exceeded the image itself |
+| Seed pack | 6.8 MB, imports in seconds |
+| pgvector | 0.8.6, created by `curriculum.0029` against `pgvector/pgvector:pg16` |
+| Local tutoring turn | **226 s** on a 7.7 GiB Docker VM — prefill 110 s, decode 1.9 tok/s, "tight fit" warning |
+| System prompt | 17,486 chars, so prefill dominates — structural, not machine-specific |
+
+**The 226 s turn is the number to be careful about.** It was on a memory-starved
+VM sharing 7.7 GiB with Postgres and the app. A 16 GB server with nothing else
+competing will be much better, but that has NOT been measured. The manual
+should say the local model is for getting started or strict data residency —
+not for thirty concurrent students — and should not quote a latency until one
+is measured on server-class hardware.
+
+## Open
+
+- **Media**: 73% of steps reference figures that are not shipped.
+- **Cloud-key turn**: never measured, so the manual cannot contrast the two.
+- **Repo visibility**: the image contains the full source (2908 `.py` files), so
+  publishing it publishes the code. Private repo + public package gives only
+  nominal source privacy. Worth deciding deliberately rather than by default.
+- **Benchmark numbers removed** from all user-facing text on Edward's call —
+  more eval needed before quoting 65% vs 94%. The local model is described as a
+  fallback, not a measured tier.

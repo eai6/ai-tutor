@@ -13,3 +13,32 @@ venv/
 archives/
 design/
 docs/
+
+# ── Never ship these ─────────────────────────────────────────────────────
+#
+# The image is published publicly (see .github/workflows/publish-image.yml), so
+# anything here is world-readable. `db.sqlite3` was already excluded, but the
+# entries around it were not — and a Django dumpdata is the same data in a
+# different file.
+#
+# Found 2026-08-12: datadump.json was inside the built image carrying
+# auth.user rows with password hashes and email addresses.
+datadump.json
+*.json.gz
+db.sqlite3*
+dumps/
+*.dump
+*.sql
+
+# Build artefacts — 135 MB of PyInstaller output, nothing the server runs.
+build/
+dist/
+*.spec
+
+# Internal working material, not part of the product.
+ab-test-reports-*
+offline_eval/
+evals/
+*.docx
+*.pdf
+.pytest_cache/

@@ -78,7 +78,13 @@ services:
       # booting a misconfigured server. The app itself also refuses to run with
       # the development signing key — see config/settings.py.
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env — see env.example}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS in .env}
+      # Loopback is appended to whatever the operator sets. The container's
+      # own healthcheck requests http://127.0.0.1:8000/health/, and Django
+      # rejects any Host it does not recognise — so a deployment that sets only
+      # its real domain (which env.example tells you to do) would be marked
+      # permanently unhealthy while serving perfectly. Adding loopback is safe:
+      # nothing outside the container can present it.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS in .env},127.0.0.1,localhost
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?set CSRF_TRUSTED_ORIGINS in .env}
 
       # Set explicitly rather than relying on defaults, so this deployment's
