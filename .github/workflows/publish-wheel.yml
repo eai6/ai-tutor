@@ -126,12 +126,6 @@ jobs:
           print('wheel contents OK')
           PY
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheel
-          path: dist_wheel/*
-          retention-days: 30
-
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -169,6 +163,19 @@ jobs:
               --cache-control 'no-cache, max-age=60'
           done
           echo "::notice title=Published::Set SERVER_WHEEL_VERSION=${VERSION} on the web app so /download/ links to it."
+
+      # Last, and allowed to fail. This is a convenience copy for debugging a
+      # release, not the release itself — and it is the step most likely to
+      # fail for reasons that have nothing to do with this build: the account's
+      # artifact storage quota is shared, and the desktop installers fill it.
+      # Placed before the S3 upload, a full quota silently skipped the actual
+      # publish, which is exactly backwards.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: wheel
+          path: dist_wheel/*
+          retention-days: 7
 
       - name: Summary
         run: |
