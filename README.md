@@ -81,6 +81,7 @@ what leaves your network, and a troubleshooting table written from symptoms
 | **Your own AWS account** | ECS Fargate + RDS, built by Pulumi. Survives a machine failure without anyone intervening. [Path B in the manual](docs/self-hosting.md). |
 | **Offline desktop app** | Runs a model on the classroom machine and never calls out. For schools with no reliable connection. |
 | **Offline kiosk** | An NVIDIA Jetson serving its own WiFi hotspot, for a room with no internet at all. [Reference](docs/reference.md). |
+| **pip, no Docker** | `pip install ai-tutor`, then `ai-tutor init && ai-tutor serve`. For a server where containers are not allowed — you supply Postgres and TLS. [Path C in the manual](docs/self-hosting.md). |
 | **From source** | `git clone`, then `docker compose build`. Also how an ARM server gets an image. |
 
 ---

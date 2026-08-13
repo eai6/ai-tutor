@@ -3,23 +3,26 @@
 For a ministry, school network, or partner that wants to run AI Tutor itself,
 under its own control, with student data inside its own borders.
 
-Two supported paths. Both run the same application; they differ in who operates
-the machine underneath it.
+Three supported paths. All run the same application; they differ in who
+operates the machine underneath it, and how much of the surrounding plumbing
+comes with it.
 
 ---
 
 ## 1. Choosing a path
 
-| | **A — your own server** | **B — your own AWS account** |
-|---|---|---|
-| You provide | One Linux server, a domain | An AWS account, a domain |
-| Source needed | No — the published image is enough | Yes, for the Pulumi program |
-| Runs on | Docker Compose | ECS Fargate + RDS, built by Pulumi |
-| Monthly cost | Server + LLM usage | ≈ $259 infrastructure + LLM usage |
-| Scales to | A few thousand students on one box | Autoscales; add tasks and database size |
-| Who patches the OS | You | AWS |
-| If the machine dies | You restore from backup | Redeploy; the database is separate |
-| Set-up time | An afternoon | A day, plus DNS propagation |
+| | **A — your own server** | **B — your own AWS account** | **C — pip, no Docker** |
+|---|---|---|---|
+| You provide | One Linux server, a domain | An AWS account, a domain | A Linux server, a domain, Python 3.12+ |
+| Source needed | No — the published image is enough | Yes, for the Pulumi program | No — the wheel is enough |
+| Runs on | Docker Compose | ECS Fargate + RDS, built by Pulumi | systemd + gunicorn |
+| Database | Bundled Postgres container | RDS, managed | **You install and run Postgres** |
+| TLS | Automatic, via Caddy | Automatic, via ACM | **You run a reverse proxy** |
+| Monthly cost | Server + LLM usage | ≈ $259 infrastructure + LLM usage | Server + LLM usage |
+| Scales to | A few thousand students on one box | Autoscales; add tasks and database size | A few thousand students on one box |
+| Who patches the OS | You | AWS | You |
+| If the machine dies | You restore from backup | Redeploy; the database is separate | You restore from backup |
+| Set-up time | An afternoon | A day, plus DNS propagation | An afternoon, if Postgres is familiar |
 
 **Choose A** if you have a server or a data-centre requirement, or you want the
 whole system inside one machine you can point at. It is the simpler thing to
@@ -28,8 +31,14 @@ understand and the cheaper thing to run.
 **Choose B** if you already operate in AWS, need it to survive a machine
 failure without someone intervening, or expect to grow past one server.
 
+**Choose C only if you cannot run containers** — a policy that forbids Docker,
+or a managed Python estate you must fit into. It installs the same application
+from a wheel, but the database, TLS and process supervision that Path A hands
+you in one command all become yours to assemble. Path A is less work and fewer
+things to get wrong; prefer it unless something rules it out.
+
 Neither path changes what the tutor does or where the *model* runs — see
-[section 6](#6-what-leaves-your-network).
+[section 7](#7-what-leaves-your-network).
 
 ---
 
@@ -51,6 +60,23 @@ Neither path changes what the tutor does or where the *model* runs — see
 
 Three containers, two volumes, one server. The knowledge base is stored as
 vectors *in Postgres*, so there is no separate vector database to run.
+
+### Path C — pip on your own server
+
+```
+                Internet
+                    │
+             Caddy or nginx      TLS terminates here — YOURS to install,
+                    │            configure and renew
+                    ▼
+       ai-tutor serve (gunicorn)  ── data directory (uploads, static)
+                    │
+                    ▼
+            PostgreSQL + pgvector  ── YOURS to install and back up
+```
+
+The same application, assembled by hand instead of by Compose. The two boxes
+marked *yours* are the difference between this path and Path A.
 
 ### Path B — AWS
 
@@ -412,7 +438,164 @@ tutoring turn**.
 
 ---
 
-## 5. Operating it
+---
+
+## 5. Path C — pip install, no Docker
+
+Same application, installed as a Python package. Choose this only if
+containers are ruled out; Path A gives you the database, TLS and process
+supervision that this path leaves to you.
+
+### What you need first
+
+- A Linux server: 4 vCPU, 8 GB RAM, 60 GB disk.
+- **Python 3.12 or newer.** Django 6 requires it; 3.11 will not install.
+- **PostgreSQL 14+ with the `pgvector` extension available.** The knowledge
+  base is stored as vectors in Postgres.
+- A domain pointing at the server, and something to terminate TLS.
+- Roughly 3 GB of disk for the dependencies alone — the install pulls
+  `onnxruntime`, `sentence-transformers` and `faster-whisper`.
+
+### Step 1 — Install
+
+```bash
+sudo apt install python3.12 python3.12-venv postgresql postgresql-16-pgvector
+
+sudo -u postgres createuser --pwprompt aitutor
+sudo -u postgres createdb --owner aitutor aitutor
+
+sudo python3.12 -m venv /opt/ai-tutor/venv
+sudo /opt/ai-tutor/venv/bin/pip install ai-tutor
+```
+
+The extension itself is created by a migration; it only has to be *available*
+to Postgres, not enabled by hand.
+
+### Step 2 — Configure
+
+```bash
+sudo /opt/ai-tutor/venv/bin/ai-tutor init
+```
+
+That writes `/etc/ai-tutor/ai-tutor.env` (mode 600) with a freshly generated
+`SECRET_KEY`, and creates `/var/lib/ai-tutor` for the database, uploads and
+collected static files. Re-running it never overwrites an existing file —
+rotating the key would log every user out and void every outstanding
+password-reset link.
+
+Edit that file and set:
+
+| | |
+|---|---|
+| `ALLOWED_HOSTS` | The hostname students will type. |
+| `CSRF_TRUSTED_ORIGINS` | The same, **with the scheme**. Without it every login fails with no useful error. |
+| `DATABASE_URL` | `postgres://aitutor:PASSWORD@localhost:5432/aitutor` |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` | At least one, or the tutor cannot answer. |
+
+Leave `HTTPS_EDGE=true` if a proxy terminates TLS in front, which it should.
+
+### Step 3 — Database, content, administrator
+
+```bash
+sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo /opt/ai-tutor/venv/bin/ai-tutor seed
+sudo /opt/ai-tutor/venv/bin/ai-tutor collectstatic --noinput
+sudo /opt/ai-tutor/venv/bin/ai-tutor createsuperuser
+```
+
+`seed` loads the curriculum bundled in the release. If it reports that the pack
+was built against a different database schema, it says so and continues with an
+empty curriculum rather than refusing to start — upload content through the
+dashboard, or import a rebuilt pack.
+
+Any Django management command works: `ai-tutor shell`, `ai-tutor dbshell`,
+`ai-tutor check --deploy`.
+
+### Step 4 — Run it as a service
+
+```bash
+sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now ai-tutor
+```
+
+The generated unit carries this installation's real paths, restarts on failure,
+and confines writes to the data directory. It binds `0.0.0.0:8000` with a 300 s
+timeout — long, because a tutoring turn takes 20-90 seconds and a shorter one
+kills the worker mid-answer.
+
+### Step 5 — TLS in front
+
+Nothing here obtains a certificate for you. With Caddy:
+
+```
+tutor.education.gov.xx {
+    encode gzip
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+Caddy obtains and renews the certificate automatically. With nginx, use
+certbot, and set `proxy_read_timeout 300s;` — the default 60 s cuts long tutor
+replies off mid-sentence.
+
+Whatever you put in front **must health-check `/health/` over plain HTTP** and
+must forward `X-Forwarded-Proto`. `/health/` is deliberately exempt from the
+HTTPS redirect for exactly this reason.
+
+### Step 6 — Verify
+
+```bash
+systemctl status ai-tutor
+curl -sS localhost:8000/health/          # {"status": "ok", ...}
+sudo /opt/ai-tutor/venv/bin/ai-tutor check
+```
+
+Then sign in at `https://<your-domain>/admin/`, point `tutoring` at a provider
+under **LLM → Model configs**, and **take one tutoring turn**. That exercises
+the database, the knowledge base, the credentials and media in one action. A
+health check does not.
+
+### What this path does not give you
+
+Stated plainly, because each is something Path A does for you:
+
+- **The database.** Installing, tuning, securing and backing up Postgres is
+  yours. Nothing here creates a backup schedule.
+- **TLS.** No certificate is obtained or renewed for you.
+- **Isolation.** The application runs as a normal process against your system
+  Python packages, not in a container.
+- **SQLite is allowed but limited.** Leave `DATABASE_URL` unset and a SQLite
+  file is used in the data directory. Workable for a single small school;
+  `pgvector` is unavailable there, so knowledge-base search falls back to a
+  slower exact scan and will not hold up under a whole school.
+
+### When something is wrong
+
+| What you see | Cause | Fix |
+|---|---|---|
+| **`ai-tutor: command not found`** | The venv's `bin` is not on `PATH`. | Call it by full path, `/opt/ai-tutor/venv/bin/ai-tutor`, which is what the systemd unit does. |
+| **"Refusing to serve: SECRET_KEY, ALLOWED_HOSTS … not set."** | No config file was found, or it is somewhere `ai-tutor` does not look. | Run `ai-tutor init`, or set `AI_TUTOR_ENV_FILE` to the file you have. |
+| **Service starts, then fails reading its configuration.** | `ProtectHome=yes` hides `/home`, and the config or data lives there. | Regenerate the unit — `ai-tutor systemd` relaxes it automatically when it detects this. Better: keep config in `/etc` and data in `/var/lib`. |
+| **Config changes have no effect.** | Something in the real environment overrides the file — that is deliberate precedence. | Check the unit's `Environment=` lines and the shell you ran from. |
+| **Everything works as root, nothing works as the service user.** | `/var/lib/ai-tutor` is owned by root. | `chown -R` it to the user in the unit's `User=` line. |
+| **Upgrade appears to do nothing.** | The service is still running the old code. | `systemctl restart ai-tutor` after every upgrade; unlike Compose, pip does not restart anything. |
+| **Login returns 403, no error anywhere.** | Session and CSRF cookies are marked `Secure` and the browser will not send them over plain HTTP. | Finish the TLS setup, or set `HTTPS_EDGE=false` — only on an isolated network. |
+
+### Upgrading
+
+```bash
+sudo /opt/ai-tutor/venv/bin/pip install --upgrade ai-tutor
+sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo /opt/ai-tutor/venv/bin/ai-tutor collectstatic --noinput
+sudo systemctl restart ai-tutor
+```
+
+**Back up the database first.** Nothing runs migrations or restarts the service
+for you on this path. Your data directory is untouched by an upgrade — that is
+why it lives outside the installed package.
+
+## 6. Operating it
 
 ### Backup and restore
 
@@ -434,7 +617,18 @@ broken images and reports no error.
 AWS console or `ops/restore_from_dump.sh`. Media lives in S3 and is versioned
 separately.
 
-Three rules that apply to both:
+**Path C.** Nothing is scheduled for you. Both halves, together, into one file:
+
+```bash
+pg_dump -Fc aitutor > /mnt/backup/aitutor-$(date +%F).dump
+tar czf /mnt/backup/media-$(date +%F).tar.gz -C /var/lib/ai-tutor media
+```
+
+Restore is `pg_restore -d aitutor` and untarring the media back into the data
+directory. Put both in a cron job or a systemd timer on the day you install —
+"we'll add backups later" is how deployments lose a term of work.
+
+Three rules that apply to all three:
 
 - A backup that only exists on the machine it backs up is not a backup.
 - Backups contain **student records**. Store them encrypted, with access
@@ -445,19 +639,25 @@ Three rules that apply to both:
 ### Logs
 
 ```bash
-docker compose logs -f app        # Path A
+docker compose logs -f app          # Path A
+journalctl -u ai-tutor -f           # Path C
 ```
 
 Path B streams to CloudWatch Logs under the cluster's log group.
 
 ### Keeping it current
 
-Pull, rebuild, restart — migrations run on start. Back up first. Read the
-release notes before upgrading across a major version.
+Back up first, and read the release notes before upgrading across a major
+version.
+
+On Paths A and B, migrations run on start; pull and restart is the whole
+procedure. **Path C is the exception** — pip replaces the code and nothing
+else, so `ai-tutor migrate`, `ai-tutor collectstatic` and
+`systemctl restart ai-tutor` are yours to run, in that order.
 
 ---
 
-## 6. What leaves your network
+## 7. What leaves your network
 
 Everything student-related stays where you put it: the database, uploaded
 media, and the application itself.

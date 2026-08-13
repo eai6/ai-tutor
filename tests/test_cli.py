@@ -196,3 +196,38 @@ class TestDispatch:
         monkeypatch.setenv('AI_TUTOR_ENV_FILE', str(clean_env / 'a.env'))
         cli.bootstrap()
         assert os.environ['DJANGO_SETTINGS_MODULE'] == cli.SETTINGS_MODULE
+
+
+class TestManualStaysTrue:
+    """The manual is a runbook — a command that does not exist is a dead end
+    for whoever is following it at 2am on an unfamiliar server."""
+
+    @pytest.fixture(scope='class')
+    def path_c(self):
+        doc = (Path(__file__).resolve().parent.parent
+               / 'docs' / 'self-hosting.md').read_text()
+        return doc[doc.index('## 5. Path C'):doc.index('## 6. Operating it')]
+
+    def test_every_command_it_tells_you_to_run_exists(self, path_c):
+        import re
+        import django
+        from django.core.management import get_commands
+
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', cli.SETTINGS_MODULE)
+        django.setup()
+        available = set(cli.COMMANDS) | set(get_commands())
+
+        named = set(re.findall(r'ai-tutor ([a-z][\w-]*)', path_c))
+        unknown = sorted(named - available)
+        assert not unknown, f'the manual names commands that do not exist: {unknown}'
+
+    def test_it_says_what_this_path_does_not_provide(self, path_c):
+        """Path C leaves the database, TLS and supervision to the operator.
+        Discovering that after installing is the wrong order."""
+        for topic in ('database', 'TLS', 'SQLite'):
+            assert topic in path_c
+
+    def test_it_warns_that_upgrades_need_a_restart(self, path_c):
+        """Unlike Compose, pip replaces the code and restarts nothing — the
+        symptom is an upgrade that appears to do nothing at all."""
+        assert 'restart ai-tutor' in path_c
