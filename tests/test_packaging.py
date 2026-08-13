@@ -148,9 +148,16 @@ class TestBuiltWheel:
         assert probe in names
 
     def test_installs_exactly_one_top_level_name(self, names):
-        """`apps` and `config` in site-packages is what the move existed to stop."""
+        """`apps` and `config` in site-packages is what the move existed to stop.
+
+        Version-agnostic on purpose: pinning the dist-info name here made the
+        suite fail on the first version bump, which would have blocked a
+        release for no reason.
+        """
         tops = {n.split('/')[0] for n in names}
-        assert tops == {'ai_tutor', 'ai_tutor-0.1.0.dist-info'}
+        packages = {t for t in tops if not t.endswith('.dist-info')}
+        assert packages == {'ai_tutor'}
+        assert len(tops) == 2, f'unexpected top-level entries: {sorted(tops)}'    
 
 
 def _built_sdist():

@@ -17,7 +17,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-tutor"
-version = "0.1.0"
+version = "0.2.0"
 description = "A conversational tutoring platform for secondary school students"
 readme = "README.md"
 license = { file = "LICENSE" }
