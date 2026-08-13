@@ -20,6 +20,22 @@ ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = ROOT / 'pyproject.toml'
 
 
+def _django_available() -> bool:
+    """Whether the app's dependencies are importable here.
+
+    The release workflow installs only `build` and `pytest` — checking that a
+    wheel is well-formed must not require installing 170 pinned packages and
+    3 GB of ML wheels. The two settings assertions below therefore skip there
+    and run in the normal suite, where Django is present. Everything else in
+    this file inspects the artefact and needs nothing installed.
+    """
+    try:
+        import django  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def _requirements() -> list[str]:
     lines = (ROOT / 'requirements.txt').read_text().splitlines()
     return [l.strip() for l in lines if l.strip() and not l.strip().startswith('#')]
@@ -78,6 +94,7 @@ class TestPackagedAssets:
         """Guards the reverse mistake: declared in pyproject, absent on disk."""
         assert (ROOT / 'ai_tutor' / asset / probe).exists()
 
+    @pytest.mark.skipif(not _django_available(), reason='Django not installed')
     def test_settings_resolve_assets_against_the_package(self):
         """Bundled assets must follow the code, not the data directory. If these
         were BASE_DIR-relative they would break the moment the wheel is
@@ -89,6 +106,7 @@ class TestPackagedAssets:
         assert Path(settings.STATICFILES_DIRS[0]).is_relative_to(package)
         assert Path(settings.LOCALE_PATHS[0]).is_relative_to(package)
 
+    @pytest.mark.skipif(not _django_available(), reason='Django not installed')
     def test_mutable_state_stays_out_of_the_package(self):
         """MEDIA_ROOT inside the package would be wiped on every upgrade."""
         from django.conf import settings

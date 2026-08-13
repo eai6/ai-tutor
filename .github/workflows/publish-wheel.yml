@@ -12,6 +12,12 @@
 # publish.
 #
 # Not on every push: releasing is a decision, not a side effect of merging.
+#
+# PUBLISHING BY HAND IS THE NORMAL ROUTE, not a fallback. A `vX.Y.Z` tag also
+# triggers deploy.yml, which deploys to AZURE PRODUCTION — the live Seychelles
+# pilot — so tagging from a feature branch would ship that branch to schools.
+# workflow_dispatch publishes the wheel and nothing else, taking the version
+# from pyproject.toml.
 name: Publish wheel
 
 on:
@@ -38,6 +44,14 @@ jobs:
           # 3.12; building on anything older produces a wheel that refuses to
           # install on the machine it was built for.
           python-version: '3.12'
+
+      - name: Resolve the version
+        id: version
+        run: |
+          set -euo pipefail
+          V=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "publishing version $V"
 
       - name: Refuse a tag that disagrees with pyproject
         # A release tagged v1.2.0 carrying ai_tutor-1.1.0.whl is the kind of
@@ -134,25 +148,27 @@ jobs:
       # The bucket's public/ prefix is world-readable; the wheel contains no
       # secrets and no student data (checked above).
       - name: Configure AWS credentials (OIDC)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
       - name: Publish to the download bucket
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           BUCKET: ${{ secrets.AWS_DOWNLOADS_BUCKET }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
+          # Keyed on the version, not the ref: a manual run has no tag, and the
+          # archive path should say which version it holds either way.
           for FILE in dist_wheel/*.whl dist_wheel/*.tar.gz; do
-            aws s3 cp "$FILE" "s3://${BUCKET}/public/server/releases/${TAG}/$(basename "$FILE")"
+            aws s3 cp "$FILE" "s3://${BUCKET}/public/server/releases/v${VERSION}/$(basename "$FILE")"
             aws s3 cp "$FILE" "s3://${BUCKET}/public/server/latest/$(basename "$FILE")" \
               --cache-control 'no-cache, max-age=60'
           done
-          echo "::notice title=Published::Set SERVER_WHEEL_VERSION=${TAG#v} on the web app so /download/ links to it."
+          echo "::notice title=Published::Set SERVER_WHEEL_VERSION=${VERSION} on the web app so /download/ links to it."
 
       - name: Summary
         run: |
