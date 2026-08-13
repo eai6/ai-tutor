@@ -209,7 +209,7 @@ ai-tutor = "ai_tutor.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/eai6/ai-tutor"
-Documentation = "https://github.com/eai6/ai-tutor/blob/main/docs/self-hosting.md"
+Documentation = "https://github.com/eai6/ai-tutor/blob/aws_deployment/docs/self-hosting.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ai_tutor"]
