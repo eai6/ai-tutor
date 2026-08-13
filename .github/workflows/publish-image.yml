@@ -57,7 +57,7 @@ jobs:
         # produces a deployment that silently starts empty, and the person who
         # finds out is a teacher looking for their lessons.
         run: |
-          PACK=deploy/seed/curriculum-pack.tar.gz
+          PACK=ai_tutor/seed/curriculum-pack.tar.gz
           if [ ! -f "$PACK" ]; then
             echo "::error title=No seed pack::$PACK is missing. Build one with"
             echo "  python manage.py build_curriculum_pack --institution <id> --no-media"

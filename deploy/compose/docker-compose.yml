@@ -150,7 +150,7 @@ services:
     #
     # The migrate + seed chain is kept exactly as the image defines it. Unlike
     # ECS there is one app container here, so nothing races.
-    command: ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && python manage.py seed_help_assistant_model && python manage.py generate_recent_updates && python manage.py build_help_index --with-source && python manage.py import_curriculum_pack deploy/seed/curriculum-pack.tar.gz --if-empty && python manage.py seed_local_tutor && exec gunicorn ai_tutor.config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 300 --graceful-timeout 30 --access-logfile - --error-logfile -"]
+    command: ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && python manage.py seed_help_assistant_model && python manage.py generate_recent_updates && python manage.py build_help_index --with-source && python manage.py import_curriculum_pack ai_tutor/seed/curriculum-pack.tar.gz --if-empty && python manage.py seed_local_tutor && exec gunicorn ai_tutor.config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 300 --graceful-timeout 30 --access-logfile - --error-logfile -"]
 
     healthcheck:
       # Two assertions, because either alone hides a real failure.

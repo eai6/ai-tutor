@@ -58,6 +58,25 @@ class Command(BaseCommand):
                 strict_schema=not options['allow_schema_drift'],
             )
         except PackError as exc:
+            if options['if_empty']:
+                # Startup mode. This command sits in the middle of a `&&` chain
+                # that ends in gunicorn, so a non-zero exit here means the
+                # container never serves at all — a crash loop, on a brand new
+                # deployment, because the bundled content is stale.
+                #
+                # A deployment with no curriculum is degraded and obvious: a
+                # teacher uploads one, or an operator imports a fresh pack by
+                # hand. A deployment that will not boot is neither. The two
+                # failures are not close in cost, so this warns and continues.
+                #
+                # Only in --if-empty mode: an operator running this by hand
+                # asked for this pack specifically and needs it to fail loudly.
+                self.stderr.write(self.style.WARNING(
+                    f'[import_curriculum_pack] could not seed: {exc}\n'
+                    f'[import_curriculum_pack] starting with an empty '
+                    f'curriculum — upload content, or import a rebuilt pack.'
+                ))
+                return
             # A refusal is the expected outcome for the wrong file, not a
             # crash. CommandError prints the message without a traceback,
             # which is what the person holding the wrong pack needs to read.

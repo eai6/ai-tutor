@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Re-download the front-end assets that used to come from CDNs.
 #
-#   scripts/vendor_assets.sh        (needs internet; writes static/vendor/)
+#   scripts/vendor_assets.sh        (needs internet; writes ai_tutor/static/vendor/)
 #
 # WHY THESE ARE IN THE REPO
 # The tutor serves students from a Jetson over its own WiFi hotspot, with no
@@ -14,7 +14,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$ROOT/static/vendor"
+OUT="$ROOT/ai_tutor/static/vendor"
 
 KATEX_VERSION="0.16.38"
 DOMPURIFY_VERSION="3.1.6"

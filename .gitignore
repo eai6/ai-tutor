@@ -96,3 +96,6 @@ deploy/compose/backups/
 
 # Local-verification compose override (native arch instead of amd64).
 deploy/compose/docker-compose.localtest.yml
+
+# Built wheels (python -m build --outdir dist_wheel)
+dist_wheel/

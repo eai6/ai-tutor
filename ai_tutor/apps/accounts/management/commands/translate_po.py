@@ -121,7 +121,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         locale_dir = (
-            Path(settings.BASE_DIR) / "locale" / options["locale"] / "LC_MESSAGES"
+            Path(settings.PACKAGE_DIR) / "locale" / options["locale"] / "LC_MESSAGES"
         )
         po_path = locale_dir / f"{options['domain']}.po"
         if not po_path.exists():
@@ -143,7 +143,7 @@ class Command(BaseCommand):
             e for e in entries if not e["msgstr"] and not e.get("is_plural")
         ]
         self.stdout.write(
-            f"Found {len(entries)} msgids in {po_path.relative_to(settings.BASE_DIR)}; "
+            f"Found {len(entries)} msgids in {po_path.relative_to(settings.PACKAGE_DIR)}; "
             f"{len(untranslated)} untranslated"
             + (f" ({plural_count} plural entries skipped — translate by hand)"
                if plural_count else "")
@@ -225,14 +225,14 @@ class Command(BaseCommand):
 
         _write_po(po_path, entries)
         self.stdout.write(self.style.SUCCESS(
-            f"Wrote {translated_count} translation(s) to {po_path.relative_to(settings.BASE_DIR)}"
+            f"Wrote {translated_count} translation(s) to {po_path.relative_to(settings.PACKAGE_DIR)}"
         ))
 
         if not options["no_compile"]:
             self.stdout.write("Compiling .mo files...")
             subprocess.run(
                 ["python", "manage.py", "compilemessages", "-l", options["locale"]],
-                cwd=settings.BASE_DIR,
+                cwd=settings.PACKAGE_DIR,
                 check=True,
             )
             self.stdout.write(self.style.SUCCESS("Done."))

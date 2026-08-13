@@ -30,7 +30,9 @@ def service_worker(_request):
     """Serve sw.js from the site root so its scope can cover the
     whole app. Service workers can't control paths above their own
     URL unless the response includes Service-Worker-Allowed."""
-    path_to_sw = settings.BASE_DIR / 'static' / 'pwa' / 'sw.js'
+    # PACKAGE_DIR: the service worker ships in the wheel. BASE_DIR is the
+    # deployment's data directory, which contains no source assets.
+    path_to_sw = settings.PACKAGE_DIR / 'static' / 'pwa' / 'sw.js'
     response = FileResponse(open(path_to_sw, 'rb'), content_type='application/javascript')
     response['Cache-Control'] = 'no-cache'
     response['Service-Worker-Allowed'] = '/'

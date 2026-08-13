@@ -84,9 +84,9 @@ hiddenimports += collect_submodules('rest_framework')
 
 # ── Data ────────────────────────────────────────────────────────────────
 datas = [
-    (str(ROOT / 'templates'), 'templates'),
-    (str(ROOT / 'static'), 'static'),
-    (str(ROOT / 'locale'), 'locale'),
+    (str(ROOT / 'ai_tutor' / 'templates'), 'ai_tutor/templates'),
+    (str(ROOT / 'ai_tutor' / 'static'), 'ai_tutor/static'),
+    (str(ROOT / 'ai_tutor' / 'locale'), 'ai_tutor/locale'),
     # The tutor's Modelfile — provisioning reads its PARAMETER lines when
     # building the tag from a downloaded base model.
     (str(ROOT / 'infra' / 'ollama'), 'infra/ollama'),

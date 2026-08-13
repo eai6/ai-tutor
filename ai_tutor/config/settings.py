@@ -17,15 +17,23 @@ from django.urls import reverse_lazy
 
 load_dotenv()
 
-# Repo root, not the package directory. This file now lives at
-# ai_tutor/config/settings.py, so it takes one more .parent to get out of
-# the package than it did when config/ was top-level.
+# Two roots, because they answer different questions and move independently.
 #
-# Everything BASE_DIR is used for is mutable state or a bundled asset that
-# has not moved yet: templates/, static/, locale/, db.sqlite3, media/,
-# staticfiles/. Phase 2 moves the assets inside the package and splits this
-# into PACKAGE_DIR (code, shipped in the wheel) and a writable data dir.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# PACKAGE_DIR is where the code and the assets that ship WITH it live —
+# templates, static, locale, the seed curriculum. Inside the installed wheel,
+# read-only, replaced wholesale on upgrade.
+#
+# BASE_DIR is where this deployment's mutable state lives — the database, uploads,
+# collected static. It must be writable and must SURVIVE an upgrade, so it can
+# never be inside the package.
+#
+# From a checkout the two differ by one level and everything works as it always
+# has. From an installed wheel, site-packages/ai_tutor is not writable and its
+# parent is meaningless, so AI_TUTOR_DATA_DIR overrides BASE_DIR. Phase 3 gives
+# that a proper default per platform; until then the checkout layout is the
+# default and the env var is the escape hatch.
+PACKAGE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(os.getenv('AI_TUTOR_DATA_DIR') or PACKAGE_DIR.parent)
 
 _DEV_SECRET_KEY = 'dev-secret-key-change-in-production'
 SECRET_KEY = os.getenv('SECRET_KEY', _DEV_SECRET_KEY)
@@ -160,7 +168,7 @@ ROOT_URLCONF = 'ai_tutor.config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [PACKAGE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -238,7 +246,7 @@ LANGUAGES = [
     ('en-us', '🇸🇨 Seychelles — English'),
     ('pt-mz', '🇲🇿 Moçambique — Português'),
 ]
-LOCALE_PATHS = [BASE_DIR / 'locale']
+LOCALE_PATHS = [PACKAGE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
@@ -246,7 +254,7 @@ USE_TZ = True
 
 # Static files
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [PACKAGE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (user uploads)

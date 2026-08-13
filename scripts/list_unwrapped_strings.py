@@ -33,7 +33,10 @@ import sys
 from pathlib import Path
 
 # Roots to scan.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Templates moved into the package in the pip-packaging work; they ship
+# inside the wheel, so they are package-relative now.
+PACKAGE_DIR = Path(__file__).resolve().parent.parent / 'ai_tutor'
+BASE_DIR = PACKAGE_DIR
 TARGETS = [
     BASE_DIR / 'templates' / 'base.html',
     BASE_DIR / 'templates' / 'tutoring' / 'chat_tutor.html',

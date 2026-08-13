@@ -58,9 +58,10 @@ class TranslatePoKeyValidationTest(TestCase):
             'msgid "Courses"\n'
             'msgstr ""\n'
         )
-        # Patch settings.BASE_DIR so the command looks in our tmpdir.
+        # Patch settings.PACKAGE_DIR so the command looks in our tmpdir.
+        # Catalogs ship inside the package, not in the data directory.
         self._base_dir_patch = patch.object(
-            settings, "BASE_DIR", Path(self._tmp.name),
+            settings, "PACKAGE_DIR", Path(self._tmp.name),
         )
         self._base_dir_patch.start()
 

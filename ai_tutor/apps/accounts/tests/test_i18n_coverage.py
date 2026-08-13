@@ -116,7 +116,10 @@ class PoFileTest(TestCase):
     M2 wrapped (~135). Threshold is conservative — drops can indicate
     a regression in the wrap or in the makemessages call."""
 
-    PO_PATH = Path(settings.BASE_DIR) / 'locale' / 'pt_MZ' / 'LC_MESSAGES' / 'django.po'
+    # PACKAGE_DIR, not BASE_DIR: translation catalogs ship inside the wheel
+    # alongside the code, while BASE_DIR is this deployment's writable data
+    # directory and holds no catalogs at all.
+    PO_PATH = Path(settings.PACKAGE_DIR) / 'locale' / 'pt_MZ' / 'LC_MESSAGES' / 'django.po'
 
     def test_po_file_exists(self):
         self.assertTrue(
