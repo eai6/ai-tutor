@@ -270,7 +270,7 @@ that refers to them keeps working):
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // ── State (script-global so the host can populate before show) ──
 window.exitTicketData = window.exitTicketData || null;
 window.exitAnswers = window.exitAnswers || {};
@@ -293,20 +293,8 @@ function escapeHtml(s) {
         .replace(/'/g, '&#39;');
 }
 
-function getCookie(name) {
-    let value = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let c of cookies) {
-            c = c.trim();
-            if (c.startsWith(name + '=')) {
-                value = decodeURIComponent(c.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return value;
-}
+// getCookie() now lives in static/js/csrf.js and reads the token from
+// the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 
 function showExitTicket() {
     if (!exitTicketData) return;
@@ -397,11 +385,24 @@ function showExitTicket() {
             if (qType === 'mcq') {
                 let sourceHTML = '';
                 if (q.source) {
-                    if (/<[a-z][\s\S]*>/i.test(q.source) && window.DOMPurify) {
-                        const clean = DOMPurify.sanitize(q.source);
-                        sourceHTML = `<div class="data-description-rich" style="margin-bottom:0.75rem;"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:200px;border:none;"></iframe></div>`;
+                    if (/<[a-z][\s\S]*>/i.test(q.source)) {
+                        // Fail CLOSED, same as renderArtifactIframe() in
+                        // chat_tutor.html. This used to drop through to raw
+                        // interpolation when DOMPurify was missing — which is
+                        // reachable, because purify.min.js is deferred and the
+                        // modal can open before it lands. The server sanitises
+                        // this field too (apps/safety/html_sanitizer.py), so
+                        // escaping here costs a little markup, never the
+                        // question.
+                        if (!window.DOMPurify) {
+                            console.error('DOMPurify unavailable — showing source as text');
+                            sourceHTML = `<div class="data-description" style="margin-bottom:0.75rem;">${escapeHtml(q.source)}</div>`;
+                        } else {
+                            const clean = DOMPurify.sanitize(q.source);
+                            sourceHTML = `<div class="data-description-rich" style="margin-bottom:0.75rem;"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:200px;border:none;"></iframe></div>`;
+                        }
                     } else {
-                        sourceHTML = `<div class="data-description" style="margin-bottom:0.75rem;">${q.source}</div>`;
+                        sourceHTML = `<div class="data-description" style="margin-bottom:0.75rem;">${escapeHtml(q.source)}</div>`;
                     }
                 }
                 bodyHTML = `${sourceHTML}<div class="options" data-q="${origIdx}">
@@ -450,11 +451,17 @@ function showExitTicket() {
                         + (ad.figure_source ? `<div style="font-size:0.7rem;color:#71717a;margin-top:4px;">Source: ${escapeHtml(ad.figure_source)}</div>` : ``)
                         + `</div>`;
                 } else if (ad.data_description) {
-                    if (/<[a-z][\s\S]*>/i.test(ad.data_description) && window.DOMPurify) {
-                        const clean = DOMPurify.sanitize(ad.data_description);
-                        dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:250px;border:none;"></iframe></div>`;
+                    if (/<[a-z][\s\S]*>/i.test(ad.data_description)) {
+                        // Fail CLOSED — see the note on q.source above.
+                        if (!window.DOMPurify) {
+                            console.error('DOMPurify unavailable — showing data description as text');
+                            dataDesc = `<div class="data-description">${escapeHtml(ad.data_description)}</div>`;
+                        } else {
+                            const clean = DOMPurify.sanitize(ad.data_description);
+                            dataDesc = `<div class="data-description-rich"><iframe sandbox="allow-scripts" srcdoc="${clean.replace(/"/g, '&quot;')}" style="width:100%;min-height:250px;border:none;"></iframe></div>`;
+                        }
                     } else {
-                        dataDesc = `<div class="data-description">${ad.data_description}</div>`;
+                        dataDesc = `<div class="data-description">${escapeHtml(ad.data_description)}</div>`;
                     }
                 } else if (ad.figure_description) {
                     dataDesc = `<div class="data-description" style="font-style:italic;color:#52525b;">${escapeHtml(ad.figure_description)}</div>`;

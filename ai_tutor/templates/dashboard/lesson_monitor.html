@@ -317,7 +317,7 @@ isn't surfaced.
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     // Auto-refresh if there are active sessions
     const activeCount = {{ active_count }};

@@ -33,7 +33,7 @@
                 </div>
                 {% endfor %}
             </div>
-            <script>
+            <script nonce="{{ request.csp_nonce }}">
                 // Simple bar heights
                 document.querySelectorAll('[data-count]').forEach(bar => {
                     const max = Math.max(...Array.from(document.querySelectorAll('[data-count]')).map(b => parseInt(b.dataset.count)));

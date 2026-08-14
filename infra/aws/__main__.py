@@ -52,6 +52,21 @@ domain_name = config.get("domain-name")
 # and the CNAMEs must be added by hand wherever the zone lives.
 hosted_zone_id = config.get("hosted-zone-id")
 
+# Who may reach the Django admin console. Empty (the default) means everyone,
+# which is what the 2026-08-13 assessment found and raised as F-04. Set it to
+# the office egress ranges and the VPN CIDR and the WAF refuses the console to
+# everything else:
+#
+#     pulumi config set --path admin-allowed-cidrs[0] 203.0.113.0/24
+#
+# Deliberately not defaulted to anything: a guessed allow-list locks the
+# operators out of their own console on the next deploy. See
+# components/edge.py.
+admin_allowed_cidrs = config.get_object("admin-allowed-cidrs") or []
+# Must match ADMIN_URL in the task environment below — the WAF matches on the
+# path, so moving the console without moving the rule silently unprotects it.
+admin_path = config.get("admin-path") or "/admin/"
+
 network = create_network(prefix, azs, region, tags)
 storage = create_storage(prefix, account_id, tags)
 data = create_data(
@@ -72,6 +87,8 @@ edge = create_edge(
     tags,
     domain_name=domain_name,
     hosted_zone_id=hosted_zone_id,
+    admin_allowed_cidrs=admin_allowed_cidrs,
+    admin_path=admin_path,
 )
 
 # ECS cluster is unblocked (only task definitions need PassRole), so it is
@@ -154,6 +171,10 @@ task_environment = (
             "CSRF_TRUSTED_ORIGINS": (
                 f"https://{domain_name}" if domain_name else f"http://{a[5]}"
             ),
+            # Keeps Django's admin mount and the WAF rule that guards it on the
+            # same path. Django wants it without the leading slash; the WAF
+            # matches the URI path, which has one.
+            "ADMIN_URL": admin_path.lstrip("/"),
             "EMBEDDING_BACKEND": "local",
         }
     )

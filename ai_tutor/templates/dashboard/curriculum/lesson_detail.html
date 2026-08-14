@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load safe_html %}
 {% load dashboard_extras %}
 {% load i18n %}
 
@@ -183,7 +184,7 @@
     #lesson-regen-spinner { animation: lesson-regen-spin 1.4s linear infinite; }
     @keyframes lesson-regen-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function () {
     var startedAt = Date.now();
     var elapsedEl = document.getElementById('lesson-regen-elapsed');
@@ -409,7 +410,7 @@
                 <input type="hidden" name="target_lesson_id" value="">
             </form>
             {% endif %}
-            <script>
+            <script nonce="{{ request.csp_nonce }}">
             (function(){
                 window.toggleLessonEoEdit = function() {
                     const view = document.getElementById('lesson-eo-view');
@@ -1000,7 +1001,7 @@
                     <!-- MCQ: Show source if present, then A/B/C/D options -->
                     {% if question.answer_data.source %}
                     <div class="rendered-html-frame" style="margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #f8fafc; padding: 0.75rem;">
-                        {{ question.answer_data.source|safe }}
+                        {{ question.answer_data.source|sanitized }}
                     </div>
                     {% endif %}
                     <div style="padding: 0.375rem 0; {% if question.correct_answer == 'A' %}color: var(--success); font-weight: 500;{% endif %}">
@@ -1057,7 +1058,7 @@
                     <!-- Short Answer / Data Interpretation -->
                     {% if question.answer_data.figure_svg %}
                     <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
-                        {{ question.answer_data.figure_svg|safe }}
+                        {{ question.answer_data.figure_svg|sanitized }}
                     </div>
                     {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
@@ -1079,7 +1080,7 @@
                     {% endif %}
                     {% elif question.answer_data.data_description %}
                     <div class="rendered-html-frame" style="margin-bottom: 0.5rem; border: 1px solid #bfdbfe; border-radius: 6px; overflow: hidden; background: #f8fafc; padding: 0.75rem;">
-                        {{ question.answer_data.data_description|safe }}
+                        {{ question.answer_data.data_description|sanitized }}
                     </div>
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
@@ -1378,15 +1379,15 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function toggleStep(header) {
     header.closest('.step-card').classList.toggle('expanded');
 }
 
 // ─── Manual regen UI (Q3.1) ──────────────────────────────────────────
 (function setupRegenUI() {
-    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
-    const csrfToken = csrf ? csrf.value : (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1];
+    // Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+    const csrfToken = window.csrfToken();
 
     function $(sel, stepId) {
         return document.querySelector(`${sel}[data-step-id="${stepId}"]`);
@@ -1505,8 +1506,8 @@ function toggleStep(header) {
 
 // ─── Exit-question manual regen UI (Q3.2) ───────────────────────────
 (function setupExitQRegenUI() {
-    const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
-    const csrfToken = csrf ? csrf.value : (document.cookie.split('; ').find(r => r.startsWith('csrftoken='))||'').split('=')[1];
+    // Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+    const csrfToken = window.csrfToken();
 
     function $(sel, qid) {
         return document.querySelector(`${sel}[data-question-id="${qid}"]`);
@@ -1740,8 +1741,7 @@ function saveQuestion(btn) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''
+            'X-CSRFToken': window.csrfToken()
         },
         body: JSON.stringify(data)
     })
@@ -1772,8 +1772,7 @@ function deleteQuestion(btn) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''
+            'X-CSRFToken': window.csrfToken()
         },
         body: JSON.stringify({action: 'delete'})
     })
@@ -1793,10 +1792,8 @@ function deleteQuestion(btn) {
 
 /* Prerequisite management */
 const PREREQ_URL = '{% url "dashboard:lesson_prerequisite_edit" lesson.id %}';
-function _csrf() {
-    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
-        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-}
+// Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+const _csrf = window.csrfToken;
 
 function addPrereq() {
     const sel = document.getElementById('prereq-select');
@@ -1977,7 +1974,7 @@ async function savePlotEdit(qid) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+                'X-CSRFToken': window.csrfToken(),
             },
             body: JSON.stringify({ plot_spec: spec }),
         });
@@ -2009,7 +2006,7 @@ async function deletePlotSpec(qid) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+                'X-CSRFToken': window.csrfToken(),
             },
             body: JSON.stringify({ remove_plot_spec: true }),
         });
@@ -2036,7 +2033,7 @@ async function addPlotToQuestion(qid) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '',
+                'X-CSRFToken': window.csrfToken(),
             },
             body: JSON.stringify({ plot_spec: starter }),
         });

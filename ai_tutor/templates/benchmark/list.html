@@ -306,7 +306,7 @@ the table.
     </table>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
     (function () {
         const selectAll = document.getElementById('select-all');
         const rowChecks = document.querySelectorAll('input.row-check');

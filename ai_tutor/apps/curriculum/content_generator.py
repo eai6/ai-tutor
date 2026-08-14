@@ -16,6 +16,8 @@ import time
 import logging
 from typing import Dict, List, Optional
 
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
@@ -4258,15 +4260,34 @@ def _DEPRECATED_generate_exit_ticket_figures(exit_ticket, lesson, institution_id
         if matched_fig:
             # Use the KB figure directly
             if q.question_type == 'data_interpretation' and data_desc:
-                # Embed above existing text data
-                answer_data['data_description'] = (
-                    f"<div style='text-align:center;margin-bottom:8px;'>"
-                    f"<img src='{matched_fig['image_url']}' style='max-width:100%;border-radius:4px;' "
-                    f"alt='{matched_fig.get('description', '')[:100]}'>"
-                    f"<div style='font-size:11px;color:#71717a;margin-top:4px;'>"
-                    f"Source: {matched_fig.get('source_file', 'textbook')}</div>"
-                    f"</div>"
-                    f"<div style='font-size:13px;'>{data_desc}</div>"
+                # Embed above existing text data.
+                #
+                # format_html, not an f-string. Every value interpolated below
+                # comes out of a knowledge-base record parsed from an uploaded
+                # textbook or worksheet — image_url, description and
+                # source_file are all attacker-reachable by anyone who can get
+                # a document in front of the ingest pipeline. The result is
+                # stored on the question and rendered with |safe in four
+                # templates, so a single apostrophe in a filename used to close
+                # the alt attribute early and anything after it became markup.
+                # Assessment finding F-07 named this exact pattern: "any value
+                # placed into an attribute ... built by string concatenation in
+                # a view".
+                #
+                # data_desc keeps its markup — it is meant to be HTML — so it
+                # is wrapped in mark_safe to opt out of escaping explicitly
+                # rather than by accident.
+                answer_data['data_description'] = format_html(
+                    "<div style='text-align:center;margin-bottom:8px;'>"
+                    "<img src='{}' style='max-width:100%;border-radius:4px;' alt='{}'>"
+                    "<div style='font-size:11px;color:#71717a;margin-top:4px;'>"
+                    "Source: {}</div>"
+                    "</div>"
+                    "<div style='font-size:13px;'>{}</div>",
+                    matched_fig['image_url'],
+                    matched_fig.get('description', '')[:100],
+                    matched_fig.get('source_file', 'textbook'),
+                    mark_safe(data_desc),
                 )
             else:
                 answer_data['figure_url'] = matched_fig['image_url']

@@ -626,7 +626,9 @@
 
 {% block extra_js %}
 {% if is_superadmin %}
-<script>
+{# See the note by gradesData below (finding F-07). #}
+{{ platform_config.grades|json_script:"grades-json" }}
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     // AI Model — auto-fill model name on provider change (per-purpose)
     var providerDefaults = {{ provider_defaults_json|safe }};
@@ -646,7 +648,12 @@
         }
     };
 
-    var gradesData = {{ platform_config.grades|safe|default:"[]" }};
+    // json_script, not |safe: grade codes and names are typed in by an
+    // administrator, and |safe rendered the Python repr of the list — an
+    // apostrophe in a grade name broke the page, and a closing script tag
+    // in one would have broken out of this block entirely (finding F-07).
+    var gradesData = JSON.parse(
+        document.getElementById('grades-json').textContent) || [];
 
     function renderTable(type) {
         var data = gradesData;

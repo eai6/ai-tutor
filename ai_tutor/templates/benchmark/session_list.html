@@ -377,7 +377,7 @@
 </div>
 {% endif %}
 {% if run_active %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
     // Reload while sampling runs. Deliberately not SSE — Azure/ALB buffering
     // makes streaming unreliable in production, and this page only needs a
     // number every few seconds.

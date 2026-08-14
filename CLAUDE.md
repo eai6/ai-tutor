@@ -33,6 +33,14 @@ Azure commands require `az account set --subscription "Pixel Design Labs LLC"` f
 
 **Media signal format.** The tutor appends `|||MEDIA:N|||` as the LAST line of its response (N is 1-based index into the catalog in the system prompt). Parse and strip BEFORE saving to DB; the frontend also sanitizes defensively. Never use the legacy `[SHOW_MEDIA:title]` format — the fuzzy matcher was deleted.
 
+**CSRF token comes from the DOM, never the cookie.** `CSRF_COOKIE_HTTPONLY = True` since the 2026-08-13 assessment (F-05), so `document.cookie` cannot see `csrftoken`. JavaScript must use `window.csrfToken()` from `static/js/csrf.js`, which both base templates load; `window.getCookie('csrftoken')` still works as an alias. A new `fetch()` that reads `document.cookie` gets an empty token and a silent 403 — `apps/safety/tests/test_assessment_findings.py::CsrfTokenSourceTests` fails the build instead.
+
+**Request input is filtered before any view.** `apps/safety/request_validation.ControlCharacterMiddleware` rejects NUL bytes with 400 (they crashed four public endpoints via psycopg — F-01) and strips other C0 controls from GET/POST. Don't add per-view NUL handling; extend the middleware.
+
+**CSP switches.** `apps/safety/csp.py` is report-only by default. `CSP_ENFORCE=1` blocks; `CSP_STRICT_SCRIPTS=1` swaps `'unsafe-inline'` for a per-request nonce; `CSP_REPORT=1` adds `report-uri` pointing at `/csp-report/`. Every inline `<script>` carries `nonce="{{ request.csp_nonce }}"` and a test enforces that. Enforcing without first clearing the ~206 inline event handlers will break the dashboard.
+
+**Login lockout.** django-axes locks the `(ip_address, username)` pair after 5 failures for 1 hour and answers 429. Every `authenticate()` call MUST pass `request` — `AxesStandaloneBackend` raises without it. Never lock on username alone (DoS against a named student) or IP alone (locks out a whole school behind one NAT).
+
 **Azure Container Apps constraints.**
 - No SSE / chunked streaming in production → `respond_stream()` exists but unused; production uses buffered JSON.
 - ChromaDB SQLite hangs over the SMB mount → `VECTORDB_ROOT=/tmp/vectordb`; Dockerfile CMD copies vectordb from the mount at startup.

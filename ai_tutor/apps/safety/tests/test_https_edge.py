@@ -19,7 +19,11 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+# parents[4], not [3]. [3] is the ai_tutor package directory, and running the
+# probe subprocess with that as its cwd puts no directory containing an
+# importable `ai_tutor` on sys.path — every case in this file failed with
+# ModuleNotFoundError rather than testing anything. Repo root is [4].
+BASE_DIR = Path(__file__).resolve().parents[4]
 
 _PROBE = (
     "import json;from django.conf import settings;"

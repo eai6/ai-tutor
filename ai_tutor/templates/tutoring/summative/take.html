@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 
+{% load safe_html %}
 {% block title %}{{ course.title }} — Summative Exam{% endblock %}
 
 {% block content %}
@@ -108,9 +109,9 @@
         <p class="ex-q-stem"><span class="ex-q-num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
 
         {% if q.answer_data.figure_svg %}
-        <div class="ex-q-fig">{{ q.answer_data.figure_svg|safe }}</div>
+        <div class="ex-q-fig">{{ q.answer_data.figure_svg|sanitized }}</div>
         {% elif q.answer_data.data_description %}
-        <div class="ex-q-fig table-fig">{{ q.answer_data.data_description|safe }}</div>
+        <div class="ex-q-fig table-fig">{{ q.answer_data.data_description|sanitized }}</div>
         {% endif %}
 
         {% if q.question_type == 'mcq' %}
@@ -172,7 +173,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // Math-symbol picker for summative exam short-answer textareas.
 // Inserts at the cursor position. Same UX as the per-lesson exit
 // ticket picker — kept at module scope (window-level) so the inline
@@ -195,10 +196,8 @@ window.insertSummativeMathSymbol = function(qid, sym) {
     const submitUrl = "{% url 'tutoring:summative_submit' course.id %}";
     const nextUrl = "{{ next_url|default:'' }}";
 
-    function getCookie(name) {
-        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
-        return m ? decodeURIComponent(m[2]) : '';
-    }
+    // getCookie() now lives in static/js/csrf.js and reads the token from
+    // the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 
     function collectAnswers() {
         const answers = {};

@@ -99,6 +99,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third-party (mobile API — memory/mobile_rn_plan.md Phase A)
     'corsheaders',
+    # Brute-force lockout on every login path. Assessment finding F-04: the
+    # admin console answers on the public internet and no account lockout,
+    # CAPTCHA or progressive delay was observed at the application layer. The
+    # WAF's 2000-per-5-minutes-per-IP rule is a flood control, not a per-account
+    # one, and a school NAT means it has to stay loose — a password-spray at one
+    # attempt per account per minute passes under it all day.
+    'axes',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'drf_spectacular',
@@ -137,6 +144,12 @@ MIDDLEWARE = [
     # memory/multi_locale_architecture_research.md.
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
+    # Rejects NUL bytes and strips other C0 control characters from query
+    # string and form input. Sits here — after host/URL normalisation, before
+    # any view or the CSRF token comparison — because the crash it fixes
+    # (2026-08-13 assessment F-01) happened in the database driver, one layer
+    # below every view. See apps/safety/request_validation.py.
+    'ai_tutor.apps.safety.request_validation.ControlCharacterMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # LocaleResolverMiddleware runs after AuthenticationMiddleware
@@ -157,13 +170,36 @@ MIDDLEWARE = [
     # dashboard. See apps/safety/csp.py for the counts and the path to
     # enforcing it.
     'ai_tutor.apps.safety.csp.ContentSecurityPolicyMiddleware',
+    # Permissions-Policy + Cross-Origin-Resource-Policy on every response, and
+    # no-store on HTML/JSON rendered for a signed-in user. After
+    # AuthenticationMiddleware because it reads request.user. See
+    # apps/safety/response_headers.py (assessment findings F-09, F-12).
+    'ai_tutor.apps.safety.response_headers.SecurityHeadersMiddleware',
     # Forces a password change after an admin reset (sets
     # Membership.password_reset_required=True). Must come AFTER
     # AuthenticationMiddleware (request.user must be set).
     'ai_tutor.apps.accounts.password_reset_middleware.PasswordResetRequiredMiddleware',
+    # django-axes. Its own documentation requires this to be LAST: it wraps the
+    # request so that authenticate() calls made inside a view can be attributed
+    # to a client, which cannot work if something below it short-circuits first.
+    'axes.middleware.AxesMiddleware',
 ]
 
 ROOT_URLCONF = 'ai_tutor.config.urls'
+
+# Where the Django admin is mounted. Default unchanged, so no existing
+# deployment, bookmark or runbook breaks by upgrading.
+#
+# Assessment finding F-04 recommended moving it off /admin/. That is obscurity,
+# not security, and it is listed here as the SECOND of two measures — the first
+# is the network restriction at the load balancer (infra/aws/components/edge.py,
+# admin-allowed-cidrs), which is the one that actually decides who may reach the
+# console. What this buys on top is that every credential-stuffing toolkit
+# probes /admin/ by default and stops there, so the noise floor drops.
+#
+# Set ADMIN_URL to a path with a random component — 'internal-console-7f3a/' —
+# and mind the trailing slash; Django's path() wants it.
+ADMIN_URL = os.getenv('ADMIN_URL', 'admin/').lstrip('/')
 
 TEMPLATES = [
     {
@@ -210,6 +246,54 @@ if DATABASES['default'].get('ENGINE', '').endswith('sqlite3'):
         "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;"
     )
 
+
+# ── Brute-force lockout (assessment finding F-04) ────────────────────────────
+#
+# AxesStandaloneBackend must come FIRST. It authenticates nothing; it raises
+# PermissionDenied for a locked-out (ip, username) pair before ModelBackend gets
+# a chance to check the password, which is what makes the lockout a lockout
+# rather than a log entry. "Standalone" rather than AxesBackend because the
+# project has a second authentication path — SimpleJWT for the mobile client —
+# and the standalone variant does not assume it owns the chain.
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Five is the number the report suggested and it is the right shape for this
+# audience: a student mistyping a password three times is normal, six attempts
+# in an hour is not.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours
+
+# Lock the (IP, username) PAIR, not either alone. Locking by username alone
+# hands anyone a denial-of-service against a named student — five wrong
+# passwords and that child cannot sit their lesson. Locking by IP alone locks
+# out an entire school, because a classroom shares one NAT address. The pair
+# stops a spray against one account from one source while leaving the rest of
+# the class working, which is the only version of this that survives contact
+# with a Seychelles computer lab.
+AXES_LOCKOUT_PARAMETERS = [['ip_address', 'username']]
+
+# A successful login clears the counter, so yesterday's typos never accumulate
+# into today's lockout.
+AXES_RESET_ON_SUCCESS = True
+
+# Read the client address the same way everything else does, through the
+# gateway-appended last X-Forwarded-For hop. Without these two, axes keys on
+# REMOTE_ADDR, which behind the ALB is the load balancer — every failure in the
+# estate would land on one bucket and lock out the world. See
+# apps/safety/client_ip.py for why the LAST hop is the trustworthy one.
+AXES_IPWARE_PROXY_COUNT = 1
+AXES_IPWARE_META_PRECEDENCE_ORDER = ['HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR']
+
+# Lockout answers 429 rather than axes' default 403, so the ALB and CloudWatch
+# can tell a throttled login apart from a CSRF rejection.
+AXES_HTTP_RESPONSE_CODE = 429
+
+# Failures are worth a log line each; the lockout itself is the event to alert
+# on. axes writes both to the 'axes' logger, which the root handler picks up.
+AXES_VERBOSE = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -347,6 +431,21 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+# The `Access-Control-Allow-Origin: *` the 2026-08-13 assessment found on five
+# responses (F-03) came from here, not from django-cors-headers — that one is
+# already scoped to ^/api/.*$ by CORS_URLS_REGEX and never sees /static/.
+# WhiteNoise adds the wildcard to everything it serves by default, so that
+# webfonts still load when the assets live on a separate CDN host.
+#
+# Ours do not. Static is served from the same origin as the pages that use it,
+# the templates reference no external host, and a same-origin font needs no CORS
+# header at all — so the wildcard granted every site on the internet read access
+# in exchange for nothing. The files are public either way; what the finding was
+# really about is that the policy was permissive by default rather than by
+# decision, and would have silently covered any future asset placed under
+# /static/.
+WHITENOISE_ALLOW_ALL_ORIGINS = False
 
 # ── Media storage — Azure Blob and S3 side by side ───────────────────────────
 # Azure Container Apps and AWS ECS run the SAME image; each deployment supplies
@@ -540,12 +639,45 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'AI Tutor <noreply@example.
 # Drop HTTPS_EDGE (or set it true) the moment a certificate is attached.
 HTTPS_EDGE = os.getenv('HTTPS_EDGE', 'true').lower() not in ('0', 'false', 'no', 'off')
 
+# Cookie attributes, stated for every cookie rather than per cookie.
+#
+# The 2026-08-13 assessment (F-06) found django_language carrying none of
+# Secure, HttpOnly or SameSite while csrftoken on the same responses carried
+# Secure and SameSite — the signature of hardening applied one cookie at a time.
+# These four blocks are the policy: every cookie this application sets declares
+# all three, and the only one that may be readable by JavaScript is one that
+# JavaScript demonstrably needs.
+#
+# Secure follows HTTPS_EDGE for the same reason the block below does: a browser
+# will not send a Secure cookie over plain HTTP, so setting it unconditionally
+# breaks login on the plain-HTTP kiosk and desktop builds in the most confusing
+# way available — a silent bounce back to the login page with no error anywhere.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# HttpOnly on the CSRF cookie is Django's non-default. It is safe here only
+# because every JavaScript caller now reads the token out of the DOM instead of
+# document.cookie — see static/js/csrf.js and the note in that file. Adding an
+# AJAX call that reads document.cookie for 'csrftoken' will silently 403.
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# The language cookie is set by django.views.i18n.set_language, which reads
+# these settings rather than taking arguments. It carries a locale code, not a
+# credential, so the direct impact was minimal — but no JavaScript reads it, so
+# there is no reason for it to be readable.
+LANGUAGE_COOKIE_HTTPONLY = True
+LANGUAGE_COOKIE_SAMESITE = 'Lax'
+
 if not DEBUG:
     # Safe to keep unconditionally: both App Gateway and the ALB overwrite
     # X-Forwarded-Proto, so it cannot be spoofed by a client.
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = HTTPS_EDGE
     CSRF_COOKIE_SECURE = HTTPS_EDGE
+    # Same gate, same reason. Missing before: the language cookie was the one
+    # cookie left at framework defaults (F-06).
+    LANGUAGE_COOKIE_SECURE = HTTPS_EDGE
 
     # Gated on HTTPS_EDGE, not on DEBUG alone. Both of these are actively
     # harmful without TLS in front:

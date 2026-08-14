@@ -44,8 +44,8 @@
    *   - 502 / 503 / 504
    *   - 408 / 429 (with Retry-After when present)
    *
-   * Does NOT retry on 4xx (other than 408/429) — that's a client bug
-   * the caller needs to fix.
+   * Does NOT retry on 4xx (other than 408/429). Those say the request
+   * itself was wrong, so repeating it unchanged cannot help.
    *
    * Options (extend RequestInit):
    *   retries: number   — max attempts (default 3)

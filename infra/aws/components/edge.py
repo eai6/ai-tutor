@@ -45,6 +45,8 @@ def create_edge(
     tags: dict,
     domain_name: "str | None" = None,
     hosted_zone_id: "str | None" = None,
+    admin_allowed_cidrs: "list[str] | None" = None,
+    admin_path: str = "/admin/",
 ) -> Edge:
     alb = aws.lb.LoadBalancer(
         f"{prefix}-alb",
@@ -322,6 +324,91 @@ def create_edge(
         ),
     )
 
+    # ── Admin console restriction ──────────────────────────────────────────
+    # The single highest-value change in the 2026-08-13 assessment (F-04), and
+    # the only one needing no application code: /admin/ answers a working login
+    # form to the whole internet, and one credential pair behind it is read and
+    # write access to every student record, staff account and platform setting.
+    #
+    # Priority 1, immediately after the rate limit and ahead of the managed
+    # groups, so an admin probe is refused before anything spends time
+    # inspecting it.
+    #
+    # OFF unless admin-allowed-cidrs is set, and that default is deliberate:
+    # guessing an allow-list here would lock the operators out of their own
+    # console on the next deploy, which is how a security control gets reverted
+    # in a hurry and stays reverted. Set it explicitly:
+    #
+    #     pulumi config set --path admin-allowed-cidrs[0] 203.0.113.0/24
+    #
+    # Blocks unconditionally, even when waf-block-mode is off. Counting this one
+    # would leave the console open while reading as protected, and unlike the
+    # managed groups there is no false-positive risk to measure first — the rule
+    # matches one path and one address list.
+    admin_rules = []
+    if admin_allowed_cidrs:
+        admin_ip_set = aws.wafv2.IpSet(
+            f"{prefix}-admin-allowlist",
+            name=f"{prefix}-admin-allowlist",
+            scope="REGIONAL",
+            ip_address_version="IPV4",
+            addresses=admin_allowed_cidrs,
+            tags={**tags, "Name": f"{prefix}-admin-allowlist"},
+        )
+        admin_rules.append(
+            aws.wafv2.WebAclRuleArgs(
+                name="RestrictAdminConsole",
+                priority=1,
+                action=aws.wafv2.WebAclRuleActionArgs(
+                    block=aws.wafv2.WebAclRuleActionBlockArgs()
+                ),
+                statement=aws.wafv2.WebAclRuleStatementArgs(
+                    and_statement=aws.wafv2.WebAclRuleStatementAndStatementArgs(
+                        statements=[
+                            # starts_with, so /admin/login/ and every nested
+                            # admin route are covered by one rule.
+                            aws.wafv2.WebAclRuleStatementAndStatementStatementArgs(
+                                byte_match_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementArgs(
+                                    search_string=admin_path,
+                                    positional_constraint="STARTS_WITH",
+                                    field_to_match=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementFieldToMatchArgs(
+                                        uri_path=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementFieldToMatchUriPathArgs()
+                                    ),
+                                    text_transformations=[
+                                        # Lowercase then URL-decode, so
+                                        # /ADMIN/ and /%61dmin/ do not walk
+                                        # straight past a literal match.
+                                        aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementTextTransformationArgs(
+                                            priority=0, type="URL_DECODE"
+                                        ),
+                                        aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementTextTransformationArgs(
+                                            priority=1, type="LOWERCASE"
+                                        ),
+                                    ],
+                                )
+                            ),
+                            aws.wafv2.WebAclRuleStatementAndStatementStatementArgs(
+                                not_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementArgs(
+                                    statements=[
+                                        aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementStatementArgs(
+                                            ip_set_reference_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementStatementIpSetReferenceStatementArgs(
+                                                arn=admin_ip_set.arn
+                                            )
+                                        )
+                                    ]
+                                )
+                            ),
+                        ]
+                    )
+                ),
+                visibility_config=aws.wafv2.WebAclRuleVisibilityConfigArgs(
+                    cloudwatch_metrics_enabled=True,
+                    metric_name="RestrictAdminConsole",
+                    sampled_requests_enabled=True,
+                ),
+            )
+        )
+
     web_acl = aws.wafv2.WebAcl(
         f"{prefix}-waf",
         name=f"{prefix}-waf",
@@ -330,6 +417,7 @@ def create_edge(
             allow=aws.wafv2.WebAclDefaultActionAllowArgs()
         ),
         rules=[rate_rule]
+        + admin_rules
         + [
             aws.wafv2.WebAclRuleArgs(
                 name=group,

@@ -37,7 +37,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function copyLink() {
     const input = document.getElementById('invite-url');
     input.select();

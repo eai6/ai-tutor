@@ -343,7 +343,7 @@
             </div>
 
             <!-- Auto-refresh every 8 seconds while processing -->
-            <script>setTimeout(function(){ window.location.reload(); }, 8000);</script>
+            <script nonce="{{ request.csp_nonce }}">setTimeout(function(){ window.location.reload(); }, 8000);</script>
             
             {% if upload.created_course %}
             <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-100); text-align: center;">
@@ -553,7 +553,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const uploadId = {{ upload.id }};
 const csrfToken = '{{ csrf_token }}';
 

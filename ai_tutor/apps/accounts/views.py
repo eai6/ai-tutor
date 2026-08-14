@@ -587,8 +587,11 @@ def delete_account(request):
         if confirm.strip().lower() != 'delete':
             messages.error(request, 'Please type "DELETE" exactly to confirm.')
             return render(request, 'accounts/delete_account.html')
-        # Re-authenticate
-        if not authenticate(username=request.user.username, password=password):
+        # Re-authenticate. The request has to be passed: django-axes rejects an
+        # authenticate() call without one, and this is a password check on a
+        # destructive action, so it belongs under the same lockout as login
+        # rather than outside it (finding F-04).
+        if not authenticate(request, username=request.user.username, password=password):
             messages.error(request, 'Password incorrect. Account NOT deleted.')
             return render(request, 'accounts/delete_account.html')
 

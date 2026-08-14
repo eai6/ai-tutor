@@ -1420,7 +1420,7 @@ only adds a way for the page to break after a legitimate upgrade.
 <script defer src="{% static 'vendor/js/katex.min.js' %}"></script>
 <script defer src="{% static 'vendor/js/katex-auto-render.min.js' %}"></script>
 {% endif %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const lessonId = {{ lesson.id }};
 const IS_MATH_LESSON = {% if is_math_lesson %}true{% else %}false{% endif %};
 let sessionId = null;

@@ -948,7 +948,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function switchSchool(value) {
     const url = new URL(window.location.href);
     url.searchParams.delete('subject');
@@ -987,14 +987,8 @@ function toggleUnit(headerEl) {
 /* ── Gamification ── */
 let gamData = null;
 
-function getCookie(name) {
-    let v = null;
-    document.cookie.split(';').forEach(c => {
-        c = c.trim();
-        if (c.startsWith(name + '=')) v = decodeURIComponent(c.substring(name.length + 1));
-    });
-    return v;
-}
+// getCookie() now lives in static/js/csrf.js and reads the token from
+// the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 
 async function loadGamification() {
     try {

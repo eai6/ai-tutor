@@ -19,7 +19,7 @@ clear storage or sign in elsewhere).
             title="Dismiss"
             style="background:transparent;border:none;color:#78350f;font-size:1.1rem;line-height:1;cursor:pointer;padding:0 0.25rem;font-weight:600;">×</button>
 </div>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var banner = document.getElementById('email-verify-banner');
     if (!banner) return;

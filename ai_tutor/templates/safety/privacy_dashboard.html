@@ -396,7 +396,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function updateConsent(consentType, given) {
     fetch(`/safety/consent/${consentType}/`, {
         method: 'POST',
@@ -473,12 +473,7 @@ function deleteAccount() {
     });
 }
 
-function getCookie(name) {
-    for (let c of document.cookie.split(';')) {
-        c = c.trim();
-        if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
-    }
-    return null;
-}
+// getCookie() now lives in static/js/csrf.js and reads the token from
+// the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 </script>
 {% endblock %}

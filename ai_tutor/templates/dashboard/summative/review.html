@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load safe_html %}
 {% load i18n %}
 
 {% block title %}{% blocktrans with title=course.title %}{{ title }} — Summative Exam{% endblocktrans %}{% endblock %}
@@ -207,7 +208,7 @@
                         <div style="margin-top:0.4rem;color:#166534;font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
                         {% endif %}
                         {% if q.answer_data.figure_svg %}
-                        <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|safe }}</div>
+                        <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|sanitized }}</div>
                         {% endif %}
                         {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
                         {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
@@ -294,7 +295,7 @@
 {# CSRF token so the inline-edit fetches can read it from the cookie or token. #}
 <form style="display:none;">{% csrf_token %}</form>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // Inline edit/delete for summative questions. Backend endpoint is the
 // same one that handles exit-ticket questions because both kinds of
 // questions live in the ExitTicketQuestion model — only the parent
@@ -309,10 +310,8 @@ function cancelSumQ(btn) {
     card.querySelector('.q-view').style.display = 'block';
     card.querySelector('.q-edit').style.display = 'none';
 }
-function _csrfTok() {
-    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
-        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-}
+// Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+const _csrfTok = window.csrfToken;
 function saveSumQ(btn) {
     const card = btn.closest('.sum-q-card');
     const qid = card.dataset.questionId;

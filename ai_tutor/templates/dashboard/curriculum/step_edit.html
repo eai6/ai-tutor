@@ -212,7 +212,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 document.querySelectorAll('.phase-option').forEach(option => {
     option.addEventListener('click', function() {
         document.querySelectorAll('.phase-option').forEach(o => o.classList.remove('selected'));

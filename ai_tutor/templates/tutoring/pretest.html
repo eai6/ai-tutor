@@ -89,7 +89,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     // Read the server-rendered question payload (modal-shape).
     const payload = JSON.parse(document.getElementById('exit-ticket-data').textContent);

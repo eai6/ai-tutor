@@ -1041,7 +1041,7 @@ lessons even when curriculum editing is locked down.
 {% endif %}
 </div><!-- /#course-live-region -->
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 function toggleCollapse(header) {
     var body = header.nextElementSibling;
     while (body && !body.classList.contains('collapsible-body')) {
@@ -1197,17 +1197,15 @@ function updateBatchActions() {
 {% block extra_js %}
 {% if can_edit_content %}
 <script src="{% static 'js/Sortable.min.js' %}"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // Drag-to-reorder units (within a course) and lessons (within a unit).
 // Persists the new order_index sequence via the reorder endpoints. The
 // student-facing catalog reads order_index, so changes apply immediately.
 (function () {
     if (typeof Sortable === 'undefined') return;
 
-    function getCookie(name) {
-        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
-        return m ? decodeURIComponent(m[2]) : '';
-    }
+    // getCookie() now lives in static/js/csrf.js and reads the token from
+    // the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 
     function toast(msg, ok) {
         const t = document.createElement('div');

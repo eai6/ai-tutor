@@ -199,12 +199,20 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+{% comment %}
+Data blocks, not code. json_script escapes <, > and & so nothing in the
+payload can close the tag it sits in — the replacement for two |safe
+renders flagged by assessment finding F-07.
+{% endcomment %}
+{{ activity_data|json_script:"activity-data-json" }}
+{{ score_distribution|json_script:"score-distribution-json" }}
+<script nonce="{{ request.csp_nonce }}">
     // Sessions bar chart with readable Y-axis. Computes 5 evenly-
     // spaced ticks (0..ceil(max)) with a "nice" step so labels are
     // round integers instead of awkward fractions, then renders
     // matching gridlines + bar heights.
-    const activityData = {{ activity_data|safe }};
+    const activityData = JSON.parse(
+        document.getElementById('activity-data-json').textContent);
 
     function niceCeil(value) {
         // Pick the smallest "nice" upper bound >= value, where nice
@@ -317,7 +325,8 @@
     // Frequency of attempts per 10% band, with mean and median drawn on top
     // so the shape and the averages are read together — a mean alone hides
     // whether the class is bimodal (a group nailing it, a group lost).
-    const distData = {{ score_distribution|safe }};
+    const distData = JSON.parse(
+        document.getElementById('score-distribution-json').textContent);
     const distMean = {{ et.avg_pct|default:0 }};
     const distMedian = {{ et.median_pct|default:0 }};
     const distBars = document.getElementById('dist-bars');

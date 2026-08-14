@@ -5,7 +5,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% comment %}
+    The only place JavaScript may obtain the CSRF token. The cookie is
+    HttpOnly (assessment finding F-05), so script cannot read it back —
+    see static/js/csrf.js.
+    {% endcomment %}
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}{% trans "Teacher Dashboard" %}{% endblock %} | AI Tutor</title>
+    <script src="{% static 'js/csrf.js' %}"></script>
     <style>
         * {
             margin: 0;
@@ -779,7 +786,7 @@
         </main>
     </div>
     
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
         // Mobile sidebar drawer — toggled by the hamburger button.
         // Closes on backdrop tap, Escape, link tap, or viewport resize
         // back above the mobile breakpoint.

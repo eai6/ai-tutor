@@ -312,7 +312,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     const modal = document.getElementById('reset-modal');
     const subtitle = document.getElementById('reset-modal-subtitle');
@@ -332,10 +332,8 @@
 
     let currentUserId = null;
 
-    function csrf() {
-        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-        return m ? decodeURIComponent(m[1]) : '';
-    }
+    // Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+    const csrf = window.csrfToken;
 
     function showSteps({ choose=false, working=false, show=false, email=false, error=null }) {
         stepChoose.style.display = choose ? '' : 'none';

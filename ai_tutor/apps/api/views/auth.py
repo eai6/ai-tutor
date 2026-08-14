@@ -26,7 +26,11 @@ from ai_tutor.apps.api.serializers.auth import (
 @authentication_classes([])
 @permission_classes([AllowAny])
 def login(request):
-    ser = LoginSerializer(data=request.data)
+    # context carries the request through to authenticate(), which django-axes
+    # requires in order to attribute a failure to a client. Without it the
+    # mobile login is the one credential endpoint with no brute-force
+    # protection — see settings.py AUTHENTICATION_BACKENDS (finding F-04).
+    ser = LoginSerializer(data=request.data, context={'request': request})
     ser.is_valid(raise_exception=True)
     return Response(ser.save(), status=status.HTTP_200_OK)
 

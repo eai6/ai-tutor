@@ -178,7 +178,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 var PROMOTE_LABELS = {
     'up': '{{ next_action|escapejs }}',
     'down': '{{ prev_action|escapejs }}',

@@ -201,7 +201,7 @@
 </div>
 
 {% if upload.status == 'processing' %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
     setTimeout(() => location.reload(), 5000);
 </script>
 {% endif %}

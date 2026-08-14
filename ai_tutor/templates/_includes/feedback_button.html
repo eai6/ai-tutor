@@ -177,7 +177,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     const overlay = document.getElementById('fb-overlay');
     const openBtn = document.getElementById('fb-open');
@@ -189,10 +189,8 @@
     const kindRow = document.getElementById('fb-kind-row');
     const severityRow = document.getElementById('fb-severity-row');
 
-    function getCookie(name) {
-        const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'));
-        return m ? decodeURIComponent(m[2]) : '';
-    }
+    // getCookie() now lives in static/js/csrf.js and reads the token from
+    // the DOM, because the csrftoken cookie is HttpOnly (finding F-05).
 
     function setActive(row, attr, value) {
         row.dataset.value = value;

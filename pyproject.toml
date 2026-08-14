@@ -55,6 +55,8 @@ dependencies = [
     "decorator==5.2.1",
     "distro==1.9.0",
     "Django==6.0.2",
+    "django-axes>=8.0.0",
+    "nh3>=0.2.18",
     "docstring_parser==0.17.0",
     "durationpy==0.10",
     "enumb==0.1.5",

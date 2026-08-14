@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load safe_html %}
 {% load dashboard_extras %}
 
 {% block title %}{{ course.title }} — Summative Results{% endblock %}
@@ -104,7 +105,7 @@
     {% with row=per_q_by_id|default_if_none:'' %}
     <div class="rv-q {% if q.id in per_q_by_id and per_q_by_id|get_item:q.id|get_item:'is_correct' %}correct{% else %}wrong{% endif %}">
         <p class="rv-stem"><span class="num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
-        {% if q.answer_data.figure_svg %}<div class="rv-fig">{{ q.answer_data.figure_svg|safe }}</div>{% endif %}
+        {% if q.answer_data.figure_svg %}<div class="rv-fig">{{ q.answer_data.figure_svg|sanitized }}</div>{% endif %}
 
         <div class="rv-row you"><strong>Your answer:</strong>
             {% with row=per_q_by_id|get_item:q.id %}

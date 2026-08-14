@@ -109,7 +109,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
     // Simple search filter
     document.getElementById('search-input').addEventListener('input', function(e) {
         const search = e.target.value.toLowerCase();

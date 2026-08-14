@@ -24,6 +24,7 @@ from django.http import FileResponse
 from django.views.i18n import JavaScriptCatalog
 
 from ai_tutor.apps.dashboard.views_health import health_check
+from ai_tutor.apps.safety.csp_report import csp_report
 
 
 def service_worker(_request):
@@ -49,7 +50,10 @@ urlpatterns = [
     # The self-hosting manual, served by the application. A public page
     # cannot route its instructions through a private repository.
     path('self-hosting/', desktop_public_views.self_hosting, name='self_hosting'),
-    path('admin/', admin.site.urls),
+    # Default 'admin/'; ADMIN_URL moves it. See the note in settings.py — the
+    # control that matters is the CIDR restriction at the load balancer, this
+    # only takes the console off the path every scanner probes by default.
+    path(settings.ADMIN_URL, admin.site.urls),
     path('api/v1/', include('ai_tutor.apps.api.urls', namespace='api')),
     # Bootstrap status for the offline desktop shell's splash screen.
     # Inert on the server — nothing links to it. See apps/desktop/views.py.
@@ -58,6 +62,10 @@ urlpatterns = [
     # same translations the templates use. Empty until M2/M3 ship
     # actual translations.
     path('jsi18n/', JavaScriptCatalog.as_view(), name='javascript-catalog'),
+    # CSP violation collector. Inert unless CSP_REPORT=1 puts a report-uri in
+    # the policy — nothing else links here. See apps/safety/csp_report.py for
+    # why it is written as defensively as it is.
+    path('csp-report/', csp_report, name='csp_report'),
     # Standard Django language picker — accepts POST with `language=<code>`
     # and sets the LANGUAGE_SESSION_KEY cookie. The landing page footer
     # uses this so anonymous visitors can pick pt-mz before logging in

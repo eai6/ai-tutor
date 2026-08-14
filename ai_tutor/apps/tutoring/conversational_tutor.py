@@ -101,6 +101,7 @@ MAX_EXIT_TICKET_HOLD_CYCLES = 5
 #   - apps/tutoring/tests/test_r9_system_prompt.py
 # Future provider builders (Gemini, OpenAI) live in sibling modules.
 from ai_tutor.apps.tutoring.prompts import TUTOR_SYSTEM_PROMPT_TEMPLATE  # noqa: F401
+from ai_tutor.apps.safety.html_sanitizer import sanitize_answer_data, sanitize_figure_html
 
 
 # =============================================================================
@@ -8536,7 +8537,7 @@ Follow the current step; this concept will be covered in sequence."""
                     # Non-MCQ types (fill_in_blank, matching, short_answer,
                     # data_interpretation) carry their own answer_data
                     # shape — surface verbatim for the frontend to dispatch.
-                    payload['answer_data'] = q.answer_data or {}
+                    payload['answer_data'] = sanitize_answer_data(q.answer_data)
                 return payload
         except Exception as exc:
             logger.warning(
@@ -11458,11 +11459,12 @@ Which concept numbers were meaningfully covered?"""
                     {'letter': 'D', 'text': q.option_d},
                 ]
                 q_data['correct'] = q.correct_answer
-                # Include source HTML for source-based MCQ questions
+                # Include source HTML for source-based MCQ questions,
+                # sanitised — the modal renders it with innerHTML.
                 if q.answer_data and q.answer_data.get('source'):
-                    q_data['source'] = q.answer_data['source']
+                    q_data['source'] = sanitize_figure_html(q.answer_data['source'])
             else:
-                q_data['answer_data'] = q.answer_data or {}
+                q_data['answer_data'] = sanitize_answer_data(q.answer_data)
             exit_questions.append(q_data)
 
         if not exit_questions:

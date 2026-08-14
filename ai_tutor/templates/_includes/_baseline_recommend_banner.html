@@ -24,7 +24,7 @@ student hasn't taken it.
             style="background:transparent;border:none;color:#4c1d95;font-size:1.1rem;line-height:1;cursor:pointer;padding:0 0.25rem;font-weight:600;">×</button>
 </div>
 {% endfor %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     document.querySelectorAll('[id^="baseline-recommend-banner-"]').forEach(function(banner) {
         var key = banner.getAttribute('data-storage-key');

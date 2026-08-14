@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load safe_html %}
 {% load i18n %}
 {% block title %}{% blocktrans with name=student_name %}Exit Ticket Review — {{ name }}{% endblocktrans %}{% endblock %}
 {% block page_title %}{% trans "Exit Ticket Review" %}{% endblock %}
@@ -256,7 +257,7 @@
     {# short_answer / data_interpretation / fallback #}
     {% if item.data_description %}
     <div class="label">{% trans "Data shown to student" %}</div>
-    <div class="data-desc">{{ item.data_description|safe }}</div>
+    <div class="data-desc">{{ item.data_description|sanitized }}</div>
     {% endif %}
     <div class="label">{% trans "Student answer" %}</div>
     <div class="free-answer">{% if item.selected_text %}{{ item.selected_text }}{% else %}{% trans "(no answer)" %}{% endif %}</div>
@@ -286,15 +287,13 @@
 </div>
 {% endif %}
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     const ATTEMPT_ID = {{ attempt_id }};
     const TOTAL = {{ total }};
 
-    function csrfToken() {
-        const m = document.cookie.match(/csrftoken=([^;]+)/);
-        return m ? m[1] : '';
-    }
+    // Token comes from the DOM via static/js/csrf.js — the cookie is HttpOnly (F-05).
+    const csrfToken = window.csrfToken;
 
     function updateScore(score, passed) {
         document.getElementById('score-display').textContent = score + '/' + TOTAL;

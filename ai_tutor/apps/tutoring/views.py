@@ -20,6 +20,7 @@ from ai_tutor.apps.tutoring.models import TutorSession, SessionTurn, StudentLess
 
 import logging
 import re
+from ai_tutor.apps.safety.html_sanitizer import sanitize_answer_data, sanitize_figure_html
 logger = logging.getLogger(__name__)
 
 # Regex to strip media signal tags from history content
@@ -2724,9 +2725,13 @@ def _serialize_pretest_questions_for_modal(questions):
                 {'letter': 'D', 'text': q.option_d},
             ]
             if q.answer_data and q.answer_data.get('source'):
-                q_data['source'] = q.answer_data['source']
+                # Sanitised here, not in the browser: this payload is built into
+                # the question card with innerHTML by the exit-ticket modal, so
+                # it never passes a template. See apps/safety/html_sanitizer.py
+                # (assessment finding F-07).
+                q_data['source'] = sanitize_figure_html(q.answer_data['source'])
         else:
-            q_data['answer_data'] = q.answer_data or {}
+            q_data['answer_data'] = sanitize_answer_data(q.answer_data)
         out_questions.append(q_data)
     return {
         'questions': out_questions,

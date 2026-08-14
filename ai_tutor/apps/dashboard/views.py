@@ -776,7 +776,10 @@ def dashboard_home(request):
         'active_students': active_students,
         'total_sessions': total_sessions,
         'et': et_stats,
-        'score_distribution': json.dumps(et_stats['distribution']),
+        # Serialised by the |json_script filter in the template rather than
+        # here, so it lands in the page as escaped JSON instead of through
+        # |safe. See finding F-07.
+        'score_distribution': et_stats['distribution'],
         'prog': prog,
         # All-time, best-score-per-student-lesson. Kept because it answers a
         # different question from et.avg_pct ("how well do students do at their
@@ -784,7 +787,7 @@ def dashboard_home(request):
         # legitimately differ — 81% vs 74% on July.
         'avg_mastery': avg_mastery,
         'avg_competency': avg_competency,
-        'activity_data': json.dumps(chart['points']),
+        'activity_data': chart['points'],
         'activity_start': chart['start'].isoformat(),
         'activity_end': chart['end'].isoformat(),
         'activity_label': chart['label'],

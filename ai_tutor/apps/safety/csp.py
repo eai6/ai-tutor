@@ -17,19 +17,48 @@ the SVG xmlns. Those directives are the ones that matter against injected
 <script src="//evil">, an injected <base>, a form re-pointed at another origin,
 and clickjacking.
 
-Enforcement is a deliberate follow-up, not a default:
+The 2026-08-13 assessment raised this as F-02: a policy that is deployed but
+switched off, on an application with no other XSS containment. Two switches were
+added in response, and they are deliberately separate, because they fail in
+different ways:
 
     CSP_ENFORCE=1     send Content-Security-Policy instead of the -Report-Only
                       variant. Do this only after watching a real deployment
                       with the browser console open and seeing no violations.
 
-There is deliberately no report-uri. Collecting reports means exposing an
-unauthenticated POST endpoint that accepts attacker-controlled JSON from any
-browser on the internet — a new piece of attack surface, added to a build whose
-point is to reduce it. Violations are visible in the browser console, which is
-where the person doing the refactor is looking anyway.
+    CSP_STRICT_SCRIPTS=1
+                      swap 'unsafe-inline' on script-src for a per-request
+                      nonce. Every inline <script> block in the templates
+                      already carries nonce="{{ request.csp_nonce }}", so those
+                      keep running — but the 206 inline EVENT HANDLERS do not,
+                      because a nonce cannot be attached to an onclick
+                      attribute. That is the refactor this flag measures.
+
+    CSP_REPORT=1      add report-uri pointing at /csp-report/ (see
+                      apps/safety/csp_report.py).
+
+Turn CSP_STRICT_SCRIPTS on with CSP_ENFORCE off, and the browser reports one
+violation per surviving inline handler without blocking anything. That report
+stream IS the remaining backlog, enumerated by the browser rather than by grep.
+When it goes quiet, both flags can go on together.
+
+The two are separate for a reason worth stating: CSP_ENFORCE on its own still
+does exactly what it did before this change — the nonce attributes now in the
+templates are inert while 'unsafe-inline' is in the policy, because a browser
+only starts ignoring 'unsafe-inline' once a nonce appears in the same directive.
+Nobody flipping the old switch gets a surprise.
+
+On report collection: the original note here argued against a report-uri,
+because collecting reports means an unauthenticated POST endpoint accepting
+attacker-controlled JSON, which is new attack surface added to a build whose
+point is to reduce it. That reasoning still stands, which is why CSP_REPORT
+defaults to off and the endpoint that serves it is written defensively — capped
+body, rate limited per IP, no database write. It exists so that the violation
+census above can be collected from real users rather than from whoever happens
+to have a console open.
 """
 import os
+import secrets
 
 # Kept as a tuple of (directive, value) rather than a dict so the order in the
 # emitted header is stable and diffable between runs.
@@ -38,10 +67,9 @@ _POLICY = (
     # widens it. The templates reference no CDN, so this holds today.
     ('default-src', "'self'"),
 
-    # Not tightenable yet — see the counts in the module docstring. Listed
-    # explicitly rather than inherited from default-src so that the day the
-    # inline handlers are gone, the fix is deleting two words on one line.
-    ('script-src', "'self' 'unsafe-inline'"),
+    # script-src is filled in per-request — see _script_src. style-src is not
+    # tightenable at all yet: 2226 inline style="" attributes, and unlike
+    # scripts there is no nonce that can be attached to an attribute.
     ('style-src', "'self' 'unsafe-inline'"),
 
     # data: for inline SVG and base64 thumbnails; blob: for figures generated
@@ -62,7 +90,11 @@ _POLICY = (
     ('frame-ancestors', "'none'"),  # clickjacking; also what X-Frame-Options does, but CSP wins where both are understood
 )
 
-POLICY_STRING = '; '.join(f'{name} {value}' for name, value in _POLICY)
+REPORT_PATH = '/csp-report/'
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, '').lower() in ('1', 'true', 'yes', 'on')
 
 
 class ContentSecurityPolicyMiddleware:
@@ -70,13 +102,21 @@ class ContentSecurityPolicyMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        enforce = os.getenv('CSP_ENFORCE', '').lower() in ('1', 'true', 'yes', 'on')
+        self.enforce = _env_flag('CSP_ENFORCE')
+        self.strict_scripts = _env_flag('CSP_STRICT_SCRIPTS')
+        self.report = _env_flag('CSP_REPORT')
         self.header = (
-            'Content-Security-Policy' if enforce
+            'Content-Security-Policy' if self.enforce
             else 'Content-Security-Policy-Report-Only'
         )
 
     def __call__(self, request):
+        # Generated before the view runs, because the template reads it while
+        # rendering and the header is not written until afterwards. One
+        # token_urlsafe call per request; 128 bits, which is what the spec asks
+        # for and what makes guessing it not a strategy.
+        request.csp_nonce = secrets.token_urlsafe(16)
+
         response = self.get_response(request)
 
         # Only HTML executes a policy. Skipping everything else keeps the header
@@ -90,5 +130,28 @@ class ContentSecurityPolicyMiddleware:
         if 'Content-Security-Policy' in response.headers:
             return response
 
-        response.headers[self.header] = POLICY_STRING
+        response.headers[self.header] = self._policy_for(request)
         return response
+
+    def _script_src(self, request) -> str:
+        """'unsafe-inline' or a nonce — never both, and not by accident.
+
+        A browser that understands nonces ignores 'unsafe-inline' the moment one
+        appears in the same directive. Emitting both would therefore not be a
+        belt-and-braces policy; it would be the strict policy, arrived at
+        without anyone deciding to.
+        """
+        if self.strict_scripts:
+            return f"'self' 'nonce-{request.csp_nonce}'"
+        return "'self' 'unsafe-inline'"
+
+    def _policy_for(self, request) -> str:
+        directives = [('script-src', self._script_src(request))]
+        directives.extend(_POLICY)
+        if self.report:
+            # report-uri is deprecated but is still the only one Safari and
+            # older Firefox honour; report-to needs a Reporting-Endpoints header
+            # to go with it. Both, so every browser in a Seychelles classroom
+            # reports something.
+            directives.append(('report-uri', REPORT_PATH))
+        return '; '.join(f'{name} {value}' for name, value in directives)

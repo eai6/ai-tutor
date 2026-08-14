@@ -471,7 +471,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
     // Locale-aware grade-level visibility. Seychelles (en-us) shows
     // S1-S5, Mozambique (pt-mz) shows 8ª-12ª Classe. Toggling the
     // Idioma dropdown swaps which set is visible AND clears any

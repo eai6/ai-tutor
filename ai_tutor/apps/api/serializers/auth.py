@@ -66,7 +66,12 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
+        # The request is what django-axes keys a failed attempt on. DRF puts it
+        # in context when the view passes it; a serializer constructed without
+        # one would raise AxesBackendRequestParameterRequired rather than
+        # silently skip the lockout, which is the failure mode we want.
         user = authenticate(
+            self.context['request'],
             username=attrs['username'], password=attrs['password'],
         )
         if not user:

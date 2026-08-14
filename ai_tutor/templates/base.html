@@ -6,7 +6,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="{{ theme_primary|default:'#FF6B35' }}">
+    {% comment %}
+    The only place JavaScript may obtain the CSRF token. The cookie is
+    HttpOnly (assessment finding F-05), so script cannot read it back —
+    see static/js/csrf.js.
+    {% endcomment %}
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}AI Tutor{% endblock %}</title>
+    <script src="{% static 'js/csrf.js' %}"></script>
 
     {# PWA — installable, offline shell, branded splash #}
     <link rel="manifest" href="{% static 'pwa/manifest.webmanifest' %}">
@@ -346,7 +353,7 @@
     <script src="{% url 'javascript-catalog' %}"></script>
 
     <script src="{% static 'js/network-helpers.js' %}" defer></script>
-    <script defer>
+    <script defer nonce="{{ request.csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function () {
             if (window.NetHelpers) {
                 window.NetHelpers.installOfflineBanner();

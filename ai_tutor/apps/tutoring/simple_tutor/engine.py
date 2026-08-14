@@ -45,6 +45,7 @@ import os
 import re
 import time
 from typing import TYPE_CHECKING, Any
+from ai_tutor.apps.safety.html_sanitizer import sanitize_answer_data, sanitize_figure_html
 
 logger = logging.getLogger(__name__)
 
@@ -3099,9 +3100,10 @@ def _build_exit_ticket_payload(session) -> dict | None:
             ]
             q_data['correct'] = q.correct_answer or ''
             if q.answer_data and isinstance(q.answer_data, dict) and q.answer_data.get('source'):
-                q_data['source'] = q.answer_data['source']
+                # Sanitised server-side — the modal renders this with innerHTML.
+                q_data['source'] = sanitize_figure_html(q.answer_data['source'])
         else:
-            q_data['answer_data'] = q.answer_data or {}
+            q_data['answer_data'] = sanitize_answer_data(q.answer_data)
         exit_questions.append(q_data)
 
     return {

@@ -130,7 +130,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 {% if upload.status == 'media_processing' %}
 // Auto-refresh while processing
 setTimeout(() => window.location.reload(), 5000);
