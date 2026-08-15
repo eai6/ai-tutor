@@ -126,10 +126,18 @@ def self_hosting(request):
     for a teacher installing on one classroom machine, this is for whoever runs
     a ministry's servers.
 
-    Deliberately only the commands. An earlier version rendered the whole
-    683-line manual here — AWS cost tables, three architecture diagrams, a
-    Pulumi walkthrough — and buried the handful of commands someone actually
-    needs under everything they do not. docs/self-hosting.md remains the long
-    form for anyone with the repository.
+    The commands stay on the fast path and everything else folds away behind a
+    closed <details>. An earlier version rendered the whole 683-line manual
+    here — AWS cost tables, three architecture diagrams, a Pulumi walkthrough —
+    and buried the handful of commands someone actually needs under everything
+    they do not; the folds are what let the detail come back without repeating
+    that. Someone on the happy path still reads five commands top to bottom and
+    opens only the one that bit them.
+
+    What earns a fold is a decision (which deployment shape, which variables)
+    or a symptom (the silent 403, the .xx placeholder eating thirty days of
+    certificate retries). What stays in the flow is what everyone types.
+    docs/self-hosting.md remains the long form, including Path B on AWS, for
+    anyone with the repository.
     """
     return render(request, 'downloads/self_hosting.html', _artefact_context())

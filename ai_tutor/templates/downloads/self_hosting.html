@@ -1,7 +1,7 @@
 {% load i18n %}
-{# Served at /self-hosting/. The commands to deploy, and nothing else. #}
-{# Everything that is a decision or a symptom lives in the manual, one #}
-{# click away — see apps/desktop/public_views.py for why. #}
+{# Served at /self-hosting/. The commands stay on the fast path; everything #}
+{# that is a decision or a symptom folds into a <details> beside the step it #}
+{# belongs to — see apps/desktop/public_views.py for why. #}
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,7 +12,7 @@
 <style>
   :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8;
           --card:#fff; --bg:#f9fafb; --codebg:#f3f4f6; --warnbg:#fffbeb;
-          --warnline:#fcd34d; --warn:#92400e; }
+          --warnline:#fcd34d; --warn:#92400e; --foldbg:#fff; }
   * { box-sizing:border-box; }
   body { margin:0; padding:2.5rem 1.25rem 5rem; color:var(--ink); background:var(--bg);
          font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
@@ -22,6 +22,12 @@
   h2 { font-size:1.15rem; margin:2.5rem 0 .35rem; }
   h2 .tag { font-size:.75rem; font-weight:600; color:#fff; background:var(--brand);
             border-radius:99px; padding:.15rem .55rem; vertical-align:middle; margin-left:.4rem; }
+  /* Steps. Numbered so someone reading over a colleague's shoulder can say
+     "you are on 3" — the folds make position otherwise hard to see. */
+  h3 { font-size:.95rem; margin:1.9rem 0 .5rem; }
+  h3 .n { display:inline-block; min-width:1.4rem; height:1.4rem; line-height:1.4rem;
+          text-align:center; border-radius:99px; background:var(--brand); color:#fff;
+          font-size:.75rem; margin-right:.45rem; }
   .need { color:var(--muted); font-size:.87rem; margin:0 0 1rem; }
   /* Wrap rather than scroll. These are commands someone is reading off the
      screen and typing into a server; a wheel URL that runs off the right edge
@@ -32,7 +38,8 @@
         white-space:pre-wrap; overflow-wrap:anywhere; }
   code { font-size:.85em; }
   pre code { font-size:1em; }
-  p code, li code { background:var(--codebg); padding:.1rem .35rem; border-radius:4px; }
+  p code, li code, td code, summary code { background:var(--codebg); padding:.1rem .35rem;
+        border-radius:4px; }
   a { color:var(--brand); }
   a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
           padding:.55rem .95rem; border-radius:8px; font-weight:600; font-size:.88rem; }
@@ -40,13 +47,40 @@
   .fill { background:var(--warnbg); border:1px solid var(--warnline); border-radius:10px;
           padding:.9rem 1.1rem; margin:0 0 .75rem; font-size:.88rem; color:var(--warn); }
   .fill code { background:rgba(0,0,0,.06); }
+  /* A code block inside a warning keeps the warning's ground rather than the
+     page's, so the box still reads as one thing. */
+  .fill pre { background:rgba(0,0,0,.05); border-color:rgba(0,0,0,.13); color:inherit; }
+  .fill pre code { background:none; }
+  .fill p { margin:0 0 .5rem; }
+  .fill p:last-child, .fill pre:last-child { margin-bottom:0; }
+  /* Folds. Closed by default: someone on the happy path should be able to
+     read the page as five commands, and open only the one that bit them. */
+  details { border:1px solid var(--line); border-radius:10px; background:var(--foldbg);
+            margin:0 0 .75rem; }
+  details[open] { padding-bottom:.35rem; }
+  summary { cursor:pointer; padding:.6rem .9rem; font-size:.85rem; font-weight:600;
+            list-style:none; color:var(--brand); }
+  summary::-webkit-details-marker { display:none; }
+  summary::before { content:"▸"; display:inline-block; width:1rem; font-weight:400; }
+  details[open] > summary::before { content:"▾"; }
+  details > :not(summary) { margin-left:.9rem; margin-right:.9rem; }
+  details .need:last-child, details p:last-child { margin-bottom:.6rem; }
+  table { border-collapse:collapse; width:100%; font-size:.82rem; margin:0 0 .9rem;
+          display:block; overflow-x:auto; }
+  th, td { border:1px solid var(--line); padding:.4rem .6rem; text-align:left;
+           vertical-align:top; }
+  th { font-weight:600; background:var(--codebg); }
+  td:first-child, th:first-child { white-space:nowrap; }
   .more { border-top:1px solid var(--line); margin-top:3rem; padding-top:1.25rem; }
   footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line);
            padding-top:1rem; margin-top:2rem; }
   footer a { color:var(--muted); }
   @media (prefers-color-scheme: dark) {
     :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --card:#1f2937; --bg:#111827;
-            --codebg:#0b1220; --brand:#60a5fa; --warnbg:#3b2f0b; --warnline:#a16207; --warn:#fcd34d; }
+            --codebg:#0b1220; --brand:#60a5fa; --warnbg:#3b2f0b; --warnline:#a16207;
+            --warn:#fcd34d; --foldbg:#1f2937; }
+    .fill code { background:rgba(255,255,255,.08); }
+    .fill pre { background:rgba(0,0,0,.28); border-color:rgba(255,255,255,.14); }
   }
 </style>
 </head>
@@ -55,80 +89,647 @@
 
   <h1>{% trans "Run AI Tutor yourself" %}</h1>
   <p class="sub">
-    {% blocktrans trimmed %}
-      On your own server, with student data inside your own borders.
-      Two ways to install it.
-    {% endblocktrans %}
+    {% trans "On your own server, with student data inside your own borders." %}
   </p>
+
+  <div class="fill">
+    <p>
+      <strong>{% trans "Where data goes." %}</strong>
+      {% blocktrans trimmed %}
+        Course material, uploaded figures and student records stay in your
+        database and on your disk. Embeddings are computed locally — the
+        <code>all-MiniLM-L6-v2</code> model runs inside the app container, so
+        your curriculum is never sent anywhere to be indexed. But
+        <strong>the text of each student message is sent to Anthropic, OpenAI
+        or Google to be answered</strong>, leaving your network. If that is not
+        acceptable, run a local model instead — see below.
+      {% endblocktrans %}
+    </p>
+    <p>
+      <strong>{% trans "First start needs internet" %}</strong>
+      {% blocktrans trimmed %}
+        even with a local model: the app downloads the embedding model
+        (~90 MB) from HuggingFace on first boot. For an air-gapped install,
+        warm the cache on a connected machine first and copy the volume
+        across.
+      {% endblocktrans %}
+    </p>
+  </div>
+
+  <details>
+    <summary>{% trans "Pick your deployment shape before you start" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Almost every install problem below comes from picking the wrong one,
+        because the default configuration assumes the first.
+      {% endblocktrans %}
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>{% trans "Public server" %}</th>
+          <th>{% trans "LAN-only" %}</th>
+          <th>{% trans "Laptop" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{% trans "Reachable from" %}</td>
+          <td>{% trans "internet" %}</td>
+          <td>{% trans "school network" %}</td>
+          <td>{% trans "one machine" %}</td>
+        </tr>
+        <tr>
+          <td>{% trans "Needs a domain" %}</td>
+          <td>{% trans "yes" %}</td>
+          <td>{% trans "no" %}</td>
+          <td>{% trans "no" %}</td>
+        </tr>
+        <tr>
+          <td>{% trans "HTTPS" %}</td>
+          <td>{% trans "automatic" %}</td>
+          <td>{% trans "none" %}</td>
+          <td>{% trans "none" %}</td>
+        </tr>
+        <tr>
+          <td><code>SITE_DOMAIN</code></td>
+          <td>{% trans "your real domain" %}</td>
+          <td><code>localhost</code></td>
+          <td><code>localhost</code></td>
+        </tr>
+        <tr>
+          <td>{% trans "Caddy site block" %}</td>
+          <td><code>{$SITE_DOMAIN}</code></td>
+          <td><code>:80</code></td>
+          <td><code>:80</code></td>
+        </tr>
+        <tr>
+          <td><code>HTTPS_EDGE</code></td>
+          <td><code>true</code></td>
+          <td><code>false</code></td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td>{% trans "Port binding" %}</td>
+          <td><code>80:80</code></td>
+          <td><code>80:80</code></td>
+          <td><code>127.0.0.1:80:80</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="fill">
+      {% blocktrans trimmed %}
+        The <strong>LAN-only</strong> and <strong>laptop</strong> shapes send
+        session and CSRF cookies in the clear. Only use them where the traffic
+        never leaves a building you control, or on a single machine. Never on
+        café or conference wifi with real student data.
+      {% endblocktrans %}
+    </div>
+  </details>
 
   <h2>{% trans "With Docker" %}<span class="tag">{% trans "recommended" %}</span></h2>
   <p class="need">
     {% blocktrans trimmed %}
       A Linux server with 4 vCPU, 8 GB RAM and 60 GB disk; Docker with the
-      Compose plugin; a domain pointing at it. Brings its own database and
-      certificates.
+      Compose plugin; a domain pointing at it, for the public-server shape
+      only. Brings its own database and certificates.
     {% endblocktrans %}
   </p>
+
+  <h3><span class="n">1</span>{% trans "Get the deployment files" %}</h3>
 
 <pre><code>mkdir -p ai-tutor &amp;&amp; cd ai-tutor
 
 # the deployment files ship inside the image, so they always match it
 docker run --rm ghcr.io/eai6/ai-tutor:latest \
   tar -C /app/deploy/compose -c \
-      docker-compose.yml Caddyfile env.example backup.sh restore.sh | tar -x
+      docker-compose.yml Caddyfile env.example backup.sh restore.sh &gt; deploy.tar
 
-cp env.example .env &amp;&amp; chmod 600 .env</code></pre>
+tar -tvf deploy.tar   # inspect: no leading / and no .. in any path
+tar -xf deploy.tar</code></pre>
+
+  <details>
+    <summary>{% trans "Where the files land, and what to read before running them" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Files land <strong>flat in <code>ai-tutor/</code></strong>, not in a
+        <code>deploy/compose/</code> subdirectory. This is also where
+        <code>backup.sh</code> lives, so that is the directory you run it from
+        later.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        That first <code>docker run</code> already pulls the full image
+        (~7 GB), so the <code>docker compose pull</code> in step 4 is usually
+        instant.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Read <code>docker-compose.yml</code> and <code>Caddyfile</code> before
+        running them. Both are commented and short. <code>Caddyfile</code> in
+        particular contains a ready-made plain-HTTP block you will need if you
+        are not on the public-server shape.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Optionally pin the exact image, so a later <code>pull</code> cannot
+        drift from the compose file you just extracted:
+      {% endblocktrans %}
+    </p>
+{% verbatim %}
+<pre><code>docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/eai6/ai-tutor:latest
+# put the resulting name@sha256:... into the app service's image: line</code></pre>
+{% endverbatim %}
+  </details>
+
+  <h3><span class="n">2</span>{% trans "Configure .env" %}</h3>
+
+<pre><code>cp env.example .env &amp;&amp; chmod 600 .env</code></pre>
 
   <div class="fill">
     {% blocktrans trimmed %}
-      Now open <code>.env</code> and fill in the entries marked REQUIRED —
-      <code>SECRET_KEY</code>, <code>POSTGRES_PASSWORD</code>,
-      <code>ALLOWED_HOSTS</code>, <code>CSRF_TRUSTED_ORIGINS</code>, and one
-      provider API key. It will not start without them, on purpose.
+      <code>env.example</code> ships <strong>placeholder values, not
+      blanks</strong> — <code>SITE_DOMAIN=tutor.education.gov.xx</code> and
+      <code>ACME_EMAIL=ict@education.gov.xx</code>. These look filled in and
+      are not. Replace both, or Caddy will spend thirty days failing to get a
+      certificate for a domain that does not exist.
     {% endblocktrans %}
   </div>
 
+  <details>
+    <summary>{% trans "Every required variable, and what to put in it" %}</summary>
+    <table>
+      <thead>
+        <tr><th>{% trans "Variable" %}</th><th>{% trans "Notes" %}</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SECRET_KEY</code></td>
+          <td><code>python3 -c 'import secrets; print(secrets.token_urlsafe(64))'</code></td>
+        </tr>
+        <tr>
+          <td><code>POSTGRES_PASSWORD</code></td>
+          <td>{% blocktrans trimmed %}avoid <code>@ : / ?</code> — they break <code>DATABASE_URL</code> parsing{% endblocktrans %}</td>
+        </tr>
+        <tr>
+          <td><code>SITE_DOMAIN</code></td>
+          <td>{% blocktrans trimmed %}compose enforces this with <code>:?</code>. Use <code>localhost</code> if you have no domain{% endblocktrans %}</td>
+        </tr>
+        <tr>
+          <td><code>ALLOWED_HOSTS</code></td>
+          <td>{% trans "the hostname students will type, comma-separated if more than one" %}</td>
+        </tr>
+        <tr>
+          <td><code>CSRF_TRUSTED_ORIGINS</code></td>
+          <td>{% trans "must include the scheme" %}</td>
+        </tr>
+        <tr>
+          <td>{% trans "one provider API key" %}</td>
+          <td>{% blocktrans trimmed %}or use the <code>local-llm</code> profile{% endblocktrans %}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Optional: <code>ACME_EMAIL</code> (only used when requesting a
+        certificate) and <code>HTTPS_EDGE</code>.
+      {% endblocktrans %}
+    </p>
+
+    <p class="need">{% trans "Public server:" %}</p>
+<pre><code>SITE_DOMAIN=tutor.yourdomain.example
+ACME_EMAIL=you@yourdomain.example
+ALLOWED_HOSTS=tutor.yourdomain.example
+CSRF_TRUSTED_ORIGINS=https://tutor.yourdomain.example
+HTTPS_EDGE=true</code></pre>
+
+    <p class="need">{% trans "LAN-only or laptop:" %}</p>
+<pre><code>SITE_DOMAIN=localhost
+#ACME_EMAIL=
+ALLOWED_HOSTS=localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=http://localhost
+HTTPS_EDGE=false</code></pre>
+
+    <p class="need">
+      {% blocktrans trimmed %}
+        Duplicate keys are easy to introduce while editing, and the last one
+        silently wins. Check:
+      {% endblocktrans %}
+    </p>
+<pre><code>grep -n 'HTTPS_EDGE\|ALLOWED_HOSTS\|CSRF_TRUSTED\|SITE_DOMAIN' .env</code></pre>
+  </details>
+
+  <h3><span class="n">3</span>{% trans "Configure Caddy — only if you are not on a public domain" %}</h3>
+  <p class="need">
+    {% blocktrans trimmed %}
+      On the public-server shape there is nothing to do here. Skip to step 4.
+    {% endblocktrans %}
+  </p>
+
+  <details>
+    <summary>{% trans "Switching Caddy to plain HTTP (LAN-only or laptop)" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Keep a copy of the original first: <code>cp Caddyfile Caddyfile.orig</code>.
+        Then delete the global <code>email</code> block and replace the whole
+        <code>{$SITE_DOMAIN}</code> block with the plain-HTTP block already
+        commented at the bottom of the file:
+      {% endblocktrans %}
+    </p>
+<pre><code>:80 {
+    encode gzip
+
+    reverse_proxy app:8000 {
+        header_up X-Real-IP {remote_host}
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+        }
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}</code></pre>
+    <div class="fill">
+      {% blocktrans trimmed %}
+        Both changes are needed — this one <strong>and</strong>
+        <code>HTTPS_EDGE=false</code>. Doing only one gives you a silent 403;
+        see troubleshooting.
+      {% endblocktrans %}
+    </div>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <strong>Laptop only:</strong> in <code>docker-compose.yml</code>, bind
+        Caddy to loopback and drop 443, which nothing listens on now.
+      {% endblocktrans %}
+    </p>
+<pre><code>    ports:
+      - "127.0.0.1:80:80"</code></pre>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>"80:80"</code> binds every interface including wifi. Docker
+        writes its own iptables rules ahead of ufw, so a firewall rule will
+        not substitute for this — the bind address is the only control that
+        works.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">4</span>{% trans "Start it" %}</h3>
+
 <pre><code>docker compose pull        # ~7 GB, once
 docker compose up -d
-docker compose exec app python manage.py createsuperuser</code></pre>
+docker compose logs -f app</code></pre>
+
+  <div class="fill">
+    {% blocktrans trimmed %}
+      <strong>Wait before doing anything else.</strong> <code>up -d</code>
+      returns when containers have <em>started</em>, not when the app is
+      usable. First boot runs 200+ database migrations, downloads the
+      embedding model and indexes the seeded curriculum — a couple of minutes
+      on modest hardware.
+    {% endblocktrans %}
+  </div>
+
+  <details>
+    <summary>{% trans "What “ready” looks like in the log" %}</summary>
+    <p class="need">{% trans "A line like this one:" %}</p>
+<pre><code>Indexed. Collection size: 0 → 151.</code></pre>
+    <p class="need">{% trans "Or check the health state, which is the same signal:" %}</p>
+<pre><code>docker compose ps    # wait for app to show (healthy)</code></pre>
+    <p class="need">
+      {% blocktrans trimmed %}
+        A <code>BertModel LOAD REPORT</code> line flagging
+        <code>embeddings.position_ids</code> as <code>UNEXPECTED</code> during
+        this is normal and can be ignored.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">5</span>{% trans "Create the admin account" %}</h3>
+  <p class="need">{% trans "Only after the app reports healthy." %}</p>
+
+<pre><code>docker compose exec app python manage.py createsuperuser</code></pre>
+
+  <details>
+    <summary>{% trans "Type a username — do not accept the default" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Leaving it blank accepts the container's OS user, which gives you an
+        account called <code>root</code> — easy to do by accident and
+        confusing later. To fix it afterwards:
+      {% endblocktrans %}
+    </p>
+<pre><code>docker compose exec app python manage.py changepassword &lt;name&gt;</code></pre>
+  </details>
 
   <p class="need">
     {% blocktrans trimmed %}
       No API key? <code>docker compose --profile local-llm up -d</code> runs a
       small model on the server instead. Weaker at tutoring than a cloud model,
-      and slower without a GPU — but it needs no account anywhere.
+      and slower without a GPU — but it needs no account anywhere and nothing
+      leaves your network. If you already run an OpenAI-compatible endpoint of
+      your own, point a model config at it instead.
     {% endblocktrans %}
   </p>
 
   <h2>{% trans "With pip, no Docker" %}</h2>
   <p class="need">
     {% blocktrans trimmed %}
-      For a server where containers are not allowed. Needs Python 3.12+ and
-      PostgreSQL with pgvector, and you run your own reverse proxy for HTTPS.
+      For a server where containers are not allowed. Needs Python
+      <strong>3.12 or newer</strong> and PostgreSQL with the
+      <code>pgvector</code> extension. You supply the database, the reverse
+      proxy and the file ownership yourself: this path automates much less
+      than the Docker one, and every step below that looks fussy is there
+      because skipping it produces a failure that does not name its own cause.
     {% endblocktrans %}
   </p>
 
 {% if server_wheel %}
-<pre><code>sudo python3.12 -m venv /opt/ai-tutor/venv
-sudo /opt/ai-tutor/venv/bin/pip install {{ server_wheel_url }}
-sudo /opt/ai-tutor/venv/bin/ai-tutor init</code></pre>
+  <div class="fill">
+    <p>
+      <strong>{% trans "Decide the service account first." %}</strong>
+      {% blocktrans trimmed %}
+        The generated systemd unit runs as an unprivileged user and reads
+        files that the install steps create as root. Nothing reconciles those
+        two automatically, so pick the account now — these commands use
+        <code>aitutor</code>; substitute your own throughout.
+      {% endblocktrans %}
+    </p>
+    <p>
+      {% blocktrans trimmed %}
+        Be logged in as that account when you run <code>ai-tutor systemd</code>
+        in step 7: it writes <code>$SUDO_USER</code>, falling back to
+        <code>$USER</code>, into the unit's <code>User=</code> line. The
+        PostgreSQL role created in step 3 happens to share the name; they are
+        separate accounts and need not match.
+      {% endblocktrans %}
+    </p>
+  </div>
+
+  <h3><span class="n">1</span>{% trans "Create the virtualenv" %}</h3>
+
+<pre><code>sudo apt install python3-venv python3-dev libpq-dev build-essential
+sudo python3 -m venv /opt/ai-tutor/venv
+/opt/ai-tutor/venv/bin/python -V     # confirm 3.12 or newer</code></pre>
+
+  <details>
+    <summary>{% trans "Use python3, not python3.12 — and do not skip python3-venv" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        The version is a floor, not a pin. Distributions that have moved past
+        3.12 have no <code>python3.12</code> binary at all, so naming it gives
+        you <code>sudo: python3.12: command not found</code> followed by two
+        misleading cascade errors about <code>pip</code> and
+        <code>ai-tutor</code> not existing.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Without <code>python3-venv</code>, <code>-m venv</code> can create the
+        directory but leave no <code>pip</code> inside — which produces an
+        error identical to the one above, for an entirely different reason.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">2</span>{% trans "Install the wheel" %}</h3>
+
+<pre><code>sudo /opt/ai-tutor/venv/bin/pip install --upgrade pip
+sudo /opt/ai-tutor/venv/bin/pip install {{ server_wheel_url }}</code></pre>
+
+  <p class="need">
+    {% blocktrans trimmed %}
+      Several GB and several minutes — torch arrives as a transitive
+      dependency of the embedding stack.
+    {% endblocktrans %}
+  </p>
+
+  <details>
+    <summary>{% trans "If it stalls on “Building wheel for …”" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        The <code>py3-none-any</code> tag applies to <code>ai_tutor</code>
+        itself, not to its dependencies. If one of those has no wheel for your
+        Python version, pip falls back to a source build. The
+        <code>libpq-dev</code> and <code>build-essential</code> packages
+        installed in step 1 cover the usual culprit.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">3</span>{% trans "Prepare the database" %}</h3>
+
+<pre><code>sudo -u postgres createuser --pwprompt aitutor
+sudo -u postgres createdb -O aitutor aitutor
+sudo -u postgres psql -d aitutor -c 'CREATE EXTENSION IF NOT EXISTS vector;'</code></pre>
 
   <div class="fill">
     {% blocktrans trimmed %}
-      <code>init</code> writes <code>/etc/ai-tutor/ai-tutor.env</code> with a
-      generated <code>SECRET_KEY</code>. Set <code>ALLOWED_HOSTS</code>,
-      <code>CSRF_TRUSTED_ORIGINS</code>, <code>DATABASE_URL</code> and a
-      provider key in it.
+      Create the extension <strong>before</strong> migrating. Migrations do run
+      <code>CREATE EXTENSION IF NOT EXISTS vector</code> themselves, but that
+      statement needs a privileged role — and the account in your
+      <code>DATABASE_URL</code> should not be one. Skip this and the migration
+      fails on the first vector column.
     {% endblocktrans %}
   </div>
 
-<pre><code>sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
-sudo /opt/ai-tutor/venv/bin/ai-tutor seed
-sudo /opt/ai-tutor/venv/bin/ai-tutor createsuperuser
+  <h3><span class="n">4</span>{% trans "Initialise and configure" %}</h3>
 
-# run it as a service
-sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
-sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</code></pre>
+<pre><code>sudo /opt/ai-tutor/venv/bin/ai-tutor init</code></pre>
+
+  <p class="need">
+    {% blocktrans trimmed %}
+      Writes <code>/etc/ai-tutor/ai-tutor.env</code> with a generated
+      <code>SECRET_KEY</code>. Edit it and set at minimum:
+    {% endblocktrans %}
+  </p>
+
+<pre><code>DATABASE_URL=postgresql://aitutor:PASSWORD@localhost:5432/aitutor
+ALLOWED_HOSTS=127.0.0.1,localhost
+CSRF_TRUSTED_ORIGINS=http://127.0.0.1:8000
+HTTPS_EDGE=false</code></pre>
+
+  <p class="need">
+    {% blocktrans trimmed %}
+      Add a provider API key too. Set <code>HTTPS_EDGE=true</code>, and the
+      real scheme in <code>CSRF_TRUSTED_ORIGINS</code>, once a TLS-terminating
+      proxy is in front.
+    {% endblocktrans %}
+  </p>
+
+  <div class="fill">
+    <p>
+      <strong>{% trans "DATABASE_URL is not optional, and nothing enforces it." %}</strong>
+      {% blocktrans trimmed %}
+        Leave it unset and Django silently falls back to SQLite at
+        <code>/var/lib/ai-tutor/db.sqlite3</code>. <code>migrate</code>
+        succeeds, <code>seed</code> succeeds, the app starts and serves — on a
+        database with no pgvector. You get a working-looking install that is
+        not the system you are evaluating.
+      {% endblocktrans %}
+    </p>
+    <p>{% trans "Check for the tell:" %}</p>
+<pre><code>grep -n DATABASE_URL /etc/ai-tutor/ai-tutor.env
+ls -la /var/lib/ai-tutor/          # a db.sqlite3 here means it fell back</code></pre>
+    <p>
+      {% blocktrans trimmed %}
+        If you find one, set <code>DATABASE_URL</code>, move the file aside,
+        and re-run migrate and seed.
+      {% endblocktrans %}
+    </p>
+  </div>
+
+  <h3><span class="n">5</span>{% trans "Fix ownership — before anything else runs" %}</h3>
+  <p class="need">
+    {% blocktrans trimmed %}
+      The install steps ran as root. The service will not. Reconcile them now,
+      or it crash-loops on startup with
+      <code>PermissionError: [Errno 13] Permission denied:
+      '/etc/ai-tutor/ai-tutor.env'</code> and never reaches Django.
+    {% endblocktrans %}
+  </p>
+
+<pre><code>sudo mkdir -p /var/lib/ai-tutor
+sudo chown -R aitutor:aitutor /var/lib/ai-tutor
+sudo chown root:aitutor /etc/ai-tutor/ai-tutor.env
+sudo chmod 640 /etc/ai-tutor/ai-tutor.env
+sudo chmod 755 /etc/ai-tutor
+
+sudo -u aitutor head -1 /etc/ai-tutor/ai-tutor.env    # prove it worked</code></pre>
+
+  <p class="need">
+    {% blocktrans trimmed %}
+      Group-readable rather than world-readable: that file holds the
+      <code>SECRET_KEY</code>, the database password and your provider key.
+    {% endblocktrans %}
+  </p>
+
+  <h3><span class="n">6</span>{% trans "Migrate, seed, collect static, create the admin" %}</h3>
+  <p class="need">
+    {% blocktrans trimmed %}
+      Run these <strong>as the service user</strong>, not as root. Running them
+      under plain <code>sudo</code> recreates the ownership problem you just
+      fixed, on every file they touch.
+    {% endblocktrans %}
+  </p>
+
+<pre><code>run() { sudo -u aitutor env \
+  AI_TUTOR_ENV_FILE=/etc/ai-tutor/ai-tutor.env \
+  AI_TUTOR_DATA_DIR=/var/lib/ai-tutor \
+  /opt/ai-tutor/venv/bin/ai-tutor "$@"; }
+
+run migrate
+run seed
+run collectstatic --noinput
+run createsuperuser</code></pre>
+
+  <div class="fill">
+    <p>
+      <strong>{% trans "collectstatic is required." %}</strong>
+      {% blocktrans trimmed %}
+        Its omission is fatal rather than cosmetic: the app uses Django's
+        manifest static-files storage, which resolves every asset through a
+        <code>staticfiles.json</code> that only <code>collectstatic</code>
+        generates. Without it every page — including the login form — returns
+        <strong>HTTP 500</strong> with <code>ValueError: Missing staticfiles
+        manifest entry for 'admin/css/base.css'</code>. The Docker image does
+        this at build time, so it only bites the pip path.
+      {% endblocktrans %}
+    </p>
+    <p>
+      {% trans "Confirm:" %}
+      <code>ls /var/lib/ai-tutor/staticfiles/staticfiles.json</code>
+    </p>
+  </div>
+
+  <details>
+    <summary>{% trans "Type a username at createsuperuser" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Leaving it blank accepts the OS user and silently gives you an account
+        called <code>root</code> — the same trap as the Docker path.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">7</span>{% trans "Install the service" %}</h3>
+
+<pre><code>sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor
+systemctl status ai-tutor --no-pager</code></pre>
+
+  <div class="fill">
+    <p>
+      <strong>{% trans "Read the generated unit before enabling it." %}</strong>
+      {% blocktrans trimmed %}
+        <code>ProtectHome=yes</code> makes <code>/home</code> invisible to the
+        service, and both the HuggingFace cache and gunicorn's control server
+        default to paths under it — <code>Permission denied:
+        '/home/&lt;user&gt;'</code>. Redirect them with
+        <code>sudo systemctl edit ai-tutor</code>:
+      {% endblocktrans %}
+    </p>
+<pre><code>[Service]
+Environment=HF_HOME=/var/lib/ai-tutor/hf
+Environment=HOME=/var/lib/ai-tutor</code></pre>
+  </div>
+
+  <details>
+    <summary>{% trans "Reading the service state" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>Active: activating (auto-restart)</code> means it is
+        crash-looping. Read the traceback with
+        <code>journalctl -u ai-tutor -n 50 --no-pager</code>, fix it, then run
+        <code>sudo systemctl reset-failed ai-tutor</code> before restarting —
+        otherwise the accumulated restart counter gets in the way.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>Active: active (running)</code> with
+        <code>Listening at: http://...:8000</code> is success.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <h3><span class="n">8</span>{% trans "Bind, proxy and verify" %}</h3>
+  <p class="need">
+    {% blocktrans trimmed %}
+      Gunicorn binds <code>0.0.0.0:8000</code> by default — reachable from your
+      whole network, in the clear, with no proxy in front. Unlike the Docker
+      path, a firewall is effective here; narrowing the bind is better still.
+    {% endblocktrans %}
+  </p>
+
+<pre><code>sudo ufw deny 8000
+# or, in /etc/ai-tutor/ai-tutor.env:  AI_TUTOR_BIND=127.0.0.1:8000
+
+curl -sI http://127.0.0.1:8000/admin/     # want 302 to /admin/login/</code></pre>
+
+  <div class="fill">
+    {% blocktrans trimmed %}
+      Your reverse proxy must allow a <strong>300-second read and write
+      timeout</strong>. A tutoring turn takes 20–90 seconds; a default
+      60-second timeout cuts the connection, the student sees a blank reply,
+      and your log records a completed request.
+    {% endblocktrans %}
+  </div>
+
+  <p class="need">
+    {% blocktrans trimmed %}
+      Then open it in a browser. A <code>302</code> from curl only proves
+      routing works — it never renders a template, so it will not catch a
+      missing <code>collectstatic</code>. The browser will.
+    {% endblocktrans %}
+  </p>
 
   <p class="need">
     <a href="{% url 'downloads:server' 'wheel' %}"><code>{{ server_wheel }}</code></a>
@@ -137,19 +738,209 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</co
   </p>
 {% else %}
   <p class="need">
-    {% trans "No wheel has been published yet. Path C in the manual has the full procedure." %}
+    {% trans "No wheel has been published yet. docs/self-hosting.md in the repository has the full procedure in the meantime." %}
   </p>
 {% endif %}
 
   <h2>{% trans "Then, whichever you chose" %}</h2>
   <p class="need">
     {% blocktrans trimmed %}
-      Sign in at <code>/admin/</code>, point <strong>tutoring</strong> at a
-      provider under LLM → Model configs, and take one tutoring turn. That
-      exercises the database, the knowledge base, the credentials and media in
-      one action — a health check does not.
+      Sign in at <code>/admin/</code>. Under <strong>LLM → Model configs</strong>,
+      add a provider config <strong>and mark it active</strong> — a config that
+      exists but is not selected fails silently later.
     {% endblocktrans %}
   </p>
+  <p class="need">
+    {% blocktrans trimmed %}
+      Then take one tutoring turn against the seeded curriculum, with
+      <code>docker compose logs -f app</code> open beside you. That single
+      action exercises the database, the vector store, the credentials and
+      media serving together — a health check does not.
+    {% endblocktrans %}
+  </p>
+  <p class="need">
+    {% blocktrans trimmed %}
+      Allow 20–90 seconds for the reply. If it fails, the log names the layer:
+      an auth error is the key, a timeout is egress from the container, and a
+      reply with no retrieved context means the model works but retrieval is
+      not wired to the active config.
+    {% endblocktrans %}
+  </p>
+
+  <h2>{% trans "Troubleshooting" %}</h2>
+
+  <details>
+    <summary>{% trans "Login form reloads, no error message" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        The commonest failure, and a silent one. Django marks session and CSRF
+        cookies <code>Secure</code>; a browser will not send those over plain
+        HTTP, so the login simply bounces.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Finish the HTTPS setup, <strong>or</strong> set
+        <code>HTTPS_EDGE=false</code> <strong>and</strong> switch the Caddyfile
+        to the <code>:80</code> block. Both are required. Then run
+        <code>docker compose up -d</code> — not <code>restart</code>, see
+        below.
+      {% endblocktrans %}
+    </p>
+    <p class="need">{% trans "If it persists, check what Django actually resolved:" %}</p>
+<pre><code>docker compose exec app python -c "
+import django; django.setup()
+from django.conf import settings
+print(settings.ALLOWED_HOSTS, settings.CSRF_TRUSTED_ORIGINS)
+"</code></pre>
+  </details>
+
+  <details>
+    <summary><code>.env</code> {% trans "edits appear to do nothing" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>docker compose restart</code> does <strong>not</strong> re-read
+        <code>.env</code>. Neither do port or volume changes take effect.
+        Always use <code>docker compose up -d</code>, which recreates the
+        affected containers.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary><code>relation "auth_user" does not exist</code></summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        You ran <code>createsuperuser</code> before migrations finished — most
+        likely by pasting it together with <code>up -d</code>. Nothing is
+        broken. Wait for the app to report healthy and run it again.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary><code>ERR_SSL_PROTOCOL_ERROR</code> {% trans "/ “sent an invalid response”" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Caddy is redirecting to HTTPS but has no certificate to serve for the
+        hostname you asked for. Either the certificate was never issued (see
+        the next entry), or you are browsing to <code>localhost</code> while
+        the only site block is for <code>{$SITE_DOMAIN}</code> — no site
+        matches, so the handshake is aborted before any HTTP happens. Switch to
+        the <code>:80</code> block.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary><code>invalidContact</code> — {% trans "domain does not end with a valid public suffix" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>ACME_EMAIL</code> is still the placeholder from
+        <code>env.example</code>. <code>.xx</code> is not a real TLD, so Let's
+        Encrypt refuses the account and Caddy falls back to ZeroSSL, which
+        refuses too. Caddy then retries with backoff <strong>for 30
+        days</strong>.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Set a real address, or remove the ACME block entirely if you are not
+        using a public domain. The same applies to <code>SITE_DOMAIN</code>:
+        issuance also needs the domain to already resolve to this server, with
+        ports 80 and 443 reachable from the internet. A laptop behind NAT
+        cannot satisfy that.
+      {% endblocktrans %}
+    </p>
+    <p class="need">{% trans "To clear the failed account state afterwards:" %}</p>
+<pre><code>docker compose down &amp;&amp; docker volume rm ai-tutor_caddy_data</code></pre>
+  </details>
+
+  <details>
+    <summary>{% trans "Browser still redirects to HTTPS after fixing the Caddyfile" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        The old redirect was a <strong>308 Permanent</strong>, and browsers
+        cache those aggressively — you will be sent to <code>https://</code>
+        without Caddy ever being asked. Use a private window, or clear site
+        data for that host.
+      {% endblocktrans %}
+    </p>
+    <p class="need">{% trans "Confirm from the shell, which does not cache:" %}</p>
+<pre><code>curl -sI http://localhost/admin/    # want 302 to /admin/login/, not 308</code></pre>
+  </details>
+
+  <details>
+    <summary>{% trans "Docker on Kali: apt has no repository for it" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Docker's apt repository has no <code>kali-rolling</code> suite. Use
+        Kali's own package, then install the Compose plugin binary directly
+        rather than falling back to the v1 <code>docker-compose</code> script:
+      {% endblocktrans %}
+    </p>
+<pre><code>sudo apt install docker.io
+mkdir -p ~/.docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o ~/.docker/cli-plugins/docker-compose
+chmod +x ~/.docker/cli-plugins/docker-compose</code></pre>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Adding yourself to the <code>docker</code> group is effectively
+        passwordless root — anyone who can reach the Docker socket can mount
+        <code>/</code> into a container. On a workstation, consider
+        <code>sudo docker</code> instead.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary>{% trans "pip path: the service crash-loops with PermissionError on ai-tutor.env" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>ai-tutor init</code> runs as root and writes the file
+        <code>0600 root:root</code>. <code>ai-tutor systemd</code> generates a
+        unit that runs as an unprivileged user. Nothing reconciles them.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        See pip step 5 — <code>chown root:&lt;user&gt;</code> and
+        <code>chmod 640</code> the env file, <code>chown -R</code> the data
+        directory, then <code>systemctl reset-failed</code> before restarting.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary>{% trans "pip path: every page returns 500, “Missing staticfiles manifest entry”" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <code>collectstatic</code> was never run. Django's manifest storage
+        raises rather than degrading to unstyled output, so even the login form
+        fails. See pip step 6.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Note that <code>curl -I /admin/</code> still returns a healthy
+        <code>302</code>, because a redirect renders no template — this failure
+        is only visible in a browser.
+      {% endblocktrans %}
+    </p>
+  </details>
+
+  <details>
+    <summary>{% trans "pip path: it started, but is it using the right database?" %}</summary>
+    <p class="need">
+      {% blocktrans trimmed %}
+        If <code>DATABASE_URL</code> is unset, Django falls back to SQLite and
+        everything appears to work — with no pgvector behind retrieval. Run
+        <code>ls -la /var/lib/ai-tutor/</code>: a <code>db.sqlite3</code> there
+        means the fallback happened.
+      {% endblocktrans %}
+    </p>
+  </details>
 
   <div class="more">
     <h2 style="margin-top:0">{% trans "Keep it running" %}</h2>
@@ -162,8 +953,8 @@ sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</co
       {% endblocktrans %}
     </p>
 
-<pre><code># Docker
-cd ai-tutor/deploy/compose &amp;&amp; ./backup.sh
+<pre><code># Docker — from the directory you extracted into
+cd ai-tutor &amp;&amp; ./backup.sh
 
 # pip
 pg_dump -Fc aitutor &gt; /mnt/backup/aitutor-$(date +%F).dump
@@ -172,10 +963,26 @@ tar czf /mnt/backup/media-$(date +%F).tar.gz -C /var/lib/ai-tutor media</code></
     <p class="need">
       {% blocktrans trimmed %}
         A backup that only exists on the machine it backs up is not a backup,
-        and these contain student records — store them encrypted. Test a
-        restore once, before you need it.
+        and these contain student records — store them encrypted, off the
+        machine.
       {% endblocktrans %}
     </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        <strong>Test a restore before you need it</strong>, while the only data
+        is seed data and your own test conversations. That is the one moment
+        when getting it wrong costs nothing.
+      {% endblocktrans %}
+    </p>
+    <p class="need">
+      {% blocktrans trimmed %}
+        Worth also confirming state survives a stop, which tells you the named
+        volumes are doing their job — sign in again afterwards, and the
+        curriculum should still be indexed:
+      {% endblocktrans %}
+    </p>
+
+<pre><code>docker compose down &amp;&amp; docker compose up -d</code></pre>
 
     <h2>{% trans "Upgrading" %}</h2>
 <pre><code># Docker — migrations run on start
@@ -186,23 +993,13 @@ sudo /opt/ai-tutor/venv/bin/pip install --upgrade ai-tutor
 sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
 sudo systemctl restart ai-tutor</code></pre>
 
-    <h2>{% trans "If login returns 403 with no error" %}</h2>
     <p class="need">
       {% blocktrans trimmed %}
-        The commonest failure, and a silent one. Django marks the session and
-        CSRF cookies <code>Secure</code>, and a browser will not send those
-        over plain HTTP — so the login form simply bounces back. Finish the
-        HTTPS setup, or set <code>HTTPS_EDGE=false</code> if you are on an
-        isolated network with no TLS.
-      {% endblocktrans %}
-    </p>
-
-    <p class="need" style="margin-top:1.5rem">
-      <strong>{% trans "One thing to know before you start." %}</strong>
-      {% blocktrans trimmed %}
-        Student data stays on your server — but when a student sends a message
-        it goes to Anthropic, OpenAI or Google to be answered, leaving your
-        network. Run a local model instead if that is not acceptable.
+        Take a backup first — migrations are not reversible. And if you edited
+        <code>Caddyfile</code> or <code>docker-compose.yml</code>, keep those
+        edits under version control or in <code>.orig</code> copies: a future
+        release may ship changed versions, and you will want to see what
+        changed rather than re-deriving your local modifications from memory.
       {% endblocktrans %}
     </p>
   </div>
