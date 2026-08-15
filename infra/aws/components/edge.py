@@ -362,36 +362,40 @@ def create_edge(
                 action=aws.wafv2.WebAclRuleActionArgs(
                     block=aws.wafv2.WebAclRuleActionBlockArgs()
                 ),
+                # The statement schema is recursive: a nested statement is just
+                # another WebAclRuleStatementArgs. The flattened
+                # ...AndStatementStatement... class names that read as though
+                # they should exist do not.
                 statement=aws.wafv2.WebAclRuleStatementArgs(
                     and_statement=aws.wafv2.WebAclRuleStatementAndStatementArgs(
                         statements=[
                             # starts_with, so /admin/login/ and every nested
                             # admin route are covered by one rule.
-                            aws.wafv2.WebAclRuleStatementAndStatementStatementArgs(
-                                byte_match_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementArgs(
+                            aws.wafv2.WebAclRuleStatementArgs(
+                                byte_match_statement=aws.wafv2.WebAclRuleStatementByteMatchStatementArgs(
                                     search_string=admin_path,
                                     positional_constraint="STARTS_WITH",
-                                    field_to_match=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementFieldToMatchArgs(
-                                        uri_path=aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementFieldToMatchUriPathArgs()
+                                    field_to_match=aws.wafv2.WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
+                                        uri_path=aws.wafv2.WebAclRuleStatementByteMatchStatementFieldToMatchUriPathArgs()
                                     ),
                                     text_transformations=[
-                                        # Lowercase then URL-decode, so
-                                        # /ADMIN/ and /%61dmin/ do not walk
-                                        # straight past a literal match.
-                                        aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementTextTransformationArgs(
+                                        # URL-decode then lowercase, so /ADMIN/
+                                        # and /%61dmin/ do not walk straight
+                                        # past a literal match.
+                                        aws.wafv2.WebAclRuleStatementByteMatchStatementTextTransformationArgs(
                                             priority=0, type="URL_DECODE"
                                         ),
-                                        aws.wafv2.WebAclRuleStatementAndStatementStatementByteMatchStatementTextTransformationArgs(
+                                        aws.wafv2.WebAclRuleStatementByteMatchStatementTextTransformationArgs(
                                             priority=1, type="LOWERCASE"
                                         ),
                                     ],
                                 )
                             ),
-                            aws.wafv2.WebAclRuleStatementAndStatementStatementArgs(
-                                not_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementArgs(
+                            aws.wafv2.WebAclRuleStatementArgs(
+                                not_statement=aws.wafv2.WebAclRuleStatementNotStatementArgs(
                                     statements=[
-                                        aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementStatementArgs(
-                                            ip_set_reference_statement=aws.wafv2.WebAclRuleStatementAndStatementStatementNotStatementStatementIpSetReferenceStatementArgs(
+                                        aws.wafv2.WebAclRuleStatementArgs(
+                                            ip_set_reference_statement=aws.wafv2.WebAclRuleStatementIpSetReferenceStatementArgs(
                                                 arn=admin_ip_set.arn
                                             )
                                         )
