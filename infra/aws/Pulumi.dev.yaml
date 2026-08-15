@@ -1,20 +1,20 @@
-encryptionsalt: v1:mE4igYfX23Y=:v1:cjH3OXnCQjr/Dk33:8adld0f1aXZfUTGFkXiin8o94jQKgQ==
 config:
   aws:region: us-east-1
   aitutor-aws:enable-ecs: "true"
   aitutor-aws:waf-block-mode: "true"
-  aitutor-aws:django-secret-key:
-    secure: v1:ad3wo8DyMRrB5qv1:xvoHIFPCQNkFIZ0zkKBgXAKOpN1C8Bp7eNT/hxvzMhLPpdaBVoGiEP58G2+csYUK75GU+YFEaVrto7moETCUiAERan7hEoCsbQECDOgrWOa48lM=
-  aitutor-aws:anthropic-api-key:
-    secure: v1:/N9FKs5l2rrTgfNy:FVcTlBQEHTeuS7P+CUwxj2z6+lZdgR15hTkYVDU4IWw57NDdXUTLIJ9hSYR/YC8+f/YGxdUaWCpbhGPH4YgcFfewcKUakQSf1mKrkNZ5xX3CNdUBPLf626kT0cpslh7RNcjVXZc5oti2fr5awpGGr7AWh2Ie1JlTYYWW7w==
-  aitutor-aws:openai-api-key:
-    secure: v1:/oIVDbGNhLu62Rt0:5TRBA33CUklY7dYIRZNUjX5XDpYUox8m6Q5AYTP5s+19JiIvU6ma/XwREDAnF963PnZQNwoQvpMuaJ4IBz1BGA==
-  aitutor-aws:google-api-key:
-    secure: v1:muKZhv0mc8ORkC/e:un/odNb9DXmPPUdLJJRro81EaXzt6cOWwGNB/IJ+gVvC+LOHjYgXvBblPG7mWCrcbBLs2e6rYg==
-  aitutor-aws:elevenlabs-api-key:
-    secure: v1:xQmcl6K3pjeikMtZ:6XtRBCKasGL846tG/aoCRV7vtI0fo8u6IEivkXmfh4Bz0eC9if16z830UP9EozxNx3c8IZee/BHYJ7n+MDnSWQDQiQ==
-  aitutor-aws:image-tag: 824ad37
-  aitutor-aws:db-password:
-    secure: v1:GgdflfJ5STqjlmib:BNAbiD9O2qkaCyA99vjcJMduhL1FinuIJTtSrNv+q038ACBBQYTGLBKjhcIDIO79
-  aitutor-aws:domain-name: migration.edwardamoah.com
+  aitutor-aws:image-tag: 0fd37045f2d7d4a1fd5af588b504c0e09e5710bf
+  aitutor-aws:domain-name: aitutor.edwardamoah.com
   aitutor-aws:hosted-zone-id: Z00581302MRKJMLLLUCQ7
+  aitutor-aws:django-secret-key:
+    secure: v1:H481I4YvAU5tcvSZ:3aI3ziMDC81k/RJBgSw1gDfHB4MN1oZSc61pxxq7kj1j2DR9YnbhS8XncflIJOGQsgZ1thHHRB9Vx3ISqlvd2D5wPiwEY1cd7JAbsulfRe6NHs8=
+  aitutor-aws:anthropic-api-key:
+    secure: v1:oRQ9wdwJpacn+h7W:itC1yazKmJIB2TnAmh7JPQRCMZiarzcAJ4QLIsvGm7JEf3aJFRo4Aj3fybhgqfl6HypEQx9N3j3v16P3jaN+aARpaVOBgYGJGdZKN98wfIv+kvbWUjZNyUBNTptTBvt5kRMwaP7J8S5EAUTZTnC80DmjTX/16sllq/1iXw==
+  aitutor-aws:openai-api-key:
+    secure: v1:wAbCRSnW5/GdC7C6:I/FaAg2tm+u11NYhrnYPaxeY9Oq+vRLtVvSUdlWJ9PnxBgY7V+3f5s6D1wYZVFLyY5QlkglhUQkvdNDXtxYDDw==
+  aitutor-aws:google-api-key:
+    secure: v1:vbAeMUXH1YJ28G9J:X3SdgNRFRjR0/V9YkNmS6BLY4gHPqte/iOyfbyEafNM6E5HNk1vNc8bPKhCU/Qa6fwLyC0YtRw==
+  aitutor-aws:elevenlabs-api-key:
+    secure: v1:X94GIZJxqkhr1Mns:q6PRcr9MQ/DGgMCamzj3HVsmEN/Dnv4DPd5SWyhhToPuYEF5BpHqXqbOTWxbkvjcAwtnPx2PMOe4zPLQqbpiJSd6rA==
+  aitutor-aws:db-password:
+    secure: v1:jw5NnNueTtKJhi2s:rpMYRwhGM2HOW+1sKUXIcKvqDzUz2PC2h8FAaZ6iSyTuGFJXeujLyLlL4tBqI0x5
+encryptionsalt: v1:5q0lctFI6fU=:v1:5MI8U+sl5gvXI6L3:+ewCaTMafLqUfdJ8Y9SokmWuRoDYIA==
