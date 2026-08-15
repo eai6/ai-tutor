@@ -286,9 +286,21 @@ class AuthenticatedCacheTests(TestCase):
         self.assertIn('no-store', response['Cache-Control'])
         self.assertIn('private', response['Cache-Control'])
 
-    def test_anonymous_pages_are_left_alone(self):
-        response = Client().get('/student/login/')
+    def test_public_marketing_pages_are_left_alone(self):
+        # The landing page carries no personal data and no CSRF-bearing form to
+        # protect, so it stays cacheable.
+        response = Client().get('/')
         self.assertNotIn('no-store', response.get('Cache-Control', ''))
+
+    def test_anonymous_auth_pages_are_no_store(self):
+        # 2026-08 assessment (QA-06 / QAS-05 / F-04): login, registration and
+        # password-reset pages must not linger in a shared-device cache even for
+        # an anonymous visitor — they render a CSRF token and redisplay any
+        # personal data just submitted.
+        for path in ('/student/login/', '/student/register/',
+                     '/staff/login/', '/staff/register/', '/password-reset/'):
+            response = Client().get(path)
+            self.assertIn('no-store', response.get('Cache-Control', ''), path)
 
 
 class BruteForceLockoutTests(TestCase):

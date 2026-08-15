@@ -661,6 +661,12 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 # AJAX call that reads document.cookie for 'csrftoken' will silently 403.
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
+# Drop Django's 1-year default (2026-08 assessment QA-09 / QAS-08 / F-07): a
+# token that lives for 364 days on a shared classroom device is a long theft
+# window. 12h covers a school day; when it lapses the next GET mints a fresh
+# token and forms re-render with it. Not made session-scoped (None) so the
+# offline PWA still has a usable token across a browser restart.
+CSRF_COOKIE_AGE = 60 * 60 * 12
 
 # The language cookie is set by django.views.i18n.set_language, which reads
 # these settings rather than taking arguments. It carries a locale code, not a

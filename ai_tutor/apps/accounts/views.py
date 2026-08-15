@@ -27,6 +27,36 @@ def landing_page(request):
     return render(request, 'accounts/landing.html')
 
 
+def _password_errors(password, *, username='', email='', first_name='', last_name=''):
+    """Run Django's configured AUTH_PASSWORD_VALIDATORS against a candidate
+    password and return a list of human-readable error strings (empty when the
+    password passes).
+
+    The registration views collect errors into a list rather than raising, and
+    used to hand-roll a bare ``len(password) < 6/8`` check that skipped the
+    common-password, all-numeric and user-attribute-similarity validators
+    entirely (the 2026-08 assessment's QA-03/QAS-03 finding). Routing every form
+    through this helper restores the full chain and a single source of truth for
+    the minimum length.
+    """
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError
+
+    # Unsaved probe user so UserAttributeSimilarityValidator can reject passwords
+    # derived from the username/email/name before the account exists.
+    probe = User(
+        username=username or '',
+        email=email or '',
+        first_name=first_name or '',
+        last_name=last_name or '',
+    )
+    try:
+        validate_password(password, user=probe)
+    except ValidationError as exc:
+        return list(exc.messages)
+    return []
+
+
 def redirect_by_role(user):
     """Redirect user to appropriate dashboard based on role."""
     if user.is_staff:
@@ -122,8 +152,10 @@ def student_register(request):
         if email and User.objects.filter(email=email).exists():
             errors.append("Email already registered.")
 
-        if len(password) < 6:
-            errors.append("Password must be at least 6 characters.")
+        errors.extend(_password_errors(
+            password, username=username, email=email,
+            first_name=first_name, last_name=last_name,
+        ))
 
         if password != password_confirm:
             errors.append("Passwords don't match.")
@@ -307,8 +339,10 @@ def staff_self_register(request):
             # the student and teacher accounts stay distinguishable.
             errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
-        if len(password) < 8:
-            errors.append("Password must be at least 8 characters.")
+        errors.extend(_password_errors(
+            password, username=username, email=email,
+            first_name=first_name, last_name=last_name,
+        ))
 
         if password != password_confirm:
             errors.append("Passwords don't match.")
@@ -437,8 +471,10 @@ def staff_register(request, token=None):
             # duplicate teacher account (see staff_self_register for rationale).
             errors.append("This email already has a teacher account. Use the teacher login, or reset your password.")
 
-        if len(password) < 8:
-            errors.append("Password must be at least 8 characters.")
+        errors.extend(_password_errors(
+            password, username=username, email=email,
+            first_name=first_name, last_name=last_name,
+        ))
 
         if password != password_confirm:
             errors.append("Passwords don't match.")
@@ -940,8 +976,15 @@ def terms_accept(request):
     if not active:
         return redirect('tutoring:catalog')
 
+    # Validate against the host allow-list, not a bare startswith('/'): a
+    # protocol-relative value like "//evil.example" also starts with "/" and
+    # would redirect off-site (open redirect / phishing vector on a page minors
+    # reach). url_has_allowed_host_and_scheme rejects those.
+    from django.utils.http import url_has_allowed_host_and_scheme
     next_url = request.GET.get('next') or request.POST.get('next') or ''
-    if not next_url.startswith('/'):
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
         next_url = ''
 
     if request.method == 'POST':

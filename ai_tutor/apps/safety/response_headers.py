@@ -53,16 +53,51 @@ PERMISSIONS_POLICY = ', '.join((
     'accelerometer=()',
     'gyroscope=()',
     'magnetometer=()',
-    'interest-cohort=()',
 ))
 
 CROSS_ORIGIN_RESOURCE_POLICY = 'same-site'
 
 NO_STORE = 'no-store, no-cache, must-revalidate, private'
 
+# Media hardening (2026-08 assessment, QA-04 / F-02).
+#
+# A user-uploadable SVG served inline from our own origin is a stored-XSS
+# vector: browsers execute <script> inside an SVG when it is the top-level
+# document, and nosniff does not help because the type genuinely IS svg. The
+# CSP middleware never sees these responses — it only writes on text/html — so
+# /media/ carried no policy at all. Neutralise the script-executing content
+# types here instead.
+#
+# The strict policy + attachment disposition go ONLY to types a browser will
+# run script from on direct navigation. Images and audio (the student's own
+# lesson media, embedded via <img>/<audio>) are left inline and untouched —
+# Content-Disposition is ignored for subresource loads anyway, so forcing
+# "attachment" on the SVG does not stop a logo from rendering in an <img>.
+_ACTIVE_MEDIA_TYPES = (
+    'image/svg+xml',
+    'text/html',
+    'application/xhtml+xml',
+    'text/xml',
+    'application/xml',
+)
+MEDIA_SANDBOX_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+
 # Response bodies that can carry a rendered view of someone's personal data.
 # Images, audio and video are the student's own lesson media and stay cacheable.
 _PRIVATE_CONTENT_TYPES = ('text/html', 'application/json')
+
+# Unauthenticated pages that must still not be left in a shared-device cache
+# (2026-08 assessment, QA-06 / QAS-05 / F-04). Each embeds a CSRF token and, on
+# a failed submit, redisplays whatever the visitor just typed — name, username,
+# student id. The public marketing pages (/, /terms/, /download/, /self-hosting/)
+# are deliberately NOT here: they carry no personal data and benefit from caching.
+_SENSITIVE_PATH_PREFIXES = (
+    '/student/login',
+    '/student/register',
+    '/staff/login',
+    '/staff/register',
+    '/password-reset',
+)
 
 
 class SecurityHeadersMiddleware:
@@ -79,7 +114,13 @@ class SecurityHeadersMiddleware:
         response.setdefault('Permissions-Policy', PERMISSIONS_POLICY)
         response.setdefault('Cross-Origin-Resource-Policy', CROSS_ORIGIN_RESOURCE_POLICY)
 
-        if self._is_private_render(request, response):
+        self._harden_media(request, response)
+
+        # A view that set its own Cache-Control thought about caching and wins.
+        if 'Cache-Control' not in response.headers and (
+            self._is_private_render(request, response)
+            or self._is_sensitive_page(request, response)
+        ):
             response['Cache-Control'] = NO_STORE
             # Some intermediaries still honour only the HTTP/1.0 spelling.
             response['Pragma'] = 'no-cache'
@@ -92,7 +133,35 @@ class SecurityHeadersMiddleware:
         user = getattr(request, 'user', None)
         if user is None or not user.is_authenticated:
             return False
-        if 'Cache-Control' in response.headers:
-            return False
         content_type = response.headers.get('Content-Type', '')
         return content_type.startswith(_PRIVATE_CONTENT_TYPES)
+
+    @staticmethod
+    def _is_sensitive_page(request, response) -> bool:
+        """Login / registration / password-reset pages — no-store even when the
+        visitor is not signed in, because they still render a CSRF token and any
+        personal data just submitted."""
+        content_type = response.headers.get('Content-Type', '')
+        if not content_type.startswith('text/html'):
+            return False
+        path = request.path or ''
+        return path.startswith(_SENSITIVE_PATH_PREFIXES)
+
+    @staticmethod
+    def _harden_media(request, response) -> None:
+        """Neutralise script-executing media served inline from our own origin.
+
+        Only SVG/XML/HTML get the strict sandbox policy and download disposition;
+        images and audio are left inline (see _ACTIVE_MEDIA_TYPES rationale)."""
+        if not (request.path or '').startswith('/media/'):
+            return
+        # nosniff on all media so a mislabelled upload can't be sniffed into an
+        # executable type. setdefault: Django's SecurityMiddleware may set this.
+        response.setdefault('X-Content-Type-Options', 'nosniff')
+
+        content_type = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
+        if content_type in _ACTIVE_MEDIA_TYPES:
+            response['Content-Security-Policy'] = MEDIA_SANDBOX_CSP
+            response['Content-Disposition'] = 'attachment'
+            # Isolate from the app origin as far as the fetch layer allows.
+            response['Cross-Origin-Resource-Policy'] = 'same-origin'
