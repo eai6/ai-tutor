@@ -1604,7 +1604,12 @@ function renderArtifactIframe(html) {
         return '';
     }
     const clean = DOMPurify.sanitize(html);
-    const resizeScript = '<script>new ResizeObserver(()=>{parent.postMessage({type:"resize",height:document.body.scrollHeight},"*")}).observe(document.body)<\/script>';
+    // A srcdoc iframe inherits this document's CSP, so the height-reporting
+    // script below needs the same nonce every inline block in the templates
+    // carries. Without it the artifact panel silently stops resizing the moment
+    // CSP_STRICT_SCRIPTS is turned on — the iframe still renders, so the
+    // breakage looks like a layout bug rather than a policy one.
+    const resizeScript = '<script nonce="{{ request.csp_nonce }}">new ResizeObserver(()=>{parent.postMessage({type:"resize",height:document.body.scrollHeight},"*")}).observe(document.body)<\/script>';
     const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#18181b}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{padding:8px 12px;border:1px solid #e4e4e7;text-align:left}th{background:#f4f4f5;font-weight:600}tr:nth-child(even){background:#fafafa}svg{max-width:100%}</style></head><body>${clean}${resizeScript}</body></html>`;
     const escaped = wrappedHtml.replace(/"/g, '&quot;');
     return `<div class="artifact-inline"><iframe sandbox="allow-scripts" srcdoc="${escaped}" style="width:100%;min-height:200px;border:none;border-radius:0.5rem;"></iframe></div>`;
