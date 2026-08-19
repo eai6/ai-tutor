@@ -352,6 +352,14 @@
     {# JS gettext() catalog — load before any inline JS uses it. #}
     <script src="{% url 'javascript-catalog' %}"></script>
 
+    {% comment %}
+    Not deferred: network-helpers.js reads this at parse time to decide whether
+    navigator.onLine means anything. On the desktop build the server and the
+    model are both on this machine, so it does not.
+    {% endcomment %}
+    <script nonce="{{ request.csp_nonce }}">
+        window.AITUTOR_LOCAL_SERVER = {{ is_desktop_build|yesno:"true,false" }};
+    </script>
     <script src="{% static 'js/network-helpers.js' %}" defer></script>
     <script defer nonce="{{ request.csp_nonce }}">
         document.addEventListener('DOMContentLoaded', function () {

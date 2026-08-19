@@ -595,9 +595,45 @@ def generate_image(request):
 # CHAT-BASED CONVERSATIONAL AI TUTOR API
 # =============================================================================
 
+def _setup_incomplete():
+    """The missing-asset list when this device cannot teach yet, else None.
+
+    A desktop install has no weights until they are provisioned. Starting a
+    lesson without the retrieval encoder produces a tutor that answers
+    normally and is silently ungrounded, so the lesson is refused instead.
+    Always None on the hosted app.
+    """
+    try:
+        from ai_tutor.apps.desktop.readiness import lesson_prerequisites
+        ready, missing = lesson_prerequisites()
+        return None if ready else missing
+    except Exception:                                # noqa: BLE001
+        return None
+
+
+def _setup_required_response(missing):
+    return JsonResponse({
+        'error': 'This device is still being set up. '
+                 'Finish setup before starting a lesson.',
+        'setup_required': True,
+        'missing': missing,
+    }, status=409)
+
+
 @login_required
 def chat_tutor_interface(request, lesson_id):
     """Render the chat-based tutoring interface."""
+    missing = _setup_incomplete()
+    if missing:
+        from django.utils.translation import gettext
+        django_messages.warning(
+            request,
+            gettext('This device still needs: %(items)s. '
+                    'Finish setup to start lessons.') % {
+                'items': ', '.join(missing)},
+        )
+        return redirect('desktop:setup')
+
     institution = get_user_institution(request.user)
     if not institution and not request.user.is_staff:
         return render(request, 'tutoring/error.html', {"message": "No institution"})
@@ -684,6 +720,10 @@ def chat_tutor_interface(request, lesson_id):
 def chat_start_session(request, lesson_id):
     """Start or resume a conversational tutoring session."""
     from ai_tutor.apps.safety import RateLimiter, SafetyAuditLog
+
+    missing = _setup_incomplete()
+    if missing:
+        return _setup_required_response(missing)
 
     # Check if student is suspended from tutor
     try:
@@ -974,6 +1014,10 @@ def chat_restart_session(request, lesson_id):
       - A NEW TutorSession is created on the next chat_start_session
         call (engine_state={}, current_step_index=0).
     """
+    missing = _setup_incomplete()
+    if missing:
+        return _setup_required_response(missing)
+
     institution = get_user_institution(request.user)
     if institution:
         lesson = get_object_or_404(
@@ -1020,6 +1064,13 @@ def chat_respond(request, session_id):
     from ai_tutor.apps.safety import (
         ContentSafetyFilter, RateLimiter, SafetyAuditLog
     )
+
+    # Also gated mid-session: an asset can be removed or a data directory can
+    # go missing while a lesson is open, and continuing would serve exactly the
+    # ungrounded turn the gate exists to prevent.
+    missing = _setup_incomplete()
+    if missing:
+        return _setup_required_response(missing)
 
     session = get_object_or_404(
         TutorSession,

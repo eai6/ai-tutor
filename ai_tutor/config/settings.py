@@ -476,6 +476,15 @@ SYNC_SERVER_URL = os.getenv('SYNC_SERVER_URL', '')
 # would be meaningless and confusing on the hosted web app.
 DESKTOP_BUILD = False
 
+# Where post-install model assets live. Both default to BASE_DIR/models, which
+# on the desktop build is the application-data directory — writable, survives
+# an upgrade, and per-user on a shared classroom machine. Weights are NOT
+# shipped inside the app: the installer stays small, an app update does not
+# re-download them, and they change far less often than the code does. See
+# apps/desktop/provisioning.py, which acquires them from a file or the network.
+MINILM_ONNX_DIR = os.getenv('MINILM_ONNX_DIR', '')
+PIPER_VOICE_DIR = os.getenv('PIPER_VOICE_DIR', '')
+
 AWS_DOWNLOADS_BUCKET = os.getenv('AWS_DOWNLOADS_BUCKET', '')
 DESKTOP_APP_VERSION = os.getenv('DESKTOP_APP_VERSION', '')
 

@@ -83,6 +83,31 @@ in place.
       its own copy.</div>
   </div>
 
+  {% comment %}
+  Second, and not optional for the required ones: a lesson will not start
+  without the content-search encoder, because a tutor that cannot search the
+  lesson content still answers — it just answers ungrounded, and nothing on
+  screen would say so.
+  {% endcomment %}
+  <div class="card" id="assets-card">
+    <h2>2. Model files</h2>
+    <p>The tutor's content search and read-aloud voice. Kept out of the app
+      download so updates stay small.</p>
+    {% for asset in assets %}
+      <div class="state">
+        <span class="dot" style="background:{% if asset.installed %}var(--ok){% else %}{% if asset.required %}var(--bad){% else %}var(--muted){% endif %}{% endif %}"></span>
+        <span>{{ asset.label }}{% if not asset.required %} <span style="color:var(--muted)">— optional</span>{% endif %}:
+          {% if asset.installed %}Installed{% else %}Not installed yet{% endif %}</span>
+      </div>
+    {% endfor %}
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="pick-assets">Choose model files folder…</button>
+    </div>
+    <div class="err" id="assets-error" hidden></div>
+    <div class="hint">Choose the <code>assets</code> folder on the setup drive.
+      Build one with <code>manage.py build_asset_pack</code>.</div>
+  </div>
+
   <!-- ── lessons ───────────────────────────────────────────────────── -->
   <div class="card">
     <h2>2. Lessons</h2>
@@ -128,8 +153,10 @@ function setState(el, labelEl, ok, text) {
 // is opened in a normal browser (which is how it gets tested).
 async function choosePath(kind) {
   if (hasNative()) return await window.pywebview.api.pick_path(kind);
-  return prompt('Full path to the ' + (kind === 'model' ? 'model file or folder'
-                                                        : 'lesson pack or folder') + ':');
+  const what = kind === 'model' ? 'model file or folder'
+             : kind === 'assets' ? 'model files folder'
+             : 'lesson pack or folder';
+  return prompt('Full path to the ' + what + ':');
 }
 
 async function post(url, body) {
@@ -201,6 +228,26 @@ $('pick-pack').onclick = async () => {
       ? ('Already up to date (v' + data.version + ').')
       : (data.lessons + ' lessons imported (v' + data.version + ').');
   await refresh();
+};
+
+// ── model files ────────────────────────────────────────────────────
+// One folder holds both assets, so a single pick installs whatever it finds.
+// A missing optional file is not an error worth showing: the required one is
+// what decides whether lessons can start.
+$('pick-assets').onclick = async () => {
+  const path = await choosePath('assets');
+  if (!path) return;
+  const errBox = $('assets-error');
+  errBox.hidden = true;
+  $('pick-assets').disabled = true;
+  const failures = [];
+  for (const key of ['minilm', 'piper']) {
+    const {ok, data} = await post('/desktop/install-asset/', {key, source:'file', path});
+    if (!ok) failures.push(data.error);
+  }
+  $('pick-assets').disabled = false;
+  if (failures.length === 2) { errBox.hidden = false; errBox.textContent = failures[0]; }
+  location.reload();
 };
 
 // ── overall ────────────────────────────────────────────────────────

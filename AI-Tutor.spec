@@ -92,16 +92,19 @@ datas = [
     (str(ROOT / 'infra' / 'ollama'), 'infra/ollama'),
 ]
 
-# The ONNX encoder (~87 MB). Built by scripts/export_minilm_onnx.py on the
-# build machine; without it the app cannot embed anything, so retrieval and
-# the grader's embedding gate both degrade. Warn loudly rather than shipping a
-# silently broken build.
-onnx_dir = ROOT / 'models' / 'minilm-l6-v2'
-if (onnx_dir / 'model.onnx').exists():
-    datas.append((str(onnx_dir), 'models/minilm-l6-v2'))
-else:
-    print('WARNING: models/minilm-l6-v2/model.onnx missing — '
-          'run scripts/export_minilm_onnx.py before packaging.')
+# NO model weights are bundled. The ONNX encoder (87 MB) and the Piper voice
+# (60 MB) are installed after the app is, by apps/desktop/provisioning.py —
+# from a file on a USB stick, or over the network where there is bandwidth.
+# Same reasoning the tutor model already follows: the installer stays small,
+# an app update does not re-download weights that rarely change, and a school
+# with no internet can still be given them by hand.
+#
+# Bundling the encoder also never worked. PyInstaller unpacks data to
+# sys._MEIPASS, but kb_storage._onnx_dir() resolves settings.BASE_DIR — the
+# application-data directory — so the packaged app looked somewhere the
+# encoder had never been, embedding failed, and retrieval quietly returned
+# nothing. Installing to BASE_DIR/models puts the file where the code already
+# looks.
 
 # The vendored Ollama binary, staged by `manage.py stage_ollama`. Without it
 # the installed app has no inference engine and no way to get one offline.

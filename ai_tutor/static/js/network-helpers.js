@@ -12,8 +12,18 @@
 (function () {
   'use strict';
 
+  // The desktop build serves from localhost and runs the tutor in local
+  // Ollama, so `navigator.onLine` says nothing about whether a request can
+  // succeed — the server is on the same machine. Reporting "offline" there
+  // diverted every student message into the localStorage outbox and the app
+  // stopped responding the moment the Wi-Fi dropped, which is exactly the
+  // situation it exists to serve. Set by base.html from settings.DESKTOP_BUILD.
+  function localServer() {
+    return window.AITUTOR_LOCAL_SERVER === true;
+  }
+
   const listeners = new Set();
-  let lastState = navigator.onLine;
+  let lastState = localServer() ? true : navigator.onLine;
 
   function emit(state) {
     if (state === lastState) return;
@@ -23,11 +33,16 @@
     }
   }
 
-  window.addEventListener('online', () => emit(true));
-  window.addEventListener('offline', () => emit(false));
+  // On a local server the browser's connectivity events are noise: the origin
+  // never became unreachable. Subscribing at all would flip the banner and the
+  // send path on an event that does not apply.
+  if (!localServer()) {
+    window.addEventListener('online', () => emit(true));
+    window.addEventListener('offline', () => emit(false));
+  }
 
   function isOnline() {
-    return navigator.onLine;
+    return localServer() ? true : navigator.onLine;
   }
 
   function onNetworkChange(fn) {

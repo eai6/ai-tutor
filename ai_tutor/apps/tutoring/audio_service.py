@@ -168,42 +168,38 @@ _piper_voice = None
 _piper_lock = threading.Lock()
 
 _PIPER_VOICE_NAME = os.environ.get("PIPER_VOICE", "en_US-lessac-medium")
-_PIPER_MODEL_DIRS = ["/models/piper", os.path.expanduser("~/.local/share/piper_voices")]
+
+# Legacy locations, kept so the Jetson image and the container builds — which
+# place the voice themselves — do not regress. The configured directory is
+# searched first; on the desktop that is the application-data folder the
+# provisioning step installs into.
+_PIPER_FALLBACK_DIRS = [
+    "/models/piper",
+    os.path.expanduser("~/.local/share/piper_voices"),
+]
 
 
-def _download_piper_model(voice_name: str, dest_dir: str) -> str:
-    """Download Piper ONNX model + JSON config from HuggingFace."""
-    import urllib.request
-
-    os.makedirs(dest_dir, exist_ok=True)
-    onnx_path = os.path.join(dest_dir, f"{voice_name}.onnx")
-    json_path = f"{onnx_path}.json"
-
-    if os.path.isfile(onnx_path) and os.path.isfile(json_path):
-        return onnx_path
-
-    parts = voice_name.split("-")
-    lang_country = parts[0]
-    speaker = parts[1]
-    quality = parts[2]
-    lang = lang_country.split("_")[0]
-
-    base_url = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
-    hf_dir = f"{lang}/{lang_country}/{speaker}/{quality}"
-
-    for filename in [f"{voice_name}.onnx", f"{voice_name}.onnx.json"]:
-        dl_url = f"{base_url}/{hf_dir}/{filename}"
-        dest_path = os.path.join(dest_dir, filename)
-        try:
-            logger.info("[TTS] Downloading %s ...", dl_url)
-            urllib.request.urlretrieve(dl_url, dest_path)
-        except Exception as e:
-            raise RuntimeError(f"[TTS] Failed to download {filename}: {e}")
-
-    return onnx_path
+def piper_voice_dirs() -> list:
+    """Every directory that may hold the voice, most specific first."""
+    try:
+        from django.conf import settings
+        configured = getattr(settings, 'PIPER_VOICE_DIR', '') or ''
+        if not configured:
+            configured = os.path.join(str(settings.BASE_DIR), 'models', 'piper')
+        return [configured] + _PIPER_FALLBACK_DIRS
+    except Exception:                                # noqa: BLE001
+        return list(_PIPER_FALLBACK_DIRS)
 
 
 def _get_piper_voice():
+    """The installed voice, or None if this device has not been given one.
+
+    Deliberately does NOT fetch anything. Downloading a 60 MB voice inside a
+    request meant the first student to press play waited on the network — and
+    on a school laptop that has never had internet, waited for a failure. The
+    voice is an installed asset now (apps/desktop/provisioning.py); with no
+    voice present, speech is simply unavailable and the lesson is unaffected.
+    """
     global _piper_voice
     if _piper_voice is None:
         with _piper_lock:
@@ -211,17 +207,18 @@ def _get_piper_voice():
                 from piper.voice import PiperVoice
                 logger.info("[TTS] Loading Piper voice %s...", _PIPER_VOICE_NAME)
 
-                for model_dir in _PIPER_MODEL_DIRS:
+                for model_dir in piper_voice_dirs():
                     onnx_path = os.path.join(model_dir, f"{_PIPER_VOICE_NAME}.onnx")
                     if os.path.isfile(onnx_path):
                         _piper_voice = PiperVoice.load(onnx_path)
                         logger.info("[TTS] Loaded from %s", onnx_path)
                         return _piper_voice
 
-                dest = _PIPER_MODEL_DIRS[-1]
-                onnx_path = _download_piper_model(_PIPER_VOICE_NAME, dest)
-                _piper_voice = PiperVoice.load(onnx_path)
-                logger.info("[TTS] Loaded (downloaded) voice %s", _PIPER_VOICE_NAME)
+                logger.warning(
+                    "[TTS] no Piper voice %s in %s — speech is unavailable "
+                    "until the voice asset is installed",
+                    _PIPER_VOICE_NAME, piper_voice_dirs(),
+                )
     return _piper_voice
 
 
@@ -229,6 +226,10 @@ def _synthesize_piper(text: str) -> bytes | None:
     try:
         import wave
         voice = _get_piper_voice()
+        if voice is None:
+            # No voice installed on this device. Not an error worth a
+            # traceback — the caller turns it into "no audio available".
+            return None
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wav:
             voice.synthesize_wav(text, wav)

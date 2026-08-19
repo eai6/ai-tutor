@@ -1535,6 +1535,7 @@ function renderMath(el) {
 // translates them per the active locale (matches the django.po
 // translations for the same strings).
 const phaseLabels = {
+    warm_up: gettext('Warm-up'),
     engage: gettext('Engage'),
     explore: gettext('Explore'),
     explain: gettext('Explain'),
@@ -1558,6 +1559,14 @@ function updateStepProgress(data) {
     const rp = data.remediation_progress;
     if (rp && rp.total) {
         stepProgress.textContent = rp.recovered + '/' + rp.total;
+        return;
+    }
+    // The warm-up is a step to the engine but not part of the lesson the
+    // student is counting through, so it gets a name rather than a number —
+    // "1/5" while recalling last week's lesson reads as if the new lesson had
+    // already started.
+    if (data.phase === 'warm_up') {
+        stepProgress.textContent = '';
         return;
     }
     if (data.step_number && data.total_steps) {
@@ -2832,7 +2841,14 @@ async function drainQueue() {
 }
 
 // Wire reconnect → drain.
-if (window.NetHelpers) {
+//
+// Except on the desktop build, where the outbox should never have been used:
+// the server is local, so a send that was queued there was queued by the old
+// navigator.onLine gate, against a question that has since moved on. Draining
+// it would replay a stale answer into a live session, so discard instead.
+if (window.AITUTOR_LOCAL_SERVER === true) {
+    saveQueue([]);
+} else if (window.NetHelpers) {
     window.NetHelpers.onNetworkChange((online) => {
         if (online) drainQueue();
     });

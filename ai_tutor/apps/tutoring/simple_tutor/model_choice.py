@@ -28,7 +28,9 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
+import urllib.error
 import urllib.request
 
 logger = logging.getLogger(__name__)
@@ -57,16 +59,36 @@ def _cloud_reachable(timeout: float = 2.0) -> bool:
         return cached['online']
 
     probe = os.environ.get('CONNECTIVITY_PROBE_URL', 'https://api.anthropic.com/')
-    try:
-        req = urllib.request.Request(probe, method='HEAD')
-        with urllib.request.urlopen(req, timeout=timeout):
-            online = True
-    except Exception:
-        # Any failure — DNS, TCP, TLS, HTTP error — counts as "not usable".
-        # An HTTP 4xx from the probe still proves connectivity, but urlopen
-        # raises on those, and treating them as offline only costs us a
-        # fallback to a model that works.
-        online = False
+    result: list = []
+
+    def _probe():
+        try:
+            req = urllib.request.Request(probe, method='HEAD')
+            with urllib.request.urlopen(req, timeout=timeout):
+                result.append(True)
+        except urllib.error.HTTPError:
+            # The server answered. HEAD / on api.anthropic.com is a 404 and
+            # urlopen raises on 4xx, so the old bare `except` called a fully
+            # online machine offline — every `auto` session silently resolved
+            # to the local model, forever. A status code of any kind proves the
+            # round trip completed.
+            result.append(True)
+        except Exception:
+            # DNS, TCP, TLS, timeout — nothing came back, so the cloud is
+            # unusable.
+            result.append(False)
+
+    # Run it on a thread we can walk away from. `urlopen(timeout=...)` bounds
+    # socket connect and read but NOT name resolution: getaddrinfo runs first
+    # and blocks on the system resolver, which on a laptop associated to Wi-Fi
+    # with no upstream — the ordinary classroom "offline" — can sit for tens of
+    # seconds. That stall landed in front of every turn, before the local model
+    # was even chosen. The worker may linger; the tutoring turn does not wait
+    # for it, and its late result is simply dropped.
+    worker = threading.Thread(target=_probe, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    online = result[0] if result else False
 
     _reachability_cache.update({'checked_at': now, 'online': online})
     return online

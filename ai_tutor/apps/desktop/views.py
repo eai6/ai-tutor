@@ -6,6 +6,7 @@ the server binds to loopback only, so the sole caller is the shell in the same
 process tree. Nothing here exposes student data.
 """
 import json
+import logging
 from pathlib import Path
 
 from django.db import transaction
@@ -20,6 +21,8 @@ from django.views.decorators.http import require_POST
 from ai_tutor.apps.desktop import provisioning
 from ai_tutor.apps.desktop.bootstrap import status
 
+logger = logging.getLogger(__name__)
+
 
 @never_cache
 def health(request):
@@ -29,12 +32,60 @@ def health(request):
 
 @never_cache
 def setup(request):
-    """First-run screen: install the model, import lessons."""
+    """First-run screen: install the model and its assets, import lessons."""
+    from ai_tutor.apps.desktop import assets, readiness
+
+    ready, missing = readiness.lesson_prerequisites()
     return render(request, 'desktop/setup.html', {
         'status': status(),
         'provision': provisioning.STATE.snapshot(),
         'model_tag': provisioning.MODEL_TAG,
+        'assets': assets.status(),
+        'lessons_ready': ready,
+        'missing_for_lessons': missing,
     })
+
+
+@never_cache
+@require_POST
+def install_asset(request):
+    """Install one model asset, from a folder or over the network.
+
+    Synchronous: these are 60-90 MB, not the 2.5 GB the tutor model is, so the
+    background-thread-plus-polling machinery would cost more than it saves.
+    """
+    from ai_tutor.apps.desktop import assets, readiness
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        payload = {}
+
+    asset = assets.by_key(payload.get('key') or '')
+    if asset is None:
+        return JsonResponse({'error': 'Unknown asset.'}, status=400)
+
+    source = payload.get('source')
+    path = payload.get('path')
+    if source not in ('file', 'download'):
+        return JsonResponse({'error': "source must be 'file' or 'download'"},
+                            status=400)
+    if source == 'file' and not path:
+        return JsonResponse({'error': 'No folder selected.'}, status=400)
+
+    try:
+        if source == 'file':
+            assets.install_from_directory(asset, path)
+        else:
+            assets.install_from_url(asset)
+    except Exception as exc:                         # noqa: BLE001
+        logger.warning('[assets] install failed for %s: %s', asset.key, exc)
+        return JsonResponse({'error': str(exc)}, status=400)
+
+    # The gate caches its answer; without this the student would be told to
+    # finish setup for up to ten more seconds after finishing it.
+    readiness.invalidate()
+    return JsonResponse({'installed': True, 'assets': assets.status()})
 
 
 @never_cache
