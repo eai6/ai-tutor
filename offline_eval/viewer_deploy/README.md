@@ -1,8 +1,26 @@
 # Multi-turn tutoring experiment viewer — Vercel deploy
 
 `index.html` is a single self-contained static page (the experiment viewer:
-transcripts + judge scoring + cross-cycle compare). It has **no build step and no
-backend** — Vercel just serves the file.
+transcripts + judge scoring + cross-cycle compare, plus manual grading and a
+human-vs-judge comparison). It has **no build step and no backend** — Vercel just
+serves the file.
+
+## Manual grades are per-browser, and only a file makes them portable
+
+The Grade tab scores a session against the same eight pedagogical dimensions the
+teacher dashboard uses at `/dashboard/benchmark/sessions/`, and the Agreement tab
+compares those verdicts with the judge's. Those grades live in **localStorage**,
+which means:
+
+- they are private to one browser profile on one machine — nothing is uploaded,
+  and two people opening the same deployed URL do **not** see each other's work;
+- clearing browser data deletes them;
+- **Export grades** writes a JSON file, and **Import** merges one back (newer
+  timestamp wins per session). That file is the only durable copy — commit it, or
+  send it to whoever is collating.
+
+The header shows how many sessions have grades that are not in an exported file
+yet.
 
 ## Deploy (CLI — simplest)
 
