@@ -111,3 +111,15 @@ mozambique/
 # credentials, only ${ZAP_*} placeholders.
 security/*.docx
 security/zap/reports/
+
+# Security paperwork that landed under tests/ rather than security/. Same rule
+# as the security/*.docx entry above: several of these are assessments of
+# migration.edwardamoah.com — a different site, not ours to publish — and the
+# consolidated registers name findings that are still open.
+tests/security/
+tests/*Security_Assessment*.docx
+
+# Raw sweep logs beside the eval results. The JSON is the result and is
+# committed; the log is the console spew that produced it, up to 27 MB for a
+# single arm, and no .log under multi_turn_results has ever been tracked.
+offline_eval/multi_turn_results/**/*.log
