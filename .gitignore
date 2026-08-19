@@ -99,3 +99,15 @@ deploy/compose/docker-compose.localtest.yml
 
 # Built wheels (python -m build --outdir dist_wheel)
 dist_wheel/
+
+# Source curriculum PDFs for the Mozambique pilot. Third-party textbooks, ~37 MB
+# of binaries, and this repository is going public — publishing someone else's
+# course materials is not ours to do, and git history keeps them forever.
+mozambique/
+
+# Security paperwork. The posture-and-roadmap document names gaps that are not
+# closed yet, and the folder also holds a document belonging to a different
+# client. The ZAP scan configs below are committed deliberately — they carry no
+# credentials, only ${ZAP_*} placeholders.
+security/*.docx
+security/zap/reports/

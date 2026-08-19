@@ -70,10 +70,10 @@ the full rendered prompt for a math lesson, run:
 ```bash
 venv/bin/python -c "
 import django, os, sys
-os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE','ai_tutor.config.settings')
 sys.path.insert(0,'.'); django.setup()
-from apps.tutoring.prompts import get_prompt_builder
-from apps.tutoring.prompts.base import StablePrefixContext
+from ai_tutor.apps.tutoring.prompts import get_prompt_builder
+from ai_tutor.apps.tutoring.prompts.base import StablePrefixContext
 ctx = StablePrefixContext('Inst','Locale','Tutor','English','S3','[safety]')
 print(get_prompt_builder('anthropic').build_stable_prefix(ctx, subject_pack='mathematics'))
 "

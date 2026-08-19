@@ -69,7 +69,7 @@ The silent `except Exception` in `_generate_response()` logged a generic error w
 Update the `ModelConfig` to match the available API key. Run in Django shell:
 
 ```python
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.models import ModelConfig
 config = ModelConfig.get_for('tutoring')
 config.provider = 'anthropic'
 config.model_name = 'claude-sonnet-4-6-20250514'

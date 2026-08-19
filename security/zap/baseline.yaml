@@ -1,0 +1,90 @@
+# OWASP ZAP — passive baseline scan.
+#
+# Crawls the site and inspects the traffic it produces. It sends no attacks, so
+# it cannot corrupt data and is safe to point at any deployment you are
+# authorised to test, including a live one.
+#
+# What it will NOT find: almost the entire application. Everything past the
+# login page is invisible to an unauthenticated crawler, so a clean result here
+# means "the login page and the public pages look sane", not "the app is
+# secure". full-auth.yaml is the scan that tests the application.
+#
+#   docker run --rm --network ai-tutor_default \
+#     -v "$PWD/security/zap:/zap/wrk:rw" \
+#     ghcr.io/zaproxy/zaproxy:stable \
+#     zap.sh -cmd -autorun /zap/wrk/baseline.yaml
+#
+# ZAP_TARGET defaults to the compose service. Override for another host:
+#   -e ZAP_TARGET=https://tutor.education.gov.xx
+
+env:
+  vars:
+    ZAP_TARGET: "http://app:8000/"
+  contexts:
+    - name: ai-tutor
+      urls:
+        - "${ZAP_TARGET}"
+      includePaths:
+        - "${ZAP_TARGET}.*"
+      excludePaths:
+        # Ends the crawl's own session the moment it is followed, after which
+        # every subsequent request is anonymous and the scan quietly tests
+        # nothing. Excluded in every plan here for that reason.
+        - "${ZAP_TARGET}logout.*"
+        - "${ZAP_TARGET}auth/logout.*"
+        # Sends real mail if SMTP is configured.
+        - "${ZAP_TARGET}password-reset.*"
+        # Django admin is a separate, well-audited application. Crawling it adds
+        # thousands of URLs and finds nothing about this codebase.
+        - "${ZAP_TARGET}admin/.*"
+        # Static assets: no server-side behaviour to assess, and they dominate
+        # the crawl budget.
+        - "${ZAP_TARGET}static/.*"
+        - "${ZAP_TARGET}media/.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+
+  - type: spider
+    parameters:
+      context: ai-tutor
+      url: "${ZAP_TARGET}"
+      maxDuration: 5
+      maxDepth: 10
+
+  # The app renders through JavaScript in places; the plain spider only reads
+  # HTML it is served. ajaxSpider drives a real browser and reaches links the
+  # plain one cannot see.
+  - type: spiderAjax
+    parameters:
+      context: ai-tutor
+      url: "${ZAP_TARGET}"
+      maxDuration: 5
+      browserId: firefox-headless
+
+  # Passive rules run as traffic arrives, so this waits for the queue to drain
+  # before the report is written. Without it the report is written early and
+  # comes out misleadingly clean.
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/reports
+      reportFile: baseline-report.html
+      reportTitle: AI Tutor — passive baseline
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/reports
+      reportFile: baseline-report.json

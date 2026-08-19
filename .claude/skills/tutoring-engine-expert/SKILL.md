@@ -234,7 +234,7 @@ from unittest.mock import Mock, patch
 
 @pytest.fixture
 def mock_llm():
-    with patch('apps.tutoring.conversational_tutor.get_llm_client') as m:
+    with patch('ai_tutor.apps.tutoring.conversational_tutor.get_llm_client') as m:
         client = Mock()
         client.generate.return_value = LLMResponse(content='...', tokens_in=0, tokens_out=0, model='test')
         m.return_value = client

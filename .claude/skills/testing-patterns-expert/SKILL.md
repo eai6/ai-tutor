@@ -66,7 +66,7 @@ def _sleepy(result_cls):
         return result_cls()
     return _impl
 
-@patch("apps.tutoring.judges.run_arithmetic_judge")
+@patch("ai_tutor.apps.tutoring.judges.run_arithmetic_judge")
 def test_no_race_in_orchestrator(self, m_arith):
     m_arith.side_effect = _sleepy(ArithmeticResult)
     # ... patch the others similarly

@@ -1,0 +1,151 @@
+# OWASP ZAP — authenticated active scan.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS SCAN ATTACKS THE TARGET. Point it at a throwaway copy, never at a
+# deployment holding real student records.
+#
+# An active scan submits every form it finds, thousands of times, with hostile
+# values. Against this application that means it will find the "delete course"
+# and "delete student" endpoints and it will call them. The excludePaths below
+# list the destructive routes this codebase actually has, but treat that list as
+# a courtesy, not a guarantee: a route added tomorrow is not in it.
+#
+# Bring up a disposable stack, seed it, scan that, throw it away.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#   docker compose up -d
+#   docker compose exec app python manage.py seed_demo_school
+#   docker run --rm --network ai-tutor_default \
+#     -v "$PWD/security/zap:/zap/wrk:rw" \
+#     -e ZAP_USER=ziggy -e ZAP_PASSWORD='<the seeded password>' \
+#     ghcr.io/zaproxy/zaproxy:stable \
+#     zap.sh -cmd -autorun /zap/wrk/full-auth.yaml
+#
+# Expect 30-90 minutes.
+#
+# VERIFY THE LOGIN WORKED before believing the report. An authenticated scan
+# that silently fell back to anonymous is the most common way this exercise
+# produces a falsely clean result — it scans the login page, finds nothing, and
+# reports success. Check the site tree contains /dashboard/ and /tutor/, not
+# just /login/. The README says how.
+
+env:
+  vars:
+    ZAP_TARGET: "http://app:8000/"
+  contexts:
+    - name: ai-tutor
+      urls:
+        - "${ZAP_TARGET}"
+      includePaths:
+        - "${ZAP_TARGET}.*"
+      excludePaths:
+        # Following this ends the scan's session; everything after it is
+        # anonymous. This single line is the difference between a real
+        # authenticated scan and a worthless one.
+        - "${ZAP_TARGET}logout.*"
+        - "${ZAP_TARGET}auth/logout.*"
+
+        # Destructive. The active scanner WILL invoke these if it can reach them.
+        - "${ZAP_TARGET}.*delete.*"
+        - "${ZAP_TARGET}.*/remove.*"
+        - "${ZAP_TARGET}.*bulk-delete.*"
+        - "${ZAP_TARGET}.*reset-password.*"
+        - "${ZAP_TARGET}password-reset.*"
+        - "${ZAP_TARGET}.*delete-account.*"
+
+        # Every request here spends real money at an LLM provider and takes
+        # 20-90 seconds. Left in, the scan never finishes and the bill is
+        # memorable.
+        - "${ZAP_TARGET}tutor/.*/respond.*"
+        - "${ZAP_TARGET}api/v1/.*/turns.*"
+
+        - "${ZAP_TARGET}admin/.*"
+        - "${ZAP_TARGET}static/.*"
+        - "${ZAP_TARGET}media/.*"
+
+      authentication:
+        method: form
+        parameters:
+          loginPageUrl: "${ZAP_TARGET}login/"
+          loginRequestUrl: "${ZAP_TARGET}login/"
+          # Django's login view takes these two field names, plus a CSRF token
+          # that ZAP re-reads from the login page on each attempt.
+          loginRequestBody: "username={%username%}&password={%password%}"
+        verification:
+          # How ZAP notices it has been logged out mid-scan — which happens, and
+          # if undetected turns the rest of the run into an anonymous crawl
+          # reported as authenticated.
+          method: poll
+          pollUrl: "${ZAP_TARGET}dashboard/"
+          pollFrequency: 60
+          pollUnits: requests
+          # The logout link only renders for an authenticated user (base.html).
+          loggedInRegex: '(?i)(logout|log out)'
+          # Django bounces anonymous users to the login form.
+          loggedOutRegex: '(?i)(name="password"|Sign in)'
+
+      sessionManagement:
+        method: cookie
+
+      users:
+        - name: scan-user
+          credentials:
+            username: "${ZAP_USER}"
+            password: "${ZAP_PASSWORD}"
+
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+
+  # Proves the credentials work before spending an hour scanning. If the site
+  # tree after this step is only the login page, stop and fix authentication
+  # rather than reading the report.
+  - type: spider
+    parameters:
+      context: ai-tutor
+      user: scan-user
+      url: "${ZAP_TARGET}"
+      maxDuration: 10
+      maxDepth: 10
+
+  - type: spiderAjax
+    parameters:
+      context: ai-tutor
+      user: scan-user
+      url: "${ZAP_TARGET}"
+      maxDuration: 10
+      browserId: firefox-headless
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  - type: activeScan
+    parameters:
+      context: ai-tutor
+      user: scan-user
+      # 0 = no cap. Set a number of minutes if the run must fit a window;
+      # a truncated scan is not a clean scan, so record it if you do.
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 90
+      policy: Default Policy
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/reports
+      reportFile: full-auth-report.html
+      reportTitle: AI Tutor — authenticated active scan
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/reports
+      reportFile: full-auth-report.json

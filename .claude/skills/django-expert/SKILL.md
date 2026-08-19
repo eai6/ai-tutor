@@ -67,8 +67,8 @@ For admin/teacher queries, institution is usually narrower — scope to their in
 Never call Anthropic/OpenAI SDK directly. Always go through the abstraction:
 
 ```python
-from apps.llm.client import get_llm_client
-from apps.llm.models import ModelConfig
+from ai_tutor.apps.llm.client import get_llm_client
+from ai_tutor.apps.llm.models import ModelConfig
 
 config = ModelConfig.get_for(institution=inst, purpose='tutoring')
 client = get_llm_client(config)
@@ -117,7 +117,7 @@ The `[ContentGen]` prefix is the convention — grep-friendly.
 Content generation can hang with `content_status='generating'`. Manual reset:
 
 ```python
-from apps.curriculum.models import Lesson
+from ai_tutor.apps.curriculum.models import Lesson
 Lesson.objects.filter(content_status='generating').update(content_status='pending')
 ```
 
@@ -166,8 +166,8 @@ The RN plan (`memory/mobile_rn_plan.md`) adds DRF. When you're building those en
 # apps/api/views/lessons.py
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from apps.api.permissions import IsInstitutionMember
-from apps.api.mixins import InstitutionScopedMixin
+from ai_tutor.apps.api.permissions import IsInstitutionMember
+from ai_tutor.apps.api.mixins import InstitutionScopedMixin
 
 class LessonListView(InstitutionScopedMixin, APIView):
     permission_classes = [IsAuthenticated, IsInstitutionMember]
@@ -190,7 +190,7 @@ The `InstitutionScopedMixin` should be the default — every mobile view uses it
 # apps/tutoring/tests/test_foo.py
 import pytest
 from django.contrib.auth.models import User
-from apps.tutoring.tutoring_models import TutorSession
+from ai_tutor.apps.tutoring.tutoring_models import TutorSession
 
 @pytest.mark.django_db
 def test_something(student_user, published_lesson):

@@ -159,7 +159,7 @@ Current `Dockerfile` is multi-stage (build deps separate from runtime). Key CMD 
 CMD ["sh", "-c", "\
   python manage.py migrate --noinput && \
   cp -r /app/media/vectordb /tmp/vectordb 2>/dev/null || true && \
-  gunicorn config.wsgi:application \
+  gunicorn ai_tutor.config.wsgi:application \
     --workers 4 --threads 4 --timeout 120 \
     --bind 0.0.0.0:8000"]
 ```
