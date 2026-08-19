@@ -537,6 +537,8 @@ def build_system_prompt(
     locale: str = 'en-us',
     family: str | None = None,
     answer_mode: str = ANSWER_MODE_FREE_TEXT,
+    warm_up_source: str = '',
+    lesson_objective: str = '',
 ) -> tuple[list[dict], list[dict]]:
     """Build the system prompt as cache-marked content blocks + the tool
     schemas.
@@ -616,6 +618,8 @@ def build_system_prompt(
     effective_figure_catalog = figure_catalog if figures_enabled else None
     step_text = _render_current_step_block(
         step, question_pool, effective_figure_catalog,
+        warm_up_source=warm_up_source,
+        lesson_objective=lesson_objective,
     )
     if step_text:
         blocks.append({
@@ -800,6 +804,8 @@ def _render_current_step_block(
     step,
     question_pool,
     figure_catalog: list[dict] | None,
+    warm_up_source: str = '',
+    lesson_objective: str = '',
 ) -> str:
     """Render the <current_step> block. Returns '' when step is None
     (exit-ticket mode — engine handles separately).
@@ -830,6 +836,28 @@ def _render_current_step_block(
         f"<phase>{phase}</phase>",
         f"<step_number>{step_num}</step_number>",
     ]
+
+    # The warm-up step carries no objective of its own — the question in the
+    # pool belongs to a lesson the student finished earlier, and which lesson
+    # that is differs per student. Name it here so the tutor can say what it is
+    # recalling instead of presenting old material as today's.
+    if warm_up_source:
+        parts.append(
+            f"<warm_up_source_lesson>{_escape_xml(warm_up_source)}"
+            f"</warm_up_source_lesson>"
+        )
+
+    # Only on the warm-up step. The opener has to tell the student what today
+    # is about before recalling last time, and the step's own objective is
+    # empty by design, so today's objective has to come from the lesson.
+    # Passed empty on every other step, which keeps their cached block
+    # byte-identical to what it is today.
+    if lesson_objective:
+        parts.append(
+            f"<todays_objective>{_escape_xml(lesson_objective)}"
+            f"</todays_objective>"
+        )
+
     if objective:
         parts.append(
             f"<enabling_objective>{_escape_xml(objective)}</enabling_objective>"

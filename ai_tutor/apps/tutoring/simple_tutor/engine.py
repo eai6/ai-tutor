@@ -302,6 +302,31 @@ _OPENING_INSTRUCTION = (
     "Do not ask for permission to start; just open and pose."
 )
 
+# The opener used when the session starts on the warm-up step.
+#
+# Three beats in a fixed order — welcome, what today is for, then the recall
+# question — because the student needs to know what they have walked into
+# before being asked about something from a previous lesson. The system prompt
+# supplies both halves: <todays_objective> is this lesson's objective, and
+# <warm_up_source_lesson> names the lesson the question is recalled from.
+#
+# Question index 1 is the warm-up; the entries after it are today's material,
+# which is what the model hands over to once the recall question is answered.
+_WARM_UP_OPENING_INSTRUCTION = (
+    "Open the lesson in three beats, in this order.\n"
+    "1. Greet the student in one short sentence.\n"
+    "2. Say what today's lesson covers in one sentence, based on "
+    "<todays_objective>.\n"
+    "3. Tell them you'll start with one quick question from "
+    "<warm_up_source_lesson>, the lesson they did earlier, to warm up — "
+    "then call pose_question with question_index 1 and include that "
+    "question's full stem (and A/B/C/D options for MCQ) in your visible "
+    "text reply.\n"
+    "Keep all three beats to about three sentences total. Start teaching "
+    "today's material only after the warm-up question has been answered, "
+    "and do not ask for permission to begin."
+)
+
 _REMEDIATION_OPENING_INSTRUCTION = (
     "The student just submitted the exit ticket. The "
     "<exit_ticket_review> block in your system prompt shows their "
@@ -330,8 +355,25 @@ def start(session: 'TutorSession') -> dict[str, Any]:
     Returns the same dict shape as ``respond()`` so the view adapter
     can project it uniformly.
     """
-    payload = respond(session, _OPENING_INSTRUCTION, _is_opening=True)
+    payload = respond(session, _opening_instruction_for(session),
+                      _is_opening=True)
     return payload
+
+
+def _opening_instruction_for(session) -> str:
+    """Which opener this session gets.
+
+    A session that starts on the warm-up step is recalling a previous lesson
+    before today's begins, which is a different opening beat from teaching the
+    first step — so it gets its own instruction.
+    """
+    try:
+        step = _load_current_step(session)
+        if _is_warm_up_step(step):
+            return _WARM_UP_OPENING_INSTRUCTION
+    except Exception:                              # noqa: BLE001
+        pass
+    return _OPENING_INSTRUCTION
 
 
 def start_remediation(session: 'TutorSession') -> dict[str, Any]:
@@ -539,6 +581,8 @@ def respond(
             if _uses_answer_picker(session, in_flight, turn_config)
             else ANSWER_MODE_FREE_TEXT
         ),
+        warm_up_source=_warm_up_source_title(step, question_pool),
+        lesson_objective=_todays_objective(session, step),
     )
 
     # ─── 4. Tool-use loop: Call 1 → tools → (optional Call 2) ─────
@@ -2971,11 +3015,14 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
         phase = 'completed'
     elif show_exit_ticket:
         phase = 'exit_ticket'
+    elif _is_warm_up_step(step):
+        phase = 'warm_up'
     elif step is not None:
         phase = (getattr(step, 'phase', '') or '').lower() or 'evaluate'
     else:
         phase = 'evaluate'
-    step_number = min(current_idx + 1, total_steps) if total_steps else 1
+    step_number, total_steps = _step_display(
+        session, current_idx, total_steps)
 
     return {
         'message': out.get('content', ''),
@@ -3278,8 +3325,110 @@ def start_for_view(session) -> dict:
         )
         return _project_start_payload(session, message)
 
+    _settle_warm_up_step(session)
     out = start(session)
     return _project_start_payload(session, out.get('content', ''))
+
+
+def _step_display(session, current_idx: int, total_steps: int) -> tuple:
+    """(step_number, total_steps) as the STUDENT counts them.
+
+    The warm-up is a real step to the engine — it advances, it grades, it owns
+    a slot — but it is not lesson content, so it does not belong in the
+    lesson's numbering. A five-step lesson still reads "1/5" once teaching
+    starts, not "2/6", and while the warm-up itself is on screen the header
+    shows the warm-up badge instead of a count.
+
+    Returns the raw pair unchanged for a lesson with no warm-up step, which is
+    every lesson until the backfill runs and every lesson on the hosted app
+    until it is deployed.
+    """
+    from ai_tutor.apps.curriculum.models import LessonStep
+
+    try:
+        has_warm_up = LessonStep.objects.filter(
+            lesson=session.lesson,
+            step_type=LessonStep.StepType.WARM_UP,
+        ).exists()
+    except Exception:                              # noqa: BLE001
+        has_warm_up = False
+
+    if not has_warm_up:
+        return (min(current_idx + 1, total_steps) if total_steps else 1), total_steps
+
+    display_total = max(total_steps - 1, 0)
+    # current_idx 0 is the warm-up; index 1 is the lesson's first step, so the
+    # index doubles as the 1-based number once the warm-up is discounted.
+    display_number = min(max(current_idx, 1), display_total) if display_total else 1
+    return display_number, display_total
+
+
+def _warm_up_source_title(step, question_pool) -> str:
+    """Title of the lesson this turn's warm-up question came from.
+
+    Empty for every non-warm-up turn, which is all of them after the opening
+    step, so the prompt is byte-identical to today's outside the warm-up.
+    """
+    if not _is_warm_up_step(step) or not question_pool:
+        return ''
+    try:
+        from ai_tutor.apps.tutoring.simple_tutor.warm_up import source_lesson_for
+        prior = source_lesson_for(question_pool[0])
+        return (getattr(prior, 'title', '') or '').strip()
+    except Exception:                              # noqa: BLE001
+        return ''
+
+
+def _todays_objective(session, step) -> str:
+    """What this lesson is for, in the lesson's own words.
+
+    Surfaced only on the warm-up step, where the opener has to say what today
+    covers before recalling earlier work. Everywhere else the step's own
+    enabling_objective is the right granularity and this stays empty.
+    """
+    if not _is_warm_up_step(step):
+        return ''
+    lesson = getattr(session, 'lesson', None)
+    return (getattr(lesson, 'objective', '') or '').strip()
+
+
+def _is_warm_up_step(step) -> bool:
+    from ai_tutor.apps.curriculum.models import LessonStep
+    return getattr(step, 'step_type', None) == LessonStep.StepType.WARM_UP
+
+
+def _settle_warm_up_step(session) -> None:
+    """Decide, once per fresh session, whether the warm-up step applies.
+
+    Every lesson carries a warm-up step at order_index 0, but it can only be
+    filled from a lesson the student has already mastered. A student on their
+    first-ever lesson has nothing to recall, so rather than open on an empty
+    step and wait for the turn cap to move them along, skip straight to step 1.
+
+    Only runs on a brand-new session (no turns yet); a resumed session keeps
+    whatever index it was on.
+    """
+    from ai_tutor.apps.curriculum.models import LessonStep
+    from ai_tutor.apps.tutoring.simple_tutor.warm_up import (
+        select_warm_up_question,
+    )
+
+    try:
+        if (session.current_step_index or 0) != 0:
+            return
+        step = _load_current_step(session)
+        if step is None or step.step_type != LessonStep.StepType.WARM_UP:
+            return
+        if select_warm_up_question(session) is not None:
+            return
+        session.current_step_index = 1
+        session.save(update_fields=['current_step_index'])
+        logger.info(
+            "[warm_up] session=%s has no eligible prior-lesson question — "
+            "starting on step 1", session.pk)
+    except Exception as exc:                       # noqa: BLE001
+        logger.warning("_settle_warm_up_step failed (session=%s): %s",
+                       getattr(session, 'pk', None), exc)
 
 
 def _is_completed(session) -> bool:
@@ -3491,11 +3640,14 @@ def _project_start_payload(session, message: str) -> dict:
         phase = 'completed'
     elif steps_exhausted and et_attached:
         phase = 'exit_ticket'
+    elif _is_warm_up_step(step):
+        phase = 'warm_up'
     elif step is not None:
         phase = (getattr(step, 'phase', '') or '').lower() or 'evaluate'
     else:
         phase = 'evaluate'
-    step_number = min(current_idx + 1, total_steps) if total_steps else 1
+    step_number, display_total_steps = _step_display(
+        session, current_idx, total_steps)
 
     if not steps_exhausted:
         # Still in lesson steps — definitely not complete.
@@ -3526,7 +3678,7 @@ def _project_start_payload(session, message: str) -> dict:
         'exit_ticket': None,
         'is_complete': is_complete,
         'step_number': step_number,
-        'total_steps': total_steps,
+        'total_steps': display_total_steps,
         'is_correct': None,
         'streak_count': None,
         'practice_score': None,

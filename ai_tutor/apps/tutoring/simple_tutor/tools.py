@@ -275,6 +275,50 @@ def build_question_pool(
         .filter(lesson=lesson, order_index=current_step_index)
         .first()
     )
+    if step is not None and step.step_type == LessonStep.StepType.WARM_UP:
+        # The warm-up step's question comes from a lesson the student already
+        # did, not from this lesson's bank. It is a real ExitTicketQuestion, so
+        # pose-by-index, the slot, the grader and the letter picker all work
+        # exactly as they do for any question.
+        #
+        # The NEXT step's questions come along behind it. Block 0 tells the
+        # model to pose the next question in the same turn as a correct
+        # verdict, and with the warm-up alone in the pool the only thing it
+        # could pose was the question just answered — the student got the same
+        # item twice. Following it with today's first questions makes that
+        # instruction do the right thing: answer the recall question, hand
+        # straight over to the lesson.
+        from ai_tutor.apps.tutoring.simple_tutor.warm_up import (
+            select_warm_up_question,
+        )
+        chosen = select_warm_up_question(session)
+        pool = [chosen] if chosen is not None else []
+        next_step = (
+            LessonStep.objects
+            .filter(lesson=lesson, order_index=current_step_index + 1)
+            .first()
+        )
+        if next_step is not None and len(pool) < max_questions:
+            pool.extend(_pool_for_step(
+                session, lesson, next_step, max_questions - len(pool),
+            ))
+        return pool
+
+    return _pool_for_step(session, lesson, step, max_questions)
+
+
+def _pool_for_step(session, lesson, step, max_questions: int) -> list:
+    """The three-tier pool for one step. Split out of build_question_pool so
+    the warm-up step can borrow the NEXT step's questions without duplicating
+    the tier logic."""
+    from ai_tutor.apps.tutoring.models import ExitTicketQuestion
+    from ai_tutor.apps.curriculum.models import LessonStep
+    from ai_tutor.apps.tutoring.simple_tutor.step_question import (
+        StepQuestion, has_question as step_has_question,
+    )
+
+    current_step_index = getattr(step, 'order_index', 0) or 0
+
     if step is None:
         # Past the last step. That is remediation: the exit ticket has been
         # submitted and failed, and there is no LessonStep to key a pool off.

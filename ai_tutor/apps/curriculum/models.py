@@ -377,6 +377,12 @@ class LessonStep(models.Model):
     - Curriculum context (from knowledge base)
     """
     class StepType(models.TextChoices):
+        # A container, not content. Every lesson opens with one, and the
+        # question that fills it is chosen per student at runtime from a
+        # lesson they have already done — see simple_tutor/warm_up.py. The row
+        # carries no question of its own because a LessonStep is shared
+        # curriculum while a warm-up depends on that student's history.
+        WARM_UP = 'warm_up', 'Warm-up'
         TEACH = 'teach', 'Teaching'
         WORKED_EXAMPLE = 'worked_example', 'Worked Example'
         PRACTICE = 'practice', 'Practice Problem'
