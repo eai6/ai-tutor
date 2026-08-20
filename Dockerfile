@@ -18,6 +18,11 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', dev
 # provably corresponds to the encoder it replaces, and the ~90 MB artifact is
 # the only thing carried forward.
 #
+# --skip-parity because the comparison against sentence-transformers goes
+# through kb_storage, which needs a configured Django — the builder has the
+# dependencies but not the app source or its settings. That comparison runs in
+# CI instead (test_onnx_embedding_parity.py), against this same artifact.
+#
 # It is built rather than copied because models/ is a gitignored build
 # artifact: a CI checkout has no models/ directory, so `COPY . .` would ship an
 # image with no encoder. Embedding would then fail into a caught exception,
@@ -25,7 +30,7 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', dev
 # only a log line to say so.
 RUN pip install --no-cache-dir "onnx>=1.22,<2"
 COPY scripts/export_minilm_onnx.py /build/scripts/
-RUN python /build/scripts/export_minilm_onnx.py \
+RUN python /build/scripts/export_minilm_onnx.py --skip-parity \
  && test -s /build/models/minilm-l6-v2/model.onnx \
  && test -s /build/models/minilm-l6-v2/tokenizer.json
 

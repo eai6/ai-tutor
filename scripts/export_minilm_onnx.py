@@ -34,7 +34,7 @@ OUT_DIR = ROOT / 'models' / 'minilm-l6-v2'
 OPSET = 14
 
 
-def main() -> int:
+def main(check_parity: bool = True) -> int:
     import torch
     from sentence_transformers import SentenceTransformer
 
@@ -111,6 +111,16 @@ def main() -> int:
     # Fail the export rather than ship a graph that silently disagrees with
     # the encoder it replaces. The threshold matches the parity test in
     # apps/curriculum/tests/test_onnx_embedding_parity.py.
+    #
+    # Skippable because this comparison goes through kb_storage, which needs a
+    # configured Django. That is free on a workstation and awkward inside a
+    # Docker builder stage, which has the dependencies but not the app or its
+    # settings. The same comparison runs in CI as
+    # test_onnx_embedding_parity.py, against the artifact this produces.
+    if not check_parity:
+        print('parity check skipped (--skip-parity)')
+        return 0
+
     from ai_tutor.apps.curriculum import kb_storage
     import numpy as np
 
@@ -136,9 +146,14 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    sys.path.insert(0, str(ROOT))
-    import os
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
-    import django
-    django.setup()
-    raise SystemExit(main())
+    check_parity = '--skip-parity' not in sys.argv
+    if check_parity:
+        # Only when the parity check will actually run — django.setup() needs
+        # the app on the path and a settings module, neither of which exists
+        # where this runs purely to produce the artifact.
+        sys.path.insert(0, str(ROOT))
+        import os
+        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ai_tutor.config.settings')
+        import django
+        django.setup()
+    raise SystemExit(main(check_parity=check_parity))
