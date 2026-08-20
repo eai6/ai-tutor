@@ -1,0 +1,153 @@
+{
+  "transcript": "sonnet-4_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 29.54333209991455,
+  "tokens_in": 3041,
+  "tokens_out": 2262,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 0,
+      "evidence": "Transcript contains no tutor turns; no student activity was elicited or supported."
+    },
+    "direct_instruction_active_practice": {
+      "score": 0,
+      "evidence": "No instruction or practice occurred \u2014 the tutor never responded."
+    },
+    "deliberate_practice": {
+      "score": 0,
+      "evidence": "No practice problems were posed; the student's request 'can you ask me the question again?' was never addressed."
+    },
+    "mastery_learning": {
+      "score": 0,
+      "evidence": "No progression, no assessment of mastery \u2014 session is empty of tutor content."
+    },
+    "cognitive_load": {
+      "score": 0,
+      "evidence": "Cannot be evaluated positively; no worked examples, subgoals, or explanations were given."
+    },
+    "layering": {
+      "score": 0,
+      "evidence": "No content delivered, so no linking to prerequisites occurred."
+    },
+    "non_interference": {
+      "score": 0,
+      "evidence": "No topics introduced \u2014 principle is vacuously untested but the session failed to deliver any content."
+    },
+    "interleaving": {
+      "score": 0,
+      "evidence": "No problems posed, so no variation possible."
+    },
+    "testing_effect": {
+      "score": 0,
+      "evidence": "No retrieval opportunity was created; student's request for the question was ignored."
+    },
+    "targeted_remediation": {
+      "score": 0,
+      "evidence": "No diagnosis or remediation \u2014 no tutor turn exists."
+    }
+  },
+  "strongest_behaviors": [
+    "None identifiable \u2014 transcript contains zero tutor turns.",
+    "N/A"
+  ],
+  "weakest_behaviors": [
+    "Tutor failed to produce the opening greeting and warm-up question as explicitly instructed by the system turn.",
+    "Tutor failed to re-pose the question when the student asked 'can you ask me the question again?'"
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Enforce mandatory opening question in first turn",
+      "rationale": "The system instruction explicitly required a greeting + first warm-up question, but no tutor output was produced. The prompt should hard-require a pose_question call on turn 1.",
+      "evidence_quote": "Begin the lesson. Greet the student briefly, name what they'll learn in one short sentence, then immediately pose the first warm-up question via pose_question",
+      "evidence_turn": "student_1",
+      "suggested_prompt_edit": "Add a rule: 'TURN 1 IS MANDATORY: You MUST output a short greeting, a one-sentence learning goal, and call pose_question with the full stem (and options if MCQ) visible in your reply. Never end turn 1 without a posed question.'",
+      "expected_effect": "Guarantees the lesson actually starts and the student sees a question.",
+      "severity": "high"
+    },
+    {
+      "title": "Add explicit 'repeat last question' behavior",
+      "rationale": "When the student said 'can you ask me the question again?' the tutor produced nothing. The prompt should specify how to handle re-ask requests by restating the last posed stem verbatim.",
+      "evidence_quote": "can you ask me the question again?",
+      "evidence_turn": "student_2",
+      "suggested_prompt_edit": "Add: 'If the student asks to hear/see the question again, repeat the most recent question stem verbatim (including options) without changing the problem or giving hints.'",
+      "expected_effect": "Prevents dead-end turns when students request a repeat.",
+      "severity": "high"
+    },
+    {
+      "title": "Forbid empty tutor turns",
+      "rationale": "The tutor produced no visible content across the session. A rule forbidding empty responses would surface failures earlier.",
+      "evidence_quote": "(no tutor turns present in transcript)",
+      "evidence_turn": "session-wide",
+      "suggested_prompt_edit": "Add: 'Every tutor turn must contain visible text for the student. Never respond with an empty message or a tool call alone.'",
+      "expected_effect": "Eliminates silent-failure turns.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Retry/fallback when tutor produces no output",
+      "rationale": "The orchestration allowed a completely empty session. A retry or canned fallback ('Let me re-ask: ...') should trigger when the model returns no visible content.",
+      "evidence_quote": "can you ask me the question again?",
+      "evidence_turn": "student_2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents user-facing dead sessions.",
+      "severity": "high"
+    },
+    {
+      "title": "Cache last posed question for automatic re-display",
+      "rationale": "Engine should store the last pose_question payload so 're-ask' requests can be served deterministically even if the model fails.",
+      "evidence_quote": "can you ask me the question again?",
+      "evidence_turn": "student_2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reliable repeat behavior independent of LLM variance.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Provide immediate acknowledgement on repeat request",
+      "rationale": "An error-prone Form-3 student asking to hear the question again needs a friendly, immediate restatement to stay engaged; silence is discouraging.",
+      "evidence_quote": "can you ask me the question again?",
+      "evidence_turn": "student_2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Better student trust and engagement, particularly for error-prone learners.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The transcript contains only two student/system turns and zero tutor responses. The tutor failed to start the lesson as instructed and failed to answer the student's request to re-ask the question. Every pedagogical principle scores 0 by default because no tutoring behavior occurred. Highest-priority fixes are ensuring a mandatory opening question, defining behavior for 'repeat the question' requests, and adding engine-level retries when the tutor produces no output.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "none",
+      "preceding_student_turn_id": "student_2",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turns exist in the transcript to evaluate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 1,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}

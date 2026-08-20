@@ -1,0 +1,175 @@
+{
+  "transcript": "sonnet-4_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 42.876505851745605,
+  "tokens_in": 3051,
+  "tokens_out": 3155,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 1,
+      "evidence": "The transcript contains no tutor turns at all \u2014 only two student prompts asking the tutor to begin. There is no evidence of any learning activity."
+    },
+    "direct_instruction_active_practice": {
+      "score": 1,
+      "evidence": "No instruction or practice was delivered; the tutor never responded with a question or explanation."
+    },
+    "deliberate_practice": {
+      "score": 1,
+      "evidence": "No practice items were posed; student says 'please try the question again' but no question exists in the transcript."
+    },
+    "mastery_learning": {
+      "score": 1,
+      "evidence": "No progression or mastery check occurred because no content was delivered."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Neither positive nor negative cognitive-load management can be assessed; nothing was presented."
+    },
+    "layering": {
+      "score": 1,
+      "evidence": "No content presented, so no linking of new to prior knowledge."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "No content, so no confusable topics \u2014 vacuously not violated."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "No problems posed, so no variation possible."
+    },
+    "testing_effect": {
+      "score": 1,
+      "evidence": "No retrieval opportunity was provided; student was ready but no question was asked."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "No diagnostic or remedial action taken; the tutor apparently failed a previous attempt and did not retry."
+    }
+  },
+  "strongest_behaviors": [
+    "None observable \u2014 no tutor turns present in the transcript.",
+    "The system apparently avoided leaking an answer (vacuously, since nothing was said)."
+  ],
+  "weakest_behaviors": [
+    "Tutor failed to produce any visible output at all, including the required opening greeting and first warm-up question.",
+    "After an apparent failed first attempt (implied by student saying 'no worries! please try the question again'), the tutor still produced no recovery turn."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Enforce mandatory opening turn with visible question stem",
+      "rationale": "The tutor produced no visible content despite an explicit instruction to greet, name the topic, and pose the first question inline. The system prompt must make this non-optional and specify that tool calls must be accompanied by visible text.",
+      "evidence_quote": "Begin the lesson. Greet the student briefly, name what they'll learn in one short sentence, then immediately pose the first warm-up question via pose_question \u2014 include the full question stem",
+      "evidence_turn": "student_id=3",
+      "suggested_prompt_edit": "OPENING TURN (REQUIRED): Your first message MUST contain (a) a one-line greeting, (b) a one-sentence topic statement, (c) the full question stem with any A/B/C/D options rendered as visible text, and (d) a pose_question tool call whose text mirrors the visible stem. Never emit a tool call without accompanying visible text. If any of (a)-(d) is missing, regenerate before sending.",
+      "expected_effect": "Guarantees the student sees a real warm-up question on turn 1 instead of an empty response.",
+      "severity": "high"
+    },
+    {
+      "title": "Add a self-recovery rule after an empty or failed prior turn",
+      "rationale": "The second student message ('please try the question again') implies the previous tutor turn was empty or malformed. The prompt should include an explicit recovery clause instructing the tutor to re-pose the intended question in full when the student signals a missing/broken turn.",
+      "evidence_quote": "no worries! please try the question again. i'm ready when you are.",
+      "evidence_turn": "student_id=4",
+      "suggested_prompt_edit": "RECOVERY RULE: If the student indicates they did not receive your previous question (e.g., 'try again', 'I don't see it', 'please repost'), your next turn MUST re-emit the full question stem in visible text plus a fresh pose_question tool call. Do not apologize at length; re-pose immediately.",
+      "expected_effect": "Prevents dead-air loops where the tutor never recovers from a failed first attempt.",
+      "severity": "high"
+    },
+    {
+      "title": "Forbid empty assistant messages",
+      "rationale": "Two consecutive student turns with no tutor reply suggests the model may have emitted empty content or only a tool call with no user-visible text. The system prompt should explicitly forbid this.",
+      "evidence_quote": "include the full question stem (and A/B/C/D options for MCQ) in your visible text reply",
+      "evidence_turn": "student_id=3",
+      "suggested_prompt_edit": "NEVER send an empty assistant message. Every turn must contain at least one full sentence of visible text addressed to the student, in addition to any tool calls.",
+      "expected_effect": "Eliminates silent turns that break the session.",
+      "severity": "high"
+    },
+    {
+      "title": "Specify persona-appropriate warm-up difficulty for error_prone S3 learners",
+      "rationale": "Because the tutor never posed a question, there is no evidence the warm-up would be calibrated. The prompt should explicitly anchor first-item difficulty for an error-prone Form 3 learner on the Seychelles curriculum.",
+      "evidence_quote": "Curriculum: Seychelles National Curriculum (S3 = Form 3, ~age 13-14)",
+      "evidence_turn": "system_context",
+      "suggested_prompt_edit": "Warm-up items MUST be one-step retrieval or recognition tasks pitched at the easy end of S3 (Form 3) for the target skill, so an error-prone learner has a high chance of success on item 1. Escalate difficulty only after a correct response.",
+      "expected_effect": "Improves early-session confidence and diagnostic value.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Add engine-level empty-turn detector with auto-retry",
+      "rationale": "The transcript shows the tutor emitting nothing at least once. Orchestration should detect an empty or tool-only assistant message and force a regeneration before the student ever sees it.",
+      "evidence_quote": "no worries! please try the question again.",
+      "evidence_turn": "student_id=4",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents blank tutor turns from reaching the student.",
+      "severity": "high"
+    },
+    {
+      "title": "Gate session start on a validated pose_question tool call",
+      "rationale": "The session status is 'active' but no question was ever posed. The engine should not mark a session started until the first pose_question tool call is successfully rendered with a stem.",
+      "evidence_quote": "session_id=2  status=active",
+      "evidence_turn": "system_context",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Ensures sessions cannot progress without an actual warm-up item on record.",
+      "severity": "high"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Show a friendly fallback when tutor generation fails",
+      "rationale": "The student had to prompt the tutor a second time. A UI-level fallback ('Reconnecting\u2026 reposting your question') would reduce confusion and mirror the polite tone the student already used.",
+      "evidence_quote": "no worries! please try the question again. i'm ready when you are.",
+      "evidence_turn": "student_id=4",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces student frustration during transient failures.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The transcript contains only two student turns and zero tutor turns. The tutor apparently failed to produce an opening question, and even after the student explicitly invited a retry, no visible tutor content appears. All ten pedagogical principles are effectively unassessable and scored near the floor. The most urgent fixes are engine-level (never emit empty assistant messages; auto-retry on blank turns) and prompt-level (mandatory opening turn schema and explicit recovery rule when the student signals a missing question).",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": null,
+      "preceding_student_turn_id": "student_id=3",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turn exists to evaluate; the first student message is a system-style kickoff instruction and no assistant reply is present in the transcript.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": null,
+      "preceding_student_turn_id": "student_id=4",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turn exists to evaluate; the student is only requesting a retry and no assistant response follows in the transcript.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 2,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 38.115734577178955,
+  "tokens_in": 3056,
+  "tokens_out": 2651,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 1,
+      "evidence": "Session has only two turns; no real practice loop developed. Tutor never got past posing a single warm-up-adjacent question."
+    },
+    "direct_instruction_active_practice": {
+      "score": 2,
+      "evidence": "The one visible tutor prompt does ask a question rather than lecture, but there is no observable follow-through."
+    },
+    "deliberate_practice": {
+      "score": 1,
+      "evidence": "Only one problem (360 \u00f7 4) posed; no calibration, no varied follow-up visible."
+    },
+    "mastery_learning": {
+      "score": 1,
+      "evidence": "No mastery check or gating visible in the transcript."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "The single item asked is simple and isolated, which is fine, but no worked example or subgoals provided."
+    },
+    "layering": {
+      "score": 1,
+      "evidence": "No explicit linking to prior concepts; lesson topic (1425) not even named in visible turns."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "No confusable topics juxtaposed because the session barely progressed."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "Only one problem type shown; no mixed practice."
+    },
+    "testing_effect": {
+      "score": 3,
+      "evidence": "Tutor did pose a retrieval question ('what is 360 \u00f7 4?') rather than explaining first."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "The phrase 'let's just try again' suggests a prior failure, but no diagnosis of prerequisite bottleneck is visible."
+    }
+  },
+  "strongest_behaviors": [
+    "Opened with a retrieval question rather than lecture ('what is 360 \u00f7 4?').",
+    "Kept cognitive load low with a single, clear numeric prompt."
+  ],
+  "weakest_behaviors": [
+    "No greeting, no naming of the lesson topic, no scaffolding visible \u2014 violates the opening instructions.",
+    "Session appears to have stalled after one turn with no remediation loop or content coverage."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Enforce compliant opening structure",
+      "rationale": "The system was told to greet, name the learning objective in one sentence, and then pose a warm-up. The visible opening skips the greet+objective and just poses '360 \u00f7 4'.",
+      "evidence_quote": "no problem! let's just try again then. what is 360 \u00f7 4?",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "OPENING TEMPLATE (mandatory on first tutor turn): (1) one-line greeting with student-friendly tone, (2) one sentence naming today's learning objective tied to the lesson topic, (3) call pose_question with the full stem visible. Never open with only a raw question.",
+      "expected_effect": "Students receive orientation before retrieval, improving engagement and reducing confusion on restart.",
+      "severity": "high"
+    },
+    {
+      "title": "Require lesson-topic framing before first question",
+      "rationale": "Lesson 1425's topic is never named in the visible text; the student cannot situate '360 \u00f7 4' within any curriculum objective.",
+      "evidence_quote": "what is 360 \u00f7 4?",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "Before the first pose_question call, include a single sentence of the form: 'Today we're working on <lesson_topic> \u2014 <one-line why it matters>.' Then pose the warm-up.",
+      "expected_effect": "Improves layering and student orientation; ties retrieval to curriculum.",
+      "severity": "medium"
+    },
+    {
+      "title": "Handle restart / retry gracefully",
+      "rationale": "The student's turn 'let's just try again then' implies a previous failed attempt. The prompt should specify how to resume without losing the opening protocol.",
+      "evidence_quote": "no problem! let's just try again then.",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "On session restart or retry, re-run the OPENING TEMPLATE in condensed form (one-line greet + objective + first warm-up) rather than jumping into a bare arithmetic prompt.",
+      "expected_effect": "Consistent onboarding even after retries; avoids context-less arithmetic drops.",
+      "severity": "medium"
+    },
+    {
+      "title": "Ban single-line bare-question openings",
+      "rationale": "Prevents the failure mode where the tutor collapses the opening down to just the arithmetic stem.",
+      "evidence_quote": "what is 360 \u00f7 4?",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "FORBIDDEN PATTERN: opening tutor turn that consists solely of a computational stem with no greeting, no objective, and no MCQ options if the item is MCQ.",
+      "expected_effect": "Eliminates cold-open arithmetic drops.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect stalled sessions and auto-resume",
+      "rationale": "The transcript shows status=active but only two turns; the engine appears to have halted after the opening.",
+      "evidence_quote": "session_id=4  status=active",
+      "evidence_turn": "header",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents dead sessions; ensures at least a full warm-up cycle completes.",
+      "severity": "high"
+    },
+    {
+      "title": "Route error_prone persona through prerequisite diagnostic first",
+      "rationale": "For error_prone learners, jumping to a raw division stem risks another failure loop. Engine should route through a short prereq diagnostic before the graded warm-up.",
+      "evidence_quote": "let's just try again then. what is 360 \u00f7 4?",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Better calibration and targeted remediation for weaker students.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warmer restart tone",
+      "rationale": "After an implied prior failure, the student would benefit from a brief encouraging line before the next problem.",
+      "evidence_quote": "no problem! let's just try again then.",
+      "evidence_turn": "student_8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces frustration for error_prone learners on restarts.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The visible transcript captures only a bare, malformed opening: the tutor appears to have skipped the mandated greeting/objective and dropped straight into '360 \u00f7 4', and the session then stalled. There is essentially no practice loop, no remediation, and no layering to evaluate. Highest-leverage fixes are enforcing the opening template, banning bare-stem openings, and detecting stalled sessions at the engine level.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "student_8_as_tutor_opening",
+      "preceding_student_turn_id": "student_7",
+      "student_made_mistake": false,
+      "skip_reason": "The 'student' turn is a system/harness instruction to begin the lesson, not a substantive student mistake or expression of confusion. Additionally, no tutor turn is present in the transcript to evaluate.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 1,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}

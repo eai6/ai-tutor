@@ -1,0 +1,153 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 30.619685649871826,
+  "tokens_in": 3047,
+  "tokens_out": 2299,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 0,
+      "evidence": "The transcript contains no tutor turns \u2014 no instruction or practice was delivered."
+    },
+    "direct_instruction_active_practice": {
+      "score": 0,
+      "evidence": "No teaching segments and no practice occurred; tutor never responded."
+    },
+    "deliberate_practice": {
+      "score": 0,
+      "evidence": "No question was ever posed, so no calibrated practice occurred."
+    },
+    "mastery_learning": {
+      "score": 0,
+      "evidence": "No progression or mastery check took place; the session is empty of tutor output."
+    },
+    "cognitive_load": {
+      "score": 0,
+      "evidence": "No content delivered, so cognitive load management cannot be assessed positively."
+    },
+    "layering": {
+      "score": 0,
+      "evidence": "No explanations or links to prior knowledge were provided."
+    },
+    "non_interference": {
+      "score": 0,
+      "evidence": "No topics discussed; principle inapplicable but scored 0 due to absence of instruction."
+    },
+    "interleaving": {
+      "score": 0,
+      "evidence": "No problems posed, so no variation possible."
+    },
+    "testing_effect": {
+      "score": 0,
+      "evidence": "No retrieval opportunities offered \u2014 tutor never posed the warm-up question requested."
+    },
+    "targeted_remediation": {
+      "score": 0,
+      "evidence": "Student's turn 6 ('let's try again. what was your answer to the last question?') suggests prior confusion, but no remediation is present."
+    }
+  },
+  "strongest_behaviors": [
+    "None identifiable \u2014 transcript contains no tutor turns",
+    "N/A"
+  ],
+  "weakest_behaviors": [
+    "Tutor never opened the lesson or posed the warm-up question despite explicit instruction",
+    "Tutor never responded to the student's follow-up asking about the last question"
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Enforce non-empty opening turn with mandatory question stem",
+      "rationale": "The system produced no visible tutor output at all, despite the opener instruction requiring an immediate greeting and posed question.",
+      "evidence_quote": "Begin the lesson. Greet the student briefly, name what they'll learn in one short sentence, then immediately pose the first warm-up question via pose_question",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "Add: 'Your FIRST reply MUST contain (1) a one-line greeting, (2) a one-sentence lesson goal, and (3) the full question stem with all options rendered inline as visible text. Never respond with an empty message or a tool call alone \u2014 always include visible text alongside any tool use.'",
+      "expected_effect": "Guarantees the student sees a warm-up question on turn 1 rather than a blank/empty tutor turn.",
+      "severity": "high"
+    },
+    {
+      "title": "Require visible text accompaniment for every tool call",
+      "rationale": "If pose_question was called silently, the student would see nothing. The prompt should forbid tool-only turns.",
+      "evidence_quote": "include the full question stem (and A/B/C/D options for MCQ) in your visible text reply",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "Add rule: 'Every tool invocation must be paired with a visible message that restates the question stem and options. A tool call without accompanying visible text is a protocol violation.'",
+      "expected_effect": "Prevents silent tool calls that leave the student with no content on screen.",
+      "severity": "high"
+    },
+    {
+      "title": "Handle 'let's try again' recovery explicitly",
+      "rationale": "Student asked 'what was your answer to the last question?' indicating a broken prior state. The prompt should specify a recovery script.",
+      "evidence_quote": "let's try again. what was your answer to the last question?",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "Add: 'If the student references a prior question that is not in your visible context, acknowledge the gap, re-pose a fresh warm-up question of appropriate difficulty, and do NOT fabricate a previous answer.'",
+      "expected_effect": "Gives the tutor a deterministic recovery path when session state is lost.",
+      "severity": "high"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and retry empty tutor turns",
+      "rationale": "The orchestration allowed the tutor to produce zero visible content on the opener; a validator should catch this.",
+      "evidence_quote": "Begin the lesson. ... just open and pose.",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Empty or tool-only opening turns are auto-retried before display, ensuring the student always receives a stem.",
+      "severity": "high"
+    },
+    {
+      "title": "Persist last-posed-question in session state",
+      "rationale": "Student's turn 6 implies loss of question context; the engine should surface the last pose_question payload back into the tutor's context on continuation.",
+      "evidence_quote": "what was your answer to the last question?",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Enables graceful continuation of interrupted sessions without hallucinating prior content.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Show a fallback message on empty tutor response",
+      "rationale": "The student experienced silence, which is disorienting and unhelpful.",
+      "evidence_quote": "let's try again.",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Student sees an explicit 'Let me re-open the lesson' message rather than emptiness.",
+      "severity": "high"
+    }
+  ],
+  "overall_summary": "The transcript contains only two student turns and zero tutor turns, so the session never actually began. All 10 principles score 0 because no instruction, practice, or remediation occurred. Highest-priority fixes are engine-level: guarantee non-empty opening turns, pair tool calls with visible text, and persist last-question state so the tutor can recover when the student says 'let's try again'.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": null,
+      "preceding_student_turn_id": "student_5",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turn exists in the transcript to evaluate. The transcript contains only two student turns and no tutor responses.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 1,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}
