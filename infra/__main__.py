@@ -329,6 +329,22 @@ if enable_appgw:
 # See memory/waf_static_ip_security_plan.md.
 waf_enabled = config.get_bool("enable-waf") or False
 
+# Whether the gateway runs the OWASP ruleset. SEPARATE from `enable-waf`, which
+# gates the whole rollout including the Key Vault TLS certificate the gateway
+# needs to serve HTTPS at all — turning that off would take the site down, not
+# just the firewall.
+#
+# WAF_v2 costs roughly $130-150/month more than Standard_v2 for this gateway:
+# both bill a floor of 10 capacity units per instance, and WAF_v2 charges more
+# for each of them plus a higher fixed rate. At the observed ~14 requests/hour
+# that premium buys ruleset evaluation and nothing else.
+#
+# The public IP is a separate resource (aitutor-{stack}-appgw-pip, Static), so
+# changing this flag does NOT change the address schools have allow-listed.
+appgw_waf_rules = config.get_bool("appgw-waf-rules")
+if appgw_waf_rules is None:
+    appgw_waf_rules = True
+
 if waf_enabled:
     _client_cfg = authorization.get_client_config()
 
@@ -1032,7 +1048,10 @@ if enable_appgw:
         application_gateway_name=appgw_name,
         resource_group_name=rg.name,
         location=rg.location,
-        sku=network.ApplicationGatewaySkuArgs(name="WAF_v2", tier="WAF_v2"),
+        sku=network.ApplicationGatewaySkuArgs(
+            name="WAF_v2" if appgw_waf_rules else "Standard_v2",
+            tier="WAF_v2" if appgw_waf_rules else "Standard_v2",
+        ),
         autoscale_configuration=network.ApplicationGatewayAutoscaleConfigurationArgs(
             min_capacity=1, max_capacity=3,
         ),
@@ -1040,7 +1059,12 @@ if enable_appgw:
             type=network.ResourceIdentityType.USER_ASSIGNED,
             user_assigned_identities=appgw_identity.id.apply(lambda i: {i: {}}),
         ),
-        firewall_policy=network.SubResourceArgs(id=waf_policy.id),
+        # Standard_v2 cannot carry a firewall policy. The policy resource itself
+        # is still created either way — it costs nothing unattached, and it
+        # means re-enabling is a config flip rather than a rebuild.
+        firewall_policy=(
+            network.SubResourceArgs(id=waf_policy.id) if appgw_waf_rules else None
+        ),
         gateway_ip_configurations=[network.ApplicationGatewayIPConfigurationArgs(
             name="appGwIpConfig",
             subnet=network.SubResourceArgs(id=appgw_subnet.id),

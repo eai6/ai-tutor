@@ -39,3 +39,4 @@ config:
   aitutor:env-default-domain: redbush-f73ec411.centralus.azurecontainerapps.io
   aitutor:env-static-ip: 10.20.0.23
   aitutor:app-identity-principal-id: 916a138c-d938-4c31-92eb-6ec87677489b
+  aitutor:appgw-waf-rules: "false"
