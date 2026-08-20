@@ -28,11 +28,19 @@ import pulumi_aws as aws
 
 APP_PORT = 8000
 
-# 8 GiB is a floor, not a preference: EMBEDDING_BACKEND=local loads
-# all-MiniLM-L6-v2 (~500 MB) into each of gunicorn's four workers. The Azure
-# staging stack documents a probe-failure crash loop when this ran on 4 GiB.
-WEB_CPU = "4096"
-WEB_MEMORY = "8192"
+# 4 GiB, on two counts. EMBEDDING_BACKEND=onnx drops sentence-transformers and
+# torch from the request path — onnxruntime loads the same encoder without
+# them — and two gunicorn workers instead of four halve how many copies can be
+# resident at once.
+#
+# The old 8 GiB floor was measured, not guessed: Azure production ran the same
+# image at 3.02 GiB against an 8 GiB allocation with the CPU essentially idle,
+# and its staging stack crash-looped when 4 workers on the torch path met a
+# 4 GiB limit. Both causes are removed here.
+#
+# Fargate bills CPU and memory separately, so this halves the task's cost.
+WEB_CPU = "2048"
+WEB_MEMORY = "4096"
 JOB_CPU = "2048"
 JOB_MEMORY = "4096"
 
@@ -251,7 +259,10 @@ def create_compute(
         # gunicorn ONLY — the Dockerfile CMD's migrate chain would race across
         # tasks. CI runs the migrate task definition below instead.
         ["gunicorn", "ai_tutor.config.wsgi:application", "--bind", f"0.0.0.0:{APP_PORT}",
-         "--workers", "4", "--threads", "4", "--timeout", "120"],
+         # Two processes, eight threads: same 16 concurrent slots as the old
+         # 4x4, at half the resident model copies. Each worker holds its own
+         # encoder; threads share one.
+         "--workers", "2", "--threads", "8", "--timeout", "120"],
         WEB_CPU, WEB_MEMORY,
     )
     migrate_td = _task_def(

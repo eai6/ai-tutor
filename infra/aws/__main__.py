@@ -175,7 +175,13 @@ task_environment = (
             # same path. Django wants it without the leading slash; the WAF
             # matches the URI path, which has one.
             "ADMIN_URL": admin_path.lstrip("/"),
-            "EMBEDDING_BACKEND": "local",
+            # onnxruntime instead of sentence-transformers + torch. Same
+            # all-MiniLM-L6-v2 weights, same 384-d vectors — the artifact is
+            # exported from those very weights in the Dockerfile's builder
+            # stage, and apps/curriculum/tests/test_onnx_embedding_parity.py
+            # asserts the two backends agree. What it drops is ~500 MB of torch
+            # per gunicorn worker.
+            "EMBEDDING_BACKEND": "onnx",
         }
     )
 )
