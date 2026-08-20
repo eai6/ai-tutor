@@ -1,0 +1,153 @@
+{
+  "transcript": "gemini-3-flash_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 38.29826474189758,
+  "tokens_in": 3056,
+  "tokens_out": 2729,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 1,
+      "evidence": "Transcript contains only two student turns (a system-style instruction and a single retry question); there is no observable tutor output or student practice to assess active doing."
+    },
+    "direct_instruction_active_practice": {
+      "score": 1,
+      "evidence": "No tutor turns are present in the transcript, so we cannot verify any instruction-then-practice pairing."
+    },
+    "deliberate_practice": {
+      "score": 1,
+      "evidence": "No practice items delivered; the second student turn hints at a retry ('let's try again') but nothing calibrated is shown."
+    },
+    "mastery_learning": {
+      "score": 1,
+      "evidence": "No progression, no mastery checks visible in transcript."
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "The student turn poses a simple single-concept question ('sum of angles on a straight line'), but no tutor scaffolding is shown."
+    },
+    "layering": {
+      "score": 1,
+      "evidence": "No explicit links to prior concepts visible; only a bare recall question appears."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "No confusable topics appear back-to-back because virtually no content is delivered."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "Only one topic surfaces; no variation possible in this fragment."
+    },
+    "testing_effect": {
+      "score": 2,
+      "evidence": "Student turn 6 does pose a retrieval question ('what is the sum of angles on a straight line?'), suggesting retrieval intent, but no tutor turn confirms this."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "'let's try again' implies a prior failure, but no diagnostic or prereq routing is visible."
+    }
+  },
+  "strongest_behaviors": [
+    "The opening student/system turn does specify a clean protocol (greet briefly, name the learning goal in one sentence, pose the first question immediately with full stem and options) which, if followed, supports low cognitive load.",
+    "A retrieval-style question ('what is the sum of angles on a straight line?') is present, aligning with the testing effect."
+  ],
+  "weakest_behaviors": [
+    "The transcript contains no tutor turns at all \u2014 the model apparently failed to produce visible output, making the session non-functional.",
+    "No feedback, hints, or remediation are delivered despite the 'let's try again' cue that a prior error occurred."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Force a non-empty visible reply on every tutor turn",
+      "rationale": "The transcript shows no tutor content at all, suggesting the model may have emitted only tool calls or empty text. The system prompt should mandate visible text accompanying any tool call.",
+      "evidence_quote": "Begin the lesson. Greet the student briefly, name what they'll learn in one short sentence, then immediately pose the first warm-up question via pose_question \u2014 include the full question stem",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "HARD RULE: Every tutor turn MUST contain visible natural-language text for the student. If you call a tool (e.g., pose_question), you must ALSO include the full question stem and any options in your visible reply. Never emit a turn with empty or tool-only content.",
+      "expected_effect": "Eliminates blank tutor turns and guarantees the student always sees the question or feedback.",
+      "severity": "high"
+    },
+    {
+      "title": "Specify recovery behavior after a failed/empty turn",
+      "rationale": "Student turn 6 ('no problem! let's try again') implies the previous tutor attempt failed. The prompt should instruct the tutor how to recover: re-pose the intended question cleanly, not defer.",
+      "evidence_quote": "no problem! let's try again.\n\nwhat is the sum of angles on a straight line?",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "If the previous turn failed or the student signals a restart ('let's try again', 'retry'), immediately re-issue the intended warm-up question in full visible text, without apology loops or meta-discussion.",
+      "expected_effect": "Ensures graceful recovery from tool/format failures and preserves lesson momentum.",
+      "severity": "high"
+    },
+    {
+      "title": "Concrete opening template with example",
+      "rationale": "The user instruction was detailed but abstract; providing a filled example in the system prompt reduces the chance of format failure on the very first turn.",
+      "evidence_quote": "Greet the student briefly, name what they'll learn in one short sentence, then immediately pose the first warm-up question",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "OPENING TEMPLATE (use verbatim structure):\n'Hi! Today we'll practise <topic in one sentence>.\n\nQ1: <full stem>\nA) ... B) ... C) ... D) ...'\nThen call pose_question with matching arguments.",
+      "expected_effect": "Reduces malformed openings; ensures the student sees a complete question on turn 1.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and auto-retry empty tutor turns",
+      "rationale": "The orchestrator appears to have accepted an empty or invisible tutor output. A guard should catch this and force regeneration before the student ever sees a blank.",
+      "evidence_quote": "no problem! let's try again.",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents dead sessions caused by tool-only or empty tutor responses.",
+      "severity": "high"
+    },
+    {
+      "title": "Log and surface tool-call outcomes",
+      "rationale": "Without visibility into whether pose_question actually executed and rendered, silent failures propagate. Add a validator that pose_question fired AND the stem is present in visible text.",
+      "evidence_quote": "immediately pose the first warm-up question via pose_question \u2014 include the full question stem",
+      "evidence_turn": "student_5",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Systematic detection of tool/visible-text mismatch failures.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Never leave the student staring at nothing",
+      "rationale": "The student's second turn suggests they had to prompt the tutor to try again, which is a poor experience. A friendly fallback ('Sorry \u2014 let me re-ask that') plus the re-posed question should be automatic.",
+      "evidence_quote": "no problem! let's try again.",
+      "evidence_turn": "student_6",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces student frustration and preserves trust after any glitch.",
+      "severity": "high"
+    }
+  ],
+  "overall_summary": "The transcript contains no visible tutor turns \u2014 only two student messages, the second of which explicitly asks to 'try again'. This indicates a hard failure of the tutoring flow: either the model produced tool calls without visible text, or the orchestrator dropped the tutor output. Because no tutor content exists, all 10 pedagogical principles score at the floor. Highest-priority fixes are (1) force visible text on every tutor turn, (2) auto-retry empty turns at the orchestrator level, and (3) provide a concrete opening template in the system prompt.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "n/a",
+      "preceding_student_turn_id": "student_5",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turns are present in the transcript; there is nothing to evaluate on BEA dimensions.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 1,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}

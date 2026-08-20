@@ -1,0 +1,166 @@
+{
+  "transcript": "gemini-3-flash_L1425_error_prone.md",
+  "lesson_label": "1425",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 29.735326528549194,
+  "tokens_in": 3046,
+  "tokens_out": 2402,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 1,
+      "evidence": "The transcript contains only two student turns and no visible tutor content; there is no evidence of student practice or doing."
+    },
+    "direct_instruction_active_practice": {
+      "score": 1,
+      "evidence": "No tutor turns are visible in the transcript to evaluate instruction-then-practice pairing."
+    },
+    "deliberate_practice": {
+      "score": 1,
+      "evidence": "No practice problems or corrective feedback are observable in the transcript."
+    },
+    "mastery_learning": {
+      "score": 1,
+      "evidence": "No mastery checks or progression logic is visible; the session appears to have stalled at 'can we try the question again?'"
+    },
+    "cognitive_load": {
+      "score": 2,
+      "evidence": "Without tutor content it's impossible to see whether load was managed; default neutral-low."
+    },
+    "layering": {
+      "score": 1,
+      "evidence": "No linking to prior concepts is visible in any tutor turn."
+    },
+    "non_interference": {
+      "score": 3,
+      "evidence": "No back-to-back confusable topics were introduced because no content is visible."
+    },
+    "interleaving": {
+      "score": 1,
+      "evidence": "No variation in problem types is observable."
+    },
+    "testing_effect": {
+      "score": 1,
+      "evidence": "The student says 'can we try the question again?' but no retrieval attempt is visible in the transcript."
+    },
+    "targeted_remediation": {
+      "score": 1,
+      "evidence": "No diagnosis or prereq routing visible after the student's request to retry."
+    }
+  },
+  "strongest_behaviors": [
+    "N/A \u2014 no tutor turns are present in the visible transcript to evaluate strengths.",
+    "The opening system directive correctly instructs the tutor to pose a warm-up question immediately."
+  ],
+  "weakest_behaviors": [
+    "No tutor content is present in the transcript despite two student turns, indicating a rendering or logging failure.",
+    "The student's request to retry the question receives no visible response."
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Require verbatim question restatement on retry",
+      "rationale": "The student asked 'can we try the question again?' \u2014 the prompt should mandate that the tutor re-pose the exact same stem (and options) without leaking the answer.",
+      "evidence_quote": "ohh, okay. can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "When a student asks to retry or re-attempt a question, re-pose the ORIGINAL question stem verbatim (including all MCQ options) via pose_question. Do NOT reveal or hint at the answer. Add a brief encouragement like 'Take your time \u2014 here it is again.'",
+      "expected_effect": "Retries preserve retrieval opportunity and avoid answer leakage.",
+      "severity": "high"
+    },
+    {
+      "title": "Forbid empty tutor turns",
+      "rationale": "The transcript shows two student turns with no visible tutor reply text, suggesting the model may have emitted only a tool call with no visible message.",
+      "evidence_quote": "ohh, okay. can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "Every tutor turn MUST include visible text to the student in addition to any tool call. If invoking pose_question, also include the full question stem and options in the visible reply.",
+      "expected_effect": "Eliminates blank turns; ensures student always sees content.",
+      "severity": "high"
+    },
+    {
+      "title": "Diagnose before retry",
+      "rationale": "An error-prone student who asks to 'try again' may not know what went wrong; the tutor should offer a brief diagnostic prompt before re-posing.",
+      "evidence_quote": "ohh, okay. can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "Before re-posing on a retry request, ask one short diagnostic question (e.g., 'Which part felt tricky \u2014 the setup or the calculation?') then re-pose the same stem.",
+      "expected_effect": "Targets remediation to the actual bottleneck.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Detect and repair empty tutor turns",
+      "rationale": "The engine should not advance to the next student turn if the previous tutor turn had no visible content.",
+      "evidence_quote": "ohh, okay. can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Prevents silent tutor failures; forces a retry of the tutor generation.",
+      "severity": "high"
+    },
+    {
+      "title": "Retry-request routing",
+      "rationale": "When the student explicitly asks to retry, the orchestrator should re-inject the last question state rather than treat it as a new turn.",
+      "evidence_quote": "can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Preserves problem context across retries.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Warm acknowledgment on retry",
+      "rationale": "An error-prone learner benefits from low-stakes framing when asking to retry.",
+      "evidence_quote": "ohh, okay. can we try the question again?",
+      "evidence_turn": "student_id=8",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces anxiety and supports persistence.",
+      "severity": "low"
+    }
+  ],
+  "overall_summary": "The transcript contains only two student turns and no visible tutor responses, making meaningful per-principle evaluation impossible. The most urgent issues are (1) empty/invisible tutor turns and (2) lack of a defined retry-handling behavior when the student asks to attempt a question again.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "none_before_student_7",
+      "preceding_student_turn_id": null,
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turn present; student_id=7 is the system/opening directive.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    },
+    {
+      "tutor_turn_id": "none_before_student_8",
+      "preceding_student_turn_id": "student_id=8",
+      "student_made_mistake": false,
+      "skip_reason": "No tutor turn is present in the transcript to evaluate; the student's message ('can we try the question again?') is a procedural request, not a substantive mistake.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 2,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}

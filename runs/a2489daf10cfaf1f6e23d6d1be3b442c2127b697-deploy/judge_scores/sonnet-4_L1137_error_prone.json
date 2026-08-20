@@ -1,0 +1,162 @@
+{
+  "transcript": "sonnet-4_L1137_error_prone.md",
+  "lesson_label": "1137",
+  "persona": "error_prone",
+  "judge_model": "claude-opus-4-7",
+  "wall_seconds": 36.65223836898804,
+  "tokens_in": 3054,
+  "tokens_out": 2687,
+  "n_tutor_turns_in_transcript": 0,
+  "scores": {
+    "active_learning": {
+      "score": 0,
+      "evidence": "No actual tutoring content occurred; the tutor never posed a question or delivered any instruction."
+    },
+    "direct_instruction_active_practice": {
+      "score": 0,
+      "evidence": "No teaching segments or practice were delivered in the transcript."
+    },
+    "deliberate_practice": {
+      "score": 0,
+      "evidence": "No practice problems were presented at all."
+    },
+    "mastery_learning": {
+      "score": 0,
+      "evidence": "No progression or mastery checks occurred because the session never began."
+    },
+    "cognitive_load": {
+      "score": 0,
+      "evidence": "No content delivered to evaluate cognitive load management."
+    },
+    "layering": {
+      "score": 0,
+      "evidence": "No concepts introduced, so no layering possible."
+    },
+    "non_interference": {
+      "score": 0,
+      "evidence": "No topics covered, cannot assess non-interference."
+    },
+    "interleaving": {
+      "score": 0,
+      "evidence": "No problems posed, so no interleaving possible."
+    },
+    "testing_effect": {
+      "score": 0,
+      "evidence": "No retrieval attempts were prompted; tutor said 'what's the first question you'd like to try?' instead of posing one."
+    },
+    "targeted_remediation": {
+      "score": 0,
+      "evidence": "No remediation because no diagnostic activity occurred."
+    }
+  },
+  "strongest_behaviors": [
+    "Friendly, non-threatening tone ('no problem! let's try again.')",
+    "Invited student engagement rather than lecturing"
+  ],
+  "weakest_behaviors": [
+    "Failed to follow the explicit system instruction to pose the first warm-up question via pose_question",
+    "Asked the student what question they wanted, effectively abdicating the tutor role"
+  ],
+  "prompt_recommendations": [
+    {
+      "title": "Enforce immediate question posing on session start",
+      "rationale": "The tutor asked the student to choose a question instead of opening with a warm-up as instructed. The system prompt should make this non-negotiable and give an example open.",
+      "evidence_quote": "what's the first question you'd like to try?",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "On session start you MUST: (1) greet in \u22641 sentence, (2) state the lesson goal in \u22641 sentence, (3) immediately call pose_question with a warm-up. NEVER ask the student to choose the question or ask permission to begin. Example: 'Hi! Today we'll practice X. Here's your first question: ...'",
+      "expected_effect": "Guarantees the session begins with active retrieval practice instead of stalling.",
+      "severity": "high"
+    },
+    {
+      "title": "Forbid meta-questions that offload lesson planning to student",
+      "rationale": "Phrases like 'what's the first question you'd like to try?' shift curricular responsibility to a 13-14 year old. Explicit prohibition prevents recurrence.",
+      "evidence_quote": "what's the first question you'd like to try?",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "FORBIDDEN PATTERNS: Do not ask the student 'what question would you like', 'where should we start', 'do you want to try\u2026'. You choose the next problem based on the lesson plan and mastery state.",
+      "expected_effect": "Keeps the tutor in control of scope and sequence.",
+      "severity": "high"
+    },
+    {
+      "title": "Require pose_question tool call in first turn",
+      "rationale": "The tutor produced only text and did not invoke pose_question. A hard requirement plus a fallback rule closes this gap.",
+      "evidence_quote": "immediately pose the first warm-up question via pose_question",
+      "evidence_turn": "student id=1 (system directive)",
+      "suggested_prompt_edit": "Your first assistant message MUST include a pose_question tool call whose stem (with any A/B/C/D options) is also mirrored verbatim in your visible text reply.",
+      "expected_effect": "Ensures structured question delivery and downstream engine tracking.",
+      "severity": "high"
+    },
+    {
+      "title": "Add recovery rule after a failed/empty prior turn",
+      "rationale": "The tutor's 'let's try again' suggests it recognized a prior failure but did not recover by posing content. A recovery rule should trigger immediate content delivery.",
+      "evidence_quote": "no problem! let's try again.",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "If a previous turn failed or produced no question, your next turn must (a) briefly acknowledge in \u22641 short clause and (b) immediately pose the intended warm-up question with full stem and options.",
+      "expected_effect": "Prevents cascading empty turns after tool or output failures.",
+      "severity": "medium"
+    }
+  ],
+  "flow_recommendations": [
+    {
+      "title": "Auto-inject warm-up if tutor fails to call pose_question on turn 1",
+      "rationale": "The engine allowed a first tutor turn with no question. A guard should detect this and either resubmit or inject a default warm-up from the lesson bank.",
+      "evidence_quote": "what's the first question you'd like to try?",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Session never begins without an actual question on screen.",
+      "severity": "high"
+    },
+    {
+      "title": "Retry policy on empty/malformed tutor opening",
+      "rationale": "The evidence shows a second attempt still lacked content. A cap of one retry with a stricter re-prompt (or fallback template) should be enforced.",
+      "evidence_quote": "no problem! let's try again.",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Guarantees a valid opening within two attempts.",
+      "severity": "medium"
+    }
+  ],
+  "experience_recommendations": [
+    {
+      "title": "Show a visible warm-up immediately on entry",
+      "rationale": "An error_prone S3 learner needs momentum; being asked to choose a question is disorienting and demotivating.",
+      "evidence_quote": "what's the first question you'd like to try?",
+      "evidence_turn": "tutor turn following student id=2",
+      "suggested_prompt_edit": "",
+      "expected_effect": "Reduces cold-start friction and increases time-on-task.",
+      "severity": "medium"
+    }
+  ],
+  "overall_summary": "The session never actually started. After a system directive to greet and immediately pose a warm-up, the tutor responded with a placeholder ('let's try again\u2026 what's the first question you'd like to try?') without invoking pose_question or presenting any content. All 10 pedagogical principles score 0 because no teaching, practice, or retrieval occurred. Fixes should focus on hard-requiring an opening question, forbidding meta-questions that offload lesson choice to the student, and adding engine-side guards that inject a warm-up if the tutor fails to.",
+  "bea_evaluations": [
+    {
+      "tutor_turn_id": "tutor_after_student_2",
+      "preceding_student_turn_id": "2",
+      "student_made_mistake": false,
+      "skip_reason": "The 'student' turn is actually a system/orchestration directive-style message ('no problem! let's try again. what's the first question you'd like to try?'), not a substantive student mistake or confusion. It is non-substantive with respect to any lesson content, so the tutor turn is out of scope for BEA evaluation.",
+      "mistake_description": null,
+      "tutor_excerpt": null,
+      "mistake_identification": null,
+      "mistake_location": null,
+      "providing_guidance": null,
+      "actionability": null,
+      "rationale": null
+    }
+  ],
+  "bea_aggregates": {
+    "n_total_tutor_turns": 1,
+    "n_in_scope": 0,
+    "coverage_rate": 0.0,
+    "mistake_identification_exact": null,
+    "mistake_identification_lenient": null,
+    "mistake_location_exact": null,
+    "mistake_location_lenient": null,
+    "providing_guidance_exact": null,
+    "providing_guidance_lenient": null,
+    "actionability_exact": null,
+    "actionability_lenient": null,
+    "overall_exact_pass_rate": null,
+    "overall_lenient_pass_rate": null,
+    "strict_pass_rate": null,
+    "lenient_pass_rate": null
+  }
+}
