@@ -28,4 +28,4 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 # Vectors now live in Postgres via pgvector — no more /tmp/vectordb
 # SMB-SQLite workaround copy. See memory/pgvector_migration_plan.md.
-CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && python manage.py seed_help_assistant_model && python manage.py generate_recent_updates && python manage.py build_help_index --with-source && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_gamification && python manage.py backfill_progress && python manage.py classify_unit_grades && python manage.py seed_help_assistant_model && python manage.py generate_recent_updates && python manage.py build_help_index --with-source && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 8 --timeout 120"]
