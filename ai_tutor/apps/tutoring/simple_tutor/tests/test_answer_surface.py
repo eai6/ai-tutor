@@ -880,3 +880,38 @@ class AnswerSurfaceProfileOverrideTest(UsesAnswerPickerTest):
         self.assertFalse(_uses_answer_picker(
             s, self._live_mcq(s, qtype='short_answer')))
 
+
+class LocalProfilesDeclareTheirSurfaceTest(DjangoTestCase):
+    """Every profiled local model states its answer surface outright.
+
+    The provider fallback infers the surface from HOSTING — local_ollama means
+    buttons — which is the inference `answer_surface` exists to stop. It was
+    right only while every local arm was 2B-8B. A new local model that omits
+    the field inherits that guess silently, and the first sign is a 27B being
+    handed four buttons, or a 2B being handed a text box it cannot parse.
+    """
+
+    def test_every_local_profile_declares_its_answer_surface(self):
+        from ai_tutor.apps.llm.model_profiles import MODEL_PROFILES
+        missing = sorted(
+            k for k, p in MODEL_PROFILES.items()
+            if k.startswith('local_ollama/')
+            and not getattr(p, 'answer_surface', None)
+        )
+        self.assertEqual(missing, [], (
+            f'local profiles without an explicit answer_surface: {missing}. '
+            'Pick "picker" (small model, buttons are the only input) or '
+            '"free_text" (large enough to read prose options).'
+        ))
+
+    def test_the_declared_values_are_ones_the_predicate_understands(self):
+        from ai_tutor.apps.llm.model_profiles import MODEL_PROFILES
+        bad = {k: p.answer_surface for k, p in MODEL_PROFILES.items()
+               if getattr(p, 'answer_surface', None)
+               and p.answer_surface not in {'picker', 'free_text'}}
+        self.assertEqual(bad, {}, (
+            f'unknown answer_surface values: {bad}. _uses_answer_picker treats '
+            'anything that is not "picker" as free text, so a typo silently '
+            'removes the buttons.'
+        ))
+

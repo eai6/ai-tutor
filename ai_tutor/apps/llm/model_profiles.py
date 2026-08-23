@@ -63,7 +63,14 @@ class ModelProfile:
     # What the student can physically send back, when the in-flight question is
     # an MCQ with options. None = decide by provider, which is what every model
     # did before this field existed: local_ollama gets the A-D buttons, cloud
-    # gets a text box. Set explicitly to override that for one model.
+    # gets a text box.
+    #
+    # Every PROFILED local model now sets this explicitly, so in practice None
+    # means "a local tag nobody has profiled yet" and the provider rule is a
+    # safety net rather than the mechanism. test_every_local_profile_declares_
+    # its_answer_surface keeps it that way: a new local model that forgets the
+    # field would otherwise inherit a guess based on hosting, which is exactly
+    # the inference this field exists to stop.
     #
     # The provider default encodes "small local model" because until now those
     # were the same thing. They are not: a local 27B reads "northing" as option
@@ -246,6 +253,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     #   more KV pressure on an 8 GB board.
     "local_ollama/qwen3-4b-thinking-jetson": ModelProfile(
         family="qwen", mode="instruct", max_tokens=4096,
+        answer_surface="picker",
         temperature=0.6, top_p=0.95, top_k=20,
         num_ctx=16384, num_gpu=99, ollama_think=True,
         notes=(
@@ -310,6 +318,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # therefore decode speed — depends on whatever else happened to be running.
     "local_ollama/qwen3:8b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, num_gpu=99,
         notes="5.2 GB weights. Comfortable on a 19 GB laptop alongside the app.",
@@ -323,6 +332,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # model (the same confound that invalidated a whole eval arm on 2026-07-30).
     "local_ollama/qwen3:14b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, num_gpu=99,
         notes="9.3 GB weights. Largest that runs usefully on 19 GB; not Jetson-viable.",
@@ -377,6 +387,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
 
     "local_ollama/qwen3.5:4b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB. Hybrid template — think=False is honoured.",
@@ -390,6 +401,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # max_tokens 1024 for the same runaway-guard reason as the 4b entries.
     "local_ollama/qwen3.5:2b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB fallback if 4b is too slow (2.7 GB Q4 weights).",
@@ -414,6 +426,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # window has to be baked into the tag. num_ctx MUST equal the Modelfile's.
     "local_ollama/qwen3.5-4b-jetson": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3.5-4B with num_ctx pinned in the Modelfile.",
@@ -424,18 +437,21 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # tutor, and the second cannot run on this box at all.)
     "local_ollama/qwen3.5-2b-jetson": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3.5-2B with num_ctx pinned in the Modelfile.",
     ),
     "local_ollama/qwen3.5:0.8b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False,
         notes="1.0 GB Q4. Too small to tutor; profiled for intent-classifier use.",
     ),
     "local_ollama/qwen3.5:9b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=3072,
+        answer_surface="picker",
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, ollama_think=False,
         notes="Does NOT fit the Jetson (6.6 GB Q4 > free RAM). Larger boxes only.",
