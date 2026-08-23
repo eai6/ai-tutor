@@ -256,17 +256,64 @@ Two arms × 34 ≈ 5–6 h ≈ **~$0.70** of GPU. Both fit one instance; `run_ma
 is resume-safe per arm. Dropping the rubric judge also removes one
 full-transcript Sonnet call per session.
 
+### 4.1b Operational notes — every one of these cost time on the dry run
+
+**`DEBUG=True` is mandatory.** `run_matrix.sh` calls `seed_ollama_configs.py`
+first and exits if it fails. That script does not go through `manage.py`, so
+`settings.py` raises `ImproperlyConfigured` ("SECRET_KEY is still the
+development default while DEBUG is False") and the whole sweep dies before it
+touches a model. The Colab notebook writes `DEBUG=True` into its env for the
+same reason.
+
+**`AI_TUTOR_ROOT="$PWD"` is mandatory.** `run_matrix.sh` defaults `ROOT` to a
+hardcoded path on another developer's machine.
+
+**Attach the SSH key to each new instance.** `~/.ssh/id_ed25519_vast` exists and
+is registered on the account, but a fresh instance does not get it
+automatically:
+
+    ./venv/bin/vastai attach ssh <instance_id> "$(cat ~/.ssh/id_ed25519_vast.pub)"
+
+Without it: `Permission denied (publickey)`.
+
+**Budget ~10 minutes of model pull before anything generates.** The 27b base is
+17 GB and the registry serves it at ~50 MB/s regardless of the box's link speed;
+the sha256 verify of a 16 GB layer adds a few more minutes. The 4b is ~90 s.
+Instance storage does not survive `destroy`, so this repeats every rental.
+
+**Version skew is expected and fine.** The local CLI (0.15.2) is far behind the
+`ollama/ollama` image server (0.32.15). `list`, `pull` and `create` were all
+verified working across it on 2026-08-23 — the create is what matters, since a
+failure there makes `run_matrix.sh` print "create failed — skipping" and drop
+the arm silently.
+
 ### 4.2 Serve + tunnel
 
-```bash
-# instance (ollama/ollama image)
-export OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 \
-       OLLAMA_KEEP_ALIVE=1h OLLAMA_MAX_LOADED_MODELS=1
-ollama serve
+**Vast's `--ssh` replaces the image entrypoint, so Ollama is NOT running when
+the instance comes up**, and `--env` flags passed to `create instance` do not
+reach it. Start it by hand:
 
-# Mac — tunnel, never expose the port. Ollama has no auth.
-ssh -N -L 11434:localhost:11434 root@<host> -p <port>
+```bash
+# on the instance. OLLAMA_HOST=127.0.0.1 is the security-critical part: the
+# image sets 0.0.0.0, and vast maps 11434 to a PUBLIC port. Ollama has no
+# authentication, so that would put an open inference API on the internet.
+cat > /root/start_ollama.sh <<'EOF'
+export OLLAMA_HOST=127.0.0.1:11434
+export OLLAMA_FLASH_ATTENTION=1
+export OLLAMA_KV_CACHE_TYPE=q8_0
+export OLLAMA_KEEP_ALIVE=1h
+export OLLAMA_MAX_LOADED_MODELS=1
+exec /bin/ollama serve
+EOF
+chmod +x /root/start_ollama.sh
+setsid nohup /root/start_ollama.sh > /root/ollama.log 2>&1 < /dev/null &
+
+# on the Mac — the tunnel is now the ONLY route in
+ssh -i ~/.ssh/id_ed25519_vast -N -L 11434:127.0.0.1:11434 -p <port> root@<ip>
 ```
+
+Confirm the public port is dead before proceeding:
+`curl -m 8 http://<ip>:<mapped_11434_port>/api/tags` must fail.
 
 ### 4.3 Smoke, then two gates
 
@@ -283,12 +330,20 @@ exists here" as "done" with no content check, so a 1-scenario file blocks the re
 run unless re-run with `FORCE=1`.
 
 **Gate 1 — instruct mode.** `cat /tmp/hg1_smoke/identity.log` → want
-`thinking_chars=0`. The one genuinely unverified thing about the 3.8 arm: 3.6's
+`thinking_chars=0`.
+
+> **Settled 2026-08-23.** A dry run on a rented 3090 produced:
+> `qwen3.8-27b-instruct profile_think=False thinking_chars=0 content_chars=1
+> -> answers directly (instruct-style)`. **`ollama_think=False` does reach
+> Qwen3.8's gate.** Keep the check — it is nearly free and guards against a
+> tag rebuilt from a different base — but it is now confirmation, not a coin
+> flip. The reasoning below is why it was ever in doubt: 3.6's
 hybrid template demonstrably gated on Ollama's top-level `think` flag, but
 Qwen3.8 moved its primary control to `reasoning_effort` and routes
 `enable_thinking` through `chat_template_kwargs`, which is vLLM-only — Ollama
 drops it. The tag ships the card's *thinking* defaults (temp 1.0, top_p 0.95,
-pp 0). `THINKS` → **stop**.
+pp 0). `THINKS` → **stop** (this would now mean the tag was rebuilt from a
+different base, not that the mechanism never worked).
 
 **Gate 2 — full GPU offload.** `ollama ps` → want `100% GPU`. The profile
 deliberately does not pin `num_gpu` (mirroring 3.6), so Ollama autofits to *free*
@@ -343,7 +398,7 @@ grading never had. Optional, and the Import merge makes it cheap.
 
 ## 6. Risks
 
-1. **Thinking suppression unverified on 3.8** — gate 1. Highest impact.
+1. ~~**Thinking suppression unverified on 3.8**~~ — **resolved 2026-08-23**, verified by dry run (§4.3). Gate 1 stays as a cheap regression check.
 2. **`passed` misread after the rubric is off** — §3.3. Record `rubric_skipped`.
 3. **Mis-minted `hg1`** — §3.6's count check catches it for free.
 4. **~3 GB VRAM headroom** — gate 2. Costs time, not correctness.

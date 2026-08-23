@@ -369,14 +369,14 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     # knob equal makes the mt100 row a clean 3.6-vs-3.8 read on one variable.
     # Tag built from infra/ollama/Modelfile.qwen3.8-27b-instruct.
     #
-    # ollama_think=False is the INTENT here, not a verified mechanism. 3.8 moved
-    # its primary reasoning control to `reasoning_effort` and routes
-    # `enable_thinking` through chat_template_kwargs (vLLM-only; Ollama drops
-    # it). Whether Ollama's top-level `think` flag still reaches 3.8's gate is
-    # unestablished — run_matrix.sh's identity probe prints thinking_chars to
-    # identity.log before the first scenario is scored, and a THINKS result
-    # means this profile is not doing what it claims. Do not read the row until
-    # that line says otherwise.
+    # ollama_think=False VERIFIED to reach 3.8's gate, 2026-08-23: a dry run on
+    # a rented 3090 reported thinking_chars=0, "answers directly". It was in
+    # doubt because 3.8 moved its primary reasoning control to
+    # `reasoning_effort` and routes `enable_thinking` through
+    # chat_template_kwargs (vLLM-only; Ollama drops it), so the 3.6 evidence did
+    # not transfer. run_matrix.sh's identity probe still prints thinking_chars
+    # before the first scenario is scored — cheap insurance against the tag
+    # being rebuilt from a different base.
     "local_ollama/qwen3.8-27b-instruct": ModelProfile(
         family="qwen", mode="instruct", max_tokens=2048,
         temperature=0.7, top_p=0.80, top_k=20,

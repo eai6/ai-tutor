@@ -18,13 +18,16 @@
 #      — Ollama's top-level `think` flag, which works on HYBRID templates that
 #      gate on Think (which this is).
 #
-# VERIFY THE MODE BEFORE TRUSTING THE ROW. Qwen3.8 moved the primary reasoning
-# knob to `reasoning_effort` (xhigh default / medium / low) alongside
-# `enable_thinking`, and `enable_thinking` now travels in chat_template_kwargs,
-# which is vLLM-only — Ollama ignores it. Whether Ollama's `think: false` maps
-# onto 3.8's new gate is NOT established here the way it was for 3.6. The
-# identity probe in run_matrix.sh settles it: read `thinking_chars` in
-# identity.log after the build and STOP THE RUN if the arm reports THINKS.
+# MODE VERIFIED 2026-08-23. Ollama's `think: false` DOES reach 3.8's gate:
+# a dry run on a rented 3090 reported `profile_think=False thinking_chars=0
+# content_chars=1 -> answers directly (instruct-style)`.
+#
+# It was in doubt because Qwen3.8 moved the primary reasoning knob to
+# `reasoning_effort` (xhigh default / medium / low) alongside `enable_thinking`,
+# and `enable_thinking` now travels in chat_template_kwargs, which is vLLM-only
+# — Ollama ignores it. Keep reading `thinking_chars` in identity.log after each
+# build anyway: it is nearly free, and it would catch this tag being rebuilt
+# from a base that behaves differently.
 #
 # The tag's own baked-in defaults are the card's THINKING numbers (temperature
 # 1.0, top_p 0.95, top_k 20, presence_penalty 0 — read from the registry params
