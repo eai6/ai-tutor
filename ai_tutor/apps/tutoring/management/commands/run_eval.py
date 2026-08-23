@@ -13,8 +13,18 @@ See memory/eval_harness_plan.md.
 from __future__ import annotations
 
 import argparse
+import json
 
 from django.core.management.base import BaseCommand, CommandError
+
+
+def _git_sha_safe() -> str:
+    """Current sha, for warning when a checkpoint was scored by other code."""
+    from evals.runner import _git_sha
+    try:
+        return _git_sha()
+    except Exception:                                        # noqa: BLE001
+        return 'unknown'
 
 
 def filter_by_subset(scenarios, subset):
@@ -59,12 +69,27 @@ class Command(BaseCommand):
                                  'benchmark, and its 15 scenarios could not '
                                  'resolve a model difference below ~36pp. Sample '
                                  'to cut wall-clock; run the full set to publish.')
+        parser.add_argument('--no-resume', action='store_true',
+                            help='Start from scratch even when a checkpoint '
+                                 'for this tutor model exists. Resuming is the '
+                                 'DEFAULT: a killed sweep continues where it '
+                                 'stopped instead of re-running scenarios it '
+                                 'already scored.')
+        parser.add_argument('--resume', nargs='?', const='latest', default=None,
+                            metavar='PARTIAL_JSON',
+                            help='Resume a killed run from its checkpoint: skip '
+                                 'scenarios already completed there and fold '
+                                 'their results into this run. With no value, '
+                                 'uses the fullest checkpoint for this tutor '
+                                 'model. Pass the SAME filters/--sample/--seed '
+                                 'as the original run so the scenario set '
+                                 'matches.')
         parser.add_argument('--seed', type=int, default=0,
                             help='Seed for --sample (default: 0). Same seed + '
                                  'same dataset = same draw.')
 
     def handle(self, *args, smoke, scenario, single_turn, multi_turn, subset,
-               sample, seed, **kwargs) -> None:
+               sample, seed, resume=None, no_resume=False, **kwargs) -> None:
         if single_turn and multi_turn:
             raise CommandError("Pass at most one of --single-turn / --multi-turn.")
         if sample is not None and sample < 1:
@@ -141,8 +166,54 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"\n=== Running {len(scenarios)} scenario(s) ===\n")
         )
 
-        result = run(scenarios)
+        # Resume. Default ON: a killed sweep continues instead of re-running
+        # scenarios it already paid for. Keyed on the tutor model inside
+        # resumable_partials, because a sweep points every arm at ONE
+        # checkpoint dir and folding arm A's scenarios into arm B's board
+        # would publish A's scores under B's name — worse than losing the run.
+        from pathlib import Path as _Path
+
+        from evals.runner import (
+            auto_resume_partial, clear_partials, load_partial, latest_partial,
+            _tutor_model_spec,
+        )
+
+        prior: list = []
+        consumed_partial = None
+        if resume is None and not no_resume:
+            auto = auto_resume_partial()
+            if auto is not None:
+                resume = str(auto)
+                self.stdout.write(self.style.WARNING(
+                    f">> auto-resuming from {auto.name} — pass --no-resume to "
+                    f"start fresh"))
+        if resume is not None:
+            consumed_partial = (latest_partial() if resume == 'latest'
+                                else _Path(resume))
+            if consumed_partial is None:
+                raise CommandError('No partial checkpoint found to resume from.')
+            try:
+                prior, ckpt_sha = load_partial(consumed_partial)
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                raise CommandError(f'Cannot resume from {consumed_partial}: {exc}')
+            if ckpt_sha != _git_sha_safe():
+                self.stdout.write(self.style.WARNING(
+                    f">> checkpoint was written at {ckpt_sha}, current code is "
+                    f"{_git_sha_safe()} — the resumed scenarios were scored by "
+                    f"DIFFERENT code than the ones about to run"))
+            self.stdout.write(self.style.SUCCESS(
+                f">> resuming: {len(prior)} scenario(s) already scored"))
+
+        def _progress(res, done, total):
+            mark = 'pass' if res.passed else ('ERR ' if res.error else 'fail')
+            self.stdout.write(f"  [{done:>3}/{total}] {mark}  {res.scenario_id}")
+            self.stdout.flush()
+
+        result = run(scenarios, on_result=_progress, prior_results=prior)
         out_path = write_run(result)
+        # Only now are the checkpoints superseded. Clearing earlier would mean
+        # a crash between run() and write_run() lost everything twice over.
+        clear_partials(_tutor_model_spec())
 
         # Per-scenario one-liner.
         for sr in result.results:

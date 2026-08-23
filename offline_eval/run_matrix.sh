@@ -49,6 +49,13 @@ if [[ -z "${OLLAMA_API_BASE:-}" && -n "${OLLAMA_HOST:-}" ]]; then
 fi
 export OLLAMA_API_BASE="${OLLAMA_API_BASE:-}"
 PROBE_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
+# Checkpoints go in the RESULTS dir, not evals/runs. The 2026-08-05 loss:
+# the checkpoint lived on the VM disk and the salvage copy only ran when the
+# eval PROCESS died inside a living runtime — a runtime death (browser closed,
+# instance reclaimed) took the disk and the checkpoint with it. RESULTS is the
+# one directory a sweep is guaranteed to care about keeping.
+export EVAL_CHECKPOINT_DIR="${EVAL_CHECKPOINT_DIR:-$RESULTS}"
+
 mkdir -p "$RESULTS" "$OLLAMA_MODELS"
 # Per-scenario checkpoints go STRAIGHT to the (Drive-backed) results dir —
 # a dead runtime keeps them (2026-08-05: VM-disk checkpoints died with the VM).

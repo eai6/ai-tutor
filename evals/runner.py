@@ -649,11 +649,148 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     )
 
 
-def run(scenarios: list[Scenario]) -> RunResult:
+def _write_partial(path: Path, *, started: str, git_sha: str, total: int,
+                   results: list) -> None:
+    """Atomically checkpoint the run so far.
+
+    Exists because of the 2026-08-04 Colab bare-tag sweep: ~22 of 30
+    scenarios had COMPLETED (9+ hours of GPU time) when the VM's OOM killer
+    SIGKILLed the process — and since the JSON was only written at the end
+    of the whole run, every one of them was lost. This file holds the same
+    shape as a final run JSON plus ``"partial": true``, so aggregate.py and
+    the analysis tooling can read a salvaged run unchanged. Deleted on
+    successful completion (the final write_run supersedes it)."""
+    payload = {
+        'partial': True,
+        'started_at': started,
+        'finished_at': None,
+        'git_sha': git_sha,
+        'total_scenarios': total,
+        'completed_scenarios': len(results),
+        'passed': sum(1 for r in results if r.passed),
+        'failed': sum(1 for r in results if not r.passed and not r.error),
+        'errored': sum(1 for r in results if r.error),
+        'results': [asdict(r) for r in results],
+        'engine': None,
+        'tutor_model': _tutor_model_spec(),
+    }
+    tmp = path.with_suffix('.tmp')
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                   encoding='utf-8')
+    tmp.replace(path)
+
+
+def checkpoint_root() -> Path:
+    """Where per-scenario checkpoints are written.
+
+    EVAL_CHECKPOINT_DIR overrides the default (evals/runs). This exists
+    because of the 2026-08-05 laptop-shutdown loss: the checkpoint lived on
+    the Colab VM disk and the salvage copy in run_matrix.sh only ran when the
+    eval PROCESS died inside a living runtime — a runtime death (browser
+    closed, VM reclaimed) took the disk and the checkpoint with it, while the
+    .log survived because it was the one file written straight to the Drive
+    mount. The sweep scripts now point this at the Drive-backed results dir
+    so every per-scenario write is durable."""
+    override = (os.environ.get('EVAL_CHECKPOINT_DIR') or '').strip()
+    return Path(override) if override else RUNS_ROOT
+
+
+def partial_path_for(started: dt.datetime, git_sha: str) -> Path:
+    ts = started.strftime('%Y-%m-%dT%H-%M-%S')
+    return checkpoint_root() / f"partial_{ts}_{git_sha}.json"
+
+
+def latest_partial() -> Path | None:
+    """Newest checkpoint under checkpoint_root(), or None. Filenames embed
+    the run's start timestamp, so lexical order is chronological order."""
+    partials = sorted(checkpoint_root().glob('partial_*.json'))
+    return partials[-1] if partials else None
+
+
+def resumable_partials(tutor_model: str) -> list[tuple[Path, int]]:
+    """Checkpoints belonging to ``tutor_model``, richest first.
+
+    Keyed on the tutor model because a sweep points every model at ONE
+    checkpoint dir (EVAL_CHECKPOINT_DIR=$RESULTS): resuming model A's
+    scenarios into model B's board would silently publish A's scores under
+    B's name — worse than losing the run.
+
+    Ranked by completed_scenarios, NOT recency. Restarts that began from
+    scratch write a newer but emptier checkpoint, so 'newest' is exactly
+    the wrong pick; scenarios always run in the same sorted order, so the
+    fullest checkpoint contains every other one's work."""
+    out: list[tuple[Path, int]] = []
+    for path in checkpoint_root().glob('partial_*.json'):
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        if not data.get('partial'):
+            continue
+        if (data.get('tutor_model') or '') != (tutor_model or ''):
+            continue
+        out.append((path, int(data.get('completed_scenarios') or 0)))
+    return sorted(out, key=lambda t: t[1], reverse=True)
+
+
+def auto_resume_partial() -> Path | None:
+    """The checkpoint this run should resume, or None to start fresh."""
+    ranked = resumable_partials(_tutor_model_spec())
+    return ranked[0][0] if ranked and ranked[0][1] > 0 else None
+
+
+def clear_partials(tutor_model: str) -> int:
+    """Delete this model's checkpoints — called once a run completes and its
+    final JSON supersedes them. Without this, superseded checkpoints from a
+    finished run would be auto-resumed by the NEXT run of the same model."""
+    removed = 0
+    for path, _ in resumable_partials(tutor_model):
+        try:
+            path.unlink(missing_ok=True)
+            removed += 1
+        except Exception:
+            logger.warning("could not remove checkpoint %s", path, exc_info=True)
+    return removed
+
+
+def load_partial(path: Path) -> tuple[list[ScenarioResult], str]:
+    """Load a checkpoint's completed results for resuming.
+
+    Returns ``(results, git_sha_of_the_checkpointed_run)``. Raises ValueError
+    for a file that is not a partial checkpoint — resuming from a FINAL run
+    JSON would silently re-report old results as new."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if not data.get('partial'):
+        raise ValueError(f'{path} is not a partial checkpoint '
+                         f'(missing "partial": true)')
+    results = [ScenarioResult(**r) for r in data.get('results') or []]
+    return results, str(data.get('git_sha') or '')
+
+
+def run(scenarios: list[Scenario], on_result=None,
+        prior_results: 'list[ScenarioResult] | None' = None) -> RunResult:
+    """Run a scenario set, checkpointing after every scenario.
+
+    ``prior_results`` resumes a killed run from its checkpoint: scenarios whose
+    id already appears there are skipped, the loaded results are seeded into
+    this run's output (and its checkpoints), and the final JSON reports the
+    union. The caller must reproduce the same scenario set — same filters, same
+    --sample seed — or the union is over two different populations.
+
+    ``on_result(result, done, total)`` fires after each scenario. Without it the
+    only progress signal was grepping session ids out of a log.
+    """
     from django.db import connections
     started = dt.datetime.now(dt.timezone.utc)
-    results: list[ScenarioResult] = []
-    for scenario in scenarios:
+    RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+    checkpoint_root().mkdir(parents=True, exist_ok=True)
+    sha = _git_sha()
+    checkpoint = partial_path_for(started, sha)
+    results: list[ScenarioResult] = list(prior_results or [])
+    done_ids = {r.scenario_id for r in results}
+    pending = [s for s in scenarios if s.id not in done_ids]
+    total = len(results) + len(pending)
+    for scenario in pending:
         # Close idle DB connections between scenarios. Azure Postgres
         # aggressively closes long-idle SSL connections; without this
         # a multi-turn scenario can succeed but the NEXT scenario's
@@ -684,13 +821,35 @@ def run(scenarios: list[Scenario]) -> RunResult:
                 tags=scenario.tags,
                 error=f"{type(exc).__name__}: {str(exc)[:200]}",
             ))
+        # Checkpoint after EVERY scenario. Before this, write_run was the only
+        # writer and it ran once at the end, so a SIGKILL at scenario 33 lost
+        # all 33 — which is exactly what happened on 2026-08-23 at scenario 10,
+        # and on the 2026-08-04 Colab sweep at 22 of 30 after 9+ hours of GPU.
+        # Now a kill costs at most the scenario in flight.
+        try:
+            _write_partial(checkpoint, started=started.isoformat(),
+                           git_sha=sha, total=total, results=results)
+        except Exception:
+            logger.warning("could not write partial checkpoint %s",
+                           checkpoint, exc_info=True)
+        if on_result is not None:
+            try:
+                on_result(results[-1], len(results), total)
+            except Exception:
+                logger.warning("on_result callback failed", exc_info=True)
     finished = dt.datetime.now(dt.timezone.utc)
+    # Completed cleanly — the final write_run supersedes the checkpoint.
+    try:
+        checkpoint.unlink(missing_ok=True)
+        checkpoint.with_suffix('.tmp').unlink(missing_ok=True)
+    except Exception:
+        pass
     from ai_tutor.apps.tutoring import simple_tutor as _st
     engine_name = 'simple_tutor' if _st.is_enabled() else 'conversational_tutor'
     return RunResult(
         started_at=started.isoformat(),
         finished_at=finished.isoformat(),
-        git_sha=_git_sha(),
+        git_sha=sha,
         total_scenarios=len(results),
         passed=sum(1 for r in results if r.passed),
         failed=sum(1 for r in results if not r.passed and not r.error),
