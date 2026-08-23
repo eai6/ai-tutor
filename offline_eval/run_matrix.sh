@@ -32,6 +32,23 @@ export OLLAMA_MODELS="${OLLAMA_MODELS:-$ROOT/offline_eval/ollama_models}"
 # ConversationalTutor (no tool-use; works with non-tool models too).
 # NOTE: models that can't tool-call will hit the engine's fallback on simple_tutor.
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
+
+# Remote Ollama (a rented GPU box). Two different consumers need the address:
+#   * the `ollama` CLI below (pull/create/list/stop/rm) reads OLLAMA_HOST;
+#   * the Django client reads api_base off the ModelConfig row, which
+#     seed_ollama_configs.py writes from OLLAMA_API_BASE.
+# Derive one from the other so callers only have to export the obvious one, and
+# hand the result to the identity probe, which would otherwise hardcode
+# localhost and report "probe failed" against a remote box — silently losing
+# the ONE check that catches a thinking model masquerading as instruct.
+if [[ -z "${OLLAMA_API_BASE:-}" && -n "${OLLAMA_HOST:-}" ]]; then
+  case "$OLLAMA_HOST" in
+    http://*|https://*) OLLAMA_API_BASE="$OLLAMA_HOST" ;;
+    *)                  OLLAMA_API_BASE="http://$OLLAMA_HOST" ;;
+  esac
+fi
+export OLLAMA_API_BASE="${OLLAMA_API_BASE:-}"
+PROBE_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
 mkdir -p "$RESULTS" "$OLLAMA_MODELS"
 # Per-scenario checkpoints go STRAIGHT to the (Drive-backed) results dir —
 # a dead runtime keeps them (2026-08-05: VM-disk checkpoints died with the VM).
@@ -86,7 +103,8 @@ while read -r tag tier _rest; do
   # the profile's think setting via the engine's own client, then report
   # whether the model thought.
   digest=$(ollama list | awk -v t="$tag" '$1==t || $1==t":latest" {print $2; exit}')
-  identity=$(AI_TUTOR_TAG="$tag" "$PY" - <<'PROBE' 2>/dev/null
+  identity=$(AI_TUTOR_TAG="$tag" AI_TUTOR_OLLAMA_BASE="$PROBE_BASE" \
+    "$PY" - <<'PROBE' 2>/dev/null
 import json, os, sys, urllib.request
 sys.path.insert(0, os.environ.get('AI_TUTOR_ROOT') or os.getcwd())
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -105,7 +123,8 @@ body = {'model': tag, 'stream': False,
 if think is not None:
     body['think'] = think
 try:
-    req = urllib.request.Request('http://localhost:11434/api/chat',
+    base = os.environ.get('AI_TUTOR_OLLAMA_BASE') or 'http://localhost:11434'
+    req = urllib.request.Request(f'{base}/api/chat',
                                  data=json.dumps(body).encode(),
                                  headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=900) as r:

@@ -16,7 +16,8 @@ NB = ROOT / 'offline_eval' / 'colab_mt100_qwen.ipynb'
 RUN_MATRIX = ROOT / 'offline_eval' / 'run_matrix.sh'
 
 ARMS = ('qwen3.5-2b-jetson', 'qwen3-4b-jetson', 'qwen3-8b-jetson',
-        'qwen3.6-27b-instruct', 'qwen3-30b-a3b-jetson')
+        'qwen3.6-27b-instruct', 'qwen3-30b-a3b-jetson',
+        'qwen3.8-27b-instruct')
 
 
 def _source():
@@ -33,7 +34,7 @@ def test_notebook_is_valid_and_regenerates_deterministically():
         assert NB.read_text() == first, 'generator is not deterministic'
 
 
-def test_runs_all_five_qwen_arms():
+def test_runs_all_qwen_arms():
     src = _source()
     for arm in ARMS:
         assert arm in src, f'{arm} missing from the notebook'
@@ -86,7 +87,7 @@ def test_run_matrix_still_builds_modelfile_tags_via_ollama_create():
 
 
 def test_every_arm_has_a_real_modelfile_on_disk():
-    """Belt-and-suspenders on top of the mechanism check above: the five
+    """Belt-and-suspenders on top of the mechanism check above: the
     Modelfiles this board depends on must actually exist, independent of
     anything the notebook or run_matrix.sh claims about them."""
     for arm in ARMS:
@@ -184,13 +185,16 @@ def test_models_txt_column_1_is_a_bare_tag_with_a_real_modelfile():
         )
 
 
-def test_groups_partition_the_five_arms_exactly():
-    """Three tabs on disjoint groups is the whole point. An overlap means two
-    tabs build and evaluate the same tag and race on one <tag>.json in the
-    shared Drive folder; a gap means an arm silently never runs."""
+def test_groups_partition_the_arms_exactly():
+    """One tab per group on disjoint groups is the whole point. An overlap
+    means two tabs build and evaluate the same tag and race on one <tag>.json
+    in the shared Drive folder; a gap means an arm silently never runs.
+
+    Asserted against ARMS rather than a literal group count so adding an arm
+    fails here only when the groups genuinely stop covering it."""
     subprocess.run([sys.executable, str(GEN)], cwd=ROOT, check=True)
     groups = _arm_groups(json.loads(NB.read_text())['cells'])
-    assert len(groups) == 3, f'expected 3 groups, got {sorted(groups)}'
+    assert len(groups) == 4, f'expected 4 groups, got {sorted(groups)}'
     flat = [t for g in groups.values() for t in g]
     assert len(flat) == len(set(flat)), f'groups overlap: {sorted(flat)}'
     assert set(flat) == set(ARMS), f'groups do not cover the arms: {sorted(flat)}'

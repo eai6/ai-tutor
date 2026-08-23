@@ -18,6 +18,19 @@ import json
 from django.core.management.base import BaseCommand, CommandError
 
 
+def filter_by_subset(scenarios, subset):
+    """Keep scenarios carrying EVERY tag in `subset` (comma-separated).
+
+    AND, not OR. A single tag is the same expression it always was, so existing
+    callers (run_cloud.sh, the Colab notebooks, MT100_RUNBOOK) are untouched;
+    the comma form exists so a board can be sliced ("v2,geography") without
+    minting a new dataset tag for every slice, which is how `v2` itself had to
+    be created.
+    """
+    wanted = [t.strip() for t in subset.split(',') if t.strip()]
+    return [s for s in scenarios if all(t in s.tags for t in wanted)]
+
+
 class Command(BaseCommand):
     help = "Run the eval harness against one or more scenarios."
 
@@ -32,7 +45,11 @@ class Command(BaseCommand):
                             help='Run only multi_turn scenarios.')
         parser.add_argument('--subset', default=None,
                             help='Only run scenarios carrying this tag. '
-                                 'Combines with --single-turn / --multi-turn.')
+                                 'Combines with --single-turn / --multi-turn. '
+                                 'Comma-separated tags AND together '
+                                 '("v2,geography" = in v2 AND geography), so a '
+                                 'board can be sliced without minting a new tag '
+                                 'for every slice.')
         parser.add_argument('--sample', type=int, default=None,
                             help='Run a random sample of N scenarios instead of '
                                  'the full set, drawn AFTER the other filters. '
@@ -96,7 +113,7 @@ class Command(BaseCommand):
             scenarios = [s for s in scenarios if s.mode == 'multi_turn']
 
         if subset:
-            scenarios = [s for s in scenarios if subset in s.tags]
+            scenarios = filter_by_subset(scenarios, subset)
 
         if not scenarios:
             hint = f" for subset={subset!r}" if subset else ""

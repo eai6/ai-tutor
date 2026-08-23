@@ -23,6 +23,9 @@ from apps.llm.models import ModelConfig
 from apps.accounts.models import Institution
 
 
+OLLAMA_API_BASE = os.environ.get('OLLAMA_API_BASE', '')
+
+
 def load_tags(path):
     tags = []
     for line in open(path, encoding='utf-8'):
@@ -50,7 +53,14 @@ def main():
                 name=f'offline-eval: {tag}',
                 purpose='tutoring',          # harmless: is_active=False won't shadow
                 api_key_env_var='',          # Ollama needs no key
-                api_base='',                 # client defaults to http://localhost:11434
+                # Empty => OllamaClient falls back to http://localhost:11434.
+                # Set OLLAMA_API_BASE to point the Django client at a REMOTE
+                # Ollama (a rented GPU box): the eval then runs on this machine
+                # while inference happens there, with the Modelfile, num_ctx and
+                # ollama_think mechanics unchanged. Export the matching
+                # OLLAMA_HOST so run_matrix.sh's `ollama pull/create/list/stop`
+                # CLI calls target the same server.
+                api_base=OLLAMA_API_BASE,
                 temperature=0.2,             # within the tutoring [0.1, 0.3] clamp
                 max_tokens=1024,
                 is_active=False,

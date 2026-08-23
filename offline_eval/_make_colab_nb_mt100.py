@@ -1,5 +1,5 @@
 """Generate offline_eval/colab_mt100_qwen.ipynb — Colab notebook that runs the
-MULTI-TURN eval for all five local Qwen tutor arms on the representative-100
+MULTI-TURN eval for all six local Qwen tutor arms on the representative-100
 multi-turn scenarios (tag `v2`), the OSS leg of the mt100 board.
 
 Purpose: score every Jetson-deployable Qwen size the offline tutor could ship
@@ -28,7 +28,7 @@ landing on two-call only by the `not family` fallback, before they had
 
 Three deliberate choices, so the numbers mean something:
 
-  1. **All five arms, Modelfile-pinned tags only.** Every arm ships from
+  1. **All six arms, Modelfile-pinned tags only.** Every arm ships from
      `infra/ollama/Modelfile.<tag>` (num_ctx/template baked in per
      apps/llm/model_profiles.py — see the CRITICAL note below). Bare
      registry tags were deprecated repo-wide (b5b7a68) and are NOT used here:
@@ -37,7 +37,7 @@ Three deliberate choices, so the numbers mean something:
      tutor on every graded turn. run_matrix.sh builds each tag via
      `ollama create <tag> -f infra/ollama/Modelfile.<tag>` — it detects the
      Modelfile automatically and never falls back to `ollama pull <tag>` for
-     these five.
+     these six.
   2. **The representative-100 multi-turn scenarios** (`--subset v2`): Task 1
      selected 100 scenarios as a representative draw over the full dataset;
      Task 2 tagged them `v2`. No `--sample` cap — the subset IS the 100.
@@ -45,7 +45,7 @@ Three deliberate choices, so the numbers mean something:
      get_model_profile` falls through to a generic `r"qwen3"` regex when an
      exact `MODEL_PROFILES` key is missing. That fallback returns a CLOUD
      profile with `num_ctx=None`, which the client then sizes to 24192 — the
-     exact value that OOMed an 8 GB box in an earlier eval arm. The five tags
+     exact value that OOMed an 8 GB box in an earlier eval arm. The six tags
      below MUST be spelled exactly as they appear in `MODEL_PROFILES`
      (apps/llm/model_profiles.py) and MUST each have a matching
      `infra/ollama/Modelfile.<tag>`; a single character off silently runs the
@@ -71,16 +71,16 @@ RESULTS = f'offline_eval/multi_turn_results/{SWEEP}'
 # No --sample cap: the v2 subset IS the 100 — every arm sees all 100.
 MODE = os.environ.get('MT100_MODE', '--multi-turn --subset v2')
 
-# The five arms under test (tag tier, run_matrix.sh shape — see run_matrix.sh:
+# The six arms under test (tag tier, run_matrix.sh shape — see run_matrix.sh:
 # `while read -r tag tier _rest`, then `MODELFILE="$ROOT/infra/ollama/
 # Modelfile.$tag"` and `TUTOR_MODEL_OVERRIDE="local_ollama/$tag"`). Column 1
 # is therefore the BARE tag, never provider-prefixed — run_matrix.sh prepends
 # `local_ollama/` itself when it invokes the eval; a prefixed column 1 makes
 # it look for a nonexistent `Modelfile.local_ollama/<tag>`, fall through to a
 # bare `ollama pull local_ollama/<tag>`, 404, and skip the arm silently (all
-# five, in this list). Every tag is Modelfile-pinned — see
+# six, in this list). Every tag is Modelfile-pinned — see
 # infra/ollama/Modelfile.<tag> for each.
-# The five arms, split into three groups so they can run in three CONCURRENT
+# The six arms, split into four groups so they can run in four CONCURRENT
 # Colab tabs. Cell 2 exposes a dropdown; each tab picks a different group.
 #
 # Split by memory footprint, not by count, because that is what decides which
@@ -92,30 +92,39 @@ MODE = os.environ.get('MT100_MODE', '--multi-turn --subset v2')
 #       failure mode do not cost the other four arms a session.
 #
 # Concurrency is safe: run_matrix.sh takes no lock, and each arm writes its own
-# <tag>.json into the shared Drive sweep folder, so three tabs on disjoint
+# <tag>.json into the shared Drive sweep folder, so four tabs on disjoint
 # groups never contend. Do NOT run the same group in two tabs — that WOULD race
 # on one JSON.
 ARM_GROUPS = {
     'A_small_2b_4b_8b': ['qwen3.5-2b-jetson', 'qwen3-4b-jetson', 'qwen3-8b-jetson'],
     'B_27b': ['qwen3.6-27b-instruct'],
     'C_30b': ['qwen3-30b-a3b-jetson'],
+    'D_27b_38': ['qwen3.8-27b-instruct'],
 }
 _GROUP_RUNTIME = {
     'A_small_2b_4b_8b': 'free T4 is fine',
     'B_27b': 'L4 / A100 — 27B does not fit a T4',
     'C_30b': 'A100 or L4 — ~18 GB at q4, `num_gpu=99` forces full offload',
+    'D_27b_38': 'L4 / A100 — 17.7 GB incl. a 0.93 GB vision projector; T4 OOMs',
 }
 
-# Instruct-mode note that travels with the list: 2b/8b/27b are hybrid templates
-# with think suppressed via the profile's ollama_think=False; 4b and 30b are
-# instruct CHECKPOINTS with nothing to suppress. Do not "fix" the asymmetry —
-# see the Modelfiles.
+# Instruct-mode note that travels with the list: 2b/8b and both 27b arms are
+# hybrid templates with think suppressed via the profile's ollama_think=False;
+# 4b and 30b are instruct CHECKPOINTS with nothing to suppress. Do not "fix"
+# the asymmetry — see the Modelfiles.
 #
-# QWEN_MODELS is the FULL five-arm list in run_matrix.sh's `tag tier` shape. It
+# D_27b_38 is the qwen3.8 successor to B_27b's 3.6, held knob-for-knob
+# identical to it so the pair reads as one variable. Its thinking-suppression
+# is the one genuinely unverified thing on this board: 3.8 moved to
+# `reasoning_effort` and a vLLM-only `enable_thinking`, so check identity.log
+# for thinking_chars before trusting the row.
+#
+# QWEN_MODELS is the FULL six-arm list in run_matrix.sh's `tag tier` shape. It
 # is what the generation-time sanity check below validates; the notebook itself
 # writes only the selected group's subset.
+_FLAT_ARMS = [tag for grp in ARM_GROUPS.values() for tag in grp]
 QWEN_MODELS = os.environ.get('MT100_MODELS') or "\n".join(
-    f"{tag:24s} jetson" for grp in ARM_GROUPS.values() for tag in grp
+    f"{tag:24s} jetson" for tag in _FLAT_ARMS
 ) + "\n"
 
 # Sanity at generation time: the v2 tag must select exactly 100 multi-turn
@@ -140,7 +149,8 @@ for _line in QWEN_MODELS.strip().splitlines():
     _mf = _ROOT / 'infra' / 'ollama' / f'Modelfile.{_tag}'
     assert _mf.exists(), f'missing {_mf}'
     _ARM_TAGS.append(_tag)
-assert len(_ARM_TAGS) == 5, f'expected 5 qwen arms, found {len(_ARM_TAGS)}'
+assert len(_ARM_TAGS) == len(_FLAT_ARMS), (
+    f'expected {len(_FLAT_ARMS)} qwen arms, found {len(_ARM_TAGS)}')
 
 cells = []
 
@@ -156,9 +166,9 @@ def code(s: str):
 
 
 md(rf"""
-# AI Tutor — **mt100** · Qwen leg · five local arms · representative 100 (`v2`)
+# AI Tutor — **mt100** · Qwen leg · six local arms · representative 100 (`v2`)
 
-Runs the five Jetson-deployable Qwen tutor sizes against the representative-100
+Runs the six local Qwen tutor arms against the representative-100
 multi-turn scenarios (tag `v2`, selected by Task 1, no sampling). This is the
 OSS leg of the mt100 board — the cloud leg (Task 5's model list) is scored on
 the same 100 scenarios so both legs sit on one combined board.
@@ -171,7 +181,7 @@ looks at `family`, so no arm resolves per-family.
 
 `two` matches production's Anthropic configuration and the mt30/mt50 OSS
 boards, keeping the 30 `v1` scenarios in this 100 comparable to those runs.
-It costs a second LLM call per turn on these five Qwen arms, which `auto`
+It costs a second LLM call per turn on these six Qwen arms, which `auto`
 would have run one-call.
 
 | tag | note |
@@ -209,16 +219,16 @@ _group_rows = "\n".join(
 )
 md(rf"""## Cell 0 — pick the arm group for THIS tab
 
-Run this notebook in **three tabs**, one per group, to evaluate the five Qwen
+Run this notebook in **four tabs**, one per group, to evaluate the six Qwen
 arms concurrently. Set the dropdown below before anything else — it decides
 which GPU you should pick in Cell 1.
 
 | group | arms | runtime it needs |
 | --- | --- | --- |
 {_group_rows}
-| `ALL` | all five, sequentially | A100/L4 (because of 30b) |
+| `ALL` | all six, sequentially | A100/L4 (because of 30b) |
 
-The groups are disjoint and `run_matrix.sh` takes no lock, so three tabs never
+The groups are disjoint and `run_matrix.sh` takes no lock, so four tabs never
 contend — each arm writes its own `<tag>.json` into the same Drive sweep
 folder and Cell 10 boards whatever has landed so far. **Do not run the same
 group in two tabs**: that races two writers onto one JSON.
@@ -381,10 +391,10 @@ for spec, tag in ARMS:
     assert os.path.exists(mf), f"missing {mf} — this arm would need a bare `ollama pull`, which is forbidden"
     p = MODEL_PROFILES[spec]
     print(f"OK  {spec:<38} num_ctx={p.num_ctx!s:<8} ollama_think={p.ollama_think}   built from {mf}")
-print("all five arms: exact profile + Modelfile present")
+print("all six arms: exact profile + Modelfile present")
 """)
 
-md(f"## Cell 9 — run the eval (100 v2 multi-turn scenarios, all five arms)\n"
+md(f"## Cell 9 — run the eval (100 v2 multi-turn scenarios, all six arms)\n"
    "Builds each tag from its Modelfile, runs 100 sessions per arm, saves "
    "JSON+log to Drive.\n\n"
    "`TUTOR_CALL_MODE=two` pins two-call for every arm, matching the pin the "
@@ -393,7 +403,7 @@ md(f"## Cell 9 — run the eval (100 v2 multi-turn scenarios, all five arms)\n"
    "Anthropic and OpenAI arms ran two-call — different protocols on one board. "
    "It also matches the mt30/mt50 OSS boards, so the 30 `v1` scenarios inside "
    "this 100 stay comparable to those runs. Cost: two LLM calls per turn "
-   "instead of one on these five arms.")
+   "instead of one on these six arms.")
 code(rf"""
 !TUTOR_CALL_MODE=two RESULTS_DIR=$PWD/{RESULTS} SIMPLE_TUTOR_ENGINE=1 CLEANUP_MODELS=1 \
   MODE="{MODE}" bash offline_eval/run_matrix.sh
@@ -438,9 +448,9 @@ else:
 md(rf"""
 ## Reading this run
 
-**What "clean" looks like:** all five arms complete 100/100 (or close —
+**What "clean" looks like:** all six arms complete 100/100 (or close —
 run_matrix.sh logs a skip+reason for anything that fails outright), Cell 8.5
-printed `OK` for all five with the expected `num_ctx` per arm (not `None`),
+printed `OK` for all six with the expected `num_ctx` per arm (not `None`),
 and Cell 11's identity log shows each hybrid arm (`qwen3.5-2b-jetson`,
 `qwen3-8b-jetson`, `qwen3.6-27b-instruct`) answering directly rather than
 `THINKS` — thinking was suppressed via `ollama_think=False` and should stay

@@ -1,6 +1,6 @@
 # mt100 runbook
 
-19 arms x 100 multi-turn scenarios (`--subset v2`). Both legs write into
+20 arms x 100 multi-turn scenarios (`--subset v2`). Both legs write into
 `offline_eval/multi_turn_results/mt100/`, one JSON per model.
 
 ## 0. Preflight (always)
@@ -60,7 +60,7 @@ when the board is aggregated.
 Resume-safe per model and guarded by a sweep lock: a second concurrent sweep
 against the same results dir refuses to start. Interrupt and re-run to resume.
 
-## 3. OSS leg — 5 Qwen arms, in Colab
+## 3. OSS leg — 6 Qwen arms, in Colab
 
 **Push the branch first.** The notebook clones `--depth 1 -b
 offline-harness-copy` straight from GitHub — it does not see local commits.
@@ -79,9 +79,9 @@ its Modelfile and results are written to
 `MyDrive/ai-tutor-eval-multiturn/mt100/`; download that folder into the local
 results dir when the arms finish.
 
-### Run it in three tabs
+### Run it in four tabs
 
-**Cell 0 is a dropdown.** Open the notebook in three Colab tabs and set a
+**Cell 0 is a dropdown.** Open the notebook in four Colab tabs and set a
 different `GROUP` in each — the arms are split by memory footprint, so each
 tab can request the runtime it actually needs:
 
@@ -90,28 +90,47 @@ tab can request the runtime it actually needs:
 | `A_small_2b_4b_8b` | `qwen3.5-2b-jetson`, `qwen3-4b-jetson`, `qwen3-8b-jetson` | free T4 is fine |
 | `B_27b` | `qwen3.6-27b-instruct` | L4 / A100 |
 | `C_30b` | `qwen3-30b-a3b-jetson` | A100 or L4 |
-| `ALL` | all five, sequentially | A100/L4 — single-tab only |
+| `D_27b_38` | `qwen3.8-27b-instruct` | L4 / A100 |
+| `ALL` | all six, sequentially | A100/L4 — single-tab only |
 
 Set it before Cell 1, because it determines which GPU to request.
 
 This is safe to parallelise: `run_matrix.sh` takes no lock, the groups are
 disjoint, and each arm writes its own `<tag>.json` into the shared Drive
-folder, so three tabs never contend. Cell 10 boards whatever has landed so
+folder, so four tabs never contend. Cell 10 boards whatever has landed so
 far, so a tab that finishes early gives you partial results immediately.
 
 **Do not run the same group in two tabs** — that races two writers onto one
-JSON. `test_groups_partition_the_five_arms_exactly` enforces the disjointness
+JSON. `test_groups_partition_the_arms_exactly` enforces the disjointness
 of the group definitions themselves, but nothing can stop two tabs being set
 to the same value by hand.
 
 Isolating `C_30b` also means the 30B arm's runtime choice and its failure mode
 (see below) cost only its own session rather than the other four arms'.
 
+**`D_27b_38` is the arm most likely to be silently wrong — check it first.**
+`qwen3.8-27b-instruct` is a straight successor to `qwen3.6-27b-instruct`, held
+knob-for-knob identical (max_tokens 2048, temp 0.7 / top_p 0.80 / top_k 20,
+num_ctx 32768, `ollama_think=False`) so the pair reads as one variable. But
+where 3.6's hybrid template demonstrably gated on Ollama's top-level `think`
+flag, Qwen3.8 moved its primary reasoning control to `reasoning_effort` and
+routes `enable_thinking` through `chat_template_kwargs` — which is vLLM-only,
+and Ollama drops it. Whether `think: false` still reaches 3.8's gate is NOT
+established. The tag's own baked-in defaults are the card's THINKING numbers
+(temperature 1.0, top_p 0.95, presence_penalty 0), so if the flag misses, the
+arm runs a reasoning model at instruct sampling and the row is meaningless.
+Read its `identity.log` line before letting it spend an L4 session.
+
+It also carries a **0.93 GB vision projector** 3.6 does not (17.74 GB total vs
+17.42 GB); the projector loads even though the tutor sends no images. Still
+fits an L4's 24 GB with ~6 GB left for KV at num_ctx 32768; a 16 GB T4 OOMs on
+the weights alone.
+
 **Check `identity.log` after the first Qwen arm completes.** Cell 9 runs
 `run_matrix.sh`, which probes each arm's model identity (thinks vs. answers
 directly) and appends the result to `identity.log` in the results dir before
 it scores a single scenario. Read that line as soon as the first arm's build
-finishes — don't wait for all five. If any arm reports `THINKS`, **stop the
+finishes — don't wait for all six. If any arm reports `THINKS`, **stop the
 run**: thinking was supposed to be suppressed (`ollama_think=False`) for the
 hybrid-template arms (2b/8b/27b), and a `THINKS` result means the identity
 probe is advisory only — `run_matrix.sh` logs it but does not abort — so a
@@ -160,7 +179,7 @@ above, matching the pattern Leg 1 already uses.
 legs set it — the `run_cloud.sh` invocations in steps 1 and 2 above, and Cell 9
 of the Colab notebook. `_call_mode()`
 (`apps/tutoring/simple_tutor/engine.py:2417`) returns the pinned value
-verbatim before it ever consults `family`, so all 19 arms run the same
+verbatim before it ever consults `family`, so all 20 arms run the same
 protocol and the per-family `'auto'` resolution below is bypassed entirely.
 
 Two-call means Call 1 picks tools, the platform grades, and Call 2 writes the
@@ -176,15 +195,15 @@ scenarios inside this 100 remain comparable to those earlier boards on protocol
 as well as on scenario set. That continuity is the whole reason the selection
 algorithm forces all 30 `v1` scenarios into the draw.
 
-The cost is real and worth planning for: the nine arms that `'auto'` would have
-run one-call (4 Google + 5 Qwen) now make two LLM calls per turn, so budget
+The cost is real and worth planning for: the ten arms that `'auto'` would have
+run one-call (4 Google + 6 Qwen) now make two LLM calls per turn, so budget
 roughly double the per-turn latency and token spend on those rows — including
 `gemini-3.1-pro-preview`, the most expensive arm on the board.
 
 Had it been left unpinned, `'auto'` would have resolved to `'two'` for the 5
 Anthropic arms (via `_FORCE_POSE_EXEMPT_FAMILIES == frozenset({'anthropic'})`)
 and the 5 OpenAI arms (via the `not family` fallback, before they had
-profiles), and `'one'` for the 4 Google and 5 Qwen arms — a 10/9 split with no
+profiles), and `'one'` for the 4 Google and 6 Qwen arms — a 10/10 split with no
 principle behind it.
 
 ### The five OpenAI arms now have ModelProfile entries

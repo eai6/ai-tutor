@@ -1,0 +1,58 @@
+# qwen3.8-27b-instruct — Qwen3.8-27B in NON-THINKING mode, pinned
+#
+# Build:   ollama create qwen3.8-27b-instruct -f infra/ollama/Modelfile.qwen3.8-27b-instruct
+# Use:     TUTOR_MODEL_OVERRIDE=local_ollama/qwen3.8-27b-instruct
+#
+# Successor arm to qwen3.6-27b-instruct, which tied the best cloud model on the
+# mt100 board (94% pass) on a lower rubric (0.86 vs opus-4-7's 0.91). Same
+# treatment for the same reason: Qwen3.8-27B is a HYBRID checkpoint, not a split
+# pair. There is no `qwen3.8:27b-instruct` tag to pull (verified against the
+# registry — 404, exactly as for 3.6). The card: "Thinking mode is on by default
+# and can be disabled per request."
+#
+# So instruct mode is a REQUEST-TIME switch, and it takes two pieces:
+#   1. This Modelfile — pins num_ctx and the card's non-thinking sampling, which
+#      a bare tag cannot do on the OpenAI-compatible endpoint the grader's
+#      Tier-2 verifier uses.
+#   2. `ollama_think=False` on the matching profile in apps/llm/model_profiles.py
+#      — Ollama's top-level `think` flag, which works on HYBRID templates that
+#      gate on Think (which this is).
+#
+# VERIFY THE MODE BEFORE TRUSTING THE ROW. Qwen3.8 moved the primary reasoning
+# knob to `reasoning_effort` (xhigh default / medium / low) alongside
+# `enable_thinking`, and `enable_thinking` now travels in chat_template_kwargs,
+# which is vLLM-only — Ollama ignores it. Whether Ollama's `think: false` maps
+# onto 3.8's new gate is NOT established here the way it was for 3.6. The
+# identity probe in run_matrix.sh settles it: read `thinking_chars` in
+# identity.log after the build and STOP THE RUN if the arm reports THINKS.
+#
+# The tag's own baked-in defaults are the card's THINKING numbers (temperature
+# 1.0, top_p 0.95, top_k 20, presence_penalty 0 — read from the registry params
+# blob), which is direct evidence that the pull defaults to thinking and that
+# the overrides below are load-bearing rather than cosmetic.
+
+FROM qwen3.8:27b
+
+# Context. The card advertises 262144 native (1M with YaRN), but this tag
+# deliberately does NOT think, and the tutor's real prompt is ~26k chars (~8k
+# tokens) plus tool schemas. 32768 is held IDENTICAL to
+# Modelfile.qwen3.6-27b-instruct on purpose: the whole point of this arm is a
+# 3.6-vs-3.8 comparison on the same 100 scenarios, so the context budget must
+# not be a second variable.
+#
+# Watch the VRAM headroom, which is NOT the same as 3.6's. This tag is
+# multimodal and ships a 0.93 GB vision projector on top of 16.81 GB of weights
+# (17.74 GB total, vs 3.6's text-only 17.42 GB). The projector loads even though
+# the tutor sends no images. On a 24 GB L4 that leaves ~6 GB for the KV cache,
+# which 32768 fits; a 16 GB T4 will OOM on the weights alone.
+PARAMETER num_ctx 32768
+
+# Qwen3.8 card, "non-thinking mode" sampling — identical to the values 3.6
+# recommends, so this is not a copy-paste from the sibling file but the same
+# advice restated by a newer card. presence_penalty 1.5 is the card's own
+# recommendation for this mode (it suppresses the repetition non-thinking Qwen
+# is prone to); repetition control is otherwise off on these tags.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.80
+PARAMETER top_k 20
+PARAMETER presence_penalty 1.5

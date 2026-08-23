@@ -424,7 +424,14 @@ class ModelConfig(models.Model):
             provider=provider,
             model_name=model_name,
             api_key_env_var=(env_var or ''),
-            api_base=('http://localhost:11434' if provider == 'local_ollama' else ''),
+            # OLLAMA_API_BASE lets a remote Ollama (rented GPU) work on the
+            # SYNTHESIS path too. Normally seed_ollama_configs.py has already
+            # written a row and branch 1 above wins; this covers the case where
+            # it has not, which would otherwise silently talk to localhost.
+            api_base=(
+                (os.environ.get('OLLAMA_API_BASE') or 'http://localhost:11434')
+                if provider == 'local_ollama' else ''
+            ),
             api_key_encrypted='',
             max_tokens=2048,
             temperature=0.0,

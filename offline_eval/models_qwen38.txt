@@ -1,0 +1,13 @@
+# Single-arm model list for the qwen3.8-27b math30 run.
+#
+# Shape is run_matrix.sh's `tag tier` (it does `read -r tag tier _rest`).
+# Column 1 must be the BARE Modelfile tag, never provider-prefixed:
+# run_matrix.sh detects infra/ollama/Modelfile.<tag>, builds it with
+# `ollama create` from its registry base, and prepends `local_ollama/` itself
+# for TUTOR_MODEL_OVERRIDE.
+#
+# Use with:
+#   MODELS_FILE=offline_eval/models_qwen38.txt
+#   MODE="--multi-turn --subset v2,math --sample 30 --seed 0"
+#   RESULTS_DIR=$PWD/offline_eval/multi_turn_results/math30
+qwen3.8-27b-instruct      jetson
