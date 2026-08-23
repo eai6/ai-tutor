@@ -60,6 +60,16 @@ class ModelProfile:
     num_gpu: int | None = None         # Ollama layers to offload to GPU. None → Ollama's autofit, which sizes to FREE memory at load time and silently leaves layers on CPU (measured 2026-07-27: 17-31 of 34 depending on what else was running). Decode tracks this directly — 25/34 gave 6.7 tok/s, 34/34 gave 13.5. Set high (99) to force full offload on a box where the model is known to fit.
     extra_body: dict | None = None     # provider thinking toggle, e.g. {"chat_template_kwargs": {"thinking": False}}
     ollama_think: bool | None = None   # Ollama /api/chat top-level `think` flag (extra_body's chat_template_kwargs is vLLM-only; Ollama ignores it). None = don't send. False works on HYBRID templates that gate on Think (qwen3:8b, qwen3.5:4b/9b) but NOT where <think> opens unconditionally (qwen3:4b Thinking-2507) — there it only disables Ollama's parser and the monologue lands in content. Verify per model.
+    # What the student can physically send back, when the in-flight question is
+    # an MCQ with options. None = decide by provider, which is what every model
+    # did before this field existed: local_ollama gets the A-D buttons, cloud
+    # gets a text box. Set explicitly to override that for one model.
+    #
+    # The provider default encodes "small local model" because until now those
+    # were the same thing. They are not: a local 27B reads "northing" as option
+    # B perfectly well, which is the failure (device session 29) the picker was
+    # built for on the 4B. Size, not hosting, is what the surface should track.
+    answer_surface: str | None = None   # None | 'picker' | 'free_text'
     prompt_strategy: str = "default"   # 'default' | 'persona_suppress' | 'no_system_no_fewshot'
     prompt_format: str = "xml"         # 'xml' (default, Claude/Grok/GLM/Kimi/DeepSeek) | 'markdown' (Gemini/Qwen)
     notes: str = ""
@@ -211,6 +221,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         temperature=0.7, top_p=0.8, top_k=20,
         num_ctx=16384, num_gpu=99,
         notes="Jetson Orin 8GB: Qwen3-4B-Instruct-2507 base, context capped for KV fit.",
+        answer_surface="picker",
     ),
 
     # Reasoning sibling of the tag above. Tag built from
@@ -339,6 +350,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         temperature=0.7, top_p=0.80, top_k=20,
         num_ctx=32768, ollama_think=False,
         notes="Qwen3.6-27B hybrid forced non-thinking (card's instruct sampling).",
+        answer_surface="free_text",
     ),
 
     # Successor to the tag above, and deliberately its twin: same max_tokens,
@@ -360,6 +372,7 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         temperature=0.7, top_p=0.80, top_k=20,
         num_ctx=32768, ollama_think=False,
         notes="Qwen3.8-27B hybrid forced non-thinking; mode unverified until identity.log.",
+        answer_surface="free_text",
     ),
 
     "local_ollama/qwen3.5:4b": ModelProfile(

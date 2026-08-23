@@ -3541,10 +3541,23 @@ def _uses_answer_picker(session, slot, cfg=None) -> bool:
         if cfg is None:
             from ai_tutor.apps.llm.models import ModelConfig
             cfg = ModelConfig.get_for('tutoring')
-        return (
-            cfg is not None
-            and str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
-        )
+        if cfg is None:
+            return False
+
+        # Per-model override beats the provider heuristic. The heuristic reads
+        # "local_ollama" as "small model that cannot parse prose options", which
+        # was true while every local arm was a 2B-8B. A local 27B does not need
+        # the buttons, and forcing them on it measures a UI the deployment would
+        # not ship. ModelProfile carries the other per-model knobs (num_ctx,
+        # ollama_think); this belongs beside them.
+        from ai_tutor.apps.llm.model_profiles import get_model_profile
+        profile = get_model_profile(
+            f"{getattr(cfg, 'provider', '')}/{getattr(cfg, 'model_name', '')}")
+        surface = getattr(profile, 'answer_surface', None) if profile else None
+        if surface:
+            return surface == 'picker'
+
+        return str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
     except Exception:                              # noqa: BLE001
         # Free text is the safe default on both sides: the student keeps a
         # way to reply, and the tutor keeps the ladder it has always had.

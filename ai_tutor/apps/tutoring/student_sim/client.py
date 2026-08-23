@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import logging
+import re
 
 from ai_tutor.apps.llm.client import get_llm_client, LLMResponse, call_with_transient_retry
 from ai_tutor.apps.llm.models import ModelConfig
@@ -52,6 +53,64 @@ class StudentTurn:
     """
     role: str  # 'tutor' or 'student'
     content: str
+
+
+_PICKER_LETTER_RX = re.compile(r'\b([A-D])\b')
+
+
+def _picker_letters(answer_choices: dict | None) -> list[str]:
+    """The letters the buttons actually offer, or [] when there is no picker.
+
+    Reads the engine's payload shape: {'letters': [{'letter': 'A', 'text': ...}]}.
+    Returns [] for a malformed or empty payload so the caller falls back to
+    free text rather than constraining the student to nothing.
+    """
+    if not isinstance(answer_choices, dict):
+        return []
+    out = []
+    for item in (answer_choices.get('letters') or []):
+        if isinstance(item, dict):
+            L = str(item.get('letter') or '').strip().upper()
+            if L in {'A', 'B', 'C', 'D'}:
+                out.append(L)
+    return out
+
+
+def _picker_instruction(letters: list[str]) -> str:
+    """The appended constraint. Deliberately says WHY, not just what: personas
+    are told elsewhere to explain their reasoning, and a bare "reply with one
+    letter" fights that instruction instead of scoping it."""
+    opts = ', '.join(letters)
+    return (
+        "\n\nThis question is multiple choice and you are answering on a device "
+        f"that shows you only four buttons: {opts}. There is no text box. "
+        "Reply with exactly one letter and nothing else — no explanation, no "
+        "punctuation, no restating the option. Choose the way this persona "
+        "would choose: if you would have got it wrong in writing, pick the "
+        "wrong letter here too."
+    )
+
+
+def _coerce_to_letter(reply: str, letters: list[str]) -> str:
+    """Force the reply down to one offered letter.
+
+    A sim that ignores the instruction and types prose would otherwise reach
+    the tutor as free text, silently turning a picker session into a
+    free-text one. Falls back to the first offered letter rather than to
+    free text: a real picker UI cannot send anything else, and a wrong letter
+    is a truthful thing for a student to send while a sentence is not.
+    """
+    up = (reply or '').strip().upper()
+    if up in letters:
+        return up
+    m = _PICKER_LETTER_RX.search(up)
+    if m and m.group(1) in letters:
+        return m.group(1)
+    logger.warning(
+        "[StudentSim] picker reply %r had no offered letter; coerced to %s",
+        reply[:60], letters[0],
+    )
+    return letters[0]
 
 
 class StudentClient:
@@ -101,11 +160,19 @@ class StudentClient:
             )
         return any_config
 
-    def next_reply(self, tutor_msg: str) -> str:
+    def next_reply(self, tutor_msg: str, answer_choices: dict | None = None) -> str:
         """Get the persona's reply to one tutor message.
 
         Updates the in-memory history. Returns the bare reply text
         (no role prefix, no quotes).
+
+        ``answer_choices`` is the engine's ``answer_choices`` payload for this
+        turn — present only when the A-D buttons are the student's ONLY input
+        (see engine._uses_answer_picker). When it is present the reply is
+        constrained to a single letter, because that is all the real UI can
+        send. Letting the sim type a sentence there would measure an interface
+        the deployment does not have, and would hand the grader free-text
+        signal a button-tapping student could never produce.
         """
         # Empty-content guard at the append site. If the tutor emits
         # an empty turn (Gemini Flash/Pro does this on tool-only
@@ -119,13 +186,21 @@ class StudentClient:
             tutor_msg = _EMPTY_USER_PLACEHOLDER
         self._history.append(StudentTurn(role='tutor', content=tutor_msg))
         messages = self._build_messages()
+        letters = _picker_letters(answer_choices)
+        system_prompt = self.persona.system_prompt
+        if letters:
+            # Appended, not substituted: the persona still decides WHICH letter
+            # (a struggler still picks badly), it just cannot answer in prose.
+            system_prompt = system_prompt + _picker_instruction(letters)
         response = call_with_transient_retry(lambda: self.client.generate(
             messages=messages,
-            system_prompt=self.persona.system_prompt,
+            system_prompt=system_prompt,
             max_tokens=self.model_config.max_tokens,
             temperature=self.persona.temperature,
         ), label='student_sim')
         reply = (response.content or '').strip()
+        if letters:
+            reply = _coerce_to_letter(reply, letters)
         # Strip a leading "Student:" prefix if the model adds one despite
         # the system prompt telling it not to. Also strip surrounding
         # quotes for the same reason.

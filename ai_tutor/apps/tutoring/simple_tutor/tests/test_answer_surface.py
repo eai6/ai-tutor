@@ -157,7 +157,7 @@ class UsesAnswerPickerTest(DjangoTestCase):
     silent from either side — the tutor hints into a surface that isn't there,
     or stays gagged while the student has a text box."""
 
-    def _setup(self, *, provider='local_ollama'):
+    def _setup(self, *, provider='local_ollama', model_name=None):
         _n['i'] += 1
         i = _n['i']
         inst = Institution.objects.create(name=f'AS{i}', slug=f'as{i}')
@@ -173,8 +173,9 @@ class UsesAnswerPickerTest(DjangoTestCase):
             lesson=lesson, order_index=0, phase='explain', teacher_script='s')
         ModelConfig.objects.create(
             provider=provider, purpose='tutoring',
-            model_name='qwen3-4b-jetson' if provider == 'local_ollama'
-            else 'claude-opus-4-7',
+            model_name=model_name or (
+                'qwen3-4b-jetson' if provider == 'local_ollama'
+                else 'claude-opus-4-7'),
             is_active=True, institution=inst,
         )
         session = TutorSession.objects.create(
@@ -839,3 +840,43 @@ class ServerPivotTest(DjangoTestCase):
 
         self.assertIsNone(maybe_pivot_stalled_question(session))
         self.assertTrue(InFlightQuestion.objects.filter(session=session).exists())
+
+
+class AnswerSurfaceProfileOverrideTest(UsesAnswerPickerTest):
+    """``ModelProfile.answer_surface`` beats the provider heuristic.
+
+    The heuristic reads local_ollama as "small model that cannot parse prose
+    options" — true while every local arm was 2B-8B, false for a local 27B.
+    Forcing buttons on the 27B would measure an interface the deployment would
+    not ship, and would deny the model the free-text answers it can handle.
+    """
+
+    def test_local_27b_marked_free_text_does_not_get_the_picker(self):
+        s = self._setup(model_name='qwen3.8-27b-instruct')
+        slot = self._live_mcq(s)
+        self.assertFalse(_uses_answer_picker(s, slot))
+        self.assertIsNone(_answer_choices_payload(s))
+
+    def test_the_other_27b_arm_too(self):
+        s = self._setup(model_name='qwen3.6-27b-instruct')
+        self.assertFalse(_uses_answer_picker(s, self._live_mcq(s)))
+
+    def test_local_4b_still_gets_it(self):
+        """The arm the picker was built for. Explicitly answer_surface='picker'
+        now, so this passes for the stated reason rather than by falling
+        through to the provider default."""
+        s = self._setup(model_name='qwen3-4b-jetson')
+        self.assertTrue(_uses_answer_picker(s, self._live_mcq(s)))
+
+    def test_local_model_with_no_profile_falls_back_to_the_provider_rule(self):
+        """An unprofiled local tag keeps the old behaviour. Without this the
+        change would silently switch every unlisted local model to free text."""
+        s = self._setup(model_name='some-unprofiled-local-tag')
+        self.assertTrue(_uses_answer_picker(s, self._live_mcq(s)))
+
+    def test_a_27b_free_text_arm_still_needs_an_mcq_to_be_asked_about(self):
+        """The override changes only the surface, not the other two gates."""
+        s = self._setup(model_name='qwen3.8-27b-instruct')
+        self.assertFalse(_uses_answer_picker(
+            s, self._live_mcq(s, qtype='short_answer')))
+

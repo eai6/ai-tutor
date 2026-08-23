@@ -197,6 +197,11 @@ def simulate_session(
                     show_exit_ticket=d.get('show_exit_ticket', False),
                     is_complete=d.get('is_complete', False),
                     is_correct=d.get('is_correct'),
+                    # Carried so the sim can answer the way the real UI would.
+                    # Non-None only when the A-D buttons are the student's only
+                    # input; dropping it here silently turned every picker
+                    # session into a free-text one.
+                    answer_choices=d.get('answer_choices'),
                 )
 
             class _SimpleTutorAdapter:
@@ -232,9 +237,17 @@ def simulate_session(
         if opening.show_exit_ticket:
             return _result('exit_ticket', 0)
 
+        # The tutor message OBJECT, not the transcript row: TranscriptTurn is
+        # the persisted shape and carries no answer_choices. The opening turn
+        # can already have a live MCQ, so it seeds this rather than None.
+        last_tutor_msg = opening
+
         for n in range(1, max_turns + 1):
             last_tutor_content = transcript[-1].content
-            student_reply = student.next_reply(last_tutor_content)
+            student_reply = student.next_reply(
+                last_tutor_content,
+                answer_choices=getattr(last_tutor_msg, 'answer_choices', None),
+            )
             if student.last_response is not None:
                 student_tokens_in += student.last_response.tokens_in
                 student_tokens_out += student.last_response.tokens_out
@@ -243,6 +256,7 @@ def simulate_session(
             ))
 
             tutor_msg = tutor.respond(student_reply)
+            last_tutor_msg = tutor_msg
             transcript.append(TranscriptTurn(
                 turn_number=n, role='tutor', content=tutor_msg.content,
                 is_correct=tutor_msg.is_correct, phase=tutor_msg.phase,

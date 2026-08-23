@@ -1,20 +1,27 @@
-# Two-arm model list: the qwen3.6 baseline and the qwen3.8 candidate, both
-# re-measured on the aws_deployment (production) engine.
+# Round 1: does the answer SURFACE matter as much as the model?
 #
-# Shape is run_matrix.sh's `tag tier` (it does `read -r tag tier _rest`).
-# Column 1 must be the BARE Modelfile tag, never provider-prefixed:
-# run_matrix.sh detects infra/ollama/Modelfile.<tag>, builds it with
-# `ollama create` from its registry base, and prepends `local_ollama/` itself
-# for TUTOR_MODEL_OVERRIDE.
+#   qwen3.8-27b-instruct  free text  — a local 27B reads prose options fine,
+#                                      so it is measured the way a cloud arm is
+#   qwen3-4b-jetson       A-D picker — the arm the buttons were built for
+#                                      (device session 29: it read "northing"
+#                                      as option B)
 #
-# Order matters only for resume: run_matrix.sh skips an arm whose JSON already
-# exists, so the baseline finishing first means a reclaimed instance loses at
-# most the candidate.
+# The surface is NOT set here. It comes from ModelProfile.answer_surface, so
+# the tutor prompt and the frontend payload cannot disagree about it — see
+# engine._uses_answer_picker, which is the single predicate behind both.
+#
+# Shape is run_matrix.sh's `tag tier` (`read -r tag tier _rest`). Column 1 must
+# be the BARE Modelfile tag: run_matrix.sh finds infra/ollama/Modelfile.<tag>,
+# builds it with `ollama create` from its FROM base, and prepends
+# `local_ollama/` itself for TUTOR_MODEL_OVERRIDE.
 #
 # Use with:
 #   MODELS_FILE=offline_eval/models_qwen38.txt
-#   MODE="--multi-turn --subset hg1"
-#   EVAL_SKIP_RUBRIC=1
+#   MODE="--multi-turn --subset hg1"          # 34 geography scenarios
+#   EVAL_SKIP_RUBRIC=1                        # graded by hand, not by an LLM
 #   RESULTS_DIR=$PWD/offline_eval/multi_turn_results/hg1_prod
-qwen3.6-27b-instruct      jetson
+#
+# 4b first: it is the cheaper arm and the one whose plumbing is new, so a
+# reclaimed instance loses the cheap half.
+qwen3-4b-jetson           jetson
 qwen3.8-27b-instruct      jetson

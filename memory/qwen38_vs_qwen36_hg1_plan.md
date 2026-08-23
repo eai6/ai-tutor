@@ -61,7 +61,37 @@ probe_resistant / non_responder / error_prone, across remediation, refusal_chain
 error_cascade, long_session, self_correction, engagement_recovery, speedrun and
 session_completion. The full list is §7.
 
-### 1.3 Two arms
+### 1.3 Two arms — and two answer surfaces
+
+**Round 1 asks a second question alongside the model one: does the answer
+SURFACE matter as much as the model?**
+
+| arm | surface | why |
+|---|---|---|
+| `qwen3.8-27b-instruct` | **free text** | a local 27B reads prose options fine; measuring it on buttons would test a UI this tier would not ship |
+| `qwen3-4b-jetson` | **A–D picker** | the arm the buttons exist for — device session 29, where it read "northing" as option B |
+
+The surface is set by `ModelProfile.answer_surface`, not by the run command, so
+`engine._uses_answer_picker` stays the single predicate behind both the tutor
+prompt's `<answer_surface>` block and the frontend's button payload. When those
+two disagree you get device session 30 — the tutor hinting about the horizontal
+axis while the on-screen buttons still belong to the vertical-axis question,
+invisible from either side alone.
+
+Before this, the predicate keyed on `provider == 'local_ollama'`, i.e. it read
+"local" as "small enough to need buttons". That held while every local arm was
+2B–8B and is wrong for a 27B.
+
+62% of the exit-ticket questions on the eight `hg1` lessons are `mcq` with
+options (166 of 268, consistent across all eight), so the picker arm really is
+mostly on buttons rather than occasionally.
+
+**The baseline does not carry over to the 4B arm.** Daniel's qwen3-4b figure
+(16/26) is a free-text session; a picker run is a different interface and is not
+comparable to it. Only the 27B arm has a usable prior — and note that prior is
+qwen3.6's 31/34, not qwen3.8's.
+
+### 1.3b Arm bookkeeping
 
 `qwen3.6-27b` has never run on the `aws_deployment` engine, so its numbers do not
 transfer. Both arms run here:
