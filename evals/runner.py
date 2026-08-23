@@ -584,7 +584,11 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     transcript_payload = [
         {'turn_number': t.turn_number, 'role': t.role, 'content': t.content,
          'phase': t.phase or '', 'is_complete': t.is_complete,
-         'show_exit_ticket': t.show_exit_ticket}
+         'show_exit_ticket': t.show_exit_ticket,
+         # Per-turn wall-clock. Dropping it here would have made the driver's
+         # measurement invisible: the run JSON is the only thing that outlives
+         # the process.
+         'latency_ms': t.latency_ms}
         for t in sim.transcript
     ]
 

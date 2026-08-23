@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -44,6 +45,11 @@ class TranscriptTurn:
     phase: str = ''
     show_exit_ticket: bool = False
     is_complete: bool = False
+    # Wall-clock to PRODUCE this turn: the tutor engine call for a tutor turn,
+    # the student-sim call for a student turn. Wall-clock, not model time — it
+    # includes the tool loop, the in-session grader and (for a remote Ollama)
+    # the network hop, which is what a student actually waits through.
+    latency_ms: Optional[float] = None
 
 
 @dataclass
@@ -225,11 +231,13 @@ def simulate_session(
             tutor = ConversationalTutor(session)
 
         # Tutor speaks first (mirrors production: views.py:820 calls .start()).
+        _t0 = time.perf_counter()
         opening = tutor.start()
+        _open_ms = (time.perf_counter() - _t0) * 1000
         transcript.append(TranscriptTurn(
             turn_number=0, role='tutor', content=opening.content,
             phase=opening.phase, show_exit_ticket=opening.show_exit_ticket,
-            is_complete=opening.is_complete,
+            is_complete=opening.is_complete, latency_ms=_open_ms,
         ))
 
         if opening.is_complete:
@@ -244,24 +252,29 @@ def simulate_session(
 
         for n in range(1, max_turns + 1):
             last_tutor_content = transcript[-1].content
+            _t0 = time.perf_counter()
             student_reply = student.next_reply(
                 last_tutor_content,
                 answer_choices=getattr(last_tutor_msg, 'answer_choices', None),
             )
+            _student_ms = (time.perf_counter() - _t0) * 1000
             if student.last_response is not None:
                 student_tokens_in += student.last_response.tokens_in
                 student_tokens_out += student.last_response.tokens_out
             transcript.append(TranscriptTurn(
                 turn_number=n, role='student', content=student_reply,
+                latency_ms=_student_ms,
             ))
 
+            _t0 = time.perf_counter()
             tutor_msg = tutor.respond(student_reply)
+            _tutor_ms = (time.perf_counter() - _t0) * 1000
             last_tutor_msg = tutor_msg
             transcript.append(TranscriptTurn(
                 turn_number=n, role='tutor', content=tutor_msg.content,
                 is_correct=tutor_msg.is_correct, phase=tutor_msg.phase,
                 show_exit_ticket=tutor_msg.show_exit_ticket,
-                is_complete=tutor_msg.is_complete,
+                is_complete=tutor_msg.is_complete, latency_ms=_tutor_ms,
             ))
 
             if tutor_msg.is_complete:
