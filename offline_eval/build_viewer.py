@@ -61,6 +61,12 @@ RUNS = [
 # than discovered.
 FLAT_RUNS = [
     ("mt100", "30_mt100_18arm_board"),
+    # Hand-annotated run: qwen3.6 vs qwen3.8 on the production engine, over the
+    # 34 `hg1` scenarios. Generated with EVAL_SKIP_RUBRIC=1, so these sessions
+    # carry NO rubric_result — the Grade tab is the instrument, and the
+    # Agreement tab has no judge side to compare against. `passed` on these rows
+    # means deterministic assertions only; check `rubric_skipped`.
+    ("hg1_prod", "40_hg1_prod_qwen36_vs_qwen38"),
 ]
 
 

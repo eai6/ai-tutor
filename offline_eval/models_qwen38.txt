@@ -1,0 +1,20 @@
+# Two-arm model list: the qwen3.6 baseline and the qwen3.8 candidate, both
+# re-measured on the aws_deployment (production) engine.
+#
+# Shape is run_matrix.sh's `tag tier` (it does `read -r tag tier _rest`).
+# Column 1 must be the BARE Modelfile tag, never provider-prefixed:
+# run_matrix.sh detects infra/ollama/Modelfile.<tag>, builds it with
+# `ollama create` from its registry base, and prepends `local_ollama/` itself
+# for TUTOR_MODEL_OVERRIDE.
+#
+# Order matters only for resume: run_matrix.sh skips an arm whose JSON already
+# exists, so the baseline finishing first means a reclaimed instance loses at
+# most the candidate.
+#
+# Use with:
+#   MODELS_FILE=offline_eval/models_qwen38.txt
+#   MODE="--multi-turn --subset hg1"
+#   EVAL_SKIP_RUBRIC=1
+#   RESULTS_DIR=$PWD/offline_eval/multi_turn_results/hg1_prod
+qwen3.6-27b-instruct      jetson
+qwen3.8-27b-instruct      jetson

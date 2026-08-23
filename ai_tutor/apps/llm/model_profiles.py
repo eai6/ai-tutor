@@ -317,6 +317,51 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         notes="9.3 GB weights. Largest that runs usefully on 19 GB; not Jetson-viable.",
     ),
 
+    # Qwen3.6-27B in NON-THINKING mode. Tag built from
+    # infra/ollama/Modelfile.qwen3.6-27b-instruct.
+    #
+    # Unlike the 2507 pair above, Qwen3.6 is ONE hybrid checkpoint that thinks
+    # by default; instruct mode is a request-time switch, so this profile is
+    # half the mechanism (the Modelfile's sampling + num_ctx is the other half).
+    # ollama_think=False is correct HERE and wrong on qwen3-4b-jetson: this
+    # template GATES on Think, so the flag genuinely suppresses the monologue,
+    # whereas Thinking-2507 opens <think> unconditionally and the flag only
+    # disables Ollama's parser.
+    #
+    # max_tokens 2048 (not the 4B's 1024): a 27B writes longer teaching turns,
+    # and with thinking off the budget is all visible answer.
+    #
+    # Baseline: the same weights in DEFAULT (thinking) mode scored 29/30 rubric
+    # 0.89 on the v1 board — best on record — at ~5 h for 30 scenarios. This
+    # entry exists to measure the same model without the reasoning tax.
+    "local_ollama/qwen3.6-27b-instruct": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=2048,
+        temperature=0.7, top_p=0.80, top_k=20,
+        num_ctx=32768, ollama_think=False,
+        notes="Qwen3.6-27B hybrid forced non-thinking (card's instruct sampling).",
+    ),
+
+    # Successor to the tag above, and deliberately its twin: same max_tokens,
+    # same sampling, same num_ctx, same ollama_think=False. Qwen3.8's card
+    # recommends the identical non-thinking numbers 3.6 does, so holding every
+    # knob equal makes the mt100 row a clean 3.6-vs-3.8 read on one variable.
+    # Tag built from infra/ollama/Modelfile.qwen3.8-27b-instruct.
+    #
+    # ollama_think=False is the INTENT here, not a verified mechanism. 3.8 moved
+    # its primary reasoning control to `reasoning_effort` and routes
+    # `enable_thinking` through chat_template_kwargs (vLLM-only; Ollama drops
+    # it). Whether Ollama's top-level `think` flag still reaches 3.8's gate is
+    # unestablished — run_matrix.sh's identity probe prints thinking_chars to
+    # identity.log before the first scenario is scored, and a THINKS result
+    # means this profile is not doing what it claims. Do not read the row until
+    # that line says otherwise.
+    "local_ollama/qwen3.8-27b-instruct": ModelProfile(
+        family="qwen", mode="instruct", max_tokens=2048,
+        temperature=0.7, top_p=0.80, top_k=20,
+        num_ctx=32768, ollama_think=False,
+        notes="Qwen3.8-27B hybrid forced non-thinking; mode unverified until identity.log.",
+    ),
+
     "local_ollama/qwen3.5:4b": ModelProfile(
         family="qwen", mode="instruct", max_tokens=1024,
         temperature=0.7, top_p=0.8, top_k=20,

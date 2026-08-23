@@ -4,7 +4,7 @@ description: >
 persona: non_responder
 subject: geography
 lesson_id: 1463
-tags: [multi_turn, geography, non_responder, engagement]
+tags: [multi_turn, geography, non_responder, engagement, hg1]
 mode: multi_turn
 max_turns: 15
 

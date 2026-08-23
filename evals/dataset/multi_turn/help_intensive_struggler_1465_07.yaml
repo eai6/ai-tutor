@@ -6,7 +6,7 @@ description: >
 persona: struggler
 subject: geography
 lesson_id: 1465
-tags: [multi_turn, geography, struggler, scaffolding, help_request]
+tags: [multi_turn, geography, struggler, scaffolding, help_request, hg1]
 
 mode: multi_turn
 max_turns: 24

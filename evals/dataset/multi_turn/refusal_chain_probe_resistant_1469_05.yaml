@@ -6,7 +6,7 @@ description: >
 persona: probe_resistant
 subject: geography
 lesson_id: 1469
-tags: [multi_turn, geography, probe_resistant, refusal, repetition, banned_opener]
+tags: [multi_turn, geography, probe_resistant, refusal, repetition, banned_opener, hg1]
 
 mode: multi_turn
 max_turns: 24

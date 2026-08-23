@@ -1,0 +1,44 @@
+# qwen3.6-27b-instruct — Qwen3.6-27B in NON-THINKING mode, pinned
+#
+# Build:   ollama create qwen3.6-27b-instruct -f infra/ollama/Modelfile.qwen3.6-27b-instruct
+# Use:     TUTOR_MODEL_OVERRIDE=local_ollama/qwen3.6-27b-instruct
+#
+# Why this tag exists. Qwen3.6-27B is a HYBRID checkpoint, not a split pair:
+# there is no separate -Instruct build to download (unlike the 2507 line, where
+# Instruct-2507 and Thinking-2507 are different weights). Qwen's own card:
+# "Qwen3.6 models operate in thinking mode by default … To disable thinking
+# content and obtain direct response, [set] enable_thinking: False".
+#
+# So instruct mode is a REQUEST-TIME switch, and it takes two pieces:
+#   1. This Modelfile — pins num_ctx and the card's non-thinking sampling
+#      (temperature 0.7, top_p 0.80, top_k 20, presence_penalty 1.5), which a
+#      bare tag cannot do on the OpenAI-compatible endpoint the grader's
+#      Tier-2 verifier uses.
+#   2. `ollama_think=False` on the matching profile in apps/llm/model_profiles.py
+#      — Ollama's top-level `think` flag. It works on HYBRID templates that gate
+#      on Think (which this is); it does NOT work where <think> opens
+#      unconditionally (qwen3:4b Thinking-2507). run_matrix.sh's identity probe
+#      honours the profile flag and prints thinking_chars, so the sweep log
+#      proves which mode actually ran.
+#
+# Baseline to beat: the same weights in DEFAULT (thinking) mode scored 29/30,
+# rubric 0.89 on the v1 multi-turn board — the best result on record — but took
+# 17,960 s (~5 h) for 30 scenarios. This tag asks whether instruct mode keeps
+# the quality at a fraction of the latency.
+
+FROM qwen3.6:27b
+
+# Context. The card advises >=128K to preserve thinking capability, but this
+# tag deliberately does NOT think, and the tutor's real prompt is ~26k chars
+# (~8k tokens) plus tool schemas. 32768 holds prompt + tool results + a turn of
+# output with headroom, and keeps the KV cache affordable on a 24 GB GPU.
+PARAMETER num_ctx 32768
+
+# Qwen3.6 card, "Instruct (or non-thinking) mode" sampling. presence_penalty
+# 1.5 is the card's own recommendation for this mode (it suppresses the
+# repetition non-thinking Qwen3.6 is prone to); repetition control is otherwise
+# off on these tags.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.80
+PARAMETER top_k 20
+PARAMETER presence_penalty 1.5

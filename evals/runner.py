@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import os
 import subprocess
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -50,6 +51,12 @@ RUNS_ROOT = REPO_ROOT / 'evals' / 'runs'
 # caught. A scenario can still override via its own `rubric_judge` block.
 # Single-turn keeps Haiku (llm_rubric.DEFAULT_RUBRIC_JUDGE) for continuity with
 # the frozen Eval 2 board.
+def _env_flag(name: str) -> bool:
+    """Truthy env flag: 1/true/yes/on, case-insensitive. Anything else is False,
+    so `EVAL_SKIP_RUBRIC=0` and `EVAL_SKIP_RUBRIC=` both mean "run the rubric"."""
+    return (os.environ.get(name) or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 MULTI_TURN_RUBRIC_JUDGE = {
     'provider': 'anthropic',
     'model': 'claude-sonnet-4-6',
@@ -142,6 +149,11 @@ class ScenarioResult:
     suggested_labels: list[str] = field(default_factory=list)   # single_turn: last turn. multi_turn: empty.
     assertion_results: list[AssertionResult] = field(default_factory=list)
     rubric_result: dict | None = None   # serialised llm_rubric.RubricResult
+    # True when EVAL_SKIP_RUBRIC suppressed Layer 3. Load-bearing: with the
+    # rubric off, `passed` means "deterministic assertions only", a much weaker
+    # bar than the mt100 boards' pass rate. Without this flag in the JSON,
+    # aggregate.py and the viewer print the two as if they were the same number.
+    rubric_skipped: bool = False
     dimensions_result: dict | None = None   # serialised llm_rubric.DimensionsResult
 
     # Multi-turn only.
@@ -589,9 +601,16 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     deterministic_passed = all(r.passed for r in assertion_results)
 
     # Layer 3 — rubric over the whole transcript, only if scenario defines one.
+    #
+    # EVAL_SKIP_RUBRIC=1 suppresses it for hand-annotated runs: the sessions are
+    # generated so a human can grade them in the viewer's Grade tab against
+    # ai_tutor/apps/benchmark/pedagogy.py, and an LLM rubric score is not wanted.
+    # Layers 1-2 (deterministic assertions) still run — they are not LLM-based
+    # and they catch mechanical breakage for free.
     rubric_payload: dict | None = None
     rubric_passed = True
-    if scenario.rubric:
+    rubric_skipped = _env_flag('EVAL_SKIP_RUBRIC')
+    if scenario.rubric and not rubric_skipped:
         rubric_result = llm_rubric.score_trajectory(
             scenario.rubric,
             transcript=[{'role': t['role'], 'content': t['content']}
@@ -608,6 +627,7 @@ def _run_multi_turn(scenario: Scenario) -> ScenarioResult:
     return ScenarioResult(
         scenario_id=scenario.id,
         passed=deterministic_passed and rubric_passed and not sim_error,
+        rubric_skipped=rubric_skipped,
         mode=scenario.mode,
         persona=scenario.persona,
         subject=scenario.subject,
