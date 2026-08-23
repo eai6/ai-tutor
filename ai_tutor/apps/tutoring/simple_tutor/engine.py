@@ -2039,10 +2039,24 @@ def _is_transient_error(exc: Exception) -> bool:
     """True for retryable cloud failures — rate limits, overloads, 5xx, connection
     blips — as opposed to permanent errors (400 / auth / schema) which must fail
     fast so we don't burn backoff on something that will never succeed."""
+    # A dropped socket is the textbook transient failure, and it used to fall
+    # through here twice over: the builtin is named ConnectionError (no
+    # 'apiconnection' substring) and OllamaClient's message is "Could not
+    # connect to Ollama at ..." (no literal 'connection error'). Measured
+    # 2026-08-23: 49 of these ended 24 of 34 eval sessions — each one degraded
+    # a turn to the "I had trouble responding" placeholder, and two in a row
+    # tripped the repeat detector into a deadlock. The same thing reaches a
+    # real student whenever the Jetson's local Ollama socket blips.
+    if isinstance(exc, (ConnectionError, TimeoutError)) or type(exc).__name__ in (
+            'ConnectionError', 'ChunkedEncodingError', 'ProtocolError',
+            'RemoteDisconnected'):
+        return True
     name = type(exc).__name__.lower()
     if any(k in name for k in (
         'ratelimit', 'internalserver', 'serviceunavailable', 'apiconnection',
-        'apitimeout', 'timeout', 'overloaded',
+        'apitimeout', 'timeout', 'overloaded', 'connectionerror',
+        'connectionreset', 'protocolerror', 'chunkedencoding',
+        'remotedisconnected',
     )):
         return True
     # `requests.HTTPError` — the shape the Ollama adapter raises — carries the
@@ -2067,7 +2081,9 @@ def _is_transient_error(exc: Exception) -> bool:
     return any(s in msg for s in (
         '429', '500 server error', '502', '503', '529', 'resource exhausted',
         'overloaded', 'unavailable', 'please try again', 'rate limit',
-        'timed out', 'connection error',
+        'timed out', 'connection error', 'could not connect',
+        'connection reset', 'connection aborted', 'broken pipe',
+        'server disconnected',
     ))
 
 

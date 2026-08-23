@@ -40,9 +40,23 @@ _TRANSIENT_BACKOFF = (2, 5, 12, 30, 60)
 def is_transient_error(exc: Exception) -> bool:
     """Retryable cloud failure (rate limit / overload / 5xx / connection blip) vs.
     a permanent error (400 / auth / schema) which must fail fast."""
+    # A dropped TCP connection is the textbook transient failure, but it used
+    # to fall through to "permanent" twice over: the builtin is named
+    # ConnectionError (no 'apiconnection' substring) and OllamaClient's message
+    # is "Could not connect to Ollama at ..." (no literal 'connection error').
+    # Measured 2026-08-23: 49 of these ended 24 of 34 eval sessions, because the
+    # tutor emitted its "I had trouble responding" fallback and two in a row
+    # tripped the repeat detector. Same failure reaches a real student on a
+    # Jetson whenever the local Ollama socket blips.
+    if isinstance(exc, (ConnectionError, TimeoutError)) or type(exc).__name__ in (
+            'ConnectionError', 'ChunkedEncodingError', 'ProtocolError',
+            'RemoteDisconnected'):
+        return True
     name = type(exc).__name__.lower()
     if any(k in name for k in ('ratelimit', 'internalserver', 'serviceunavailable',
-                               'apiconnection', 'apitimeout', 'timeout', 'overloaded')):
+                               'apiconnection', 'apitimeout', 'timeout', 'overloaded',
+                               'connectionerror', 'connectionreset', 'protocolerror',
+                               'chunkedencoding', 'remotedisconnected')):
         return True
     for attr in ('status_code', 'code'):
         try:
@@ -50,10 +64,23 @@ def is_transient_error(exc: Exception) -> bool:
                 return True
         except (TypeError, ValueError):
             pass
+    # requests.HTTPError carries the status on exc.response.status_code, not
+    # exc.status_code, so every requests-based provider fell through the walk
+    # above and its 5xx read as permanent. The engine's copy of this classifier
+    # learned that after the Jetson 2026-07-27 incident (six 500s in one
+    # session, none retried); this copy never did. Same bug, two files.
+    try:
+        if int(getattr(getattr(exc, 'response', None), 'status_code', None)) in (
+                429, 500, 502, 503, 504, 529):
+            return True
+    except (TypeError, ValueError):
+        pass
     msg = str(exc).lower()
     return any(s in msg for s in (
         '429', '503', '529', 'resource exhausted', 'overloaded', 'unavailable',
-        'please try again', 'rate limit', 'timed out', 'connection error'))
+        'please try again', 'rate limit', 'timed out', 'connection error',
+        'could not connect', 'connection reset', 'connection aborted',
+        'broken pipe', 'server disconnected'))
 
 
 def call_with_transient_retry(fn, *, label: str = 'llm', backoff=_TRANSIENT_BACKOFF):
