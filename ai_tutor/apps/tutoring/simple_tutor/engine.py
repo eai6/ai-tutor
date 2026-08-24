@@ -658,7 +658,10 @@ def respond(
                 text_chars=len(_FALLBACK_REPLY),
                 placeholder=True,          # this IS the failure placeholder
                 failed_call='call1',       # which call gave up
-                retries=_diag['retries'], last_error=_diag['last_error'],
+                retries=_diag['retries'],
+            tok_in=_diag.get('tok_in', 0),
+            tok_cached=_diag.get('tok_cached', 0),
+            tok_write=_diag.get('tok_write', 0), last_error=_diag['last_error'],
                 tool_results=[], call2_sent=[], reply=_FALLBACK_REPLY,
             )
         _persist_student_turn(session, user_input, step)
@@ -886,6 +889,9 @@ def respond(
             # row is what the sim scores as a deadlock.
             placeholder=_FALLBACK_REPLY[:40] in (text_reply or ''),
             retries=_diag['retries'],
+            tok_in=_diag.get('tok_in', 0),
+            tok_cached=_diag.get('tok_cached', 0),
+            tok_write=_diag.get('tok_write', 0),
             last_error=_diag['last_error'],
             # The bodies. This is the field that would have answered "did the
             # bank's <explanation> reach the model?" — clipped in trace.py.
@@ -2190,6 +2196,42 @@ def _reset_turn_diagnostics() -> None:
     _TURN_STATE.call2 = []
     _TURN_STATE.model = ''
     _TURN_STATE.api_base = ''
+    _TURN_STATE.tok_in = 0
+    _TURN_STATE.tok_cached = 0
+    _TURN_STATE.tok_write = 0
+
+
+def _note_usage(resp) -> None:
+    """Accumulate token usage across a turn's calls.
+
+    Cached input is the difference between a ~$20 and a ~$57 cloud sweep on the
+    Opus arm, and the prompt is deliberately layered for it. Without this the
+    only way to find a silent cache invalidation is the invoice, which arrives
+    after the spend rather than during it."""
+    try:
+        # generate_with_tools returns the PROVIDER's message object, not an
+        # LLMResponse, so the counts sit under .usage and are named per vendor:
+        # Anthropic uses cache_read_input_tokens, OpenAI reports cached_tokens
+        # under prompt_tokens_details. Reading a flat resp.input_tokens finds
+        # nothing and reports a cold cache on a warm one.
+        u = getattr(resp, 'usage', None) or resp
+        tin = (getattr(u, 'input_tokens', None)
+               or getattr(u, 'prompt_tokens', None) or 0)
+        tcached = (getattr(u, 'cache_read_input_tokens', None)
+                   or getattr(u, 'cache_read_tokens', None) or 0)
+        if not tcached:
+            det = getattr(u, 'prompt_tokens_details', None)
+            tcached = getattr(det, 'cached_tokens', 0) or 0 if det else 0
+        # Anthropic's input_tokens EXCLUDES cached tokens, so the three buckets
+        # are disjoint and the prompt's true size is their sum. Treating
+        # input_tokens as the total makes cache reads look like they exceed the
+        # input and prices the run negative.
+        twrite = getattr(u, 'cache_creation_input_tokens', 0) or 0
+        _TURN_STATE.tok_in = getattr(_TURN_STATE, 'tok_in', 0) + int(tin or 0)
+        _TURN_STATE.tok_cached = getattr(_TURN_STATE, 'tok_cached', 0) + int(tcached or 0)
+        _TURN_STATE.tok_write = getattr(_TURN_STATE, 'tok_write', 0) + int(twrite or 0)
+    except Exception:                                            # noqa: BLE001
+        pass                     # diagnostics must never break a tutoring turn
 
 
 def _note_retry(exc: Exception) -> None:
@@ -2204,6 +2246,9 @@ def turn_diagnostics() -> dict:
         'call2': list(getattr(_TURN_STATE, 'call2', []) or []),
         'model': getattr(_TURN_STATE, 'model', ''),
         'api_base': getattr(_TURN_STATE, 'api_base', ''),
+        'tok_in': getattr(_TURN_STATE, 'tok_in', 0),
+        'tok_cached': getattr(_TURN_STATE, 'tok_cached', 0),
+        'tok_write': getattr(_TURN_STATE, 'tok_write', 0),
     }
 
 
@@ -2530,7 +2575,12 @@ def _call_llm(
         # tool_choice omitted entirely when None so the production
         # Anthropic call is byte-identical (default is auto).
         extra = {'tool_choice': tool_choice} if tool_choice else {}
-        return _invoke_with_transient_retry(
+        # Anthropic returns EARLY here, on its own native SDK path. Diagnostics
+        # added to the shared path below therefore never ran for the arm whose
+        # cache economics matter most — the trace reported 0 input tokens and 0
+        # cache reads for Opus while the calls were plainly happening.
+        _note_model(config)
+        _resp = _invoke_with_transient_retry(
             lambda: client.messages.create(
                 model=model_name,
                 max_tokens=max_tokens,
@@ -2542,6 +2592,8 @@ def _call_llm(
             label='Anthropic',
             provider=provider,
         )
+        _note_usage(_resp)
+        return _resp
 
     # Any other provider (OpenAI / Gemini / local Ollama): route through
     # the pluggable client factory's generate_with_tools(), which returns
@@ -2577,7 +2629,7 @@ def _call_llm(
         except (TypeError, ValueError):
             pass
     _note_model(config)
-    return _invoke_with_transient_retry(
+    _resp = _invoke_with_transient_retry(
         lambda: client.generate_with_tools(
             messages=messages,
             system_prompt=_system_blocks_to_text(effective_blocks),
@@ -2591,6 +2643,8 @@ def _call_llm(
         on_attempt=reset_stream,
         provider=provider,
     )
+    _note_usage(_resp)
+    return _resp
 
 
 # ============================================================================

@@ -9,7 +9,10 @@
 #   FORCE=1 bash offline_eval/run_cloud.sh                  # redo even if a JSON exists
 set -uo pipefail
 
-ROOT="${AI_TUTOR_ROOT:-/home/daniel/Documents/work/Nyansapo/web/ai-tutor}"
+# Default to the repo this script lives in, not a path from whoever wrote it.
+# The old absolute default pointed at another machine's checkout, so every run
+# without AI_TUTOR_ROOT set died on `cd` before doing anything.
+ROOT="${AI_TUTOR_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$ROOT"
 PY="${PY:-$ROOT/venv/bin/python}"
 RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/single_turn_results/results}"
@@ -28,11 +31,25 @@ mkdir -p "$RESULTS"
 # run the same model at the same time, interleave writes into one per-model .log,
 # and the `grep Output:` below can then copy the wrong run's JSON. Cost doubles and
 # the results are silently untrustworthy.
-exec 9>"$RESULTS/.sweep.lock"
-if ! flock -n 9; then
+# flock is Linux-only; macOS has no such binary, so `if ! flock` took the
+# failure branch every time and the guard refused every run on this machine —
+# reporting a concurrent sweep that did not exist. Fall back to an atomic
+# mkdir, which is portable and gives the same one-sweep-per-results-dir
+# guarantee.
+LOCK="$RESULTS/.sweep.lock.d"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$RESULTS/.sweep.lock"
+  flock -n 9 || {
+    echo "!! a sweep is already running against $RESULTS — refusing to start a second one." >&2
+    echo "   (ps -eo pid,etime,cmd | grep run_cloud.sh)" >&2
+    exit 1
+  }
+elif ! mkdir "$LOCK" 2>/dev/null; then
   echo "!! a sweep is already running against $RESULTS — refusing to start a second one." >&2
-  echo "   (ps -eo pid,etime,cmd | grep run_cloud.sh)" >&2
+  echo "   (stale? remove $LOCK)" >&2
   exit 1
+else
+  trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 fi
 
 echo ">> Engine: SIMPLE_TUTOR_ENGINE=$SIMPLE_TUTOR_ENGINE   Mode: ${MODE:-(full suite)}"
