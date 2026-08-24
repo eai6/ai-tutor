@@ -65,36 +65,57 @@ def build_prompt(target_tokens: int = 4900) -> str:
     return " ".join(out)
 
 
-def one_call(host: str, model: str, prompt: str, num_predict: int, out: list, idx: int):
+# A turn is call 1 (pick a tool - a SHORT structured emission) then call 2
+# (write the reply, ~90 tokens). Modelling a turn as two 90-token calls
+# over-counts call 1 and inflates the turn, badly for a slow model where call
+# 1's short output is a large share of a long call. Checked against the boards,
+# doubling over-stated the 27B turn by 1.39x and under-stated the 4B by 0.55x —
+# wrong in both directions, so TURN MODE issues the real pair instead.
+CALL1_TOKENS = 24
+
+
+def _chat(host, model, prompt, num_predict, question):
     body = {
         "model": model,
         "stream": False,
-        "messages": [{"role": "user", "content": prompt +
-                      "\n\nIn one sentence, what is exfoliation?"}],
+        "messages": [{"role": "user", "content": prompt + question}],
         "options": {"num_predict": num_predict},
     }
     req = urllib.request.Request(
         f"{host}/api/chat", data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=900) as r:
+        return json.loads(r.read())
+
+
+def one_call(host: str, model: str, prompt: str, num_predict: int, out: list,
+             idx: int, turn_mode: bool = False):
     t0 = time.perf_counter()
     try:
-        with urllib.request.urlopen(req, timeout=900) as r:
-            d = json.loads(r.read())
-        out[idx] = {
-            "ok": True,
-            "secs": time.perf_counter() - t0,
-            "in": d.get("prompt_eval_count", 0),
-            "out": d.get("eval_count", 0),
-        }
+        if turn_mode:
+            a = _chat(host, model, prompt, CALL1_TOKENS,
+                      "\n\nWhich tool should be called next? Reply with the tool name only.")
+            b = _chat(host, model, prompt,
+                      num_predict, "\n\nIn one sentence, what is exfoliation?")
+            tin = a.get("prompt_eval_count", 0) + b.get("prompt_eval_count", 0)
+            tout = a.get("eval_count", 0) + b.get("eval_count", 0)
+        else:
+            b = _chat(host, model, prompt, num_predict,
+                      "\n\nIn one sentence, what is exfoliation?")
+            tin, tout = b.get("prompt_eval_count", 0), b.get("eval_count", 0)
+        out[idx] = {"ok": True, "secs": time.perf_counter() - t0,
+                    "in": tin, "out": tout}
     except Exception as exc:                                  # noqa: BLE001
         out[idx] = {"ok": False, "secs": time.perf_counter() - t0,
                     "err": f"{type(exc).__name__}: {str(exc)[:80]}"}
 
 
-def _one_round(host: str, model: str, prompt: str, n: int, num_predict: int) -> list:
+def _one_round(host: str, model: str, prompt: str, n: int, num_predict: int,
+               turn_mode: bool = False) -> list:
     results = [None] * n
     threads = [threading.Thread(target=one_call,
-                                args=(host, model, prompt, num_predict, results, i))
+                                args=(host, model, prompt, num_predict, results, i,
+                                      turn_mode))
                for i in range(n)]
     t0 = time.perf_counter()
     for t in threads:
@@ -108,7 +129,7 @@ def _one_round(host: str, model: str, prompt: str, n: int, num_predict: int) -> 
 
 
 def run_level(host: str, model: str, prompt: str, n: int, num_predict: int,
-              repeat: int = 3) -> dict:
+              repeat: int = 3, turn_mode: bool = False) -> dict:
     """Run the level `repeat` times and pool the rounds, dropping the first.
 
     Single-shot levels were not reproducible. One sweep timed N=8 at 13.3s and
@@ -118,7 +139,7 @@ def run_level(host: str, model: str, prompt: str, n: int, num_predict: int,
     request does not. The first round absorbs that and is discarded; the rest
     are pooled, so p50 comes from `repeat-1` x N observations rather than one.
     """
-    rounds = [_one_round(host, model, prompt, n, num_predict)
+    rounds = [_one_round(host, model, prompt, n, num_predict, turn_mode)
               for _ in range(max(repeat, 2))]
     warm = [r for rnd in rounds[1:] for r in rnd]
 
@@ -152,6 +173,9 @@ def main() -> int:
     ap.add_argument("--levels", default="1,2,4,8,16")
     ap.add_argument("--num-predict", type=int, default=90,
                     help="measured median tutor reply is ~90 tokens")
+    ap.add_argument("--turn-mode", action="store_true",
+                    help="time a whole TUTOR TURN (short call 1 + full call 2), "
+                         "not a single call")
     ap.add_argument("--repeat", type=int, default=3,
                     help="rounds per level; the first is discarded as warm-up")
     ap.add_argument("--acceptable", type=float, default=20.0,
@@ -163,13 +187,15 @@ def main() -> int:
 
     print(f"model      {args.model}")
     print(f"prompt     ~{len(prompt.split())} words")
-    print(f"reply cap  {args.num_predict} tokens\n")
+    print(f"reply cap  {args.num_predict} tokens")
+    print(f"timing     {'WHOLE TURN (call1+call2)' if args.turn_mode else 'one call'}\n")
     print(f"{'N':>3}{'ok':>5}{'p50':>9}{'p95':>9}{'max':>9}{'tok/s':>9}{'obs':>6}")
     print("-" * 56)
 
     rows = []
     for n in levels:
-        r = run_level(args.host, args.model, prompt, n, args.num_predict, args.repeat)
+        r = run_level(args.host, args.model, prompt, n, args.num_predict, args.repeat,
+                      args.turn_mode)
         rows.append(r)
         if not r.get("p50"):
             print(f"{n:>3}{r['ok']:>5}   FAILED: {r.get('err')}")
