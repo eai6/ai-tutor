@@ -1,0 +1,85 @@
+Error: could not connect to ollama server, run 'ollama serve' to start it
+Error: could not connect to ollama server, run 'ollama serve' to start it
+
+############ qwen3-4b-jetson slots=12 ############
+  ollama up, NUM_PARALLEL=12
+  VRAM loaded: 18182 MiB
+model      qwen3-4b-jetson
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+ 16   32     5.5s    10.9s    12.0s     62.7    32
+ 32   64     9.5s    16.5s    17.1s     75.0    64
+ 64  128    15.7s    27.4s    28.6s     84.0   128
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 64
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s         125
+          30s         186
+          60s         309
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3-4b-ctx8k slots=24 ############
+  ollama up, NUM_PARALLEL=24
+  VRAM loaded: 18174 MiB
+model      qwen3-4b-ctx8k
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+ 16   32     4.8s     6.6s     6.7s     91.0    32
+ 32   64     7.5s    12.1s    13.6s     93.6    64
+ 64  128    13.1s    25.3s    26.5s     94.4   128
+128  256    20.1s    40.2s    42.8s    113.5   256
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 128
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s         224
+          30s         319
+          60s         510
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3.8-27b-instruct slots=4 ############
+  ollama up, NUM_PARALLEL=4
+  VRAM loaded: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+  8   16    19.6s    32.8s    35.1s     21.2    16
+ 16   32    37.7s    66.2s    71.0s     20.4    32
+ 32   64    71.3s   133.2s   141.7s     20.3    64
+
+measured prompt: 5155 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 8
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          14
+          30s          20
+          60s          33
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE
