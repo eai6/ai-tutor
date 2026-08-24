@@ -41,7 +41,11 @@ from ai_tutor.apps.tutoring.simple_tutor.warm_up import select_warm_up_question
 
 rows=[]
 for f in pathlib.Path('evals/dataset/multi_turn').rglob('*.yaml'):
-    t=f.read_text(); m=re.search(r'(?m)^tags: \[(.*)\]', t)
+    if f.name.startswith('._'): continue   # macOS AppleDouble junk
+    # encoding pinned: the box locale is not UTF-8, and read_text()
+    # defaults to it — a scenario containing ° or — then raises
+    # UnicodeDecodeError and the check fails for the wrong reason.
+    t=f.read_text(encoding='utf-8'); m=re.search(r'(?m)^tags: \[(.*)\]', t)
     rows.append(types.SimpleNamespace(id=f.stem, tags=[x.strip() for x in m.group(1).split(',')] if m else []))
 tag='${SUBSET}'.split()[0]
 sel=filter_by_subset(rows, tag)

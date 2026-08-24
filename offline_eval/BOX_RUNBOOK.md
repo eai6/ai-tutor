@@ -36,7 +36,7 @@ app, the DB and the model on one host removes it.
 
 The tunnel is still fine for short work — a smoke test, a single scenario.
 
-## The four traps
+## The five traps
 
 **1. The stopped instance.** `vastai create instance` can return
 `success: False` and still hand back a contract id. The instance sits at
@@ -61,6 +61,13 @@ common GPU images ship 3.11 and pip fails with
 conda env. **Do not downgrade Django to fit the image** — a different Django
 is a different app, and the run stops being comparable to the boards it is
 meant to join.
+
+**5. macOS AppleDouble files.** `tar` on macOS writes a `._name` companion for
+every file. The box then holds 802 `*.yaml` — 401 real scenarios and 401 junk —
+and `discover_scenarios` globs `*.yaml`, so the eval would parse the junk as
+scenarios. This is the only trap here that produces a WRONG ANSWER rather than
+a delay; the others merely waste time. `box_setup.sh` sets `COPYFILE_DISABLE=1`
+and excludes `._*`, and `box_run.sh` skips them defensively.
 
 ## The DB is shipped, not rebuilt
 

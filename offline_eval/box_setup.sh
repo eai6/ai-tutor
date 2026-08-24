@@ -14,7 +14,7 @@
 # reduced it and none removed it. Putting the app, the DB and the model on one
 # host removes the failure class instead of mitigating it a fourth time.
 #
-# THE FOUR THINGS THAT COST HOURS ON 2026-08-24, each now handled below:
+# THE FIVE THINGS THAT COST HOURS ON 2026-08-24, each now handled below:
 #
 #   1. `vastai create instance` can return success:False and still hand back a
 #      contract id. The instance sits at intended_status=stopped, billing, and
@@ -43,7 +43,12 @@ echo "===== 0. reachable? ====="
 
 echo "===== 1. ship code + data ====="
 # Excludes results, weights and caches — the payload is ~12 MB, not ~800 MB.
-tar czf /tmp/aitutor_box.tgz -C "$ROOT" \
+# COPYFILE_DISABLE stops macOS tar writing an AppleDouble "._name" companion
+# for every file. Without it the box receives 401 junk ._*.yaml alongside 401
+# real scenarios — they are not UTF-8, and discover_scenarios globs *.yaml, so
+# the eval would have tried to parse them as scenarios.
+COPYFILE_DISABLE=1 tar czf /tmp/aitutor_box.tgz -C "$ROOT" \
+  --exclude='._*' \
   --exclude='*/multi_turn_results/*' --exclude='*/single_turn_results/*' \
   --exclude='*/ollama_models/*' --exclude='__pycache__' --exclude='*.pyc' \
   --exclude='*/viewer_deploy/index.html' --exclude='*/prompt_snapshots/*' \
