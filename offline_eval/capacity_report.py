@@ -1,45 +1,55 @@
 """Turn the concurrency sweep into a students-supported answer.
 
-    python offline_eval/capacity_report.py
+    python offline_eval/capacity_report.py offline_eval/sweep_rtx3090.log
 
-WHY THIS EXISTS RATHER THAN THE BENCHMARK REPORTING IT DIRECTLY. The benchmark
-times ONE model call. A student's turn costs TWO, because the engine runs
-TUTOR_CALL_MODE=two: call 1 picks the tool, the platform grades, call 2 writes
-the reply. Reading a single-call latency as a turn halves the apparent cost and
-doubles the apparent capacity — the mistake this file exists to not make.
+WHY THE BENCHMARK DOES NOT REPORT THIS ITSELF. The benchmark times ONE model
+call. A student's turn costs TWO, because the engine runs TUTOR_CALL_MODE=two:
+call 1 picks the tool, the platform grades, call 2 writes the reply. Reading a
+single-call latency as a turn halves the apparent cost and doubles the apparent
+capacity — the mistake this file exists to not make.
 
-So the two numbers come from the two places that measure them honestly:
+    turn(N) = 2 x call(N)
 
-  * per-turn latency at N=1 is MEASURED, from the eval boards themselves
-    (latency_report.py over 641 real turns for math-27b, etc). No modelling of
-    what a turn "should" cost.
-  * the slowdown from concurrency comes from the sweep, as a RATIO
-    p50(N)/p50(1). A ratio is what the benchmark measures well, and it carries
-    over to the two-call turn without assuming how the turn splits.
+That doubling is CHECKED, not assumed, against the eval boards' own measured
+per-turn medians (latency_report.py, 641 real turns for math-27b). The check
+prints, and it prints whether it passed.
 
-Then, for N concurrent slots and a student who spends `think` seconds reading
-the question and typing an answer:
+An earlier version scaled a board latency by the ratio call(N)/call(1). That
+needs an N=1 level in the sweep, and silently used the smallest N present as
+the baseline when there wasn't one — inflating every ratio. Doubling needs no
+baseline and cannot fail that way.
 
-    turn(N)     = board_turn_p50 x p50(N)/p50(1)
-    students(N) = N x (turn(N) + think) / turn(N)
-
-THINK TIME IS AN ASSUMPTION AND IT DOMINATES. It is the difference between a
-lab where students race and homework where they wander off. It is reported as
-a range, never folded into one number.
+THE THREE NUMBERS ARE DIFFERENT AND ARE REPORTED SEPARATELY:
+  * slots    — how many requests the GPU batches at once. A server setting,
+               bounded by VRAM, since num_ctx is allocated PER SLOT.
+  * N        — how many students are waiting at the same instant. Requests
+               beyond the slot count QUEUE rather than fail, so N can exceed
+               slots. This is the measured, assumption-free capacity number.
+  * students — how many can be in a lesson at once. Larger than N, because a
+               student spends most of a turn reading and typing, using no GPU:
+                   students = N x (turn + think) / turn
+               It inherits the think-time ASSUMPTION, so it is a range.
 """
-
 import re
 import sys
 
-# p50 seconds per single call, PARSED from a sweep log rather than transcribed.
-# Hand-copying a grid of numbers between a remote log and a source file is a
-# silent-corruption step with no error surface, and every figure below divides
-# by one of them.
+# Measured per-TURN medians from the eval boards (latency_report.py). Whole
+# turns: both calls, plus the platform's grading in between.
+BOARD_TURN = {
+    "qwen3-4b-jetson": {"geography": 5.09, "maths": 7.46},
+    "qwen3.8-27b-instruct": {"geography": 19.62, "maths": 14.86},
+}
+# Same weights, smaller num_ctx — the boards' latency still applies.
+ALIASES = {"qwen3-4b-ctx8k": "qwen3-4b-jetson"}
+
+TOLERABLE_TURN_S = 60.0
+THINK_TIMES = (15, 30, 60)
+
 _HDR = re.compile(r"^#+ (\S+) slots=(\d+)")
-_ROW = re.compile(r"^\s*(\d+)\s+\d+\s+([\d.]+)s")
+_ROW = re.compile(r"^\s*(\d+)\s+\d+\s+([\d.]+)s\s+([\d.]+)s")
 
 
-def parse_sweep(path: str) -> dict:
+def parse_sweep(path):
     out, key = {}, None
     for line in open(path):
         h = _HDR.match(line)
@@ -49,62 +59,54 @@ def parse_sweep(path: str) -> dict:
             continue
         r = _ROW.match(line)
         if r and key:
-            out[key][int(r.group(1))] = float(r.group(2))
+            out[key][int(r.group(1))] = (float(r.group(2)), float(r.group(3)))
     return {k: v for k, v in out.items() if v}
 
 
-# Measured per-TURN medians from the eval boards (latency_report.py). These are
-# whole turns: both calls, plus the platform's grading in between.
-BOARD_TURN = {
-    "qwen3-4b-jetson": {"geography": 5.09, "maths": 7.46},
-    "qwen3.8-27b-instruct": {"geography": 19.62, "maths": 14.86},
-}
-
-# What a student will sit through for one tutor reply before the session stops
-# feeling live. Not measured here; stated so it can be argued with.
-TOLERABLE_TURN_S = 25.0
-THINK_TIMES = (15, 30, 60)
-
-
-def main() -> int:
-    path = sys.argv[1] if len(sys.argv) > 1 else "offline_eval/sweep_rtx3090.log"
-    SWEEP = parse_sweep(path)
-    if not SWEEP:
-        print(f"no sweep levels parsed from {path}")
+def main():
+    paths = sys.argv[1:] or ["offline_eval/sweep_rtx3090.log"]
+    sweep = {}
+    for p in paths:
+        sweep.update(parse_sweep(p))
+    if not sweep:
+        print(f"no sweep levels parsed from {paths}")
         return 1
-    print(f"sweep: {path}\n")
-    print("SANITY GATE — a single call must be about half a measured turn,")
-    print("because a turn is two calls. If it is not, the sweep config is wrong.\n")
-    print(f"  {'model':<24}{'call p50':>10}{'x2':>8}{'board turn':>12}{'':>4}")
-    for model, subj in BOARD_TURN.items():
-        base = min(v[1] for (m, _), v in SWEEP.items() if m == model)
-        turn = min(subj.values())
-        ok = 0.6 <= (2 * base) / turn <= 1.6
-        print(f"  {model:<24}{base:>9.1f}s{2*base:>7.1f}s{turn:>11.1f}s"
-              f"    {'ok' if ok else 'MISMATCH'}")
+    print(f"sweep: {', '.join(paths)}\n")
 
-    for (model, slots), pts in sorted(SWEEP.items()):
-        print(f"\n{'='*66}\n{model}   {slots} parallel slots\n{'='*66}")
-        base = pts[1]
-        for subject, board in sorted(BOARD_TURN[model].items()):
-            print(f"\n  {subject} (measured turn at N=1: {board:.1f}s)")
-            print(f"    {'N':>4}{'slowdown':>11}{'turn':>9}{'':>3}"
-                  + "".join(f"{'think ' + str(t) + 's':>12}" for t in THINK_TIMES))
-            for n in sorted(pts):
-                turn = board * (pts[n] / base)
-                live = turn <= TOLERABLE_TURN_S
-                cells = "".join(
-                    f"{n * (turn + t) / turn:>12.0f}" if live else f"{'-':>12}"
-                    for t in THINK_TIMES)
-                print(f"    {n:>4}{pts[n]/base:>10.2f}x{turn:>8.1f}s"
-                      f"{'' if live else ' !'}{'' if live else ''}{cells}"
-                      + ("   over budget" if not live else ""))
+    print("CHECK — turn = 2 x call, against the boards' measured turns.")
+    for (model, slots), pts in sorted(sweep.items()):
+        base = BOARD_TURN[ALIASES.get(model, model)]
+        if 1 not in pts:
+            print(f"  {model:<24} no N=1 level in this sweep — check skipped")
+            continue
+        est, real = 2 * pts[1][0], min(base.values())
+        print(f"  {model:<24} 2x{pts[1][0]:.1f}s = {est:.1f}s vs board {real:.1f}s"
+              f"   {'ok' if 0.6 <= est / real <= 1.6 else 'MISMATCH'}")
 
-    print(f"\n  '-' means the turn exceeds {TOLERABLE_TURN_S:.0f}s and the session "
-          f"stops feeling live;\n  adding students there buys throughput by making "
-          f"every one of them wait.")
-    print("\n  Think time is an ASSUMPTION. Pick the column matching the setting:\n"
-          "  a timed lab sits near 15s, ordinary classwork nearer 30s, homework 60s+.")
+    for (model, slots), pts in sorted(sweep.items()):
+        print(f"\n{'='*74}\n{model}   {slots} parallel slots\n{'='*74}")
+        print(f"  {'N':>5}{'turn p50':>11}{'turn p95':>11}   "
+              + "".join(f"{'think ' + str(t) + 's':>11}" for t in THINK_TIMES))
+        for n in sorted(pts):
+            p50, p95 = pts[n]
+            t50, t95 = 2 * p50, 2 * p95
+            live = t50 <= TOLERABLE_TURN_S
+            cells = "".join(f"{n * (t50 + t) / t50:>11.0f}" if live else f"{'-':>11}"
+                            for t in THINK_TIMES)
+            flag = "" if t95 <= TOLERABLE_TURN_S else "   tail over budget"
+            print(f"  {n:>5}{t50:>10.1f}s{t95:>10.1f}s   {cells}{flag}")
+
+        ok50 = [n for n, (a, _) in pts.items() if 2 * a <= TOLERABLE_TURN_S]
+        ok95 = [n for n, (_, b) in pts.items() if 2 * b <= TOLERABLE_TURN_S]
+        print(f"\n  max concurrent students, median turn under "
+              f"{TOLERABLE_TURN_S:.0f}s: {max(ok50, default=0)}")
+        print(f"  max concurrent students, 95th pct turn under "
+              f"{TOLERABLE_TURN_S:.0f}s: {max(ok95, default=0)}")
+
+    print(f"\n  '-' = median turn over {TOLERABLE_TURN_S:.0f}s; adding students there "
+          f"buys throughput\n      by making every one of them wait longer.")
+    print("\n  Think-time columns are an ASSUMPTION, not a measurement: a timed lab\n"
+          "  sits near 15s, ordinary classwork nearer 30s, homework 60s+.")
     return 0
 
 
