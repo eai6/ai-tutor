@@ -91,3 +91,39 @@ warm-up is reachable. Each has silently invalidated a run:
 
 Results exist only on the rented host until `box_fetch.sh` runs. A destroyed
 instance takes the board and its trace with it.
+
+## Serving many students at once: OLLAMA_NUM_PARALLEL
+
+Every eval arm ran with `OLLAMA_NUM_PARALLEL` **unset**, so ollama picked its
+own slot count. That is fine for a sequential eval and wrong for a capacity
+measurement, where the slot count IS the variable.
+
+**`num_ctx` is allocated per slot, not shared across them.** This is the trap.
+On a 24 GB RTX 3090 the 4b at `num_ctx 16384`:
+
+| slots | VRAM   | p50 at N=1 | verdict |
+|-------|--------|------------|---------|
+| 4     | 8.0 GB | 2.4s       | fine |
+| 8     | 13.2 GB| 2.5s       | fine |
+| 12    | 18.2 GB| 2.6s       | fine |
+| 16    | 22.9 GB| **11.7s**  | collapsed |
+
+At 16 slots the card sat at 22.9 of 24.5 GB and a SINGLE request became 4.6x
+slower than at 4 slots — slower than production. Nothing errors; it just gets
+quietly worse, so the only way to notice is to check N=1 against a latency you
+already trust. The 27b (`num_ctx 32768`, 17 GB of weights) reaches the same
+wall around 8 slots.
+
+**So gate every sweep on N=1.** A single request must roughly match the eval
+board's measured per-turn latency, halved — a board turn is TWO model calls
+under `TUTOR_CALL_MODE=two`, so 4b N=1 of 2.4s against a 5.09s geography turn
+is right, and 11.7s is a config error rather than a finding.
+
+**And repeat each level.** Single-shot levels are not reproducible: one sweep
+timed the 4b at 13.3s for N=8 and 4.9s for N=12, and the 27b faster at N=2 than
+at N=1. Latency cannot fall as load rises — that is a slot serving its first
+request and paying allocation costs. `concurrency_bench.py --repeat 3` discards
+the first round and pools the rest.
+
+    python offline_eval/concurrency_bench.py --model qwen3-4b-jetson --levels 1,4,8,12
+    python offline_eval/capacity_report.py <sweep.log>   # -> students supported

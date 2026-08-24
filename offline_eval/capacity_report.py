@@ -28,17 +28,30 @@ lab where students race and homework where they wander off. It is reported as
 a range, never folded into one number.
 """
 
-# p50 seconds per single call, from the sweep. Keyed by (model, slots) -> {N: p50}.
-# Only configurations that passed the sanity gate below are listed: 4b at 16
-# slots reserved ~20 GB of KV cache (num_ctx is allocated PER SLOT), pushed the
-# 3090 to 22.9/24.5 GB, and made even N=1 slower than production — a measurement
-# of a misconfigured server, not of the GPU.
-SWEEP = {
-    ("qwen3-4b-jetson", 4):        {1: 2.4, 2: 3.3, 4: 3.7},
-    ("qwen3-4b-jetson", 8):        {1: 2.5, 4: 5.4, 8: 5.7},
-    ("qwen3.8-27b-instruct", 4):   {1: 9.9, 2: 6.9, 4: 10.8},
-    ("qwen3.8-27b-instruct", 8):   {1: 10.4, 4: 8.7, 8: 20.5},
-}
+import re
+import sys
+
+# p50 seconds per single call, PARSED from a sweep log rather than transcribed.
+# Hand-copying a grid of numbers between a remote log and a source file is a
+# silent-corruption step with no error surface, and every figure below divides
+# by one of them.
+_HDR = re.compile(r"^#+ (\S+) slots=(\d+)")
+_ROW = re.compile(r"^\s*(\d+)\s+\d+\s+([\d.]+)s")
+
+
+def parse_sweep(path: str) -> dict:
+    out, key = {}, None
+    for line in open(path):
+        h = _HDR.match(line)
+        if h:
+            key = (h.group(1), int(h.group(2)))
+            out[key] = {}
+            continue
+        r = _ROW.match(line)
+        if r and key:
+            out[key][int(r.group(1))] = float(r.group(2))
+    return {k: v for k, v in out.items() if v}
+
 
 # Measured per-TURN medians from the eval boards (latency_report.py). These are
 # whole turns: both calls, plus the platform's grading in between.
@@ -54,6 +67,12 @@ THINK_TIMES = (15, 30, 60)
 
 
 def main() -> int:
+    path = sys.argv[1] if len(sys.argv) > 1 else "offline_eval/sweep_rtx3090.log"
+    SWEEP = parse_sweep(path)
+    if not SWEEP:
+        print(f"no sweep levels parsed from {path}")
+        return 1
+    print(f"sweep: {path}\n")
     print("SANITY GATE — a single call must be about half a measured turn,")
     print("because a turn is two calls. If it is not, the sweep config is wrong.\n")
     print(f"  {'model':<24}{'call p50':>10}{'x2':>8}{'board turn':>12}{'':>4}")
