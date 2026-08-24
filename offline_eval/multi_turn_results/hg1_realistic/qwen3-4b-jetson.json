@@ -1,0 +1,188 @@
+{
+  "started_at": "2026-08-24T01:36:05.620052+00:00",
+  "finished_at": "2026-08-24T01:37:03.864808+00:00",
+  "git_sha": "aa22bc5339dc",
+  "total_scenarios": 1,
+  "passed": 1,
+  "failed": 0,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1469_14",
+      "passed": true,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1469,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "remediation",
+        "exit_ticket",
+        "hg1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=6, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": null,
+      "rubric_skipped": true,
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "What do you notice about the surfaces of rocks around you? Can you spot any cracks, rough patches, or places where the rock seems to be breaking apart?\n\nWhich of the following is an example of physical weathering?\n\nA) Rainwater dissolving limestone and creating caves  \nB) Plant roots growing through rock cracks and breaking them apart  \nC) Oxygen reacting with iron minerals to form rust  \nD) Freeze-thaw cycles causing water in rock cracks to expand and contract",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 24907.13100018911
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 2152.6077080052346
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "You picked B — plant roots growing through cracks and breaking them apart. That is a form of biological weathering, not physical weathering. Physical weathering involves mechanical breakdown without chemical change, like freeze-thaw cycles. Try looking at the options again.",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4733.564416877925
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 940.3366250917315
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nWhich of the following best defines weathering?\nA) The movement of broken rock and soil downhill by gravity\nB) The transport of sediment by rivers, wind, or glaciers\nC) The breakdown of rock in situ by physical, chemical, or biological processes\nD) The formation of new mineral crystals as rock cools",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4781.347417039797
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 490.2137089520693
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Correct — nice work. Try this one:\n\nOxidation as a weathering process primarily affects rocks containing which type of mineral?\nA) Iron-rich minerals\nB) Quartz\nC) Limestone\nD) Feldspar",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4619.453333085403
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 499.195208074525
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Yes, exactly right. Next up:\n\nWhich of the following best illustrates the process of exfoliation?\nA) Lichens growing on rock surfaces and secreting weak acids\nB) Water flowing over rocks and carrying away loose sediment\nC) Granite boulders shedding outer layers as they cool after exposure at the surface\nD) Ice wedging in cracks and pushing rock apart",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4764.555291971192
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 483.9400411583483
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "That's it — well done. Here's another:\n\nWhich of the following is a chemical weathering process?\nA) Sand and pebbles abrading rock surfaces along coastlines\nB) Carbonation, where rainwater containing CO₂ dissolves limestone\nC) Temperature changes causing rocks to expand and contract\nD) Burrowing animals creating cracks in soil and rock",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4967.393833911046
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 528.1596248969436
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true,
+          "latency_ms": 4277.15366682969
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 6,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 1204,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/qwen3-4b-jetson"
+}

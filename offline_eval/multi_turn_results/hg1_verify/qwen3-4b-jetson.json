@@ -1,0 +1,62 @@
+{
+  "started_at": "2026-08-24T02:33:37.085294+00:00",
+  "finished_at": "2026-08-24T02:33:44.900151+00:00",
+  "git_sha": "069ce3b99b8e",
+  "total_scenarios": 1,
+  "passed": 0,
+  "failed": 0,
+  "errored": 1,
+  "results": [
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1469_14",
+      "passed": false,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1469,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "remediation",
+        "exit_ticket",
+        "hg1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": false,
+          "detail": "actual='error', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=0, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": null,
+      "rubric_skipped": true,
+      "dimensions_result": null,
+      "transcript": [],
+      "sim_reason": "error",
+      "sim_turns": 0,
+      "per_turn_labels": [],
+      "session_id": 1208,
+      "error": "name 'cfg' is not defined"
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/qwen3-4b-jetson"
+}
