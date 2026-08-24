@@ -54,11 +54,16 @@ class ExplanationReachesTheTutorTest(TestCase):
     def test_correct_verdict_carries_the_explanation(self):
         self.assertIn(EXPLANATION, self._feedback('correct'))
 
-    def test_the_tutor_is_told_to_say_why(self):
-        """The old wording, "briefly acknowledge", is what produced a bare
-        tick. If it comes back, so does the behaviour."""
+    def test_the_tutor_is_told_to_give_a_reason(self):
+        """Asserts the REQUIREMENT, not the wording — an earlier version of
+        this test pinned the literal word "WHY" and broke when the instruction
+        was rephrased, which is a test measuring the wrong thing.
+
+        "briefly acknowledge" is the original wording that produced a bare
+        tick; if it returns, so does the behaviour."""
         out = self._feedback('correct')
-        self.assertIn('WHY', out)
+        self.assertRegex(out, r'REASON|why it is right',
+                         'the instruction must demand a reason, not a tick')
         self.assertNotIn('briefly acknowledge', out)
 
     # --- gating -----------------------------------------------------------
@@ -196,3 +201,69 @@ class CatalogQuestionIdIsAPrimaryKeyTest(TestCase):
         back = ExitTicketQuestion.objects.get(pk=slot.catalog_question_id)
         self.assertEqual(back.question_text, pool[2].question_text)
         self.assertEqual(back.explanation, pool[2].explanation)
+
+
+class TaskInstructionIsPlacedToBeReadTest(TestCase):
+    """Placement, not wording, was why the explanation went unused.
+
+    Measured 2026-08-24: the FIRST correct turn of 34 of 34 sessions reached
+    for a templated acknowledgement — on a 4B AND a 27B, before any history
+    existed. So it was not self-reinforcement from <recent_turns>, and not a
+    small-model limit. Both branches arrived in one paragraph that opened with
+    the wrong-answer ladder, so on a correct answer the model read the
+    instruction that did not apply first, and the one that did was buried.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        inst = Institution.objects.create(name='TP', slug='tp')
+        course = Course.objects.create(title='C', institution=inst,
+                                       grade_level='S3', is_published=True)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        lesson = Lesson.objects.create(unit=unit, title='L', objective='o',
+                                       order_index=0, is_published=True)
+        ticket = ExitTicket.objects.create(lesson=lesson)
+        cls.q = ExitTicketQuestion.objects.create(
+            exit_ticket=ticket, question_type='mcq', question_text='Q?',
+            option_a='a', option_b='b', option_c='c', option_d='d',
+            correct_answer='B', explanation=EXPLANATION)
+
+    def _fb(self, verdict):
+        return fmt('record_answer', {
+            'recorded': True, 'verdict': verdict, 'reference_answer': 'B',
+            'question_text': 'Q?', 'question_type': 'mcq',
+            'attempt_count_before': 0, 'catalog_question_id': self.q.pk})
+
+    def test_the_task_is_the_last_thing_read(self):
+        """Final tokens steer generation most. The task used to sit 6th of 8
+        blocks, behind text about the branch that did not apply."""
+        self.assertTrue(self._fb('correct').rstrip().endswith(
+            'Do not reference older questions from <recent_turns>.'))
+        self.assertIn('YOUR TASK THIS TURN',
+                      self._fb('correct').split('\n')[-1])
+
+    def test_explanation_sits_immediately_above_the_task(self):
+        lines = [l for l in self._fb('correct').split('\n') if l.strip()]
+        expl = next(i for i, l in enumerate(lines) if l.startswith('<explanation>'))
+        task = next(i for i, l in enumerate(lines) if l.startswith('YOUR TASK'))
+        self.assertEqual(task, expl + 1,
+                         'the material and the task that uses it must be adjacent')
+
+    def test_a_correct_verdict_never_sees_the_hint_ladder(self):
+        """The whole failure: reading the inapplicable branch first."""
+        out = self._fb('correct')
+        self.assertNotIn('progressively deeper scaffolding', out)
+        self.assertNotIn('Give one hint', out)
+
+    def test_a_wrong_verdict_never_sees_the_explain_instruction(self):
+        out = self._fb('incorrect')
+        self.assertNotIn('Open with the REASON', out)
+        self.assertNotIn(EXPLANATION, out)
+
+    def test_the_instruction_is_framed_positively(self):
+        """Naming the phrasing to avoid is how "(e.g. 'Try this:')" became the
+        opener in 34 of 34 sessions. State what to do, not what not to say."""
+        out = self._fb('correct')
+        for banned in ("that's right", "Got it", "don't say", "Do not say"):
+            self.assertNotIn(banned, out,
+                             f'{banned!r} names a phrasing the model can copy')

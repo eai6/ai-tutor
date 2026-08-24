@@ -1051,6 +1051,50 @@ _PRIVATE_NOTE = (
 )
 
 
+def _task_for_verdict(verdict: str) -> str:
+    """The instruction for THIS verdict only.
+
+    Both branches used to arrive in one paragraph that opened with the
+    incorrect case, so on a correct answer the model read the whole
+    wrong-answer ladder before reaching the sentence that applied to it.
+    Measured 2026-08-24: the FIRST correct turn of 34 of 34 sessions reached
+    for a templated acknowledgement, on both a 4B and a 27B — so this was not
+    self-reinforcement from <recent_turns> and not a small-model limit. The
+    instruction simply was not landing.
+
+    Two changes, both from prompting-fundamentals: split by verdict so the
+    model is never asked to select the applicable branch out of prose (the
+    platform already knows which), and put the task LAST, since final tokens
+    steer generation most strongly.
+
+    Framed positively. "Do not say 'that's right'" would name the exact string
+    to avoid, and naming a concrete phrase next to the generation point is how
+    "(e.g. 'Try this:')" ended up as the opener in 34 of 34 sessions.
+    """
+    if verdict == 'CORRECT':
+        return (
+            "YOUR TASK THIS TURN. The student got it right. Open with the "
+            "REASON it is right — one or two sentences built from "
+            "<explanation> above, in your own words, naming the option or "
+            "value they chose. Praise, if any, comes after the reason and in "
+            "no more than four words. Then call pose_question for the next "
+            "question. Do not reference older questions from <recent_turns>."
+        )
+    if verdict == 'INCORRECT':
+        return (
+            "YOUR TASK THIS TURN. Give one hint, sized to the wrong-attempt "
+            "count above (1st/2nd/3rd+ → progressively deeper scaffolding). A "
+            "hint sets up the next step the student should take; it performs "
+            "no intermediate or final computation and never states the "
+            "reference value or its option letter. Do not reference older "
+            "questions from <recent_turns>."
+        )
+    return (
+        "Compose your next reply ABOUT THIS EXACT QUESTION. Do not reference "
+        "older questions from <recent_turns>."
+    )
+
+
 def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
     """Render a tool result as an instruction-laden block for Call 2.
 
@@ -1138,29 +1182,31 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
             f"Question I just graded (type={qtype}):",
             f'  "{qtext}"' if qtext else '  (no question_text recorded)',
             f"Reference (correct answer): {ref}" if ref else "",
-            f"<explanation>{expl}</explanation>" if expl else "",
             f"Wrong-attempt count on this question so far: {attempts_so_far}",
+            # The explanation sits immediately ABOVE the task that uses it.
+            # It used to be three lines higher with the attempt count wedged
+            # between, and the task itself was buried mid-paragraph below.
+            f"<explanation>{expl}</explanation>" if expl else "",
             "",
-            (
-                "Compose your next reply ABOUT THIS EXACT QUESTION. "
-                "If incorrect, give a hint per the wrong-answer "
-                "ladder (1st/2nd/3rd+ attempts → progressively deeper "
-                "scaffolding, never reveal the reference). A hint sets "
-                "up the next step the student should take; it performs "
-                "no intermediate or final computation and never states "
-                "the reference value or its option letter. If correct, "
-                "confirm it and say in one or two sentences WHY it is "
-                "right — use <explanation> above if one is given, in "
-                "your own words, tied to the option or value the student "
-                "actually chose. A bare 'that's right' teaches nothing. "
-                "Then either continue teaching or call pose_question with "
-                "the next question. Do NOT reference older questions from "
-                "<recent_turns>."
-            ),
+            _task_for_verdict(verdict),
         ]
         if just:
             parts.insert(4, f"Grader justification: {just}")
-        parts.append(_PRIVATE_NOTE)
+        # _PRIVATE_NOTE before the task, not after. Final tokens steer
+        # generation most, and the last thing the model reads should be what
+        # it is meant to DO — not a standing caution about vocabulary.
+        # Order matters more than content here. Final layout:
+        #   verdict / question / reference / attempts
+        #   private note        <- standing caution, read early
+        #   <explanation>       <- the material
+        #   YOUR TASK THIS TURN <- what to do with it, LAST
+        # The explanation and the task that consumes it end up adjacent, and
+        # the task is the last thing read.
+        task = parts.pop()
+        expl_at = next((i for i, x in enumerate(parts)
+                        if x.startswith('<explanation>')), len(parts))
+        parts.insert(expl_at, _PRIVATE_NOTE)
+        parts.append(task)
         return "\n".join(p for p in parts if p)
 
     if (tool_name == 'record_answer'
