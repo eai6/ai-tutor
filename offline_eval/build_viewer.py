@@ -83,6 +83,9 @@ FLAT_RUNS = [
     # pool runs dry, not because the model is worse at maths. Read them as a
     # content gap.
     ("math_4b_v2", "43_math_4b_postfix"),
+    # Same tutor build as 42/43, free-text tier. Pair 42 vs 44 for the answer
+    # SURFACE comparison at fixed subject: 4b on A-D buttons against 27b typing.
+    ("geo_27b_v2", "44_geo_27b_postfix"),
 ]
 
 
