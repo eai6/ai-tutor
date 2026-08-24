@@ -1198,6 +1198,11 @@ def handle_record_answer(
         'reference_answer': in_flight.reference_answer,
         'question_type': in_flight.question_type,
         'attempt_count_before': in_flight.attempt_count,
+        # Captured here, with the rest of the snapshot, because the
+        # correct-verdict branch below DELETES the slot — read it afterwards
+        # and it is gone. The engine uses it to fetch the bank's authored
+        # explanation so the tutor can say why an answer was right.
+        'catalog_question_id': in_flight.catalog_question_id,
     }
     # Read off the row before the correct-verdict branch deletes it.
     in_flight_options = list(in_flight.options or [])

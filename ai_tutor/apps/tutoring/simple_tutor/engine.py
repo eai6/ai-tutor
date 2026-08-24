@@ -1005,8 +1005,16 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
             "Your text reply on this turn MUST include the question "
             "stem verbatim (and the four labelled options A/B/C/D if "
             "MCQ) so the student can read the question in the chat. "
-            "A brief lead-in is fine (e.g. 'Try this:'), but the "
-            "stem itself must appear in the visible text.",
+            # No example lead-in here. This used to read "(e.g. 'Try this:')"
+            # and qwen3-4b copied that string verbatim as its opener in 34 of
+            # 34 sessions — 0% ever greeted the student — while qwen3.8-27b
+            # ignored it and greeted properly 91% of the time. A concrete
+            # example next to the generation point beats an abstract
+            # instruction in the system prompt, and the smaller the model the
+            # more literally it copies. Say what the reply must CONTAIN, and
+            # leave the phrasing to the opening instruction.
+            "A short lead-in before the stem is fine; write it in your own "
+            "words. The stem itself must appear in the visible text.",
         ]
         if mismatch:
             parts.append(
@@ -1028,11 +1036,31 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
         # attempt_count for the hint ladder: when verdict=correct the
         # slot was cleared; otherwise attempts is attempts_before + 1.
         attempts_so_far = attempts_before if verdict == 'CORRECT' else attempts_before + 1
+        # The bank's authored explanation for THIS question, fetched at the
+        # moment of grading rather than trusting it to still be in
+        # <question_pool>: the pool rotates with the step, and the question just
+        # graded may already have dropped out of it. One indexed PK lookup.
+        # Only sent on a CORRECT verdict — on a wrong answer this text states
+        # the answer, and handing it over would turn a hint into a reveal.
+        expl = ''
+        if verdict == 'CORRECT':
+            cat_id = result.get('catalog_question_id')
+            if cat_id:
+                try:
+                    from ai_tutor.apps.tutoring.models import ExitTicketQuestion
+                    expl = (ExitTicketQuestion.objects
+                            .filter(pk=cat_id)
+                            .values_list('explanation', flat=True)
+                            .first() or '').strip()
+                except Exception:                            # noqa: BLE001
+                    logger.warning("explanation lookup failed for q=%s",
+                                   cat_id, exc_info=True)
         parts = [
             f"VERDICT: {verdict}",
             f"Question I just graded (type={qtype}):",
             f'  "{qtext}"' if qtext else '  (no question_text recorded)',
             f"Reference (correct answer): {ref}" if ref else "",
+            f"<explanation>{expl}</explanation>" if expl else "",
             f"Wrong-attempt count on this question so far: {attempts_so_far}",
             "",
             (
@@ -1043,9 +1071,13 @@ def _format_tool_result_for_call2(tool_name: str, result: dict) -> str:
                 "up the next step the student should take; it performs "
                 "no intermediate or final computation and never states "
                 "the reference value or its option letter. If correct, "
-                "briefly acknowledge and either continue teaching or "
-                "call pose_question with the next question. Do NOT "
-                "reference older questions from <recent_turns>."
+                "confirm it and say in one or two sentences WHY it is "
+                "right — use <explanation> above if one is given, in "
+                "your own words, tied to the option or value the student "
+                "actually chose. A bare 'that's right' teaches nothing. "
+                "Then either continue teaching or call pose_question with "
+                "the next question. Do NOT reference older questions from "
+                "<recent_turns>."
             ),
         ]
         if just:

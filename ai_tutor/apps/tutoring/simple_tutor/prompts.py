@@ -936,6 +936,16 @@ def _render_question_pool(pool) -> str:
                         f'    <key_concepts>{_escape_xml(", ".join(str(k) for k in kws))}</key_concepts>'
                     )
 
+        # Applies to BOTH branches, so it sits outside the mcq/else split.
+        # Every question in the bank carries an authored explanation (12,375 of
+        # 12,375 populated) and none of it ever reached the model. Without it
+        # the tutor can only assert that an answer was right; with it, it can
+        # say WHY — the difference between marking and teaching.
+        expl = (getattr(q, 'explanation', '') or '').strip()
+        if expl:
+            parts.append(
+                f'    <explanation>{_escape_xml(expl)}</explanation>')
+
         parts.append('  </question>')
     parts.append("</question_pool>")
     return "\n".join(parts)
