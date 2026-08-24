@@ -98,6 +98,12 @@ FLAT_RUNS = [
     # work. Try this one:"). Expect that shape in the transcripts. It is a
     # known engine limitation, not something to re-discover per session.
     ("math_27b_v3", "45_math_27b_postfix"),
+    # Cloud ceiling reference: one model per provider, all free text, same
+    # scenarios and same tutor build as 42-45. Read these against the local
+    # arms to see what the offline tiers give up, NOT as a cloud leaderboard.
+    # Arms appear here as each finishes, so this board may be partial.
+    ("geo_cloud", "46_geo_cloud_3arm"),
+    ("math_cloud", "47_math_cloud_3arm"),
 ]
 
 
@@ -233,6 +239,14 @@ def _read_run(path, label):
     out = []
     for jf in sorted(glob.glob(os.path.join(path, "*.json"))):
         model = os.path.basename(jf)[:-5]
+        # partial_*.json are resume checkpoints, not model arms. They sit
+        # beside the real boards while a sweep is mid-flight and carry the
+        # same sessions, so globbing them in invents a duplicate arm named
+        # after a timestamp — and because the grade key is run|model|scenario,
+        # a hand-grade recorded against the phantom is a DIFFERENT key from
+        # one recorded against the real arm. Grades would silently split.
+        if model.startswith("partial_"):
+            continue
         try:
             data = json.load(open(jf))
         except Exception:
