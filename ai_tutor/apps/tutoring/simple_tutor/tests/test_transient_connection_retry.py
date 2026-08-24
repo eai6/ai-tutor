@@ -133,3 +133,64 @@ class RetryActuallyHappensTest(SimpleTestCase):
             always_bad, label='test', provider='local_ollama')
         self.assertIsNone(out)
         self.assertEqual(calls['n'], 1, 'burned a retry on a permanent error')
+
+
+class ConnectionLadderTest(SimpleTestCase):
+    """A dropped socket earns more patience than a local 5xx.
+
+    The short local ladder exists because a wasted local generation costs ~92s,
+    so attempts 3-6 buy nothing. That reasoning is about a 5xx — the server got
+    the request and failed. When the socket drops, the request never arrived,
+    so a retry wastes no decode, and 2s is often too short for the transport to
+    come back (33 connection failures in one arm on 2026-08-23, 18 recovered).
+    """
+
+    def test_local_5xx_keeps_the_single_short_retry(self):
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        self.assertEqual(engine._backoff_for('local_ollama'), [2])
+
+    def test_local_connection_failure_gets_a_longer_ladder(self):
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        ladder = engine._backoff_for('local_ollama', ConnectionError('x'))
+        self.assertGreater(len(ladder), 1)
+        self.assertEqual(ladder[0], 2, 'first retry should still be quick')
+
+    def test_cloud_ladder_is_untouched(self):
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        self.assertEqual(engine._backoff_for('anthropic'), [2, 5, 12, 30, 60])
+
+    def test_a_connection_blip_survives_more_than_one_attempt(self):
+        """The behaviour, not the constant: two consecutive drops used to end
+        the turn, and two placeholders in a row end the session."""
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        calls = {'n': 0}
+
+        def flaky():
+            calls['n'] += 1
+            if calls['n'] < 3:
+                raise ConnectionError('Could not connect to Ollama')
+            return 'recovered'
+
+        out = engine._invoke_with_transient_retry(
+            flaky, label='t', provider='local_ollama')
+        self.assertEqual(out, 'recovered')
+        self.assertEqual(calls['n'], 3)
+
+    def test_a_local_5xx_still_stops_after_one_retry(self):
+        """Guards the other direction: this must not become the cloud ladder,
+        or one bad turn costs ~11 minutes of wasted generations."""
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        import requests
+        calls = {'n': 0}
+
+        def always_500():
+            calls['n'] += 1
+            resp = requests.Response()
+            resp.status_code = 500
+            exc = requests.exceptions.HTTPError('500 Server Error')
+            exc.response = resp
+            raise exc
+
+        engine._invoke_with_transient_retry(
+            always_500, label='t', provider='local_ollama')
+        self.assertEqual(calls['n'], 2, 'one attempt plus one retry')

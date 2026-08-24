@@ -92,15 +92,22 @@ def summarise(rows):
 def grep(rows, needle):
     """Did the model actually SEE this string? The question that could not be
     answered at all before, because tool-result bodies were never logged."""
+    # Search what was SENT to the model, not the platform's result dict. The
+    # bank's <explanation> is injected into the call-2 string and never appears
+    # in the dict, so searching the dict answers a different question — the
+    # mistake that made "0/7 turns" look like an answer when it was not.
+    def _blob(r):
+        return json.dumps({'sent': r.get('call2_sent') or [],
+                           'results': r.get('tool_results') or []}, default=str)
+
     hits = 0
     for r in rows:
-        blob = json.dumps(r.get('tool_results') or [], default=str)
-        if needle.lower() in blob.lower():
+        if needle.lower() in _blob(r).lower():
             hits += 1
     print(f'"{needle}" appears in the tool results of {hits}/{len(rows)} turns')
     if hits:
         for r in rows:
-            blob = json.dumps(r.get('tool_results') or [], default=str)
+            blob = _blob(r)
             if needle.lower() in blob.lower():
                 i = blob.lower().index(needle.lower())
                 print(f'   session {r.get("session_id")}: '

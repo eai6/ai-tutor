@@ -67,3 +67,36 @@ def test_trace_name_is_overridable(monkeypatch, tmp_path):
     monkeypatch.setenv('TUTOR_TRACE_NAME', 'arm-a')
     trace.emit(session_id=1)
     assert (tmp_path / 'arm-a.jsonl').exists()
+
+
+class TestInstrumentationCannotBreakATurn:
+    """The tracer sits in the LLM call path. On 2026-08-24 a NameError there
+    errored every scenario in a run inside 11 seconds — the instrumentation
+    broke the thing it was measuring. These pin the guards."""
+
+    def test_note_model_survives_a_junk_config(self):
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        engine._reset_turn_diagnostics()
+        engine._note_model(object())          # no provider/model_name
+        engine._note_model(None)
+        assert engine.turn_diagnostics()['model'] == ''
+
+    def test_note_call2_survives_junk(self):
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        engine._reset_turn_diagnostics()
+        engine._note_call2_content('tool', None)
+        assert isinstance(engine.turn_diagnostics()['call2'], list)
+
+    def test_diagnostics_work_without_a_reset(self):
+        """A turn path that never called _reset_turn_diagnostics must still
+        return a usable dict rather than raising AttributeError."""
+        from ai_tutor.apps.tutoring.simple_tutor import engine
+        import threading
+        out = {}
+
+        def worker():
+            out['d'] = engine.turn_diagnostics()   # fresh thread, no reset
+
+        t = threading.Thread(target=worker)
+        t.start(); t.join()
+        assert set(out['d']) >= {'retries', 'last_error', 'call2', 'model'}

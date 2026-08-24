@@ -25,6 +25,16 @@ import statistics
 import sys
 
 
+# The engine's fallback when a turn fails outright. These are NOT generations:
+# they return in ~0.4s without calling the model, so counting them pulls a
+# tutor median DOWN and makes a struggling arm look fast. Reported separately.
+_PLACEHOLDER = 'had trouble responding'
+
+
+def is_placeholder(turn) -> bool:
+    return _PLACEHOLDER in (turn.get('content') or '')
+
+
 def pct(xs, p):
     if not xs:
         return 0.0
@@ -60,12 +70,19 @@ def main() -> int:
         arm = arm.split('/')[-1]
 
         by_role: dict[str, list[float]] = {'tutor': [], 'student': []}
+        placeholders = 0
         for r in data.get('results', []):
             for t in r.get('transcript', []):
                 ms = t.get('latency_ms')
                 if ms is None:                    # pre-instrumentation run
                     continue
+                if t.get('role') == 'tutor' and is_placeholder(t):
+                    placeholders += 1             # failed turn, not a generation
+                    continue
                 by_role.setdefault(t.get('role', '?'), []).append(float(ms))
+        if placeholders:
+            print(f'{arm:26}{"NOTE":9} {placeholders} failed turn(s) excluded '
+                  f'— they returned without calling the model')
 
         if not any(by_role.values()):
             print(f'{arm:26}{"—":9}{"":>6}  no latency_ms — run predates the '

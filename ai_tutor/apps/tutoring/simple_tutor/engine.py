@@ -848,9 +848,11 @@ def respond(
             # Which model, and WHICH HOST. A dropped tunnel silently pointed a
             # whole run at the laptop's ollama instead of the rented GPU; the
             # console log could not have told us.
-            model=f"{getattr(turn_config, 'provider', '')}/"
-                  f"{getattr(turn_config, 'model_name', '')}" if turn_config else '',
-            api_base=getattr(turn_config, 'api_base', '') or '',
+            model=_diag['model'] or (
+                f"{getattr(turn_config, 'provider', '')}/"
+                f"{getattr(turn_config, 'model_name', '')}" if turn_config else ''),
+            api_base=_diag['api_base'] or (
+                getattr(turn_config, 'api_base', '') if turn_config else ''),
             family=_family,
             two_call=used_two_call,
             # Was the picker actually on this turn? Measured, not inferred.
@@ -869,6 +871,10 @@ def respond(
             # bank's <explanation> reach the model?" — clipped in trace.py.
             tool_results=[{'tool': tr.get('tool'), 'result': tr.get('result')}
                           for tr in tool_results],
+            # What the model actually READ. The dict above is the platform's
+            # view; this is the model's, and they differ — the bank's
+            # <explanation> only exists in this one.
+            call2_sent=_diag['call2'],
             reply=text_reply or '',
         )
 
@@ -962,6 +968,14 @@ def _extract_tool_use_blocks(response) -> list:
     return out
 
 
+def _traced_format_for_call2(tool_name: str, result: dict) -> str:
+    """_format_tool_result_for_call2 plus a trace side-effect. One call site
+    means the trace cannot drift from what was sent."""
+    text = _format_tool_result_for_call2(tool_name, result)
+    _note_call2_content(tool_name, text)
+    return text
+
+
 def _build_tool_result_content(tool_use_blocks: list, tool_results: list) -> list:
     """Pair the LLM's tool_use blocks with our dispatched tool_results
     by ORDER (Anthropic's tool_use_id is the canonical pairing key, but
@@ -995,7 +1009,7 @@ def _build_tool_result_content(tool_use_blocks: list, tool_results: list) -> lis
         # salient when the LLM composes its Call 2 text — otherwise it
         # tends to draw on older parts of <recent_turns> and reference
         # the wrong question in hints. Caught 2026-05-26 in M11.3 E2E.
-        content_text = _format_tool_result_for_call2(tool_name, result_obj)
+        content_text = _traced_format_for_call2(tool_name, result_obj)
         out.append({
             'type': 'tool_result',
             'tool_use_id': getattr(block, 'id', ''),
@@ -2046,6 +2060,19 @@ _TRANSIENT_BACKOFF = [2, 5, 12, 30, 60]
 # worth having is attempts 3-6, which have no failure mode they can fix.
 _LOCAL_TRANSIENT_BACKOFF = [2]
 
+# A dropped CONNECTION is a different failure from a local 5xx, and the ladder
+# above was written for the 5xx. That reasoning — "each attempt costs a whole
+# generation (~92 s), so attempts 3-6 have no failure mode they can fix" — does
+# not transfer: when the socket drops, the request never reached the model, so
+# a retry wastes no decode at all. It also takes longer than 2 s to clear.
+#
+# Measured 2026-08-23: 33 connection failures in one 34-scenario arm, 18 of
+# which the single 2 s retry recovered and the rest did not; each unrecovered
+# one degraded a turn to the placeholder, and two in a row ended the session.
+# On a Jetson the same shape appears when ollama serve restarts or the model
+# reloads under memory pressure.
+_LOCAL_CONNECTION_BACKOFF = [2, 5, 12]
+
 # Providers running on the same box as Django. Not "open-weight" — a
 # Qwen served by a cloud host has cloud queueing behaviour and wants the
 # cloud ladder.
@@ -2055,12 +2082,48 @@ _LOCAL_PROVIDERS = frozenset({'local_ollama'})
 _TURN_STATE = threading.local()
 
 
+def _note_call2_content(tool_name: str, text: str) -> None:
+    """Remember what was actually SENT to the model this turn.
+
+    The raw tool-result dict is not it. The bank's <explanation> is injected by
+    _format_tool_result_for_call2 into the string the model reads, so tracing
+    the dict answers a different question than the one being asked — which is
+    exactly the error that made "0/7 turns mention explanation" look like
+    evidence when it was measuring the wrong object.
+    """
+    try:
+        items = getattr(_TURN_STATE, 'call2', None)
+        if items is None:
+            items = _TURN_STATE.call2 = []
+        items.append({'tool': tool_name, 'sent': text})
+    except Exception:                                        # noqa: BLE001
+        logger.debug('trace: could not record call2 content', exc_info=True)
+
+
+def _note_model(cfg) -> None:                                    # noqa: D401
+    """The config the call actually used. turn_config is None on some paths,
+    which is why the first trace reported model='?' and host='(default)' —
+    the two fields the connectivity question needed."""
+    # Wrapped: this is instrumentation sitting directly in the LLM call path,
+    # and on 2026-08-24 a NameError here errored every scenario in a run inside
+    # 11 seconds. A tracer must never be able to fail a turn.
+    try:
+        _TURN_STATE.model = (f"{getattr(cfg, 'provider', '')}/"
+                             f"{getattr(cfg, 'model_name', '')}") if cfg else ''
+        _TURN_STATE.api_base = (getattr(cfg, 'api_base', '') or '') if cfg else ''
+    except Exception:                                        # noqa: BLE001
+        logger.debug('trace: could not record model', exc_info=True)
+
+
 def _reset_turn_diagnostics() -> None:
     """Call at the start of a turn. Retries and the last error class are
     per-turn facts; without resetting, a trace would report the whole
     session's history on every line."""
     _TURN_STATE.retries = 0
     _TURN_STATE.last_error = ''
+    _TURN_STATE.call2 = []
+    _TURN_STATE.model = ''
+    _TURN_STATE.api_base = ''
 
 
 def _note_retry(exc: Exception) -> None:
@@ -2072,17 +2135,35 @@ def turn_diagnostics() -> dict:
     return {
         'retries': getattr(_TURN_STATE, 'retries', 0),
         'last_error': getattr(_TURN_STATE, 'last_error', ''),
+        'call2': list(getattr(_TURN_STATE, 'call2', []) or []),
+        'model': getattr(_TURN_STATE, 'model', ''),
+        'api_base': getattr(_TURN_STATE, 'api_base', ''),
     }
 
 
 from ai_tutor.apps.tutoring.simple_tutor import trace as _trace  # noqa: E402
 
 
-def _backoff_for(provider: str | None) -> list[int]:
-    """Retry ladder for ``provider`` — short for local, laddered for cloud."""
+def _backoff_for(provider: str | None, exc: Exception | None = None) -> list[int]:
+    """Retry ladder for ``provider`` — short for local, laddered for cloud.
+
+    A local CONNECTION failure gets its own ladder: the short local one exists
+    because a wasted local generation is expensive, and a request that never
+    arrived wasted none.
+    """
     if (provider or '').strip().lower() in _LOCAL_PROVIDERS:
+        if exc is not None and _is_connection_error(exc):
+            return _LOCAL_CONNECTION_BACKOFF
         return _LOCAL_TRANSIENT_BACKOFF
     return _TRANSIENT_BACKOFF
+
+
+def _is_connection_error(exc: Exception) -> bool:
+    """The socket never delivered the request. Distinct from a 5xx, which
+    means the server got it and failed."""
+    return isinstance(exc, (ConnectionError, TimeoutError)) or type(exc).__name__ in (
+        'ConnectionError', 'ChunkedEncodingError', 'ProtocolError',
+        'RemoteDisconnected')
 
 
 # A 5xx whose body names the GENERATION as malformed, not the server as busy.
@@ -2204,10 +2285,14 @@ def _invoke_with_transient_retry(fn, *, label: str, on_attempt=None,
     the request and each attempt costs a whole generation; omitting it keeps
     the cloud ladder, which is the safe default for anything remote.
     """
-    backoff = _backoff_for(provider)
-    retries = len(backoff) if (
-        os.getenv('SIMPLE_TUTOR_TRANSIENT_RETRY', '1').strip() != '0') else 0
-    for attempt in range(retries + 1):
+    # The ladder depends on the EXCEPTION (a dropped socket earns more patience
+    # than a local 5xx), which does not exist until the first failure. Bound the
+    # loop by the longest ladder this provider could use, then re-derive the
+    # real one per exception inside the handler.
+    retry_on = os.getenv('SIMPLE_TUTOR_TRANSIENT_RETRY', '1').strip() != '0'
+    max_ladder = max(len(_backoff_for(provider)),
+                     len(_backoff_for(provider, ConnectionError())))
+    for attempt in range(max_ladder + 1):
         try:
             if on_attempt is not None:
                 on_attempt()
@@ -2222,6 +2307,8 @@ def _invoke_with_transient_retry(fn, *, label: str, on_attempt=None,
                     label, type(exc).__name__, detail,
                 )
                 return None
+            backoff = _backoff_for(provider, exc) if retry_on else []
+            retries = len(backoff)
             if _is_transient_error(exc) and attempt < retries:
                 _note_retry(exc)
                 delay = backoff[attempt]
@@ -2423,6 +2510,7 @@ def _call_llm(
                 )
         except (TypeError, ValueError):
             pass
+    _note_model(config)
     return _invoke_with_transient_retry(
         lambda: client.generate_with_tools(
             messages=messages,

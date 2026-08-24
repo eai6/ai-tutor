@@ -748,7 +748,20 @@ def handle_pose_question_by_index(
         reference_answer=reference,
         source='catalog',
         options=options or None,
-        catalog_question_id=idx,
+        # The QUESTION'S primary key, not the pool index. This field was
+        # written as `idx` — the 1-based position in <question_pool> — while
+        # three readers all treat it as a pk:
+        #   * the catalog cross-check below (filter(pk=catalog_question_id)),
+        #     which was therefore comparing the posed answer against whatever
+        #     question happened to own that pk, making every catalog_mismatch
+        #     advisory meaningless;
+        #   * the pivot ladder's difficulty lookup (tools.py ~1521), which
+        #     read the wrong question's difficulty when choosing an easier one;
+        #   * the engine's explanation lookup, added 2026-08-23, which fetched
+        #     an unrelated question and silently returned nothing — the reason
+        #     "explain why the answer is right" shipped and did nothing.
+        # The pool entry is in hand as `q`, so the pk costs nothing to carry.
+        catalog_question_id=getattr(q, 'pk', None),
     )
 
 

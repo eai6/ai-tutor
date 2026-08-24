@@ -117,3 +117,82 @@ class OpeningLeadInTest(TestCase):
             'posed': True, 'question_type': 'mcq', 'source': 'catalog',
         })
         self.assertIn('stem', out.lower())
+
+
+class CatalogQuestionIdIsAPrimaryKeyTest(TestCase):
+    """The field is read as a pk in three places and was written as a pool
+    index. Everything downstream was silently resolving the wrong question:
+    the catalog cross-check compared against a stranger's correct_answer, the
+    pivot ladder read a stranger's difficulty, and the explanation lookup
+    fetched a stranger and returned nothing — which is why "explain why the
+    answer is right" shipped and did nothing at all.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        inst = Institution.objects.create(name='PK', slug='pk')
+        course = Course.objects.create(title='C', institution=inst,
+                                       grade_level='S3', is_published=True)
+        unit = Unit.objects.create(course=course, title='U', order_index=0)
+        lesson = Lesson.objects.create(unit=unit, title='L', objective='o',
+                                       order_index=0, is_published=True)
+        ticket = ExitTicket.objects.create(lesson=lesson)
+        # Several rows, so a pool INDEX (1, 2, 3...) and a PK cannot coincide.
+        cls.qs = [
+            ExitTicketQuestion.objects.create(
+                exit_ticket=ticket, question_type='mcq',
+                question_text=f'Q{i}?', option_a='a', option_b='b',
+                option_c='c', option_d='d', correct_answer='B',
+                explanation=f'because reason {i}')
+            for i in range(4)
+        ]
+
+    def test_posing_pool_entry_2_stores_that_question_pk(self):
+        from ai_tutor.apps.tutoring.models import TutorSession
+        from ai_tutor.apps.tutoring.simple_tutor.tools import (
+            handle_pose_question_by_index,
+        )
+        from django.contrib.auth import get_user_model
+
+        lesson = self.qs[0].exit_ticket.lesson
+        inst = lesson.unit.course.institution
+        user = get_user_model().objects.create_user('pk-stu', password='x')
+        session = TutorSession.objects.create(
+            institution=inst, student=user, lesson=lesson, engine='simple')
+
+        # REVERSED pool, so position and pk cannot coincide: pks are 1..4 in
+        # creation order, so pool position 1 is now the question with the
+        # HIGHEST pk. Ordering them the same way is how the first version of
+        # this test passed against the bug.
+        pool = list(reversed(self.qs))
+        target = pool[1]                       # pool position 2
+        handle_pose_question_by_index(session, question_index=2, question_pool=pool)
+
+        from ai_tutor.apps.tutoring.models import InFlightQuestion
+        slot = InFlightQuestion.objects.get(session=session)
+        self.assertEqual(
+            slot.catalog_question_id, target.pk,
+            'catalog_question_id must be the question pk, not the pool index')
+        self.assertNotEqual(
+            slot.catalog_question_id, 2,
+            'storing the pool index is the bug this test exists for')
+
+    def test_the_stored_id_resolves_back_to_the_posed_question(self):
+        """The property every reader depends on."""
+        from ai_tutor.apps.tutoring.models import TutorSession, InFlightQuestion
+        from ai_tutor.apps.tutoring.simple_tutor.tools import (
+            handle_pose_question_by_index,
+        )
+        from django.contrib.auth import get_user_model
+
+        lesson = self.qs[0].exit_ticket.lesson
+        inst = lesson.unit.course.institution
+        user = get_user_model().objects.create_user('pk-stu2', password='x')
+        session = TutorSession.objects.create(
+            institution=inst, student=user, lesson=lesson, engine='simple')
+        pool = list(reversed(self.qs))
+        handle_pose_question_by_index(session, question_index=3, question_pool=pool)
+        slot = InFlightQuestion.objects.get(session=session)
+        back = ExitTicketQuestion.objects.get(pk=slot.catalog_question_id)
+        self.assertEqual(back.question_text, pool[2].question_text)
+        self.assertEqual(back.explanation, pool[2].explanation)
