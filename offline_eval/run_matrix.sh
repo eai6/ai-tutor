@@ -56,6 +56,13 @@ PROBE_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
 # one directory a sweep is guaranteed to care about keeping.
 export EVAL_CHECKPOINT_DIR="${EVAL_CHECKPOINT_DIR:-$RESULTS}"
 
+# Structured per-turn trace, one file per ARM (TUTOR_TRACE_NAME is set in the
+# loop). Lives beside the results so a sweep's evidence travels with its board.
+# Read it with offline_eval/trace_report.py; grepping console output is how the
+# 2026-08-23 eval was debugged, and several questions had no answer there at all
+# — which host a call reached, whether a tool result contained what we thought.
+export TUTOR_TRACE_DIR="${TUTOR_TRACE_DIR:-$RESULTS/trace}"
+
 mkdir -p "$RESULTS" "$OLLAMA_MODELS"
 # Per-scenario checkpoints go STRAIGHT to the (Drive-backed) results dir —
 # a dead runtime keeps them (2026-08-05: VM-disk checkpoints died with the VM).
@@ -151,7 +158,8 @@ PROBE
   echo "$(date -u +%FT%TZ) $identity_line" >> "$RESULTS/identity.log"
   start=$(date +%s)
   log="$RESULTS/${safe}.log"
-  TUTOR_MODEL_OVERRIDE="local_ollama/$tag" "$PY" manage.py run_eval $MODE >"$log" 2>&1
+  TUTOR_TRACE_NAME="$safe" \
+    TUTOR_MODEL_OVERRIDE="local_ollama/$tag" "$PY" manage.py run_eval $MODE >"$log" 2>&1
   rc=$?
   elapsed=$(( $(date +%s) - start ))
   out=$(grep -oE "Output: .*\.json" "$log" | tail -1 | sed 's/^Output: //')

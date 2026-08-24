@@ -43,6 +43,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 from ai_tutor.apps.safety.html_sanitizer import sanitize_answer_data, sanitize_figure_html
@@ -461,6 +462,7 @@ def respond(
     if _is_offline_session(session):
         from ai_tutor.apps.tutoring.simple_tutor.exit_ticket import ensure_remediation_question
         ensure_remediation_question(session)
+    _reset_turn_diagnostics()
     in_flight = InFlightQuestion.objects.filter(session=session).first()
     step = _load_current_step(session)
     question_pool = build_question_pool(session)
@@ -827,6 +829,48 @@ def respond(
         used_two_call, len(text_reply or ''),
         [tr.get('tool') for tr in tool_results],
     )
+
+    # Structured trace. Off unless TUTOR_TRACE_DIR is set. Every field here
+    # exists because a real question could not be answered from the console
+    # log during the 2026-08-23 eval — see simple_tutor/trace.py.
+    if _trace.enabled():
+        _diag = turn_diagnostics()
+        _verdict = None
+        for _tr in tool_results:
+            _r = _tr.get('result') or {}
+            if _r.get('recorded'):
+                _verdict = _r.get('verdict')
+                break
+        _trace.emit(
+            session_id=getattr(session, 'id', None),
+            lesson_id=getattr(session, 'lesson_id', None),
+            step_index=getattr(session, 'current_step_index', None),
+            # Which model, and WHICH HOST. A dropped tunnel silently pointed a
+            # whole run at the laptop's ollama instead of the rented GPU; the
+            # console log could not have told us.
+            model=f"{getattr(turn_config, 'provider', '')}/"
+                  f"{getattr(turn_config, 'model_name', '')}" if turn_config else '',
+            api_base=getattr(turn_config, 'api_base', '') or '',
+            family=_family,
+            two_call=used_two_call,
+            # Was the picker actually on this turn? Measured, not inferred.
+            answer_mode=('letter_picker'
+                         if _uses_answer_picker(session, in_flight, turn_config)
+                         else 'free_text'),
+            tools=[tr.get('tool') for tr in tool_results],
+            verdict=_verdict,
+            text_chars=len(text_reply or ''),
+            # Did the engine serve its failure placeholder? Two of these in a
+            # row is what the sim scores as a deadlock.
+            placeholder=_FALLBACK_REPLY[:40] in (text_reply or ''),
+            retries=_diag['retries'],
+            last_error=_diag['last_error'],
+            # The bodies. This is the field that would have answered "did the
+            # bank's <explanation> reach the model?" — clipped in trace.py.
+            tool_results=[{'tool': tr.get('tool'), 'result': tr.get('result')}
+                          for tr in tool_results],
+            reply=text_reply or '',
+        )
 
     # ─── 8. Persist turns + verdicts ──────────────────────────────
     # On the opening (warm-up) call, ``user_input`` is the synthetic
@@ -2008,6 +2052,32 @@ _LOCAL_TRANSIENT_BACKOFF = [2]
 _LOCAL_PROVIDERS = frozenset({'local_ollama'})
 
 
+_TURN_STATE = threading.local()
+
+
+def _reset_turn_diagnostics() -> None:
+    """Call at the start of a turn. Retries and the last error class are
+    per-turn facts; without resetting, a trace would report the whole
+    session's history on every line."""
+    _TURN_STATE.retries = 0
+    _TURN_STATE.last_error = ''
+
+
+def _note_retry(exc: Exception) -> None:
+    _TURN_STATE.retries = getattr(_TURN_STATE, 'retries', 0) + 1
+    _TURN_STATE.last_error = type(exc).__name__
+
+
+def turn_diagnostics() -> dict:
+    return {
+        'retries': getattr(_TURN_STATE, 'retries', 0),
+        'last_error': getattr(_TURN_STATE, 'last_error', ''),
+    }
+
+
+from ai_tutor.apps.tutoring.simple_tutor import trace as _trace  # noqa: E402
+
+
 def _backoff_for(provider: str | None) -> list[int]:
     """Retry ladder for ``provider`` — short for local, laddered for cloud."""
     if (provider or '').strip().lower() in _LOCAL_PROVIDERS:
@@ -2153,6 +2223,7 @@ def _invoke_with_transient_retry(fn, *, label: str, on_attempt=None,
                 )
                 return None
             if _is_transient_error(exc) and attempt < retries:
+                _note_retry(exc)
                 delay = backoff[attempt]
                 logger.warning(
                     "_call_llm: %s transient %s (%s) — retry %d/%d in %ds",
