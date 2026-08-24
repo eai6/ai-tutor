@@ -1,0 +1,26 @@
+############ qwen3-4b-ctx8k slots=24 ############
+  VRAM loaded: 18174 MiB
+model      qwen3-4b-ctx8k
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+144  288    25.6s    50.1s    55.2s    103.8   288
+160  320    34.0s    64.5s    70.3s     93.3   320
+176  352    32.2s    61.6s    65.6s    103.5   352
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 144
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s         229
+          30s         313
+          60s         482
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE

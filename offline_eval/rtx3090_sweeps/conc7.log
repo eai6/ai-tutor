@@ -1,0 +1,45 @@
+
+############ qwen3-4b-ctx8k slots=24 ############
+  ollama up, NUM_PARALLEL=24
+  VRAM loaded: 18174 MiB
+model      qwen3-4b-ctx8k
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+192  384    33.8s    66.5s    70.4s    107.4   384
+256  512    43.5s    85.7s    91.6s    110.9   512
+384  768    64.0s   121.5s   132.2s    113.2   768
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is <1
+
+############ qwen3.8-27b-instruct slots=4 ############
+  ollama up, NUM_PARALLEL=4
+  VRAM loaded: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+ 12   24    28.4s    48.5s    52.1s     20.9    24
+ 16   32    35.4s    63.6s    67.4s     21.8    32
+ 24   48    55.8s    99.2s   105.1s     20.6    48
+
+measured prompt: 5155 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 12
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          18
+          30s          25
+          60s          37
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE

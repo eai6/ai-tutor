@@ -1,0 +1,57 @@
+
+############ qwen3-4b-ctx8k slots=24 ############
+  ollama up, NUM_PARALLEL=24
+  VRAM loaded: 18174 MiB
+model      qwen3-4b-ctx8k
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+  1    2     1.4s     1.2s     1.6s     26.7     2
+ 80  160    15.3s    30.3s    32.4s     99.7   160
+ 96  192    17.4s    34.5s    36.1s    102.3   192
+112  224    19.2s    36.6s    40.3s    107.8   224
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 15s is 1
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          12
+          30s          22
+          60s          44
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3.8-27b-instruct slots=4 ############
+  ollama up, NUM_PARALLEL=4
+  VRAM loaded: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+  1    2     4.1s     3.9s     4.3s     22.1     2
+  2    4     5.1s     6.7s     6.8s     26.7     4
+  4    8    10.1s    16.5s    17.7s     21.0     8
+  6   12    14.5s    23.8s    26.4s     21.6    12
+
+measured prompt: 5155 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 15s is 6
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          12
+          30s          18
+          60s          31
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE

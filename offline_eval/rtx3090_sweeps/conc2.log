@@ -1,0 +1,82 @@
+
+############ qwen3-4b-jetson slots=4 ############
+  ollama up, NUM_PARALLEL=4
+  VRAM loaded: 8004 MiB
+model      qwen3-4b-jetson
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max     wall    tok/s
+-----------------------------------------------------
+  1    1     2.4s     2.4s     2.4s     2.4s     17.8
+  2    2     3.3s     3.2s     3.3s     3.4s     25.9
+  4    4     3.7s     3.9s     3.9s     4.0s     37.0
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 20s is 4
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          20
+          30s          36
+          60s          69
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3-4b-jetson slots=8 ############
+  ollama up, NUM_PARALLEL=8
+  VRAM loaded: 13156 MiB
+model      qwen3-4b-jetson
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max     wall    tok/s
+-----------------------------------------------------
+  1    1     2.5s     2.5s     2.5s     2.5s     17.2
+  4    4     5.4s     5.4s     5.4s     5.4s     29.8
+  8    8     5.7s     5.9s     5.9s     5.9s     54.1
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 20s is 8
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          29
+          30s          50
+          60s          92
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3.8-27b-instruct slots=8 ############
+  ollama up, NUM_PARALLEL=8
+  VRAM loaded: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max     wall    tok/s
+-----------------------------------------------------
+  1    1    10.4s    10.4s    10.4s    10.4s      8.7
+  4    4     8.7s    10.5s    15.4s    15.4s     23.4
+  8    8    20.5s    30.9s    36.1s    36.1s     20.0
+
+measured prompt: 5155 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 20s is 4
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          11
+          30s          18
+          60s          32
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE

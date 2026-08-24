@@ -1,0 +1,59 @@
+
+############ qwen3-4b-jetson (slots=16) ############
+  ollama up, NUM_PARALLEL=16
+  VRAM after load: 22942 MiB
+model      qwen3-4b-jetson
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max     wall    tok/s
+-----------------------------------------------------
+  1    1    11.7s    11.7s    11.7s    11.7s      3.7
+  2    2    15.9s    14.9s    17.0s    17.0s      5.2
+  4    4    17.5s    17.5s    17.8s    17.8s      9.7
+  8    8    28.5s    29.1s    29.1s    29.1s     11.1
+ 16   16    44.8s    54.1s    55.9s    55.9s     10.8
+
+measured prompt: 5153 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 20s is 4
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s           7
+          30s          11
+          60s          18
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+  VRAM after sweep: 22956 MiB
+
+############ qwen3.8-27b-instruct (slots=4) ############
+  ollama up, NUM_PARALLEL=4
+  VRAM after load: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+
+  N   ok      p50      p95      max     wall    tok/s
+-----------------------------------------------------
+  1    1     9.9s     9.9s     9.9s     9.9s      9.1
+  2    2     6.9s     4.4s     9.3s     9.3s     19.3
+  4    4    10.8s    13.1s    16.7s    16.9s     21.3
+
+measured prompt: 5155 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 20s is 4
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          10
+          30s          15
+          60s          26
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+  VRAM after sweep: 19158 MiB
+CONC DONE
