@@ -54,8 +54,13 @@ def parse_sweep(path):
     for line in open(path):
         h = _HDR.match(line)
         if h:
+            # setdefault, NOT assignment: the same (model, slots) arm is often
+            # swept twice across separate logs to extend the N range, and
+            # resetting here silently discarded every level from the earlier
+            # run — leaving a table that looked complete and had lost its
+            # low-N rows, which are the ones under budget.
             key = (h.group(1), int(h.group(2)))
-            out[key] = {}
+            out.setdefault(key, {})
             continue
         r = _ROW.match(line)
         if r and key:

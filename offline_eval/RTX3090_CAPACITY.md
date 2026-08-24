@@ -7,12 +7,16 @@ time, using the 4B or the 27B model?
 
 | Model | Concurrent students (median turn < 60s) | Concurrent students (95th-pct turn < 60s) |
 |---|---|---|
-| **qwen3-4B** (A–D picker tier) | **128** | **64** |
-| **qwen3.8-27B** (free-text tier) | **8** | **under 8** |
+| **qwen3-4B** (A–D picker tier) | **144** | **64** |
+| **qwen3.8-27B** (free-text tier) | **12** | **none of the levels tested** |
 
-A **16× gap** between the tiers. That gap, not the absolute numbers, is the
+A **12× gap** between the tiers. That gap, not the absolute numbers, is the
 planning fact: one 3090 serves a class on the 4B and serves one small group on
 the 27B.
+
+Both crossings are bracketed by measurement, not extrapolated. The 4B is inside
+budget at N=144 (51.2s turn) and outside at N=160 (68.0s); the 27B is inside at
+N=12 (56.8s) and outside at N=16 (70.8s).
 
 ---
 
@@ -56,6 +60,16 @@ call as a turn would double the reported capacity.
 | 32 | 15.0s | 24.2s | 94 | 64 | 96 | 160 |
 | 64 | 26.2s | 50.6s | 94 | 101 | 137 | 211 |
 | 128 | 40.2s | 80.4s | 114 | 176 | 224 | 319 |
+| **144** | **51.2s** | 100.2s | 104 | 186 | 228 | 313 |
+| 160 | 68.0s | 129.0s | 93 | over budget | — | — |
+| 176 | 64.4s | 123.2s | 104 | over budget | — | — |
+| 192 | 67.6s | 133.0s | 107 | over budget | — | — |
+| 256 | 87.0s | 171.4s | 111 | over budget | — | — |
+| 384 | 128.0s | 243.0s | 113 | over budget | — | — |
+
+N=160 and N=176 land within noise of each other (68.0s and 64.4s) — past
+saturation the curve flattens and ordering between adjacent levels stops being
+meaningful. Both are over budget, which is what the bracket needs.
 
 ### qwen3-4B — 12 slots at `num_ctx` 16384 (18.2 GB used)
 
@@ -70,7 +84,9 @@ call as a turn would double the reported capacity.
 | N | turn p50 | turn p95 | tok/s | students @15s | @30s | @60s |
 |---|---|---|---|---|---|---|
 | 8 | 39.2s | 65.6s | 21 | 11 | 14 | 20 |
-| 16 | 75.4s | 132.4s | 20 | over budget | — | — |
+| **12** | **56.8s** | 97.0s | 21 | 15 | 18 | 25 |
+| 16 | 70.8s | 127.2s | 22 | over budget | — | — |
+| 24 | 111.6s | 198.4s | 21 | over budget | — | — |
 | 32 | 142.6s | 266.4s | 20 | over budget | — | — |
 
 ---
@@ -87,14 +103,20 @@ needed for this workload.
 **2. The 27B is compute-bound; the 4B is not.** The 27B holds ~21 tok/s
 whatever the load — it is saturated at 4 concurrent requests, so more students
 only queue. The 4B climbs from 91 to 114 tok/s as N rises, meaning it is still
-filling the GPU rather than fighting for it. This is why the gap is 16x and not
+filling the GPU rather than fighting for it. This is why the gap is 12x and not
 the ~6x the model sizes suggest.
 
-**3. The tail breaks before the median does.** At N=128 the 4B has a 40s median
-turn but an 80s 95th percentile: one student in twenty waits over a minute
-while the average student is fine. If the 60s budget is a promise rather than
-an average, the safe numbers are the second column of the headline table —
-**64 for the 4B, under 8 for the 27B**.
+**3. The tail breaks well before the median does.** At N=128 the 4B has a 40s
+median turn but an 80s 95th percentile: one student in twenty waits over a
+minute while the average student is fine. If the 60s budget is a promise rather
+than an average, the safe number for the 4B is **64** (50.6s p95), less than
+half the median-based 144.
+
+For the 27B there is no such number. Its 95th percentile is already 65.6s at
+N=8, the lowest level tested, so **no measured configuration keeps the 27B's
+tail inside 60s** — a strict-tail deployment of the free-text tier needs fewer
+than 8 concurrent students, or a larger budget, and this sweep does not say
+which.
 
 ---
 
