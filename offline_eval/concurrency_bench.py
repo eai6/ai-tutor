@@ -1,0 +1,180 @@
+"""How many students can one GPU tutor at once?
+
+    python offline_eval/concurrency_bench.py --model qwen3-4b-jetson
+    python offline_eval/concurrency_bench.py --model qwen3.8-27b-instruct --levels 1,2,4
+
+Run it ON the box. Pure standard library.
+
+WHAT IT MEASURES, and why that is not "concurrent students". The benchmark
+fires N simultaneous generations and reports how per-request latency degrades
+with N. That is a SERVER capacity number. A classroom number is different,
+because a student is not generating continuously: they read the question,
+think, and type. One busy slot therefore serves several students.
+
+    students ≈ slots × (turn_latency + think_time) / turn_latency
+
+so the think time you assume drives the answer as much as the hardware does.
+The script reports the server number and applies a stated think-time range —
+it does not hide the assumption inside one figure.
+
+THE PROMPT IS SIZED FROM THE REAL BOARDS. Measured on the geography 27b arm:
+584 calls, median 4,916 input tokens, ~90 output. A toy 20-token prompt would
+overstate capacity badly, because prefill dominates this workload — the tutor
+re-sends its system prompt, question pool and recent turns every turn.
+
+TWO CEILINGS, and they bind differently per model:
+  * VRAM — each parallel slot needs its own KV cache. At num_ctx 32768 the 27b
+    needs ~3 GB per slot on top of 17 GB of weights, so a 24 GB card holds very
+    few. The 4b (2.5 GB, num_ctx 16384) has far more room.
+  * Compute — once slots are saturated, added concurrency buys throughput at
+    the cost of per-request latency. The point where median latency crosses
+    what a student will sit through is the real limit.
+"""
+import argparse
+import json
+import statistics
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+# ~5k tokens of lesson-shaped filler. Sized to the measured median prompt
+# (4,916 input tokens); the exact words do not matter, the token count does.
+_PARA = (
+    "Weathering is the breakdown of rock in place, without transport. "
+    "Physical weathering fractures rock mechanically; chemical weathering "
+    "alters its minerals. In the Seychelles the granite bedrock shows "
+    "exfoliation, where curved sheets peel from the surface as confining "
+    "pressure is released. Mass movement is the downslope motion of material "
+    "under gravity, ranging from imperceptible creep to sudden rockfall. "
+)
+
+
+def build_prompt(target_tokens: int = 4900) -> str:
+    # English runs ~1.3 tokens per WORD, so ~0.75 words per token. Getting this
+    # backwards (dividing by 0.75) builds a prompt 2.4x too large and makes the
+    # capacity look far worse than it is. The script prints the model's own
+    # prompt_eval_count so the assumption is checked against reality, not
+    # trusted.
+    words_needed = int(target_tokens * 0.75)
+    out, n = [], 0
+    while n < words_needed:
+        out.append(_PARA)
+        n += len(_PARA.split())
+    return " ".join(out)
+
+
+def one_call(host: str, model: str, prompt: str, num_predict: int, out: list, idx: int):
+    body = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "user", "content": prompt +
+                      "\n\nIn one sentence, what is exfoliation?"}],
+        "options": {"num_predict": num_predict},
+    }
+    req = urllib.request.Request(
+        f"{host}/api/chat", data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"})
+    t0 = time.perf_counter()
+    try:
+        with urllib.request.urlopen(req, timeout=900) as r:
+            d = json.loads(r.read())
+        out[idx] = {
+            "ok": True,
+            "secs": time.perf_counter() - t0,
+            "in": d.get("prompt_eval_count", 0),
+            "out": d.get("eval_count", 0),
+        }
+    except Exception as exc:                                  # noqa: BLE001
+        out[idx] = {"ok": False, "secs": time.perf_counter() - t0,
+                    "err": f"{type(exc).__name__}: {str(exc)[:80]}"}
+
+
+def run_level(host: str, model: str, prompt: str, n: int, num_predict: int) -> dict:
+    results = [None] * n
+    threads = [threading.Thread(target=one_call,
+                                args=(host, model, prompt, num_predict, results, i))
+               for i in range(n)]
+    t0 = time.perf_counter()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    wall = time.perf_counter() - t0
+
+    ok = [r for r in results if r and r.get("ok")]
+    bad = [r for r in results if r and not r.get("ok")]
+    if not ok:
+        return {"n": n, "ok": 0, "failed": len(bad),
+                "err": bad[0].get("err") if bad else "all failed"}
+    secs = sorted(r["secs"] for r in ok)
+    toks = sum(r["out"] for r in ok)
+    return {
+        "n": n, "ok": len(ok), "failed": len(bad),
+        "p50": statistics.median(secs),
+        "p95": secs[min(int(0.95 * (len(secs) - 1)), len(secs) - 1)],
+        "max": max(secs),
+        "wall": wall,
+        "tok_s": toks / wall if wall else 0,
+        "in_tokens": statistics.median([r["in"] for r in ok]),
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--host", default="http://127.0.0.1:11434")
+    ap.add_argument("--levels", default="1,2,4,8,16")
+    ap.add_argument("--num-predict", type=int, default=90,
+                    help="measured median tutor reply is ~90 tokens")
+    ap.add_argument("--acceptable", type=float, default=20.0,
+                    help="seconds a student will wait for one tutor turn")
+    args = ap.parse_args()
+
+    prompt = build_prompt()
+    levels = [int(x) for x in args.levels.split(",") if x.strip()]
+
+    print(f"model      {args.model}")
+    print(f"prompt     ~{len(prompt.split())} words")
+    print(f"reply cap  {args.num_predict} tokens\n")
+    print(f"{'N':>3}{'ok':>5}{'p50':>9}{'p95':>9}{'max':>9}{'wall':>9}{'tok/s':>9}")
+    print("-" * 53)
+
+    rows = []
+    for n in levels:
+        r = run_level(args.host, args.model, prompt, n, args.num_predict)
+        rows.append(r)
+        if not r.get("p50"):
+            print(f"{n:>3}{r['ok']:>5}   FAILED: {r.get('err')}")
+            break
+        print(f"{n:>3}{r['ok']:>5}{r['p50']:>8.1f}s{r['p95']:>8.1f}s"
+              f"{r['max']:>8.1f}s{r['wall']:>8.1f}s{r['tok_s']:>9.1f}")
+
+    good = [r for r in rows if r.get("p50")]
+    if not good:
+        return 1
+
+    print(f"\nmeasured prompt: {good[0]['in_tokens']:.0f} input tokens "
+          f"(real boards: 4,916 median)")
+
+    # The server number, then the classroom number — with the assumption named.
+    usable = [r for r in good if r["p50"] <= args.acceptable]
+    slots = max((r["n"] for r in usable), default=0)
+    print(f"\nSERVER: largest N holding p50 <= {args.acceptable:.0f}s is {slots or '<1'}")
+    if slots:
+        base = good[0]["p50"]
+        print(f"\nCLASSROOM (students = slots x (latency + think) / latency):")
+        print(f"  {'think time':>12}{'students':>12}")
+        for think in (15, 30, 60):
+            lat = next(r["p50"] for r in good if r["n"] == slots)
+            print(f"  {think:>10}s{slots * (lat + think) / lat:>12.0f}")
+        print(f"\n  Think time is an ASSUMPTION, not a measurement. A 40-minute "
+              f"lab\n  session and a homework setting differ enough to change "
+              f"the answer\n  several-fold — pick the one that matches the "
+              f"deployment.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
