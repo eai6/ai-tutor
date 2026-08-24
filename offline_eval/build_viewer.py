@@ -77,6 +77,12 @@ FLAT_RUNS = [
     # mcq,short_numeric. Read 42 against 40 as a before/after of the tutor, not
     # as two measurements of one thing.
     ("geo_4b_v2", "42_geo_4b_postfix"),
+    # Same tutor build as 42, math slice. The 10 failures are concentrated on
+    # lessons 1141 and 1138, whose MCQ banks hold 4 and 5 questions against the
+    # ~6 a session needs — those sessions run to the 30-turn cap because the
+    # pool runs dry, not because the model is worse at maths. Read them as a
+    # content gap.
+    ("math_4b_v2", "43_math_4b_postfix"),
 ]
 
 

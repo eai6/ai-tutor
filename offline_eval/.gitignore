@@ -20,3 +20,11 @@ cloud_models_md.txt
 # Underscore-prefixed files there are local scratch (judge A/B cache/report).
 multi_turn_results/_*
 *.zip
+
+# Per-turn traces travel WITH the board they describe. The *.jsonl rule above
+# predates them, and a board without its trace cannot answer the questions the
+# trace exists for — which host the calls reached, whether a tool result
+# actually carried what we think, how many turns retried. That is the
+# difference between a result you can re-examine and a number you have to
+# trust. ~1 MB per arm.
+!multi_turn_results/*/trace/*.jsonl
