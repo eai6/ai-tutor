@@ -91,7 +91,7 @@ def one_call(host: str, model: str, prompt: str, num_predict: int, out: list, id
                     "err": f"{type(exc).__name__}: {str(exc)[:80]}"}
 
 
-def run_level(host: str, model: str, prompt: str, n: int, num_predict: int) -> dict:
+def _one_round(host: str, model: str, prompt: str, n: int, num_predict: int) -> list:
     results = [None] * n
     threads = [threading.Thread(target=one_call,
                                 args=(host, model, prompt, num_predict, results, i))
@@ -101,23 +101,47 @@ def run_level(host: str, model: str, prompt: str, n: int, num_predict: int) -> d
         t.start()
     for t in threads:
         t.join()
-    wall = time.perf_counter() - t0
+    for r in results:
+        if r:
+            r["wall"] = time.perf_counter() - t0
+    return [r for r in results if r]
 
-    ok = [r for r in results if r and r.get("ok")]
-    bad = [r for r in results if r and not r.get("ok")]
+
+def run_level(host: str, model: str, prompt: str, n: int, num_predict: int,
+              repeat: int = 3) -> dict:
+    """Run the level `repeat` times and pool the rounds, dropping the first.
+
+    Single-shot levels were not reproducible. One sweep timed N=8 at 13.3s and
+    N=12 at 4.9s on the same server — latency cannot fall as load rises, so
+    that pair was noise, not capacity. The cause is per-slot warm-up: a slot
+    that has never served a request pays allocation and cache costs the next
+    request does not. The first round absorbs that and is discarded; the rest
+    are pooled, so p50 comes from `repeat-1` x N observations rather than one.
+    """
+    rounds = [_one_round(host, model, prompt, n, num_predict)
+              for _ in range(max(repeat, 2))]
+    warm = [r for rnd in rounds[1:] for r in rnd]
+
+    ok = [r for r in warm if r.get("ok")]
+    bad = [r for r in warm if not r.get("ok")]
     if not ok:
         return {"n": n, "ok": 0, "failed": len(bad),
                 "err": bad[0].get("err") if bad else "all failed"}
     secs = sorted(r["secs"] for r in ok)
-    toks = sum(r["out"] for r in ok)
+    # Throughput is per round, so average the rounds rather than dividing the
+    # pooled token count by one round's wall clock.
+    tps = [sum(r["out"] for r in rnd if r.get("ok")) / max(
+        (r["wall"] for r in rnd if r.get("ok")), default=1)
+        for rnd in rounds[1:]]
     return {
         "n": n, "ok": len(ok), "failed": len(bad),
         "p50": statistics.median(secs),
         "p95": secs[min(int(0.95 * (len(secs) - 1)), len(secs) - 1)],
         "max": max(secs),
-        "wall": wall,
-        "tok_s": toks / wall if wall else 0,
+        "wall": statistics.mean([r["wall"] for r in ok]),
+        "tok_s": statistics.mean(tps) if tps else 0,
         "in_tokens": statistics.median([r["in"] for r in ok]),
+        "samples": len(ok),
     }
 
 
@@ -128,6 +152,8 @@ def main() -> int:
     ap.add_argument("--levels", default="1,2,4,8,16")
     ap.add_argument("--num-predict", type=int, default=90,
                     help="measured median tutor reply is ~90 tokens")
+    ap.add_argument("--repeat", type=int, default=3,
+                    help="rounds per level; the first is discarded as warm-up")
     ap.add_argument("--acceptable", type=float, default=20.0,
                     help="seconds a student will wait for one tutor turn")
     args = ap.parse_args()
@@ -138,18 +164,18 @@ def main() -> int:
     print(f"model      {args.model}")
     print(f"prompt     ~{len(prompt.split())} words")
     print(f"reply cap  {args.num_predict} tokens\n")
-    print(f"{'N':>3}{'ok':>5}{'p50':>9}{'p95':>9}{'max':>9}{'wall':>9}{'tok/s':>9}")
-    print("-" * 53)
+    print(f"{'N':>3}{'ok':>5}{'p50':>9}{'p95':>9}{'max':>9}{'tok/s':>9}{'obs':>6}")
+    print("-" * 56)
 
     rows = []
     for n in levels:
-        r = run_level(args.host, args.model, prompt, n, args.num_predict)
+        r = run_level(args.host, args.model, prompt, n, args.num_predict, args.repeat)
         rows.append(r)
         if not r.get("p50"):
             print(f"{n:>3}{r['ok']:>5}   FAILED: {r.get('err')}")
             break
         print(f"{n:>3}{r['ok']:>5}{r['p50']:>8.1f}s{r['p95']:>8.1f}s"
-              f"{r['max']:>8.1f}s{r['wall']:>8.1f}s{r['tok_s']:>9.1f}")
+              f"{r['max']:>8.1f}s{r['tok_s']:>9.1f}{r.get('samples',0):>6}")
 
     good = [r for r in rows if r.get("p50")]
     if not good:
