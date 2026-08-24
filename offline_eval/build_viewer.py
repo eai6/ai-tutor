@@ -86,6 +86,18 @@ FLAT_RUNS = [
     # Same tutor build as 42/43, free-text tier. Pair 42 vs 44 for the answer
     # SURFACE comparison at fixed subject: 4b on A-D buttons against 27b typing.
     ("geo_27b_v2", "44_geo_27b_postfix"),
+    # The fourth arm, completing the 2x2 of subject x answer surface: 27b
+    # typing free text at maths. Pair 45 vs 43 for the model comparison at
+    # fixed subject, 45 vs 44 for the subject comparison at fixed model.
+    #
+    # One caveat to carry into grading. This is the first board run AFTER the
+    # task-placement fix that was meant to make the tutor explain WHY a correct
+    # answer is correct, and the fix largely did not land: the bank explanation
+    # reaches the tutor on 100% of correct turns, but only 7% of
+    # acknowledgements use it and 184 of 282 are bare praise ("Correct — nice
+    # work. Try this one:"). Expect that shape in the transcripts. It is a
+    # known engine limitation, not something to re-discover per session.
+    ("math_27b_v3", "45_math_27b_postfix"),
 ]
 
 
