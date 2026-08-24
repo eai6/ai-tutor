@@ -1,0 +1,3 @@
+# The free-text tier. answer_surface='free_text' on its ModelProfile, so it is
+# measured the way a cloud arm is — a local 27B reads prose options fine.
+qwen3.8-27b-instruct      jetson

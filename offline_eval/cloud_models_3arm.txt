@@ -1,0 +1,12 @@
+# Three cloud arms for the hg1/math boards — "provider/model_name  <result_filename>".
+#
+# All three are FREE TEXT, like qwen3.8-27b: answer_surface is unset on their
+# profiles, so _uses_answer_picker falls through to the provider rule and only
+# local_ollama gets the A-D buttons. That is the intended contrast — the picker
+# is for the tier that cannot read prose options, not for these.
+#
+# One model per provider, deliberately: this is a ceiling reference for the
+# local arms, not a cloud leaderboard.
+anthropic/claude-opus-4-7          claude-opus-4-7
+google/gemini-3.5-flash            gemini-3.5-flash
+openai/gpt-5.4-mini                gpt-5.4-mini

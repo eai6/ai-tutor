@@ -67,6 +67,16 @@ FLAT_RUNS = [
     # Agreement tab has no judge side to compare against. `passed` on these rows
     # means deterministic assertions only; check `rubric_skipped`.
     ("hg1_prod", "40_hg1_prod_qwen36_vs_qwen38"),
+    ("math34_prod", "41_math34_prod_qwen36_vs_qwen38"),
+    # Post-fix geography. Everything below is new since 40/41 and the two are
+    # NOT comparable: the warm-up now fires (it was structurally unreachable
+    # before — no warm-up steps, no prior mastery), correct answers carry the
+    # bank's explanation (catalog_question_id was a pool index, so the lookup
+    # fetched a stranger), the seeded "Try this:" opener is gone, and the pool
+    # is MCQ-only as production ships it rather than the harness's widened
+    # mcq,short_numeric. Read 42 against 40 as a before/after of the tutor, not
+    # as two measurements of one thing.
+    ("geo_4b_v2", "42_geo_4b_postfix"),
 ]
 
 

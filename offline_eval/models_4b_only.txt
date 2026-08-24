@@ -1,0 +1,7 @@
+# Single arm: the picker tier, run first and alone.
+#
+# Sequencing is deliberate — 34 scenarios on the cheap arm (~30 min, ~$0.09)
+# before committing GPU time to the 27b, so a misconfiguration costs the small
+# run rather than all four. Everything in this sweep is new since the last
+# board: warm-up reachable, explanations plumbed, mcq-only pool, per-turn trace.
+qwen3-4b-jetson           jetson

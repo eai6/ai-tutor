@@ -16,6 +16,12 @@ RESULTS="${RESULTS_DIR:-$ROOT/offline_eval/single_turn_results/results}"
 MODELS_FILE="${CLOUD_MODELS_FILE:-$ROOT/offline_eval/cloud_models.txt}"
 MODE="${MODE:---single-turn}"
 export SIMPLE_TUTOR_ENGINE="${SIMPLE_TUTOR_ENGINE:-1}"
+# Same crash-safety and debuggability as run_matrix.sh. Cloud arms are the ones
+# most exposed to a mid-sweep failure — a provider overload window outlasts any
+# retry ladder — and without a checkpoint a kill at scenario 33 loses all 33.
+export EVAL_CHECKPOINT_DIR="${EVAL_CHECKPOINT_DIR:-$RESULTS}"
+export TUTOR_TRACE_DIR="${TUTOR_TRACE_DIR:-$RESULTS/trace}"
+
 mkdir -p "$RESULTS"
 
 # One sweep per results dir. Two concurrent sweeps skip on the same JSONs, so they
@@ -45,9 +51,11 @@ while read -r spec safe region _rest; do
   # Vertex MaaS models live in per-model regions; export GOOGLE_CLOUD_LOCATION
   # for those rows (non-override .env default applies to rows without a region).
   if [[ -n "${region:-}" ]]; then
-    GOOGLE_CLOUD_LOCATION="$region" TUTOR_MODEL_OVERRIDE="$spec" "$PY" manage.py run_eval $MODE >"$log" 2>&1
+    GOOGLE_CLOUD_LOCATION="$region" TUTOR_TRACE_NAME="$safe" \
+      TUTOR_MODEL_OVERRIDE="$spec" "$PY" manage.py run_eval $MODE >"$log" 2>&1
   else
-    TUTOR_MODEL_OVERRIDE="$spec" "$PY" manage.py run_eval $MODE >"$log" 2>&1
+    TUTOR_TRACE_NAME="$safe" \
+      TUTOR_MODEL_OVERRIDE="$spec" "$PY" manage.py run_eval $MODE >"$log" 2>&1
   fi
   rc=$?
   elapsed=$(( $(date +%s) - start ))

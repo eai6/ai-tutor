@@ -110,6 +110,7 @@ class ModelProfile:
 # Token budgets (framework §2.1 / §3): thinking models need room for the reasoning
 # trace BEFORE the tool-call; instruct models are fine at the historical default.
 _MT_INSTRUCT = 16000
+_MT_OPENAI = 8192        # GPT-5.x bills reasoning against the SAME budget as the answer
 _MT_THINKING = 32768
 _MT_ANTHROPIC = 2048     # raise the eval ceiling above the legacy 1024 (Claude rarely hits it)
 _MT_GEMINI_THINK = 8192
@@ -135,6 +136,32 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
     ),
 
     # --- Gemini (framework §3.5: leave temperature at provider default = 1.0) ---
+    # --- OpenAI ---
+    #
+    # An exact key MATTERS here beyond sampling. Without one, get_model_profile
+    # returns None, family is None, and two things follow: max_tokens falls back
+    # to 1024 (engine.py: `profile.max_tokens if profile else 1024`) while
+    # reasoning bills against that same budget — so a reasoning model can spend
+    # the whole allowance thinking and return finish_reason=length with empty
+    # content and no tool call, which reads as a near-zero tutoring score for a
+    # purely harness reason. And every family-gated repair path
+    # (_should_force_pose, polarity alignment, auto-grade fallback, stuck-slot
+    # pivot, ensure-posed-question) early-returns on `not family`, so the arm
+    # runs unscaffolded while every other family gets all six.
+    #
+    # SAMPLING IS DELIBERATELY ABSENT. OpenAIClient._build_completion_kwargs
+    # routes every `gpt-5*` name through its new-generation branch, which sends
+    # only max_completion_tokens and drops temperature/top_p/top_k. The API
+    # enforces it too. Setting sampling here would be inert and misleading.
+    "openai/gpt-5.4-mini": ModelProfile(
+        family="openai", mode="thinking", max_tokens=_MT_OPENAI,
+        notes="Reasons at the API default; budget shared with the answer.",
+    ),
+    "openai/gpt-5.4-nano": ModelProfile(
+        family="openai", mode="thinking", max_tokens=_MT_OPENAI,
+        notes="Reasons at the API default; budget shared with the answer.",
+    ),
+
     "google/gemini-3.1-pro-preview": ModelProfile(
         family="gemini", mode="thinking", max_tokens=_MT_GEMINI_THINK,
         notes="Gemini-3: leave temp default (omit). thinkingLevel not thinkingBudget.",
