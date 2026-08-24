@@ -10,6 +10,7 @@ all. Pure standard library.
 """
 import argparse
 import collections
+import glob
 import json
 import os
 import statistics
@@ -30,7 +31,7 @@ def load(path):
     return rows
 
 
-def summarise(rows):
+def summarise(rows, trace_dir=None):
     print(f'{len(rows)} turns traced\n')
 
     # "Which Ollama did this run actually talk to?" — the question a dead
@@ -62,6 +63,33 @@ def summarise(rows):
                                    for r in ph)
         for e, n in errs.most_common(5):
             print(f'   {n:5}  after {e}')
+        calls = collections.Counter(r.get('failed_call') or 'end-of-turn'
+                                    for r in ph)
+        print('   gave up at:', dict(calls))
+
+    # Cross-check the trace against the run JSONs sitting beside it. A trace
+    # that under-counts is worse than none: on 2026-08-24 this report said
+    # "0 placeholders" for a run whose transcripts were full of them, because
+    # failed turns returned before the emit. Silence must not read as health.
+    # The board JSONs sit one level up from the trace dir.
+    root = os.path.dirname(os.path.abspath(trace_dir)) if trace_dir else None
+    boards = ([f for f in glob.glob(os.path.join(root, '*.json'))
+               if 'partial_' not in os.path.basename(f)] if root else [])
+    seen = set()
+    for b in boards:
+        try:
+            data = json.load(open(b))
+        except Exception:
+            continue
+        for res in data.get('results', []):
+            for t in res.get('transcript', []):
+                if t.get('role') == 'tutor' and 'had trouble responding' in (
+                        t.get('content') or ''):
+                    seen.add((res.get('scenario_id'), t.get('turn_number')))
+    if seen and len(seen) > len(ph):
+        print(f'\n   !! TRACE UNDER-COUNTS: the transcripts contain '
+              f'{len(seen)} placeholder turn(s) but the trace recorded '
+              f'{len(ph)}. Turns are failing without being traced.')
 
     # "Was that slow turn slow, or was it retried?"
     retried = [r for r in rows if (r.get('retries') or 0) > 0]
@@ -152,7 +180,7 @@ def main():
     elif args.session:
         session(rows, args.session)
     else:
-        summarise(rows)
+        summarise(rows, args.dir)
     return 0
 
 

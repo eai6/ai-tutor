@@ -100,3 +100,37 @@ class TestInstrumentationCannotBreakATurn:
         t = threading.Thread(target=worker)
         t.start(); t.join()
         assert set(out['d']) >= {'retries', 'last_error', 'call2', 'model'}
+
+
+class TestFailedTurnsAreTraced:
+    """The turns worth investigating were the only ones never recorded.
+
+    When _call_llm returns None the turn serves _FALLBACK_REPLY and returns
+    early — past the emit at the end of the turn. So on 2026-08-24 a math-27b
+    run's trace reported "0 placeholders" while 15 of its 34 sessions
+    deadlocked on that fallback repeating, and I read the trace as evidence the
+    run was healthy. A monitor that goes quiet during a failure is worse than
+    no monitor, because it is believed.
+    """
+
+    def test_the_early_return_emits_before_returning(self):
+        """Structural: the emit must sit above the fallback return, not after."""
+        import pathlib
+        src = pathlib.Path(
+            'ai_tutor/apps/tutoring/simple_tutor/engine.py').read_text()
+        i = src.index("if response is None:")
+        block = src[i:i + 1600]
+        assert '_trace.emit(' in block, 'failed turn returns without tracing'
+        assert block.index('_trace.emit(') < block.index("'fallback': True"), \
+            'the emit must run BEFORE the early return'
+
+    def test_the_failed_turn_is_marked_as_a_placeholder(self):
+        """placeholder=True is what the report counts; a failed turn that
+        traced with placeholder=False would be just as invisible."""
+        import pathlib
+        src = pathlib.Path(
+            'ai_tutor/apps/tutoring/simple_tutor/engine.py').read_text()
+        i = src.index("if response is None:")
+        block = src[i:i + 1600]
+        assert 'placeholder=True' in block
+        assert "failed_call='call1'" in block, 'record WHICH call gave up'

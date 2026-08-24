@@ -641,6 +641,26 @@ def respond(
         tool_choice=call1_tool_choice, config=turn_config,
     )
     if response is None:
+        # Trace the FAILED turn before returning. This early return used to
+        # skip the emit at the end of the turn, so the exact turns worth
+        # investigating were the only ones never recorded — a math-27b run on
+        # 2026-08-24 reported "0 placeholders" from its trace while 15 of its
+        # 34 sessions deadlocked on this very fallback repeating. A monitor
+        # that goes quiet during a failure is worse than no monitor.
+        if _trace.enabled():
+            _diag = turn_diagnostics()
+            _trace.emit(
+                session_id=getattr(session, 'id', None),
+                lesson_id=getattr(session, 'lesson_id', None),
+                step_index=getattr(session, 'current_step_index', None),
+                model=_diag['model'], api_base=_diag['api_base'],
+                family=_family, two_call=False, tools=[], verdict=None,
+                text_chars=len(_FALLBACK_REPLY),
+                placeholder=True,          # this IS the failure placeholder
+                failed_call='call1',       # which call gave up
+                retries=_diag['retries'], last_error=_diag['last_error'],
+                tool_results=[], call2_sent=[], reply=_FALLBACK_REPLY,
+            )
         _persist_student_turn(session, user_input, step)
         return {
             'content': _FALLBACK_REPLY,
