@@ -1,0 +1,188 @@
+{
+  "started_at": "2026-08-24T02:43:07.099808+00:00",
+  "finished_at": "2026-08-24T02:44:05.878277+00:00",
+  "git_sha": "069ce3b99b8e",
+  "total_scenarios": 1,
+  "passed": 1,
+  "failed": 0,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1469_14",
+      "passed": true,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1469,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "remediation",
+        "exit_ticket",
+        "hg1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=6, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": null,
+      "rubric_skipped": true,
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hello! Today we’re exploring what weathering and mass movements are, and how they shape the land. Let’s warm up with a quick question about river channels.  \n\nWhich of the following best describes a V-shaped river channel?  \nA) Wide and shallow with gentle sloping banks  \nB) Narrow and deep with steep vertical sides  \nC) Rectangular in cross-section with uniform depth  \nD) Broad and flat with extensive floodplain areas",
+          "phase": "warm_up",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 19233.808084158227
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 735.309167066589
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nWhich of the following best illustrates the process of exfoliation?\nA) Lichens growing on rock surfaces and secreting weak acids\nB) Water flowing over rocks and carrying away loose sediment\nC) Granite boulders shedding outer layers as they cool after exposure at the surface\nD) Ice wedging in cracks and pushing rock apart",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 5064.673209097236
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "C",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 6746.5176661498845
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Correct — nice work. Try this one:\n\nWhich of the following is a chemical weathering process?\nA) Sand and pebbles abrading rock surfaces along coastlines\nB) Carbonation, where rainwater containing CO₂ dissolves limestone\nC) Temperature changes causing rocks to expand and contract\nD) Burrowing animals creating cracks in soil and rock",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 5049.281500047073
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 976.6050002072006
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Yes, exactly right. Next up:\n\nWhich type of mass movement is characterized by very slow, continuous downhill movement of soil and rock, often lasting years or decades?\nA) Creep\nB) Rockfall\nC) Mudflow\nD) Landslide",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4615.631958004087
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "A",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 486.8925418704748
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "That's it — well done. Here's another:\n\nWhich of the following is an example of physical weathering?\nA) Rainwater dissolving limestone and creating caves\nB) Plant roots growing through rock cracks and breaking them apart\nC) Oxygen reacting with iron minerals to form rust\nD) Freeze-thaw cycles causing water in rock cracks to expand and contract",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4637.117833131924
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "D",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 512.9453339613974
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nHow does weathering directly contribute to mass movement?\nA) Weathering provides the transporting agents needed for erosion\nB) Weathering breaks rock into smaller fragments that can be easily moved by gravity\nC) Weathering only affects chemical composition and does not affect physical stability\nD) Weathering prevents mass movement by cementing rock particles together",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 4689.561000093818
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "B",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 1456.501082982868
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true,
+          "latency_ms": 4500.855500111356
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 6,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 1210,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/qwen3-4b-jetson"
+}

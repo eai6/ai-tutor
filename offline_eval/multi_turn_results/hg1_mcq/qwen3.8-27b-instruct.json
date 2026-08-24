@@ -1,0 +1,226 @@
+{
+  "started_at": "2026-08-24T02:44:26.793799+00:00",
+  "finished_at": "2026-08-24T02:47:25.545372+00:00",
+  "git_sha": "069ce3b99b8e",
+  "total_scenarios": 1,
+  "passed": 1,
+  "failed": 0,
+  "errored": 0,
+  "results": [
+    {
+      "scenario_id": "remediation_after_exit_ticket_fail_average_1469_14",
+      "passed": true,
+      "persona": "average",
+      "subject": "geography",
+      "lesson_id": 1469,
+      "tags": [
+        "multi_turn",
+        "geography",
+        "average",
+        "remediation",
+        "exit_ticket",
+        "hg1"
+      ],
+      "mode": "multi_turn",
+      "tutor_response": "",
+      "suggested_labels": [],
+      "assertion_results": [
+        {
+          "name": "expected_reason",
+          "passed": true,
+          "detail": "actual='exit_ticket', allowed=['completed', 'exit_ticket', 'max_turns']"
+        },
+        {
+          "name": "max_turn_count",
+          "passed": true,
+          "detail": "turns=8, limit=24"
+        },
+        {
+          "name": "no_repeated_tutor_phrase_within_window",
+          "passed": true,
+          "detail": "no phrase ≥3× in any 5-turn window"
+        },
+        {
+          "name": "no_tool_syntax_in_any_turn",
+          "passed": true,
+          "detail": "no tool/thinking syntax in any tutor turn"
+        }
+      ],
+      "rubric_result": null,
+      "rubric_skipped": true,
+      "dimensions_result": null,
+      "transcript": [
+        {
+          "turn_number": 0,
+          "role": "tutor",
+          "content": "Hey, welcome back! Today we're going to define weathering and mass movements. First, a quick warm-up from your earlier river channel lesson: Where on a river channel cross-section diagram would you measure the width of the river?\n\nA. From the riverbed to the water surface\nB. From one bank to the other bank at the water surface level\nC. From the floodplain edge to the opposite floodplain edge\nD. Along the longest part of the riverbed",
+          "phase": "warm_up",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 20306.206499924883
+        },
+        {
+          "turn_number": 1,
+          "role": "student",
+          "content": "yeah i remember that. it's B, from one bank to the other at the top where the water is.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 1649.7543749865144
+        },
+        {
+          "turn_number": 1,
+          "role": "tutor",
+          "content": "Got it — that's right. Here's the next one:\n\nWhich type of mass movement is characterized by very slow, continuous downhill movement of soil and rock, often lasting years or decades?\nA) Creep\nB) Rockfall\nC) Mudflow\nD) Landslide",
+          "phase": "engage",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 15768.18308304064
+        },
+        {
+          "turn_number": 2,
+          "role": "student",
+          "content": "i think it's A, creep. because you said very slow and it takes years so that sounds like creep to me.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 1150.4737921059132
+        },
+        {
+          "turn_number": 2,
+          "role": "tutor",
+          "content": "Correct — nice work. Try this one:\n\nWhich of the following is a chemical weathering process?\nA) Sand and pebbles abrading rock surfaces along coastlines\nB) Carbonation, where rainwater containing CO₂ dissolves limestone\nC) Temperature changes causing rocks to expand and contract\nD) Burrowing animals creating cracks in soil and rock",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 18782.409084029496
+        },
+        {
+          "turn_number": 3,
+          "role": "student",
+          "content": "hmm, it's B i think. because that one talks about rainwater dissolving stuff, that's like a chemical thing happening to the rock right?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 5189.698959002271
+        },
+        {
+          "turn_number": 3,
+          "role": "tutor",
+          "content": "Which of the following best illustrates the process of exfoliation?\n\nA. Lichens growing on rock surfaces and secreting weak acids\nB. Water flowing over rocks and carrying away loose sediment\nC. Granite boulders shedding outer layers as they cool after exposure at the surface\nD. Ice wedging in cracks and pushing rock apart",
+          "phase": "explain",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 15551.242541987449
+        },
+        {
+          "turn_number": 4,
+          "role": "student",
+          "content": "i think it's C. because exfoliation is like when the layers peel off, and that happens when the rock cools down and shrinks i think.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 943.6087498907
+        },
+        {
+          "turn_number": 4,
+          "role": "tutor",
+          "content": "Nice work — exfoliation is that physical weathering process where cooling and contraction make outer layers peel off, especially in granite. Here's your next one:\n\n**Which of the following is an example of physical weathering?**\n\nA. Rainwater dissolving limestone and creating caves\nB. Plant roots growing through rock cracks and breaking them apart\nC. Oxygen reacting with iron minerals to form rust\nD. Freeze-thaw cycles causing water in rock cracks to expand and contract",
+          "phase": "explore",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 18181.727166986093
+        },
+        {
+          "turn_number": 5,
+          "role": "student",
+          "content": "i think it's D. because the water freezing and unfreezing breaks the rock apart, and that's physical not chemical right?",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 755.1040421240032
+        },
+        {
+          "turn_number": 5,
+          "role": "tutor",
+          "content": "Yes, exactly right. Next up:\n\nOxidation as a weathering process primarily affects rocks containing which type of mineral?\nA) Iron-rich minerals\nB) Quartz\nC) Limestone\nD) Feldspar",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 17754.76320879534
+        },
+        {
+          "turn_number": 6,
+          "role": "student",
+          "content": "it's A, iron-rich minerals. because oxidation is like rust and rust happens to iron stuff.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 974.3650411255658
+        },
+        {
+          "turn_number": 6,
+          "role": "tutor",
+          "content": "That's it — well done. Here's another:\n\nWhich of the following is a chemical weathering process?\nA) Sand and pebbles abrading rock surfaces along coastlines\nB) Carbonation, where rainwater containing CO₂ dissolves limestone\nC) Temperature changes causing rocks to expand and contract\nD) Burrowing animals creating cracks in soil and rock",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 22166.32458404638
+        },
+        {
+          "turn_number": 7,
+          "role": "student",
+          "content": "wait, isn't this the same one as before? yeah it's B again, carbonation dissolving the limestone.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 938.9122501015663
+        },
+        {
+          "turn_number": 7,
+          "role": "tutor",
+          "content": "You're right to notice — carbonation showing up again makes sense because it's a core process in Seychelles' tropical, high-rainfall setting. But hold on: I need to see your actual answer to this question before I can move on. Take another look at the options and let me know which letter you're going with.",
+          "phase": "practice",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 13524.04687507078
+        },
+        {
+          "turn_number": 8,
+          "role": "student",
+          "content": "oh yeah sorry, B. carbonation is the chemical one where the rainwater dissolves the limestone.",
+          "phase": "",
+          "is_complete": false,
+          "show_exit_ticket": false,
+          "latency_ms": 964.4172920379788
+        },
+        {
+          "turn_number": 8,
+          "role": "tutor",
+          "content": "Great — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+          "phase": "exit_ticket",
+          "is_complete": false,
+          "show_exit_ticket": true,
+          "latency_ms": 24079.026625026017
+        }
+      ],
+      "sim_reason": "exit_ticket",
+      "sim_turns": 8,
+      "per_turn_labels": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "session_id": 1211,
+      "error": ""
+    }
+  ],
+  "engine": "simple_tutor",
+  "tutor_model": "local_ollama/qwen3.8-27b-instruct"
+}
