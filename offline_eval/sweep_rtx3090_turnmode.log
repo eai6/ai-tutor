@@ -1,0 +1,61 @@
+
+############ qwen3-4b-ctx8k slots=24 ############
+  ollama up, NUM_PARALLEL=24
+  VRAM loaded: 18174 MiB
+model      qwen3-4b-ctx8k
+prompt     ~3705 words
+reply cap  90 tokens
+timing     WHOLE TURN (call1+call2)
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+  1    2     2.6s     2.5s     2.8s     24.0     2
+ 32   64    20.0s    28.6s    29.7s     81.3    64
+ 48   96    28.8s    36.3s    36.4s     80.8    96
+ 64  128    39.4s    51.1s    52.5s     75.8   128
+ 80  160    44.0s    59.9s    63.2s     80.2   160
+
+measured prompt: 10310 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 48
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s          73
+          30s          98
+          60s         148
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+
+############ qwen3.8-27b-instruct slots=4 ############
+  ollama up, NUM_PARALLEL=4
+  VRAM loaded: 19142 MiB
+model      qwen3.8-27b-instruct
+prompt     ~3705 words
+reply cap  90 tokens
+timing     WHOLE TURN (call1+call2)
+
+  N   ok      p50      p95      max    tok/s   obs
+--------------------------------------------------------
+  1    2     8.9s     8.8s     8.9s     12.8     2
+  4    8    22.6s    28.3s    30.5s     15.5     8
+  6   12    31.5s    42.8s    43.0s     15.9    12
+  8   16    39.0s    52.6s    55.7s     16.8    16
+ 12   24    55.6s    77.6s    83.1s     17.0    24
+
+measured prompt: 10314 input tokens (real boards: 4,916 median)
+
+SERVER: largest N holding p50 <= 30s is 4
+
+CLASSROOM (students = slots x (latency + think) / latency):
+    think time    students
+          15s           7
+          30s           9
+          60s          15
+
+  Think time is an ASSUMPTION, not a measurement. A 40-minute lab
+  session and a homework setting differ enough to change the answer
+  several-fold — pick the one that matches the deployment.
+CONC2 DONE
