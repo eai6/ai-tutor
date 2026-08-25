@@ -18,6 +18,46 @@ successive exports do not sort meaningfully. `<run>_<date>_<who>.json` keeps a
 directory of them readable and makes two people's grades of the same run
 obvious at a glance.
 
+## Exporting a subset
+
+**Export grades** opens a scope picker: one row per run x model arm, with how
+many grades sit in each. Everything is ticked when it opens, so exporting the
+lot is unchanged — same verdicts, same `manual_grades_<count>.json` filename as
+before the picker existed.
+
+Narrowing it is the point. Once a browser profile holds grades for several
+boards, "everything I have ever graded" is rarely the file worth committing,
+and re-exporting an old board on top of a colleague's copy of it is how a merge
+goes wrong. Tick one board, or one arm of one board, and only those verdicts are
+written.
+
+A narrowed export puts its scope in the filename, because a subset named by
+count alone collides with every other subset of that size:
+
+| Selection | Filename |
+|---|---|
+| everything | `manual_grades_34.json` |
+| one run | `manual_grades_46_geo_cloud_3arm_34.json` |
+| one arm of one run | `manual_grades_46_geo_cloud_3arm_gpt-5.4-mini_34.json` |
+| arms across several runs | `manual_grades_2runs_34.json` |
+
+Still rename on the way in — the generated name only has to survive the trip
+from `~/Downloads`.
+
+Two behaviours worth knowing:
+
+- **Part-finished gradings inside a selected arm travel with it**, the same way
+  a full export has always carried them. An export is a backup before it is a
+  dataset. `graded` still counts only the complete ones.
+- **Only the arms you actually wrote stop counting as unexported.** The "N
+  sessions not exported" figure in the header is not cleared by exporting a
+  different board — reporting one board as safe on the strength of another's
+  export is precisely how an evening's grading gets lost.
+
+An arm whose run is no longer on the page — a renamed run, or results that
+moved — is still listed, marked `not in this build`. Those grades exist only in
+that browser, so they are the ones least safe to hide.
+
 To load a file back into the page — your own, or someone else's — use
 **Import**. It merges per session and keeps whichever copy has the newer `ts`,
 so re-importing your own export is a no-op and importing a colleague's adds

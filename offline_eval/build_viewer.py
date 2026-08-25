@@ -230,6 +230,28 @@ function passRates(rows){
           mine: 100 * rows.filter(x => x.h).length / n,
           judge: 100 * rows.filter(x => x.j).length / n};
 }
+// The Me-vs-judge headline, over TWO deliberately different denominators.
+//
+// Your pass rate needs no judge — you graded the session, that is the whole
+// input. The judge's needs a judge verdict, and a run generated with
+// EVAL_SKIP_RUBRIC=1 has none on any session. Computing both over the
+// intersection, as this once did, means one missing judge side erases the
+// grader's own work from the page: 34 sessions graded by hand reported as a
+// dash.
+//
+// So `mine` is over everything graded in scope and `judge` is over the subset
+// with a verdict, and both denominators are returned so the page can print
+// them. Anything that COMPARES the two uses `comparedMine`, which is over the
+// intersection — comparing a rate over 34 with a rate over 0 is not a
+// comparison, and comparing one over 34 with one over 12 is a different claim
+// than it looks.
+function sxsRates(mineRows, comparedRows){
+  const g = mineRows.length;
+  const c = passRates(comparedRows);
+  return {graded: g,
+          mine: g ? 100 * mineRows.filter(x => x.h).length / g : null,
+          compared: c.n, comparedMine: c.mine, judge: c.judge};
+}
 // Models you have graded something in, each with its count, so a dropdown
 // built from this answers "how many have I done here" before it is toggled.
 // A model with nothing graded is left out — the opposite of personaBalance
@@ -240,6 +262,112 @@ function modelCounts(sessions){
   const n = {};
   sessions.forEach(d => {n[d.m] = (n[d.m] || 0) + 1;});
   return Object.keys(n).sort().map(m => ({model: m, n: n[m]}));
+}
+"""
+# The one bulk action on the grading form. Split out and pinned for the same
+# reason as the export filter: a one-click "everything was fine" is the exact
+# affordance that turns a graded set into a rubber stamp, so what it may and may
+# not touch is a rule worth holding still rather than a detail of a click
+# handler.
+GRADE_JS = r"""
+// What a "fill the rest as met" click writes, and where. Returns only the
+// dimensions it would fill, each mapped to its own desideratum -- which is not
+// a constant: most dimensions want `yes`, `revealing_answer` wants `no`, and
+// `tutor_tone` wants `encouraging`. Reading it off each dimension is what keeps
+// the button honest about what "met" means per row.
+//
+// Additive by construction. A dimension the grader has already answered is
+// never in the result, so the button cannot overwrite a judgement with a pass.
+// That restriction is what makes it safe to offer at all: it turns the click
+// from "declare this session fine" into "the ones I did not flag were fine",
+// and it makes the careful order -- mark the failures first, then fill -- the
+// cheap one.
+function fillMet(values){
+  const out = {};
+  DIMS.forEach(d => {
+    if(values[d.key]) return;
+    out[d.key] = d.desideratum;
+  });
+  return out;
+}
+"""
+
+# Which grades an export writes. Split out of the page's DOM code and pinned by
+# tests/test_viewer_grading.py because the failure here is silent and expensive:
+# an export that quietly drops a scope looks identical to one that included it,
+# and the file is the only durable copy a graded set has.
+EXPORT_JS = r"""
+// Verdicts grouped into the scopes an export can be narrowed to: one row per
+// run x model arm, which is how the boards are actually organised — a run holds
+// several arms and a grader works through one arm at a time.
+//
+// Grouping reads the stored key (`run|model|scenario`), NOT this build's
+// session list, so a grade whose session has since moved or been renamed out of
+// the page still appears as its own row and can still be exported. Dropping
+// those silently would destroy work that only exists in this browser.
+function exportGroups(verdicts){
+  const g = {};
+  Object.keys(verdicts).forEach(k => {
+    const p = k.split('|');
+    const run = p[0] || '(no run)', model = p[1] || '(no model)';
+    const id = run + '|' + model;
+    if(!g[id]) g[id] = {id: id, run: run, model: model,
+                        complete: 0, partial: 0, n: 0};
+    g[id].n++;
+    if(gradeComplete((verdicts[k] || {}).d || {})) g[id].complete++;
+    else g[id].partial++;
+  });
+  return Object.keys(g).sort().map(id => g[id]);
+}
+// The file a selection produces. Part-finished verdicts inside a selected scope
+// travel with it, exactly as a full export carries them — they are work in
+// progress, and an export is a backup before it is a dataset. `graded` counts
+// only the complete ones, so it keeps meaning the thing the README says it
+// means and stays comparable with files written before this picker existed.
+function exportPayload(verdicts, selectedIds, dimKeys, stamp){
+  const want = {};
+  (selectedIds || []).forEach(i => {want[i] = 1;});
+  const out = {};
+  let complete = 0;
+  Object.keys(verdicts).forEach(k => {
+    const p = k.split('|');
+    const id = (p[0] || '(no run)') + '|' + (p[1] || '(no model)');
+    if(!want[id]) return;
+    out[k] = verdicts[k];
+    if(gradeComplete((verdicts[k] || {}).d || {})) complete++;
+  });
+  return {version: 1, exported: stamp, dimensions: dimKeys,
+          graded: complete, verdicts: out};
+}
+// What to call the download. `manual_grades_<count>.json` is what full exports
+// have always been named, and it is kept for a full export so nothing that
+// reads those files has to learn a second convention.
+//
+// A SUBSET named by count alone would be actively misleading: two different
+// arms that happen to have 34 grades each produce the same filename, and the
+// name says nothing about which scope is inside. So a narrowed export puts its
+// scope in the name — the run when a whole run is selected, run and model when
+// it is a single arm. manual_grades/README.md still asks you to rename on the
+// way in; this only has to survive the trip from ~/Downloads.
+function exportName(groups, selectedIds, count){
+  const sel = (selectedIds || []).slice();
+  const slug = s => String(s).replace(/[^A-Za-z0-9._-]+/g, '-')
+                             .replace(/^-+|-+$/g, '') || 'x';
+  if(!sel.length) return 'manual_grades_0.json';
+  if(sel.length === groups.length) return 'manual_grades_' + count + '.json';
+  const runs = {};
+  sel.forEach(id => {runs[id.split('|')[0]] = 1;});
+  const runNames = Object.keys(runs);
+  if(runNames.length === 1){
+    const inRun = groups.filter(g => g.run === runNames[0]);
+    // One arm of one run — name the arm. A whole run selected while other runs
+    // exist is still a subset, and names the run only.
+    if(sel.length === 1 && inRun.length > 1)
+      return 'manual_grades_' + slug(runNames[0]) + '_'
+             + slug(sel[0].split('|')[1]) + '_' + count + '.json';
+    return 'manual_grades_' + slug(runNames[0]) + '_' + count + '.json';
+  }
+  return 'manual_grades_' + runNames.length + 'runs_' + count + '.json';
 }
 """
 
@@ -370,6 +498,24 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--card)}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .dirty{color:#b8860b;font-size:12.5px;font-weight:600}
+/* Export scope picker. Centred rather than a right-hand drawer like .panel —
+   it is a decision to make before an action, not a thing to read alongside. */
+.expw{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:21;
+ width:min(680px,94vw);max-height:88vh;display:none;flex-direction:column;
+ background:var(--bg);border:1px solid var(--line);border-radius:12px;
+ box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.exph{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.expb{overflow:auto;padding:6px 16px 10px}
+.expf{padding:11px 16px;border-top:1px solid var(--line);display:flex;
+ gap:8px;align-items:center;flex-wrap:wrap}
+.exprun{font-weight:700;font-size:13px;margin:12px 0 5px;color:var(--accent);
+ display:flex;gap:8px;align-items:center}
+.exprow{display:flex;gap:9px;align-items:baseline;padding:4px 0 4px 18px;
+ font-size:13px;border-top:1px solid var(--line)}
+.exprow label{cursor:pointer;display:flex;gap:9px;align-items:baseline;width:100%}
+.expn{color:var(--mut);font-size:12px;margin-left:auto;white-space:nowrap}
+.exppart{color:#b8860b}
+.expsum{font-size:12.5px;color:var(--mut);margin-left:auto;text-align:right}
 .rule{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);
  border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:13px;line-height:1.55;max-width:1000px}
 .gr{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}
@@ -378,6 +524,8 @@ tbody tr{cursor:pointer}tbody tr:hover{background:var(--card)}
 @media(max-width:1100px){.gr-l{position:static}}
 .tsc{max-height:calc(100vh - 240px);min-height:240px;overflow:auto;border:1px solid var(--line);
  border-radius:8px;padding:8px;background:var(--card)}
+.fillbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.fillbar .small{color:var(--mut)}
 .dim{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:9px}
 .dim.done{border-color:var(--accent)}
 .dim .nm{font-weight:600;margin-bottom:2px}
@@ -468,11 +616,12 @@ textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6
   <li><b>The pass rule is all-or-nothing.</b> A session passes only if every applicable dimension sits at its desideratum. One dimension at &ldquo;To some extent&rdquo; fails it. That is deliberately demanding — the interesting number is the per-dimension rate, which the Agreement tab reports.</li>
   <li><b>Not applicable</b> means the dimension genuinely never arose. It is excluded from scoring, not counted as a failure. Leaving a dimension blank is different: an incomplete grading is not scored at all.</li>
   <li><b>The judge's grade is hidden until you finish.</b> Read it first and the agreement figure measures how much it anchored you, not whether you independently agree. You can reveal it anyway; that session is then marked <i>peeked</i> and excluded from the headline figure.</li>
+  <li><b>Mark remaining N as met</b>, above the eight cards, fills every dimension you have <i>not</i> answered with its desired value &mdash; which is not the same value on every row (<i>revealing the answer</i> passes on <b>No</b>, <i>tone</i> on <b>Encouraging</b>). It never changes an answer you have already given, so the quick route on a session with one problem is: mark the problem, then click it. On a clean session it is one click instead of eight.</li>
   <li><b>Your grades live in this browser</b> (localStorage), keyed by run + model + scenario, so they survive a rebuild of this page. They do <b>not</b> survive clearing your browser data, and they are not shared with anyone. The header counts sessions you have not yet exported.</li>
  </ul>
 
  <h2>Where to put an export</h2>
- <p><b>Export grades</b> downloads a JSON file — an ordinary browser download, to wherever your browser saves things (usually <code>~/Downloads</code>), named <code>manual_grades_&lt;count&gt;.json</code>. Nothing is uploaded; this page has no backend.</p>
+ <p><b>Export grades</b> opens a scope picker — one row per run × model arm, with how many grades sit in each — and writes only the arms you tick. Everything is selected when it opens, so exporting the lot is still two clicks. Narrowing it is the point: with several boards graded in one browser, a file holding all of them is rarely the one worth committing, and re-exporting an old board over a colleague’s copy is how a merge goes wrong. A full export is named <code>manual_grades_&lt;count&gt;.json</code> as before; a narrowed one carries its scope in the name (<code>manual_grades_46_geo_cloud_3arm_34.json</code>) because a subset named by count alone collides with every other subset of that size. Only the arms you actually wrote stop counting as unexported. It is an ordinary browser download, to wherever your browser saves things (usually <code>~/Downloads</code>). Nothing is uploaded; this page has no backend.</p>
  <p>That file is the only durable copy of your work. Move it into the repository, renaming it as you go — the exported name carries only a count, so successive exports collide and do not sort:</p>
  <p><code>mv ~/Downloads/manual_grades_37.json offline_eval/manual_grades/mt100_2026-08-17_daniel.json</code></p>
  <p><code>offline_eval/manual_grades/README.md</code> documents the file format, the value each dimension can hold, and the one trap in reading a file by hand: <code>verdicts</code> can contain part-finished gradings, which are excluded from scoring and from the <code>graded</code> count. Use <b>Import</b> to load a file back — your own or a colleague's. It merges per session, keeping whichever copy was edited more recently, so re-importing your own export changes nothing and importing someone else's adds only what you have not graded yourself.</p>
@@ -641,15 +790,43 @@ textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6
 <div class="overlay" id="ov" onclick="if(event.target.id=='ov')closeP()"></div>
 <div class="panel" id="panel" style="display:none"></div>
 
+<div class="overlay" id="exov" onclick="if(event.target.id=='exov')closeExport()"></div>
+<div class="expw" id="expw">
+ <div class="exph">
+  <span class="close" onclick="closeExport()">&times;</span>
+  <b style="font-size:15px">Export grades</b>
+  <div class="meta" style="margin:4px 0 0">Choose which arms to write. Everything
+   is selected by default — narrow it to export one board, or one model, on its own.
+   Part-finished gradings inside a chosen arm travel with it.</div>
+ </div>
+ <div class="expb" id="expb"></div>
+ <div class="expf">
+  <button class="btn" onclick="expSelect('all')">All</button>
+  <button class="btn" onclick="expSelect('none')">None</button>
+  <button class="btn" onclick="expSelect('invert')">Invert</button>
+  <span class="expsum" id="expsum"></span>
+  <button class="btn pri" id="expgo" onclick="doExport()">Export</button>
+ </div>
+</div>
+
 <script>
 const DATA = __DATA__;
 const DIMS = __DIMS__;
 __PASS_RULE__
 __STATS__
+__GRADE__
+__EXPORT__
 let sortKey='run', sortDir=1;
 const BY_KEY={}; DATA.forEach(d=>{BY_KEY[d.k]=d;});
+// Run labels this build actually carries. The export picker uses it to mark a
+// scope whose sessions are no longer on the page, rather than hiding it.
+const RUNS_ON_PAGE={}; DATA.forEach(d=>{RUNS_ON_PAGE[d.run]=1;});
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+// Attribute-safe variant. Run and model names reach the export picker as HTML
+// attribute values, and they are derived from directory and file names rather
+// than from anything this script controls.
+function escA(s){return esc(s).replace(/"/g,'&quot;');}
 function uniq(k){return [...new Set(DATA.map(d=>d[k]).filter(x=>x!=null))].sort();}
 function fillSel(id,label,vals){const s=document.getElementById(id);s.innerHTML='<option value="">'+label+': all</option>'+vals.map(v=>'<option>'+esc(v)+'</option>').join('');}
 function scoreColor(v){if(v==null)return 'var(--mut)';return v>=0.7?'var(--pass)':v>=0.4?'#b8860b':'var(--fail)';}
@@ -765,16 +942,94 @@ function gradedKeys(){return Object.keys(STORE.verdicts).filter(graded);}
 // file that moved. Reported rather than silently dropped.
 function orphanKeys(){return gradedKeys().filter(k=>!BY_KEY[k]);}
 
+/* Export is a two-step now: pick the scope, then write the file. The picker is
+   not a confirmation step to click through — with several boards in one browser
+   profile, "export everything I have ever graded" is rarely the file anyone
+   wants to commit, and re-exporting an old board on top of a colleague's copy
+   of it is how a merge goes wrong. Selecting everything reproduces exactly what
+   the old one-click export wrote, filename included. */
+let EXPGROUPS=[];
+
 function exportGrades(){
- const keys=gradedKeys();
- const payload={version:1,exported:new Date().toISOString(),
-  dimensions:DIMS.map(d=>d.key),graded:keys.length,verdicts:STORE.verdicts};
+ EXPGROUPS=exportGroups(STORE.verdicts);
+ if(!EXPGROUPS.length){alert('Nothing graded in this browser yet.');return;}
+ const byRun={};
+ EXPGROUPS.forEach(g=>{(byRun[g.run]=byRun[g.run]||[]).push(g);});
+ let h='';
+ Object.keys(byRun).sort().forEach(run=>{
+  const rid='exprun-'+encodeURIComponent(run);
+  const orphan=byRun[run].every(g=>!RUNS_ON_PAGE[g.run]);
+  h+='<div class="exprun"><label style="display:flex;gap:8px;align-items:center;cursor:pointer">'+
+     '<input type="checkbox" id="'+escA(rid)+'" onchange="expToggleRun('+JSON.stringify(run).replace(/"/g,'&quot;')+',this.checked)">'+
+     esc(run)+'</label>'+
+     (orphan?'<span class="expn" title="No session with this run label is in this build of the page — an older or renamed result set. Still yours to export.">not in this build</span>':'')+
+     '</div>';
+  byRun[run].forEach(g=>{
+   h+='<div class="exprow"><label>'+
+      '<input type="checkbox" class="expck" data-id="'+escA(g.id)+'" data-run="'+escA(g.run)+'" onchange="expPaint()">'+
+      '<span>'+esc(g.model)+'</span>'+
+      '<span class="expn">'+g.complete+' graded'+
+      (g.partial?' <span class="exppart">+'+g.partial+' part-done</span>':'')+
+      '</span></label></div>';
+  });
+ });
+ document.getElementById('expb').innerHTML=h;
+ expSelect('all');
+ document.getElementById('exov').style.display='block';
+ document.getElementById('expw').style.display='flex';
+}
+function closeExport(){
+ document.getElementById('exov').style.display='none';
+ document.getElementById('expw').style.display='none';
+}
+function expBoxes(){return Array.prototype.slice.call(document.querySelectorAll('.expck'));}
+function expSelectedIds(){return expBoxes().filter(b=>b.checked).map(b=>b.dataset.id);}
+function expSelect(mode){
+ expBoxes().forEach(b=>{b.checked=(mode==='all')?true:(mode==='none')?false:!b.checked;});
+ expPaint();
+}
+function expToggleRun(run,on){
+ expBoxes().forEach(b=>{if(b.dataset.run===run)b.checked=on;});
+ expPaint();
+}
+function expPaint(){
+ // A run's own box reflects its arms rather than driving them: indeterminate
+ // when the run is partly selected, so a half-picked board never reads as whole.
+ const byRun={};
+ expBoxes().forEach(b=>{const r=byRun[b.dataset.run]=byRun[b.dataset.run]||{n:0,on:0};
+  r.n++; if(b.checked)r.on++;});
+ Object.keys(byRun).forEach(run=>{
+  const el=document.getElementById('exprun-'+encodeURIComponent(run));
+  if(!el)return;
+  el.checked=byRun[run].on===byRun[run].n;
+  el.indeterminate=byRun[run].on>0&&byRun[run].on<byRun[run].n;
+ });
+ const sel=expSelectedIds(), want={};
+ sel.forEach(i=>{want[i]=1;});
+ let complete=0,partial=0;
+ EXPGROUPS.forEach(g=>{if(want[g.id]){complete+=g.complete;partial+=g.partial;}});
+ document.getElementById('expsum').textContent=
+  sel.length?complete+' graded'+(partial?' + '+partial+' part-done':'')+
+   ' from '+sel.length+' arm'+(sel.length===1?'':'s'):'nothing selected';
+ document.getElementById('expgo').disabled=!sel.length;
+}
+function doExport(){
+ const sel=expSelectedIds();
+ if(!sel.length)return;
+ const payload=exportPayload(STORE.verdicts,sel,DIMS.map(d=>d.key),
+                             new Date().toISOString());
+ const name=exportName(EXPGROUPS,sel,payload.graded);
  const a=document.createElement('a');
  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,1)],{type:'application/json'}));
- a.download='manual_grades_'+keys.length+'.json';
+ a.download=name;
  document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
- DIRTY.clear();paintDirty();
+ // Only what was actually written stops counting as unexported. Clearing the
+ // whole set here would report a board as safe on the strength of a different
+ // board's export -- the precise claim that loses someone an evening's grading.
+ Object.keys(payload.verdicts).forEach(k=>DIRTY.delete(k));
+ paintDirty();
+ closeExport();
 }
 function importGrades(input){
  const f=input.files&&input.files[0];if(!f)return;
@@ -834,14 +1089,19 @@ function drawGrade(){
    '<div class="sec">Transcript</div><div class="tsc">'+transcriptHTML(d.tr)+'</div>'+
    '<div class="sec">Judge</div><div id="g-judge">'+judgeBox(d,r)+'</div>'+
   '</div>'+
-  '<div>'+dimFormHTML(r)+
+  '<div>'+
+   '<div class="fillbar">'+
+    '<button class="btn" id="g-fill" onclick="fillMetClick()"></button>'+
+    '<span class="small" id="g-fillnote"></span>'+
+   '</div>'+
+   dimFormHTML(r)+
    '<div class="sec">Notes</div>'+
    '<textarea id="g-notes" onchange="setNotes(this.value)" placeholder="Anything the eight dimensions do not capture.">'+esc(r.notes||'')+'</textarea>'+
    '<div style="margin-top:10px" id="g-verdict"></div>'+
    '<div style="margin-top:10px"><button class="btn pri" onclick="gradeStep(1)">Next session &rarr;</button> '+
    '<button class="btn" onclick="clearGrade()">Clear this grade</button></div>'+
   '</div>';
- paintVerdict();
+ paintVerdict();paintFill();
 }
 
 function dimFormHTML(r){
@@ -871,11 +1131,54 @@ function setDim(key,val){
  // Repaint only what changed — re-rendering the form would throw away the
  // grader's scroll position halfway down eight dimensions.
  const card=document.querySelector('.dim[data-k="'+key+'"]');if(card)card.classList.add('done');
- paintVerdict();
+ paintVerdict();paintFill();
  document.getElementById('g-judge').innerHTML=judgeBox(d,r);
 }
 function setNotes(t){const d=QUEUE[QI];if(!d)return;
  const r=touch(d.k);r.notes=t;r.ts=new Date().toISOString();saveStore(d.k);}
+/* Bulk-fill the dimensions still blank, each with its own desired value.
+   Eight radio clicks to say "nothing wrong here" is a tax on the common case,
+   and a tax on grading is paid in sessions that never get graded.
+
+   It only ever fills BLANKS -- see fillMet. So the fast path on a clean session
+   is one click, and the fast path on a session with one problem is: mark the
+   problem, then one click. Nothing you have already decided moves. */
+function fillMetClick(){
+ const d=QUEUE[QI];if(!d)return;
+ const r=touch(d.k);
+ const add=fillMet(r.d||{});
+ const keys=Object.keys(add);
+ if(!keys.length)return;
+ keys.forEach(k=>{r.d[k]=add[k];});
+ r.ts=new Date().toISOString();saveStore(d.k);
+ // Repaint the affected cards in place. Re-rendering the form would throw away
+ // the grader's scroll position, the same reason setDim patches rather than
+ // redraws.
+ keys.forEach(k=>{
+  const card=document.querySelector('.dim[data-k="'+k+'"]');
+  if(!card)return;
+  card.classList.add('done');
+  card.querySelectorAll('input[type=radio]').forEach(rb=>{rb.checked=(rb.value===add[k]);});
+ });
+ paintVerdict();
+ document.getElementById('g-judge').innerHTML=judgeBox(d,r);
+ paintFill();
+}
+// The button says how many it would fill, so a click is never a guess about
+// what is about to be written. Nothing left to fill disables it rather than
+// hiding it -- a control that vanishes reads as a bug.
+function paintFill(){
+ const b=document.getElementById('g-fill');if(!b)return;
+ const d=QUEUE[QI];
+ const n=d?Object.keys(fillMet((rec(d.k)||{}).d||{})).length:0;
+ b.textContent=n?'Mark remaining '+n+' as met':'All eight answered';
+ b.disabled=!n;
+ b.title='Sets every dimension you have not answered to its desired value '
+  +'(yes, except: revealing the answer wants no, tone wants encouraging). '
+  +'Dimensions you have already answered are left alone.';
+ document.getElementById('g-fillnote').textContent=
+  n&&n<DIMS.length?'your '+(DIMS.length-n)+' answered stay as they are':'';
+}
 function clearGrade(){
  const d=QUEUE[QI];if(!d)return;
  if(!confirm('Discard your grade for '+d.s+'?'))return;
@@ -972,15 +1275,20 @@ function drawSxs(){
 
 function drawSxsSummary(run,model){
  const S=gradedRows({run:run,model:model,basis:'rp'});
- const R=passRates(S.rows);
+ const R=sxsRates(S.mine,S.rows);
  const pct=x=>x==null?'—':x.toFixed(1)+'%';
  const scope=(model||'all models')+(run?' in '+run:'');
  const el=document.getElementById('x-summary');
 
+ // Each rate carries its own denominator in the caption. Two percentages side
+ // by side read as a comparison whether or not they are over the same set, so
+ // the set has to be on screen next to them.
  const cards='<div class="cards">'+
-  '<div class="kpi"><b>'+R.n+'</b><span>sessions compared</span></div>'+
-  '<div class="kpi"><b>'+pct(R.mine)+'</b><span>my pass rate</span></div>'+
-  '<div class="kpi"><b>'+pct(R.judge)+'</b><span>LLM judge pass rate</span></div>'+
+  '<div class="kpi"><b>'+R.graded+'</b><span>sessions I graded</span></div>'+
+  '<div class="kpi"><b>'+pct(R.mine)+'</b><span>my pass rate'+
+   (R.graded?' · of '+R.graded:'')+'</span></div>'+
+  '<div class="kpi"><b>'+pct(R.judge)+'</b><span>LLM judge pass rate'+
+   (R.compared?' · of '+R.compared:' · no judge verdict')+'</span></div>'+
   '</div>';
 
  const excl=[];
@@ -990,18 +1298,31 @@ function drawSxsSummary(run,model){
  // Naming the scope in words matters once a model can be selected: three bare
  // percentages look identical whichever model produced them.
  let note;
- if(!R.n){
-  note='Nothing to compare in <b>'+esc(scope)+'</b>'+
-   (excl.length?' — '+excl.join(' and ')+', which is all of it.':' yet.');
+ if(!R.graded){
+  note='Nothing graded in <b>'+esc(scope)+'</b> yet'+
+   (S.peeked?' — '+S.peeked+' peeked, which is all of it.':'.');
+ }else if(!R.compared){
+  // The case this whole function was rewritten for: a run scored with the
+  // rubric skipped. Your work is the measurement here, not half of one.
+  note='<b>'+esc(scope)+'</b> · you graded '+R.graded+' session'+
+   (R.graded===1?'':'s')+'. '+
+   (S.noJudge?'None of them carries a judge verdict — this run was scored with '+
+    'the rubric skipped, so there is nothing to agree or disagree with. Your '+
+    'rate stands on its own, and the Agreement tab will stay empty for it.':
+    'Nothing to compare against yet.');
  }else{
-  const gap=Math.abs(R.mine-R.judge)<0.05?
+  const gap=Math.abs(R.comparedMine-R.judge)<0.05?
    'You and the judge pass the same share of them.':
-   'You pass '+Math.abs(R.mine-R.judge).toFixed(1)+' points '+
-   (R.mine>R.judge?'MORE':'FEWER')+' of them than the judge — you are the '+
-   (R.mine>R.judge?'more lenient':'stricter')+' of the two.';
-  note='<b>'+esc(scope)+'</b> · '+R.n+' session'+(R.n===1?'':'s')+' compared. '+gap+
-   (excl.length?' '+excl.join(' and ')+' excluded from these percentages — both would '+
-    'bias the comparison. They still count in the chart below.':'');
+   'You pass '+Math.abs(R.comparedMine-R.judge).toFixed(1)+' points '+
+   (R.comparedMine>R.judge?'MORE':'FEWER')+' of them than the judge — you are the '+
+   (R.comparedMine>R.judge?'more lenient':'stricter')+' of the two.';
+  const sameSet=R.compared===R.graded;
+  note='<b>'+esc(scope)+'</b> · '+R.compared+' of your '+R.graded+
+   ' also carr'+(R.compared===1?'ies':'y')+' a judge verdict. '+gap+
+   (sameSet?'':' That comparison is over those '+R.compared+' only, so it will '+
+    'not match the headline rate above.')+
+   (excl.length?' '+excl.join(' and ')+' excluded from the comparison — both '+
+    'would bias it. They still count in the chart below.':'');
  }
 
  el.innerHTML=cards+'<div class="small" style="margin:-6px 0 12px">'+note+'</div>'+
@@ -1107,12 +1428,16 @@ function cohensKappa(pairs){
 // tab's percentages and the agreement tab's statistics go through it, so the
 // two can never quietly apply different exclusion rules to the same sessions.
 function gradedRows(f){
- const out={rows:[],peeked:0,noJudge:0,orphan:orphanKeys().length,basis:f.basis};
+ const out={rows:[],mine:[],peeked:0,noJudge:0,orphan:orphanKeys().length,basis:f.basis};
  gradedKeys().forEach(k=>{
   const d=BY_KEY[k];if(!d)return;
   if((f.run&&d.run!==f.run)||(f.model&&d.m!==f.model)||
      (f.persona&&d.p!==f.persona)||(f.subject&&d.sub!==f.subject))return;
   const r=rec(k),j=f.basis==='pass'?d.pass:d.rp;
+  // Your verdict does not depend on the judge's existing, so it is collected
+  // BEFORE the judge-side filter. `rows` below stays the strict intersection
+  // that agreement needs; `mine` is everything you actually graded in scope.
+  if(!r.peeked)out.mine.push({d:d,r:r,p:d.p,h:sessionPasses(r.d||{}),j:j==null?null:!!j});
   if(j==null){out.noJudge++;return;}
   if(r.peeked){out.peeked++;return;}
   out.rows.push({d:d,r:r,p:d.p,h:sessionPasses(r.d||{}),j:!!j});
@@ -1234,6 +1559,8 @@ def build(src=None, out=None, flat_runs=None):
             .replace("__DIMS__", _embed(dimensions_payload()))
             .replace("__PASS_RULE__", PASS_RULE_JS)
             .replace("__STATS__", STATS_JS)
+            .replace("__GRADE__", GRADE_JS)
+            .replace("__EXPORT__", EXPORT_JS)
             .replace("__DATA__", _embed(sessions)))
     with open(out, "w") as fh:
         fh.write(html)

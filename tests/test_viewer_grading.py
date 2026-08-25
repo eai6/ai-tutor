@@ -437,3 +437,317 @@ def test_me_vs_judge_tab_filters_by_model(tmp_path):
     for fn in ('drawSxsSummary', 'fillSxsSel', 'personaChart'):
         assert fn in html
     assert "v('x-model')" in html
+
+
+# ── The export scope picker ─────────────────────────────────────────────
+
+def _run_export_js(body, tmp_path):
+    """Run a snippet against the page's shipped export helpers.
+
+    `exportGroups` and `exportPayload` both call `gradeComplete`, which lives
+    in the pass rule, so the driver carries both blocks.
+    """
+    driver = tmp_path / 'export.js'
+    driver.write_text(
+        f'const DIMS = {json.dumps(BV.dimensions_payload())};\n'
+        f'{BV.PASS_RULE_JS}\n{BV.EXPORT_JS}\n{body}\n'
+    )
+    proc = subprocess.run(
+        ['node', str(driver)], capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, f'node failed:\n{proc.stderr}'
+    return json.loads(proc.stdout)
+
+
+def _verdict(complete=True):
+    """A stored grading — every dimension answered, or one short of it."""
+    keys = [d.key for d in P.DIMENSIONS]
+    values = {k: P.YES for k in keys}
+    if not complete:
+        values.pop(keys[-1])
+    return {'d': values, 'notes': '', 'peeked': False,
+            'ts': '2026-08-25T09:00:00.000Z'}
+
+
+def _store():
+    """Two runs, three arms, with a part-finished grading in one of them."""
+    return {
+        '46_geo_cloud_3arm|gpt-5.4-mini|s1': _verdict(),
+        '46_geo_cloud_3arm|gpt-5.4-mini|s2': _verdict(),
+        '46_geo_cloud_3arm|gemini-3.5-flash|s1': _verdict(),
+        '46_geo_cloud_3arm|gemini-3.5-flash|s2': _verdict(complete=False),
+        '30_mt100_18arm_board|qwen3-30b|s9': _verdict(),
+    }
+
+
+def test_export_groups_are_run_by_model_with_their_counts(tmp_path):
+    """The picker's rows. Part-finished gradings are counted separately rather
+    than folded into `complete` — the number a grader recognises as "how much
+    of this arm have I done" is the completed one."""
+    got = _run_export_js(
+        f'console.log(JSON.stringify(exportGroups({json.dumps(_store())})));',
+        tmp_path)
+
+    assert [(g['run'], g['model'], g['complete'], g['partial']) for g in got] == [
+        ('30_mt100_18arm_board', 'qwen3-30b', 1, 0),
+        ('46_geo_cloud_3arm', 'gemini-3.5-flash', 1, 1),
+        ('46_geo_cloud_3arm', 'gpt-5.4-mini', 2, 0),
+    ]
+
+
+def test_export_groups_keep_scopes_that_left_the_page(tmp_path):
+    """Grouping reads the stored key, not this build's session list.
+
+    A grade whose run was renamed or whose results moved is the work most at
+    risk — it exists only in this browser. It must stay exportable.
+    """
+    store = {'99_a_run_that_moved|some-model|s1': _verdict()}
+    got = _run_export_js(
+        f'console.log(JSON.stringify(exportGroups({json.dumps(store)})));',
+        tmp_path)
+
+    assert len(got) == 1
+    assert got[0]['run'] == '99_a_run_that_moved'
+
+
+def test_export_payload_writes_only_the_selected_arms(tmp_path):
+    """The whole point: an unselected arm's grades are absent from the file."""
+    got = _run_export_js(
+        'console.log(JSON.stringify(exportPayload('
+        f'{json.dumps(_store())},'
+        '["46_geo_cloud_3arm|gpt-5.4-mini"],'
+        f'{json.dumps([d.key for d in P.DIMENSIONS])},'
+        '"2026-08-25T10:00:00.000Z")));',
+        tmp_path)
+
+    assert sorted(got['verdicts']) == ['46_geo_cloud_3arm|gpt-5.4-mini|s1',
+                                       '46_geo_cloud_3arm|gpt-5.4-mini|s2']
+    assert got['graded'] == 2
+    assert got['version'] == 1
+    assert got['dimensions'] == [d.key for d in P.DIMENSIONS]
+
+
+def test_export_payload_carries_part_finished_grades_but_does_not_count_them(
+        tmp_path):
+    """An export is a backup before it is a dataset, so work in progress inside
+    a selected arm travels with it. `graded` still counts only the complete —
+    the meaning manual_grades/README.md documents, and the meaning every file
+    written before the picker existed already has."""
+    got = _run_export_js(
+        'console.log(JSON.stringify(exportPayload('
+        f'{json.dumps(_store())},'
+        '["46_geo_cloud_3arm|gemini-3.5-flash"],'
+        f'{json.dumps([d.key for d in P.DIMENSIONS])},'
+        '"2026-08-25T10:00:00.000Z")));',
+        tmp_path)
+
+    assert len(got['verdicts']) == 2
+    assert got['graded'] == 1
+
+
+def test_selecting_every_arm_reproduces_the_old_whole_store_export(tmp_path):
+    """The picker must not become a way to lose a grade.
+
+    With everything ticked the file is byte-for-byte what the one-click export
+    wrote before this feature, filename included, so nothing downstream has to
+    special-case files written after it.
+    """
+    store = _store()
+    got = _run_export_js(
+        f'const S = {json.dumps(store)};\n'
+        'const G = exportGroups(S);\n'
+        'const P = exportPayload(S, G.map(g => g.id), '
+        f'{json.dumps([d.key for d in P.DIMENSIONS])}, "t");\n'
+        'console.log(JSON.stringify({v: P.verdicts, g: P.graded, '
+        'n: exportName(G, G.map(x => x.id), P.graded)}));',
+        tmp_path)
+
+    assert got['v'] == store
+    assert got['g'] == 4
+    assert got['n'] == 'manual_grades_4.json'
+
+
+def test_a_narrowed_export_carries_its_scope_in_the_filename(tmp_path):
+    """`manual_grades_34.json` from one arm collides with `manual_grades_34.json`
+    from any other arm of the same size — the trap manual_grades/README.md
+    documents. A subset says which subset it is."""
+    store = _store()
+    got = _run_export_js(
+        f'const S = {json.dumps(store)};\n'
+        'const G = exportGroups(S);\n'
+        'const name = (ids, n) => exportName(G, ids, n);\n'
+        'console.log(JSON.stringify({'
+        '  arm: name(["46_geo_cloud_3arm|gpt-5.4-mini"], 2),'
+        '  run: name(["46_geo_cloud_3arm|gpt-5.4-mini",'
+        '             "46_geo_cloud_3arm|gemini-3.5-flash"], 3),'
+        '  none: name([], 0)'
+        '}));',
+        tmp_path)
+
+    assert got['arm'] == 'manual_grades_46_geo_cloud_3arm_gpt-5.4-mini_2.json'
+    assert got['run'] == 'manual_grades_46_geo_cloud_3arm_3.json'
+    assert got['none'] == 'manual_grades_0.json'
+
+
+def test_export_helpers_ship_in_the_generated_page(tmp_path):
+    """Logic that is tested but not shipped tests nothing."""
+    out = tmp_path / 'index.html'
+    BV.build(src=_fixture(tmp_path), out=str(out), flat_runs=[])
+    html = out.read_text()
+
+    assert BV.EXPORT_JS in html
+    # The picker itself, not just the helpers behind it.
+    assert 'id="expw"' in html
+    assert 'function doExport()' in html
+
+
+# ── The grading form's one bulk action ──────────────────────────────────
+
+def _run_grade_js(body, tmp_path):
+    """Run a snippet against the page's shipped grading-form helpers."""
+    driver = tmp_path / 'grade.js'
+    driver.write_text(
+        f'const DIMS = {json.dumps(BV.dimensions_payload())};\n'
+        f'{BV.PASS_RULE_JS}\n{BV.GRADE_JS}\n{body}\n'
+    )
+    proc = subprocess.run(
+        ['node', str(driver)], capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, f'node failed:\n{proc.stderr}'
+    return json.loads(proc.stdout)
+
+
+def test_fill_met_writes_each_dimensions_own_desideratum(tmp_path):
+    """"Met" is not one value. Most dimensions want `yes`, but the taxonomy has
+    dimensions that pass on something else — filling them all with `yes` would
+    record a failing grade as a passing one."""
+    got = _run_grade_js('console.log(JSON.stringify(fillMet({})));', tmp_path)
+
+    assert got == {d.key: d.desideratum for d in P.DIMENSIONS}
+    # The guard this test exists for: at least one dimension does NOT pass on
+    # `yes`, so a blanket fill would be wrong.
+    assert {d.desideratum for d in P.DIMENSIONS} != {P.YES}
+
+
+def test_a_filled_form_passes_the_shipped_rule(tmp_path):
+    """One click on an untouched session must produce the all-met verdict the
+    button claims, under the same rule the page scores with."""
+    got = _run_grade_js(
+        'console.log(JSON.stringify(sessionPasses(fillMet({}))));', tmp_path)
+    assert got is True
+
+
+def test_fill_met_never_touches_an_answered_dimension(tmp_path):
+    """The restriction that makes a one-click "all met" safe to offer.
+
+    Overwriting a judgement with a pass is how a graded set quietly becomes a
+    rubber stamp — and it would be invisible afterwards, because the result
+    looks exactly like a session someone graded as fine.
+    """
+    keys = [d.key for d in P.DIMENSIONS]
+    answered = {keys[0]: P.NO, keys[3]: P.NOT_APPLICABLE}
+    got = _run_grade_js(
+        f'console.log(JSON.stringify(fillMet({json.dumps(answered)})));',
+        tmp_path)
+
+    assert keys[0] not in got and keys[3] not in got
+    assert sorted(got) == sorted(k for k in keys if k not in answered)
+
+
+def test_fill_met_on_a_finished_grade_writes_nothing(tmp_path):
+    """Nothing left to fill — the button has nothing to do and says so."""
+    full = {d.key: d.desideratum for d in P.DIMENSIONS}
+    got = _run_grade_js(
+        f'console.log(JSON.stringify(fillMet({json.dumps(full)})));', tmp_path)
+    assert got == {}
+
+
+def test_grade_helpers_ship_in_the_generated_page(tmp_path):
+    out = tmp_path / 'index.html'
+    BV.build(src=_fixture(tmp_path), out=str(out), flat_runs=[])
+    html = out.read_text()
+
+    assert BV.GRADE_JS in html
+    assert 'function fillMetClick()' in html
+    assert 'id="g-fill"' in html
+
+
+# ── Me vs judge, when there is no judge ─────────────────────────────────
+
+def _rows(spec):
+    """`h` is my verdict, `j` the judge's — None where no judge ran."""
+    return [{'h': h, 'j': j} for h, j in spec]
+
+
+def test_my_pass_rate_survives_a_run_the_judge_never_scored(tmp_path):
+    """The regression this exists for.
+
+    Runs generated with EVAL_SKIP_RUBRIC=1 carry no rubric on any session, so
+    the intersection of "graded by me" and "scored by the judge" is empty.
+    Computing both rates over that intersection reported an afternoon of
+    hand-grading as a dash. Mine needs no judge.
+    """
+    mine = _rows([(True, None), (True, None), (False, None), (True, None)])
+    got = _run_stats_js(
+        f'console.log(JSON.stringify(sxsRates({json.dumps(mine)}, [])));',
+        tmp_path)
+
+    assert got['graded'] == 4
+    assert got['mine'] == 75.0
+    assert got['compared'] == 0
+    assert got['judge'] is None
+
+
+def test_the_two_rates_keep_their_own_denominators(tmp_path):
+    """A partially-scored run. The headline rate is over everything graded; the
+    judge's is over what the judge actually saw."""
+    mine = _rows([(True, True), (True, False), (False, None), (False, None)])
+    compared = _rows([(True, True), (True, False)])
+    got = _run_stats_js(
+        f'console.log(JSON.stringify(sxsRates({json.dumps(mine)}, '
+        f'{json.dumps(compared)})));',
+        tmp_path)
+
+    assert got['graded'] == 4 and got['mine'] == 50.0
+    assert got['compared'] == 2 and got['judge'] == 50.0
+    # What a leniency claim must be computed over — not the headline 50%.
+    assert got['comparedMine'] == 100.0
+
+
+def test_comparison_uses_the_intersection_not_the_headline(tmp_path):
+    """`mine` and `comparedMine` diverging is the whole reason both exist.
+
+    Saying "you are more lenient than the judge" on the strength of a rate over
+    sessions the judge never saw is a claim about nothing.
+    """
+    mine = _rows([(True, True)] + [(False, None)] * 9)
+    compared = _rows([(True, True)])
+    got = _run_stats_js(
+        f'console.log(JSON.stringify(sxsRates({json.dumps(mine)}, '
+        f'{json.dumps(compared)})));',
+        tmp_path)
+
+    assert got['mine'] == 10.0
+    assert got['comparedMine'] == 100.0
+    assert got['judge'] == 100.0
+
+
+def test_nothing_graded_reports_null_not_zero(tmp_path):
+    """0% claims a judgement nobody made — the rule the rest of this file holds."""
+    got = _run_stats_js('console.log(JSON.stringify(sxsRates([], [])));',
+                        tmp_path)
+    assert got == {'graded': 0, 'mine': None, 'compared': 0,
+                   'comparedMine': None, 'judge': None}
+
+
+def test_graded_rows_keeps_my_rows_when_the_judge_is_absent(tmp_path):
+    """The split has to survive in the page's own row builder, not just in the
+    statistic — that is where the rows were being dropped."""
+    out = tmp_path / 'index.html'
+    BV.build(src=_fixture(tmp_path), out=str(out), flat_runs=[])
+    html = out.read_text()
+
+    assert 'out.mine.push(' in html
+    # Ordered before the judge-side filter, or it is dropped again.
+    assert html.index('out.mine.push(') < html.index('if(j==null){out.noJudge++')
+    assert 'sxsRates(S.mine,S.rows)' in html
