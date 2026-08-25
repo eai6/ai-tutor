@@ -98,12 +98,34 @@ FLAT_RUNS = [
     # work. Try this one:"). Expect that shape in the transcripts. It is a
     # known engine limitation, not something to re-discover per session.
     ("math_27b_v3", "45_math_27b_postfix"),
+    # The PRE-fix maths board. Pair it with 45: 14/34 against 24/34 on the same
+    # 34 scenarios and the same model. Grade them together or the improvement
+    # is a number with no sessions behind it. 41b predates the reachable
+    # warm-up, the MCQ-only pool and the catalog_question_id fix all at once,
+    # so read it as "before all of that", never as one isolated change.
+    ("math_27b_v2", "41b_math_27b_PREFIX"),
     # Cloud ceiling reference: one model per provider, all free text, same
     # scenarios and same tutor build as 42-45. Read these against the local
     # arms to see what the offline tiers give up, NOT as a cloud leaderboard.
-    # Arms appear here as each finishes, so this board may be partial.
+    #
+    # Both boards cluster tightly (geography 34/34/34, maths 23/22/22) and the
+    # frontier model does NOT beat the local 27B's 24/34 on maths. Six of
+    # Opus's eleven maths failures are on lessons 1141 and 1138, whose MCQ
+    # banks hold 4 and 5 questions against the ~6 a session needs — a content
+    # ceiling that caps every arm identically. Discount those two lessons on
+    # every arm or the board ranks models by how gracefully they degrade when
+    # the question pool runs dry.
     ("geo_cloud", "46_geo_cloud_3arm"),
     ("math_cloud", "47_math_cloud_3arm"),
+    # Single-scenario smokes from the fixture work of 2026-08-23, kept as the
+    # trail rather than as boards: each holds ONE scenario per model, so a pass
+    # rate here is one session and means nothing statistically. They record
+    # what was checked before the full arms were spent.
+    ("hg1_after", "48a_smoke_after_fix"),
+    ("hg1_realistic", "48b_smoke_realistic_fixture"),
+    ("hg1_traced", "48c_smoke_first_trace"),
+    ("hg1_verify", "48d_smoke_verify"),
+    ("hg1_mcq", "48e_smoke_mcq_pool"),
 ]
 
 
