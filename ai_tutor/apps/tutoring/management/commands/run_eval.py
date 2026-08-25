@@ -243,7 +243,16 @@ class Command(BaseCommand):
                     detail = detail.replace('\n', ' ')
             else:
                 label = self.style.WARNING('FAIL ')
-                fails = [r.name for r in sr.assertion_results if not r.passed]
+                # assertion_results are dataclass objects on a fresh run but
+                # plain dicts when they come back from a resume checkpoint,
+                # which is JSON. Reading .passed off a dict raised
+                # AttributeError at the very END of a 2.2-hour Gemini arm —
+                # after every scenario had been run and paid for — so the
+                # board was never written. Handle both shapes.
+                def _af(r, key):
+                    return r.get(key) if isinstance(r, dict) else getattr(r, key, None)
+                fails = [_af(r, 'name') for r in sr.assertion_results
+                         if not _af(r, 'passed')]
                 if sr.rubric_result and not sr.rubric_result.get('passed'):
                     fails.append('rubric')
                 detail = f"failed: {', '.join(fails)}"
