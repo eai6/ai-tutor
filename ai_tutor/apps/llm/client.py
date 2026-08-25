@@ -2413,7 +2413,30 @@ class GeminiClient(BaseLLMClient):
             )
         try:
             from google import genai
-            self.client = genai.Client(api_key=self.api_key)
+            # A request timeout is REQUIRED here, not a nicety. Without one the
+            # SDK blocks in SSL socket read forever when a connection stalls:
+            # a maths sweep sat in _ssl__SSLSocket_read for 83 minutes with the
+            # retry ladder never engaging, because a call that never returns
+            # never raises and so is never retried. The Ollama and OpenAI paths
+            # already carry 120s/600s timeouts; this one did not.
+            timeout_s = float(os.environ.get('GEMINI_TIMEOUT_S', '180'))
+            try:
+                from google.genai import types as _genai_types
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=_genai_types.HttpOptions(
+                        timeout=int(timeout_s * 1000),      # SDK wants ms
+                    ),
+                )
+            except Exception:                                    # noqa: BLE001
+                # Older SDKs lack HttpOptions. Losing the timeout is worse than
+                # losing nothing, so say so rather than failing silently.
+                logger.warning(
+                    "Gemini client built WITHOUT a request timeout — "
+                    "google-genai lacks HttpOptions; a stalled connection can "
+                    "hang indefinitely."
+                )
+                self.client = genai.Client(api_key=self.api_key)
         except ImportError:
             raise ImportError("google-genai package not installed. Run: pip install google-genai")
 
