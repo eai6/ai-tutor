@@ -1,0 +1,2560 @@
+{
+ "version": 1,
+ "exported": "2026-08-25T14:55:58.154Z",
+ "dimensions": [
+  "mistake_identification",
+  "mistake_location",
+  "revealing_answer",
+  "providing_guidance",
+  "actionability",
+  "coherence",
+  "tutor_tone",
+  "human_likeness"
+ ],
+ "graded": 169,
+ "verdicts": {
+  "42_geo_4b_postfix|qwen3-4b-jetson|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T06:44:09.597Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|average_geo_scale_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the answer:\n\nIf you measured 6 cm between two towns on a map with a scale of 1:100,000, how many kilometres apart are they?\nA) 6 kilometres\nB) 60 kilometres\nC) 600 kilometres\nD) 6,000 kilometres\nstudent\nB\nTUTOR · explain\nYou picked B — that suggests the distance is 60 kilometres, which would mean 1 cm on the map equals 10 km on the ground.  \nOn a 1:100,000 scale, 1 cm represents 100,000 cm, or 1 kilometre. So 6 cm equals 6 kilometres, not 60.  \nLook again at what the scale means and how it connects map distance to real-world distance.\nstudent\nA",
+   "peeked": false,
+   "ts": "2026-08-25T07:24:43.525Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:26:50.339Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:27:00.630Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:27:14.318Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:27:30.294Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:28:41.334Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:28:57.044Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:29:11.353Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|speedrun_capable_1466_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:29:31.016Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T07:41:41.397Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|error_cascade_error_prone_1466_04": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed correct answer and also failed to pose next question after saying \"Here is the next one\" :\n\nOn a map with a scale of 1:200,000, a measured distance of 3 cm represents how many kilometres on the ground?\nA) 3 km\nB) 6 km\nC) 20 km\nD) 60 km\nstudent\nA\nTUTOR · explore\nYou picked A — that option describes a distance of 3 km, which is too small for a 3 cm measurement on a 1:200,000 map.  \nRemember: on a scale of 1:200,000, 1 cm represents 0.2 km, so multiply the map distance by 200,000 and divide by 100,000 to get kilometres.  \nTry again with the correct reasoning.\nstudent\nD\nTUTOR · explore\nYou picked D — that option describes a distance of 60 km, which is far too large for a 3 cm measurement on a 1:200,000 map.  \nOn a map scale of 1:200,000, 1 cm represents 2 km, so 3 cm represents 6 km. Check the unit conversion and the multiplication step.\n\nAnother example:\n\nGot it — that's right. Here's the next one:\n\nA navigation task requires you to measure the distance from Seychelles airport to Victoria city centre along the main road. Which approach would give the most useful result?\nA) Measure the straight-line distance only\nB) Measure the actual road distance using the string or tracing method\nC) Estimate the distance without measuring\nD) Use only the map scale without any measurement\nstudent\nA\nTUTOR · practice\nYou picked A — measuring only the straight-line distance ignores the actual road network.  \nThe actual road distance must account for turns, hills, and built-up areas, so using a string or tracing method along the road gives a more realistic result.  \nHere's the next one:\nstudent\nB",
+   "peeked": false,
+   "ts": "2026-08-25T07:49:07.344Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|error_prone_geo_direction_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed correct answer:\nA bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West\nstudent\nA\nTUTOR · engage\nYou picked A — that’s east, which is not the starting point for bearings. Bearings are always measured clockwise from north. Try looking at the options again.\nstudent\nC\n\nAnother example:\n\nWhat is the bearing equivalent of the compass point Southwest (SW)?\nA) 135°\nB) 225°\nC) 315°\nD) 45°\nstudent\nA\nTUTOR · explain\nYou picked A — that option describes Northeast (45°), not Southwest.  \nBearings increase clockwise from North, so Southwest, at 225°, is halfway between South (180°) and West (270°).  \nLook at the options again.\nstudent\nB",
+   "peeked": false,
+   "ts": "2026-08-25T07:53:19.179Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the answer:\n\nTUTOR · engage\nGot it — that's right. Here's the next one:\n\nWhat does 'gently-sloping land' refer to in geographical terms?\nA) Land that descends gradually with a shallow angle of incline\nB) Land that rises steeply and is difficult to climb\nC) Completely flat terrain with no variation in elevation\nD) Land shaped into a deep valley formation\nstudent\nB\nTUTOR · engage\nYou picked B — that describes steep terrain, not gently-sloping land.  \nGently-sloping land means a gradual descent with a shallow angle, not a steep rise.  \nLook again at the options and think about what \"gradual\" means.\nstudent\nA\n\n-----------------------------------\n\nTutor poses a question but fails to give options:\nHere’s the next one:  \nA narrow, elevated strip of land with high points on either side is geographically termed a:\n\nTUTOR · practice\nYou picked A — that suggests ranking islands by size, which is not relevant to how we describe terrain. Geographical terms help us clearly and consistently describe landforms so everyone understands the landscape, whether for planning or discussion.  \n\nHere's the next one:\nstudent\nA",
+   "peeked": false,
+   "ts": "2026-08-25T08:07:55.840Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "actionability": "to_some_extent",
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the correct answer and fails to pose next question after it says \"Here's the next one\":\n\nWhich of the following best describes a V-shaped river channel?\nA) Wide and shallow with gentle sloping banks\nB) Narrow and deep with steep vertical sides\nC) Rectangular in cross-section with uniform depth\nD) Broad and flat with extensive floodplain areas\nstudent\nA\nTUTOR · engage\nYou picked A — wide and shallow with gentle sloping banks. That describes a floodplain or a river in its lower course, not a V-shaped channel. Look at the shape of the sides: a V-shaped channel has narrow, deep sides with steep vertical sides. Here's the next one:\nstudent\nA",
+   "peeked": false,
+   "ts": "2026-08-25T08:14:00.843Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|session_completion_error_prone_1466_03": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the correct answer:\nWhich tool would be most appropriate for measuring the length of a winding mountain path on a map?\nA) A ruler\nB) A protractor\nC) A compass\nD) A string or piece of thread\nstudent\nA\nTUTOR · explain\nYou picked A — a ruler — which can only measure straight lines, not curved paths.  \nFor a winding mountain path, you need something that can bend, like a string or thread.  \nTry looking at the other options again.\n\nAnother example:\n\n\nIf a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?\nA) 7.5 km\nB) 15 km\nC) 10 km\nD) 20 km\nstudent\nC\nTUTOR · explore\nYou picked C — that option describes a ground distance of 10 km, which is not correct for 6 cm on a map where 2 cm equals 5 km.  \nRemember: if 2 cm = 5 km, then 1 cm = 2.5 km, so 6 cm = 6 × 2.5 = 15 km.  \nLook at the options again and think about how the scale works\n\nTutor fails to pose next question even after saying \"Here's another\":\n\nYou picked C — placing the ruler's zero mark with the starting point describes a step, but not the most important first one. Before measuring, you must know the map scale to convert the ruler distance to real ground distance. Here's the next one:\nstudent\nA",
+   "peeked": false,
+   "ts": "2026-08-25T08:18:00.407Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:18:16.713Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the correct answer:\nHere’s a quick warm-up question from our earlier lesson on river channels:  \nIn a river's middle course, which erosion process predominantly shapes the channel into a U-shaped profile?  \nA) Abrasion from sediment particles grinding against bedrock  \nB) Vertical erosion deepening the riverbed through downward cutting  \nC) Headward erosion extending the river valley upstream  \nD) Lateral erosion of the riverbanks by water flowing across the channel\nstudent\nB\nTUTOR · warm_up\nYou picked B — vertical erosion deepens the riverbed, but that doesn’t create a U-shaped profile. Lateral erosion widens the riverbanks horizontally, which is what shapes the channel into a U. Look again at the options to see what actually forms the U-shape.",
+   "peeked": false,
+   "ts": "2026-08-25T08:19:11.258Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|non_responder_geo_scale_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the correct answer and fails to pose next question after saying \"Here's the next one \" \nTwo congruent triangles have corresponding sides. If one triangle has sides 6 cm, 5 cm, and 13 cm, what is the perimeter of the other triangle?  \nA) 48 cm  \nB) 29 cm  \nC) 43 cm  \nD) 24 cm\nstudent\nB\nTUTOR · warm_up\nYou picked B — that option describes a perimeter of 29 cm, which is incorrect because the sides of the triangle are 6 cm, 5 cm, and 13 cm.  \nCongruent triangles have equal corresponding sides, so the perimeter is simply the sum of the three sides: 6 + 5 + 13 = 24 cm.  \nHere’s the next one:\nstudent\nA\n\n------------------------------\n\nTutor fails to pose options for the a question it posed:\nHere’s the next one:  \nWhich of the following would most clearly show the individual buildings and street layouts of the town of Beau Vallon?\n",
+   "peeked": false,
+   "ts": "2026-08-25T08:21:31.335Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|non_responder_geo_session_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed correct answer:\nWhich analogy best helps students understand the relationship between compass points and bearings?\nA) Compass points are like city names, and bearings are like street addresses—both identify locations, but bearings are more precise.\nB) Compass points are like colours (red, blue), and bearings are like exact wavelengths (nm)—same concept, different precision.\nC) Compass points are what you say out loud, and bearings are what you write down—they are identical direction information.\nD) Compass points are used on old maps, and bearings are used on modern maps—they serve different historical purposes.\nstudent\nA\nTUTOR · engage\nYou picked A — that compares compass points to city names and bearings to street addresses, but it misses the key idea that both systems describe direction, just with different levels of precision.  \n\nCompass points are like colours (red, blue), and bearings are like exact wavelengths (nm)—both describe a property, but bearings give a precise numerical value. Try looking at the options again.\nstudent\nB",
+   "peeked": false,
+   "ts": "2026-08-25T08:23:43.282Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:23:54.393Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:24:00.122Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:24:15.050Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:24:19.734Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:24:25.738Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:24:32.594Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:26:42.465Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|short_session_probe_resistant_1465_10": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed correct answer:\n\nTwo locations on a map have six-figure grid references 456782 and 456792. What is the spatial relationship between these two locations?\nA) They are in different grid squares\nB) They are in the same grid square and very close together\nC) They are in the same grid square but 1 unit apart horizontally\nD) They are in the same grid square but 1 unit apart vertically\nstudent\nB\nTUTOR · engage\nYou picked B — that option describes locations in the same grid square but very close together, which is vague and doesn’t specify the direction of difference.  \nLook at the numbers: both references start with 4567, so they are in the same grid square. The last two digits (82 and 92) differ in the northing, meaning they are 1 unit apart vertically.  \nTry again with that in mind.",
+   "peeked": false,
+   "ts": "2026-08-25T08:29:56.269Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:30:11.967Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:30:43.469Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:31:29.968Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|long_session_struggler_1470_03": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the answer:\nWhich process best describes exfoliation?\nA) Ice crystals wedging apart rock layers due to freezing water in fractures\nB) Curved sheets of rock peeling away from the surface due to pressure release as overlying rock is removed\nC) The weathering of rock by acids produced by lichen growth\nD) The breakup of rock fragments by repeated heating and cooling during daily temperature changes\nstudent\nA\nTUTOR · engage\nYou picked A — that describes freeze-thaw weathering, not exfoliation.  \nExfoliation is about rock sheets peeling away due to pressure release, not ice or acids.  \nLook again at the options and think about what happens when rock is exposed to air and pressure drops.",
+   "peeked": false,
+   "ts": "2026-08-25T08:33:19.677Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:33:26.310Z"
+  },
+  "42_geo_4b_postfix|qwen3-4b-jetson|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:33:32.203Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:40:03.861Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:43:33.943Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:43:44.238Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:43:49.952Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:45:43.630Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:45:49.500Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:45:59.847Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:46:05.043Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:46:48.356Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|speedrun_capable_1466_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:47:35.511Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:52:04.575Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T08:53:45.999Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|error_prone_geo_direction_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "The tutor fails to be in sync with the student's response:\n\nA cartographer creates a map with a compass rose showing all 16 cardinal and secondary-intercardinal points. If the intercardinal points (NE, SE, SW, NW) are at 45°, 135°, 225°, and 315° respectively, at what bearing is North-Northeast (NNE)?\nA) 22.5°\nB) 33.75°\nC) 56.25°\nD) 67.5°\nstudent\n33.75 degrees, so B\nTUTOR · practice\nYou picked 33.75°, which is actually halfway between NE (45°) and ENE (67.5°), so that's a different point on the rose. NNE sits right between North (0°) and NE (45°), so think about what value falls exactly midway between those two anchors. Look at the options again.\nstudent\nohh so its between 0 and 45, so like half of 45 which is 22.5, so A\nTUTOR · practice\nYou picked 33.75°, which sits halfway between NE (45°) and ENE (67.5°), so it describes a different point on the rose than NNE.",
+   "peeked": false,
+   "ts": "2026-08-25T08:56:47.129Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:00:23.618Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:07:11.266Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:08:42.073Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:08:59.372Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:09:07.036Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:09:12.365Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:09:17.324Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:09:23.297Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:09:36.876Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:10:01.780Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:10:08.228Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:10:49.734Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:11:06.886Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:11:14.513Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|short_session_probe_resistant_1465_10": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:11:20.909Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:16:05.935Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:18:25.202Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:19:48.626Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:28:35.742Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:29:03.237Z"
+  },
+  "44_geo_27b_postfix|qwen3.8-27b-instruct|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:30:04.124Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:46:56.511Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:50:20.624Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:52:33.512Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T09:52:38.301Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:00:04.148Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:00:20.862Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:00:57.590Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|average_geo_scale_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the answer:\n\nA map with the ratio 1:250,000 would be classified as which scale type?\nA) Large scale\nB) Small scale\nC) Medium scale\nD) Ultra-large scale\nstudent\nhmm so 1:250,000 is pretty big right? like it's not tiny like 1:5,000 but it's not huge like 1:2,000,000. i think that's medium scale? so C.\nTUTOR · practice\nThat is a logical way to look at the numbers, but geographers classify scale based on the size of the fraction. Because 1/250,000 is a tiny fraction compared to 1/10,000, it is classified as a small scale map. With that fraction rule in mind, what is your choice?\nstudent\noh ok so the smaller the fraction the smaller the scale. so 1:250,000 is a really small fraction so it's small scale. so B.",
+   "peeked": false,
+   "ts": "2026-08-25T10:02:41.148Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:02:57.388Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:03:06.602Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:03:12.057Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:03:42.609Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:28.700Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:33.829Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:38.714Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:43.576Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:48.549Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:04:53.649Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:06:36.480Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:06:41.424Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:07:00.340Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|speedrun_capable_1466_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:07:05.610Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:07:11.518Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:09:23.300Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:09:28.573Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|speedrun_capable_1466_11": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to povide a hint or explanation after a student gets it wrong\nWhen converting a four-figure grid reference to a six-figure reference, why is the grid square divided into 10 equal parts on each side?\nA) To create a decimal system that allows easy estimation of position within the square\nB) To match the metric system used on all maps\nC) To represent the scale of the map in kilometres\nD) To align with compass directions\nstudent\nB\nTUTOR · warm_up\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: When converting a four-figure grid reference to a six-figure reference, why is the grid square divided into 10 equal parts on each side?\nA) To create a decimal system that allows easy estimation of position within the square\nB) To match the metric system used on all maps\nC) To represent the scale of the map in kilometres\nD) To align with compass directions",
+   "peeked": false,
+   "ts": "2026-08-25T10:10:48.277Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:10:53.301Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:11:00.550Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:11:06.273Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|speedrun_capable_1466_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:11:11.061Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:15:08.125Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:16:04.084Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|error_prone_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:17:01.122Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:18:21.820Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:20:02.362Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:21:12.945Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide guidance:\nA description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain\nstudent\na) two: a plain and a ridge\nTUTOR · explore\nNot quite — let's walk through it together. Here's the question again:\n\nOne more look at this one: A description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain\nstudent\nohh i see, so i count them up... gently-sloping hillside, then the plain, then the ridge... thats c) four: a slope, a plain, a ridge, and a hill\n\nAnother example:\nA description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain\nstudent\na) two: a plain and a ridge\nTUTOR · explore\nNot quite — let's walk through it together. Here's the question again:\n\nOne more look at this one: A description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain",
+   "peeked": false,
+   "ts": "2026-08-25T11:02:23.816Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to give a hint:\n\nWhere on a river channel cross-section diagram would you measure the width of the river?\nA) From the riverbed to the water surface\nB) From one bank to the other bank at the water surface level\nC) From the floodplain edge to the opposite floodplain edge\nD) Along the longest part of the riverbed\nstudent\nc, from the floodplain edge to the opposite floodplain edge\nTUTOR · practice\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: Where on a river channel cross-section diagram would you measure the width of the river?\nA) From the riverbed to the water surface\nB) From one bank to the other bank at the water surface level\nC) From the floodplain edge to the opposite floodplain edge\nD) Along the longest part of the riverbed\nstudent\nwait what, so its b, from one bank to the other bank at the water surface level",
+   "peeked": false,
+   "ts": "2026-08-25T10:25:13.916Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:25:42.897Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide a hint:\n\nA description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain\nstudent\nC) Four: a slope, a plain, a ridge, and a hill\nTUTOR · engage\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: A description of an area as 'a gently-sloping hillside descending to a narrow plain with a ridge visible in the distance' incorporates how many distinct geographical landforms?\nA) Two: a plain and a ridge\nB) Three: gently-sloping land, a plain, and a ridge\nC) Four: a slope, a plain, a ridge, and a hill\nD) Only one: the hillside terrain",
+   "peeked": false,
+   "ts": "2026-08-25T10:26:26.122Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:26:34.741Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:28:43.391Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:29:56.830Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:31:18.729Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:31:58.986Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:32:11.040Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:32:16.143Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide guidance:\nIn a river's middle course, which erosion process predominantly shapes the channel into a U-shaped profile?\nA) Abrasion from sediment particles grinding against bedrock\nB) Vertical erosion deepening the riverbed through downward cutting\nC) Headward erosion extending the river valley upstream\nD) Lateral erosion of the riverbanks by water flowing across the channel\nstudent\nB\nTUTOR · warm_up\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: In a river's middle course, which erosion process predominantly shapes the channel into a U-shaped profile?\nA) Abrasion from sediment particles grinding against bedrock\nB) Vertical erosion deepening the riverbed through downward cutting\nC) Headward erosion extending the river valley upstream\nD) Lateral erosion of the riverbanks by water flowing across the channel\n",
+   "peeked": false,
+   "ts": "2026-08-25T10:32:52.670Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:33:14.252Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:34:16.163Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:34:27.100Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:34:34.764Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:34:58.839Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:10.856Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:15.236Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:19.123Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|short_session_probe_resistant_1465_10": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:23.188Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:26.960Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:35:31.682Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|probe_resistant_geo_scale_001": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide guidance or a hint when learner fails:\nA map of Seychelles at 1:100,000 would be considered which type of scale, and what would be its primary limitation?\nA) Large scale; it cannot show the entire country on one map.\nB) Small scale; it cannot show individual buildings or streets.\nC) Large scale; it is too detailed for international comparisons.\nD) Small scale; it lacks elevation data.\nstudent\nB\nTUTOR · engage\nClose, but not quite — take it one step at a time. Here's the question again:\n\nSame question, fresh angle: A map of Seychelles at 1:100,000 would be considered which type of scale, and what would be its primary limitation?\nA) Large scale; it cannot show the entire country on one map.\nB) Small scale; it cannot show individual buildings or streets.\nC) Large scale; it is too detailed for international comparisons.\nD) Small scale; it lacks elevation data.",
+   "peeked": false,
+   "ts": "2026-08-25T10:36:35.504Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:36:42.344Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:36:58.554Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:38:23.776Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:40:01.538Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:40:21.126Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:40:25.935Z"
+  },
+  "46_geo_cloud_3arm|claude-opus-4-7|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:41:00.952Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:41:04.579Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|error_cascade_struggler_1469_16": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor ignores the student response:\nIn a study of a mountain valley in Seychelles, geologists find a debris fan (fan-shaped deposit) at the base of a steep granite slope, recent scars on the slope face, and fine sediment in the valley stream. Which interpretation best links weathering and mass movement to explain these observations?\nA) Biological weathering alone created the fan without any physical mass movement\nB) Carbonation dissolved the valley rocks; gentle creep spread the material across the fan\nC) Freeze-thaw fractured the rock; wind erosion transported the fragments\nD) Exfoliation and oxidation weathered the granite; rockfalls and debris flows transported the material to create the fan\nstudent\numm im stuck. there's like loads of stuff happening here\nTUTOR · explore\nLet's pick up where we left off. Here's the question:\n\nIn a study of a mountain valley in Seychelles, geologists find a debris fan (fan-shaped deposit) at the base of a steep granite slope, recent scars on the slope face, and fine sediment in the valley stream. Which interpretation best links weathering and mass movement to explain these observations?\nA) Biological weathering alone created the fan without any physical mass movement\nB) Carbonation dissolved the valley rocks; gentle creep spread the material across the fan\nC) Freeze-thaw fractured the rock; wind erosion transported the fragments\nD) Exfoliation and oxidation weathered the granite; rockfalls and debris flows transported the material to create the fan",
+   "peeked": false,
+   "ts": "2026-08-25T10:42:21.391Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:42:35.205Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:43:04.787Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:43:20.201Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide guidance or hint:\nGot it — that's right. Here's the next one:\n\nWhich of the following best describes a plain?\nA) A narrow ridge of elevated land running across the landscape\nB) A large, flat area of land with little or no elevation change\nC) A deep depression between two hills or mountains\nD) A steep slope that descends rapidly downhill\nstudent\nA\nTUTOR · engage\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: Which of the following best describes a plain?\nA) A narrow ridge of elevated land running across the landscape\nB) A large, flat area of land with little or no elevation change\nC) A deep depression between two hills or mountains\nD) A steep slope that descends rapidly downhill",
+   "peeked": false,
+   "ts": "2026-08-25T10:58:50.908Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T10:59:38.990Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|error_prone_geo_direction_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor asks two questions at the same time:\nTUTOR · engage\nNot quite — let's walk through it together. Here's the question again:\n\nLet's take another run at it: A bearing is always measured clockwise from which direction?\nA) East\nB) South\nC) North\nD) West\n\nLet's park that one for now and come at the skill from a different problem:\n\nIn a navigation exercise, a destination is at bearing 083° from your starting position. A second destination is at bearing 263° from the same starting position. What can you conclude about the relative positions of the two destinations?\nA) Both are approximately in the same direction (east), just at different distances.\nB) They are nearly opposite each other, with one roughly east and one roughly west.\nC) One is slightly south of due east, and the other is slightly south of due west.\nD) They form a 90° angle when viewed from the starting position.\n\n-------------------------------\nTutor fails to give a hint or guidance:\nIn a navigation exercise, a destination is at bearing 083° from your starting position. A second destination is at bearing 263° from the same starting position. What can you conclude about the relative positions of the two destinations?\nA) Both are approximately in the same direction (east), just at different distances.\nB) They are nearly opposite each other, with one roughly east and one roughly west.\nC) One is slightly south of due east, and the other is slightly south of due west.\nD) They form a 90° angle when viewed from the starting position.\nstudent\nc\nTUTOR · engage\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: In a navigation exercise, a destination is at bearing 083° from your starting position. A second destination is at bearing 263° from the same starting position. What can you conclude about the relative positions of the two destinations?\nA) Both are approximately in the same direction (east), just at different distances.\nB) They are nearly opposite each other, with one roughly east and one roughly west.\nC) One is slightly south of due east, and the other is slightly south of due west.\nD) They form a 90° angle when viewed from the starting position.\nstudent\nb",
+   "peeked": false,
+   "ts": "2026-08-25T11:01:25.866Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:03:59.295Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:04:29.713Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|short_session_probe_resistant_1465_10": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:04:35.406Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:06:34.826Z"
+  },
+  "46_geo_cloud_3arm|gemini-3.5-flash|struggler_geo_direction_001": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to provide a hint or guidance:\nLet's keep going. Here's the question:\n\nWhich of the following best defines a large scale map?\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.\nstudent\nhmm i think its A? cause it says large scale so like... it should show a large area right\nTUTOR · warm_up\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: Which of the following best defines a large scale map?\nA) A map that covers a very large geographic area such as a continent or entire country.\nB) A map with a small ratio (e.g., 1:25,000) that shows a limited area with high detail.\nC) A map printed on large paper or displayed on a large computer screen.\nD) A map that requires a magnifying glass to read the labels.",
+   "peeked": false,
+   "ts": "2026-08-25T11:07:21.147Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|error_cascade_struggler_1469_16": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the correct answer:\nWhich statement best describes mass movement?\nA) The gradual wearing away of rock by wind and water\nB) The chemical breakdown of minerals at the Earth's surface\nC) The downhill movement of rock and soil under gravity without a transporting agent\nD) The deposition of sediment in valleys and plains\nstudent\nhmm i think its a) the gradual wearing away of rock by wind and water\nTUTOR · engage\nNot quite — you picked a process where rock is worn away by wind and water, but mass movement is about material moving downhill because of gravity. Focus on the phrase “under gravity without a transporting agent,” then choose the option that matches that rule.",
+   "peeked": false,
+   "ts": "2026-08-25T11:09:02.296Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:09:16.394Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:10:03.640Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|session_completion_struggler_1470_07": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the answer:\nWhich process best describes exfoliation?\nA) Ice crystals wedging apart rock layers due to freezing water in fractures\nB) Curved sheets of rock peeling away from the surface due to pressure release as overlying rock is removed\nC) The weathering of rock by acids produced by lichen growth\nD) The breakup of rock fragments by repeated heating and cooling during daily temperature changes\nstudent\numm is it A? like the ice thing breaks the rock apart\nTUTOR · engage\nNot quite — you’re thinking of water freezing in cracks, which is freeze-thaw weathering. Exfoliation is the kind of weathering where outer rock layers peel off after pressure is released, so look for the option about sheets peeling away.\nstudent\nohh ok so its B then? the curved sheets peeling away thing",
+   "peeked": false,
+   "ts": "2026-08-25T11:10:59.240Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:11:30.476Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:11:45.827Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:11:50.757Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:12:29.000Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:12:50.888Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:12:55.839Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|short_session_probe_resistant_1465_10": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:13:00.375Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:13:14.517Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:13:27.259Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:13:37.020Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:13:43.980Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:14:07.054Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:14:13.540Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:14:57.910Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|error_prone_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:15:50.666Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "revealing_answer": "yes_correct"
+   },
+   "notes": "Tutor reveals the answer:\n\nWhich statement best explains why geographical terminology is important when comparing landscapes in Seychelles?\nA) It allows scientists to rank islands by size and population\nB) It provides a standardized way to describe terrain features that aids communication and planning decisions\nC) It determines which islands are suitable for tourism only\nD) It eliminates the need for detailed field observations\nstudent\nA) It allows scientists to rank islands by size and population\nTUTOR · explain\nGeographical terminology is about using the same clear language for landforms so people understand each other and can make decisions about areas. Focus on whether the statement talks about describing terrain in a standard way, rather than ranking islands or choosing tourism sites.",
+   "peeked": false,
+   "ts": "2026-08-25T11:16:32.281Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor reveals the answer:\nTUTOR · engage\nCorrect — nice work. Try this one:\n\nWhich of the following best describes a V-shaped river channel?\nA) Wide and shallow with gentle sloping banks\nB) Narrow and deep with steep vertical sides\nC) Rectangular in cross-section with uniform depth\nD) Broad and flat with extensive floodplain areas\nstudent\na\nTUTOR · engage\nNot quite — a V-shaped channel is the one where the river has cut down deeply, leaving steep sides. Look for the option that describes a channel that is narrow and steep rather than wide and flat.",
+   "peeked": false,
+   "ts": "2026-08-25T11:18:16.401Z"
+  },
+  "46_geo_cloud_3arm|gpt-5.4-mini|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-25T11:18:30.551Z"
+  }
+ }
+}
