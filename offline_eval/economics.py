@@ -59,6 +59,30 @@ QUALITY = {                     # human-graded pass rate, geography, n=169
 K_CAPITAL = 2500.0        # RTX 3090, purchase
 GPU_WATTS, KWH = 350.0, 0.20
 HOURS_DAY, SCHOOL_DAYS = 6, 190
+DISCOUNT = 0.05           # social discount rate; education CEA commonly 3-5%
+LIFE_YEARS = 3            # useful life; 3y is the standard for computer hardware
+
+# Reference points from the literature, for calibration rather than decoration:
+SSA_SPEND_PER_STUDENT = 208.0   # Sub-Saharan Africa, primary, 2013 PPP USD
+                                # (Bashir et al. 2018, cited in Angrist et al. 2023)
+TZ_CAPITATION_SECONDARY = 5.0   # Tanzania capitation grant, US$/secondary
+                                # student/year, 2018-19
+
+
+def crf(rate: float, years: int) -> float:
+    """Capital recovery factor — annualises a lump sum over its useful life.
+
+    The ingredients method (Levin & McEwan) annualises durable goods rather
+    than expensing them in year one, because a card bought once yields service
+    over several years. Dividing capital by life, as a first pass usually does,
+    omits the opportunity cost of the funds tied up in the asset; the CRF does
+    not. At 5% over 3 years it adds ~10% to the annual charge, which is small
+    against the uncertainty in usage but wrong to leave out of a paper that
+    calls itself an economic analysis.
+    """
+    if rate <= 0:
+        return 1.0 / years
+    return rate * (1 + rate) ** years / ((1 + rate) ** years - 1)
 
 
 def session_minutes(arm, subject="maths", think_sec=30):
@@ -82,14 +106,20 @@ def main():
     ap.add_argument("--students", type=int, default=300)
     ap.add_argument("--sessions", type=int, default=200,
                     help="sessions per student per year (5/week x 40 weeks)")
-    ap.add_argument("--life", type=int, default=2, help="card life, years")
+    ap.add_argument("--life", type=int, default=LIFE_YEARS,
+                    help="useful life of the card, years (3 = hardware standard)")
+    ap.add_argument("--discount", type=float, default=DISCOUNT,
+                    help="social discount rate (education CEA commonly 0.03-0.05)")
     ap.add_argument("--think", type=int, default=30, help="student think seconds/turn")
     a = ap.parse_args()
 
     E = GPU_WATTS / 1000 * HOURS_DAY * SCHOOL_DAYS * KWH
-    print(f"Unit of output: one student-tutoring-hour (STH).")
-    print(f"Roll {a.students}, {a.sessions} sessions/student/yr, "
-          f"{a.think}s think time, card life {a.life}y.\n")
+    ann = K_CAPITAL * crf(a.discount, a.life)
+    print("Unit of output: one student-tutoring-hour (STH).")
+    print(f"Roll {a.students}, {a.sessions} sessions/student/yr, {a.think}s think time.")
+    print(f"Capital ${K_CAPITAL:,.0f} annualised over {a.life}y at {a.discount:.0%} "
+          f"= ${ann:,.0f}/yr (CRF {crf(a.discount, a.life):.4f}); "
+          f"electricity ${E:,.0f}/yr.\n")
 
     # --- demand side: how many STH the school actually consumes -------------
     print("DEMAND — hours of tutoring the school consumes")
@@ -149,7 +179,7 @@ def main():
         # hours at zero and report the over-subscribed option as cheap — the
         # 27B needs three cards at this roll, and its cost must say so.
         cards = math.ceil(Q / cap)
-        atc = (cards * K_CAPITAL / a.life + cards * E) / Q
+        atc = cards * (K_CAPITAL * crf(a.discount, a.life) + E) / Q
         tag = "fixed + ~0 marginal" + (f", {cards} cards" if cards > 1 else "")
         rows.append((f"on-device {arm}", atc, tag))
     for arm, c in COST_PER_SESSION.items():
@@ -169,7 +199,7 @@ def main():
     for arm, n in CONCURRENCY.items():
         _, _, Q = demand[arm]
         cards = math.ceil(Q / (n * HOURS_DAY * SCHOOL_DAYS))
-        atc = (cards * K_CAPITAL / a.life + cards * E) / Q
+        atc = cards * (K_CAPITAL * crf(a.discount, a.life) + E) / Q
         ce.append((f"on-device {arm}", atc, QUALITY[arm]))
     for arm, c in COST_PER_SESSION.items():
         hrs = session_minutes(arm, "maths", a.think) / 60
