@@ -185,6 +185,34 @@ def transcripts_jsonl(path):
     return n
 
 
+def concurrency():
+    """The GPU concurrency sweep: N simultaneous whole tutor responses vs latency.
+
+    Parsed from the sweep log so the workbook is self-contained — otherwise the
+    capacity section of the analysis is the one part a reader cannot reproduce
+    from the export alone.
+    """
+    import re
+    hdr = re.compile(r"^#+ (\S+) slots=(\d+)")
+    row = re.compile(r"^\s*(\d+)\s+\d+\s+([\d.]+)s\s+([\d.]+)s")
+    out, key = [], None
+    path = pathlib.Path("offline_eval/sweep_rtx3090_turnmode.log")
+    if not path.exists():
+        return pd.DataFrame()
+    for line in open(path):
+        h = hdr.match(line)
+        if h:
+            key = (h.group(1), int(h.group(2)))
+            continue
+        m = row.match(line)
+        if m and key:
+            out.append({"model": key[0], "parallel_slots": key[1],
+                        "concurrent_requests": int(m.group(1)),
+                        "response_seconds_p50": float(m.group(2)),
+                        "response_seconds_p95": float(m.group(3))})
+    return pd.DataFrame(out)
+
+
 def cost_summary(resp):
     rows = []
     for arm, g in resp[resp.arm.isin(PRICE_IN)].groupby("arm"):
@@ -213,6 +241,8 @@ CODEBOOK = [
     ("tutor_responses", "one row per tutor response from the engine trace: tokens, tools, verdict"),
     ("grades_long", "one row per graded session x dimension; LONG format"),
     ("cost_summary", "metered spend per cloud arm, derived from tutor_responses"),
+    ("concurrency", "GPU capacity sweep: N simultaneous tutor responses vs latency, "
+                    "measured on one RTX 3090"),
     ("codebook", "this sheet"),
     ("", ""),
     ("KEY TERMS", ""),
@@ -256,7 +286,8 @@ def main():
     code = pd.DataFrame(CODEBOOK, columns=["name", "meaning"])
 
     tables = {"transcripts": msgs, "sessions": sess, "tutor_responses": resp,
-              "grades_long": grades, "cost_summary": cost, "codebook": code}
+              "grades_long": grades, "cost_summary": cost,
+              "concurrency": concurrency(), "codebook": code}
     for name, df in tables.items():
         df.to_csv(OUT / f"{name}.csv", index=False)
 
