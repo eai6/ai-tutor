@@ -161,3 +161,141 @@ open.
 - Cost: `offline_eval/cloud_cost.py` over the same traces
 - Concurrency ceilings: `offline_eval/RTX3090_CAPACITY.md`
 - Boards: `offline_eval/multi_turn_results/{geo,math}_{4b_v2,27b_v2,27b_v3,cloud}`
+
+---
+
+## 6. Cost per student per year — capital against metered
+
+The two tiers are priced in different units, and the comparison only means
+something once both are per student per year.
+
+- **Cloud is metered.** Every session bills tokens. The school pays again for
+  every lesson, every year, forever.
+- **Offline is capital.** One RTX 3090 (~$2,500) is bought once and amortised
+  over the roll and the card's life. Cost per student *falls* as the school
+  grows — the opposite shape.
+
+Assumption: **80 sessions per student per year** (2/week x 40 weeks), and the
+mean of the two boards' per-session cost, since a real timetable mixes
+subjects.
+
+### Cloud
+
+| model | $/session | $/student/yr | 150 students | 300 students |
+|---|---:|---:|---:|---:|
+| claude-opus-4-7 | 0.456 | **$36.44** | $5,466 | $10,932 |
+| gemini-3.5-flash | 0.072 | **$5.76** | $864 | $1,728 |
+| gpt-5.4-mini | 0.040 | **$3.20** | $480 | $960 |
+
+### Offline — one RTX 3090
+
+| roll | card life | $/student/yr | total/yr |
+|---:|---:|---:|---:|
+| 150 | 1 year | **$17.20** | $2,580 |
+| 150 | 2 years | **$8.87** | $1,330 |
+| 300 | 1 year | **$8.60** | $2,580 |
+| 300 | 2 years | **$4.43** | $1,330 |
+
+($2,500 capital plus ~$80/yr electricity at 350W, 6h/day, 190 school days,
+$0.20/kWh.)
+
+### The result that matters, and it is not the convenient one
+
+**At a 150-300 student roll, the cheap cloud tier is cheaper than the GPU.**
+GPT-5.4-mini costs $3.20 per student per year against the card's $4.43 at its
+most favourable assumption (300 students, 2-year life) and $17.20 at its least.
+
+The crossover — the roll at which the card becomes cheaper:
+
+| model | 1-year card life | 2-year card life |
+|---|---:|---:|
+| claude-opus-4-7 | **71 students** | **36 students** |
+| gemini-3.5-flash | 448 | 231 |
+| gpt-5.4-mini | 806 | 416 |
+
+So the honest summary is split:
+
+- **Against a frontier model, the GPU wins easily.** Opus is beaten by the card
+  at any roll above ~71 students, and a 300-student school pays $10,932/yr for
+  Opus against $1,330 for the card.
+- **Against a cheap cloud tier, the GPU does not win on cost at this scale.**
+  GPT-5.4-mini beats one 3090 until roughly 400-800 students.
+
+**The offline case therefore does not rest on cost alone at 150-300 students.**
+It rests on what the metered tiers cannot offer: working without connectivity,
+no per-use bill that grows with adoption, no data leaving the school, and no
+exposure to price or availability changes. Those are the arguments the
+deployment stands on; cost parity with the cheap cloud tier is a supporting
+fact, not the headline.
+
+Quality changes this again, though — see below.
+
+---
+
+## 7. Quality, from 169 human grades (geography)
+
+Graded in the viewer's Grade tab against the 8 pedagogical dimensions of
+`ai_tutor/apps/benchmark/pedagogy.py`, all-or-nothing pass rule, zero sessions
+peeked.
+
+| arm | pass | rate | $/student/yr |
+|---|---:|---:|---:|
+| claude-opus-4-7 | 34/34 | **100%** | $36.44 |
+| **qwen3.8-27B (local)** | 33/34 | **97%** | **$4.43** |
+| gpt-5.4-mini | 29/33 | **88%** | $3.20 |
+| gemini-3.5-flash | 24/34 | **71%** | $5.76 |
+| **qwen3-4B (local)** | 23/34 | **68%** | **$4.43** |
+
+### Where each tier fails
+
+| dimension | Opus | Gemini | GPT | 4B | 27B |
+|---|---:|---:|---:|---:|---:|
+| revealing_answer | 0% | 3% | 9% | **32%** | 0% |
+| providing_guidance | 0% | **24%** | 3% | 0% | 0% |
+| actionability | 0% | 0% | 0% | **15%** | 0% |
+| coherence | 0% | 6% | 0% | 0% | 3% |
+
+Every arm scored 100% on mistake identification, mistake location, tutor tone
+and human-likeness. The tiers separate on two or three specific behaviours, not
+on general competence.
+
+**The 27B is the result.** At 97% it is within one session of Opus, beats both
+cheaper cloud models, and costs $4.43 per student per year against Opus's
+$36.44 — an eighth of the price for statistically indistinguishable teaching.
+
+**The 4B's weakness is specific.** Its dominant failure is *revealing the
+answer* (32%) — giving the answer instead of guiding to it. That is a prompt
+and policy behaviour, not a capability ceiling, and it is the same family as
+the low explanation-uptake finding. It is worth one targeted attempt before
+concluding the 4B cannot teach.
+
+### The capacity tension
+
+| arm | quality | concurrent students (30s turn budget) |
+|---|---:|---:|
+| qwen3.8-27B | 97% | **4** |
+| qwen3-4B | 68% | **48** |
+
+This is the deployment decision in one table. The 27B teaches nearly as well as
+a frontier model but serves four students at a time; the 4B serves forty-eight
+but reveals the answer in a third of sessions. Fixing the 4B's revealing-answer
+behaviour is worth more than any model swap available here — it is the only
+change that would give a full class frontier-adjacent tutoring on one card.
+
+**Caveat: this is geography only.** The maths grading is outstanding, and the
+maths board carries a known content ceiling (lessons 1141 and 1138) that will
+depress every arm.
+
+---
+
+## Figures
+
+| file | shows |
+|---|---|
+| `figures/fig1_latency.png` | per-turn latency by arm and subject, median with 95th-percentile whisker |
+| `figures/fig2_quality_vs_cost.png` | human pass rate against $/student/year |
+| `figures/fig3_crossover.png` | $/student/year vs roll, GPU curves against cloud lines |
+| `figures/fig4_dimensions.png` | per-dimension failure rate by arm |
+
+Regenerate with `python offline_eval/make_figures.py`; cost model in
+`offline_eval/cost_model.py`.
