@@ -13,17 +13,26 @@ students. Two run on one local GPU, three through cloud APIs.
 
 ## Files
 
-| file | rows | one row is |
+**`ai_tutor_geography_dataset.xlsx` is self-contained** — everything below is a
+sheet in it, transcripts included. The CSVs are the same tables for anyone who
+would rather load them directly.
+
+| sheet | rows | one row is |
 |---|---:|---|
-| `ai_tutor_geography_dataset.xlsx` | — | every table below as a sheet, plus the codebook |
-| `sessions.csv` | 170 | one tutoring session |
-| `messages.csv` | 2,882 | one message, tutor or student, in order |
-| `tutor_responses.csv` | 1,526 | one tutor response: tokens, tools, grading verdict |
-| `grades_long.csv` | 1,353 | one graded session × dimension |
-| `cost_summary.csv` | 3 | one cloud arm's metered spend |
-| `transcripts.jsonl` | 170 | one session, full conversation text |
+| `codebook` | 20 | field definitions — read first |
+| **`transcripts`** | **2,882** | **one message, in order, with the text itself** |
+| `sessions` | 170 | one tutoring session |
+| `tutor_responses` | 1,526 | one tutor response: tokens, tools, grading verdict |
+| `grades_long` | 1,353 | one graded session × dimension |
+| `cost_summary` | 3 | one cloud arm's metered spend |
+
+`transcripts_nested.jsonl` holds the same conversation text nested by session,
+for anyone who wants records rather than rows. The workbook does not need it.
 
 ## Three things to know before using it
+
+**To read a conversation**, filter `transcripts` to one `scenario_id` and one
+`arm`, then sort by `message_index`. Tutor and student messages alternate.
 
 **A "tutor response" is one message from the tutor, not an exchange.** A
 session with 7 tutor responses also holds 6–7 student messages. The
@@ -43,7 +52,7 @@ which the taxonomy treats as unscorable rather than failed.
 
 ```python
 import pandas as pd
-g = pd.read_csv("grades_long.csv")
+g = pd.read_excel("ai_tutor_geography_dataset.xlsx", sheet_name="grades_long")
 comp = g[g.grading_complete]
 (comp.groupby(["arm", "scenario_id"]).session_passes.first()
      .groupby("arm").agg(graded="size", passed="sum"))

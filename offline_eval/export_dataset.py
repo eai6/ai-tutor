@@ -8,9 +8,10 @@ flattens all of it into tidy tables, one row per observation, so it can be
 opened in a spreadsheet, read into R or Stata, or attached to a paper.
 
 Writes offline_eval/export/:
-    ai_tutor_geography_dataset.xlsx   every table as a sheet, plus a codebook
+    ai_tutor_geography_dataset.xlsx   SELF-CONTAINED: every table as a sheet,
+                                      including the transcripts and a codebook
     *.csv                             the same tables, one file each
-    transcripts.jsonl                 full conversation text, one session/line
+    transcripts_nested.jsonl          the same text nested by session
 
 GEOGRAPHY ONLY, matching the analysis. Two maths lessons hold fewer bank
 questions than a session consumes, so sessions there end on the turn cap rather
@@ -69,6 +70,11 @@ def sessions_and_messages():
                         "arm": arm, "tier": tier, "scenario_id": r.get("scenario_id"),
                         "message_index": i, "exchange_number": t.get("turn_number"),
                         "role": t.get("role"), "phase": t.get("phase"),
+                        # The message text itself. Longest in this corpus is
+                        # 1,073 characters against Excel's 32,767 cell limit,
+                        # so the transcript lives IN the workbook rather than
+                        # in a side file the reader has to reunite with it.
+                        "message": t.get("content") or "",
                         "latency_seconds": (round(t["latency_ms"] / 1000, 3)
                                             if t.get("latency_ms") is not None else None),
                         "characters": len(t.get("content") or ""),
@@ -175,8 +181,8 @@ def cost_summary(resp):
 
 
 CODEBOOK = [
+    ("transcripts", "one row per message, IN ORDER, with the message text itself"),
     ("sessions", "one row per tutoring session (34 per arm)"),
-    ("messages", "one row per message, tutor and student, in order"),
     ("tutor_responses", "one row per tutor response from the engine trace: tokens, tools, verdict"),
     ("grades_long", "one row per graded session x dimension; LONG format"),
     ("cost_summary", "metered spend per cloud arm, derived from tutor_responses"),
@@ -215,7 +221,7 @@ def main():
     cost = cost_summary(resp)
     code = pd.DataFrame(CODEBOOK, columns=["name", "meaning"])
 
-    tables = {"sessions": sess, "messages": msgs, "tutor_responses": resp,
+    tables = {"transcripts": msgs, "sessions": sess, "tutor_responses": resp,
               "grades_long": grades, "cost_summary": cost, "codebook": code}
     for name, df in tables.items():
         df.to_csv(OUT / f"{name}.csv", index=False)
@@ -227,13 +233,15 @@ def main():
             if name != "codebook":
                 df.to_excel(w, sheet_name=name[:31], index=False)
 
-    n = transcripts_jsonl(OUT / "transcripts.jsonl")
+    # JSONL kept for anyone who wants nested records; the workbook is
+    # self-contained without it.
+    n = transcripts_jsonl(OUT / "transcripts_nested.jsonl")
 
     print(f"  wrote {OUT}/\n")
     print(f"  {'table':<20}{'rows':>8}{'cols':>7}")
     for name, df in tables.items():
         print(f"  {name:<20}{len(df):>8}{len(df.columns):>7}")
-    print(f"  {'transcripts.jsonl':<20}{n:>8}{'':>7}  full conversation text")
+    print(f"  {'transcripts_nested':<20}{n:>8}{'':>7}  same text, nested JSONL")
     print(f"\n  workbook: {xlsx.name} ({xlsx.stat().st_size//1024} KB)")
     return 0
 

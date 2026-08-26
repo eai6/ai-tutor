@@ -1,6 +1,6 @@
 name,meaning
+transcripts,"one row per message, IN ORDER, with the message text itself"
 sessions,one row per tutoring session (34 per arm)
-messages,"one row per message, tutor and student, in order"
 tutor_responses,"one row per tutor response from the engine trace: tokens, tools, verdict"
 grades_long,one row per graded session x dimension; LONG format
 cost_summary,"metered spend per cloud arm, derived from tutor_responses"
