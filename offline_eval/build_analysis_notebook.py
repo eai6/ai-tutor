@@ -16,8 +16,8 @@ follows.
 
 ## What the data is
 
-Ten arms over two subject boards of 34 scenarios each, all on the same tutor
-build and the same simulated students:
+Five arms over one subject board (geography, 34 scenarios), all on the same
+tutor build and the same simulated students:
 
 | tier | arms |
 |---|---|
@@ -32,6 +32,11 @@ Raw inputs, all in this repository:
 - `manual_grades/manual_grades_3runs_169.json` — 169 human verdicts across 8
   pedagogical dimensions
 - `sweep_rtx3090_turnmode.log` — GPU concurrency sweep
+
+**Geography only.** The maths boards are excluded because two of their lessons
+hold fewer bank questions than a session consumes, so sessions end on the turn
+cap rather than on the tutor's behaviour — a content defect that would read as
+a model difference.
 
 ## A caution before the numbers
 
@@ -58,10 +63,12 @@ sys.path.insert(0, str(ROOT))
 LOCAL, CLOUD, GREY = "#1b6ca8", "#c0562f", "#777777"
 IS_LOCAL = lambda arm: arm.startswith("qwen")
 
-BOARDS = {
-    "geography": ["geo_4b_v2", "geo_27b_v2", "geo_cloud"],
-    "maths":     ["math_4b_v2", "math_27b_v3", "math_cloud"],
-}
+# GEOGRAPHY ONLY. The maths boards are excluded: two of their lessons hold
+# fewer bank questions than a session consumes, so sessions there end on the
+# turn cap rather than on the tutor's behaviour. Every arm is depressed by the
+# same content gap, so including them would price a content defect as a model
+# difference.
+BOARDS = {"geography": ["geo_4b_v2", "geo_27b_v2", "geo_cloud"]}
 print("repo root:", ROOT)
 print("boards found:", {k: [b for b in v if (RES/b).exists()] for k, v in BOARDS.items()})
 """)
@@ -162,36 +169,33 @@ lat_wide
 
 co(r"""
 arms = list(lat_wide.index)
-fig, ax = plt.subplots(figsize=(9, 4.6))
-w = 0.38
-for i, (off, subj, alpha) in enumerate(((-w/2, "geography", 1.0), (w/2, "maths", 0.62))):
-    p50 = [lat_wide.loc[a, ("p50", subj)] for a in arms]
-    p95 = [lat_wide.loc[a, ("p95", subj)] for a in arms]
-    ax.bar([x + off for x in range(len(arms))], p50, w,
-           yerr=[[0]*len(p50), [b - a for a, b in zip(p50, p95)]],
-           color=[LOCAL if IS_LOCAL(a) else CLOUD for a in arms],
-           alpha=alpha, capsize=3, error_kw={"ecolor": GREY, "lw": 1})
+fig, ax = plt.subplots(figsize=(8.4, 4.4))
+p50 = [lat_wide.loc[a, ("p50", "geography")] for a in arms]
+p95 = [lat_wide.loc[a, ("p95", "geography")] for a in arms]
+ax.bar(range(len(arms)), p50, 0.6,
+       yerr=[[0]*len(p50), [b - a for a, b in zip(p50, p95)]],
+       color=[LOCAL if IS_LOCAL(a) else CLOUD for a in arms],
+       capsize=4, error_kw={"ecolor": GREY, "lw": 1})
 from matplotlib.patches import Patch
-# Colour encodes local-vs-cloud, opacity encodes subject. Coloured legend
-# swatches would claim colour means subject, so the legend is neutral grey.
-ax.legend(handles=[Patch(facecolor=GREY, alpha=1.0, label="geography"),
-                   Patch(facecolor=GREY, alpha=0.62, label="maths")],
+ax.legend(handles=[Patch(facecolor=LOCAL, label="on-device (RTX 3090)"),
+                   Patch(facecolor=CLOUD, label="cloud API")],
           fontsize=9, frameon=False)
 ax.set_xticks(range(len(arms))); ax.set_xticklabels(arms, fontsize=8.5, rotation=12)
 ax.set_ylabel("seconds per tutor turn")
-ax.set_title("Tutor response latency — median, whisker to 95th percentile", fontsize=11)
+ax.set_title("Tutor response latency, geography — median, whisker to 95th pct",
+             fontsize=11)
 ax.axhline(30, ls="--", lw=1, color=GREY)
 ax.text(len(arms)-0.4, 31, "30s budget", fontsize=8, color=GREY, ha="right")
 for s in ("top", "right"): ax.spines[s].set_visible(False)
-fig.text(0.01, 0.02, "blue = on-device (RTX 3090)   orange = cloud API", fontsize=8, color=GREY)
-fig.tight_layout(rect=(0, 0.04, 1, 1)); fig.savefig("figures/fig1_latency.png", dpi=200)
+fig.tight_layout(); fig.savefig("figures/fig1_latency.png", dpi=200)
 fig
 """)
 
 md(r"""
-**The local 4B is not the slow option.** It beats Gemini Flash on both subjects
-and sits close to Opus. The slowest cloud arm is slower than the fastest local
-one — which is the opposite of the usual assumption about on-device inference.
+**The local 4B is not the slow option.** At 5.09s per turn it beats Gemini
+Flash (10.55s) and sits close to Opus (4.27s). The slowest cloud arm is slower
+than the faster local one — the opposite of the usual assumption about
+on-device inference.
 """)
 
 md(r"""
@@ -207,17 +211,27 @@ run negative.
 
 co(r"""
 PRICES = {"claude-opus-4-7": 5.00, "gemini-3.5-flash": 0.30, "gpt-5.4-mini": 0.25}
+OUT_PRICES = {"claude-opus-4-7": 25.00, "gemini-3.5-flash": 2.50, "gpt-5.4-mini": 2.00}
 CACHE_READ, CACHE_WRITE = 0.10, 1.25       # multiples of the input rate
+# Output tokens are not recorded by the tracer, so they are estimated from
+# reply length at ~4 chars/token plus ~25 tokens for call 1's tool selection.
+# They are only 6-8% of the bill, but omitting them understates every cloud
+# arm — and made this notebook disagree with cost_audit.py by $1.19.
+CHARS_PER_TOKEN, CALL1_OUT = 4.0, 25
 
 cloud = turns[turns.arm.isin(PRICES)]
+cloud = cloud.assign(out_tok=cloud.reply.str.len()/CHARS_PER_TOKEN + CALL1_OUT)
 cost = (cloud.groupby(["subject", "arm"])
         .agg(fresh=("tok_in", "sum"), cached=("tok_cached", "sum"),
-             written=("tok_write", "sum"), sessions=("session", "nunique"))
+             written=("tok_write", "sum"), out_tok=("out_tok", "sum"),
+             sessions=("session", "nunique"))
         .reset_index())
 rate = cost.arm.map(PRICES)
+out_rate = cost.arm.map(OUT_PRICES)
 cost["hit_%"] = (100 * cost.cached / (cost.fresh + cost.cached + cost.written)).round(0)
 cost["cost_usd"] = ((cost.fresh*rate + cost.cached*rate*CACHE_READ
-                   + cost.written*rate*CACHE_WRITE) / 1e6).round(2)
+                   + cost.written*rate*CACHE_WRITE
+                   + cost.out_tok*out_rate) / 1e6).round(2)
 cost["uncached_usd"] = ((cost.fresh + cost.cached + cost.written) * rate / 1e6).round(2)
 cost["usd_per_session"] = (cost.cost_usd / cost.sessions).round(4)
 display(cost)
@@ -253,17 +267,29 @@ co(r"""
 SESSIONS_PER_YEAR = 200      # 5/week x 40 weeks; the pilot expects 5-10/week
 GPU_CAPITAL, GPU_WATTS, KWH = 2500.0, 350.0, 0.20
 HOURS_DAY, SCHOOL_DAYS = 6, 190
+LIFE_YEARS, DISCOUNT = 3, 0.05
 POWER_YR = GPU_WATTS/1000 * HOURS_DAY * SCHOOL_DAYS * KWH
+
+def crf(r, n):
+    # Capital recovery factor. Spreads a lump sum over the asset's life while
+    # charging for the opportunity cost of the funds tied up in it; dividing
+    # capital by life omits that.
+    return 1/n if r <= 0 else r*(1+r)**n/((1+r)**n - 1)
+
+ANNUAL_CAPITAL = GPU_CAPITAL * crf(DISCOUNT, LIFE_YEARS)
+print(f"capital ${GPU_CAPITAL:,.0f} over {LIFE_YEARS}y at {DISCOUNT:.0%}"
+      f" -> ${ANNUAL_CAPITAL:,.0f}/yr + ${POWER_YR:,.0f} power"
+      f" = ${ANNUAL_CAPITAL+POWER_YR:,.0f}/yr")
 
 per_session = cost.groupby("arm")["usd_per_session"].mean()   # mixed timetable
 cloud_year = (per_session * SESSIONS_PER_YEAR).round(2)
 
-def gpu_year(students, years):
-    return (GPU_CAPITAL/years + POWER_YR) / students
+def gpu_year(students, years=LIFE_YEARS):
+    return (GPU_CAPITAL*crf(DISCOUNT, years) + POWER_YR) / students
 
 rows = [{"option": f"{a} (cloud)", "$/student/yr": v} for a, v in cloud_year.items()]
 for st in (150, 300):
-    for yr in (1, 2):
+    for yr in (2, 3):
         rows.append({"option": f"RTX 3090 — {st} students, {yr}y life",
                      "$/student/yr": round(gpu_year(st, yr), 2)})
 display(pd.DataFrame(rows).sort_values("$/student/yr").reset_index(drop=True))
@@ -274,7 +300,7 @@ print(f"electricity is ${POWER_YR:.0f}/yr — "
 co(r"""
 rolls = list(range(20, 901, 10))
 fig, ax = plt.subplots(figsize=(8.2, 4.8))
-for years, ls in ((1, "--"), (2, "-")):
+for years, ls in ((2, "--"), (3, "-")):
     ax.plot(rolls, [gpu_year(r, years) for r in rolls], ls, color=LOCAL, lw=2,
             label=f"RTX 3090, {years}-year life")
 # A band, not a line: usage is the dominant uncertainty and moves cloud cost 2x
@@ -304,7 +330,7 @@ cross = []
 for arm, ps in per_session.items():
     row = {"cloud model": arm}
     for sess in (200, 400):
-        for yr in (1, 2):
+        for yr in (2, 3):
             row[f"{sess}/yr, {yr}y card"] = round((GPU_CAPITAL/yr + POWER_YR)/(ps*sess))
     cross.append(row)
 pd.DataFrame(cross).set_index("cloud model")
@@ -464,10 +490,8 @@ md(r"""
 
 ### What this does not establish
 
-- **Geography only.** The maths grades are outstanding. The maths board also
-  carries a content ceiling — two lessons hold fewer MCQs than a session needs,
-  so sessions there hit the turn cap regardless of model. Discount those on
-  every arm.
+- **One subject.** All of this is geography. Whether the ranking holds on a
+  more reasoning-heavy subject is untested here.
 - **Assertions are not pedagogy.** The board `passed` column measures whether
   the machinery worked, nothing more.
 - **Neither cost column is a full TCO.** The GPU side excludes the host
