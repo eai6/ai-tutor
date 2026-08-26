@@ -1,0 +1,4 @@
+arm,price_input_per_1M,price_output_per_1M,tokens_input_fresh,tokens_input_cached,tokens_cache_write,tokens_output_estimated,sessions,billed_usd,usd_per_session
+claude-opus-4-7,5.0,25.0,1504857,4124127,415837,41884,34,13.2324,0.38919
+gemini-3.5-flash,0.3,2.5,5557243,244212,0,34996,34,1.762,0.05182
+gpt-5.4-mini,0.25,2.0,3613357,2209408,0,31253,34,1.0211,0.03003

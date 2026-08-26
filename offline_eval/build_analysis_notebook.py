@@ -236,15 +236,20 @@ cost = (cloud.groupby(["subject", "arm"])
 rate = cost.arm.map(PRICES)
 out_rate = cost.arm.map(OUT_PRICES)
 cost["hit_%"] = (100 * cost.cached / (cost.fresh + cost.cached + cost.written)).round(0)
-cost["cost_usd"] = ((cost.fresh*rate + cost.cached*rate*CACHE_READ
+cost["cost_exact"] = ((cost.fresh*rate + cost.cached*rate*CACHE_READ
                    + cost.written*rate*CACHE_WRITE
-                   + cost.out_tok*out_rate) / 1e6).round(2)
-cost["uncached_usd"] = ((cost.fresh + cost.cached + cost.written) * rate / 1e6).round(2)
+                   + cost.out_tok*out_rate) / 1e6)
+cost["cost_usd"] = cost.cost_exact.round(2)
+cost["uncached_exact"] = ((cost.fresh + cost.cached + cost.written) * rate
+                          + cost.out_tok*out_rate) / 1e6
+cost["uncached_usd"] = cost.uncached_exact.round(2)
 cost["usd_per_session"] = (cost.cost_usd / cost.sessions).round(4)
 display(cost)
-print(f"total metered spend  ${cost.cost_usd.sum():.2f}"
-      f"   uncached would be ${cost.uncached_usd.sum():.2f}"
-      f"   caching saved ${cost.uncached_usd.sum()-cost.cost_usd.sum():.2f}")
+# Totalled from unrounded values: summing the rounded per-arm column instead
+# accumulates rounding error and disagrees with the exported dataset by a cent.
+print(f"total metered spend  ${cost.cost_exact.sum():.2f}"
+      f"   uncached would be ${cost.uncached_exact.sum():.2f}"
+      f"   caching saved ${cost.uncached_exact.sum()-cost.cost_exact.sum():.2f}")
 """)
 
 md(r"""

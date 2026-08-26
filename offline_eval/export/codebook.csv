@@ -1,0 +1,21 @@
+name,meaning
+sessions,one row per tutoring session (34 per arm)
+messages,"one row per message, tutor and student, in order"
+tutor_responses,"one row per tutor response from the engine trace: tokens, tools, verdict"
+grades_long,one row per graded session x dimension; LONG format
+cost_summary,"metered spend per cloud arm, derived from tutor_responses"
+codebook,this sheet
+,
+KEY TERMS,
+tutor response,ONE message from the tutor. Not an exchange: a session with 7 tutor responses also holds 6-7 student messages.
+exchange_number,the transcript's own turn_number: a tutor message and the student reply share one value.
+tier,on-device (RTX 3090) or cloud API
+at_desideratum,"TRUE if the verdict matches the dimension's target. NULL for n/a, which the taxonomy treats as unscorable, NOT as a failure."
+session_passes,TRUE only if EVERY applicable dimension is at its desideratum (all-or-nothing). NULL if the grading is incomplete.
+grading_complete,FALSE if fewer than 8 dimensions were answered. Exclude these: an unanswered dimension is not a 'no'.
+peeked,"the judge's grade was revealed before grading finished; such a session measures anchoring, not independent judgement."
+assertions_passed,"deterministic checks only (session ran, tools fired, grading resolved). NOT a measure of teaching quality."
+tokens_input_*,"the three input buckets are DISJOINT: a provider's input_tokens excludes cached tokens, so prompt size is their sum."
+tokens_output_estimated,not recorded by the tracer; estimated from reply length at ~4 chars/token plus ~25 tokens for the tool call.
+,
+SCOPE,"Geography only, 5 arms x 34 scenarios. Grades cover geography boards."

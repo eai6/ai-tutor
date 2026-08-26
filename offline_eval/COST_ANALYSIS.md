@@ -47,6 +47,7 @@ each bill.
 | claude-opus-4-7 | $13.23 | $0.389 | $31.27 | 58% |
 | gemini-3.5-flash | $1.76 | $0.052 | $1.83 | 4% |
 | gpt-5.4-mini | $1.02 | $0.030 | $1.52 | 33% |
+| **total** | **$16.02** | | **$34.62** | **54%** |
 
 **Per session is the number that scales.** A school pays it again for every
 session, every year; it does not fall with volume.

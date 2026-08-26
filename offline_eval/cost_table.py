@@ -69,6 +69,7 @@ def main():
     print("TABLE 3 — What the run cost")
     print("=" * 72)
     print(f"  {'model':<20}{'billed':>10}{'per session':>13}{'if uncached':>13}{'saved':>9}")
+    tot_billed = tot_unc = 0.0
     for arm, u in usage.items():
         p = PRICES[arm]
         billed = (u["fresh"] * p["in"]
@@ -77,8 +78,14 @@ def main():
                   + u["out"] * p["out"]) / 1e6
         unc = ((u["fresh"] + u["cached"] + u["written"]) * p["in"]
                + u["out"] * p["out"]) / 1e6
+        tot_billed += billed
+        tot_unc += unc
         print(f"  {arm:<20}{billed:>10.2f}{billed/SESSIONS:>13.4f}"
               f"{unc:>13.2f}{100*(1-billed/unc):>8.0f}%")
+    # Totalled from the UNROUNDED values. Summing the 2dp column instead
+    # accumulates rounding error and reported $16.01 against a true $16.02.
+    print(f"  {'total':<20}{tot_billed:>10.2f}{'':<13}{tot_unc:>13.2f}"
+          f"{100*(1-tot_billed/tot_unc):>8.0f}%")
     print("\n  'per session' is the number that scales: a school pays it again for")
     print("  every session, every year. It does not fall with volume.")
 
