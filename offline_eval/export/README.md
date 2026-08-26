@@ -29,6 +29,19 @@ would rather load them directly.
 `transcripts_nested.jsonl` holds the same conversation text nested by session,
 for anyone who wants records rather than rows. The workbook does not need it.
 
+## When it was run
+
+All five arms ran on **2026-08-24**; grading was recorded on **2026-08-25**.
+
+`run_date`, `run_started_at` and `run_finished_at` in `sessions` time the
+**arm**, not the individual session — the boards carry no per-session clock, so
+every session in one arm shares those values. `graded_at` in `grades_long` *is*
+per session.
+
+`git_sha` records the commit behind each run. The two on-device arms ran on
+earlier commits than the three cloud arms; the engine was unchanged between
+them, but the sha is there so that is checkable rather than taken on trust.
+
 ## Three things to know before using it
 
 **`session_id` joins every sheet.** All four data sheets carry it, and it is

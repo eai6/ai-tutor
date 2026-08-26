@@ -15,6 +15,10 @@ tier,on-device (RTX 3090) or cloud API
 session_id,"the tutoring session. One scenario produces exactly ONE session per arm in this run (170 sessions, 170 distinct arm x scenario pairs, none repeated), so session_id and scenario_id identify the same thing here. Use session_id to join to tutor_responses."
 scenario_id,the test case that was run. Names the situation being tested; the same scenario is run once per arm.
 persona,the simulated student's behaviour profile for that scenario.
+run_date / run_started_at / run_finished_at,"when the ARM was run, not the individual session — the boards carry no per-session clock, so every session in one arm shares these values. All five arms ran on 2026-08-24."
+git_sha,"the commit that produced the run. The on-device arms ran on earlier commits than the cloud arms; the engine was unchanged between them, but the sha is recorded so that is checkable rather than asserted."
+tutor_model_spec,the provider/model string the harness was given.
+graded_date / graded_at,"when the human grading was recorded. Unlike the run clock this IS per session. Grading ran 2026-08-25, the day after the sessions."
 at_desideratum,"TRUE if the verdict matches the dimension's target. NULL for n/a, which the taxonomy treats as unscorable, NOT as a failure."
 session_passes,TRUE only if EVERY applicable dimension is at its desideratum (all-or-nothing). NULL if the grading is incomplete.
 grading_complete,FALSE if fewer than 8 dimensions were answered. Exclude these: an unanswered dimension is not a 'no'.

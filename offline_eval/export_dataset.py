@@ -51,7 +51,13 @@ def sessions_and_messages():
             if os.path.basename(f).startswith("partial_"):
                 continue                       # resume checkpoints, not boards
             arm = os.path.basename(f)[:-5]
-            for r in json.load(open(f)).get("results", []):
+            d = json.load(open(f))
+            # The boards timestamp the RUN, not each session — there is no
+            # per-session clock in the data. Recorded as run_* so nobody reads
+            # a session-level time into it, with the date split out for
+            # filtering and git_sha for the code version that produced it.
+            started, finished = d.get("started_at"), d.get("finished_at")
+            for r in d.get("results", []):
                 tr = r.get("transcript", [])
                 tutor = [t for t in tr if t.get("role") == "tutor"]
                 lat = [t["latency_ms"] / 1000 for t in tutor
@@ -62,6 +68,12 @@ def sessions_and_messages():
                     "scenario_id": r.get("scenario_id"),
                     "lesson_id": r.get("lesson_id"),
                     "persona": r.get("persona"),
+                    "run_date": (started or "")[:10] or None,
+                    "run_started_at": started,
+                    "run_finished_at": finished,
+                    "git_sha": d.get("git_sha"),
+                    "tutor_model_spec": d.get("tutor_model"),
+                    "engine": d.get("engine"),
                     "assertions_passed": r.get("passed"),
                     "tutor_responses": len(tutor),
                     "student_messages": sum(1 for t in tr if t.get("role") == "student"),
@@ -155,6 +167,8 @@ def grades_long():
                 "grading_complete": complete,
                 "peeked": bool(v.get("peeked")),
                 "session_passes": (P.session_passes(v["d"]) if complete else None),
+                # Unlike the run clock, the grading clock IS per session.
+                "graded_date": (v.get("ts") or "")[:10] or None,
                 "graded_at": v.get("ts"),
             })
     return pd.DataFrame(rows)
@@ -267,6 +281,18 @@ CODEBOOK = [
     ("scenario_id", "the test case that was run. Names the situation being tested; "
                     "the same scenario is run once per arm."),
     ("persona", "the simulated student's behaviour profile for that scenario."),
+    ("run_date / run_started_at / run_finished_at",
+     "when the ARM was run, not the individual session — the boards carry no "
+     "per-session clock, so every session in one arm shares these values. All "
+     "five arms ran on 2026-08-24."),
+    ("git_sha", "the commit that produced the run. The on-device arms ran on "
+                "earlier commits than the cloud arms; the engine was unchanged "
+                "between them, but the sha is recorded so that is checkable "
+                "rather than asserted."),
+    ("tutor_model_spec", "the provider/model string the harness was given."),
+    ("graded_date / graded_at", "when the human grading was recorded. Unlike the run "
+                                "clock this IS per session. Grading ran 2026-08-25, the "
+                                "day after the sessions."),
     ("at_desideratum", "TRUE if the verdict matches the dimension's target. NULL for "
                        "n/a, which the taxonomy treats as unscorable, NOT as a failure."),
     ("session_passes", "TRUE only if EVERY applicable dimension is at its desideratum "
