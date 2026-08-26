@@ -10,6 +10,11 @@ opened in a spreadsheet, read into R or Stata, or attached to a paper.
 Writes offline_eval/export/:
     ai_tutor_geography_dataset.xlsx   SELF-CONTAINED: every table as a sheet,
                                       including the transcripts and a codebook
+
+No cost sheet: the measured quantity is tokens, and it is in tutor_responses.
+Turning tokens into money needs list prices that move, cache multipliers, and
+an estimate of the output tokens the tracer never recorded — assumptions softer
+than the rest of the data, and better made by whoever needs the figure.
     *.csv                             the same tables, one file each
     transcripts_nested.jsonl          the same text nested by session
 
@@ -38,9 +43,6 @@ BOARDS = {"geo_4b_v2": "on-device", "geo_27b_v2": "on-device", "geo_cloud": "clo
 GRADES = "offline_eval/manual_grades/manual_grades_3runs_169.json"
 OUT = pathlib.Path("offline_eval/export")
 
-PRICE_IN = {"claude-opus-4-7": 5.00, "gemini-3.5-flash": 0.30, "gpt-5.4-mini": 0.25}
-PRICE_OUT = {"claude-opus-4-7": 25.00, "gemini-3.5-flash": 2.50, "gpt-5.4-mini": 2.00}
-CACHE_READ, CACHE_WRITE, CHARS_PER_TOKEN, CALL1_OUT = 0.10, 1.25, 4.0, 25
 
 
 def sessions_and_messages():
@@ -227,34 +229,17 @@ def concurrency():
     return pd.DataFrame(out)
 
 
-def cost_summary(resp):
-    rows = []
-    for arm, g in resp[resp.arm.isin(PRICE_IN)].groupby("arm"):
-        out_tok = g.reply_characters.sum() / CHARS_PER_TOKEN + CALL1_OUT * len(g)
-        pi, po = PRICE_IN[arm], PRICE_OUT[arm]
-        billed = (g.tokens_input_fresh.sum() * pi
-                  + g.tokens_input_cached.sum() * pi * CACHE_READ
-                  + g.tokens_cache_write.sum() * pi * CACHE_WRITE
-                  + out_tok * po) / 1e6
-        rows.append({
-            "arm": arm, "price_input_per_1M": pi, "price_output_per_1M": po,
-            "tokens_input_fresh": int(g.tokens_input_fresh.sum()),
-            "tokens_input_cached": int(g.tokens_input_cached.sum()),
-            "tokens_cache_write": int(g.tokens_cache_write.sum()),
-            "tokens_output_estimated": int(out_tok),
-            "sessions": g.session_id.nunique(),
-            "billed_usd": round(billed, 4),
-            "usd_per_session": round(billed / g.session_id.nunique(), 5),
-        })
-    return pd.DataFrame(rows)
-
-
 CODEBOOK = [
     ("transcripts", "one row per message, IN ORDER, with the message text itself"),
     ("sessions", "one row per tutoring session (34 per arm)"),
     ("tutor_responses", "one row per tutor response from the engine trace: tokens, tools, verdict"),
     ("grades_long", "one row per graded session x dimension; LONG format"),
-    ("cost_summary", "metered spend per cloud arm, derived from tutor_responses"),
+    ("(no cost sheet)", "deliberate. The measured quantity is TOKENS, in "
+                        "tutor_responses. Converting them to dollars needs list "
+                        "prices that change, cache-rate multipliers, and an ESTIMATE "
+                        "of output tokens the tracer never recorded — so the money "
+                        "figure is softer than the rest of this dataset and is left "
+                        "to whoever needs it, with their own prices."),
     ("concurrency", "GPU capacity sweep: N simultaneous tutor responses vs latency, "
                     "measured on one RTX 3090. The ONLY sheet not drawn from the "
                     "tutoring sessions — it is a synthetic load test, so it has no "
@@ -317,12 +302,11 @@ def main():
     sess, msgs = sessions_and_messages()
     resp = responses()
     grades = grades_long()
-    cost = cost_summary(resp)
     code = pd.DataFrame(CODEBOOK, columns=["name", "meaning"])
 
     tables = {"transcripts": msgs, "sessions": sess, "tutor_responses": resp,
-              "grades_long": grades, "cost_summary": cost,
-              "concurrency": concurrency(), "codebook": code}
+              "grades_long": grades, "concurrency": concurrency(),
+              "codebook": code}
     for name, df in tables.items():
         df.to_csv(OUT / f"{name}.csv", index=False)
 

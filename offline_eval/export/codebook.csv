@@ -3,7 +3,7 @@ transcripts,"one row per message, IN ORDER, with the message text itself"
 sessions,one row per tutoring session (34 per arm)
 tutor_responses,"one row per tutor response from the engine trace: tokens, tools, verdict"
 grades_long,one row per graded session x dimension; LONG format
-cost_summary,"metered spend per cloud arm, derived from tutor_responses"
+(no cost sheet),"deliberate. The measured quantity is TOKENS, in tutor_responses. Converting them to dollars needs list prices that change, cache-rate multipliers, and an ESTIMATE of output tokens the tracer never recorded — so the money figure is softer than the rest of this dataset and is left to whoever needs it, with their own prices."
 concurrency,"GPU capacity sweep: N simultaneous tutor responses vs latency, measured on one RTX 3090. The ONLY sheet not drawn from the tutoring sessions — it is a synthetic load test, so it has no session_id and does not join to the other sheets."
 qwen3-4b-ctx8k,"the same 4B weights as qwen3-4b-jetson with an 8,192-token context instead of 16,384. Ollama allocates context PER PARALLEL SLOT, so halving it fits 24 slots in the same 24 GB rather than 12 — that is what produces the 48-concurrent figure. NOTE: quality was measured at 16k context and capacity at 8k, so those two results come from different configurations of the same model."
 codebook,this sheet

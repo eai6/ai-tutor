@@ -27,7 +27,6 @@ simulated students. Two run on one local GPU; three through cloud APIs.
 | `sessions` | 170 | one tutoring session |
 | `tutor_responses` | 1,526 | one tutor response: tokens, tools, verdict |
 | `grades_long` | 1,353 | one graded session × dimension |
-| `cost_summary` | 3 | one cloud arm's metered spend |
 | `concurrency` | 10 | one load level on the GPU sweep |
 
 A **tutor response** is one message from the tutor, not an exchange: a session
@@ -162,6 +161,10 @@ pd.DataFrame([{"model": m, "input": PRICE_IN[m], "output": PRICE_OUT[m],
 """)
 
 co(r"""
+# Computed here rather than shipped in the export. The measured quantity is
+# TOKENS; the dollar figure needs list prices that move, cache multipliers, and
+# an ESTIMATE of the output tokens the tracer never recorded. Keeping the
+# derivation visible is more honest than presenting a cost column as data.
 cl = responses[responses.arm.isin(PRICE_IN)].copy()
 cl["tokens_output_est"] = cl.reply_characters/CHARS_PER_TOKEN + CALL1_OUT
 cost = (cl.groupby("arm").agg(

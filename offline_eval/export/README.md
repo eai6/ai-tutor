@@ -24,10 +24,16 @@ would rather load them directly.
 | `sessions` | 170 | one tutoring session — with `persona` and `lesson_id` |
 | `tutor_responses` | 1,526 | one tutor response: tokens, tools, grading verdict |
 | `grades_long` | 1,353 | one graded session × dimension |
-| `cost_summary` | 3 | one cloud arm's metered spend |
 
 `transcripts_nested.jsonl` holds the same conversation text nested by session,
 for anyone who wants records rather than rows. The workbook does not need it.
+
+**There is no cost sheet, deliberately.** The measured quantity is tokens, and
+those are in `tutor_responses` — fresh input, cached input, cache writes, and
+the reply length in characters. Converting them to money needs list prices that
+change, cache-rate multipliers, and an estimate of output tokens the tracer
+never recorded. That is softer than the rest of this dataset, so the conversion
+is left to whoever needs it, with prices they can defend.
 
 ## When it was run
 
