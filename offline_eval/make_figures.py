@@ -2,7 +2,7 @@
 
     python offline_eval/make_figures.py            # -> offline_eval/figures/*.png
 
-Every series is measured. Latency comes from the per-turn traces, quality from
+Every series is measured. Latency comes from the per-response traces, quality from
 the 169 hand grades, cloud cost from the metered token buckets, GPU cost from
 the capital model in cost_model.py. Nothing here is illustrative.
 """
@@ -67,7 +67,7 @@ def fig_latency():
                error_kw={"ecolor": GREY, "lw": 1})
     ax.set_xticks(list(x))
     ax.set_xticklabels([a.replace(" (local)", "\n(local)") for a in arms], fontsize=9)
-    ax.set_ylabel("seconds per tutor turn")
+    ax.set_ylabel("seconds per tutor response")
     ax.set_title("Tutor response latency — median, whisker to 95th percentile",
                  fontsize=11)
     ax.axhline(30, ls="--", lw=1, color=GREY)

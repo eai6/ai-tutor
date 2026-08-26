@@ -6,7 +6,7 @@ produce it. The two are therefore reported in the units they actually have,
 rather than forced onto a common denominator.
 
 All figures are from the geography board, 34 sessions per arm, computed by
-`offline_eval/cost_table.py` from the per-turn traces.
+`offline_eval/cost_table.py` from the per-response traces.
 
 ---
 
@@ -52,10 +52,10 @@ each bill.
 session, every year; it does not fall with volume.
 
 Gemini's caching barely engages — 4% saved against Opus's 58%. On a workload
-that re-sends the same static prefix every turn, cache reads should dominate
-after the first turn of a session. It costs little at Flash prices, but the
-same behaviour on a more expensive model would re-bill the whole prefix on
-every turn.
+that re-sends the same static prefix on every tutor response, cache reads
+should dominate after the first response of a session. It costs little at Flash
+prices, but the same behaviour on a more expensive model would re-bill the
+whole prefix every time.
 
 ---
 

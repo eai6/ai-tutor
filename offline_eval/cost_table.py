@@ -8,7 +8,7 @@ size. On-device tutoring has no per-token price at all — the marginal cost of
 a session is the electricity to produce it — so it is reported as the capital
 required, and not forced onto a per-token basis it does not have.
 
-Token counts come from the per-turn traces in
+Token counts come from the per-response traces in
 multi_turn_results/geo_cloud/trace/. Output tokens are not recorded by the
 tracer and are estimated from reply length; they are 6-8% of each bill.
 """

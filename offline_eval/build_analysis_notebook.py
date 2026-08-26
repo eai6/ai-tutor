@@ -10,7 +10,7 @@ def co(t): C.append(nbf.v4.new_code_cell(t.strip()))
 md(r"""
 # Offline vs cloud LLM tutoring — latency, cost and teaching quality
 
-Everything below is **recomputed from raw per-turn transcripts**, not from
+Everything below is **recomputed from the raw transcripts**, not from
 copied figures. Change a board, re-run the notebook, and every table and chart
 follows.
 
@@ -27,7 +27,7 @@ tutor build and the same simulated students:
 Raw inputs, all in this repository:
 
 - `multi_turn_results/<board>/trace/<arm>.jsonl` — one JSON object per tutor
-  turn: latency, token buckets, tools called, the reply itself
+  RESPONSE: token buckets, tools called, the reply itself
 - `multi_turn_results/<board>/<arm>.json` — per-scenario pass/fail
 - `manual_grades/manual_grades_3runs_169.json` — 169 human verdicts across 8
   pedagogical dimensions
@@ -78,12 +78,19 @@ md(r"""
 
 Two sources, because they record different things:
 
-- **`trace/<arm>.jsonl`** — one object per tutor turn from the engine: token
-  buckets, tools called, retries, the reply. This is where cost comes from.
+- **`trace/<arm>.jsonl`** — one object per tutor RESPONSE from the engine:
+  token buckets, tools called, retries, the reply. This is where cost comes
+  from.
 - **`<arm>.json`** — the board, whose `transcript` array carries `latency_ms`
   per message. This is where latency comes from, and it is timed around the
-  whole turn as the simulated student experienced it: both model calls plus
-  the platform's grading and database work between them.
+  whole tutor response as the simulated student experienced it: both model
+  calls plus the platform's grading and database work between them.
+
+A **tutor response** is one message from the tutor. The transcript alternates
+tutor and student messages, so a session of 7 tutor responses contains 7 tutor
+messages and 6-7 student replies. Student messages are excluded from the
+latency figures: the student side is the simulator, not the system under
+test.
 
 Reading latency off the trace would silently yield nothing — the field is not
 there — so the two are loaded separately rather than assumed to be one table.
@@ -132,17 +139,17 @@ def load_latency():
 
 turns = load_turns()
 msgs = load_latency()
-print(f"{len(turns):,} traced turns across {turns.arm.nunique()} arms")
+print(f"{len(turns):,} traced tutor responses across {turns.arm.nunique()} arms")
 print(f"{len(msgs):,} timed messages "
       f"({(msgs.role=='tutor').sum():,} tutor, {(msgs.role=='student').sum():,} student)")
 turns.groupby(["subject", "arm"]).agg(
-    turns=("session", "size"), sessions=("session", "nunique"),
+    responses=("session", "size"), sessions=("session", "nunique"),
     placeholders=("placeholder", "sum"), retries=("retries", "sum"))
 """)
 
 md(r"""
 **Zero placeholders and zero retries everywhere** is the first thing to check.
-A placeholder means a turn fell back to a canned reply after a failed call; any
+A placeholder means a response fell back to canned text after a failed call; any
 non-zero count would mean the latency and quality numbers are measuring a
 degraded system rather than the real one.
 """)
@@ -159,7 +166,7 @@ co(r"""
 TUTOR_ROLE = "tutor"      # transcript roles are tutor/student
 lat = (msgs[msgs.role == TUTOR_ROLE]
             .groupby(["subject", "arm"])["sec"]
-            .agg(turns="size", p50="median",
+            .agg(responses="size", p50="median",
                  p95=lambda s: s.quantile(0.95), max="max")
             .round(2).reset_index())
 lat_wide = lat.pivot(index="arm", columns="subject",
@@ -181,7 +188,7 @@ ax.legend(handles=[Patch(facecolor=LOCAL, label="on-device (RTX 3090)"),
                    Patch(facecolor=CLOUD, label="cloud API")],
           fontsize=9, frameon=False)
 ax.set_xticks(range(len(arms))); ax.set_xticklabels(arms, fontsize=8.5, rotation=12)
-ax.set_ylabel("seconds per tutor turn")
+ax.set_ylabel("seconds per tutor response")
 ax.set_title("Tutor response latency, geography — median, whisker to 95th pct",
              fontsize=11)
 ax.axhline(30, ls="--", lw=1, color=GREY)
@@ -192,7 +199,7 @@ fig
 """)
 
 md(r"""
-**The local 4B is not the slow option.** At 5.09s per turn it beats Gemini
+**The local 4B is not the slow option.** At 5.09s per response it beats Gemini
 Flash (10.55s) and sits close to Opus (4.27s). The slowest cloud arm is slower
 than the faster local one — the opposite of the usual assumption about
 on-device inference.
@@ -242,10 +249,10 @@ print(f"total metered spend  ${cost.cost_usd.sum():.2f}"
 
 md(r"""
 Note **Gemini's cache barely engages** (single-digit hit rate) against Opus's
-~70%. On a workload that re-sends the same static prefix every turn, reads
-should dominate after the first turn of a session. It costs little at Flash
+~70%. On a workload that re-sends the same static prefix every response,
+reads should dominate after the first one of a session. It costs little at Flash
 prices, but the same behaviour on a heavier tier would re-bill the whole prefix
-every turn.
+every response.
 """)
 
 md(r"""
@@ -381,7 +388,8 @@ md(r"""
 ## 5. Concurrency — how many students one card serves
 
 From `sweep_rtx3090_turnmode.log`. Each level fires N simultaneous **whole
-turns** (the short tool-picking call, then the full reply) and reports how
+tutor responses** (the short tool-picking call, then the full reply) and
+reports how
 latency degrades. Requests beyond the server's slot count queue rather than
 fail, so N can exceed the slots.
 """)
@@ -401,7 +409,7 @@ for line in open(ROOT / "offline_eval" / "sweep_rtx3090_turnmode.log"):
 sweep = pd.DataFrame(sweep)
 display(sweep)
 
-BUDGET = 30.0    # seconds a student will wait for one tutor turn
+BUDGET = 30.0    # seconds a student will wait for one tutor response
 cap = (sweep[sweep.turn_p50 <= BUDGET].groupby("model")["N"].max()
        .rename(f"max concurrent @{BUDGET:.0f}s median").to_frame())
 cap[f"@{BUDGET:.0f}s 95th pct"] = sweep[sweep.turn_p95 <= BUDGET].groupby("model")["N"].max()
