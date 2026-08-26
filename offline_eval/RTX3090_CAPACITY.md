@@ -18,6 +18,14 @@ the 27B.
 platform gap" below before planning against them.** A real tutor response on the same
 box measured 14.9s where the benchmark measures 8.9s.
 
+**One caveat on the 4B.** The capacity sweep ran `qwen3-4b-ctx8k` — the same
+weights with an 8,192-token context instead of the 16,384 used for the tutoring
+sessions. Context is allocated per parallel slot, so halving it fits 24 slots
+in 24 GB rather than 12, which is what produces the 48-student figure. The
+measured median prompt is ~5,200 tokens, so 8,192 clears prompt and reply
+comfortably — but quality was measured at 16k and capacity at 8k, so the two
+results come from different configurations of the same model.
+
 ---
 
 ## Method
