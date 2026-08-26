@@ -168,11 +168,20 @@ def fig_dimensions(comp, dims):
     short = {"qwen3-4b-jetson": "4B (local)", "qwen3.8-27b-instruct": "27B (local)",
              "claude-opus-4-7": "Opus 4.7", "gemini-3.5-flash": "Gemini Flash",
              "gpt-5.4-mini": "GPT-5.4-mini"}
-    keep = [d for d in dims
-            if any(sum(1 for k, r in comp.items()
-                       if k.split("|")[1] == a and r["d"][d] not in ("n/a", DES.get(d)))
-                   for a in arms)]
-    fig, ax = plt.subplots(figsize=(8.6, 4.4))
+    # All eight, including the four nobody fails. Dropping them would report
+    # only where the models differ and hide the equally useful result that none
+    # failed to identify a mistake, locate it, stay encouraging or sound human.
+    keep = list(dims)
+    # One shade per arm, within a family: blues on-device, warm cloud. The
+    # previous version gave all three cloud arms the SAME orange, so their
+    # legend swatches were identical and a reader could not tell which bar was
+    # which — the legend claimed a distinction the colours did not make.
+    SHADE = {
+        "qwen3-4b-jetson": "#7fb3d5", "qwen3.8-27b-instruct": "#15476b",
+        "gemini-3.5-flash": "#f0b48a", "gpt-5.4-mini": "#d97742",
+        "claude-opus-4-7": "#8c2f11",
+    }
+    fig, ax = plt.subplots(figsize=(10.2, 4.6))
     w = 0.8 / len(arms)
     for i, a in enumerate(arms):
         vals = []
@@ -181,20 +190,18 @@ def fig_dimensions(comp, dims):
             sc = [x for x in rs if x != "n/a"]
             vals.append(100 * sum(1 for x in sc if x != DES.get(d)) / len(sc) if sc else 0)
         ax.bar([j + i*w - 0.4 for j in range(len(keep))], vals, w,
-               label=short.get(a, a),
-               color=LOCAL if "qwen" in a else CLOUD,
-               alpha=1.0 if "qwen" in a else 0.55)
+               label=short.get(a, a), color=SHADE.get(a, GREY))
     ax.set_xticks(range(len(keep)))
-    ax.set_xticklabels([k.replace("_", "\n") for k in keep], fontsize=9)
+    ax.set_xticklabels([k.replace("_", "\n") for k in keep], fontsize=8)
     ax.set_ylabel("% of sessions failing the dimension")
-    ax.set_title("Where each tier fails — only dimensions with any failure shown",
-                 fontsize=11)
-    ax.legend(fontsize=8.5, frameon=False, ncol=3)
+    ax.set_title("Failure rate on all eight pedagogical dimensions", fontsize=11)
+    ax.legend(fontsize=8, frameon=False, ncol=5)
     ax.grid(axis="y", alpha=0.25, ls=":")
     for s in ("top", "right"): ax.spines[s].set_visible(False)
     fig.text(0.01, 0.02,
-             "four dimensions omitted: every arm scored 100% on mistake identification, "
-             "location, tone and human-likeness", fontsize=8, color=GREY)
+             "zero bars are a result, not missing data: every arm scored 100% on "
+             "mistake identification, mistake location, tone and human-likeness",
+             fontsize=8, color=GREY)
     fig.tight_layout(rect=(0, 0.05, 1, 1))
     fig.savefig(OUT / "fig4_dimensions.png", dpi=200)
 

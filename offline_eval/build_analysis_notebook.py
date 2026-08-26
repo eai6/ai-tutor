@@ -314,18 +314,21 @@ for k, v in complete.items():
         recs.append({"arm": arm, "dimension": dim, "fail": val != DES.get(dim)})
 fails = (pd.DataFrame(recs).groupby(["dimension", "arm"])["fail"]
          .mean().mul(100).round(0).unstack(fill_value=0))
-fails = fails.loc[fails.max(axis=1) > 0]      # hide dimensions nobody failed
+# All eight are shown, including the four every arm passes. A table that hides
+# them reports only where models differ and loses the equally useful finding
+# that no model failed to spot a mistake, locate it, stay encouraging, or
+# sound human. Rows are ordered as pedagogy.py asks them, not by failure rate.
+fails = fails.reindex([d.key for d in P.DIMENSIONS]).fillna(0)
+fails["desideratum"] = [DES[k] for k in fails.index]
 display(fails)
-print("dimensions omitted (every arm at 100%):",
-      sorted(set(DES) - set(fails.index)))
 """)
 
 co(r"""
-ax = fails.T.plot(kind="bar", figsize=(9, 4.4), width=0.8,
+ax = fails.drop(columns="desideratum").T.plot(kind="bar", figsize=(10, 4.4), width=0.82,
                   color=["#1b6ca8", "#c0562f", "#e0a080", "#4a90c4"])
 ax.set_ylabel("% of sessions failing the dimension")
-ax.set_title("Where each tier fails — only dimensions with any failure shown", fontsize=11)
-ax.legend(fontsize=8.5, frameon=False, ncol=4, title=None)
+ax.set_title("Failure rate on all eight pedagogical dimensions", fontsize=11)
+ax.legend(fontsize=8, frameon=False, ncol=5, title=None)
 ax.grid(axis="y", alpha=0.25, ls=":")
 for s in ("top", "right"): ax.spines[s].set_visible(False)
 plt.xticks(rotation=12, fontsize=9); plt.tight_layout()
@@ -341,7 +344,7 @@ different fixes — so the verdicts are shown as recorded.
 
 co(r"""
 detail = []
-for dim in fails.index:
+for dim in [d.key for d in P.DIMENSIONS]:
     for arm, vs in complete_by_arm.items():
         c = collections.Counter(v["d"][dim] for v in vs)
         for val, n in c.items():
