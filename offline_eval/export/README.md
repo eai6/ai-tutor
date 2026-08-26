@@ -21,7 +21,7 @@ would rather load them directly.
 |---|---:|---|
 | `codebook` | 20 | field definitions — read first |
 | **`transcripts`** | **2,882** | **one message, in order, with the text itself** |
-| `sessions` | 170 | one tutoring session |
+| `sessions` | 170 | one tutoring session — with `persona` and `lesson_id` |
 | `tutor_responses` | 1,526 | one tutor response: tokens, tools, grading verdict |
 | `grades_long` | 1,353 | one graded session × dimension |
 | `cost_summary` | 3 | one cloud arm's metered spend |
@@ -31,8 +31,15 @@ for anyone who wants records rather than rows. The workbook does not need it.
 
 ## Three things to know before using it
 
-**To read a conversation**, filter `transcripts` to one `scenario_id` and one
-`arm`, then sort by `message_index`. Tutor and student messages alternate.
+**`session_id` joins every sheet.** All four data sheets carry it, and it is
+the key to use: filter `transcripts` to one `session_id` and sort by
+`message_index` to read that conversation; the same id gives you its 8 grade
+rows and its tutor responses.
+
+**One scenario produced exactly one session per arm** — 170 sessions, 170
+distinct arm × scenario pairs, none run twice. So `session_id` and
+`scenario_id` identify the same thing in this dataset. `scenario_id` names the
+situation being tested; `session_id` names the run of it.
 
 **A "tutor response" is one message from the tutor, not an exchange.** A
 session with 7 tutor responses also holds 6–7 student messages. The

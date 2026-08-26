@@ -58,7 +58,10 @@ def sessions_and_messages():
                        if t.get("latency_ms") is not None]
                 srows.append({
                     "arm": arm, "tier": tier, "board": board,
+                    "session_id": r.get("session_id"),
                     "scenario_id": r.get("scenario_id"),
+                    "lesson_id": r.get("lesson_id"),
+                    "persona": r.get("persona"),
                     "assertions_passed": r.get("passed"),
                     "tutor_responses": len(tutor),
                     "student_messages": sum(1 for t in tr if t.get("role") == "student"),
@@ -67,7 +70,9 @@ def sessions_and_messages():
                 })
                 for i, t in enumerate(tr):
                     mrows.append({
-                        "arm": arm, "tier": tier, "scenario_id": r.get("scenario_id"),
+                        "arm": arm, "tier": tier,
+                        "session_id": r.get("session_id"),
+                        "scenario_id": r.get("scenario_id"),
                         "message_index": i, "exchange_number": t.get("turn_number"),
                         "role": t.get("role"), "phase": t.get("phase"),
                         # The message text itself. Longest in this corpus is
@@ -108,8 +113,28 @@ def responses():
     return pd.DataFrame(rows)
 
 
+def scenario_to_session():
+    """(arm, scenario_id) -> session_id.
+
+    One scenario produces exactly one session per arm in this run — verified,
+    not assumed: 170 sessions, 170 distinct (arm, scenario_id) pairs, no
+    scenario run twice. The grade file keys on scenario, so session_id is
+    joined in rather than left for the reader to reconstruct.
+    """
+    m = {}
+    for board in BOARDS:
+        for f in sorted(glob.glob(f"{RES}/{board}/*.json")):
+            if os.path.basename(f).startswith("partial_"):
+                continue
+            arm = os.path.basename(f)[:-5]
+            for r in json.load(open(f)).get("results", []):
+                m[(arm, r.get("scenario_id"))] = r.get("session_id")
+    return m
+
+
 def grades_long():
     """One row per graded session x dimension. Long, not wide."""
+    s2s = scenario_to_session()
     g = json.load(open(GRADES))
     dims = g["dimensions"]
     des = {d.key: d.desideratum for d in P.DIMENSIONS}
@@ -121,7 +146,9 @@ def grades_long():
         complete = len(v.get("d", {})) == len(dims)
         for dim, val in v.get("d", {}).items():
             rows.append({
-                "arm": arm, "board": run, "scenario_id": scenario,
+                "arm": arm, "board": run,
+                "session_id": s2s.get((arm, scenario)),
+                "scenario_id": scenario,
                 "dimension": dim, "verdict": val,
                 "desideratum": des.get(dim),
                 "at_desideratum": None if val == "n/a" else (val == des.get(dim)),
@@ -194,6 +221,13 @@ CODEBOOK = [
     ("exchange_number", "the transcript's own turn_number: a tutor message and the "
                         "student reply share one value."),
     ("tier", "on-device (RTX 3090) or cloud API"),
+    ("session_id", "the tutoring session. One scenario produces exactly ONE session "
+                   "per arm in this run (170 sessions, 170 distinct arm x scenario "
+                   "pairs, none repeated), so session_id and scenario_id identify the "
+                   "same thing here. Use session_id to join to tutor_responses."),
+    ("scenario_id", "the test case that was run. Names the situation being tested; "
+                    "the same scenario is run once per arm."),
+    ("persona", "the simulated student's behaviour profile for that scenario."),
     ("at_desideratum", "TRUE if the verdict matches the dimension's target. NULL for "
                        "n/a, which the taxonomy treats as unscorable, NOT as a failure."),
     ("session_passes", "TRUE only if EVERY applicable dimension is at its desideratum "

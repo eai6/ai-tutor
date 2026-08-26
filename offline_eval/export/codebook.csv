@@ -10,6 +10,9 @@ KEY TERMS,
 tutor response,ONE message from the tutor. Not an exchange: a session with 7 tutor responses also holds 6-7 student messages.
 exchange_number,the transcript's own turn_number: a tutor message and the student reply share one value.
 tier,on-device (RTX 3090) or cloud API
+session_id,"the tutoring session. One scenario produces exactly ONE session per arm in this run (170 sessions, 170 distinct arm x scenario pairs, none repeated), so session_id and scenario_id identify the same thing here. Use session_id to join to tutor_responses."
+scenario_id,the test case that was run. Names the situation being tested; the same scenario is run once per arm.
+persona,the simulated student's behaviour profile for that scenario.
 at_desideratum,"TRUE if the verdict matches the dimension's target. NULL for n/a, which the taxonomy treats as unscorable, NOT as a failure."
 session_passes,TRUE only if EVERY applicable dimension is at its desideratum (all-or-nothing). NULL if the grading is incomplete.
 grading_complete,FALSE if fewer than 8 dimensions were answered. Exclude these: an unanswered dimension is not a 'no'.
