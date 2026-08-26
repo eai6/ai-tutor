@@ -249,106 +249,24 @@ every turn.
 """)
 
 md(r"""
-### 3.2 Cost per student per year
+### 3.2 On-device: capital, not a per-token price
 
-The tiers are priced in different units, and the comparison only means
-something once both are per student per year.
+| item | cost |
+|---|---:|
+| NVIDIA RTX 3090, 24 GB | **$2,500**, one-off |
 
-- **Cloud is metered** — every session bills tokens; the school pays again
-  every year, forever.
-- **Offline is capital** — one card bought once, amortised over the roll and
-  its life. Cost per student *falls* as the school grows.
+Both on-device models run on this one card, so the hardware cost is the same
+whichever is deployed, and there is no per-token charge at all.
 
-`SESSIONS_PER_YEAR` scales the cloud column and leaves the GPU column
-untouched, so it decides the comparison on its own. **Change it first.**
-""")
-
-co(r"""
-SESSIONS_PER_YEAR = 200      # 5/week x 40 weeks; the pilot expects 5-10/week
-GPU_CAPITAL, GPU_WATTS, KWH = 2500.0, 350.0, 0.20
-HOURS_DAY, SCHOOL_DAYS = 6, 190
-LIFE_YEARS, DISCOUNT = 3, 0.05
-POWER_YR = GPU_WATTS/1000 * HOURS_DAY * SCHOOL_DAYS * KWH
-
-def crf(r, n):
-    # Capital recovery factor. Spreads a lump sum over the asset's life while
-    # charging for the opportunity cost of the funds tied up in it; dividing
-    # capital by life omits that.
-    return 1/n if r <= 0 else r*(1+r)**n/((1+r)**n - 1)
-
-ANNUAL_CAPITAL = GPU_CAPITAL * crf(DISCOUNT, LIFE_YEARS)
-print(f"capital ${GPU_CAPITAL:,.0f} over {LIFE_YEARS}y at {DISCOUNT:.0%}"
-      f" -> ${ANNUAL_CAPITAL:,.0f}/yr + ${POWER_YR:,.0f} power"
-      f" = ${ANNUAL_CAPITAL+POWER_YR:,.0f}/yr")
-
-per_session = cost.groupby("arm")["usd_per_session"].mean()   # mixed timetable
-cloud_year = (per_session * SESSIONS_PER_YEAR).round(2)
-
-def gpu_year(students, years=LIFE_YEARS):
-    return (GPU_CAPITAL*crf(DISCOUNT, years) + POWER_YR) / students
-
-rows = [{"option": f"{a} (cloud)", "$/student/yr": v} for a, v in cloud_year.items()]
-for st in (150, 300):
-    for yr in (2, 3):
-        rows.append({"option": f"RTX 3090 — {st} students, {yr}y life",
-                     "$/student/yr": round(gpu_year(st, yr), 2)})
-display(pd.DataFrame(rows).sort_values("$/student/yr").reset_index(drop=True))
-print(f"electricity is ${POWER_YR:.0f}/yr — "
-      f"{100*POWER_YR/(GPU_CAPITAL/2+POWER_YR):.0f}% of a 2-year-life total")
-""")
-
-co(r"""
-rolls = list(range(20, 901, 10))
-fig, ax = plt.subplots(figsize=(8.2, 4.8))
-for years, ls in ((2, "--"), (3, "-")):
-    ax.plot(rolls, [gpu_year(r, years) for r in rolls], ls, color=LOCAL, lw=2,
-            label=f"RTX 3090, {years}-year life")
-# A band, not a line: usage is the dominant uncertainty and moves cloud cost 2x
-# across 5-10 sessions/week, while the GPU curves do not move at all.
-for arm, ps in per_session.items():
-    lo, hi = ps*200, ps*400
-    ax.fill_between([0, 900], lo, hi, color=CLOUD, alpha=0.13, lw=0)
-    ax.plot([0, 900], [lo, lo], color=CLOUD, lw=1.3, alpha=0.9)
-    ax.text(360, hi*1.06, arm, fontsize=8, color=CLOUD, ha="left")
-ax.axvspan(150, 300, color=GREY, alpha=0.12)
-ax.text(225, ax.get_ylim()[1]*0.55, "typical\nschool roll", fontsize=8.5,
-        color=GREY, ha="center")
-ax.set_yscale("log"); ax.set_xlim(0, 900)
-ax.set_xlabel("students sharing one GPU"); ax.set_ylabel("$ per student per year (log)")
-ax.set_title("Where a bought GPU beats a metered API", fontsize=11)
-ax.legend(fontsize=9, frameon=False, loc="lower left"); ax.grid(alpha=0.25, ls=":")
-for s in ("top", "right"): ax.spines[s].set_visible(False)
-fig.text(0.01, 0.02, "shaded band = 5 to 10 sessions per student per week; "
-         "GPU curves do not move with usage", fontsize=8, color=GREY)
-fig.tight_layout(rect=(0, 0.05, 1, 1)); fig.savefig("figures/fig3_crossover.png", dpi=200)
-fig
-""")
-
-co(r"""
-# Crossover: the roll at which the card becomes cheaper than each cloud tier.
-cross = []
-for arm, ps in per_session.items():
-    row = {"cloud model": arm}
-    for sess in (200, 400):
-        for yr in (2, 3):
-            row[f"{sess}/yr, {yr}y card"] = round((GPU_CAPITAL/yr + POWER_YR)/(ps*sess))
-    cross.append(row)
-pd.DataFrame(cross).set_index("cloud model")
+That is the whole difference. A metered service is paid for again with every
+session; a bought card is paid for once. Going further — cost per student per
+year, or a break-even against teacher time — needs assumptions about usage
+intensity, card lifetime and wage levels that this study did not measure, and
+those assumptions would drive the answer more than anything measured here.
 """)
 
 md(r"""
-**Below the crossover the cloud is genuinely cheaper** — the card is idle
-capital. Above it the GPU wins and keeps winning, because the cloud bill
-repeats every year while the card is already paid for.
-
-At 5–10 sessions/week and a 150–300 roll the card beats every cloud tier with
-one exception: a 150-student school replacing the card annually, against the
-cheapest cloud model. At 2 sessions/week the answer flips — which is why usage
-belongs in the paper as a stated assumption, not a hidden constant.
-""")
-
-md(r"""
-## 4. Teaching quality — 169 human grades
+## 4. Teaching quality — the central result
 
 Graded in the viewer's Grade tab against the eight dimensions of
 `ai_tutor/apps/benchmark/pedagogy.py`. A session passes only if **every
@@ -368,6 +286,10 @@ DIMS = G["dimensions"]
 complete = {k: v for k, v in G["verdicts"].items() if len(v.get("d", {})) == len(DIMS)}
 print(f"{len(G['verdicts'])} verdicts stored, {len(complete)} complete, "
       f"{sum(1 for v in complete.values() if v.get('peeked'))} peeked")
+
+complete_by_arm = collections.defaultdict(list)
+for k, v in complete.items():
+    complete_by_arm[k.split("|")[1]].append(v)
 
 qual = collections.defaultdict(lambda: [0, 0])
 for k, v in complete.items():
@@ -410,32 +332,46 @@ plt.xticks(rotation=12, fontsize=9); plt.tight_layout()
 plt.savefig("figures/fig4_dimensions.png", dpi=200); plt.gcf()
 """)
 
+md(r"""
+A single failure rate hides *how* a dimension failed. `to_some_extent` is a
+tutor being vague; `no` is a tutor being wrong; `yes_correct` on
+`revealing_answer` is a tutor handing over the answer. Different problems,
+different fixes — so the verdicts are shown as recorded.
+""")
+
 co(r"""
-# Quality against cost — the trade-off in one view.
-fig, ax = plt.subplots(figsize=(7.6, 5))
-gpu_cost_2y_300 = gpu_year(300, 2)
-placed = []
-for _, r in quality.iterrows():
-    arm = r["arm"]
-    x = cloud_year.get(arm, gpu_cost_2y_300)
-    col = LOCAL if IS_LOCAL(arm) else CLOUD
-    ax.scatter(x, r["pass_rate_%"], s=150, color=col, zorder=3,
-               edgecolor="white", lw=1.5)
-    # Nudge labels apart: the two local arms share an x (one shared card).
-    dy = -34 if (any(abs(x-px) < 1 and abs(r['pass_rate_%']-py) > 20
-                     for px, py in placed) and r['pass_rate_%'] < 80) else 16
-    ax.annotate(f"{arm}\n{r['pass_rate_%']:.0f}%", (x, r["pass_rate_%"]),
-                textcoords="offset points", xytext=(0, dy), ha="center", fontsize=8.5)
-    placed.append((x, r["pass_rate_%"]))
-ax.set_xscale("log"); ax.set_xlabel("$ per student per year (log)")
-ax.set_ylabel("human-graded pass rate, geography (%)")
-ax.set_title("Teaching quality against cost per student", fontsize=11)
-ax.set_ylim(55, 112); ax.grid(alpha=0.25, ls=":")
-for s in ("top", "right"): ax.spines[s].set_visible(False)
-fig.text(0.01, 0.02, f"local at 300-student roll, 2-year card life; "
-         f"cloud at {SESSIONS_PER_YEAR} sessions/student/year", fontsize=8, color=GREY)
-fig.tight_layout(rect=(0, 0.04, 1, 1)); fig.savefig("figures/fig2_quality_vs_cost.png", dpi=200)
-fig
+detail = []
+for dim in fails.index:
+    for arm, vs in complete_by_arm.items():
+        c = collections.Counter(v["d"][dim] for v in vs)
+        for val, n in c.items():
+            if val not in ("n/a", DES[dim]):
+                detail.append({"dimension": dim, "arm": arm,
+                               "verdict recorded": val, "sessions": n})
+pd.DataFrame(detail).sort_values(["dimension", "sessions"],
+                                 ascending=[True, False]).reset_index(drop=True)
+""")
+
+md(r"""
+**Every arm scored 100% on four of the eight dimensions** — mistake
+identification, mistake location, tutor tone and human-likeness. No model
+struggled to spot an error, locate it, stay encouraging, or sound human.
+
+All separation is in the other four, and each tier fails differently:
+
+- **qwen3-4B** hands over the answer in 32% of sessions (11 of 34, every one of
+  them the *correct* answer) and is vague about the next step in 15%. It knows
+  the answer and tells the student — a failure of pedagogical restraint, not of
+  capability.
+- **Gemini 3.5 Flash** gives only partial guidance in 24% of sessions — the
+  largest single weakness of any arm, and why a cloud model finishes below an
+  on-device one.
+- **qwen3.8-27B** fails once, on coherence, across 34 sessions.
+- **Opus 4.7** does not fail on any dimension.
+
+Because the gap is a few specific behaviours rather than general competence, it
+is the kind of thing prompt and policy can address — the practically important
+finding for anyone deploying the smaller model.
 """)
 
 md(r"""
@@ -483,21 +419,25 @@ md(r"""
 
 | | |
 |---|---|
-| **Latency** | the local 4B beats two of three cloud arms; the 27B is the slowest local option |
-| **Cost** | at 5–10 sessions/week the card beats every cloud tier at a 150–300 roll, bar one corner case |
-| **Quality** | the local 27B reaches 97% against Opus's 100% — at a fraction of the cost |
-| **Capacity** | but the 27B serves ~4 concurrent students; the 4B serves ~48 at 68% quality |
+| **Quality** | the on-device 27B reaches 97% against Opus's 100%, and beats both cheaper cloud models |
+| **Failure modes** | all separation sits in 4 of 8 dimensions; every arm is perfect on the other 4 |
+| **Latency** | the on-device 4B beats two of three cloud arms |
+| **Cost** | cloud is metered per session and repeats; the card is $2,500 once |
+| **Capacity** | the 27B serves ~4 concurrent students, the 4B ~48 |
 
 ### What this does not establish
 
 - **One subject.** All of this is geography. Whether the ranking holds on a
   more reasoning-heavy subject is untested here.
-- **Assertions are not pedagogy.** The board `passed` column measures whether
-  the machinery worked, nothing more.
-- **Neither cost column is a full TCO.** The GPU side excludes the host
-  machine, networking, physical security and teacher time; the cloud side
-  excludes the internet connection an offline deployment exists to avoid
-  needing.
+- **Tutoring quality, not learning.** The grades record whether experts judged
+  the tutoring sound. Whether students learn more would need a controlled
+  trial, which this is not.
+- **No total cost of ownership.** The cost section reports published token
+  prices, what this run consumed, and the price of the card. It deliberately
+  stops short of cost per student per year, which would need assumptions about
+  usage, card lifetime and staff time that were not measured.
+- **One grader.** 169 sessions, no second rater, so no inter-rater
+  reliability figure.
 """)
 
 nb["cells"] = C
