@@ -175,19 +175,21 @@ something once both are per student per year.
   over the roll and the card's life. Cost per student *falls* as the school
   grows — the opposite shape.
 
-Assumption: **80 sessions per student per year** (2/week x 40 weeks), and the
-mean of the two boards' per-session cost, since a real timetable mixes
-subjects.
+**Usage assumption: 5-10 tutoring sessions per student per week**, i.e.
+200-400 per year over 40 teaching weeks. This single number scales the entire
+cloud column and leaves the GPU column untouched, so it decides the comparison
+on its own. Figures below use 200/yr (the low end); the 400/yr column is given
+alongside.
 
-### Cloud
+### Cloud, at 200 and 400 sessions/student/year
 
-| model | $/session | $/student/yr | 150 students | 300 students |
+| model | $/session | $/student/yr @200 | @400 | 300 students @200 |
 |---|---:|---:|---:|---:|
-| claude-opus-4-7 | 0.456 | **$36.44** | $5,466 | $10,932 |
-| gemini-3.5-flash | 0.072 | **$5.76** | $864 | $1,728 |
-| gpt-5.4-mini | 0.040 | **$3.20** | $480 | $960 |
+| claude-opus-4-7 | 0.456 | **$91.10** | $182.20 | $27,330 |
+| gemini-3.5-flash | 0.072 | **$14.40** | $28.80 | $4,320 |
+| gpt-5.4-mini | 0.040 | **$8.00** | $16.00 | $2,400 |
 
-### Offline — one RTX 3090
+### Offline — one RTX 3090, unchanged by usage
 
 | roll | card life | $/student/yr | total/yr |
 |---:|---:|---:|---:|
@@ -197,40 +199,39 @@ subjects.
 | 300 | 2 years | **$4.43** | $1,330 |
 
 ($2,500 capital plus ~$80/yr electricity at 350W, 6h/day, 190 school days,
-$0.20/kWh.)
+$0.20/kWh. Electricity is under 6% of the total, so even a 3x tariff error
+moves the per-student figure by well under a dollar.)
 
-### The result that matters, and it is not the convenient one
+### At this usage the GPU wins at school scale
 
-**At a 150-300 student roll, the cheap cloud tier is cheaper than the GPU.**
-GPT-5.4-mini costs $3.20 per student per year against the card's $4.43 at its
-most favourable assumption (300 students, 2-year life) and $17.20 at its least.
+The crossover — the roll above which the card is cheaper:
 
-The crossover — the roll at which the card becomes cheaper:
+| model | @200/yr, 1-yr card | @200/yr, 2-yr | @400/yr, 1-yr | @400/yr, 2-yr |
+|---|---:|---:|---:|---:|
+| claude-opus-4-7 | **28** | **15** | **14** | **7** |
+| gemini-3.5-flash | 179 | 92 | 90 | 46 |
+| gpt-5.4-mini | 322 | 166 | 161 | 83 |
 
-| model | 1-year card life | 2-year card life |
-|---|---:|---:|
-| claude-opus-4-7 | **71 students** | **36 students** |
-| gemini-3.5-flash | 448 | 231 |
-| gpt-5.4-mini | 806 | 416 |
+At a 150-300 roll and 5-10 sessions/week:
 
-So the honest summary is split:
+- **Against Opus it is not close.** A 300-student school pays $27,330-$54,660
+  a year for Opus against $1,330 for a 2-year card — a factor of 20 to 40.
+- **Against Gemini Flash the card wins throughout** the school-roll band on a
+  2-year life, and above ~180 students on a 1-year life.
+- **Against GPT-5.4-mini, the cheapest cloud tier, the card wins** at 300
+  students on either card life, and at 150 students on a 2-year life. The one
+  case it loses is a 150-student school replacing the card annually — an
+  unusually harsh assumption.
 
-- **Against a frontier model, the GPU wins easily.** Opus is beaten by the card
-  at any roll above ~71 students, and a 300-student school pays $10,932/yr for
-  Opus against $1,330 for the card.
-- **Against a cheap cloud tier, the GPU does not win on cost at this scale.**
-  GPT-5.4-mini beats one 3090 until roughly 400-800 students.
+**This reverses the picture at low usage.** At the 2 sessions/week first
+modelled, GPT-5.4-mini was cheaper than the card at every school-scale roll and
+the offline case had to rest on connectivity and data residency alone. At the
+pilot's actual 5-10/week, the cost case stands on its own: cloud spend scales
+with every lesson taught, and the card does not. Usage is the pivot, and it is
+worth stating in the paper as such rather than presenting one figure.
 
-**The offline case therefore does not rest on cost alone at 150-300 students.**
-It rests on what the metered tiers cannot offer: working without connectivity,
-no per-use bill that grows with adoption, no data leaving the school, and no
-exposure to price or availability changes. Those are the arguments the
-deployment stands on; cost parity with the cheap cloud tier is a supporting
-fact, not the headline.
-
-Quality changes this again, though — see below.
-
----
+Connectivity, no bill that grows with adoption, and data staying in the school
+remain true, and they are now supporting arguments rather than the whole case.
 
 ## 7. Quality, from 169 human grades (geography)
 

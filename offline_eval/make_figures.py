@@ -37,7 +37,7 @@ COST_SESSION = {           # $/session, mean of the two boards
     "claude-opus-4-7": 0.456, "gemini-3.5-flash": 0.072, "gpt-5.4-mini": 0.040,
 }
 GPU_CAPITAL, GPU_POWER_YR = 2500.0, 80.0
-SESSIONS_YR = 80
+SESSIONS_YR = 200          # 5 sessions/week x 40 weeks — the pilot's low end
 
 
 def grades():
@@ -120,7 +120,7 @@ def fig_quality_cost(g):
     ax.grid(alpha=0.25, ls=":")
     for s in ("top", "right"): ax.spines[s].set_visible(False)
     fig.text(0.01, 0.02,
-             "local at 300-student roll, 2-year card life; cloud at 80 sessions/student/year",
+             "local at 300-student roll, 2-year card life; cloud at 200 sessions/student/year (5/week)",
              fontsize=8, color=GREY)
     fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(OUT / "fig2_quality_vs_cost.png", dpi=200)
@@ -133,10 +133,17 @@ def fig_crossover():
         y = [(GPU_CAPITAL / years + GPU_POWER_YR) / r for r in rolls]
         ax.plot(rolls, y, ls, color=LOCAL, lw=2,
                 label=f"RTX 3090, {years}-year life")
+    # A band, not a line: usage is the dominant uncertainty and it moves the
+    # cloud cost by 2x across the pilot's stated 5-10 sessions/week, while
+    # leaving the GPU curves untouched. Drawing one line would hide the very
+    # sensitivity that decides the comparison.
     for m, c in COST_SESSION.items():
-        v = c * SESSIONS_YR
-        ax.axhline(v, color=CLOUD, lw=1.4, alpha=0.85)
-        ax.text(880, v * 1.06, m, fontsize=8, color=CLOUD, ha="right")
+        lo, hi = c * 200, c * 400
+        ax.fill_between([0, 900], lo, hi, color=CLOUD, alpha=0.13, lw=0)
+        ax.plot([0, 900], [lo, lo], color=CLOUD, lw=1.3, alpha=0.9)
+        # Left-aligned: the legend sits top-right and the Opus band runs
+        # along the top, so a right-aligned label lands underneath it.
+        ax.text(360, hi * 1.06, m, fontsize=8, color=CLOUD, ha="left")
     ax.axvspan(150, 300, color=GREY, alpha=0.12)
     ax.text(225, 60, "typical\nschool roll", fontsize=8.5, color=GREY,
             ha="center", va="top")
@@ -144,10 +151,14 @@ def fig_crossover():
     ax.set_xlabel("students sharing one GPU")
     ax.set_ylabel("$ per student per year  (log scale)")
     ax.set_title("Where a bought GPU beats a metered API", fontsize=11)
-    ax.legend(fontsize=9, frameon=False, loc="upper right")
+    ax.set_xlim(0, 900)
+    ax.legend(fontsize=9, frameon=False, loc="lower left")
     ax.grid(alpha=0.25, ls=":")
     for s in ("top", "right"): ax.spines[s].set_visible(False)
-    fig.tight_layout()
+    fig.text(0.01, 0.02,
+             "shaded band = 5 to 10 tutoring sessions per student per week; "
+             "GPU curves do not move with usage", fontsize=8, color=GREY)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
     fig.savefig(OUT / "fig3_crossover.png", dpi=200)
 
 

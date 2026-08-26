@@ -49,9 +49,15 @@ def gpu_cost_per_student_year(students, years, hours_per_school_day=6,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sessions", type=int, default=80,
+    # 200 = 5 sessions/week x 40 weeks, the low end of the pilot's expected
+    # 5-10/week. This single number scales the ENTIRE cloud column and leaves
+    # the GPU column untouched, so it decides the comparison on its own: at the
+    # 80/yr first assumed, the cheap cloud tier beat the card at school scale;
+    # at 200 the card wins. It is the first thing to check against a real
+    # timetable, and the first thing a reviewer should ask about.
+    ap.add_argument("--sessions", type=int, default=200,
                     help="tutoring sessions per student per year "
-                         "(default 80 = 2/week x 40 weeks)")
+                         "(default 200 = 5/week x 40 weeks; 400 = 10/week)")
     args = ap.parse_args()
     S = args.sessions
 
