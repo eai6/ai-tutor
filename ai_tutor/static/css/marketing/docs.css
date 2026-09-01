@@ -1,0 +1,837 @@
+/* ==========================================================================
+   Documentation — the country adoption playbook
+   ==========================================================================
+   Two page shapes on one set of rules:
+
+     the index    a masthead, a search field, and six cards in two labelled
+                  bands — Part I for ministries, Part II for their technical
+                  teams. The bands are the document's own division, and it is
+                  the single most useful thing to tell a reader before they
+                  pick a link, because half the document is not addressed to
+                  them.
+
+     a section    a contents rail and a measured column of prose, with the
+                  document's tables, shell blocks and boxed asides.
+
+   The through-line is the numbering. Every section carries the label the Word
+   document gives it — 1…12, A…H, A1…A3 — in the mono face, and that label is
+   the same object in the card list, the contents list, the page heading and
+   the pager. It is not decoration: a reader who arrives on section F from a
+   search needs to know that F is a technical appendix, not chapter six.
+
+   Layered on marketing/landing.css, which already owns .lp-header, .lp-wrap
+   and .lp-footer. Colour comes from shared/tokens.css and nothing here
+   introduces a literal.
+   ========================================================================== */
+
+.docs {
+    /* Wider than the landing page's 68rem. This is a document with eleven-
+       column cost tables in it; at the marketing measure they scroll from the
+       first row, which is where a reader stops trusting them. */
+    --lp-max: 78rem;
+    --docs-measure: 44rem;
+}
+
+.docs-page {
+    padding-block: var(--space-10) var(--space-12);
+}
+
+/* --------------------------------------------------------------------------
+   Header link
+   ------------------------------------------------------------------------
+   Lives in landing.css's header, so it is defined against that geometry: a
+   quiet text link between the wordmark and the two sign-in buttons, which
+   keeps the buttons the only filled things up there.
+   -------------------------------------------------------------------------- */
+.lp-header__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-left: var(--space-6);
+}
+
+.lp-header__link {
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: var(--space-2) 0;
+    border-bottom: 2px solid transparent;
+    transition: color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out);
+}
+
+.lp-header__link:hover { color: var(--text); }
+
+.lp-header__link[aria-current="page"] {
+    color: var(--primary-ink);
+    border-bottom-color: var(--primary);
+}
+
+.lp-header__link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-xs);
+}
+
+/* --------------------------------------------------------------------------
+   Masthead
+   -------------------------------------------------------------------------- */
+.docs-masthead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-8);
+    flex-wrap: wrap;
+}
+
+.docs-masthead__titles { flex: 1 1 26rem; min-width: 0; }
+
+.docs-masthead h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+    margin: 0;
+    color: var(--text);
+}
+
+.docs-masthead__lede {
+    margin: var(--space-3) 0 0;
+    max-width: 46rem;
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    color: var(--text-secondary);
+}
+
+/* ---------------------------------------------------------------- search */
+.docs-search { flex: 0 1 22rem; padding-top: var(--space-2); }
+
+.docs-search__label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.docs-search__field {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border-field);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.docs-search__field:focus-within {
+    border-color: var(--primary);
+    box-shadow: var(--focus-halo);
+}
+
+.docs-search__field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    color: var(--text);
+}
+
+.docs-search__field input:focus { outline: none; }
+
+.docs-search__go {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    border: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+}
+
+.docs-search__go:hover { background: var(--surface-hover); color: var(--text); }
+.docs-search__go:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+
+.docs-search__status {
+    margin: var(--space-4) 0 0;
+    font-size: var(--text-base);
+    color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   Meta row and breadcrumb
+   ------------------------------------------------------------------------
+   Right-aligned above the breadcrumb, the way a documentation site puts its
+   page-level actions. Every item here is real: a version, where you are, two
+   companion documents and print.
+   -------------------------------------------------------------------------- */
+.docs-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-5);
+    margin-top: var(--space-8);
+    font-size: var(--text-base);
+}
+
+.docs-meta a,
+.docs-meta__btn,
+.docs-meta__current,
+.docs-meta__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-decoration: none;
+    color: var(--text-link);
+}
+
+.docs-meta a:hover { text-decoration: underline; }
+
+.docs-meta__chip {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    color: var(--primary-ink);
+    background: var(--accent-surface);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+}
+
+.docs-meta__current { color: var(--text); font-weight: var(--weight-medium); }
+
+.docs-meta__btn {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+.docs-meta__btn:hover { text-decoration: underline; }
+
+.docs-meta a:focus-visible,
+.docs-meta__btn:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-xs);
+}
+
+.docs-crumbs {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--border);
+    font-size: var(--text-base);
+}
+
+.docs-crumbs a { color: var(--text-link); text-decoration: none; }
+.docs-crumbs a:hover { text-decoration: underline; }
+.docs-crumbs__sep { color: var(--text-faint); }
+.docs-crumbs__here { color: var(--text); font-weight: var(--weight-medium); }
+
+.docs-crumbs__date {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Part bands
+   ------------------------------------------------------------------------
+   The document is two documents. Saying so above the cards costs one line and
+   saves a technical reader from starting at section 1 — or, worse, a director
+   from starting at appendix E.
+   -------------------------------------------------------------------------- */
+.docs-part { margin-top: var(--space-12); }
+
+.docs-part__head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: var(--space-4);
+    row-gap: var(--space-1);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid var(--text);
+}
+
+.docs-part__label {
+    grid-row: 1;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--primary-ink);
+}
+
+.docs-part__title {
+    grid-row: 1;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    color: var(--text);
+}
+
+.docs-part__blurb {
+    grid-column: 2;
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Cards
+   -------------------------------------------------------------------------- */
+.docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: var(--space-5);
+    margin-top: var(--space-6);
+}
+
+.docs-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: box-shadow var(--dur-base) var(--ease-out),
+                border-color var(--dur-base) var(--ease-out);
+}
+
+.docs-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
+}
+
+.docs-card__body { flex: 1; padding: var(--space-6); }
+
+.docs-card__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    color: var(--text);
+}
+
+.docs-card__lede {
+    margin: var(--space-2) 0 var(--space-5);
+    font-size: var(--text-base);
+    line-height: var(--leading-snug);
+    color: var(--text-muted);
+}
+
+.docs-card__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-1);
+}
+
+.docs-card__item a {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    margin-inline: calc(var(--space-2) * -1);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: var(--text-link);
+    transition: background var(--dur-fast) var(--ease-out);
+}
+
+.docs-card__item a:hover { background: var(--accent-surface); }
+
+.docs-card__item a:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.docs-card__link-text { line-height: var(--leading-snug); }
+
+/* The document's own numbering. Mono, because it is a label rather than
+   prose, and it has to align down the column for the count to read. */
+.docs-num {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-wide);
+    color: var(--primary-ink);
+    background: var(--accent-surface);
+    border-radius: var(--radius-xs);
+    padding: var(--space-1) var(--space-2);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.docs-card__more {
+    margin: 0;
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--border);
+    background: var(--surface-sunken);
+}
+
+.docs-card__more a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--text-link);
+    text-decoration: none;
+}
+
+.docs-card__more a:hover { text-decoration: underline; }
+
+.docs-card__more a:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-xs);
+}
+
+.docs-card__more .icon { transition: transform var(--dur-fast) var(--ease-out); }
+.docs-card__more a:hover .icon { transform: translateX(2px); }
+
+/* Search filtering. Hidden through an attribute rather than a class so the
+   rule cannot be beaten by specificity elsewhere. A card's footer link hides
+   with the rest: it is the only route to two of the appendices, so it has to
+   answer the filter like any other link. */
+.docs-card__item[hidden],
+.docs-card__more[hidden],
+.docs-card[hidden],
+.docs-part[hidden] { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   Utility bar
+   -------------------------------------------------------------------------- */
+.docs-tools {
+    margin-top: var(--space-12);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+    overflow: hidden;
+}
+
+.docs-tools__item + .docs-tools__item { border-top: 1px solid var(--border); }
+
+.docs-tools summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-6);
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    color: var(--text);
+    list-style: none;
+}
+
+.docs-tools summary::-webkit-details-marker { display: none; }
+
+.docs-tools summary::after {
+    content: '';
+    margin-left: auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.docs-tools__item[open] summary::after { transform: rotate(-135deg); }
+.docs-tools summary:hover { background: var(--surface-hover); }
+.docs-tools summary:focus-visible { outline: none; box-shadow: var(--focus-ring-inset); }
+
+.docs-about {
+    margin: 0;
+    padding: 0 var(--space-6) var(--space-6);
+    display: grid;
+    grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+    gap: var(--space-2) var(--space-5);
+    font-size: var(--text-base);
+}
+
+.docs-about dt {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding-top: 0.15rem;
+}
+
+.docs-about dd { margin: 0; color: var(--text-secondary); }
+
+/* ==========================================================================
+   A section page
+   ========================================================================== */
+.docs-article { display: grid; gap: var(--space-8); margin-top: var(--space-8); }
+
+@media (min-width: 62rem) {
+    .docs-article--railed { grid-template-columns: 15rem minmax(0, 1fr); }
+    .docs-rail { position: sticky; top: calc(var(--topbar-height) + var(--space-6)); }
+}
+
+/* A section with no subheadings gets no rail — and without one, the full
+   78rem would leave its prose in the left third of an empty page. These are
+   the checklists, the glossary and the risk table: they are read as a whole
+   rather than navigated, so the column closes up around them. */
+.docs-article:not(.docs-article--railed) { max-width: 58rem; }
+
+.docs-rail { align-self: start; }
+
+.docs-rail__label {
+    margin: 0 0 var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.docs-rail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 var(--space-4);
+    border-left: 2px solid var(--border);
+    display: grid;
+    gap: var(--space-2);
+}
+
+.docs-rail a {
+    font-size: var(--text-base);
+    line-height: var(--leading-snug);
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.docs-rail a:hover { color: var(--primary-ink); }
+.docs-rail a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+
+.docs-main { min-width: 0; }
+
+.docs-head { padding-bottom: var(--space-6); border-bottom: 1px solid var(--border); }
+
+.docs-eyebrow {
+    margin: 0 0 var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.docs-head h1 {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 1.3rem + 1.5vw, 2.4rem);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+    color: var(--text);
+}
+
+.docs-num--lg {
+    font-size: var(--text-sm);
+    padding: var(--space-1) var(--space-3);
+    flex: none;
+}
+
+.docs-head__lede {
+    margin: var(--space-4) 0 0;
+    max-width: var(--docs-measure);
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   The prose
+   ------------------------------------------------------------------------
+   Running text is capped at the reading measure; tables and shell blocks are
+   deliberately not, because an eleven-column deployment comparison is
+   unreadable at 44rem and the whole point of the section is that it can be
+   compared across.
+   -------------------------------------------------------------------------- */
+.docs-body {
+    font-size: var(--text-md);
+    line-height: var(--leading-normal);
+    color: var(--text);
+}
+
+.docs-body > p,
+.docs-body > .doc-list { max-width: var(--docs-measure); }
+
+.docs-body > p { margin: var(--space-5) 0; }
+
+.docs-body h2 {
+    margin: var(--space-10) 0 var(--space-3);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-snug);
+    color: var(--text);
+    scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
+}
+
+.docs-body h3 {
+    margin: var(--space-8) 0 var(--space-3);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--text);
+    scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
+}
+
+.docs-body .doc-list { margin: var(--space-5) 0; padding-left: var(--space-6); }
+.docs-body .doc-list li { margin-bottom: var(--space-3); }
+.docs-body .doc-list li::marker { color: var(--primary); }
+.docs-body strong { font-weight: var(--weight-bold); }
+
+/* ------------------------------------------------------------------ tables */
+.doc-table-wrap {
+    margin: var(--space-6) 0;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+}
+
+.doc-table-wrap:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-base);
+    line-height: var(--leading-snug);
+}
+
+.doc-table th,
+.doc-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border);
+}
+
+.doc-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-sunken);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--text);
+    border-bottom: 1px solid var(--border-strong);
+    white-space: nowrap;
+}
+
+.doc-table tbody th {
+    font-weight: var(--weight-medium);
+    color: var(--text);
+    background: var(--surface);
+}
+
+.doc-table tbody tr:last-child th,
+.doc-table tbody tr:last-child td { border-bottom: 0; }
+.doc-table tbody tr:hover th,
+.doc-table tbody tr:hover td { background: var(--surface-sunken); }
+.doc-table ul { margin: 0; padding-left: var(--space-5); }
+
+/* -------------------------------------------------------------- shell code */
+.doc-code {
+    margin: var(--space-5) 0;
+    padding: var(--space-4) var(--space-5);
+    background: var(--surface-inverse);
+    color: var(--warm-100);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    /* Wrap rather than scroll. These are commands read off a screen and typed
+       into a server, and a line that runs off the right edge is invisible in
+       a way a wrapped one is not. Wrapping adds no characters, so a copy is
+       unaffected. The same call the self-hosting page makes. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+}
+
+.doc-code code { font: inherit; color: inherit; background: none; padding: 0; }
+
+/* ------------------------------------------------------------------- asides
+   The document's boxed notes. Each one is a warning that cost somebody a
+   month, so they get the amber role rather than a neutral grey panel — but
+   only a left edge of it, because there are forty of them and forty filled
+   amber panels would be a different document. */
+.doc-note {
+    margin: var(--space-6) 0;
+    max-width: var(--docs-measure);
+    padding: var(--space-4) var(--space-5);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-left: 3px solid var(--warning-solid);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+}
+
+.doc-note__label {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--warning);
+}
+
+.doc-note p:last-child { margin-bottom: 0; }
+.doc-note p + p { margin-top: var(--space-3); }
+
+/* --------------------------------------------------------------------------
+   Pager
+   -------------------------------------------------------------------------- */
+.docs-pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-top: var(--space-12);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border);
+}
+
+.docs-pager__link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.docs-pager__link:hover { border-color: var(--border-strong); box-shadow: var(--shadow-xs); }
+.docs-pager__link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.docs-pager__link--next { grid-column: 2; justify-content: flex-end; text-align: right; }
+.docs-pager__link .icon { flex: none; color: var(--primary-ink); }
+
+.docs-pager__dir {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.docs-pager__title {
+    display: block;
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+@media (max-width: 48rem) {
+    .docs-search { flex: 1 1 100%; }
+    .docs-meta { justify-content: flex-start; gap: var(--space-4); }
+    .docs-crumbs__date { margin-left: 0; flex-basis: 100%; }
+    /* One column, so the label and title have to give up the shared row they
+       sit on at desktop — left on it, auto-placement invents a second column
+       and throws the title to the far edge. */
+    .docs-part__head { grid-template-columns: minmax(0, 1fr); }
+    .docs-part__label,
+    .docs-part__title,
+    .docs-part__blurb { grid-row: auto; grid-column: 1; }
+    .docs-pager { grid-template-columns: minmax(0, 1fr); }
+    .docs-pager__link--next { grid-column: 1; }
+}
+
+/* The wordmark, the nav link and a sign-in button do not fit one phone row:
+   at 390px they overrun by 9px, and at 375px by rather more. The link drops to
+   its own row rather than being hidden — it is the way into the documentation,
+   and a reader on a phone is exactly the reader who was sent the link. */
+@media (max-width: 40rem) {
+    .lp-header__inner { flex-wrap: wrap; row-gap: var(--space-2); }
+    .lp-header__nav {
+        order: 3;
+        flex-basis: 100%;
+        margin-left: 0;
+        padding-top: var(--space-1);
+        border-top: 1px solid var(--border);
+    }
+    .lp-header__link { padding-top: var(--space-1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .docs-card,
+    .docs-card__more .icon,
+    .docs-tools summary::after,
+    .docs-pager__link { transition: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Print
+   ------------------------------------------------------------------------
+   A ministry prints this for a meeting. Chrome, navigation and the search
+   field are not part of the argument; the shell blocks invert so they do not
+   arrive as a page of ink.
+   -------------------------------------------------------------------------- */
+@media print {
+    .lp-header,
+    .lp-footer,
+    .docs-search,
+    .docs-meta,
+    .docs-pager,
+    .docs-rail,
+    .skip-link { display: none !important; }
+
+    .docs-page { padding: 0; }
+    .docs-article--railed { grid-template-columns: minmax(0, 1fr); }
+    .docs-tools__item { break-inside: avoid; }
+
+    .doc-code {
+        background: var(--surface-sunken);
+        color: var(--text);
+        border: 1px solid var(--border);
+    }
+
+    .doc-note,
+    .doc-table-wrap { break-inside: avoid; }
+    .docs-body h2, .docs-body h3 { break-after: avoid; }
+}

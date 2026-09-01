@@ -1,0 +1,37 @@
+{% load i18n dashboard_ui %}
+{% comment %}
+The public footer, shared by the landing page and the documentation site.
+Extracted alongside the header for the same reason — see _marketing_header.html.
+{% endcomment %}
+<footer class="lp-footer">
+    <div class="lp-wrap">
+        <div class="lp-footer__row">
+            <a href="{% url 'dashboard:help_index' %}">{% trans "Help & FAQ" %}</a>
+            <a href="{% url 'docs:index' %}">{% trans "Documentation" %}</a>
+            <a href="{% url 'accounts:terms' %}">{% trans "Terms of use" %}</a>
+            <a href="{% url 'self_hosting' %}">{% trans "Run it yourself" %}</a>
+
+            {% comment %}
+            One form, one button per language — not a form per button relying
+            on `display: contents`, which collapses into a stack wherever that
+            does not apply. Labels are language-only; the country-forward
+            names in settings.LANGUAGES are for a teacher choosing a course
+            locale, not a visitor choosing what to read.
+            {% endcomment %}
+            {% get_current_language as CURRENT_LANG %}
+            <form action="{% url 'set_language' %}" method="post"
+                  class="lang-switch" aria-label="{% trans 'Language' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                {% for code, label in LANGUAGES %}
+                    {% if code|lower == CURRENT_LANG|lower %}
+                        <span class="lang-switch__on" aria-current="true">{{ code|language_label }}</span>
+                    {% else %}
+                        <button type="submit" name="language" value="{{ code }}" class="lang-switch__btn">{{ code|language_label }}</button>
+                    {% endif %}
+                {% endfor %}
+            </form>
+        </div>
+        <p class="lp-footer__legal">© 2026 The World Bank Group</p>
+    </div>
+</footer>

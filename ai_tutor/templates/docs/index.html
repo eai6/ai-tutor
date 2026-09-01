@@ -1,0 +1,101 @@
+{% extends "docs/base.html" %}
+{% load i18n dashboard_ui %}
+
+{% comment %}
+The documentation front door.
+
+Six cards rather than one contents list. The document is 23 sections in two
+parts written for two different audiences, and a ministry official who opens a
+flat list of 23 links reads none of them. Each card is a question a country
+actually arrives with; the sections under it are the document's own answer,
+carrying the document's own numbering so nobody loses their place.
+
+The full contents list is still here, at the bottom, for the reader who wants
+the shape of the whole thing.
+{% endcomment %}
+
+{% block content %}
+<div class="lp-wrap docs-page">
+
+    <div class="docs-masthead">
+        <div class="docs-masthead__titles">
+            <h1>{% trans "Documentation" %}</h1>
+            <p class="docs-masthead__lede">
+                {% blocktrans %}Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, what it costs, and how to get a first cohort teaching.{% endblocktrans %}
+            </p>
+        </div>
+
+        {# Filters what is already on the page. No results screen, no round #}
+        {# trip: 23 sections is small enough that the answer is always here. #}
+        <form class="docs-search" role="search" id="docs-search"
+              data-index="{% url 'docs:search_index' %}">
+            <label class="docs-search__label" for="docs-search-input">{% trans "Search the playbook" %}</label>
+            <div class="docs-search__field">
+                <input type="search" id="docs-search-input" name="q" autocomplete="off"
+                       placeholder="{% trans 'Search the playbook' %}"
+                       aria-describedby="docs-search-status">
+                <button type="submit" class="docs-search__go" aria-label="{% trans 'Search' %}">
+                    {% icon "search" size="sm" %}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="docs-meta">
+        <span class="docs-meta__chip">{% icon "courses" size="sm" %}{% blocktrans %}Playbook v{{ version }}{% endblocktrans %}</span>
+        <span class="docs-meta__current" aria-current="page">{% icon "list" size="sm" %}{% trans "Overview" %}</span>
+        <a href="{% url 'self_hosting' %}">{% icon "download" size="sm" %}{% trans "Run it yourself" %}</a>
+        <a href="{% url 'dashboard:help_index' %}">{% icon "help" size="sm" %}{% trans "Help & FAQ" %}</a>
+        <button type="button" class="docs-meta__btn" id="docs-print">{% trans "Print" %}</button>
+    </div>
+
+    <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
+        <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
+        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
+        <span class="docs-crumbs__here">{% trans "Country adoption playbook" %}</span>
+        <span class="docs-crumbs__date">{{ version_date }}</span>
+    </nav>
+
+    <p class="docs-search__status" id="docs-search-status" role="status" hidden></p>
+
+    {# ─────────────────────────────────────── the two parts ──────────────── #}
+    <section class="docs-part" data-part="one">
+        <div class="docs-part__head">
+            <p class="docs-part__label">{% trans "Part I" %}</p>
+            <h2 class="docs-part__title">{{ part_one }}</h2>
+            <p class="docs-part__blurb">{{ part_one_blurb }}</p>
+        </div>
+        <div class="docs-grid">
+            {% for card in cards %}{% if card.part == part_one %}
+                {% include "docs/_card.html" %}
+            {% endif %}{% endfor %}
+        </div>
+    </section>
+
+    <section class="docs-part" data-part="two">
+        <div class="docs-part__head">
+            <p class="docs-part__label">{% trans "Part II" %}</p>
+            <h2 class="docs-part__title">{{ part_two }}</h2>
+            <p class="docs-part__blurb">{{ part_two_blurb }}</p>
+        </div>
+        <div class="docs-grid">
+            {% for card in cards %}{% if card.part == part_two %}
+                {% include "docs/_card.html" %}
+            {% endif %}{% endfor %}
+        </div>
+    </section>
+
+    {# ───────────────────────────────────────── utility bar ──────────────── #}
+    <div class="docs-tools">
+        <details class="docs-tools__item">
+            <summary>{% icon "info" size="sm" %}{% trans "About this document" %}</summary>
+            <dl class="docs-about">
+                <dt>{% trans "Version" %}</dt><dd>{{ version }} — {{ version_date }}</dd>
+                <dt>{% trans "Status" %}</dt><dd>{{ status }}</dd>
+                <dt>{% trans "Evidence base" %}</dt><dd>{{ evidence_base }}</dd>
+                <dt>{% trans "Costs" %}</dt><dd>{{ costs_note }}</dd>
+            </dl>
+        </details>
+    </div>
+</div>
+{% endblock %}

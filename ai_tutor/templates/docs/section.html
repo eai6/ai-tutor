@@ -1,0 +1,75 @@
+{% extends "docs/base.html" %}
+{% load i18n dashboard_ui %}
+
+{% comment %}
+One section of the playbook.
+
+The contents rail is rendered server-side from apps/docs/_headings.py rather
+than assembled in the browser, so it is there for a reader with no JavaScript
+and for a search engine. Sections whose prose has no subheadings — the
+checklists and the glossary — get no rail and the full measure instead.
+{% endcomment %}
+
+{% block page_title %}{{ section.label }}. {{ section.title }}{% endblock %}
+{% block page_description %}{{ section.summary }}{% endblock %}
+
+{% block content %}
+<div class="lp-wrap docs-page">
+
+    <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
+        <a href="{% url 'docs:index' %}">{% trans "Documentation" %}</a>
+        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
+        <span>{{ section.part }}</span>
+        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
+        <span class="docs-crumbs__here">{{ section.label }}. {{ section.title }}</span>
+    </nav>
+
+    <article class="docs-article{% if section.headings %} docs-article--railed{% endif %}">
+
+        {% if section.headings %}
+        <nav class="docs-rail" aria-label="{% trans 'On this page' %}">
+            <p class="docs-rail__label">{% trans "On this page" %}</p>
+            <ul>
+                {% for anchor, title in section.headings %}
+                <li><a href="#{{ anchor }}">{{ title }}</a></li>
+                {% endfor %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        <div class="docs-main">
+            <header class="docs-head">
+                <p class="docs-eyebrow">{% if part_numeral %}{{ part_numeral }} &middot; {% endif %}{{ section.part }}</p>
+                <h1><span class="docs-num docs-num--lg">{{ section.label }}</span>{{ section.title }}</h1>
+                <p class="docs-head__lede">{{ section.summary }}</p>
+            </header>
+
+            <div class="docs-body">
+                {% include body_template %}
+            </div>
+        </div>
+    </article>
+
+    <nav class="docs-pager" aria-label="{% trans 'Section navigation' %}">
+        {% if previous %}
+        <a class="docs-pager__link docs-pager__link--prev" href="{% url 'docs:section' previous.slug %}">
+            {% icon "arrow-left" size="sm" %}
+            <span>
+                <span class="docs-pager__dir">{% trans "Previous" %}</span>
+                <span class="docs-pager__title">{{ previous.label }}. {{ previous.title }}</span>
+            </span>
+        </a>
+        {% else %}<span></span>{% endif %}
+
+        {% if following %}
+        <a class="docs-pager__link docs-pager__link--next" href="{% url 'docs:section' following.slug %}">
+            <span>
+                <span class="docs-pager__dir">{% trans "Next" %}</span>
+                <span class="docs-pager__title">{{ following.label }}. {{ following.title }}</span>
+            </span>
+            {% icon "arrow-right" size="sm" %}
+        </a>
+        {% else %}<span></span>{% endif %}
+    </nav>
+</div>
+{% endblock %}

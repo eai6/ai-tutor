@@ -1,0 +1,36 @@
+{% load i18n dashboard_ui %}
+{% comment %}
+One index tile. The list is the card; the footer link leads out of it, to the
+section a reader of these most often wants next.
+
+data-terms carries the section's summary and subheadings so the search filter
+can match on text that is not visible in the tile. The footer link carries it
+too: two appendices appear in no card list, and without this a search for what
+they contain would come back empty.
+{% endcomment %}
+<article class="docs-card">
+    <div class="docs-card__body">
+        <h3 class="docs-card__title">{{ card.title }}</h3>
+        <p class="docs-card__lede">{{ card.lede }}</p>
+        <ul class="docs-card__list">
+            {% for s in card.sections %}
+            <li class="docs-card__item" data-slug="{{ s.slug }}" data-terms="{{ s.search_terms }}">
+                <a href="{% url 'docs:section' s.slug %}">
+                    <span class="docs-num">{{ s.label }}</span>
+                    <span class="docs-card__link-text">{{ s.title }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% if card.more_url_name %}
+    <p class="docs-card__more">
+        <a href="{% url card.more_url_name %}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
+    </p>
+    {% else %}
+    <p class="docs-card__more" data-slug="{{ card.more_section.slug }}"
+       data-terms="{{ card.more_section.search_terms }}">
+        <a href="{% url 'docs:section' card.more_section.slug %}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
+    </p>
+    {% endif %}
+</article>

@@ -50,6 +50,10 @@ urlpatterns = [
     # The self-hosting manual, served by the application. A public page
     # cannot route its instructions through a private repository.
     path('self-hosting/', desktop_public_views.self_hosting, name='self_hosting'),
+    # The country adoption playbook, as a documentation site. Public for the
+    # same reason /self-hosting/ is — a ministry reads it before it has an
+    # account. Above the accounts include so /docs/ is not swallowed by it.
+    path('docs/', include('ai_tutor.apps.docs.urls', namespace='docs')),
     # Default 'admin/'; ADMIN_URL moves it. See the note in settings.py — the
     # control that matters is the CIDR restriction at the load balancer, this
     # only takes the console off the path every scanner probes by default.
