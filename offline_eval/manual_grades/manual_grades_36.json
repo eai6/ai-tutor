@@ -1,0 +1,557 @@
+{
+ "version": 1,
+ "exported": "2026-08-17T18:52:06.898Z",
+ "dimensions": [
+  "mistake_identification",
+  "mistake_location",
+  "revealing_answer",
+  "providing_guidance",
+  "actionability",
+  "coherence",
+  "tutor_tone",
+  "human_likeness"
+ ],
+ "graded": 36,
+ "verdicts": {
+  "30_mt100_18arm_board|claude-opus-5|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:05:02.166Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:12:57.222Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:17:20.268Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_full_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:17:57.316Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:19:23.448Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:21:26.369Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:28:17.741Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T16:45:57.789Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|no_banned_opener_loop_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T16:47:20.627Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:19:35.005Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_prone_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:26:22.089Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|help_intensive_error_prone_1470_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:31:04.910Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:38:53.028Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:44:08.311Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:45:37.729Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:46:59.824Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:47:37.195Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:55:05.514Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:56:51.618Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:58:31.764Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:59:45.954Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|straight_line_average_1469_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:00:11.426Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:01:20.403Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:01:41.772Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:03:35.024Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:04:23.856Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:05:13.412Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:09.431Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:29.399Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:50.194Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:07:13.556Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:07:45.396Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|speedrun_probe_resistant_1468_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:11:53.327Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:12:28.920Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:13:45.651Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:14:21.584Z"
+  }
+ }
+}

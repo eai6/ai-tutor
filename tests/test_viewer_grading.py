@@ -439,6 +439,33 @@ def test_me_vs_judge_tab_filters_by_model(tmp_path):
     assert "v('x-model')" in html
 
 
+def test_me_vs_judge_tab_filters_by_subject(tmp_path):
+    """The comparison tab scopes to one subject.
+
+    The boards mix maths and geography sessions, and the two are not the same
+    measurement: a tutor that holds up on a geography lesson can fall apart on
+    arithmetic, so a pooled pass rate hides exactly the gap worth reading. The
+    subject has to reach the same three places the model filter does — the
+    headline rates, the session list, and the persona chart — or the tab shows
+    a figure for one scope beside a list for another.
+    """
+    out = tmp_path / 'index.html'
+    BV.build(src=_fixture(tmp_path), out=str(out), flat_runs=[])
+    html = out.read_text()
+
+    assert 'id="x-subject"' in html, 'no subject filter on the me-vs-judge tab'
+    assert "v('x-subject')" in html
+    # gradedRows is the single gate the KPIs pass through; the subject has to
+    # be one of the keys it is handed, not filtered separately downstream.
+    assert 'subject:subject' in html
+    # The scope helpers behind the session list and the persona chart take it
+    # too, so all three read the same set.
+    for call in ('gradedSessions(run,\'\',subject)',
+                 'gradedSessions(run,model,subject)',
+                 'personasIn(run,model,subject)'):
+        assert call in html, f'{call} missing — a filter that stops at the KPIs'
+
+
 # ── The export scope picker ─────────────────────────────────────────────
 
 def _run_export_js(body, tmp_path):

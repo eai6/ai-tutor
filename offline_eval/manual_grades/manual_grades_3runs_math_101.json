@@ -1,0 +1,1540 @@
+{
+ "version": 1,
+ "exported": "2026-08-26T13:45:37.649Z",
+ "dimensions": [
+  "mistake_identification",
+  "mistake_location",
+  "revealing_answer",
+  "providing_guidance",
+  "actionability",
+  "coherence",
+  "tutor_tone",
+  "human_likeness"
+ ],
+ "graded": 101,
+ "verdicts": {
+  "43_math_4b_postfix|qwen3-4b-jetson|long_session_average_1144_02": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor correctly identifies that a student answer is wrong, but gives a wrong explanation about why that answer is wrong:\n\n\n\nA box contains 7 red balls and 8 yellow balls. What is the total number of possible outcomes when drawing one ball?  \nA) 14  \nB) -1  \nC) 56  \nD) 15\nstudent\nA\nTUTOR · warm_up\nYou picked A — that refers to 14, which is the sum of 7 and 8, but it's not the total number of possible outcomes when drawing one ball. The total number of outcomes is simply the total number of balls. Look again at the options and think about what the total number of balls is.\nstudent\nD\n\nAnother Example:\n\nA quality inspector finds 3 defective items in 190 items. If 90 items are produced, how many defects are expected?\nA) 87\nB) 93\nC) 5700\nD) 1.42105",
+   "peeked": false,
+   "ts": "2026-08-26T08:51:59.867Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1139_17": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nCorrect — nice work.\nstudent\nthanks\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah, ready\nTUTOR · evaluate\nLet's keep going.\nstudent\nok what's the question\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah go ahead\nTUTOR · evaluate\nLet's keep going.\nstudent\nok what's next\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok im listening\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T08:54:29.159Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1144_11": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "to_some_extent",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor correctly identifies a wrong answer but gives a wrong explanation about it:\nA box contains 7 red balls and 8 yellow balls. What is the total number of possible outcomes when drawing one ball?  \nA) 14  \nB) -1  \nC) 56  \nD) 15\nstudent\nA\nTUTOR · warm_up\nYou picked A — that refers to 14, which is the sum of 7 and 8, but it’s not the total number of possible outcomes. The total number of possible outcomes is simply the total count of all balls. Look again at the options and think about what \"total number of possible outcomes\" means when drawing one ball.\n\n----------------------------------------\n\nTutor penalizes a correct answer and accepts a wrong one:\nA hotel serves 30 guests per day for 20 days. What is the total number of guest-meals served?\nA) 120 meals\nB) 2400 meals\nC) 54 meals\nD) 600 meals\nstudent\nD\nTUTOR · practice\nYou picked D — that option describes the total number of meals for a different scenario. Think about what happens when you multiply the number of guests per day by the number of days. Try looking at the options again.\nstudent\nB",
+   "peeked": false,
+   "ts": "2026-08-26T09:42:18.070Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|straight_line_average_1138_08": {
+   "d": {
+    "mistake_identification": "to_some_extent",
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor accepts a wrong answer:\nTwo intersecting roads in Seychelles form four angles. If one angle is 115°, what is the sum of the two vertically opposite angles?\nA) 130°\nB) 180°\nC) 115°\nD) 230°\nstudent\nD\n\n------------------------\nTuto stops posing questions:\nTUTOR · practice\nYes, exactly right.\nstudent\nyeah thanks\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nyeah go ahead\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok what's the next question\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nalright im listening\nTUTOR · practice\nLet's keep going.\nstudent\nyeah im ready for the next one\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok so what do you want to ask me\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah go on then\nTUTOR · practice\nLet's keep going.\nstudent\nok im waiting for the question\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nalright what is it\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah just ask me the question please\nTUTOR · practice\nLet's keep going.\nstudent\nok im ready whenever you are\nTUTOR · practice\nLet's pick up where we left off.",
+   "peeked": false,
+   "ts": "2026-08-26T09:45:46.716Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|straight_line_average_1139_07": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nCorrect — nice work.\nstudent\nyeah thanks\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok im ready\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah what's the question\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah go on\nTUTOR · evaluate\nLet's keep going.\nstudent\nok im waiting\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nyeah what do you want to ask me\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T09:47:40.510Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|straight_line_average_1141_13": {
+   "d": {
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "to_some_extent",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor choice options don't have the answer for the question posed:\n\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0\nstudent\nA\n\n----------------\nTutor repeats same exact question successively even after a student get's it right.\n\nA boat trip to La Digue is cancelled with probability 0.15000000000000002. What is the probability the trip goes ahead?\nA) 0.85\nB) 1.15\nC) 0.075\nD) 0.15\nstudent\nA\nTUTOR · practice\nGot it — that's right.\n\nA boat trip to La Digue is cancelled with probability 0.15000000000000002. What is the probability the trip goes ahead?\nA) 0.85\nB) 1.15\nC) 0.075\nD) 0.15\n\n------------------\nTutor stops posing questions:\n\n\nstudent\nB\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah ok, ready for the next one\nTUTOR · practice\nLet's keep going.\nstudent\nwhat's the question?\nTUTOR · practice\nThe question will appear shortly — I’m ready to begin with the next one. Let’s keep going.\nstudent\nok, i'm waiting\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah, what's the next question?\nTUTOR · practice\nLet's pick up where we left off.  \nProbabilities of an event and its complement always add up to 1 — check your answers to make sure they follow this rule.  \nHere's the next one:\nstudent\nok i'm ready\nTUTOR · practice\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T09:54:16.728Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|self_correction_capable_1143_12": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incorrect explanation for a wrong answer:\n\nA Seychellois fisherman has caught 6 grouper, 3 tuna, 5 snapper, 5 barracuda, and 6 mackerel. How many total possible outcomes are there when selecting one fish at random?\nA) 14\nB) 2700\nC) 19\nD) 25\nstudent\nC\nTUTOR · explain\nYou picked C — that is the number of fish types, not the total number of fish. Add up all the fish caught to find the total possible outcomes. Look at the options again.",
+   "peeked": false,
+   "ts": "2026-08-26T09:58:31.159Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|self_correction_capable_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:05:51.978Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|self_correction_capable_1145_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:08:06.147Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|session_completion_capable_1141_05": {
+   "d": {
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stopped posing questions mid session:\nTUTOR · explain\nCorrect — nice work.\nstudent\nyeah\nTUTOR · explain\nLet's keep going.\nstudent\nready\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nok\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · explain\nLet's keep going.\nstudent\nyeah\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nok\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · explain\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · practice\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · practice\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · practice\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nready\nTUTOR · practice\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T10:09:09.956Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|speedrun_capable_1139_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:09:28.774Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|speedrun_capable_1144_13": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:11:08.931Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|baseline_full_session_error_prone_1142_15": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incorrect explanation for a wrong answer;\nA box contains 7 red balls and 8 yellow balls. What is the total number of possible outcomes when drawing one ball?  \nA) 14  \nB) -1  \nC) 56  \nD) 15\nstudent\nA\nTUTOR · warm_up\nYou picked A — that represents 14, which is the sum of 7 and 8, but it's not the total number of possible outcomes. The total outcomes are all the balls, so it’s 7 red plus 8 yellow. Look again at the options and think about what \"total possible outcomes\" means when drawing one ball.\n\n--------------------\n\nTutor fails to pose next question:\nYou picked B — that represents a number, not a percentage. In a formal weather report, a percentage is most appropriate to clearly communicate the chance of rain. Here's the next one:\nstudent\nA\n--------------------------------\nTutor revealed correct answer:\nA probability is 40%. What is this as a fraction in simplest form? (Enter as decimal for now.)\n\nA) 0.2\nB) 0.4\nC) 0.8\nD) 0.6\nstudent\nA\nTUTOR · explain\nYou picked A — that is 20%, not 40%. A probability of 40% means 40 out of 100, which is 0.4. Look again at what 40% actually means in terms of a fraction.\nstudent\nB",
+   "peeked": false,
+   "ts": "2026-08-26T10:20:04.690Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|error_cascade_error_prone_1145_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:21:54.428Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|help_intensive_error_prone_1141_11": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nThat's it — well done.\nstudent\nthanks\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\ncool\nTUTOR · practice\nLet's keep going.\nstudent\nyeah go ahead\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nalright im listening\nTUTOR · practice\nLet's keep going.\nstudent\nyep whats the next question\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready for the next one\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah lets do it\nTUTOR · practice\nLet's keep going.\nstudent\nok what is it\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nim ready go ahead\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im listening\nTUTOR · practice\nLet's keep going.\nstudent\nyep whats the question\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready for it\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nalright lets go\nTUTOR · practice\nLet's keep going.\nstudent\nok what do you want to ask me\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nim ready go on\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah im listening what is it\nTUTOR · explain\nLet's keep going.\nstudent\nok im ready for the next question\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nalright lets do this\nTUTOR · explain\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T10:23:03.079Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|help_intensive_error_prone_1141_16": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nyeah go ahead\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready for the next one\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah whats the question\nTUTOR · practice\nLet's keep going.\nstudent\nok im listening\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah go ahead with the question\nTUTOR · practice\nLet's keep going.\nstudent\nok what is it\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready for the next question\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah im ready go ahead\nTUTOR · practice\nLet's keep going.\nstudent\nok im waiting for the question\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok what do you want to ask me\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah ok im listening for the question\nTUTOR · practice\nLet's keep going.\nstudent\nok im ready whenever you are\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nok go ahead with the next question please\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah what is it\nTUTOR · explain\nLet's keep going.\nstudent\nok im waiting\nTUTOR · explain\nLet's pick up where we left off.\n",
+   "peeked": false,
+   "ts": "2026-08-26T10:23:42.447Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_error_prone_1139_01": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · explain\nThat's it — well done.\nstudent\nthanks! that one was tricky but i got it in the end\nTUTOR · explain\n    \"question\nstudent\nok im ready for the next one\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyep go ahead\nTUTOR · explain\nLet's keep going.\nstudent\nok\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nalright im ready\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah lets go\nTUTOR · explain\nLet's keep going.\nstudent\nok what's the next question\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nim ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im listening\nTUTOR · practice\nLet's keep going.\nstudent\nyeah whats next\nTUTOR · practice\nLet's pick up where we left off.\nstudent\ngo on then\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im waiting for the question\nTUTOR · practice\nLet's keep going.\n",
+   "peeked": false,
+   "ts": "2026-08-26T10:24:31.594Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|session_completion_error_prone_1142_04": {
+   "d": {
+    "coherence": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incomplete/ambiguous answer options given:\nA lottery has a 1% chance of winning. What does this mean in practical terms?\nA) 2\nB) 3\nC) 4\nD) 1\n\n------------------\nTutor fails to pose choice options for a question:\nHere’s the next one:  \nA weather forecast states there is an 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\nstudent\nA\nTUTOR · practice\nYes, exactly right. Next up:\n\nA weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?\nA) 2\nB) 4\nC) 3\nD) 1\n\n\n--------------------\n\nTutor moved to the next questions without the student getting right the initial one:\nThe probability of finding a coconut on a beach is 3/5. As a percentage, what is this?\nA) 60%\nB) 15%\nC) 166.667%\nD) 85%\nstudent\nC\nTUTOR · explain\nYou picked C — 166.667% — that’s the result of dividing 5 by 3, not 3 by 5.  \nRemember: the numerator (what you want) always goes first in division.  \nLook at the options again.\nstudent\nD\nTUTOR · explain\nYou picked D — 85% — that’s not what 3/5 equals. Remember: to convert a fraction to a percentage, multiply the numerator by 100 and divide by the denominator. Look at the options again.  \n\nHere’s the next one:  \nA weather forecast states there is an 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\n\n----------------------\nThe answer choices are incomplete or ambiguous :\nTUTOR · practice\nThat's it — well done. Here's another:\n\nA weather forecast states there is a 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\nA) 1\nB) 4\nC) 3\nD) 2\nstudent\nC\nTUTOR · practice\nA weather forecast states there is a 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\nA) 1\nB) 4\nC) 3\nD) 2\nstudent\nB\n\n-----------------\nInvalid question and options:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3",
+   "peeked": false,
+   "ts": "2026-08-26T10:36:10.612Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|engagement_recovery_non_responder_1141_10": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · explain\nCorrect — nice work.\nstudent\nok\nTUTOR · explain\nLet's keep going.\nstudent\nyeah\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nk\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · explain\nLet's keep going.\nstudent\nsure\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nok\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · explain\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nfine\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nsure\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nk\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nfine\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nidk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T10:37:24.266Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|engagement_recovery_non_responder_1143_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:38:00.575Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|non_responder_math_session_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "The question is incomplete/malformed.\nWhich statement is correct about angles?\nA) 180\nB) 90\nC) 360\nD) 270",
+   "peeked": false,
+   "ts": "2026-08-26T10:41:44.600Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|refusal_chain_non_responder_1138_17": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nYes, exactly right.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nsure\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nidk\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nfine\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · practice\nLet's keep going.\nstudent\nk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nsure\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.",
+   "peeked": false,
+   "ts": "2026-08-26T10:42:53.612Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|refusal_chain_non_responder_1143_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T10:43:29.261Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|remediation_after_exit_ticket_fail_non_responder_1141_02": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stopped posing questions mid session:\nTUTOR · explain\nCorrect — nice work.\nstudent\nok\nTUTOR · explain\nLet's keep going.\nstudent\nyeah\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nk\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · explain\nLet's keep going.\nstudent\nsure\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nidk\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nfine\nTUTOR · explain\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nsure\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nidk\nTUTOR · practice\nLet's keep going.\nstudent\nfine\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · practice\nLet's keep going.\nstudent\nk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nsure\nTUTOR · practice\nLet's keep going.\nstudent\nidk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nfine\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nyeah\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nk\nTUTOR · practice\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T10:44:18.941Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|long_session_probe_resistant_1137_16": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incorrect/ambiguous question and choice options:\nWhich statement is correct about angles?\nA) 180\nB) 90\nC) 360\nD) 270",
+   "peeked": false,
+   "ts": "2026-08-26T10:46:17.271Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|long_session_probe_resistant_1142_15": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Ambiguous choice options:\nA lottery has a 1% chance of winning. What does this mean in practical terms?\nA) 2\nB) 3\nC) 4\nD) 1\n\nAnother example:\nA weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?\nA) 2\nB) 4\nC) 3\nD) 1\n\n\nAnother example:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3",
+   "peeked": false,
+   "ts": "2026-08-26T10:49:52.364Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|long_session_probe_resistant_1145_08": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incorrect explanation for a wrong answer:\nA rectangle has length 14 m and width 4 m. What is its perimeter?\nA) 18 m\nB) 56 m\nC) 32 m\nD) 36 m\nstudent\nC\nTUTOR · engage\nYou picked C — that option describes the area of the rectangle, not the perimeter.  \nRemember: perimeter is the total distance around the shape, so add all the sides.  \nLook at the options again.\nstudent\nD",
+   "peeked": false,
+   "ts": "2026-08-26T10:53:35.537Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|probe_resistant_math_session_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Malformed or ambiguous choice options:\nWhich statement is correct about angles?\nA) 180\nB) 90\nC) 360\nD) 270",
+   "peeked": false,
+   "ts": "2026-08-26T10:58:10.242Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|short_session_probe_resistant_1141_05": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "No answer in choice options provided:\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T11:01:36.392Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|short_session_probe_resistant_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "to_some_extent",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incorrect explanation for  a wrong answer:\nA rectangle has length 14 m and width 4 m. What is its perimeter?\nA) 18 m\nB) 56 m\nC) 32 m\nD) 36 m\nstudent\nC\nTUTOR · explain\nYou picked C — that option refers to the area of the rectangle, not the perimeter. Perimeter is the total distance around the shape, which is found by adding all the sides. Look at the options again.",
+   "peeked": false,
+   "ts": "2026-08-26T11:04:21.047Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|speedrun_probe_resistant_1142_06": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Ambiguous choice options for a question:\nA weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?\nA) 2\nB) 4\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T11:05:37.785Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|error_cascade_struggler_1139_10": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nCorrect — nice work.\nstudent\nthanks\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok im ready\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah go ahead\nTUTOR · evaluate\nLet's keep going.\nstudent\nok what's the question\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok im listening\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah im ready for the next one\nTUTOR · evaluate\nLet's keep going.\nstudent\nok whats the question\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok just ask me\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T11:06:38.939Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|session_completion_struggler_1142_17": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Question and choice options aren't related:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3\n\n-------------------------------\nAmbiguous choice options povided:\nA lottery has a 1% chance of winning. What does this mean in practical terms?\nA) 2\nB) 3\nC) 4\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T11:08:46.536Z"
+  },
+  "43_math_4b_postfix|qwen3-4b-jetson|struggler_math_session_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Ambiguous choice options:\nWhich statement is correct about angles?\nA) 180\nB) 90\nC) 360\nD) 270",
+   "peeked": false,
+   "ts": "2026-08-26T11:10:27.403Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|long_session_average_1144_02": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Student answer from calculations is correct but selects a wrong choice option and the tutor don't inform the student of the disparity:\nA hotel serves 30 guests per day for 20 days. What is the total number of guest-meals served?\nA) 120 meals\nB) 2400 meals\nC) 54 meals\nD) 600 meals\nstudent\n30 guests per day times 20 days\n\n30 times 20 is 600\n\nB\n",
+   "peeked": false,
+   "ts": "2026-08-26T11:17:15.603Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_average_1139_17": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nGot it — that's right.\nstudent\nok thanks\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah, ready\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok, what's the question?\nTUTOR · evaluate\nGood — let’s see how this goes. Here’s your first check:\nstudent\nok im listening\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah go ahead\nTUTOR · evaluate\nLet's keep going.\nstudent\nok im ready\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nyeah what is it\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok im waiting for the question\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T11:18:45.122Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_average_1144_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:21:55.835Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|straight_line_average_1138_08": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah, ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok, what's the question?\nTUTOR · practice\nHold on — my question bank for this step came through empty, so I can't pull a ready-made one right now. Let me set you up with a quick check instead: if two angles sit on the same straight line and one of them is 70°, what do you think the other must be?\nstudent\n110 degrees\nTUTOR · practice\nLet's keep going.\nstudent\nok im ready\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah, what's next?\nTUTOR · practice\nGreat — let's put that rule to work on a real stall in Victoria. Angles sitting on one straight line always add up to 180°, so the missing one is just whatever fills the gap. Here's your first go:\nstudent\nok i got it. angles on a straight line add to 180\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah ready for the question\nTUTOR · practice\nLet's keep going.\nstudent\nok im waiting\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah just give me the question\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok what is it\nTUTOR · practice\nLet's keep going.\nstudent\ni'm ready, what's the problem?\nTUTOR · practice\nGood — let's see what you've got.\nstudent\nok go ahead\nTUTOR · practice\nLet's pick up where we left off.",
+   "peeked": false,
+   "ts": "2026-08-26T11:31:18.354Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|straight_line_average_1139_07": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah ready\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok what's the next one\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok i'm ready\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah go ahead\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok what's the question\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nyeah i'm waiting for the question\nTUTOR · evaluate\nLet's keep going.\nstudent\num are you gonna ask me something or",
+   "peeked": false,
+   "ts": "2026-08-26T11:32:05.117Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|straight_line_average_1141_13": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · explain\nGot it — that's right.\nstudent\nok cool. so what's next?\nTUTOR · explain\nThe question pool came back empty, so I can't pull up a new one just yet. Hang tight for a second — if the lesson's still going, your next check question should load right up. If it doesn't, let me know and I'll walk you through the idea again in plain words.\nstudent\nyeah ok, no worries. i'll wait\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok i'm ready when you are\nTUTOR · explain\nLet's keep going.\n",
+   "peeked": false,
+   "ts": "2026-08-26T11:35:47.482Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|self_correction_capable_1143_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:36:58.326Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|self_correction_capable_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:40:52.534Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|self_correction_capable_1145_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:42:37.646Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|session_completion_capable_1141_05": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok but can you actually ask me something? i'm ready to answer\nTUTOR · practice\nI don't have any questions loaded right now — the question bank for this step came back empty. Let me know if you'd like to move on to a different topic or if there's something specific about complementary probabilities you want to work through, and I'll take it from there.\nstudent\nok, yeah let's move on to something else then\nTUTOR · practice\nLet's keep going.\nstudent\nyeah ready for the next topic\nTUTOR · practice\nLet's pick up where we left off.\nstudent\ni'm waiting for you to give me a new topic or question\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\num, you need to actually ask me something. what's the next question or topic?\nTUTOR · practice\nI'm hitting a snag on my end — the question bank for this step came through empty, so I can't pull one up right now. Let me reset and try again in a moment; if it's still blank, tell me and we'll move to whatever you'd like to work through next.\nstudent\nok, just let me know when you're ready\nTUTOR · practice\nLet's keep going.\nstudent\ni'm still waiting. did you get a question?\nTUTOR · practice\nYour message got cut off there — I can’t see any answer from you yet. When you’re ready, just type your response to the question on screen and I’ll mark it straight away.",
+   "peeked": false,
+   "ts": "2026-08-26T11:44:03.737Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|speedrun_capable_1139_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:45:50.844Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|speedrun_capable_1144_13": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T11:46:43.207Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|baseline_full_session_error_prone_1142_15": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options are ambiguous /incomplete:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3\n\n----------------\nQuestion and choice options are ambiguous:\nA scientist reports that the probability of a species surviving is 0.38. For a grant proposal, which form is most suitable?\nA) 3\nB) 2\nC) 1\nD) 4",
+   "peeked": false,
+   "ts": "2026-08-26T11:55:05.462Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|error_cascade_error_prone_1145_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:01:22.189Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|help_intensive_error_prone_1141_11": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · explain\nCorrect — nice work.\nstudent\nohh wait, that doesn't make sense though. i thought you said the complement was 0.1? but ok cool, A is right\nTUTOR · explain\nGood catch — if the original probability was 0.35, then the complement is 0.65, not 0.1. Let's check that with a fresh question.\nstudent\nyeah ok i get it now. so if something happens at 0.35, then it doesn't happen at 0.65 because 1 minus 0.35 is 0.65\nTUTOR · explain\nLet's keep going.\nstudent\nok im ready for the next one\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nalright, im ready whenever you are\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok im waiting for the question\nTUTOR · explain\nLet's keep going.\nstudent\nyeah im ready, what's the next question?\nTUTOR · explain\nI'm sorry — I don't have any questions loaded in the pool right now. Let me check what's available so we can keep going.\nstudent\nok no problem, just let me know when you have one. i'm ready to go\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nyeah ok im here, whenever you have the next question just ask me\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nalright im waiting for the question then\nTUTOR · practice\nLet's keep going.\nstudent\nok so what's the next one? im ready\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah im still here, just give me the question whenever you're ready\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok tutor im waiting for you to ask me something, what's the question?\nTUTOR · practice\nYou're right — I owe you a proper question. Let's get one on screen now.\nstudent\nok cool, im ready. what is it?\nTUTOR · practice\nI'm ready to put one on screen — but the question bank for this step came through empty, so there's nothing valid I can load right now. Let me know once it refreshes and I'll pose the first practice problem immediately.\nstudent\nok no worries, just tell me when its ready and ill answer it. im patient\nTUTOR · practice\nLet's keep going.\nstudent\nyeah ok im still here waiting. whenever you have a question just ask me and ill do it\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nalright tutor im ready whenever you are. just give me the next question and ill answer it\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok so im still waiting for the question. whats the next one about?\nTUTOR · practice\nThe question bank for this step hasn't loaded yet, so I can't pull one up. Could you refresh or reload the app? Once the questions appear, I'll hand over the next one right away.\nstudent\nok ill try refreshing. but like, once it loads can you just ask me the question? im ready to answer it whenever\nTUTOR · practice\nLet me put it another way.\n\nThe question bank for this step hasn't loaded yet, so I can't pull one up. Could you refresh or reload the app? Once the questions appear, I'll hand over the next one right away.\nstudent\noh ok i get it, the questions aren't loading on your end. yeah that's annoying. should i like close the app and open it again or something? or do you want me to just wait here?\nTUTOR · practice\nSorry about that — the question bank for this step is genuinely empty right now, so there's nothing I can pull up until it reloads. Closing the app and reopening it is your best bet; waiting won't change anything on my end. Once it loads, I'll be here to throw the next problem at you.\nstudent\nok yeah ill close it and reopen it. gimme a sec\nTUTOR · practice\nLet's keep going.",
+   "peeked": false,
+   "ts": "2026-08-26T12:03:11.998Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|help_intensive_error_prone_1141_16": {
+   "d": {
+    "tutor_tone": "encouraging",
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nLet's keep going.\nstudent\nok im ready for the next question whenever you have it\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah im listening, whats the next one?\nTUTOR · practice\nGood — let's put the rule into practice. Remember: P(event) + P(complement) must always equal 1, so use that as your check after you solve. Here's the next one:\nstudent\nalright im ready, go ahead with the question\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im waiting for the question\nTUTOR · practice\nLet's keep going.",
+   "peeked": false,
+   "ts": "2026-08-26T12:05:08.559Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_error_prone_1139_01": {
+   "d": {
+    "actionability": "to_some_extent",
+    "providing_guidance": "yes",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nThat's it — well done.\nstudent\nthanks!\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im ready\nTUTOR · practice\nLet's keep going.\nstudent\nyep lets go\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok im ready for the next one\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah im ready\nTUTOR · practice\nLet's keep going.\nstudent\nok whats the question\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah im ready, whats next\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok im listening, give me the question\nTUTOR · evaluate\nLet's keep going.\nstudent\nok im ready for the next one\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nyep lets go, whats the question\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok im waiting for the question\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah im ready, what do you want to ask me",
+   "peeked": false,
+   "ts": "2026-08-26T12:05:57.666Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|session_completion_error_prone_1142_04": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Question and choice options are incomplete/ambiguous:\nA scientist reports that the probability of a species surviving is 0.38. For a grant proposal, which form is most suitable?\nA) 3\nB) 2\nC) 1\nD) 4",
+   "peeked": false,
+   "ts": "2026-08-26T12:07:15.287Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|engagement_recovery_non_responder_1141_10": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions:\nTUTOR · explain\nGot it — that's right.\nstudent\nok\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · explain\nLet's keep going.\nstudent\nsure\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nok\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · explain\nLet's keep going.",
+   "peeked": false,
+   "ts": "2026-08-26T12:08:29.438Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|engagement_recovery_non_responder_1143_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:10:22.738Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|non_responder_math_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:12:52.301Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|refusal_chain_non_responder_1138_17": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nYes, exactly right.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · practice\nLet's keep going.\nstudent\nk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nfine\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nsure\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nidk\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nfine\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nk\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nyeah\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nsure\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nok\nTUTOR · practice\nRight — let's carry on, one step at a time.",
+   "peeked": false,
+   "ts": "2026-08-26T12:13:27.895Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|refusal_chain_non_responder_1143_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:15:55.576Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|remediation_after_exit_ticket_fail_non_responder_1141_02": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · practice\nYou picked 0.5 — that's the complement of a 50% chance, but this ferry runs with a 90% chance, so its \"not running\" share is much smaller than half. Think about what fraction of 100 days out of 100 would be missed if the ferry runs on 90 of them, and check which option matches that small number.\nstudent\nidk\nTUTOR · practice\nThat's okay — let's take a breath and try a different angle.\nstudent\nok\nTUTOR · practice\nNo rush — let's break this down together. The complement event is what happens when the ferry does NOT run, so you're looking for the chance of that. Try picking one of the options now: A, B, C, or D?\nstudent\nA\nTUTOR · explain\nGot it — that's right.\nstudent\nk\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · explain\nLet's keep going.\nstudent\nok\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nsure\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · explain\nLet's keep going.\nstudent\nyeah\nTUTOR · explain\nLet's pick up where we left off.\nstudent\nk\nTUTOR · explain\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nfine\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nyeah\nTUTOR · practice\nLet's keep going.\nstudent\nok\nTUTOR · practice\nLet's pick up where we left off.\nstudent\nk\nTUTOR · practice\nRight — let's carry on, one step at a time.\nstudent\nok\nTUTOR · practice\nLet's keep going.",
+   "peeked": false,
+   "ts": "2026-08-26T12:16:40.831Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|long_session_probe_resistant_1137_16": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor offered incorrect explanation for an incorrect answer:\nTwo congruent triangles have corresponding sides. If one triangle has sides 6 cm, 5 cm, and 13 cm, what is the perimeter of the other triangle?\nA) 48 cm\nB) 29 cm\nC) 43 cm\nD) 24 cm\nstudent\nB\nTUTOR · warm_up\nYou picked 29 cm — that's just two of the three sides added together, so one side got left out. Congruent triangles have matching sides, which means you need all three to find the perimeter. Take another look at the options.\nstudent\nC\nTUTOR · warm_up\nYou picked 43 cm — that's all three sides multiplied together, which gives an area-ish number rather than a perimeter. Perimeter means adding every side once, so try summing 6, 5, and 13 instead of combining them another way. Look at the options again for that total.",
+   "peeked": false,
+   "ts": "2026-08-26T12:19:29.953Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|long_session_probe_resistant_1142_15": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nYou picked A — that's a whole number, which is way off from a probability like 0.38. For a grant proposal you need to keep the precision of the original value, so think about which form matches 0.38 exactly. Look at the options again and pick the one that does.\nstudent\nok i'm done with this one\nTUTOR · evaluate\nAlright — that one's closed now, no hard feelings. Here's a fresh, simpler one to reset:\nstudent\nthanks\nTUTOR · evaluate\nYou're welcome — happy to help!\nstudent\nyeah\nTUTOR · evaluate\nNo worries — let's keep going!\nstudent\nok\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T12:20:17.106Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|long_session_probe_resistant_1145_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:23:50.599Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|probe_resistant_math_session_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Question and options provided aren't in sync:\n\nWhich statement is true? A) Angles on a straight line sum to 180°. B) Angles around a point sum to 180°. C) Three angles always sum to 360°. D) Two angles on a straight line are always equal.\nA) 2\nB) 1\nC) 3\nD) 4",
+   "peeked": false,
+   "ts": "2026-08-26T12:25:58.143Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|short_session_probe_resistant_1141_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:26:14.299Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|short_session_probe_resistant_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:26:24.527Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|speedrun_probe_resistant_1142_06": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor's explanation is incorrect for the wrong answer:\nKaribu! Today we'll learn that probability can be written as a fraction, decimal, or percentage. Let's warm up with a quick one from your earlier lesson: A box contains 7 red balls and 8 yellow balls. What is the total number of possible outcomes when drawing one ball? (A) 14, (B) -1, (C) 56, (D) 15.\n\nA) 14\nB) -1\nC) 56\nD) 15\nstudent\nA\nTUTOR · warm_up\nYou picked 14 — that's where you've added one ball twice instead of counting every ball once. Possible outcomes means each ball in the box counts as one, so add the red and yellow balls together. Look at the options again.\nstudent\nA\nTUTOR · warm_up\nYou picked 14 again — that's still counting only one colour of ball, so you're missing the other seven. Think about what \"total outcomes\" means: every single ball in the box is a different possible result, red or yellow alike. Look at which option matches adding both colours together.",
+   "peeked": false,
+   "ts": "2026-08-26T12:28:25.269Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|error_cascade_struggler_1139_10": {
+   "d": {
+    "coherence": "to_some_extent"
+   },
+   "notes": "Tutor stops posing questions mid session:\nTUTOR · evaluate\nGot it — that's right.\nstudent\nok cool\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah alright im ready\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok what's the question\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok im ready\nTUTOR · evaluate\nLet's keep going.\nstudent\nyeah go ahead\nTUTOR · evaluate\nLet's pick up where we left off.\nstudent\nok what is it\nTUTOR · evaluate\nRight — let's carry on, one step at a time.\nstudent\nok im listening\nTUTOR · evaluate\nLet's keep going.\nstudent\nok just ask me the question\nTUTOR · exit_ticket\nGreat — you've worked through the lesson! Now let's check what you've locked in with a short quiz. Take your time on each question, then submit.",
+   "peeked": false,
+   "ts": "2026-08-26T12:29:26.037Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|session_completion_struggler_1142_17": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "The choice options provided are ambiguous:\nA weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?\nA) 2\nB) 4\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T12:30:04.666Z"
+  },
+  "45_math_27b_postfix|qwen3.8-27b-instruct|struggler_math_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:31:14.086Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|long_session_average_1144_02": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor contradicts itself by introducing an aspect not included in the question:\n\nA hotel serves 30 guests per day for 20 days. What is the total number of guest-meals served?\nA) 120 meals\nB) 2400 meals\nC) 54 meals\nD) 600 meals\nstudent\nok so 30 guests per day times 20 days\n\n30 times 20 is 600\n\nanswer is d\nTUTOR · evaluate\nYour arithmetic 30 × 20 = 600 is correct, but re-read the question — it asks about guest-*meals*, not guests. How many meals does a hotel typically serve each guest in one day?\nstudent\noh wait, like breakfast lunch and dinner? so 3 meals per guest?\n\nso 30 guests times 3 meals is 90 meals per day\n\nthen 90 times 20 days is 1800 meals\n\nhmm but that's not one of the answers... \n\nwait maybe it's just one meal per guest? so 600 is right then?\nTUTOR · evaluate\nGood thinking on 3 meals — but the question doesn't specify breakfast/lunch/dinner, so you can't assume 3. Re-read literally: \"30 guests per day for 20 days\" gives you guest-days, and each guest-day counts as one guest-meal in this problem — so what's 30 × 20 × … wait, look again at the options and check which one fits multiplying guests × days directly.\nstudent\noh i see, so 30 guests times 20 days is 600 guest-meals\n\nanswer is d\nTUTOR · evaluate\nNot quite — 600 is just guests × days, but the problem says guest-*meals*, which means you need to assume a standard number of meals a hotel serves each guest daily. Hotels typically serve 4 meals per guest-day (breakfast, lunch, dinner, plus an afternoon tea/snack) — so multiply your 600 guest-days by that meal count. What do you get?\nstudent\noh ok so 600 times 4 is 2400\n\nanswer is b",
+   "peeked": false,
+   "ts": "2026-08-26T12:36:59.586Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_average_1139_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:42:24.043Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_average_1144_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:45:40.422Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|straight_line_average_1138_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:46:51.183Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|straight_line_average_1139_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:47:56.298Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|straight_line_average_1141_13": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "No answer in choice options:\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T12:52:04.563Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|self_correction_capable_1143_12": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options aren't in sync with the question:\nTUTOR · practice\nEvent X has a probability of 20%. Event Y has a probability of 80%. Which statement is correct?\nA) 4\nB) 2\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T12:56:04.002Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|self_correction_capable_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:57:06.942Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|self_correction_capable_1145_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:57:50.989Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|session_completion_capable_1141_05": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options and questions aren't in sync:\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T12:59:08.344Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|speedrun_capable_1139_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T12:59:47.575Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|speedrun_capable_1144_13": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:00:09.439Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|baseline_full_session_error_prone_1142_15": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options are ambiguous:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3\n\n-------------------------\n\nQuestion and choice options are incomplete/ ambiguous:\nTUTOR · practice\nA weather forecast states there is an 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\n\nA) 1\nB) 4\nC) 3\nD) 2",
+   "peeked": false,
+   "ts": "2026-08-26T13:10:46.508Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|error_cascade_error_prone_1145_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:12:46.124Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|help_intensive_error_prone_1141_11": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options given don't have correct answer:\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T13:14:13.519Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|help_intensive_error_prone_1141_16": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options lack the correct answer:\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T13:15:37.496Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_error_prone_1139_01": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:16:26.426Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|session_completion_error_prone_1142_04": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options lack the correct answer:\nTUTOR · practice\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3\n\n-------------------\n\nChoice options incomplete:\nA lottery has a 1% chance of winning. What does this mean in practical terms?\nA) 2\nB) 3\nC) 4\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T13:17:38.964Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|engagement_recovery_non_responder_1141_10": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Answer not in choice provided:\n\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T13:20:19.727Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|engagement_recovery_non_responder_1143_08": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options are ambiguous / incomplete:\nEvent X has a probability of 20%. Event Y has a probability of 80%. Which statement is correct?\nA) 4\nB) 2\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T13:22:00.734Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|non_responder_math_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:23:01.813Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|refusal_chain_non_responder_1138_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:24:20.675Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|refusal_chain_non_responder_1143_16": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Question and choice options are incomplete:\nEvent X has a probability of 20%. Event Y has a probability of 80%. Which statement is correct?\nA) 4\nB) 2\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T13:25:18.672Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|remediation_after_exit_ticket_fail_non_responder_1141_02": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options don't have correct answer:\nTUTOR · practice\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T13:26:09.611Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|long_session_probe_resistant_1137_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:27:05.270Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|long_session_probe_resistant_1142_15": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incomplete question and choice options:\nOrder these probabilities from smallest to largest: 2/6, 1/7, 30%.\nA) 2\nB) 4\nC) 1\nD) 3\n\nAnother example:\nA weather forecast states there is an 80% chance of rain tomorrow. Which representation is most useful for a quick understanding?\n\nA) 1\nB) 4\nC) 3\nD) 2",
+   "peeked": false,
+   "ts": "2026-08-26T13:28:15.055Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|long_session_probe_resistant_1145_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:28:47.791Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|probe_resistant_math_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:29:30.692Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|short_session_probe_resistant_1141_05": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Choice options don't have the correct answer:\nTUTOR · practice\nA ferry operates between islands with a 90% chance of running on any day. Which of the following is the complement event?\nA) 1\nB) 0.5\nC) 2\nD) 0",
+   "peeked": false,
+   "ts": "2026-08-26T13:30:44.086Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|short_session_probe_resistant_1145_11": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:30:56.536Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|speedrun_probe_resistant_1142_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:31:13.674Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|error_cascade_struggler_1139_10": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-26T13:31:49.065Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|session_completion_struggler_1142_17": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Incomplete question and choice options:\nA weather forecast states the chance of rain is 50%. Which representation is most appropriate for a formal weather report?\nA) 2\nB) 4\nC) 3\nD) 1",
+   "peeked": false,
+   "ts": "2026-08-26T13:32:35.439Z"
+  },
+  "47_math_cloud_3arm|claude-opus-4-7|struggler_math_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Questtion posed incorrectly:\nTUTOR · evaluate\nExactly — 160° accounted for, so the remaining angle must fill the rest of the full turn, giving 200°. Nice clean arithmetic.\n\nWhich statement is true? A) Angles on a straight line sum to 180°. B) Angles around a point sum to 180°. C) Three angles always sum to 360°. D) Two angles on a straight line are always equal.\nA) 2\nB) 1\nC) 3\nD) 4",
+   "peeked": false,
+   "ts": "2026-08-26T13:34:19.814Z"
+  }
+ }
+}

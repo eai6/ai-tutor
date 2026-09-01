@@ -606,7 +606,7 @@ textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6
   <tr><td>Browse</td><td>the full session table. Filter with the dropdowns, sort by clicking a column header, and click any row to open its full transcript + judge scores in a panel on the right.</td></tr>
   <tr><td>Cross-cycle compare</td><td>pick one scenario + one model and see that SAME session side-by-side across every run that ran it — the fastest way to check whether a fix actually changed a specific session's behaviour.</td></tr>
   <tr><td>Grade</td><td>judge a session <b>yourself</b> against the eight pedagogical dimensions, one session at a time. See below.</td></tr>
-  <tr><td>Me vs judge</td><td>your pass rate beside the judge's over the sessions you have graded, filterable to one <b>model</b>; the per-persona balance chart; and, for any single session, your eight dimensions beside the judge's rubric.</td></tr>
+  <tr><td>Me vs judge</td><td>your pass rate beside the judge's over the sessions you have graded, filterable to one <b>model</b> or one <b>subject</b> (maths / geography); the per-persona balance chart; and, for any single session, your eight dimensions beside the judge's rubric.</td></tr>
   <tr><td>Agreement</td><td>the same question over everything you have graded — confusion matrix, agreement rate, &kappa;, and which dimension drives your fails.</td></tr>
  </tbody></table>
 
@@ -766,6 +766,7 @@ textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6
  <div class="filters">
   <select id="x-run" onchange="fillSxsSel();drawSxs()"></select>
   <select id="x-model" onchange="fillSxsSel();drawSxs()"></select>
+  <select id="x-subject" onchange="fillSxsSel();drawSxs()"></select>
   <select id="x-sess" onchange="drawSxs()"></select>
   <span class="small">Every session you have graded, your verdict beside the judge's.</span>
  </div>
@@ -1228,11 +1229,14 @@ function badge(p){
 
 /* ── me vs judge ─────────────────────────────────────────────────────── */
 function fillSxsSel(){
- const run=v('x-run');
+ const run=v('x-run'),subject=v('x-subject');
  // Counts ride in the option labels so the dropdown reports the workload per
- // model without being opened one entry at a time.
+ // model without being opened one entry at a time. They are counted INSIDE the
+ // chosen subject, so with `math` selected the label answers "how many maths
+ // sessions have I graded on this model" rather than a total the tab below it
+ // will not show.
  const ms=document.getElementById('x-model'),mprev=ms.value;
- const counts=modelCounts(gradedSessions(run,''));
+ const counts=modelCounts(gradedSessions(run,'',subject));
  const total=counts.reduce((a,c)=>a+c.n,0);
  ms.innerHTML='<option value="">model: all ('+total+')</option>'+
   counts.map(c=>'<option value="'+esc(c.model)+'">'+esc(c.model)+' ('+c.n+')</option>').join('');
@@ -1240,7 +1244,8 @@ function fillSxsSel(){
 
  const model=ms.value;
  const keys=gradedKeys().filter(k=>BY_KEY[k]&&(!run||BY_KEY[k].run===run)&&
-                                   (!model||BY_KEY[k].m===model)).sort();
+                                   (!model||BY_KEY[k].m===model)&&
+                                   (!subject||BY_KEY[k].sub===subject)).sort();
  const s=document.getElementById('x-sess');
  const prev=s.value;
  s.innerHTML=keys.length?keys.map(k=>{
@@ -1252,32 +1257,36 @@ function fillSxsSel(){
 
 // Every persona present in the data, so the balance chart can show a zero bar
 // for one you have not started rather than omitting the row.
-function personasIn(run,model){
- return [...new Set(DATA.filter(d=>(!run||d.run===run)&&(!model||d.m===model))
+function personasIn(run,model,subject){
+ return [...new Set(DATA.filter(d=>(!run||d.run===run)&&(!model||d.m===model)&&
+                                   (!subject||d.sub===subject))
   .map(d=>d.p).filter(x=>x!=null))].sort();
 }
 // Sessions with a complete grading, for workload counting. Deliberately looser
 // than gradedRows below: a peeked session or one the judge never scored still
 // took your time, so it still counts toward balance.
-function gradedSessions(run,model){
+function gradedSessions(run,model,subject){
  return gradedKeys().map(k=>BY_KEY[k])
-  .filter(d=>d&&(!run||d.run===run)&&(!model||d.m===model));
+  .filter(d=>d&&(!run||d.run===run)&&(!model||d.m===model)&&
+              (!subject||d.sub===subject));
 }
 
 function drawSxs(){
- const run=v('x-run'),model=v('x-model');
- drawSxsSummary(run,model);
+ const run=v('x-run'),model=v('x-model'),subject=v('x-subject');
+ drawSxsSummary(run,model,subject);
  const k=v('x-sess'),body=document.getElementById('x-body');
  const d=BY_KEY[k],r=rec(k);
  if(!d||!r){body.innerHTML='<div class="small">Grade a session on the Grade tab and it appears here.</div>';return;}
  body.innerHTML=sxsHTML(d,r);
 }
 
-function drawSxsSummary(run,model){
- const S=gradedRows({run:run,model:model,basis:'rp'});
+function drawSxsSummary(run,model,subject){
+ const S=gradedRows({run:run,model:model,subject:subject,basis:'rp'});
  const R=sxsRates(S.mine,S.rows);
  const pct=x=>x==null?'—':x.toFixed(1)+'%';
- const scope=(model||'all models')+(run?' in '+run:'');
+ // The subject leads the scope string because it is the coarsest cut of the
+ // three: "math · all models in geo_cloud_3arm" reads in the order you narrowed.
+ const scope=(subject?subject+' · ':'')+(model||'all models')+(run?' in '+run:'');
  const el=document.getElementById('x-summary');
 
  // Each rate carries its own denominator in the caption. Two percentages side
@@ -1326,16 +1335,16 @@ function drawSxsSummary(run,model){
  }
 
  el.innerHTML=cards+'<div class="small" style="margin:-6px 0 12px">'+note+'</div>'+
-  personaChart(run,model);
+  personaChart(run,model,subject);
 }
 
 // A single-series horizontal bar chart: one measure (sessions graded) across
 // six nominal personas. Value labels sit outside the bar ends because the bars
 // are short, and a hairline marks the level every bar is aiming at.
-function personaChart(run,model){
- const personas=personasIn(run,model);
+function personaChart(run,model,subject){
+ const personas=personasIn(run,model,subject);
  if(!personas.length)return '';
- const rows=personaBalance(gradedSessions(run,model),personas);
+ const rows=personaBalance(gradedSessions(run,model,subject),personas);
  const target=rows.length?rows[0].target:0;
  const scale=Math.max(target,1);
  const done=rows.filter(r=>r.deficit===0).length;
@@ -1518,6 +1527,10 @@ function openSxs(k){
  // and the tab would open on whatever happened to be selected before.
  if(d){
   document.getElementById('x-run').value=d.run;
+  // The subject moves onto the session rather than being cleared: a subject
+  // left selected from a previous look would filter the requested session out
+  // of the list, and clearing it would silently widen a scope you had chosen.
+  document.getElementById('x-subject').value=d.sub==null?'':d.sub;
   fillSxsSel();
   document.getElementById('x-model').value=d.m;
  }
@@ -1538,7 +1551,7 @@ document.getElementById('c-scenario').innerHTML=uniq('s').map(x=>'<option>'+esc(
 document.getElementById('c-model').innerHTML=uniq('m').map(x=>'<option>'+esc(x)+'</option>').join('');
 fillSel('g-run','run',uniq('run'));fillSel('g-model','model',uniq('m'));
 fillSel('g-persona','persona',uniq('p'));fillSel('g-subject','subject',uniq('sub'));
-fillSel('x-run','run',uniq('run'));
+fillSel('x-run','run',uniq('run'));fillSel('x-subject','subject',uniq('sub'));
 fillSel('a-run','run',uniq('run'));fillSel('a-model','model',uniq('m'));
 fillSel('a-persona','persona',uniq('p'));fillSel('a-subject','subject',uniq('sub'));
 draw();

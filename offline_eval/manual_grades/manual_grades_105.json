@@ -1,0 +1,1638 @@
+{
+ "version": 1,
+ "exported": "2026-08-18T13:20:51.639Z",
+ "dimensions": [
+  "mistake_identification",
+  "mistake_location",
+  "revealing_answer",
+  "providing_guidance",
+  "actionability",
+  "coherence",
+  "tutor_tone",
+  "human_likeness"
+ ],
+ "graded": 105,
+ "verdicts": {
+  "30_mt100_18arm_board|claude-opus-5|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:05:02.166Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:12:57.222Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:17:20.268Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_full_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:17:57.316Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:19:23.448Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:21:26.369Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T15:28:17.741Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T16:45:57.789Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|no_banned_opener_loop_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T16:47:20.627Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:19:35.005Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_prone_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:26:22.089Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|help_intensive_error_prone_1470_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:31:04.910Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_error_prone_1467_08": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:38:53.028Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:44:08.311Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:45:37.729Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:46:59.824Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:47:37.195Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|non_responder_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:55:05.514Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:56:51.618Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:58:31.764Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T17:59:45.954Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|straight_line_average_1469_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:00:11.426Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_struggler_1468_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:01:20.403Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:01:41.772Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:03:35.024Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_struggler_1470_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:04:23.856Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|session_completion_struggler_1470_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:05:13.412Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:09.431Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:29.399Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:06:50.194Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:07:13.556Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:07:45.396Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|speedrun_probe_resistant_1468_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:11:53.327Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:12:28.920Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|struggler_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:13:45.651Z"
+  },
+  "30_mt100_18arm_board|claude-opus-5|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-17T18:14:21.584Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|average_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T06:17:00.999Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|average_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T06:19:10.997Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T06:21:29.271Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T06:26:13.025Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T06:59:41.650Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|straight_line_average_1469_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:02:58.398Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|capable_full_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:06:23.047Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:07:02.030Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|capable_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:07:43.993Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|long_session_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:08:20.539Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:08:55.434Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|speedrun_capable_1470_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:10:12.276Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T07:17:16.490Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|error_cascade_error_prone_1466_04": {
+   "d": {
+    "mistake_location": "to_some_extent",
+    "mistake_identification": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "The tutor didn't explain why that answer is wrong.\n\nA student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\nstudent\nd\nTUTOR · explain\nClose, but not quite — take it one step at a time. Here's the question again:\n\nSame question, fresh angle: A student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\n\n------------------------------------------------------------------------------------------------------------------\nThe tutor posted two questions that are unrelated and  failed to follow up on the first one\n\nSame question, fresh angle: A student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\n\nIf a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?\nA) 7.5 km\nB) 15 km\nC) 10 km\nD) 20 km\nstudent\nok so for the first one i think its a because like the measurement will always be wrong without knowing the scale\n\nfor the second one, 2 cm is 5 km so 6 cm would be 10 km\nTUTOR · explain\nNot quite — let's walk through it together. Here's the question again:\n\nOne more look at this one: If a map shows a scale bar where 2 cm equals 5 km, what is the ground distance represented by 6 cm on the map?\nA) 7.5 km\nB) 15 km\nC) 10 km\nD) 20 km\n",
+   "peeked": false,
+   "ts": "2026-08-18T07:44:07.396Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|error_prone_geo_direction_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "to_some_extent",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Fails to give a hint when a student's answer is wrong\n\nCorrect — nice work. Try this one:\n\nWhich of the following statements best describes the relationship between compass points and bearings?\nA) Compass points and bearings are the same thing expressed differently.\nB) Bearings are compass points that have been converted to degrees.\nC) Compass points are verbal directions, while bearings are precise numerical measurements from north.\nD) Compass points are used only on nautical maps, while bearings are used on land maps.\nstudent\nb\nTUTOR · explain\nClose, but not quite — take it one step at a time. Here's the question again:\n\nOne more look at this one: Which of the following statements best describes the relationship between compass points and bearings?\nA) Compass points and bearings are the same thing expressed differently.\nB) Bearings are compass points that have been converted to degrees.\nC) Compass points are verbal directions, while bearings are precise numerical measurements from north.\nD) Compass points are used only on nautical maps, while bearings are used on land maps.\n\n\nAnother example\n\n\nA bearing of 315° corresponds to which compass point?\nA) Northeast (NE)\nB) Northwest (NW)\nC) Southeast (SE)\nD) Southwest (SW)\nstudent\na\nTUTOR · practice\nNot quite — let's walk through it together. Here's the question again:\n\nOne more look at this one: A bearing of 315° corresponds to which compass point?\nA) Northeast (NE)\nB) Northwest (NW)\nC) Southeast (SE)\nD) Southwest (SW)",
+   "peeked": false,
+   "ts": "2026-08-18T07:53:18.270Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|error_prone_geo_session_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "mistake_location": "yes",
+    "mistake_identification": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the correct answer.\n\nYou classified 1:250,000 as a large-scale map, but a larger second number in the ratio means the real world has been shrunk down much more. A large ratio number like 250,000 covers a wide territory with less local detail, making it a small scale. Please take another look and choose again from the options.\nstudent\nohh right, so the bigger number means smaller scale. so it would be B) Small scale",
+   "peeked": false,
+   "ts": "2026-08-18T07:58:31.025Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|session_completion_error_prone_1466_03": {
+   "d": {
+    "mistake_location": "yes",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "actionability": "yes",
+    "providing_guidance": "no",
+    "revealing_answer": "no",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor fails to explain why that answer is wrong or give a hint\nA student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\nstudent\nd, rulers are not reliable measurement tools\nTUTOR · explain\nClose, but not quite — take it one step at a time. Here's the question again:\n\nOne more look at this one: A student measures a straight line on a map using a ruler and gets 5 cm. However, they forget to record the map scale. Without the scale, why is the measurement essentially useless?\nA) The measurement will always be inaccurate\nB) Without the scale, the ground distance cannot be determined\nC) The scale will change if the map is photocopied\nD) Rulers are not reliable measurement tools\n\nanother example\n\nWhen using the string method to measure a curved coastline, the next step after tracing the coastline with string is to:\nA) Cut the string into equal segments\nB) Straighten the string and measure its length against a ruler\nC) Calculate the map scale again\nD) Draw the coastline on a new map\nstudent\na, cut the string into equal segments\nTUTOR · practice\nNot quite — let's walk through it together. Here's the question again:\n\nOne more look at this one: When using the string method to measure a curved coastline, the next step after tracing the coastline with string is to:\nA) Cut the string into equal segments\nB) Straighten the string and measure its length against a ruler\nC) Calculate the map scale again\nD) Draw the coastline on a new map",
+   "peeked": false,
+   "ts": "2026-08-18T08:07:04.563Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "actionability": "to_some_extent",
+    "providing_guidance": "no",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "In the first turn, the tutor doesn't hand back a response with which the student can take some action.\n\nWhich of the following best describes a V-shaped river channel?\nA) Wide and shallow with gentle sloping banks\nB) Narrow and deep with steep vertical sides\nC) Rectangular in cross-section with uniform depth\nD) Broad and flat with extensive floodplain areas\nstudent\nB\nTUTOR · explain\nCorrect — nice work.\n\n-----------------------------------------------------------------\nTutor fails to give a hint\n\n\nWhere on a river channel cross-section diagram would you measure the width of the river?\nA) From the riverbed to the water surface\nB) From one bank to the other bank at the water surface level\nC) From the floodplain edge to the opposite floodplain edge\nD) Along the longest part of the riverbed\nstudent\nC\nTUTOR · practice\nNot this time — have another look. Here's the question again:\n\nOne more look at this one: Where on a river channel cross-section diagram would you measure the width of the river?\nA) From the riverbed to the water surface\nB) From one bank to the other bank at the water surface level\nC) From the floodplain edge to the opposite floodplain edge\nD) Along the longest part of the riverbed\n\n\nAnother example:\n\nThere are 2 answers, learner get one correct and the tutor doesn't point out that there is another answer\nA river study examines channel cross-sections from three locations. Location X displays a V-shaped channel cut into bedrock with steep sides typical of the upper course. Location Y shows a U-shaped channel in alluvial sediment characteristic of the lower course. Location Z shows a rectangular box-shaped channel with artificial concrete levees. Which location best represents a naturally developed channel form?\nA) Location X, which has a V-shaped channel typical of the upper course\nB) Location Y, which has a U-shaped channel in alluvial sediment\nC) Location Z, which has a box-shaped channel with artificial levees\nD) All three locations equally represent naturally developed channels",
+   "peeked": false,
+   "ts": "2026-08-18T08:15:16.869Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:17:41.298Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:18:05.909Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:18:32.987Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|non_responder_geo_session_001": {
+   "d": {
+    "actionability": "yes",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:18:54.541Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:22:03.984Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "actionability": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "In the first turn, the tutor failed to give an actionable response:\n\nn the Seychelles context, a small river draining from the higher central peaks typically shows which characteristics?\nA) Wide floodplain, U-shaped channel, slow-moving water\nB) Steep gradient, V-shaped channel, rapid water flow with vertical erosion\nC) Box-shaped channel, moderate gradient, mixed erosion\nD) Shallow braided channels with extensive deposition\nstudent\nB\nTUTOR · explain\nCorrect — nice work.",
+   "peeked": false,
+   "ts": "2026-08-18T08:24:34.109Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:25:43.880Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:26:27.797Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:26:56.563Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|probe_resistant_geo_session_001": {
+   "d": {
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "actionability": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:27:30.147Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:28:03.644Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|speedrun_probe_resistant_1468_03": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "coherence": "yes",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "human_likeness": "to_some_extent",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "All or most of the answers are responded to with only \"Got it — that's right.\" No further explanation or tutoring. Just Oks and posing the next question.",
+   "peeked": false,
+   "ts": "2026-08-18T08:33:30.886Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|error_cascade_struggler_1468_12": {
+   "d": {
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor asks for a choice answer yet the student already gave it in his/her response\n\nstudent\nyeah so if it goes sideways thats lateral erosion... so B has that in it right? shift from vertical to lateral erosion. so B?\nTUTOR · explore\nYou've connected the dots perfectly regarding lateral erosion. As a river moves to flatter land, vertical cutting decreases while sideways erosion and deposition shape a wider, flatter U-shaped valley. Does option B best represent that shift from downwards to sideways erosion for you?\nstudent\nyeah i think so. B says the shift from vertical to lateral erosion and like the sediment stuff. so yeah B makes sense now\n\n\nanother example\n\nstudent\nhmm so the banks are falling in and theres like deep cuts in the rock... that sounds like it's cutting down a lot. so thats vertical erosion right? and that happens in the upper course where its V shaped. so B?\nTUTOR · practice\nYour reasoning is spot-on—vertical erosion cuts deeply into the bedrock while gravity pulls the unstable banks inward. This dual action is exactly how the steep-sided, narrow channel of the early river stage forms. Since you have worked it out so well, which option best fits your explanation?\nstudent\nyeah so B right? vertical erosion in the upper course making the V shaped channel. thats what i said\n",
+   "peeked": false,
+   "ts": "2026-08-18T08:40:35.309Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|error_cascade_struggler_1469_16": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging"
+   },
+   "notes": "Tutor asks for a choice answer selected yet student already mentioned it in his/her response.\n\nstudent\nhmm so the banks are falling in and theres like deep cuts in the rock... that sounds like it's cutting down a lot. so thats vertical erosion right? and that happens in the upper course where its V shaped. so B?\nTUTOR · practice\nYour reasoning is spot-on—vertical erosion cuts deeply into the bedrock while gravity pulls the unstable banks inward. This dual action is exactly how the steep-sided, narrow channel of the early river stage forms. Since you have worked it out so well, which option best fits your explanation?\nstudent\nyeah so B right? vertical erosion in the upper course making the V shaped channel. thats what i said\n",
+   "peeked": false,
+   "ts": "2026-08-18T08:46:00.937Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|help_intensive_struggler_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T08:47:24.818Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|long_session_struggler_1470_03": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "actionability": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor doesn't give a hint if the student get it wrong\n\n\nWhich process best describes exfoliation?\nA) Ice crystals wedging apart rock layers due to freezing water in fractures\nB) Curved sheets of rock peeling away from the surface due to pressure release as overlying rock is removed\nC) The weathering of rock by acids produced by lichen growth\nD) The breakup of rock fragments by repeated heating and cooling during daily temperature changes\nstudent\nhmm is it a?\nTUTOR · explain\nClose, but not quite — take it one step at a time. Here's the question again:\n\nOne more look at this one: Which process best describes exfoliation?\nA) Ice crystals wedging apart rock layers due to freezing water in fractures\nB) Curved sheets of rock peeling away from the surface due to pressure release as overlying rock is removed\nC) The weathering of rock by acids produced by lichen growth\nD) The breakup of rock fragments by repeated heating and cooling during daily temperature changes",
+   "peeked": false,
+   "ts": "2026-08-18T08:51:01.848Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|session_completion_struggler_1470_07": {
+   "d": {
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor asks for answer choice yet student already gave it in the response\n\nhmm ok so like... freeze-thaw is when water freezes right? and it breaks rocks\n\nso mountains are cold so water freezes there... that would be B i think?\n\nbecause if its warm like seychelles the water doesnt freeze so it cant break the rocks\n\nis it B?\nTUTOR · engage\nYou have got the exact mechanism down: when water freezes, it expands with immense force, wedging cracks wider and wider over time. Since Seychelles stays warm year-round, liquid water never freezes here to do that work. Does that make B your final choice for the question?\nstudent\nyeah B makes sense cos like the water freezes and expands and breaks the rocks, and in seychelles its always warm so that cant happen\n\nso B is my final answer",
+   "peeked": false,
+   "ts": "2026-08-18T08:54:28.561Z"
+  },
+  "30_mt100_18arm_board|gemini-3.5-flash|struggler_session_completion_001": {
+   "d": {
+    "providing_guidance": "no",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "actionability": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor fails to give hints\n\nA small scale map is best described as having which of the following characteristics?\nA) A ratio of 1:10,000 and showing a small area with great detail.\nB) A ratio of 1:1,000,000 or larger and showing a large area with limited detail.\nC) A ratio of 1:50,000 and showing only urban centres.\nD) A map made from a reduced photograph rather than a survey.\nstudent\nhmm idk this one is confusing. like whats a small scale map even mean\n\ni think its like... A? cause it says small area? or wait maybe B cause it says 1 million which sounds big\n\nim stuck between those two honestly\nTUTOR · engage\nLet's keep going. Here's the question:\n\nA small scale map is best described as having which of the following characteristics?\nA) A ratio of 1:10,000 and showing a small area with great detail.\nB) A ratio of 1:1,000,000 or larger and showing a large area with limited detail.\nC) A ratio of 1:50,000 and showing only urban centres.\nD) A map made from a reduced photograph rather than a survey.\nstudent\noh wait i think its B. cause small scale sounds like it would be a smaller number ratio thing... wait no that doesnt make sense\n\nactually i think B cause like 1 million is really small so thats small scale right? and it shows a big area but not much detail\n\nis it B?",
+   "peeked": false,
+   "ts": "2026-08-18T08:59:39.210Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|average_geo_direction_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "The tutor while pivoting got confused between what answer is for the pivot question and which one is for the initial question.\n\nWhat is the bearing equivalent of the compass point Southwest (SW)?\nA) 135°\nB) 225°\nC) 315°\nD) 45°\nstudent\nok so southwest is like halfway between south and west. south is 180 and west is 270, so halfway would be... 225. that's B\nTUTOR · explore\nYou picked B — that's correct! Southwest is exactly 225° because it's halfway between south (180°) and west (270°), measured clockwise from north. Here's the next one: What is the bearing equivalent of East-Southeast (ESE)?\nstudent\nwait, east-southeast? is that like between east and southeast?\nTUTOR · explore\nYou're thinking about it well — but for now, let's focus on Southwest (SW). We know it's exactly halfway between South (180°) and West (270°), measured clockwise from North, so it's 225°.  \n\nNext, here's a new one: What is the bearing equivalent of East-Southeast (ESE)?  \n\n(Answer choices will appear after this.)\nstudent\nok so east is 90 and southeast is 135. so halfway between those would be... 90 plus 135 is 225, divided by 2 is like 112 or 113 i think? is it 112?\nTUTOR · explore\nYou picked 112° — that’s halfway between east (90°) and southeast (135°), which is actually east-southeast (ESE), not southwest (SW).  \nSouthwest is after south (180°), and we measure clockwise from north — so it’s 225°, past south by 45°.  \nLook again at the options and think about where southwest falls on the compass.\nstudent\nwait im confused now. you said southwest is 225 right? that's what i said before and you said it was right. but now you're asking me about east-southeast again? \n\nis the question asking for east-southeast or southwest? cause i thought we already did southwest and it was 225\nTUTOR · explore\nYou're right to ask — I see the confusion. The question is asking for the bearing of **Southwest (SW)**, not east-southeast. Southwest is exactly halfway between south (180°) and west (270°), so it's 225°. You previously said 225°, and that was correct — it's the right bearing for SW.  \n\n------------------------\nAnothe scenario of confusion:\n\nWhat is the bearing equivalent of the compass point Southwest (SW)?\nA) 135°\nB) 225°\nC) 315°\nD) 45°\nstudent\nok so southwest is like halfway between south and west. south is 180 and west is 270, so halfway would be... 225. that's B\nTUTOR · explore\nYou picked B — that's correct! Southwest is exactly 225° because it's halfway between south (180°) and west (270°), measured clockwise from north. Here's the next one: What is the bearing equivalent of East-Southeast (ESE)?\nstudent\nwait, east-southeast? is that like between east and southeast?\nTUTOR · explore\nYou're thinking about it well — but for now, let's focus on Southwest (SW). We know it's exactly halfway between South (180°) and West (270°), measured clockwise from North, so it's 225°.  \n\nNext, here's a new one: What is the bearing equivalent of East-Southeast (ESE)?  \n\n(Answer choices will appear after this.)\nstudent\nok so east is 90 and southeast is 135. so halfway between those would be... 90 plus 135 is 225, divided by 2 is like 112 or 113 i think? is it 112?\nTUTOR · explore\nYou picked 112° — that’s halfway between east (90°) and southeast (135°), which is actually east-southeast (ESE), not southwest (SW).  \nSouthwest is after south (180°), and we measure clockwise from north — so it’s 225°, past south by 45°.  \nLook again at the options and think about where southwest falls on the compass.\nstudent\nwait im confused now. you said southwest is 225 right? that's what i said before and you said it was right. but now you're asking me about east-southeast again? \n\nis the question asking for east-southeast or southwest? cause i thought we already did southwest and it was 225\nTUTOR · explore\nYou're right to ask — I see the confusion. The question is asking for the bearing of **Southwest (SW)**, not east-southeast. Southwest is exactly halfway between south (180°) and west (270°), so it's 225°. You previously said 225°, and that was correct — it's the right bearing for SW.  \n",
+   "peeked": false,
+   "ts": "2026-08-18T09:28:21.246Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|average_geo_scale_001": {
+   "d": {
+    "coherence": "no",
+    "actionability": "to_some_extent"
+   },
+   "notes": "The tutor's response after the student answer aren't in sync:\nA map with the ratio 1:250,000 would be classified as which scale type?\nA) Large scale\nB) Small scale\nC) Medium scale\nD) Ultra-large scale\nstudent\nok so 1:250,000 is bigger than 1:50,000 so that means it shows more area and less detail. so that would be small scale i think. B\nTUTOR · explain\nYou picked B — that option describes a small scale map, which is correct in saying it shows less detail, but it misses the key rule: a larger ratio (like 1:250,000) means less detail and a larger area, so it's small scale. A large scale map has a smaller ratio (like 1:5,000), showing more detail in a small area. Here's the next one:\nstudent\nwait so like... the smaller the number on the bottom the more detail you get? that's confusing but ok i get it now. so 1:5,000 is big detail and 1:250,000 is small detail. yeah i think i understand now\nTUTOR · explain\nYou picked B — that option correctly identifies a small scale map, which shows less detail over a larger area. The key rule is: a smaller ratio (like 1:5,000) means more detail in a small area, while a larger ratio (like 1:250,000) means less detail over a broader area. Here's the next one:\nstudent\nok yeah i get it now. smaller number means zoomed in more, bigger number means zoomed out. so like 1:5,000 is large scale and 1:250,000 is small scale. i think i've got it\nTUTOR · explain\nYou picked B — that option correctly identifies a small scale map, which shows less detail over a larger area. A large scale map has a smaller ratio (like 1:5,000) and shows more detail for a small area, while a small scale map has a larger ratio (like 1:250,000) and covers a bigger area with less detail.  \nHere's the next one:\nstudent\nok i'm ready. what's the question?\n\n\n\nAlso the tutor repeats the exact same question it asked.\n\n\nHere’s the next one:  \nHow does decreasing the map scale (moving from 1:50,000 to 1:500,000) affect what can be shown on the map?\nstudent\nok so we go from 1:50,000 to 1:500,000. thats a bigger number so smaller scale. smaller scale shows more area but less detail. so A is right\nTUTOR · explore\nYou're on the right track — moving from 1:50,000 to 1:500,000 means the scale decreases, so it's a smaller scale. Smaller scale shows a larger area but with less detail. That means option A is correct.  \n\nHere's the next one:  \nHow does decreasing the map scale (moving from 1:50,000 to 1:500,000) affect what can be shown on the map?\nstudent\nwait we just did this one didn't we? yeah i already said A. more area but less detail. is there a different question now?\nTUTOR · explore\nHow does decreasing the map scale (moving from 1:50,000 to 1:500,000) affect what can be shown on the map?\nA) More area can be shown, but with less detail.\nB) Less area can be shown, but with more detail.\nC) More area can be shown, with the same amount of detail.\nD) The area coverage stays the same, but symbols become larger.\nstudent\nyeah this is the same question again. the answer is A. bigger number means smaller scale means more area less detail. can we do a different one now?\n\n------------------------------\n\nThe tutor doesn't pose an actionable response after a student answer\n\nYou picked A — that's correct! When the denominator increases, the scale decreases, meaning the map shows a larger area but with less detail. Here's the next one:\nstudent\nok thanks. i'm ready for the next one",
+   "peeked": false,
+   "ts": "2026-08-18T09:48:59.659Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1466_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T09:49:52.735Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|remediation_after_exit_ticket_fail_average_1469_14": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T09:50:57.069Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|self_correction_average_1469_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T09:53:58.424Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|self_correction_average_1470_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T09:54:50.923Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|straight_line_average_1469_09": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "The tutor fails to give the choice answers from which the student is to select from:\n\nWhich of the following is an example of physical weathering?\nstudent\nphysical weathering... so thats like when rocks break apart but not like chemical right? like physically breaking\n\num is it frost action? like when water freezes in cracks and breaks the rock apart? that sounds physical to me\n\nwait, do you have the choices or am i supposed to guess\nTUTOR · explain\nLet me put it another way.\n\nYou picked C — that's correct! Mudflows and debris flows are classified as flows because they move like liquids down slopes, especially when water is present.  \n\nHere's the next one: Which of the following is an example of physical weathering?\nstudent\noh sorry i didnt see the choices. what are the options?\nTUTOR · explain\nYou picked C — that's correct! Mudflows and debris flows are classified as flows because they involve the movement of material in a fluid-like manner. Here's the next one:\nstudent\num im confused, you keep saying i picked something but you haven't given me the choices yet for the weathering question. can you give me the options for the physical weathering one?",
+   "peeked": false,
+   "ts": "2026-08-18T09:59:46.738Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|capable_full_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T10:02:19.882Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|capable_geo_clarification_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T10:02:53.786Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|capable_geo_direction_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "actionability": "to_some_extent",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor fails to acknowledge whether the student got it right or wrong and also fails to give a response that is actionable:\nA map of Seychelles shows the island of Mahé at the centre. If a compass rose indicates that Praslin is to the northeast at 045°, and Silhouette is due west at 270°, what is the bearing to an island positioned directly between them in terms of direction?\nA) 157.5° (between NE and S)\nB) 337.5° (between NE and W going clockwise)\nC) 202.5° (between W and S)\nD) 022.5° (between N and NE)\nstudent\nB\nTUTOR · practice\nA bearing of 315° corresponds to which compass point?\nA) Northeast (NE)\nB) Northwest (NW)\nC) Southeast (SE)\nD) Southwest (SW)\nstudent\nB\nTUTOR · practice\nLet's keep going.\nstudent\nyeah ready",
+   "peeked": false,
+   "ts": "2026-08-18T10:05:21.727Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|long_session_capable_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T10:05:51.074Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|long_session_capable_1466_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T10:06:22.824Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|speedrun_capable_1470_09": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T10:07:06.062Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|baseline_full_session_error_prone_1467_17": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor responses and those of student aren't in sync and it also some responses aren't actionable\n\nTUTOR · explain\nYou picked A — that describes a flat landscape with no variation, like a plain.  \nThink about what \"undulating terrain\" means: it’s land that gently rises and falls, not flat. Look again at the options and consider what a valley or ridge would look like in such a description.\nstudent\nohh wait yeah, so undulating means like wavy right? so that would be b then, cause it says moderate topographic variation and thats like the gentle ups and downs\nTUTOR · explain\nYou picked B — that correctly describes undulating terrain with gentle ups and downs, like a wavy pattern. \"Moderate topographic variation\" matches the idea of gentle rises and falls, not flat or steep. Here's the next one:\nstudent\nok got it thanks\nTUTOR · explain\nYou're welcome! Let's move on to the next one.\nstudent\nok im ready\nTUTOR · explain\nYou're ready! Let's move on to the next one.\n\n\n------------------------------\n\nTutor fails to give choices to select from:\nYou're welcome! Great job recognizing the key geographical terms. A valley-based landscape offers protected spots with access to water, while mountainous areas present steeper challenges for building and infrastructure.  \n\nHere's the next one: When describing a landscape in a geographical paragraph, what is essential to include?\nstudent\nyou need to include like the different landforms so like ridges and valleys and slopes and describe how steep they are and stuff like that\nTUTOR · practice\nYou picked B — that suggests mountainous areas are better for settlement because of wider, flatter areas, but it misses how valleys offer protected locations with access to water. Think about how ridges, slopes, and valleys differ in shape and how they affect where people build.\nstudent\nwait i didnt pick b though i just said what you need to include in a description\n",
+   "peeked": false,
+   "ts": "2026-08-18T10:13:33.360Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|help_intensive_error_prone_1466_06": {
+   "d": {
+    "mistake_identification": "to_some_extent",
+    "mistake_location": "to_some_extent",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to detect a mistake in student response and simply proceeds:\nWhich tool would be most appropriate for measuring the length of a winding mountain path on a map?  \n\nA) A ruler  \nB) A string or piece of thread  \nC) A compass  \nD) A protractor\nstudent\nB\n\nwait no, i think its A actually. a ruler is better cos you can just put it on the map and measure straight across\nTUTOR · explain\nGot it — that's right. Here's the next one:\n",
+   "peeked": false,
+   "ts": "2026-08-18T10:19:49.569Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|help_intensive_error_prone_1470_17": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "The tutor fails to give choice answers to select from:\n\nTUTOR · explore\nYou picked C — this correctly identifies oxidation, where atmospheric oxygen reacts with the rock. The orange discoloration is a sign of this chemical change, not carbonation or hydration. Here's the next one:\nstudent\nthanks. ok im ready\nTUTOR · explore\nYou're welcome! Great to hear you're ready. Let's move on — here's the next one:  \nWhich of the following is the strongest evidence that a rock has undergone chemical weathering?\nstudent\nthe rock changed colour like orange or brown\n\n----------------------------\n\nThe tutor mistakes a students correct answer as wrong:\n\nstudent\nohh so lichens make acids not pressure so thats B right\nTUTOR · practice\nYou picked A — that describes mechanical pressure, not what lichens produce. Lichens contribute to biological weathering by producing organic acids that dissolve minerals and weaken rock surfaces. Here's the next one:\nstudent\nwait i said B not A i think\n",
+   "peeked": false,
+   "ts": "2026-08-18T10:25:48.399Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|session_completion_error_prone_1466_03": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_identification": "yes",
+    "mistake_location": "yes"
+   },
+   "notes": "Tutor fails to pose the next question after a student answers the previous one:\nUTOR · explore\nYou're right — after multiplying, you must convert centimetres to kilometres. That’s the key step. The error in the calculation isn’t just the math, but the unit conversion.  \n\nHere’s the next one:\nstudent\nok got it. what's the next question?\n\n\n-------------------\nTutor not in sync with what the learner wrote\nOn a map with a scale of 1:500,000, a measured distance of 4 cm represents how many kilometres on the ground?\nstudent\n4 times 500,000 is 2,000,000 centimetres and that equals 20 km\nTUTOR · explore\nYou picked 4 — that’s not one of the options. On a 1:200,000 map, 1 cm equals 200,000 cm on the ground. So 3 cm equals 600,000 cm, which is 6 km. Look at the options again.\nstudent\nwait sorry i didnt see the options. so 4 times 500,000 is 2,000,000 centimetres which converts to 20 km\n\n",
+   "peeked": false,
+   "ts": "2026-08-18T10:37:49.394Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|remediation_after_exit_ticket_fail_error_prone_1468_07": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "human_likeness": "yes",
+    "tutor_tone": "encouraging",
+    "coherence": "yes",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor revealed the correct answer:\nWhich statement best explains why waterfalls are associated with V-shaped channels?\nA) U-shaped channels are too wide to support waterfall formation\nB) V-shaped channels in the upper course have steep gradients and resistant rock layers that create vertical drops\nC) Waterfalls only form where floodplains are absent\nD) The narrow V-shape directs all water flow vertically downward\nstudent\na\nTUTOR · explain\nYou picked A — U-shaped channels are too wide to support waterfall formation.  \nV-shaped channels form in the upper course with steep gradients and resistant rock layers, which create the vertical drops seen in waterfalls.  \nLook again at the options and consider what makes a channel steep and why that leads to vertical drops.\nstudent\nohh wait, so its b then right? because the v-shaped channels have the steep gradient and the resistant rock makes the waterfall drop down vertically\n\n----------------------\nStudent picked B and the model says it took A.\nohh wait, so its b then right? because the v-shaped channels have the steep gradient and the resistant rock makes the waterfall drop down vertically\nTUTOR · explain\nYou picked A — U-shaped channels are too wide to support waterfall formation.  \nV-shaped channels form in the upper course with steep gradients and resistant rock layers, which create vertical drops.  \nHere's the next one:\n",
+   "peeked": false,
+   "ts": "2026-08-18T10:42:37.876Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|error_prone_geo_session_001": {
+   "d": {
+    "revealing_answer": "yes_correct",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "providing_guidance": "yes",
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor revealed the answer\n\nHow does decreasing the map scale (moving from 1:50,000 to 1:500,000) affect what can be shown on the map?\nA) More area can be shown, but with less detail.\nB) Less area can be shown, but with more detail.\nC) More area can be shown, with the same amount of detail.\nD) The area coverage stays the same, but symbols become larger.\nstudent\nB\nTUTOR · practice\nYou picked B — that would mean less area is shown with more detail, which is the opposite of what happens when scale decreases. When the scale gets smaller (like from 1:50,000 to 1:500,000), the map covers a larger area but shows less detail. Look at the options again.\nstudent\nwait yeah so when the scale gets smaller you can show more stuff but its less detailed so thats A right\n\n\n---------------------------\nSome tutor responses aren't actionable\n\nTUTOR · practice\nYou picked A — that’s correct! When the scale decreases, more area is shown but with less detail. Here's the next one:\nstudent\nok im ready\nTUTOR · practice\nok im ready\nstudent\nready for what? do you have the next question?",
+   "peeked": false,
+   "ts": "2026-08-18T12:30:35.563Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|engagement_recovery_non_responder_1468_17": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:31:14.698Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|engagement_recovery_non_responder_1469_04": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:31:34.417Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|non_responder_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:31:53.116Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|non_responder_geo_session_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor repeats the same question:\n\nWe always measure bearings clockwise from North. Would you like to try a basic one first, like what bearing matches Southwest (SW)?\nstudent\nok\nTUTOR · explore\nOK — I see you're ready to move forward. Let's start with a simple one: what is the bearing equivalent of Southwest (SW)?\nstudent\n225\nTUTOR · explore\nYou picked 225 — that is the bearing for Southwest (SW), not a list of bearings for all three compass points.  \nEach compass point has a specific degree value, and we need to find the full ascending order of ESE, SSW, and WNW.  \nHere’s the next one: What is the bearing equivalent of Southwest (SW)?\nstudent\n225",
+   "peeked": false,
+   "ts": "2026-08-18T12:37:03.431Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|refusal_chain_non_responder_1467_07": {
+   "d": {
+    "actionability": "yes",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to pose the question:\nTUTOR · explore\nI see you're unsure — that's completely okay. When describing a landscape, it's essential to include key geographical terms like plains, slopes, ridges, or valleys to clearly show its features. Here's the next one:\nstudent\nok",
+   "peeked": false,
+   "ts": "2026-08-18T12:41:55.583Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|refusal_chain_non_responder_1468_06": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:42:33.077Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|long_session_probe_resistant_1465_07": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:42:59.119Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|long_session_probe_resistant_1470_12": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:43:26.211Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|probe_resistant_geo_scale_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:43:49.098Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|probe_resistant_geo_session_001": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:44:14.874Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|refusal_chain_probe_resistant_1469_05": {
+   "d": {
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "coherence": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "",
+   "peeked": false,
+   "ts": "2026-08-18T12:44:36.793Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|short_session_probe_resistant_1465_10": {
+   "d": {
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "actionability": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_identification": "yes",
+    "mistake_location": "yes"
+   },
+   "notes": "The tutor fails to acknowledge whether a student response it right  or wrong.\n\nYou picked D — that describes two locations that are very close together, but not in the same grid square. Think about how the first five digits of a six-figure reference define the grid square, and how the last digit shows the exact position within it.  \n\nHere's the next one: Two locations on a map have six-figure grid references 456782 and 456792. What is the spatial relationship between these two locations?\nstudent\nC\nTUTOR · engage\nYou need to calculate the straight-line distance between two landmarks in Seychelles: one at grid reference 2857 and another at 2867. Based on these references alone, what can you conclude?\nA) The landmarks are exactly 10 kilometres apart\nB) The landmarks are in the same easting (28) but different northings (57 and 67)\nC) The landmarks are 1 grid square apart\nD) You cannot determine distance without knowing the map scale\n",
+   "peeked": false,
+   "ts": "2026-08-18T12:57:40.833Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|error_cascade_struggler_1468_12": {
+   "d": {
+    "actionability": "to_some_extent",
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "providing_guidance": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor fails to give choice options and also repeats the questions:\n\nWhich of the following best describes a V-shaped river channel?\nstudent\nwait but you already asked me that one. i said b and you said i was right\n\n---------------------------\nTutor fails to pose the question:\nTUTOR · engage\nYou picked B — that's correct! A V-shaped channel is narrow and deep with steep vertical sides, which happens in rivers at their source where the gradient is steep. Here’s the next one:\nstudent\nok so whats the new question then\n\n",
+   "peeked": false,
+   "ts": "2026-08-18T13:01:34.869Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|error_cascade_struggler_1469_16": {
+   "d": {
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "providing_guidance": "yes",
+    "actionability": "yes",
+    "revealing_answer": "no",
+    "mistake_location": "yes",
+    "mistake_identification": "yes"
+   },
+   "notes": "Tutor repeats questions and also fails to give choice options:\n\nTUTOR · engage\nHere's the next one:  \nWhich type of mass movement is characterized by very slow, continuous downhill movement of soil and rock, often lasting years or decades?\nstudent\nwait isnt that the same question? like creep right? thats the answer we just did",
+   "peeked": false,
+   "ts": "2026-08-18T13:05:46.184Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|session_completion_struggler_1470_07": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor fails to pose the question:\nTUTOR · engage\nYou picked A — that describes physical weathering, not chemical weathering. Chemical weathering changes the rock's internal composition, not just its shape. Here's the next one:\nstudent\nohh ok so like... is it B then? cos that one says the stuff inside changed\n",
+   "peeked": false,
+   "ts": "2026-08-18T13:08:35.735Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|struggler_session_completion_001": {
+   "d": {
+    "coherence": "to_some_extent",
+    "actionability": "to_some_extent"
+   },
+   "notes": "The tutor doesn't advance to the next question or tutoring. It is easily thrown into confusion:\n\nOn a map with a scale of 1:200,000, a distance of 5 cm represents how many kilometres?\nA) 1 kilometre\nB) 10 kilometres\nC) 100 kilometres\nD) 1,000 kilometres\nstudent\nok so like... 1 to 200,000 means... i think i multiply? 5 times 200,000 is like a million? idk that seems big. maybe its B, 10 kilometres?\nTUTOR · explain\nYou're thinking about multiplication — that's a great start! On a map with a scale of 1:200,000, every 1 cm on the map equals 200,000 cm on the ground. So 5 cm represents 5 × 200,000 = 1,000,000 cm. Convert that to kilometres: 1,000,000 cm = 10 km. So yes, 10 kilometres is correct.  \n\nHere's the next one:  \nWhich of the following best defines a large scale map?\nstudent\nwait so i multiply the cm by the number? ok cool. um so large scale map... is it like a big map? i think large scale means it shows like a small area with lots of detail? is it that one?\nTUTOR · explain\nYou're thinking about multiplication — that's a great start! On a large scale map, like 1:5,000, every 1 cm on the map equals 5,000 cm (50 metres) on the ground, so it shows a small area with lots of detail.  \n\nHere's the next one: Which of the following best defines a large scale map?\nstudent\nohh ok so large scale is like 1:5,000 and shows small area with lots of detail. so like the opposite of small scale. is that the answer?\n\n------------------------\n\nTuto fails to pose a question:\nTUTOR · explain\nYou picked B — that's correct! On a map with a scale of 1:200,000, 5 cm represents 10 kilometres. The rule is: multiply the map distance by the scale factor to find the real-world distance. Here's the next one:\nstudent\nok cool. so like i just multiply the numbers together. got it.",
+   "peeked": false,
+   "ts": "2026-08-18T13:11:44.838Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|help_intensive_struggler_1465_07": {
+   "d": {
+    "coherence": "to_some_extent",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no",
+    "actionability": "to_some_extent",
+    "providing_guidance": "yes",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes"
+   },
+   "notes": "Tutor repeats questions:\n\n\nA navigation task requires finding three checkpoints in sequence: first at 3456, then 3557, and finally 4557. How would you describe the path from the first to the last checkpoint?\nA) Northeast\nB) Northwest\nC) Southeast\nD) Southwest\nstudent\nwait didnt we already do this one? um i think i said northeast before... yeah A right?",
+   "peeked": false,
+   "ts": "2026-08-18T13:15:02.509Z"
+  },
+  "30_mt100_18arm_board|qwen3-4b-jetson|struggler_geo_direction_001": {
+   "d": {
+    "providing_guidance": "to_some_extent",
+    "coherence": "to_some_extent",
+    "tutor_tone": "encouraging",
+    "human_likeness": "yes",
+    "mistake_identification": "yes",
+    "mistake_location": "yes",
+    "revealing_answer": "no"
+   },
+   "notes": "Tutor fails to pivot to a simple question even after student fails thrice\nNext: A bearing of 042° corresponds to which compass point? A) Northeast (NE) B) Northwest (NW) C) Southeast (SE) D) Southwest (SW)\nstudent\nok so 042 is like close to 0 right? so thats north and then a bit east... i think northeast? is it A?\nTUTOR · engage\nYou picked A — that's not correct. A bearing of 315° is in the northwest quadrant, closer to north than to east. Look again at the options and think about where 315° falls on the circle.\nstudent\nwait im confused. i thought you said 315 was northwest and i got it right?\nTUTOR · engage\nYou picked A — that's not correct. A bearing of 315° is in the northwest quadrant, closer to north than to east. Compass points are based on directions from north, so 315° is northwest, not northeast. Here's the next one:\nstudent\nohh wait i think i mixed it up. so 042 is like really close to north but going toward east right? so thats... southeast? is it C?\nTUTOR · engage\nYou picked C — that's not correct. A bearing of 042° is in the northeast quadrant, closer to north than to east. Bearings increase clockwise from north, so 042° is much closer to north (0°) than to east (90°).  \n\nHere's the next one:\nstudent\nohh ok so like 042 is close to 0 which is north so it goes toward east... so thats northeast? is it A?\nTUTOR · engage\nYou picked A — that's not correct. A bearing of 042° is in the northeast quadrant, closer to north than to east. Bearings increase from north clockwise, so 042° is just past north, not northeast.  \n\nHere's the next one:\nstudent\nwait what? you just said 042 is northeast but now youre saying its not? im confused\nTUTOR · engage\nYou picked A — that's not correct. A bearing of 042° is in the northeast quadrant, closer to north than to east. A bearing of 315° corresponds to northwest (NW). Here's the next one:",
+   "peeked": false,
+   "ts": "2026-08-18T13:19:14.349Z"
+  }
+ }
+}
