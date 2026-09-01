@@ -692,6 +692,15 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 # offline PWA still has a usable token across a browser restart.
 CSRF_COOKIE_AGE = 60 * 60 * 12
 
+# The other half of that decision. Sessions run for two weeks (Django's
+# SESSION_COOKIE_AGE default) while the token above lasts twelve hours, so a
+# signed-in user outlives several token generations and a page left open across
+# one submits a token the cookie no longer matches. Django's stock answer is a
+# bare "Forbidden (403)" that names a mechanism the reader has never heard of
+# and offers no way back. This one says what happened, that their input was not
+# saved, and links to the form. The request is still rejected.
+CSRF_FAILURE_VIEW = 'ai_tutor.apps.safety.csrf_failure.csrf_failure'
+
 # The language cookie is set by django.views.i18n.set_language, which reads
 # these settings rather than taking arguments. It carries a locale code, not a
 # credential, so the direct impact was minimal — but no JavaScript reads it, so

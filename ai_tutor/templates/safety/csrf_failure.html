@@ -1,0 +1,129 @@
+{% load static i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% trans "Your session timed out" %} — {% trans "AI Tutor" %}</title>
+<link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
+<style nonce="{{ request.csp_nonce }}">
+    body {
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: var(--space-6);
+        background: var(--canvas);
+        color: var(--text);
+        font-family: var(--font-body);
+    }
+
+    .recover {
+        width: 100%;
+        max-width: 30rem;
+        padding: var(--space-8);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--card-shadow);
+    }
+
+    .recover__icon {
+        display: grid;
+        place-items: center;
+        width: 3rem;
+        height: 3rem;
+        margin-bottom: var(--space-5);
+        border-radius: var(--radius-md);
+        background: var(--warning-surface);
+        color: var(--warning);
+    }
+
+    .recover h1 {
+        margin: 0 0 var(--space-3);
+        font-family: var(--font-display);
+        font-size: var(--text-xl);
+        font-weight: var(--weight-bold);
+        letter-spacing: var(--tracking-tight);
+    }
+
+    .recover p {
+        margin: 0 0 var(--space-4);
+        color: var(--text-secondary);
+        line-height: var(--leading-normal);
+    }
+
+    /* The one thing the reader most needs to know, and the one thing Django's
+       own page never says. */
+    .recover__lost {
+        padding: var(--space-3) var(--space-4);
+        background: var(--warning-surface);
+        border: 1px solid var(--warning-border);
+        border-radius: var(--radius-md);
+        color: var(--warning);
+        font-size: var(--text-sm);
+    }
+
+    .recover__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        margin-top: var(--space-6);
+    }
+
+    .recover__btn {
+        display: inline-block;
+        padding: var(--space-3) var(--space-5);
+        border-radius: var(--radius-sm);
+        background: var(--primary-fill);
+        color: var(--text-on-accent);
+        font-weight: var(--weight-bold);
+        font-size: var(--text-sm);
+        text-decoration: none;
+    }
+
+    .recover__btn--ghost {
+        background: transparent;
+        color: var(--primary-ink);
+        border: 1px solid var(--border-strong);
+    }
+</style>
+</head>
+<body>
+<main class="recover">
+    <div class="recover__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><path d="M12 16h.01"/>
+        </svg>
+    </div>
+
+    <h1>{% trans "Your session timed out" %}</h1>
+
+    <p>
+        {% blocktrans trimmed %}
+            This page had been open long enough that the security check
+            protecting it expired, so we could not accept the form. Nothing was
+            wrong with what you entered.
+        {% endblocktrans %}
+    </p>
+
+    <p class="recover__lost">
+        {% blocktrans trimmed %}
+            Your changes were not saved. Open the form again and re-enter them.
+        {% endblocktrans %}
+    </p>
+
+    <div class="recover__actions">
+        {% if return_url %}
+        <a class="recover__btn" href="{{ return_url }}">{% trans "Back to the form" %}</a>
+        {% endif %}
+        <a class="recover__btn {% if return_url %}recover__btn--ghost{% endif %}"
+           href="{% url 'accounts:landing' %}">{% trans "Go to the home page" %}</a>
+    </div>
+</main>
+</body>
+</html>
