@@ -193,8 +193,9 @@ def claim_page(request):
 @require_POST
 def claim_submit(request):
     """Bind a roster entry to a new local account and sign the student in."""
-    from django.contrib.auth import login
     from django.contrib.auth.models import User
+
+    from ai_tutor.apps.accounts.auth_utils import login_created_user
     from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile
     from ai_tutor.apps.desktop.models import DeviceState, RosterEntry
 
@@ -254,7 +255,9 @@ def claim_submit(request):
         entry.claimed_at = timezone.now()
         entry.save(update_fields=['local_user', 'claimed_at'])
 
-    login(request, user)
+    # The account was created by this view (or by a previous claim), so it
+    # never went through authenticate() — see accounts/auth_utils.py.
+    login_created_user(request, user)
     return redirect('tutoring:catalog')
 
 

@@ -10,6 +10,7 @@ User Types:
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
+from ai_tutor.apps.accounts.auth_utils import login_created_user
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -226,11 +227,16 @@ def student_register(request):
             from ai_tutor.apps.accounts.email_verification import send_verification_email
             send_verification_email(request, user)
 
-        login(request, user)
+        # We created this account ourselves, so it never went through
+        # authenticate() and carries no .backend — see accounts/auth_utils.py.
+        login_created_user(request, user)
         if email:
+            # sticky: this one names an address the reader has to go and check,
+            # and the page behind it does not repeat it.
             messages.success(
                 request,
                 f"Welcome, {first_name}! 🎉 We sent a verification link to {email} — check your inbox.",
+                extra_tags='sticky',
             )
         else:
             messages.success(request, _("Welcome, %(name)s! 🎉 Let's start learning!") % {"name": first_name})
@@ -268,7 +274,7 @@ def staff_login(request):
 
             if has_access:
                 login(request, user)
-                messages.success(request, _("Welcome, %(name)s!") % {"name": user.first_name or user.username})
+                messages.success(request, _("Welcome back, %(name)s!") % {"name": user.first_name or user.username})
                 if _terms_acceptance_pending(user):
                     return redirect(f"/terms/accept/?next=/dashboard/")
                 return redirect('dashboard:home')
@@ -511,7 +517,8 @@ def staff_register(request, token=None):
         invitation.registered_user = user
         invitation.save()
 
-        login(request, user)
+        # Self-created account — see accounts/auth_utils.py.
+        login_created_user(request, user)
         messages.success(request, f"Welcome, {first_name}! Your staff account is ready.")
         return redirect('dashboard:home')
 
@@ -560,7 +567,11 @@ def login_view(request):
 def logout_view(request):
     """Logout and redirect to landing."""
     logout(request)
-    messages.info(request, _("You've been logged out."))
+    # No flash here. Landing on the signed-out page is itself the confirmation,
+    # and this one was never seen where it was raised: the landing and login
+    # templates render no message region, so it sat in the session until the
+    # next visit to a page that did — arriving stale, next to a welcome that
+    # contradicted it.
     return redirect('accounts:landing')
 
 
