@@ -27,6 +27,7 @@ from django.views.decorators.http import require_POST
 
 from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 from ai_tutor.apps.curriculum.models import Course, Unit, Lesson
+from ai_tutor.apps.dashboard.attention import build_attention_items
 from ai_tutor.apps.tutoring.models import TutorSession, StudentLessonProgress
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash, logout
@@ -62,6 +63,16 @@ def get_staff_context(request):
             'membership': None,
             'institution': institution,
             'role': 'superadmin',
+            # What to print where a person's role is shown. Two templates used
+            # to each carry their own `{% if user.is_staff %}…{% else %}
+            # membership.get_role_display{% endif %}`, and had already drifted
+            # apart ("Super admin" in the topbar, "Super Admin" in settings).
+            # The membership label is no help either: Role.STAFF reads "Staff
+            # (Teacher/Admin)" because one value covers both, so it names two
+            # roles and commits to neither. The distinction the product
+            # actually makes is this one — platform-wide vs a school — so it
+            # is resolved once, here, next to the flag it depends on.
+            'role_label': _('Super Admin'),
             'all_schools': all_schools,
             'is_aggregated': institution is None,
             'unreviewed_flag_count': _safety_flag_count(institution),
@@ -105,6 +116,12 @@ def get_staff_context(request):
         'membership': membership,
         'institution': institution,
         'role': 'staff',
+        # See the superadmin branch above. There is no school-admin role in the
+        # data model — Membership.Role is STAFF or STUDENT, and every
+        # administrative action is gated on User.is_staff — so a staff
+        # membership without that flag is a teacher, and saying so is more
+        # accurate than "Staff (Teacher/Admin)", not less.
+        'role_label': _('Teacher'),
         'all_schools': staff_schools if len(staff_schools) > 1 else [],
         'is_aggregated': False,
         'unreviewed_flag_count': _safety_flag_count(institution),
@@ -436,6 +453,16 @@ def _exit_ticket_stats(sessions_qs):
     mean = (sum(fractions) / n) if n else 0.0
     median = fractions[n // 2] if n else 0.0
 
+    # Students mastering, over the SAME session set as everything else here.
+    # ExitTicket.passing_score is the lesson's mastery threshold, so an attempt
+    # with passed=True is mastery of that lesson. Counting distinct students
+    # rather than attempts answers "how many of them got there", not "how many
+    # times it happened".
+    students_attempted = attempts.values('student_id').distinct().count()
+    students_mastered = (
+        attempts.filter(passed=True).values('student_id').distinct().count()
+    )
+
     return {
         'sessions_started': started,
         'sessions_reached': reached,
@@ -444,6 +471,12 @@ def _exit_ticket_stats(sessions_qs):
         'passed': passed,
         'avg_pct': round(mean * 100),
         'median_pct': round(median * 100),
+        'students_attempted': students_attempted,
+        'students_mastered': students_mastered,
+        'mastering_pct': (
+            round(students_mastered / students_attempted * 100)
+            if students_attempted else 0
+        ),
         # Bars for the frequency chart: label, count, and the bucket midpoint
         # so the template can place the mean/median markers.
         'distribution': [
@@ -734,33 +767,6 @@ def dashboard_home(request):
         Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
     ).count()
 
-    # "X% students mastered" — % of ATTEMPTING students who mastered
-    # at least one lesson. Edward, 2026-05-08: was previously
-    # `mastered_cells / (students × lessons) × 100`, which read 7%
-    # when 7 student-lesson cells were mastered out of 80 (20 students
-    # × 4 lessons), even though most students hadn't started most
-    # lessons yet. The cell-coverage definition didn't match what
-    # the "students mastered" label implied. Now the metric counts
-    # students who have crossed the mastery threshold on at least
-    # ONE lesson, divided by students who have attempted any lesson.
-    avg_mastery = 0
-    students_with_progress = (
-        filter_by_institution(
-            StudentLessonProgress.objects.exclude(best_score__isnull=True),
-            institution,
-        )
-        .values('student_id').distinct().count()
-    )
-    students_who_mastered = (
-        filter_by_institution(
-            StudentLessonProgress.objects.filter(mastery_level='mastered'),
-            institution,
-        )
-        .values('student_id').distinct().count()
-    )
-    if students_with_progress > 0:
-        avg_mastery = round((students_who_mastered / students_with_progress) * 100)
-
     # avg_competency (C4): average best_score across all populated progress rows,
     # as a percentage. Source of truth = exit ticket attempts via StudentLessonProgress.
     from django.db.models import Avg
@@ -770,22 +776,29 @@ def dashboard_home(request):
     ).aggregate(avg=Avg('best_score'))
     avg_competency = round((avg_competency_data['avg'] or 0.0) * 100)
 
+    # Triage rail. Derived entirely from the figures computed above — no
+    # extra queries — so the page can lead with "what needs you" instead of
+    # opening on analytics. Thresholds live in attention.py, not in the
+    # template. See ai_tutor/apps/dashboard/attention.py.
+    attention_items = build_attention_items(
+        flag_count=request.staff_ctx.get('unreviewed_flag_count', 0),
+        et=et_stats,
+        prog=prog,
+        total_students=total_students,
+        active_students=active_students,
+    )
+
     context = {
         **request.staff_ctx,
+        'attention_items': attention_items,
         'total_students': total_students,
         'active_students': active_students,
         'total_sessions': total_sessions,
         'et': et_stats,
-        # Serialised by the |json_script filter in the template rather than
-        # here, so it lands in the page as escaped JSON instead of through
-        # |safe. See finding F-07.
-        'score_distribution': et_stats['distribution'],
+        # `prog` still feeds the triage rail above, and _exit_ticket_stats
+        # still computes its distribution for the aggregate export — neither
+        # is reachable from this page any more.
         'prog': prog,
-        # All-time, best-score-per-student-lesson. Kept because it answers a
-        # different question from et.avg_pct ("how well do students do at their
-        # best, ever" vs "how did attempts in this window go"), and the two
-        # legitimately differ — 81% vs 74% on July.
-        'avg_mastery': avg_mastery,
         'avg_competency': avg_competency,
         'activity_data': chart['points'],
         'activity_start': chart['start'].isoformat(),
@@ -3565,7 +3578,6 @@ def settings_page(request):
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
             email = request.POST.get('email', '').strip()
-            new_school = (request.POST.get('school') or '').strip()
             if not email:
                 messages.error(request, "Email is required.")
             elif User.objects.filter(email=email).exclude(pk=request.user.pk).exists():
@@ -3576,17 +3588,12 @@ def settings_page(request):
                 request.user.email = email
                 request.user.save()
 
-                # School (institution) update — re-points the active
-                # membership. New value comes from the school dropdown
-                # populated from active institutions.
-                if new_school and membership:
-                    new_inst = (
-                        Institution.objects.filter(id=new_school, is_active=True).first()
-                        or Institution.objects.filter(slug=new_school, is_active=True).first()
-                    )
-                    if new_inst and new_inst.id != membership.institution_id:
-                        membership.institution = new_inst
-                        membership.save(update_fields=['institution'])
+                # No school change here, by design. Re-pointing a membership
+                # re-scopes every query the account makes, so it belongs to
+                # whoever administers the school (the Staff page), not to a
+                # field on the member's own profile. A posted 'school' is
+                # ignored rather than rejected: the form no longer sends one,
+                # so anything arriving here is not a form a person filled in.
 
                 # Preferred locale — drives LocaleResolverMiddleware's
                 # per-user branch. Blank → fall back to institution
@@ -3619,14 +3626,20 @@ def settings_page(request):
                 messages.success(request, "Password changed successfully.")
 
         elif action == 'delete_account':
+            # Staff accounts own session records, safety flags and progress
+            # rows for real students, so deleting one is an administrative
+            # decision rather than a self-service button. This view is
+            # staff-only (teacher_required), so the answer is the same for
+            # everyone who can reach it. Students keep self-service deletion
+            # on their own settings page (accounts:delete_account).
             if request.user.is_staff:
                 messages.error(request, "Super Admin accounts cannot be self-deleted.")
             else:
-                from ai_tutor.apps.safety import DataPrivacy
-                DataPrivacy.delete_user_data(request.user, keep_anonymized=True)
-                request.user.delete()
-                logout(request)
-                return redirect('accounts:landing')
+                messages.error(
+                    request,
+                    "Staff accounts cannot be deleted from this page. "
+                    "Contact your school administrator to have your account removed.",
+                )
 
         elif action == 'competency' and is_superadmin:
             platform_config = PlatformConfig.load()
@@ -3894,6 +3907,8 @@ def settings_page(request):
     provider_choices = []
     provider_defaults_json = '{}'
     img_provider_defaults_json = '{}'
+    text_model_catalog = {}
+    image_model_catalog = {}
     if is_superadmin:
         from ai_tutor.apps.llm.models import ModelConfig
         tutor_config = ModelConfig.objects.filter(is_active=True, purpose='tutoring').first()
@@ -3915,17 +3930,15 @@ def settings_page(request):
             has_img_db_key = bool(img_config.api_key_encrypted)
             has_img_env_key = bool(os.getenv(img_config.api_key_env_var or '', ''))
         provider_choices = ModelConfig.Provider.choices
-        provider_defaults_json = json.dumps({
-            'anthropic': 'claude-sonnet-4-20250514',
-            'openai': 'gpt-4o',
-            'google': 'gemini-3.1-pro-preview',
-            'azure_openai': 'gpt-4o',
-            'local_ollama': 'llama3',
-        })
-        img_provider_defaults_json = json.dumps({
-            'openai': 'gpt-image-2',
-            'google': 'gemini-3.1-flash-image-preview',
-        })
+        # The per-provider default used to be a literal dict here and the only
+        # thing the page knew about model names. It now comes from the catalog,
+        # which also feeds the picker — one list, so the default is always an
+        # option in the dropdown rather than a fourth place to keep in sync.
+        from ai_tutor.apps.llm import catalog as model_catalog
+        provider_defaults_json = json.dumps(model_catalog.defaults(model_catalog.TEXT_MODELS))
+        img_provider_defaults_json = json.dumps(model_catalog.defaults(model_catalog.IMAGE_MODELS))
+        text_model_catalog = model_catalog.as_json_dict(model_catalog.TEXT_MODELS)
+        image_model_catalog = model_catalog.as_json_dict(model_catalog.IMAGE_MODELS)
 
     # Tutor personalities (superadmin)
     personalities = []
@@ -3935,15 +3948,6 @@ def settings_page(request):
 
     all_timezones = sorted(zoneinfo.available_timezones())
     all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
-    # Active schools list for the user's own profile-school dropdown
-    # (every staff member can change their own school regardless of
-    # whether they're a superadmin).
-    user_school_choices = list(
-        Institution.objects.filter(is_active=True)
-        .exclude(slug=Institution.GLOBAL_SLUG)
-        .order_by('name')
-        .values('id', 'name')
-    )
     # Staff/user management moved to the centralized Staff page
     # (dashboard:staff_list) — no all_users / reset_target here anymore.
 
@@ -3955,7 +3959,6 @@ def settings_page(request):
         'platform_config': platform_config,
         'all_timezones': all_timezones,
         'all_schools': all_schools,
-        'user_school_choices': user_school_choices,
         # Locale picker for the admin's own account section. Drives
         # LocaleResolverMiddleware via StudentProfile.preferred_locale.
         # NOTE: staff/user management (all_users) moved to the centralized
@@ -3979,6 +3982,8 @@ def settings_page(request):
         'provider_choices': provider_choices,
         'provider_defaults_json': provider_defaults_json,
         'img_provider_defaults_json': img_provider_defaults_json,
+        'text_model_catalog': text_model_catalog,
+        'image_model_catalog': image_model_catalog,
         'personalities': personalities,
     }
 

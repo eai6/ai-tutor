@@ -1,201 +1,147 @@
 {% extends "dashboard/base.html" %}
-{% load i18n %}
+{% load static i18n dashboard_ui %}
 
-{% block title %}{% trans "Dashboard" %}{% endblock %}
-{% block page_title %}{% trans "Dashboard Overview" %}{% endblock %}
+{% block title %}{% trans "Overview" %}{% endblock %}
+{% block page_title %}{% trans "Overview" %}{% endblock %}
+{% block topbar_eyebrow %}
+<span class="topbar-eyebrow">{{ activity_label }}</span>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard/pages/home.css' %}">
+{% endblock %}
 
 {% block content %}
-{# Page-level, above everything, because it governs every figure below — not #}
-{# just the chart. Sitting inside the chart card it read as a chart control. #}
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-body" style="display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding-top:1rem; padding-bottom:1rem;">
-        <form method="get" style="display:flex; align-items:flex-end; gap:0.5rem; flex-wrap:wrap; margin:0;">
-            <div>
-                <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--gray-500); margin-bottom:0.35rem;">{% trans "Showing" %}</div>
-                <div style="font-weight:600; font-size:1rem;">{{ activity_label }}</div>
+<div class="stack">
+
+    {% comment %} ─────────────────────────────────────────────────────────
+    1. TRIAGE — what needs the teacher, before any analytics.
+
+    The page used to open with a learning-gain figure: a good answer to
+    "how did the term go", and the wrong answer to the question someone
+    actually opens this page with, which is "is anything wrong right now".
+    Items are built and ranked in apps/dashboard/attention.py from figures
+    the view already had, so this costs no extra query.
+    ───────────────────────────────────────────────────────────── {% endcomment %}
+    <section aria-labelledby="attention-heading">
+        <div class="section-head">
+            <h2 class="section-head__title" id="attention-heading">{% trans "Needs you" %}</h2>
+            {# Deliberately NOT labelled with the period: safety flags are every #}
+            {# unreviewed flag, not just this window's, and saying "July 2026" #}
+            {# over the row claimed otherwise. #}
+            <p class="section-head__note">{% trans "Most urgent first" %}</p>
+        </div>
+
+        {% if attention_items %}
+        <div class="attention">
+            {% for item in attention_items %}{% attention_item item %}{% endfor %}
+        </div>
+        {% else %}
+        {# Same footprint as a populated rail, so clearing the last flag #}
+        {# doesn't make the rest of the page jump up the screen. #}
+        <p class="attention-clear">
+            {% icon "check-circle" size="md" %}
+            {% trans "Nothing needs review. No safety flags, no students going backwards." %}
+        </p>
+        {% endif %}
+    </section>
+
+    {% comment %} ─────────────────────────────────────────────────────────
+    2. PERIOD — governs every figure below, so it sits above them rather
+    than inside the chart card, where it read as a chart control. Presets
+    are one click; the custom range is disclosed only when wanted.
+    ───────────────────────────────────────────────────────────── {% endcomment %}
+    <section class="period" aria-labelledby="period-heading">
+        <div class="period__current">
+            <span class="eyebrow" id="period-heading">{% trans "Showing" %}</span>
+            <span class="period__value">{{ activity_label }}</span>
+        </div>
+
+        <div class="period__controls">
+            <div class="segmented" role="group" aria-labelledby="period-heading">
+                {% for key, label, days in activity_presets %}
+                <a href="?preset={{ key }}" class="segmented__option"
+                   {% if activity_preset == key %}aria-current="true"{% endif %}>{{ label }}</a>
+                {% endfor %}
             </div>
-            <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem; margin-left:0.75rem;">
-                {% trans "From" %}
-                <input type="date" name="start" value="{{ activity_start }}"
-                       style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-            </label>
-            <label style="font-size:0.72rem; color:var(--gray-500); display:flex; flex-direction:column; gap:0.15rem;">
-                {% trans "To" %}
-                <input type="date" name="end" value="{{ activity_end }}"
-                       style="padding:0.25rem 0.4rem; font-size:0.8rem; border:1px solid var(--gray-300); border-radius:4px;">
-            </label>
-            <button type="submit" class="btn btn-primary" style="padding:0.3rem 0.7rem; font-size:0.78rem;">{% trans "Apply" %}</button>
-        </form>
-        <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
-            {% for key, label, days in activity_presets %}
-            <a href="?preset={{ key }}"
-               class="btn {% if activity_preset == key %}btn-primary{% else %}btn-secondary{% endif %}"
-               style="padding:0.2rem 0.55rem; font-size:0.75rem;">{{ label }}</a>
-            {% endfor %}
-            {# Carries the window that is on screen, so "export" means "export #}
-            {# what I am looking at" rather than some other period. #}
+
+            {% comment %}
+            Export sits with the period control, not in the topbar: the file it
+            produces covers exactly the window selected here, so the two belong
+            together. In the topbar it read as a page-level action and gave no
+            hint that the range was baked into the download.
+            {% endcomment %}
             <a href="{% url 'dashboard:aggregate_export_csv' %}?start={{ activity_start }}&amp;end={{ activity_end }}"
-               class="btn btn-secondary"
-               title="{% trans 'Anonymised session and exit-ticket rows for this period. Every chart above can be rebuilt from it.' %}"
-               style="padding:0.2rem 0.55rem; font-size:0.75rem; margin-left:0.5rem;">
-                ⬇ {% trans "Export data" %}
+               class="btn btn--secondary btn--sm"
+               title="{% blocktrans with label=activity_label %}Download the rows behind every figure on this page, for {{ label }}{% endblocktrans %}">
+                {% icon "download" size="sm" %}{% trans "Export this period" %}
             </a>
-        </div>
-    </div>
-</div>
 
-<!-- Learning gain — first thing on the page: it is the only figure here
- that answers "is the tutoring working", so it leads. -->
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header">
-        <h2 class="card-title" title="{% blocktrans with n=prog.gain.pairs u=prog.gain.excluded_unverifiable %}Before = the student's first exit ticket for a lesson, After = their latest. Only pairs asking the same question formats are counted ({{ n }} counted, {{ u }} excluded as unverifiable). Students who passed first time are not included, which likely overstates the gain.{% endblocktrans %}">{% trans "Learning gain" %}</h2>
-    </div>
-    <div class="card-body">
-        {% if prog.gain.pairs %}
-        <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:1rem;">
-                <div style="text-align:center;">
-                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Before" %}</div>
-                    <div style="font-size:2rem; font-weight:700; color:var(--gray-500);">{{ prog.gain.pre_pct }}%</div>
-                </div>
-                <div style="font-size:1.5rem; color:var(--gray-400);">→</div>
-                <div style="text-align:center;">
-                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "After" %}</div>
-                    <div style="font-size:2rem; font-weight:700; color:var(--success);">{{ prog.gain.post_pct }}%</div>
-                </div>
-                <div style="text-align:center; margin-left:0.5rem;">
-                    <div style="font-size:0.7rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Mean gain" %}</div>
-                    <div style="font-size:2rem; font-weight:700; color:var(--success);">+{{ prog.gain.mean_gain }}</div>
-                </div>
-            </div>
-            <div style="font-size:0.8rem; color:var(--gray-600); line-height:1.6;">
-                {# "lesson attempts" read as sessions, which this is not. The unit #}
-                {# is one student paired with one lesson: a student who did three #}
-                {# lessons contributes three pairs, and retaking one lesson is #}
-                {# still ONE pair even though it is two sessions. The tiles above #}
-                {# count sessions, so the page was mixing units without saying so. #}
-                {% blocktrans with n=prog.gain.pairs med=prog.gain.median_gain %}{{ n }} student–lesson pairs with both a before and after measure · median gain +{{ med }} points{% endblocktrans %}<br>
-                <span style="color:var(--success); font-weight:600;">{{ prog.gain.improved }} {% trans "improved" %}</span> ·
-                {{ prog.gain.same }} {% trans "unchanged" %} ·
-                <span style="color:var(--danger); font-weight:600;">{{ prog.gain.declined }} {% trans "declined" %}</span>
-            </div>
-        </div>
-        {% else %}
-        <div class="empty-state"><p>{% trans "No before/after pairs in this period — a lesson needs either a diagnostic, or two exit-ticket attempts to compare." %}</p></div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Score distribution — directly under learning gain: the gain figure
- is a mean, and this is the shape behind it. -->
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header" style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-        <h2 class="card-title">{% trans "Exit ticket score distribution" %}</h2>
-        <div style="font-size:0.78rem; color:var(--gray-500);">
-            {% blocktrans with n=et.attempts %}{{ n }} attempts{% endblocktrans %}
-            &nbsp;·&nbsp;
-            <span style="color:var(--primary); font-weight:600;">{% trans "mean" %} {{ et.avg_pct }}%</span>
-            &nbsp;·&nbsp;
-            <span style="color:var(--accent, #7c3aed); font-weight:600;">{% trans "median" %} {{ et.median_pct }}%</span>
-        </div>
-    </div>
-    <div class="card-body">
-        {% if et.attempts %}
-        <div id="dist-wrap" style="display:flex; gap:0.4rem; height:200px;">
-            <div id="dist-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:34px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;"></div>
-            <div id="dist-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
-                <div id="dist-gridlines" style="position:absolute; inset:0 0 34px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;"></div>
-                {# Markers sit in this layer so they can be positioned by #}
-                {# percentage across the full 0-100% axis, independent of #}
-                {# the bar flexbox below. #}
-                <div id="dist-markers" style="position:absolute; inset:0 0 34px 0; pointer-events:none; z-index:2;"></div>
-                <div id="dist-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;"></div>
-                <div id="dist-x-axis" style="display:flex; gap:4px; height:34px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);"></div>
-            </div>
-        </div>
-        <div style="margin-top:0.5rem; font-size:0.72rem; color:var(--gray-500);">
-            {% trans "Score on each attempt, as a percentage. Includes failed attempts and retries." %}
-        </div>
-        {% else %}
-        <div class="empty-state"><p>{% trans "No exit ticket attempts in this period." %}</p></div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Stats Cards -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Total Students" %}</div>
-        <div class="stat-value">{{ total_students }}</div>
-        {# Roster size is not windowed — "how many students do we have" is not #}
-        {# a question about a date range. The line beneath it is. #}
-        <div class="stat-change positive">{% blocktrans with count=active_students %}{{ count }} active in this period{% endblocktrans %}</div>
-    </div>
-
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Sessions started" %}</div>
-        <div class="stat-value">{{ total_sessions }}</div>
-        {# The drop-off is the point: a session that never reaches the exit #}
-        {# ticket produced no assessment evidence at all. #}
-        <div class="stat-change" title="{% trans 'Sessions that got as far as the exit ticket. The rest stopped during the lesson.' %}">
-            {% blocktrans with n=et.sessions_reached pct=et.reach_pct %}{{ n }} reached the exit ticket ({{ pct }}%){% endblocktrans %}
-        </div>
-    </div>
-
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Avg Exit Ticket Score" %}</div>
-        <div class="stat-value">{{ et.avg_pct }}%</div>
-        <div class="progress-bar" style="margin-top: 0.5rem;">
-            <div class="progress-fill success" style="width: {{ et.avg_pct }}%;"></div>
-        </div>
-        {# Every attempt in the window, not best-score-per-student. The old #}
-        {# tile averaged StudentLessonProgress.best_score, which is monotonic #}
-        {# and all-time, so it excluded failures and retries by construction — #}
-        {# it read 81% where July's attempts actually averaged 74%. #}
-        <div class="stat-change" title="{% trans 'Mean across every practice/retake attempt from sessions started in this period. Includes failed attempts and retries.' %}">
-            {% blocktrans with n=et.attempts med=et.median_pct %}{{ n }} attempts · median {{ med }}%{% endblocktrans %}
-        </div>
-    </div>
-</div>
-
-{# Bottom padding clears the fixed Help/Feedback button, which otherwise #}
-{# sits on top of the last chart's x-axis and hides the final labels. #}
-<div style="padding-bottom:5rem;">
-    <!-- Sessions chart — full width since the Recent Activity panel beside
-         it was removed to keep this page on high-level figures. -->
-    <div class="card">
-        <div class="card-header">
-            {# Controls live at the top of the page now — they govern the tiles #}
-            {# too, and repeating them here would imply they are chart-only. #}
-            <h2 class="card-title">{% trans "Sessions over time" %}</h2>
-        </div>
-        <div class="card-body">
-            <div id="activity-chart-wrap" style="display:flex; gap:0.4rem; height:240px;">
-                <div id="activity-y-axis" style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; padding-right:0.25rem; padding-bottom:24px; font-size:0.7rem; color:var(--gray-500); min-width:1.6rem; user-select:none;">
-                    <!-- Y-axis tick labels rendered by JS -->
-                </div>
-                <div id="activity-plot" style="position:relative; flex:1; display:flex; flex-direction:column;">
-                    <div id="activity-gridlines" style="position:absolute; inset:0 0 24px 0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none;">
-                        <!-- Horizontal gridlines rendered by JS -->
+            <details class="period__custom">
+                <summary>{% icon "calendar" size="sm" %}{% trans "Custom range" %}</summary>
+                <form method="get" class="period__custom-form">
+                    <div class="field">
+                        <label class="field__label" for="range-start">{% trans "From" %}</label>
+                        <input type="date" id="range-start" name="start" value="{{ activity_start }}" class="input input--sm">
                     </div>
-                    <div id="activity-bars" style="position:relative; flex:1; display:flex; align-items:stretch; gap:4px; z-index:1;">
-                        <!-- Bars rendered by JS -->
+                    <div class="field">
+                        <label class="field__label" for="range-end">{% trans "To" %}</label>
+                        <input type="date" id="range-end" name="end" value="{{ activity_end }}" class="input input--sm">
                     </div>
-                    <div id="activity-x-axis" style="display:flex; gap:4px; height:24px; padding-top:0.25rem; font-size:0.7rem; color:var(--gray-500);">
-                        <!-- Date labels rendered by JS -->
-                    </div>
+                    <button type="submit" class="btn btn--primary btn--sm">{% trans "Apply range" %}</button>
+                </form>
+            </details>
+        </div>
+    </section>
+
+    {% comment %} ─────────────────────────────────────────────────────────
+    3. SIGNAL ROW — four figures, one line of context each. The "how is
+    this counted" notes moved out of title="" attributes, which keyboard
+    users never see and touch users cannot reach at all, into disclosures.
+    ───────────────────────────────────────────────────────────── {% endcomment %}
+    <section class="metric-row" aria-label="{% trans 'Headline figures' %}">
+        {% blocktrans asvar students_note with count=active_students %}{{ count }} active this period{% endblocktrans %}
+        {% stat_tile label=_("Students on roll") value=total_students note=students_note %}
+
+        {% blocktrans asvar reach_note with n=et.sessions_reached pct=et.reach_pct %}{{ n }} reached the exit ticket ({{ pct }}%){% endblocktrans %}
+        {% trans "Sessions that got as far as the exit ticket. The rest stopped during the lesson, which means they produced no assessment evidence at all." as reach_hint %}
+        {% stat_tile label=_("Sessions started") value=total_sessions note=reach_note hint=reach_hint %}
+
+        {% comment %}
+        Windowed, like every other tile on this row. The mean-score tile that
+        used to sit here was removed: the number it showed is still computed,
+        because the triage rail raises it as an item when it drops below the
+        floor, and a figure a teacher must act on belongs in "Needs you"
+        rather than in a row of context. The distribution chart below carries
+        the same information with the shape the mean was hiding.
+        {% endcomment %}
+        {% blocktrans asvar mastery_note with n=et.students_mastered total=et.students_attempted %}{{ n }} of {{ total }} who attempted{% endblocktrans %}
+        {% trans "Of the students who attempted an exit ticket in this period, the share who passed at least one. A lesson's pass mark is its mastery threshold, so passing is mastering that lesson. Counted over the same sessions as the figures beside it, so it moves with the period above." as mastery_hint %}
+        {% stat_tile label=_("Students mastering") value=et.mastering_pct|stringformat:"s"|add:"%" tone="info" note=mastery_note hint=mastery_hint %}
+    </section>
+
+    {% comment %} ─────────────────────────────────────────────────────────
+    4. TREND — last, because it is the figure a teacher browses rather than
+    acts on.
+    ───────────────────────────────────────────────────────────── {% endcomment %}
+    <section class="card" aria-labelledby="activity-heading">
+        <header class="card__header">
+            <h2 class="card__title" id="activity-heading">{% trans "Sessions over time" %}</h2>
+            <p class="card__meta">{{ activity_label }}</p>
+        </header>
+        <div class="card__body">
+            <div class="chart chart--sessions" id="activity-chart">
+                <div class="chart__y" id="activity-y" aria-hidden="true"></div>
+                <div class="chart__plot">
+                    <div class="chart__grid" id="activity-grid" aria-hidden="true"></div>
+                    <div class="chart__bars" id="activity-bars"></div>
+                    <div class="chart__x" id="activity-x" aria-hidden="true"></div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-
-
-
-    
-    
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -204,209 +150,6 @@ Data blocks, not code. json_script escapes <, > and & so nothing in the
 payload can close the tag it sits in — the replacement for two |safe
 renders flagged by assessment finding F-07.
 {% endcomment %}
-{{ activity_data|json_script:"activity-data-json" }}
-{{ score_distribution|json_script:"score-distribution-json" }}
-<script nonce="{{ request.csp_nonce }}">
-    // Sessions bar chart with readable Y-axis. Computes 5 evenly-
-    // spaced ticks (0..ceil(max)) with a "nice" step so labels are
-    // round integers instead of awkward fractions, then renders
-    // matching gridlines + bar heights.
-    const activityData = JSON.parse(
-        document.getElementById('activity-data-json').textContent);
-
-    function niceCeil(value) {
-        // Pick the smallest "nice" upper bound >= value, where nice
-        // means {1, 2, 5} × 10^n. Keeps Y-axis ticks readable.
-        if (value <= 0) return 1;
-        const exp = Math.floor(Math.log10(value));
-        const base = Math.pow(10, exp);
-        const m = value / base;
-        let nice;
-        if (m <= 1) nice = 1;
-        else if (m <= 2) nice = 2;
-        else if (m <= 5) nice = 5;
-        else nice = 10;
-        return nice * base;
-    }
-
-    if (activityData && activityData.length > 0) {
-        const rawMax = Math.max(...activityData.map(d => d.sessions), 1);
-        const yMax = niceCeil(rawMax);
-        const tickCount = 5;  // 0, 25%, 50%, 75%, 100%
-        const ticks = [];
-        for (let i = tickCount - 1; i >= 0; i--) {
-            ticks.push(Math.round((yMax * i) / (tickCount - 1)));
-        }
-
-        // Y-axis labels (top → bottom, so top = max)
-        const yAxisEl = document.getElementById('activity-y-axis');
-        ticks.forEach(t => {
-            const span = document.createElement('span');
-            span.textContent = t;
-            yAxisEl.appendChild(span);
-        });
-
-        // Horizontal gridlines aligned with each tick
-        const gridEl = document.getElementById('activity-gridlines');
-        ticks.forEach((_, i) => {
-            const line = document.createElement('div');
-            line.style.borderTop = i === ticks.length - 1
-                ? '1px solid var(--gray-300)'   // x-axis baseline
-                : '1px dashed var(--gray-200)';
-            line.style.height = '0';
-            gridEl.appendChild(line);
-        });
-
-        // Bars
-        const barsEl = document.getElementById('activity-bars');
-        const xAxisEl = document.getElementById('activity-x-axis');
-        // Thin the labels so they never collide. At 14 bars every bar is
-        // labelled as before; over a long range only every Nth is, which is
-        // what keeps a 12-month window legible instead of a grey smear.
-        const labelEvery = Math.max(1, Math.ceil(activityData.length / 14));
-        let lastLabelledMonth = null;
-        activityData.forEach((d, idx) => {
-            const barWrap = document.createElement('div');
-            barWrap.style.flex = '1';
-            barWrap.style.display = 'flex';
-            barWrap.style.flexDirection = 'column';
-            barWrap.style.justifyContent = 'flex-end';
-            barWrap.style.alignItems = 'center';
-            barWrap.style.minWidth = '0';
-
-            const barFill = document.createElement('div');
-            const heightPct = (d.sessions / yMax) * 100;
-            barFill.style.width = '100%';
-            barFill.style.background = 'var(--primary)';
-            barFill.style.borderRadius = '4px 4px 0 0';
-            barFill.style.height = heightPct + '%';
-            barFill.style.minHeight = d.sessions > 0 ? '2px' : '0';
-            barFill.style.transition = 'height 0.3s';
-            barFill.title = `${d.date}: ${d.sessions} session${d.sessions === 1 ? '' : 's'}`;
-            barWrap.appendChild(barFill);
-            barsEl.appendChild(barWrap);
-
-            const dateLabel = document.createElement('div');
-            dateLabel.style.flex = '1';
-            dateLabel.style.textAlign = 'center';
-            dateLabel.style.minWidth = '0';
-            dateLabel.style.overflow = 'hidden';
-            dateLabel.style.whiteSpace = 'nowrap';
-            // Day-of-month alone is ambiguous once the window spans months —
-            // "07" could be any of them. Carry the month on the first labelled
-            // bar of each month.
-            //
-            // Compared against the last LABELLED month, not the immediately
-            // preceding bar. Labels are thinned, so the true first-of-month bar
-            // is usually not labelled: the old check compared against its
-            // neighbour, found the same month, and printed a bare day — which
-            // is why a 90-day axis read "May 12, 19, 26, 02, 09" with no hint
-            // that 02 was June.
-            const parts = d.date.split(' ');
-            if (idx % labelEvery === 0) {
-                dateLabel.textContent = (lastLabelledMonth !== parts[0])
-                    ? d.date            // "Jun 02"
-                    : (parts[1] || d.date);  // "09"
-                lastLabelledMonth = parts[0];
-                // Each cell is only as wide as its bar. Over a long window that
-                // is ~19px, which clips "Sep 01" to "Se". The neighbouring
-                // cells are deliberately blank, so let the text spill into
-                // them rather than truncating it.
-                dateLabel.style.overflow = 'visible';
-            } else {
-                dateLabel.textContent = '';
-            }
-            dateLabel.title = d.date;
-            xAxisEl.appendChild(dateLabel);
-        });
-    }
-
-    // ── Exit ticket score distribution ──────────────────────────────────
-    // Frequency of attempts per 10% band, with mean and median drawn on top
-    // so the shape and the averages are read together — a mean alone hides
-    // whether the class is bimodal (a group nailing it, a group lost).
-    const distData = JSON.parse(
-        document.getElementById('score-distribution-json').textContent);
-    const distMean = {{ et.avg_pct|default:0 }};
-    const distMedian = {{ et.median_pct|default:0 }};
-    const distBars = document.getElementById('dist-bars');
-
-    if (distBars && distData && distData.length > 0) {
-        const rawMax = Math.max(...distData.map(d => d.count), 1);
-        const yMax = niceCeil(rawMax);          // shared with the sessions chart
-        const tickCount = 5;
-        const rawTicks = [];
-        for (let i = tickCount - 1; i >= 0; i--) {
-            rawTicks.push(Math.round((yMax * i) / (tickCount - 1)));
-        }
-        // Counts are integers, so a small yMax rounds several ticks to the same
-        // value — a 2-attempt window rendered "2, 2, 1, 1, 0". Dedupe rather
-        // than always drawing five.
-        const ticks = [...new Set(rawTicks)];
-
-        const yAxis = document.getElementById('dist-y-axis');
-        ticks.forEach(t => {
-            const el = document.createElement('div');
-            el.textContent = t;
-            yAxis.appendChild(el);
-        });
-
-        const grid = document.getElementById('dist-gridlines');
-        ticks.forEach((_, i) => {
-            const line = document.createElement('div');
-            line.style.borderTop = (i === ticks.length - 1)
-                ? '1px solid var(--gray-300)'
-                : '1px dashed var(--gray-200)';
-            grid.appendChild(line);
-        });
-
-        const xAxis = document.getElementById('dist-x-axis');
-        distData.forEach(d => {
-            const wrap = document.createElement('div');
-            wrap.style.cssText = 'flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:0;';
-
-            const bar = document.createElement('div');
-            bar.style.width = '100%';
-            // Tint the failing bands so the pass line is visible without a
-            // legend. 80% is the configured passing_score on these tickets.
-            bar.style.background = (d.lo >= 80) ? 'var(--success)' : 'var(--primary)';
-            bar.style.opacity = (d.lo >= 80) ? '1' : '0.55';
-            bar.style.borderRadius = '4px 4px 0 0';
-            bar.style.height = ((d.count / yMax) * 100) + '%';
-            bar.style.minHeight = d.count > 0 ? '2px' : '0';
-            bar.title = `${d.label}%: ${d.count} attempt${d.count === 1 ? '' : 's'}`;
-            wrap.appendChild(bar);
-            distBars.appendChild(wrap);
-
-            const lbl = document.createElement('div');
-            lbl.style.cssText = 'flex:1; text-align:center; min-width:0; white-space:nowrap;';
-            lbl.textContent = d.lo;      // 0, 10, 20 … band lower edge
-            xAxis.appendChild(lbl);
-        });
-
-        // Mean / median rules. Positioned by percentage across the axis, which
-        // is why they live in their own absolutely-positioned layer rather
-        // than inside the bar flexbox.
-        const markers = document.getElementById('dist-markers');
-        [
-            { pct: distMean, color: 'var(--primary)', label: 'mean' },
-            { pct: distMedian, color: 'var(--accent, #7c3aed)', label: 'median' },
-        ].forEach((m, idx) => {
-            const line = document.createElement('div');
-            line.style.cssText = `position:absolute; top:0; bottom:0; left:${m.pct}%;`
-                + `border-left:2px dashed ${m.color};`;
-            markers.appendChild(line);
-
-            const tag = document.createElement('div');
-            // Stagger vertically so mean and median stay readable when close.
-            tag.style.cssText = `position:absolute; left:${m.pct}%; top:${idx * 16}px;`
-                + `transform:translateX(-50%); font-size:0.65rem; font-weight:600;`
-                + `color:${m.color}; background:var(--white,#fff); padding:0 3px;`
-                + `border-radius:3px; white-space:nowrap;`;
-            tag.textContent = `${m.label} ${m.pct}%`;
-            markers.appendChild(tag);
-        });
-    }
-
-</script>
+{{ activity_data|json_script:"activity-data" }}
+<script src="{% static 'js/dashboard-charts.js' %}" defer></script>
 {% endblock %}

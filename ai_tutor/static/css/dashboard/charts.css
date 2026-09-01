@@ -1,0 +1,112 @@
+/* ==========================================================================
+   Teacher dashboard — charts
+   ==========================================================================
+   The dashboard draws its one chart — sessions over time — from divs rather
+   than a charting library (no CDN in production, and the shape is simple).
+   Previously the rendering JS set ~15 style properties per bar inline.
+   Everything static now lives here; the JS sets only the height percentage,
+   which is the one thing that is actually data.
+   ========================================================================== */
+
+.chart {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.chart--sessions { height: 220px; }
+
+/* Y axis ---------------------------------------------------------------- */
+.chart__y {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: var(--space-1);
+    min-width: 2.2rem;
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+/* Reserves exactly the x-axis height so ticks line up with gridlines. */
+.chart__y { padding-bottom: var(--chart-axis-h, 30px); }
+
+/* Plot ------------------------------------------------------------------ */
+.chart__plot {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart__grid {
+    position: absolute;
+    inset: 0 0 var(--chart-axis-h, 30px) 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.chart__gridline { border-top: 1px dashed var(--border); height: 0; }
+.chart__gridline--base { border-top: 1px solid var(--border-strong); }
+
+.chart__bars {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    gap: 3px;
+}
+
+.chart__x {
+    display: flex;
+    gap: 3px;
+    height: var(--chart-axis-h, 30px);
+    padding-top: var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.chart__x-label {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Only labelled ticks may spill into their blank neighbours; unlabelled
+   cells stay clipped so nothing overlaps. */
+.chart__x-label--shown { overflow: visible; }
+
+/* Bars ------------------------------------------------------------------ */
+.chart__col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: stretch;
+}
+
+.chart__bar {
+    width: 100%;
+    border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+    background: var(--accent-solid);
+    transition: height var(--dur-slow) var(--ease-out),
+                background var(--dur-fast) var(--ease-out);
+}
+
+.chart__col:hover .chart__bar { background: var(--primary-dark); }
+
+/* Charts are decorative duplicates of a table the teacher can also read.
+   When motion is reduced, bars appear at their final height immediately. */
+@media (prefers-reduced-motion: reduce) {
+    .chart__bar { transition: none; }
+}
