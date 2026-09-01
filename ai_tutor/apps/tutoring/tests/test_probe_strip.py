@@ -130,9 +130,14 @@ class ScaffoldConsistencyPrincipleTest(SimpleTestCase):
     verbatim from the posed problem."""
 
     def test_principle_present_in_system_prompt(self):
-        import inspect
-        from ai_tutor.apps.tutoring import conversational_tutor as mod
-        source = inspect.getsource(mod)
+        # Asserted against the exported template, not inspect.getsource() of
+        # a module. The prompt text moved out of conversational_tutor.py into
+        # prompts/anthropic.py and these guards silently stopped guarding —
+        # they passed nothing and failed on the module, not on the principle.
+        # The template is what actually reaches the model, so check that.
+        from ai_tutor.apps.tutoring.prompts import (
+            TUTOR_SYSTEM_PROMPT_TEMPLATE as source,
+        )
         self.assertIn('id="scaffold_consistency"', source)
         self.assertIn("SCAFFOLD CONSISTENCY", source)
         # Both the wrong + right shapes are illustrated so the LLM

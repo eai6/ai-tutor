@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.auth.models import User
+from django.test import Client
 from django.urls import reverse
 
 from ai_tutor.apps.accounts.models import Institution
@@ -83,10 +84,22 @@ class TestClaimSubmit:
 
     def test_the_password_actually_works(self, client, provisioned):
         """A password that is set but not usable would strand the student at
-        the next login, with no way back — the entry is already claimed."""
+        the next login, with no way back — the entry is already claimed.
+
+        Signs in through the real login view rather than ``client.login()``:
+        that helper calls ``authenticate()`` with no request, and
+        AxesStandaloneBackend raises on that (see CLAUDE.md). Going through
+        the view also proves the whole path works, not just the hash.
+        """
         self._claim(client, password='pencil')
         user = RosterEntry.objects.get(server_user_id=501).local_user
-        assert client.login(username=user.username, password='pencil')
+        assert user.check_password('pencil')
+
+        fresh = Client()
+        fresh.post(reverse('accounts:student_login'),
+                   {'username': user.username, 'password': 'pencil'})
+        assert '_auth_user_id' in fresh.session
+        assert int(fresh.session['_auth_user_id']) == user.pk
 
     def test_a_second_claim_of_the_same_name_is_refused(self, client, provisioned):
         self._claim(client)

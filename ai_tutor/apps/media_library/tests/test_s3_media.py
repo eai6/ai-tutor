@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.http import Http404
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from ai_tutor.apps.media_library import s3_media
 
@@ -59,7 +59,15 @@ BODY = b"0123456789A"  # 11 bytes
 
 
 @override_settings(AWS_MEDIA_BUCKET="test-bucket", MEDIA_URL="media/")
-class S3MediaServingTests(SimpleTestCase):
+class S3MediaServingTests(TestCase):
+    """TestCase, not SimpleTestCase, because these serve a real response.
+
+    ``FileResponse.close()`` fires Django's ``request_finished`` signal, and
+    Django wires ``close_old_connections`` to it — a database touch that
+    SimpleTestCase forbids. It only bites once some earlier test in the run
+    has opened a connection, so the file passed alone and failed in the full
+    suite. Order-dependent, and the order was not the bug.
+    """
     """serve_media against a private bucket."""
 
     def setUp(self):

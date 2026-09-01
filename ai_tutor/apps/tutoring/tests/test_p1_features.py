@@ -365,7 +365,9 @@ class TestSeychellesContextLibrary(TestCase):
             grade_levels=['S3'],
         )
         self.assertEqual(entry.category, 'economic')
-        self.assertEqual(str(entry), '[Economic] GDP')
+        # The locale suffix is deliberate: entries are scoped per course
+        # locale so Seychelles facts don't leak into Mozambique courses.
+        self.assertEqual(str(entry), '[Economic] GDP (en-us)')
 
     def test_filter_by_subject_tag(self):
         # Clear any seeded data first to test in isolation

@@ -81,10 +81,20 @@ class TestPage:
     @override_settings(SERVER_WHEEL_VERSION='', **BUCKET)
     def test_never_offers_a_link_it_cannot_serve(self):
         """Before a release the page must not show a pip command pointing at a
-        wheel that does not exist."""
+        wheel that does not exist.
+
+        It still has to show the procedure. The page used to hide all eight pip
+        steps behind the wheel being published, so on a deployment with no
+        downloads bucket the "with pip, no Docker" route rendered as a heading
+        and an apology. Only the install line depends on the artefact: without
+        a wheel it installs the published package by name, which is what
+        docs/self-hosting.md tells you to do.
+        """
         body = Client().get('/self-hosting/').content.decode()
         assert 'py3-none-any.whl' not in body
-        assert 'No wheel has been published yet' in body
+        assert 'pip install ai-tutor' in body
+        assert 'python3 -m venv /opt/ai-tutor/venv' in body
+        assert 'run collectstatic --noinput' in body
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_still_offers_the_desktop_installers(self):
