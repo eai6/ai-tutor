@@ -14,9 +14,9 @@ student hasn't taken it.
 {% for c in baseline_recommended_courses %}
 <div id="baseline-recommend-banner-{{ c.id }}"
      data-storage-key="baseline_recommend_dismissed_for_{{ user.id }}_{{ c.id }}"
-     style="background:#ede9fe;border-bottom:1px solid #c4b5fd;padding:0.6rem 1rem;font-size:0.88rem;color:#4c1d95;display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;position:relative;">
+     style="background:var(--accent-surface);border-bottom:1px solid var(--accent-border);padding:0.6rem 1rem;font-size:0.88rem;color:#4c1d95;display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;position:relative;">
     <span>🎯 Take the <strong>{{ c.title }}</strong> baseline whenever you're ready — it helps the tutor focus on what you actually need.</span>
-    <a href="{{ c.url }}" style="background:#5b21b6;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:600;text-decoration:none;">Take baseline</a>
+    <a href="{{ c.url }}" style="background:var(--accent);color:var(--surface);border:none;border-radius:6px;padding:0.3rem 0.75rem;font-size:0.8rem;font-weight:600;text-decoration:none;">Take baseline</a>
     <button type="button" class="baseline-banner-close"
             data-banner-id="baseline-recommend-banner-{{ c.id }}"
             aria-label="Dismiss this notice"

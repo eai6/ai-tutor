@@ -14,7 +14,7 @@
     margin-bottom: 1.5rem;
 }
 .chat-header h2 { margin: 0; font-size: 1.25rem; }
-.chat-meta { color: #71717a; font-size: 0.875rem; margin-top: 0.25rem; }
+.chat-meta { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
 
 .back-link {
     display: inline-flex;
@@ -36,7 +36,7 @@
     margin-bottom: 1.5rem;
 }
 .info-card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     padding: 0.75rem 1.25rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -58,7 +58,7 @@
 .cog-bar-lg {
     width: 80px;
     height: 10px;
-    background: #e5e7eb;
+    background: var(--border);
     border-radius: 5px;
     overflow: hidden;
     display: inline-block;
@@ -68,13 +68,13 @@
     height: 100%;
     border-radius: 5px;
 }
-.cog-green { background: #10b981; }
-.cog-yellow { background: #f59e0b; }
-.cog-red { background: #ef4444; }
+.cog-green { background: var(--success-solid); }
+.cog-yellow { background: var(--warning-solid); }
+.cog-red { background: var(--danger-solid); }
 
 /* EO coverage */
 .eo-section {
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     padding: 1rem 1.25rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -93,12 +93,12 @@
     font-weight: 600;
     margin: 0.125rem;
 }
-.eo-covered { background: #d1fae5; color: #059669; }
-.eo-failed { background: #fee2e2; color: #dc2626; }
+.eo-covered { background: var(--success-surface); color: var(--success-solid); }
+.eo-failed { background: var(--danger-surface); color: var(--danger-solid); }
 
 /* Exit ticket results */
 .exit-result {
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     padding: 1rem 1.25rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -113,12 +113,12 @@
     font-size: 1.5rem;
     font-weight: 800;
 }
-.exit-pass { color: #059669; }
-.exit-fail { color: #dc2626; }
+.exit-pass { color: var(--success-solid); }
+.exit-fail { color: var(--danger-solid); }
 
 /* Chat conversation */
 .chat-container {
-    background: #f4f4f5;
+    background: var(--surface-sunken);
     border-radius: 0.75rem;
     padding: 1.25rem;
     max-height: 70vh;
@@ -135,21 +135,21 @@
     white-space: pre-wrap;
 }
 .bubble-tutor {
-    background: #fff;
+    background: var(--surface);
     color: #1f2937;
     border-bottom-left-radius: 0.25rem;
     margin-right: auto;
     box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 .bubble-student {
-    background: #dbeafe;
+    background: var(--info-surface);
     color: #1e3a5f;
     border-bottom-right-radius: 0.25rem;
     margin-left: auto;
 }
 .bubble-system {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--warning-surface);
+    color: var(--warning);
     margin: 0.5rem auto;
     text-align: center;
     font-size: 0.75rem;
@@ -194,7 +194,7 @@
     </div>
     <div>
         <span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.6875rem;font-weight:700;text-transform:uppercase;
-            {% if session.status == 'active' %}background:#d1fae5;color:#059669;{% elif session.status == 'completed' %}background:#dbeafe;color:#2563eb;{% else %}background:#f3f4f6;color:#6b7280;{% endif %}">
+            {% if session.status == 'active' %}background:var(--success-surface);color:var(--success-solid);{% elif session.status == 'completed' %}background:var(--info-surface);color:var(--info-solid);{% else %}background:var(--surface-sunken);color:var(--text-muted);{% endif %}">
             {{ session.status }}
         </span>
     </div>
@@ -225,7 +225,7 @@ memory/pilot_session_plan.md).
     <span class="exit-score-big {% if exit_score >= 8 %}exit-pass{% else %}exit-fail{% endif %}">
         {{ exit_score }}/{{ exit_total|default:"10" }}
     </span>
-    <span style="margin-left:0.5rem;font-size:0.875rem;color:#71717a;">
+    <span style="margin-left:0.5rem;font-size:0.875rem;color:var(--text-muted);">
         {% if exit_score >= 8 %}{% trans "Passed" %}{% else %}{% trans "Did not pass" %}{% endif %}
     </span>
 </div>
@@ -253,10 +253,10 @@ memory/pilot_session_plan.md).
             {% endcomment %}
             {% for m in turn.metadata.attached_media %}
                 {% if m.url %}
-                <div style="margin-top:0.4rem;max-width:340px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;">
+                <div style="margin-top:0.4rem;max-width:340px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);">
                     <img src="{{ m.url }}" alt="{{ m.alt }}" style="display:block;width:100%;height:auto;">
                     {% if m.caption %}
-                    <div style="font-size:0.7rem;color:#71717a;padding:0.35rem 0.5rem;border-top:1px solid #f4f4f5;background:#fafafa;">
+                    <div style="font-size:0.7rem;color:var(--text-muted);padding:0.35rem 0.5rem;border-top:1px solid var(--surface-sunken);background:var(--surface-sunken);">
                         {{ m.caption|truncatechars:160 }}
                     </div>
                     {% endif %}

@@ -3,9 +3,9 @@
 {% block title %}Delete Account{% endblock %}
 
 {% block content %}
-<div style="max-width:520px;margin:3rem auto;padding:2rem;background:#fff;border-radius:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-    <h1 style="font-size:1.5rem;font-weight:700;color:#dc2626;margin:0 0 0.5rem;">Delete your account</h1>
-    <p style="color:#71717a;margin:0 0 1.5rem;">
+<div style="max-width:520px;margin:3rem auto;padding:2rem;background:var(--surface);border-radius:0.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+    <h1 style="font-size:1.5rem;font-weight:700;color:var(--danger-solid);margin:0 0 0.5rem;">Delete your account</h1>
+    <p style="color:var(--text-muted);margin:0 0 1.5rem;">
         This will permanently delete your account ({{ request.user.username }}) and
         all of your tutoring sessions, progress, and exit ticket history.
         <strong>This cannot be undone.</strong>
@@ -13,25 +13,25 @@
 
     {% if messages %}
         {% for message in messages %}
-            <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-size:0.9rem;">{{ message }}</div>
+            <div style="background:var(--danger-surface);border:1px solid #fca5a5;color:var(--danger);padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-size:0.9rem;">{{ message }}</div>
         {% endfor %}
     {% endif %}
 
     <form method="post" autocomplete="off">
         {% csrf_token %}
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-weight:600;color:#374151;margin-bottom:0.4rem;">Confirm your password:</label>
+            <label style="display:block;font-weight:600;color:var(--text-secondary);margin-bottom:0.4rem;">Confirm your password:</label>
             <input type="password" name="password" required autocomplete="current-password"
-                   style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:6px;font-size:1rem;">
+                   style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--border-strong);border-radius:6px;font-size:1rem;">
         </div>
         <div style="margin-bottom:1.5rem;">
-            <label style="display:block;font-weight:600;color:#374151;margin-bottom:0.4rem;">Type <code style="background:#f3f4f6;padding:0.1rem 0.3rem;border-radius:3px;">DELETE</code> to confirm:</label>
+            <label style="display:block;font-weight:600;color:var(--text-secondary);margin-bottom:0.4rem;">Type <code style="background:var(--surface-sunken);padding:0.1rem 0.3rem;border-radius:3px;">DELETE</code> to confirm:</label>
             <input type="text" name="confirm" required autocomplete="off"
-                   style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:6px;font-size:1rem;">
+                   style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--border-strong);border-radius:6px;font-size:1rem;">
         </div>
         <div style="display:flex;justify-content:space-between;gap:0.75rem;">
-            <a href="javascript:history.back()" style="display:inline-block;padding:0.6rem 1rem;background:#f3f4f6;color:#374151;text-decoration:none;border-radius:6px;font-weight:600;">Cancel</a>
-            <button type="submit" style="padding:0.6rem 1.5rem;background:#dc2626;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;">Permanently delete account</button>
+            <a href="javascript:history.back()" style="display:inline-block;padding:0.6rem 1rem;background:var(--surface-sunken);color:var(--text-secondary);text-decoration:none;border-radius:6px;font-weight:600;">Cancel</a>
+            <button type="submit" style="padding:0.6rem 1.5rem;background:var(--danger-solid);color:var(--surface);border:none;border-radius:6px;font-weight:700;cursor:pointer;">Permanently delete account</button>
         </div>
     </form>
 </div>

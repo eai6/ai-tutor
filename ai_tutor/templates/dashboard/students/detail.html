@@ -53,7 +53,7 @@
                 {% endif %}
                 <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('{% blocktrans with name=student.username %}Permanently delete student account &quot;{{ name }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
+                    <button type="submit" class="btn btn-sm" style="background:var(--danger-surface);color:var(--danger);border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
                 </form>
             </div>
         </div>
@@ -106,9 +106,9 @@
                         {% for lesson in cp.lessons %}
                         <div style="padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; border: 1px solid;
                             {% if lesson.mastery_level == 'mastered' %}
-                                background: #ecfdf5; color: #065F46; border-color: #a7f3d0;
+                                background: var(--success-surface); color: var(--success); border-color: var(--success-border);
                             {% elif lesson.mastery_level == 'in_progress' %}
-                                background: #fffbeb; color: #92400E; border-color: #fde68a;
+                                background: var(--warning-surface); color: var(--warning); border-color: var(--warning-border);
                             {% else %}
                                 background: var(--gray-50); color: var(--gray-500); border-color: var(--gray-200);
                             {% endif %}
@@ -128,7 +128,7 @@
                             </div>
                             {% if lesson.weak_concepts %}
                             <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
-                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:var(--warning-surface);padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
                             </div>
                             {% endif %}
                         </div>
@@ -166,7 +166,7 @@
                         <div>
                             <div style="font-weight: 500;">
                                 {{ session.lesson.title }}
-                                {% if session.is_group_for_student %}<span class="badge" title="{% trans 'Joined as a group participant' %}" style="background:#ede9fe;color:#5b21b6;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
+                                {% if session.is_group_for_student %}<span class="badge" title="{% trans 'Joined as a group participant' %}" style="background:var(--accent-surface);color:var(--accent);font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
                             </div>
                             <div style="font-size: 0.8125rem; color: var(--gray-500);">
                                 {{ session.started_at|date:"M d, Y H:i" }}

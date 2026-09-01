@@ -8,57 +8,57 @@
 <style>
     .summary-row { display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:1rem; }
     .summary-card {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--surface); border:1px solid var(--border); border-radius:10px;
         padding:0.85rem 1.1rem; flex:1; min-width:180px;
     }
-    .summary-card .label { font-size:0.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
-    .summary-card .value { font-size:1.4rem; font-weight:700; color:#111; line-height:1.1; margin-top:0.15rem; }
+    .summary-card .label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--text); line-height:1.1; margin-top:0.15rem; }
 
     .matrix {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--surface); border:1px solid var(--border); border-radius:10px;
         overflow-x: auto;
     }
     .matrix table { width:100%; border-collapse:collapse; min-width: 720px; }
     .matrix th, .matrix td { padding:0.5rem 0.75rem; text-align:left; font-size:0.85rem; vertical-align:top; }
-    .matrix thead th { background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid #e5e7eb; position:sticky; top:0; }
-    .matrix tbody tr { border-bottom:1px solid #f3f4f6; }
-    .matrix tbody tr:hover { background:#fafafa; }
-    .matrix .obj { color:#111; font-weight:500; max-width:380px; }
+    .matrix thead th { background:var(--surface-sunken); color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border); position:sticky; top:0; }
+    .matrix tbody tr { border-bottom:1px solid var(--surface-sunken); }
+    .matrix tbody tr:hover { background:var(--surface-sunken); }
+    .matrix .obj { color:var(--text); font-weight:500; max-width:380px; }
 
-    .bar { width:100%; height:8px; background:#f3f4f6; border-radius:4px; overflow:hidden; margin-top:0.2rem; }
+    .bar { width:100%; height:8px; background:var(--surface-sunken); border-radius:4px; overflow:hidden; margin-top:0.2rem; }
     .bar-fill { height:100%; transition: width 0.3s ease; }
     .bar-fill.baseline { background:#fbbf24; }
-    .bar-fill.latest { background:#8b5cf6; }
-    .bar-fill.final { background:#10b981; }
+    .bar-fill.latest { background:var(--accent-solid); }
+    .bar-fill.final { background:var(--success-solid); }
 
-    .pct { font-weight:600; color:#111; font-variant-numeric: tabular-nums; }
-    .pct-faint { color:#9ca3af; font-size:0.8rem; }
-    .delta-pos { color:#047857; font-weight:600; }
-    .delta-neg { color:#b91c1c; font-weight:600; }
-    .delta-zero { color:#6b7280; }
+    .pct { font-weight:600; color:var(--text); font-variant-numeric: tabular-nums; }
+    .pct-faint { color:var(--text-faint); font-size:0.8rem; }
+    .delta-pos { color:var(--success); font-weight:600; }
+    .delta-neg { color:var(--danger); font-weight:600; }
+    .delta-zero { color:var(--text-muted); }
 
-    .legend { display:flex; gap:1rem; font-size:0.78rem; color:#6b7280; margin:0.5rem 0 1rem; flex-wrap:wrap; }
+    .legend { display:flex; gap:1rem; font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0 1rem; flex-wrap:wrap; }
     .legend-swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:0.3rem; vertical-align:middle; }
 
-    .empty-state { text-align:center; padding:3rem 1rem; color:#6b7280; }
-    .empty-state h3 { color:#374151; margin:0.5rem 0; }
+    .empty-state { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+    .empty-state h3 { color:var(--text-secondary); margin:0.5rem 0; }
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
 </div>
 
 <div class="summary-row">
-    <div class="summary-card" style="background:linear-gradient(135deg,#5b21b6 0%,#8b5cf6 100%);color:#fff;border:none;">
+    <div class="summary-card" style="background:linear-gradient(135deg,var(--accent) 0%,var(--accent-solid) 100%);color:var(--surface);border:none;">
         <div class="label" style="color:rgba(255,255,255,0.8);">{% trans "Class readiness" %}</div>
-        <div class="value" style="color:#fff;">{{ readiness }}%</div>
+        <div class="value" style="color:var(--surface);">{{ readiness }}%</div>
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:0.2rem;">{% trans "average of class competency across all lessons" %}</div>
     </div>
     <div class="summary-card">
         <div class="label">{% trans "Teaching objectives" %}</div>
         <div class="value">{{ matrix.objectives|length }}</div>
-        {% if struggling_count %}<div style="font-size:0.72rem;color:#b91c1c;margin-top:0.2rem;">{% blocktrans with n=struggling_count %}{{ n }} below 50%{% endblocktrans %}</div>{% endif %}
-        {% if untouched_count %}<div style="font-size:0.72rem;color:#6b7280;margin-top:0.2rem;">{% blocktrans with n=untouched_count %}{{ n }} not yet assessed{% endblocktrans %}</div>{% endif %}
+        {% if struggling_count %}<div style="font-size:0.72rem;color:var(--danger);margin-top:0.2rem;">{% blocktrans with n=struggling_count %}{{ n }} below 50%{% endblocktrans %}</div>{% endif %}
+        {% if untouched_count %}<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">{% blocktrans with n=untouched_count %}{{ n }} not yet assessed{% endblocktrans %}</div>{% endif %}
     </div>
     <div class="summary-card">
         <div class="label">{% trans "Roster" %}</div>
@@ -72,9 +72,9 @@
 
 {% if recommendation %}
 <div style="margin-bottom:1rem;padding:0.85rem 1.1rem;border-radius:10px;font-size:0.92rem;line-height:1.5;
-    {% if recommendation_type == 'success' %}background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;
-    {% elif recommendation_type == 'danger' %}background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;
-    {% else %}background:#fef3c7;border:1px solid #fcd34d;color:#92400e;{% endif %}">
+    {% if recommendation_type == 'success' %}background:var(--success-surface);border:1px solid #6ee7b7;color:var(--success);
+    {% elif recommendation_type == 'danger' %}background:var(--danger-surface);border:1px solid #fca5a5;color:var(--danger);
+    {% else %}background:var(--warning-surface);border:1px solid var(--warning-border);color:var(--warning);{% endif %}">
     <strong>{% if recommendation_type == 'success' %}✓{% elif recommendation_type == 'danger' %}!{% else %}⚠{% endif %}</strong>
     {{ recommendation }}
 </div>
@@ -133,19 +133,19 @@
 {% endif %}
 
 {% if student_gaps %}
-<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">{% trans "Students with the most gaps" %}</h3>
-    <p style="margin:0 0 0.75rem;color:#6b7280;font-size:0.82rem;">{% trans "Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown." %}</p>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;">
+    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--text);">{% trans "Students with the most gaps" %}</h3>
+    <p style="margin:0 0 0.75rem;color:var(--text-muted);font-size:0.82rem;">{% trans "Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown." %}</p>
     <div style="display:flex;flex-direction:column;gap:0.4rem;">
         {% for gap in student_gaps %}
-        <a href="{% url 'dashboard:student_competency' course.id gap.student.id %}" style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-decoration:none;color:inherit;">
+        <a href="{% url 'dashboard:student_competency' course.id gap.student.id %}" style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--surface-sunken);border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;">
             <div style="flex:1;min-width:0;">
-                <div style="font-weight:600;color:#111;font-size:0.9rem;">{{ gap.student.first_name }} {{ gap.student.last_name }} <span style="color:#9ca3af;font-weight:400;">@{{ gap.student.username }}</span></div>
-                <div style="font-size:0.78rem;color:#6b7280;margin-top:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">{{ gap.student.first_name }} {{ gap.student.last_name }} <span style="color:var(--text-faint);font-weight:400;">@{{ gap.student.username }}</span></div>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                     {% trans "Weak on:" %} {{ gap.weak_objectives|join:" · "|truncatechars:140 }}
                 </div>
             </div>
-            <span style="background:#fee2e2;color:#991b1b;font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{% blocktrans count count=gap.weak_count %}{{ count }} gap{% plural %}{{ count }} gaps{% endblocktrans %}</span>
+            <span style="background:var(--danger-surface);color:var(--danger);font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{% blocktrans count count=gap.weak_count %}{{ count }} gap{% plural %}{{ count }} gaps{% endblocktrans %}</span>
         </a>
         {% endfor %}
     </div>

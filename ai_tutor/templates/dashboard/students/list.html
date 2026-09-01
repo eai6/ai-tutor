@@ -1,122 +1,120 @@
 {% extends "dashboard/base.html" %}
-{% load i18n %}
+{% load static i18n dashboard_ui %}
 
 {% block title %}{% trans "Students" %}{% endblock %}
 {% block page_title %}{% trans "Students" %}{% endblock %}
+{% block topbar_eyebrow %}
+<span class="topbar-eyebrow">{% blocktrans count n=total_count %}{{ n }} on roll{% plural %}{{ n }} on roll{% endblocktrans %}</span>
+{% endblock %}
+
+{% comment %}
+Search moved from the card header into the topbar: it is the first thing a
+teacher does on this page, and it now sits at a fixed position that does not
+move as the table grows.
+{% endcomment %}
+{% block topbar_actions %}
+<div class="search">
+    {% icon "search" %}
+    <label for="student-search" class="sr-only">{% trans "Search students by name" %}</label>
+    <input type="search" id="student-search" class="input input--sm" autocomplete="off"
+           placeholder="{% trans 'Search students…' %}">
+</div>
+{% endblock %}
 
 {% block content %}
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">{% blocktrans with count=total_count %}All Students ({{ count }}){% endblocktrans %}</h2>
-        <div style="display: flex; gap: 0.5rem;">
-            <input type="text" class="form-control" placeholder="{% trans 'Search students...' %}" style="width: 250px;" id="search-input">
-        </div>
-    </div>
-    <div class="card-body" style="padding: 0;">
+    <div class="card__body card__body--flush">
         {% if students %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>{% trans "Student" %}</th>
-                    <th>{% trans "Grade" %}</th>
-                    <th>{% trans "School" %}</th>
-                    <th>{% trans "Progress" %}</th>
-                    <th>{% trans "Last Active" %}</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in students %}
-                <tr class="student-row" data-name="{{ s.user.first_name }} {{ s.user.last_name }}">
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.875rem;">
-                                {{ s.user.first_name|slice:":1"|upper }}{{ s.user.last_name|slice:":1"|upper }}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">{% trans "Student" %}</th>
+                        <th scope="col">{% trans "Grade" %}</th>
+                        <th scope="col">{% trans "School" %}</th>
+                        <th scope="col">{% trans "Lessons mastered" %}</th>
+                        <th scope="col">{% trans "Last active" %}</th>
+                        <th scope="col"><span class="sr-only">{% trans "Actions" %}</span></th>
+                    </tr>
+                </thead>
+                <tbody id="student-rows">
+                    {% for s in students %}
+                    <tr class="student-row" data-search="{{ s.user.first_name }} {{ s.user.last_name }} {{ s.user.email }}">
+                        <td>
+                            <div class="cell-primary">
+                                <span class="avatar avatar--sm" aria-hidden="true">{{ s.user.first_name|slice:":1"|upper }}{{ s.user.last_name|slice:":1"|upper }}</span>
+                                <span>
+                                    <span class="cell-primary__name">{{ s.user.first_name }} {{ s.user.last_name }}</span>
+                                    <span class="cell-primary__meta truncate">{{ s.user.email }}</span>
+                                </span>
                             </div>
-                            <div>
-                                <div style="font-weight: 500;">{{ s.user.first_name }} {{ s.user.last_name }}</div>
-                                <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ s.user.email }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        {% if s.profile %}
-                            <span class="badge badge-info">{{ s.profile.grade_level }}</span>
-                        {% else %}
-                            <span style="color: var(--gray-400);">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if s.profile %}
-                            {{ s.profile.get_school_display_name }}
-                        {% else %}
-                            <span style="color: var(--gray-400);">—</span>
-                        {% endif %}
-                    </td>
-                    <td style="width: 200px;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div class="progress-bar" style="flex: 1;">
-                                <div class="progress-fill {% if s.mastery_pct >= 70 %}success{% endif %}" style="width: {{ s.mastery_pct }}%;"></div>
-                            </div>
-                            <span style="font-size: 0.875rem; color: var(--gray-500); min-width: 60px;">
-                                {{ s.lessons_mastered }}/{{ s.lessons_total }}
-                            </span>
-                        </div>
-                    </td>
-                    <td>
-                        {% if s.last_active %}
-                            <span style="font-size: 0.875rem;">{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}</span>
-                        {% else %}
-                            <span style="color: var(--gray-400);">{% trans "Never" %}</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn-secondary btn-sm">{% trans "View" %}</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </td>
+                        <td>
+                            {% if s.profile %}{% badge s.profile.grade_level tone="info" %}
+                            {% else %}<span class="muted">—</span>{% endif %}
+                        </td>
+                        <td class="text-sm">
+                            {% if s.profile %}{{ s.profile.get_school_display_name }}
+                            {% else %}<span class="muted">—</span>{% endif %}
+                        </td>
+                        <td>
+                            {% comment %}
+                            Mastery reads as a fraction AND a bar. The bar is
+                            for scanning down the column; the fraction is the
+                            fact, and screen readers get it from the
+                            progressbar role rather than from the bar's width.
+                            {% endcomment %}
+                            {% if s.mastery_pct >= 70 %}
+                            {% progress s.mastery_pct tone="success" label=_("Lessons mastered") count=s.lessons_mastered total=s.lessons_total %}
+                            {% else %}
+                            {% progress s.mastery_pct tone="accent" label=_("Lessons mastered") count=s.lessons_mastered total=s.lessons_total %}
+                            {% endif %}
+                        </td>
+                        <td class="text-sm">
+                            {% if s.last_active %}{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}
+                            {% else %}<span class="muted">{% trans "Never" %}</span>{% endif %}
+                        </td>
+                        <td class="row-actions">
+                            <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn--secondary btn--sm">
+                                {% trans "Open" %}<span class="sr-only"> {{ s.user.first_name }} {{ s.user.last_name }}</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-        <!-- Pagination -->
+        {# Announced when the client-side filter empties the table. #}
+        <p class="empty" id="no-matches" hidden role="status">
+            {% trans "No students match that search." %}
+        </p>
+
         {% if students.has_other_pages %}
-        <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
+        <nav class="pagination" aria-label="{% trans 'Student list pages' %}">
             {% if students.has_previous %}
-                <a href="?page={{ students.previous_page_number }}" class="btn btn-secondary btn-sm">← {% trans "Previous" %}</a>
+            <a href="?page={{ students.previous_page_number }}" class="btn btn--secondary btn--sm">
+                {% icon "arrow-left" size="sm" %}{% trans "Previous" %}
+            </a>
             {% endif %}
-
-            <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
+            <span class="pagination__status">
                 {% blocktrans with current=students.number total=students.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
             </span>
-
             {% if students.has_next %}
-                <a href="?page={{ students.next_page_number }}" class="btn btn-secondary btn-sm">{% trans "Next" %} →</a>
+            <a href="?page={{ students.next_page_number }}" class="btn btn--secondary btn--sm">
+                {% trans "Next" %}{% icon "arrow-right" size="sm" %}
+            </a>
             {% endif %}
-        </div>
+        </nav>
         {% endif %}
 
         {% else %}
-        <div class="empty-state">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-            </svg>
-            <h3>{% trans "No Students Yet" %}</h3>
-            <p>{% trans "Students will appear here once they join your institution." %}</p>
-        </div>
+        {% empty_state title=_("No students yet") body=_("Students appear here once they join your institution and complete a profile.") icon_name="students" %}
         {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script nonce="{{ request.csp_nonce }}">
-    // Simple search filter
-    document.getElementById('search-input').addEventListener('input', function(e) {
-        const search = e.target.value.toLowerCase();
-        document.querySelectorAll('.student-row').forEach(row => {
-            const name = row.dataset.name.toLowerCase();
-            row.style.display = name.includes(search) ? '' : 'none';
-        });
-    });
-</script>
+<script src="{% static 'js/dashboard-filter.js' %}" defer></script>
 {% endblock %}

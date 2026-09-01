@@ -9,13 +9,13 @@
     .settings-page h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.25rem; }
     .settings-page .lead { color: var(--text-muted); margin-bottom: 1.5rem; }
     .settings-page .back-link {
-        color: #6b7280;
+        color: var(--text-muted);
         font-size: 0.85rem;
         text-decoration: none;
         margin-bottom: 1rem;
         display: inline-block;
     }
-    .settings-page .back-link:hover { color: #5b21b6; }
+    .settings-page .back-link:hover { color: var(--accent); }
 
     .panel {
         background: var(--bg-card);
@@ -53,9 +53,9 @@
         padding: 0.75rem 0.875rem;
         font-size: 1rem;
         font-family: inherit;
-        border: 1px solid #e4e4e7;
+        border: 1px solid var(--border);
         border-radius: var(--radius-sm);
-        background: #fff;
+        background: var(--surface);
         color: var(--text-dark);
         min-height: 44px;
     }
@@ -103,16 +103,16 @@
         margin-bottom: 0.5rem;
     }
     .alert-success { background: rgba(0, 184, 148, 0.12); color: #0a7857; }
-    .alert-error { background: rgba(255, 118, 117, 0.12); color: #b91c1c; }
+    .alert-error { background: rgba(255, 118, 117, 0.12); color: var(--danger); }
 
     .danger-zone {
         border: 1px solid rgba(220, 38, 38, 0.25);
         background: rgba(255, 118, 117, 0.06);
     }
-    .danger-zone h2 { color: #b91c1c; }
+    .danger-zone h2 { color: var(--danger); }
     .btn-danger {
         background: transparent;
-        color: #b91c1c;
+        color: var(--danger);
         border: 1px solid rgba(220, 38, 38, 0.4);
     }
     .btn-danger:hover { background: rgba(220, 38, 38, 0.08); }
@@ -287,14 +287,17 @@
             </div>
             <div class="field">
                 <label for="id_new_password1">{% trans "New password" %}</label>
-                <input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" required>
+                <input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" required
+                    data-pw-strength
+                    data-pw-similar-to="#first_name,#last_name,#email">
                 {% if password_form.new_password1.errors %}
                 <ul class="errorlist">{% for e in password_form.new_password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
             <div class="field">
                 <label for="id_new_password2">{% trans "Confirm new password" %}</label>
-                <input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" required>
+                <input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" required
+                    data-pw-confirms="#id_new_password1">
                 {% if password_form.new_password2.errors %}
                 <ul class="errorlist">{% for e in password_form.new_password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}

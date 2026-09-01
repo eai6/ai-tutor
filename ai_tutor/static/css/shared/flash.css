@@ -1,0 +1,90 @@
+/* ==========================================================================
+   Flash messages (django.contrib.messages)
+   ==========================================================================
+   Shared by both shells. It used to live in dashboard/components/controls.css
+   and was therefore reachable from exactly one of the two, which is half of
+   why the student side rendered no messages at all — see the note in
+   templates/base.html.
+
+   Tone skins use the semantic status roles, so the same banner reads correctly
+   on the teacher palette and the student one without a second definition.
+   ========================================================================== */
+
+.messages {
+    margin-bottom: var(--space-5);
+}
+
+.messages > * + * { margin-top: var(--space-2); }
+
+.alert {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    font-size: var(--text-base);
+}
+
+.alert .icon { font-size: 1.125rem; margin-top: 1px; }
+
+.alert--success { background: var(--success-surface); border-color: var(--success-border); color: var(--success); }
+.alert--error,
+.alert--danger  { background: var(--danger-surface);  border-color: var(--danger-border);  color: var(--danger); }
+.alert--warning { background: var(--warning-surface); border-color: var(--warning-border); color: var(--warning); }
+.alert--info    { background: var(--info-surface);    border-color: var(--info-border);    color: var(--info); }
+
+/* --------------------------------------------------------------------------
+   Dismissal
+   ------------------------------------------------------------------------
+   The button is built by flash.js, so with JavaScript off there is no control
+   that does nothing and no banner that vanishes on a timer — the message just
+   stays, which is the behaviour this page had before.
+   -------------------------------------------------------------------------- */
+.alert__text { flex: 1; min-width: 0; }
+
+.alert__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: -1px -1px -1px 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    /* Never fully transparent: an invisible control is one a mouse user cannot
+       find. It lifts on hover rather than appearing. */
+    opacity: .55;
+    transition: opacity var(--dur-fast) var(--ease-out),
+                background-color var(--dur-fast) var(--ease-out);
+}
+
+.alert__close:hover,
+.alert__close:focus-visible { opacity: 1; background: rgb(0 0 0 / .06); }
+
+.alert__close .icon { margin-top: 0; font-size: 1rem; }
+
+/* Collapses its own height as it goes, so the banners below do not jump up a
+   step and then settle. */
+.alert.is-leaving {
+    overflow: hidden;
+    opacity: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-block: 0;
+    border-block-width: 0;
+    transition: opacity var(--dur-fast) var(--ease-out),
+                max-height var(--dur-base) var(--ease-out),
+                margin-top var(--dur-base) var(--ease-out),
+                padding var(--dur-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .alert.is-leaving { transition: none; }
+}

@@ -40,7 +40,7 @@
 
                 <div style="display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap;">
                     <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm" style="font-size:0.78rem;">{% trans "Lessons" %}</a>
-                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm" style="background:#0891b2; color:#fff; border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">{% trans "Competency map" %}</a>
+                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm" style="background:#0891b2; color:var(--surface); border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">{% trans "Competency map" %}</a>
                 </div>
             </div>
             {% endfor %}
@@ -60,7 +60,7 @@
     </div>
     <div class="card-body" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-            <thead style="background:#f9fafb;">
+            <thead style="background:var(--surface-sunken);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
                     <th style="padding:0.55rem 1rem;">{% trans "Lesson" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Course" %}</th>
@@ -79,7 +79,7 @@
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">{{ r.course.title }}</td>
                     <td style="padding:0.55rem 1rem;">
                         {% blocktrans count count=r.unique_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %}
-                        {% if r.completed_count %}<div style="font-size:0.72rem;color:#059669;">{% blocktrans with c=r.completed_count %}{{ c }} completed{% endblocktrans %}</div>{% endif %}
+                        {% if r.completed_count %}<div style="font-size:0.72rem;color:var(--success-solid);">{% blocktrans with c=r.completed_count %}{{ c }} completed{% endblocktrans %}</div>{% endif %}
                     </td>
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);">{{ r.session_count }}</td>
                     <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">
@@ -87,8 +87,8 @@
                     </td>
                     <td style="padding:0.55rem 1rem;">
                         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Monitor" %}</a>
-                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Report" %}</a>
+                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm" style="background:var(--accent-solid);color:var(--surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Monitor" %}</a>
+                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm" style="background:var(--info-solid);color:var(--surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Report" %}</a>
                         </div>
                     </td>
                 </tr>
@@ -124,12 +124,12 @@
         <input type="hidden" name="from_grade" value="{{ grade }}">
         <input type="hidden" name="direction" id="promote-direction" value="up">
         <input type="hidden" name="redirect_to" value="{% url 'dashboard:class_detail' grade %}">
-        <div style="padding:0.75rem 1rem; background:#eff6ff; border-bottom:1px solid #dbeafe; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-            <label style="font-size:0.875rem; font-weight:500; color:#1e40af;">
+        <div style="padding:0.75rem 1rem; background:var(--info-surface); border-bottom:1px solid var(--info-surface); display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <label style="font-size:0.875rem; font-weight:500; color:var(--info);">
                 <input type="checkbox" id="select-all" onchange="toggleAllStudents(this)" style="margin-right:0.25rem;">
                 {% trans "Select all" %}
             </label>
-            <span id="selected-count" style="font-size:0.78rem; color:#1e40af;">{% trans "0 selected" %}</span>
+            <span id="selected-count" style="font-size:0.78rem; color:var(--info);">{% trans "0 selected" %}</span>
             <button type="submit" class="btn btn-primary btn-sm" id="confirm-btn">{% trans "Confirm" %}</button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="closePromoteForm()">{% trans "Cancel" %}</button>
         </div>

@@ -140,7 +140,7 @@
                     <td style="text-align: center;">{{ lesson.recent_sessions }}</td>
                     <td style="text-align: center;">{{ lesson.recent_completions }}</td>
                     <td style="text-align: right;">
-                        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
+                        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
                             {% trans "Session Report" %}
                         </a>
                     </td>

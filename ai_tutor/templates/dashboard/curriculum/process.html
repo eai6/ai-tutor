@@ -60,12 +60,12 @@
         margin-bottom: 0.5rem;
     }
     .timeline-step.pending .timeline-icon { background: var(--gray-100); color: var(--gray-400); border: 2px solid var(--gray-200); }
-    .timeline-step.active .timeline-icon { background: #EFF6FF; color: #2563EB; border: 2px solid #2563EB; animation: pulse 2s infinite; }
-    .timeline-step.review .timeline-icon { background: #FEF3C7; color: #D97706; border: 2px solid #D97706; }
-    .timeline-step.completed .timeline-icon { background: #D1FAE5; color: #059669; border: 2px solid #059669; }
+    .timeline-step.active .timeline-icon { background: var(--info-surface); color: var(--info-solid); border: 2px solid var(--info-solid); animation: pulse 2s infinite; }
+    .timeline-step.review .timeline-icon { background: var(--warning-surface); color: var(--warning); border: 2px solid var(--warning); }
+    .timeline-step.completed .timeline-icon { background: var(--success-surface); color: var(--success-solid); border: 2px solid var(--success-solid); }
     .timeline-label { font-size: 0.75rem; font-weight: 500; text-align: center; color: var(--gray-500); }
     .timeline-step.active .timeline-label, .timeline-step.review .timeline-label { color: var(--gray-900); font-weight: 600; }
-    .timeline-step.completed .timeline-label { color: #059669; }
+    .timeline-step.completed .timeline-label { color: var(--success-solid); }
     @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); } }
     
     /* Cards */
@@ -86,9 +86,9 @@
     .step-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 600; font-size: 1.125rem; }
     .step-number { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; }
     .step-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; padding: 0.375rem 0.75rem; border-radius: 20px; }
-    .step-status.processing { background: #DBEAFE; color: #1D4ED8; }
-    .step-status.review { background: #FEF3C7; color: #B45309; }
-    .step-status.completed { background: #D1FAE5; color: #047857; }
+    .step-status.processing { background: var(--info-surface); color: var(--info); }
+    .step-status.review { background: var(--warning-surface); color: #B45309; }
+    .step-status.completed { background: var(--success-surface); color: var(--success); }
     .step-body { padding: 1.5rem; }
     
     /* Results */
@@ -166,12 +166,12 @@
     .btn-primary:hover { filter: brightness(0.9); }
     .btn-secondary { background: var(--gray-100); color: var(--gray-700); }
     .btn-secondary:hover { background: var(--gray-200); }
-    .btn-success { background: #059669; color: white; }
-    .btn-success:hover { background: #047857; }
+    .btn-success { background: var(--success-solid); color: white; }
+    .btn-success:hover { background: var(--success); }
     .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
     .btn-icon { padding: 0.35rem; border-radius: 6px; background: transparent; border: none; cursor: pointer; color: var(--gray-400); }
     .btn-icon:hover { background: var(--gray-100); color: var(--gray-700); }
-    .btn-icon.danger:hover { background: #FEE2E2; color: #DC2626; }
+    .btn-icon.danger:hover { background: var(--danger-surface); color: var(--danger-solid); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     
     /* Spinner */
@@ -179,11 +179,11 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     
     /* Info Box */
-    .info-box { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; }
+    .info-box { background: var(--info-surface); border: 1px solid #BFDBFE; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; }
     .info-box-icon { font-size: 1.25rem; }
     .info-box-content { flex: 1; }
-    .info-box-title { font-weight: 600; color: #1E40AF; margin-bottom: 0.25rem; }
-    .info-box-text { font-size: 0.875rem; color: #1E40AF; }
+    .info-box-title { font-weight: 600; color: var(--info); margin-bottom: 0.25rem; }
+    .info-box-text { font-size: 0.875rem; color: var(--info); }
     
     /* Options */
     .generation-options { background: var(--gray-50); border-radius: 8px; padding: 1rem; margin-top: 1rem; }
@@ -195,13 +195,13 @@
     .step-actions { display: flex; gap: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-100); margin-top: 1.5rem; flex-wrap: wrap; }
     
     /* Complete */
-    .complete-banner { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; }
+    .complete-banner { background: linear-gradient(135deg, var(--success-surface) 0%, var(--success-border) 100%); border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; }
     .complete-icon { font-size: 3rem; margin-bottom: 1rem; }
-    .complete-title { font-size: 1.5rem; font-weight: 700; color: #065F46; margin-bottom: 0.5rem; }
+    .complete-title { font-size: 1.5rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; }
     .complete-stats { display: flex; justify-content: center; gap: 2rem; margin: 1.5rem 0; }
     .complete-stat { text-align: center; }
-    .complete-stat-value { font-size: 2rem; font-weight: 700; color: #047857; }
-    .complete-stat-label { font-size: 0.875rem; color: #065F46; }
+    .complete-stat-value { font-size: 2rem; font-weight: 700; color: var(--success); }
+    .complete-stat-label { font-size: 0.875rem; color: var(--success); }
 </style>
 {% endblock %}
 
@@ -256,7 +256,7 @@
     <div class="complete-banner">
         <div class="complete-icon">🎉</div>
         <div class="complete-title">{% trans "Curriculum Processing Complete!" %}</div>
-        <p style="color: #065F46; margin: 0;">{% trans "Your curriculum has been processed and lesson content generated." %}</p>
+        <p style="color: var(--success); margin: 0;">{% trans "Your curriculum has been processed and lesson content generated." %}</p>
 
         <div class="complete-stats">
             <div class="complete-stat">
@@ -297,7 +297,7 @@
                 </div>
                 <div class="result-card">
                     <h4>📋 {% trans "Status" %}</h4>
-                    <div style="font-size: 0.875rem; color: #D97706; font-weight: 500;">{% trans "Ready" %}</div>
+                    <div style="font-size: 0.875rem; color: var(--warning); font-weight: 500;">{% trans "Ready" %}</div>
                 </div>
             </div>
             <div class="step-actions">
@@ -339,7 +339,7 @@
             <!-- Always show progress log during processing -->
             <div style="margin-top: 1rem;">
                 <h4 style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 0.5rem;">📋 Progress Log</h4>
-                <pre id="progress-log" style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{% if upload.processing_log %}{{ upload.processing_log }}{% else %}Waiting for processing to start...{% endif %}</pre>
+                <pre id="progress-log" style="background: var(--gray-900); color: var(--success-solid); padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{% if upload.processing_log %}{{ upload.processing_log }}{% else %}Waiting for processing to start...{% endif %}</pre>
             </div>
 
             <!-- Auto-refresh every 8 seconds while processing -->
@@ -408,13 +408,13 @@
                         <!-- Unit-level terminal objectives (editable) -->
                         <div style="padding:0.75rem 1rem;background:#f8fafc;border-bottom:1px solid var(--gray-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                                <div style="font-size:0.75rem;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:0.05em;">{% trans "Terminal Objectives (Assessment Targets)" %}</div>
-                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:#ede9fe;color:#6366f1;border:1px solid #c4b5fd;border-radius:4px;" onclick="addObjective(this, 'to')">+ {% trans "Add TO" %}</button>
+                                <div style="font-size:0.75rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Terminal Objectives (Assessment Targets)" %}</div>
+                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:var(--accent-surface);color:var(--info-solid);border:1px solid var(--accent-border);border-radius:4px;" onclick="addObjective(this, 'to')">+ {% trans "Add TO" %}</button>
                             </div>
                             <div class="unit-tos-list">
                             {% for to in unit.terminal_objectives %}
                             <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;">
-                                <span style="font-size:0.6875rem;font-weight:700;color:#6366f1;background:#ede9fe;padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">TO{{ forloop.counter }}</span>
+                                <span style="font-size:0.6875rem;font-weight:700;color:var(--info-solid);background:var(--accent-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">TO{{ forloop.counter }}</span>
                                 <textarea class="to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1">{{ to }}</textarea>
                                 <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="{% trans 'Remove' %}">✕</button>
                             </div>
@@ -428,14 +428,14 @@
                         {% if unit.enabling_objectives %}
                         <div style="padding:0.75rem 1rem;background:#f0fdf4;border-bottom:1px solid var(--gray-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                                <div style="font-size:0.75rem;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.05em;">{% trans "Enabling Objectives (Teaching Steps)" %}</div>
-                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:#d1fae5;color:#059669;border:1px solid #a7f3d0;border-radius:4px;" onclick="addObjective(this, 'eo')">+ {% trans "Add EO" %}</button>
+                                <div style="font-size:0.75rem;font-weight:700;color:var(--success-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Enabling Objectives (Teaching Steps)" %}</div>
+                                <button type="button" class="btn btn-sm" style="font-size:0.6875rem;padding:2px 8px;background:var(--success-surface);color:var(--success-solid);border:1px solid var(--success-border);border-radius:4px;" onclick="addObjective(this, 'eo')">+ {% trans "Add EO" %}</button>
                             </div>
                             <div class="unit-eos-list">
                             {% for eo in unit.enabling_objectives %}
                             <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem;">
-                                <span style="font-size:0.6875rem;font-weight:700;color:#059669;background:#d1fae5;padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">EO{{ forloop.counter }}</span>
-                                <textarea class="eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;resize:vertical;min-height:24px;color:#374151;" rows="1">{{ eo }}</textarea>
+                                <span style="font-size:0.6875rem;font-weight:700;color:var(--success-solid);background:var(--success-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">EO{{ forloop.counter }}</span>
+                                <textarea class="eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;resize:vertical;min-height:24px;color:var(--text-secondary);" rows="1">{{ eo }}</textarea>
                                 <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
                             </div>
                             {% endfor %}
@@ -455,27 +455,27 @@
                                      always renders (even when empty) so the + Add TO button is
                                      reachable on lessons that the parser left without any TOs. -->
                                 <div style="margin-top:0.5rem;" class="lesson-tos-block">
-                                    <div style="font-size:0.625rem;font-weight:700;color:#6366f1;text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
+                                    <div style="font-size:0.625rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
                                     <div class="lesson-tos-list">
                                     {% for eo in lesson.enabling_objectives %}
                                     <div class="lesson-to-row" style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
-                                        <span style="font-size:0.5625rem;font-weight:700;color:#6366f1;margin-top:4px;">TO</span>
-                                        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid #e4e4e7;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1">{{ eo }}</textarea>
+                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--info-solid);margin-top:4px;">TO</span>
+                                        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1">{{ eo }}</textarea>
                                         <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="Remove">✕</button>
                                     </div>
                                     {% endfor %}
                                     </div>
-                                    <button type="button" style="font-size:0.6875rem;color:#6366f1;background:none;border:1px dashed #c7d2fe;border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
+                                    <button type="button" style="font-size:0.6875rem;color:var(--info-solid);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
                                 </div>
 
                                 <!-- Teaching steps for this lesson (editable) -->
                                 {% if lesson.teaching_steps %}
                                 <div style="margin-top:0.5rem;">
-                                    <div style="font-size:0.625rem;font-weight:700;color:#059669;text-transform:uppercase;margin-bottom:0.25rem;">Teaching Steps</div>
+                                    <div style="font-size:0.625rem;font-weight:700;color:var(--success-solid);text-transform:uppercase;margin-bottom:0.25rem;">Teaching Steps</div>
                                     {% for ts in lesson.teaching_steps %}
                                     <div style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
-                                        <span style="font-size:0.5625rem;font-weight:700;color:#059669;margin-top:4px;">EO</span>
-                                        <textarea class="lesson-eo-input" style="flex:1;font-size:0.75rem;border:1px solid #e4e4e7;border-radius:4px;padding:3px 6px;resize:vertical;min-height:22px;color:#6b7280;" rows="1">{{ ts }}</textarea>
+                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--success-solid);margin-top:4px;">EO</span>
+                                        <textarea class="lesson-eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:22px;color:var(--text-muted);" rows="1">{{ ts }}</textarea>
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -532,11 +532,11 @@
     {% elif upload.status == 'failed' %}
     <!-- Failed State -->
     <div class="step-card" style="border: 2px solid #FCA5A5;">
-        <div class="step-header" style="background: #FEE2E2;">
-            <div class="step-title" style="color: #991B1B;">❌ Processing Failed</div>
+        <div class="step-header" style="background: var(--danger-surface);">
+            <div class="step-title" style="color: var(--danger);">❌ Processing Failed</div>
         </div>
         <div class="step-body">
-            <p style="color: #991B1B; margin-bottom: 1rem;">{{ upload.error_message|default:"An error occurred." }}</p>
+            <p style="color: var(--danger); margin-bottom: 1rem;">{{ upload.error_message|default:"An error occurred." }}</p>
             {% if upload.processing_log %}
             <details style="margin-bottom: 1rem;"><summary style="cursor: pointer;">View details</summary>
             <pre style="background: var(--gray-100); padding: 1rem; border-radius: 8px; font-size: 0.75rem; margin-top: 0.5rem;">{{ upload.processing_log }}</pre>
@@ -636,8 +636,8 @@ function addObjective(btn, type) {
     const list = btn.closest('div').querySelector(type === 'to' ? '.unit-tos-list' : '.unit-eos-list');
     if (!list) return;
     const count = list.querySelectorAll('.objective-row').length + 1;
-    const color = type === 'to' ? '#6366f1' : '#059669';
-    const bg = type === 'to' ? '#ede9fe' : '#d1fae5';
+    const color = type === 'to' ? 'var(--info-solid)' : 'var(--success-solid)';
+    const bg = type === 'to' ? 'var(--accent-surface)' : 'var(--success-surface)';
     const label = type === 'to' ? 'TO' : 'EO';
     const row = document.createElement('div');
     row.className = 'objective-row';
@@ -661,9 +661,9 @@ function addLesson(btn) {
                 <input type="text" value="New Lesson" placeholder="Lesson title" class="lesson-title-input">
                 <textarea placeholder="Learning objective (e.g., Students will be able to...)" class="lesson-objective-input" rows="2"></textarea>
                 <div style="margin-top:0.5rem;" class="lesson-tos-block">
-                    <div style="font-size:0.625rem;font-weight:700;color:#6366f1;text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
+                    <div style="font-size:0.625rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
                     <div class="lesson-tos-list"></div>
-                    <button type="button" style="font-size:0.6875rem;color:#6366f1;background:none;border:1px dashed #c7d2fe;border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
+                    <button type="button" style="font-size:0.6875rem;color:var(--info-solid);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
                 </div>
             </div>
             <button type="button" class="btn-icon danger" onclick="removeLesson(this)">✕</button>
@@ -681,8 +681,8 @@ function addLessonTO(btn) {
     row.className = 'lesson-to-row';
     row.style.cssText = 'display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;';
     row.innerHTML = `
-        <span style="font-size:0.5625rem;font-weight:700;color:#6366f1;margin-top:4px;">TO</span>
-        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid #e4e4e7;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1" placeholder="Type Terminal Objective..."></textarea>
+        <span style="font-size:0.5625rem;font-weight:700;color:var(--info-solid);margin-top:4px;">TO</span>
+        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1" placeholder="Type Terminal Objective..."></textarea>
         <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="Remove">✕</button>
     `;
     list.appendChild(row);

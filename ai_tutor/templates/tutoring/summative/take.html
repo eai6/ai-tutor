@@ -8,83 +8,83 @@
     .ex-wrap { max-width: 760px; margin: 1rem auto 5rem; padding: 0 1rem; }
     .ex-head {
         position: sticky; top: 0; z-index: 200;
-        background: #fff;
-        border-bottom: 1px solid #e5e7eb;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
         padding: 0.75rem 1rem;
         margin: -1rem -1rem 1.25rem -1rem;
         display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
         justify-content: space-between;
     }
-    .ex-head h1 { font-size: 1.05rem; margin: 0; color: #111; }
-    .ex-progress { background: #ede9fe; color: #5b21b6; padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .ex-head h1 { font-size: 1.05rem; margin: 0; color: var(--text); }
+    .ex-progress { background: var(--accent-surface); color: var(--accent); padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
     .ex-q {
-        background: #fff;
-        border: 1px solid #e5e7eb;
+        background: var(--surface);
+        border: 1px solid var(--border);
         border-radius: 14px;
         padding: 1.1rem 1.25rem;
         margin-bottom: 0.75rem;
     }
-    .ex-q-stem { color: #111; font-size: 1rem; line-height: 1.6; margin: 0 0 0.85rem; }
-    .ex-q-num { display:inline-block; background:#f3f4f6; color:#5b21b6; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
+    .ex-q-stem { color: var(--text); font-size: 1rem; line-height: 1.6; margin: 0 0 0.85rem; }
+    .ex-q-num { display:inline-block; background:var(--surface-sunken); color:var(--accent); padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
     .ex-q-fig { margin: 0.5rem 0 0.85rem; max-width: 100%; }
     .ex-q-fig svg { max-width: 100%; height: auto; }
     .opt {
         display: flex; gap: 0.6rem; align-items: flex-start;
         padding: 0.55rem 0.8rem;
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--border);
         border-radius: 10px;
         margin-bottom: 0.4rem;
         cursor: pointer;
         transition: border-color 0.12s ease, background 0.12s ease;
         font-size: 0.95rem;
-        color: #111;
+        color: var(--text);
     }
-    .opt:hover { border-color: #c4b5fd; }
-    .opt input[type=radio] { margin-top: 0.2rem; accent-color: #5b21b6; }
-    .opt.selected { border-color: #5b21b6; background: #ede9fe; }
+    .opt:hover { border-color: var(--accent-border); }
+    .opt input[type=radio] { margin-top: 0.2rem; accent-color: var(--accent); }
+    .opt.selected { border-color: var(--accent); background: var(--accent-surface); }
     .text-input, .textarea-input {
         width: 100%;
         padding: 0.6rem 0.8rem;
-        border: 1px solid #d1d5db;
+        border: 1px solid var(--border-strong);
         border-radius: 8px;
         font-family: inherit;
         font-size: 0.95rem;
-        color: #111;
+        color: var(--text);
         box-sizing: border-box;
     }
-    .text-input:focus, .textarea-input:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .text-input:focus, .textarea-input:focus { outline: none; border-color: var(--accent-solid); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .textarea-input { min-height: 100px; resize: vertical; }
-    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.92rem; color: #374151; }
+    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.92rem; color: var(--text-secondary); }
     .blank-row input { flex: 1; min-width: 200px; }
     .match-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
-    .match-row .left { font-weight: 500; color: #111; min-width: 140px; }
-    .match-row select { flex: 1; min-width: 180px; padding: 0.45rem 0.7rem; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 0.9rem; }
+    .match-row .left { font-weight: 500; color: var(--text); min-width: 140px; }
+    .match-row select { flex: 1; min-width: 180px; padding: 0.45rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 8px; font-family: inherit; font-size: 0.9rem; }
     .table-fig table { border-collapse: collapse; }
-    .table-fig th, .table-fig td { border: 1px solid #d1d5db; padding: 0.4rem 0.7rem; }
+    .table-fig th, .table-fig td { border: 1px solid var(--border-strong); padding: 0.4rem 0.7rem; }
     .ex-submit {
         position: sticky; bottom: 1rem;
         display: flex; gap: 0.5rem; justify-content: center;
         margin: 1rem 0;
     }
     .ex-submit button {
-        background: #5b21b6; color: #fff; border: none;
+        background: var(--accent); color: var(--surface); border: none;
         padding: 0.85rem 2rem; border-radius: 999px;
         font-size: 1rem; font-weight: 700; cursor: pointer;
         box-shadow: 0 8px 24px rgba(91,33,182,0.3);
     }
     .ex-submit button[disabled] { opacity: 0.6; cursor: wait; }
     .answered-bar {
-        height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden;
+        height: 6px; background: var(--surface-sunken); border-radius: 3px; overflow: hidden;
         max-width: 200px; flex: 1;
     }
-    .answered-fill { height: 100%; background: #8b5cf6; transition: width 0.2s ease; }
+    .answered-fill { height: 100%; background: var(--accent-solid); transition: width 0.2s ease; }
 </style>
 
 <div class="ex-wrap">
     <div class="ex-head">
         <div>
             <h1>{{ course.title }} — {% if is_baseline %}Baseline Assessment{% else %}Summative Exam{% endif %}</h1>
-            <div style="font-size:0.78rem;color:#6b7280;margin-top:0.2rem;">
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">
                 {{ total_q }} questions{% if is_baseline %} · this is your starting point — answer what you know, skip what you don't{% else %} · pass with {{ pass_threshold }} of {{ total_q }}{% endif %}
             </div>
         </div>
@@ -95,11 +95,11 @@
     </div>
 
     {% if is_baseline %}
-    <div style="background:#ede9fe;border:1px solid #c4b5fd;color:#5b21b6;padding:0.75rem 1rem;border-radius:10px;font-size:0.88rem;margin-bottom:1rem;line-height:1.55;">
+    <div style="background:var(--accent-surface);border:1px solid var(--accent-border);color:var(--accent);padding:0.75rem 1rem;border-radius:10px;font-size:0.88rem;margin-bottom:1rem;line-height:1.55;">
         🎯 <strong>This is your baseline.</strong> Don't worry if you don't know everything — we use this to figure out exactly what to teach you. Just answer what you can, leave the rest blank.
     </div>
     {% else %}
-    <div style="background:#fef3c7;border:1px solid #fde68a;color:#92400e;padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
+    <div style="background:var(--warning-surface);border:1px solid var(--warning-border);color:var(--warning);padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
         ⚠️ Once you submit, you can't retake this exam without a teacher reset. Take your time.
     </div>
     {% endif %}
@@ -122,7 +122,7 @@
             <label class="opt" data-letter="D"><input type="radio" name="q_{{ q.id }}" value="D"><span><strong>D.</strong> {{ q.option_d }}</span></label>
         {% elif q.question_type == 'fill_in_blank' %}
             {% if q.answer_data.text_template %}
-            <p style="color:#374151;font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
+            <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
             {% endif %}
             {% for blank in q.answer_data.blanks %}
             <div class="blank-row"><span>Blank {{ forloop.counter }}:</span><input type="text" class="text-input" data-qid="{{ q.id }}" data-blank-index="{{ forloop.counter0 }}" autocomplete="off"></div>
@@ -147,20 +147,20 @@
         {% else %}
             {% if course.is_math %}
             <div class="math-toolbar" data-qid="{{ q.id }}" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.4rem;">
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '°')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">°</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', 'π')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">π</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '√')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">√</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '²')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">²</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '³')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">³</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '±')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">±</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≤')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≤</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≥')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≥</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≠')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≠</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '×')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">×</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '÷')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">÷</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '½')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">½</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¼')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¼</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¾')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¾</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '°')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">°</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', 'π')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">π</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '√')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">√</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '²')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">²</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '³')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">³</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '±')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">±</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≤')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≤</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≥')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≥</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≠')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≠</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '×')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">×</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '÷')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">÷</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '½')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">½</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¼')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">¼</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¾')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">¾</button>
             </div>
             {% endif %}
             <textarea class="textarea-input" data-qid="{{ q.id }}" placeholder="Write your answer…"></textarea>

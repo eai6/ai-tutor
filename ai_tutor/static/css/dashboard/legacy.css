@@ -1,0 +1,318 @@
+/* ==========================================================================
+   Teacher dashboard — legacy class compatibility
+   ==========================================================================
+   The dashboard's component CSS used to live in a <style> block inside
+   dashboard/base.html. Replacing that shell removed those rules, which broke
+   every page still written against the old class names — around twenty of
+   them, including Settings and Student Groups.
+
+   This file re-implements exactly those names on top of the new tokens. It is
+   not a copy of the old sheet: `.card-header` here is the same rule as
+   `.card__header`, so a legacy page picks up the new palette, type scale and
+   spacing rather than freezing the old look. The two vocabularies render
+   identically.
+
+   **This file is scaffolding.** When a page is migrated, its classes move to
+   the `__`/`--` names in components/. When the last page is migrated, delete
+   this file and the <link> in base.html. Do not add anything new here, and do
+   not write new templates against these names.
+
+   Scope: only the 73 selectors the old base.html actually defined. Classes a
+   page defines in its own {% block extra_css %} are unaffected and still work.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Card  →  .card__header / .card__body / .card__title
+   ------------------------------------------------------------------------
+   .card itself is still defined in components/surfaces.css, which is why
+   these pages kept their borders and lost only the interior padding — the
+   symptom was a title sitting on the card's top edge.
+   -------------------------------------------------------------------------- */
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.card-title {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-tight);
+    margin: 0;
+}
+
+.card-body { padding: var(--space-5); }
+
+/* --------------------------------------------------------------------------
+   Buttons  →  .btn--primary / --secondary / --sm
+   ------------------------------------------------------------------------
+   .btn is defined in components/controls.css; only the modifiers were lost.
+   --primary-fill rather than --primary: white on the brand orange is 3.6:1
+   and fails AA for the label.
+   -------------------------------------------------------------------------- */
+.btn-primary {
+    background: var(--primary-fill);
+    border-color: var(--primary-fill);
+    color: var(--text-on-accent);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: var(--text-on-accent);
+}
+
+.btn-secondary {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    background: var(--surface-hover);
+    border-color: var(--warm-400);
+    color: var(--text);
+}
+
+.btn-danger {
+    background: var(--danger-solid);
+    border-color: var(--danger-solid);
+    color: var(--text-on-accent);
+}
+
+.btn-danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--text-on-accent);
+}
+
+/* .btn-success and .btn-lg were never defined in the old sheet either — a
+   pre-existing gap, not something this refactor removed. Two pages use them
+   for a confirm/approve action, and a green "Approve" rendering as a bare
+   grey box reads as disabled. Defined here so the shim leaves the legacy
+   pages coherent rather than merely as broken as it found them. */
+.btn-success {
+    background: var(--success-solid);
+    border-color: var(--success-solid);
+    color: var(--text-on-accent);
+}
+
+.btn-success:hover {
+    background: var(--success);
+    border-color: var(--success);
+    color: var(--text-on-accent);
+}
+
+.btn-lg {
+    min-height: 46px;
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--text-md);
+}
+
+.btn-sm {
+    min-height: 30px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+}
+
+/* --------------------------------------------------------------------------
+   Forms  →  .field / .field__label / .input
+   ------------------------------------------------------------------------
+   This is what the Settings screenshot was missing: raw browser inputs with
+   no border, radius, padding or focus ring.
+   -------------------------------------------------------------------------- */
+.form-group { margin-bottom: var(--space-4); }
+
+.form-label {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    color: var(--text-secondary);
+}
+
+.form-control {
+    width: 100%;
+    min-height: 38px;
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border-field);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.form-control::placeholder { color: var(--text-muted); }
+
+.form-control:hover { border-color: var(--warm-400); }
+
+.form-control:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Same chevron as .select. The literal grey is unavoidable — an SVG data URI
+   cannot read a CSS custom property. */
+select.form-control {
+    appearance: none;
+    padding-right: var(--space-8);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236F6860' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-2) center;
+    background-size: 1rem;
+    cursor: pointer;
+}
+
+textarea.form-control { min-height: 6rem; resize: vertical; }
+
+/* --------------------------------------------------------------------------
+   Badges  →  .badge--*
+   ------------------------------------------------------------------------
+   .badge is defined in components/controls.css; the tone modifiers were lost,
+   leaving every badge in the neutral skin.
+   -------------------------------------------------------------------------- */
+.badge-success { background: var(--success-surface); color: var(--success); border-color: var(--success-border); }
+.badge-warning { background: var(--warning-surface); color: var(--warning); border-color: var(--warning-border); }
+.badge-danger  { background: var(--danger-surface);  color: var(--danger);  border-color: var(--danger-border); }
+.badge-info    { background: var(--info-surface);    color: var(--info);    border-color: var(--info-border); }
+.badge-secondary { background: var(--surface-sunken); color: var(--text-secondary); border-color: var(--border); }
+
+/* --------------------------------------------------------------------------
+   Alerts  →  .alert--*
+   -------------------------------------------------------------------------- */
+.alert-success { background: var(--success-surface); border-color: var(--success-border); color: var(--success); }
+.alert-error   { background: var(--danger-surface);  border-color: var(--danger-border);  color: var(--danger); }
+.alert-warning { background: var(--warning-surface); border-color: var(--warning-border); color: var(--warning); }
+.alert-info    { background: var(--info-surface);    border-color: var(--info-border);    color: var(--info); }
+
+/* --------------------------------------------------------------------------
+   Stat cards  →  .metric-row / .tile
+   -------------------------------------------------------------------------- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+}
+
+.stat-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.stat-value {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-medium);
+    line-height: 1.05;
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.stat-change {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: var(--leading-snug);
+}
+
+.stat-change.positive { color: var(--success); font-weight: var(--weight-medium); }
+.stat-change.negative { color: var(--danger);  font-weight: var(--weight-medium); }
+
+/* --------------------------------------------------------------------------
+   Progress  →  .progress / .progress__fill
+   -------------------------------------------------------------------------- */
+.progress-bar {
+    height: 6px;
+    background: var(--warm-200);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--accent-solid);
+    transition: width var(--dur-slow) var(--ease-out);
+}
+
+.progress-fill.success { background: var(--success-solid); }
+.progress-fill.warning { background: var(--warning-solid); }
+.progress-fill.danger  { background: var(--danger-solid); }
+
+/* --------------------------------------------------------------------------
+   Empty state  →  .empty
+   -------------------------------------------------------------------------- */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-2);
+    padding: var(--space-10) var(--space-6);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.empty-state svg {
+    width: 2rem;
+    height: 2rem;
+    color: var(--text-faint);
+    margin-bottom: var(--space-1);
+}
+
+.empty-state h3 {
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+}
+
+.empty-state p { max-width: 46ch; line-height: var(--leading-normal); }
+
+/* --------------------------------------------------------------------------
+   Mobile tables
+   ------------------------------------------------------------------------
+   Legacy pages put a bare <table> straight into the canvas, with no
+   .table-wrap around it, so below 768px they used to blow the layout out
+   horizontally. The old sheet handled that here, keyed on .content-area;
+   the canvas is now .app-canvas. The three opt-out classes name pages that
+   transform their own tables into cards at this width — see lesson_monitor
+   and lesson_session_report.
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .app-canvas table:not(.session-table):not(.obj-table):not(.responsive-cards) {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        font-size: var(--text-sm);
+    }
+
+    .app-canvas table:not(.session-table):not(.obj-table):not(.responsive-cards) th,
+    .app-canvas table:not(.session-table):not(.obj-table):not(.responsive-cards) td {
+        padding: var(--space-2) var(--space-3);
+    }
+}

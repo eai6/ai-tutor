@@ -8,20 +8,20 @@
 {% block content %}
 <style>
     .sm-pill { display:inline-block; padding:0.15rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; }
-    .sm-pill.mcq { background:#dbeafe; color:#1e40af; }
-    .sm-pill.short_answer { background:#fef3c7; color:#92400e; }
+    .sm-pill.mcq { background:var(--info-surface); color:var(--info); }
+    .sm-pill.short_answer { background:var(--warning-surface); color:var(--warning); }
     .sm-pill.data_interpretation { background:#fae8ff; color:#86198f; }
-    .sm-pill.fill_in_blank { background:#e0e7ff; color:#3730a3; }
-    .sm-pill.matching { background:#fee2e2; color:#991b1b; }
-    .sm-pill.easy { background:#dcfce7; color:#166534; }
-    .sm-pill.medium { background:#f3f4f6; color:#374151; }
-    .sm-pill.hard { background:#fef3c7; color:#92400e; }
-    .sm-pill.tag { background:#ede9fe; color:#5b21b6; }
-    .qrow { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.55rem; }
-    .qmeta { font-size:0.72rem; color:#6b7280; margin-top:0.25rem; }
+    .sm-pill.fill_in_blank { background:var(--info-surface); color:#3730a3; }
+    .sm-pill.matching { background:var(--danger-surface); color:var(--danger); }
+    .sm-pill.easy { background:#dcfce7; color:var(--success); }
+    .sm-pill.medium { background:var(--surface-sunken); color:var(--text-secondary); }
+    .sm-pill.hard { background:var(--warning-surface); color:var(--warning); }
+    .sm-pill.tag { background:var(--accent-surface); color:var(--accent); }
+    .qrow { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.55rem; }
+    .qmeta { font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem; }
     .coverage-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:0.4rem; }
-    .coverage-cell { background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:0.4rem 0.65rem; font-size:0.78rem; display:flex; justify-content:space-between; gap:0.5rem; }
-    .coverage-cell.thin { background:#fef2f2; border-color:#fca5a5; }
+    .coverage-cell { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.4rem 0.65rem; font-size:0.78rem; display:flex; justify-content:space-between; gap:0.5rem; }
+    .coverage-cell.thin { background:var(--danger-surface); border-color:#fca5a5; }
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
@@ -34,7 +34,7 @@
         </form>
         <form method="post" action="{% url 'dashboard:summative_publish' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-sm" style="{% if summative.is_published %}background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;{% else %}background:#5b21b6;color:#fff;border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
+            <button type="submit" class="btn btn-sm" style="{% if summative.is_published %}background:var(--danger-surface);color:var(--danger);border:1px solid #fca5a5;{% else %}background:var(--accent);color:var(--surface);border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
                 {% if summative.is_published %}{% trans "Unpublish" %}{% else %}{% trans "Publish" %}{% endif %}
             </button>
         </form>
@@ -66,12 +66,12 @@
     <div class="card-header">
         <h2 class="card-title">{% trans "Bank summary" %}</h2>
         <span style="font-size:0.8rem;color:var(--gray-500);">
-            {% if summative.is_published %}<span style="color:#166534;font-weight:600;">● {% trans "Published" %}</span>{% else %}<span style="color:#92400e;font-weight:600;">● {% trans "Draft" %}</span>{% endif %}
+            {% if summative.is_published %}<span style="color:var(--success);font-weight:600;">● {% trans "Published" %}</span>{% else %}<span style="color:var(--warning);font-weight:600;">● {% trans "Draft" %}</span>{% endif %}
             · {% blocktrans with date=summative.created_at|date:"M j, H:i" %}created {{ date }}{% endblocktrans %}
         </span>
     </div>
     <div class="card-body">
-        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:#111;margin-bottom:0.75rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:var(--text);margin-bottom:0.75rem;">
             <div>{% blocktrans with current=coverage.total target=coverage.target_count %}<strong>{{ current }}</strong> / {{ target }} questions in bank{% endblocktrans %}</div>
             <div>{% blocktrans with n=coverage.unique_tags %}<strong>{{ n }}</strong> teaching objectives covered{% endblocktrans %}</div>
             <div>{% blocktrans with n=summative.questions_per_attempt %}<strong>{{ n }}</strong> served per student attempt{% endblocktrans %}</div>
@@ -109,7 +109,7 @@
         <h2 class="card-title">{% trans "Student scores" %}</h2>
         <div style="font-size:0.78rem;color:var(--gray-500);">
             {% blocktrans with attempted=score_stats.attempted total=score_stats.total_students %}{{ attempted }} of {{ total }} attempted{% endblocktrans %}
-            {% if score_stats.passed %}· <strong style="color:#059669;">{% blocktrans with n=score_stats.passed %}{{ n }} passed{% endblocktrans %}</strong>{% endif %}
+            {% if score_stats.passed %}· <strong style="color:var(--success-solid);">{% blocktrans with n=score_stats.passed %}{{ n }} passed{% endblocktrans %}</strong>{% endif %}
             {% if score_stats.avg_best_pct is not None %}· {% blocktrans with pct=score_stats.avg_best_pct %}avg best <strong>{{ pct }}%</strong>{% endblocktrans %}{% endif %}
             · {% blocktrans with pct=score_stats.passing_pct %}pass {{ pct }}%{% endblocktrans %}
         </div>
@@ -117,7 +117,7 @@
     <div class="card-body" style="padding:0;">
         {% if student_scores %}
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-            <thead style="background:#f9fafb;">
+            <thead style="background:var(--surface-sunken);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
                     <th style="padding:0.55rem 1rem;">{% trans "Student" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Best" %}</th>
@@ -151,7 +151,7 @@
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             {{ r.attempts }}
-                            {% if r.group_attempts %}<span title="{{ r.group_attempts }} of {{ r.attempts }} attempt{{ r.attempts|pluralize }} in a group session" style="margin-left:0.2rem;font-size:0.7rem;color:#7c3aed;cursor:help;">({{ r.group_attempts }} 👥)</span>{% endif %}
+                            {% if r.group_attempts %}<span title="{{ r.group_attempts }} of {{ r.attempts }} attempt{{ r.attempts|pluralize }} in a group session" style="margin-left:0.2rem;font-size:0.7rem;color:var(--accent);cursor:help;">({{ r.group_attempts }} 👥)</span>{% endif %}
                         {% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--gray-500);">
@@ -159,11 +159,11 @@
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if not r.has_attempt %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:0.72rem;font-weight:600;">{% trans "Not taken" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--surface-sunken);color:var(--text-muted);font-size:0.72rem;font-weight:600;">{% trans "Not taken" %}</span>
                         {% elif r.passed %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:0.72rem;font-weight:700;">{% trans "Passed" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--success-surface);color:var(--success);font-size:0.72rem;font-weight:700;">{% trans "Passed" %}</span>
                         {% else %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:0.72rem;font-weight:600;">{% trans "Below pass" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--danger-surface);color:var(--danger);font-size:0.72rem;font-weight:600;">{% trans "Below pass" %}</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -193,24 +193,24 @@
                         <span class="sm-pill {{ q.question_type }}">{{ q.get_question_type_display }}</span>
                         <span class="sm-pill {{ q.difficulty }}">{{ q.get_difficulty_display }}</span>
                         {% if q.concept_tag %}<span class="sm-pill tag" title="{{ q.concept_tag }}">{{ q.concept_tag|truncatechars:60 }}</span>{% endif %}
-                        <div style="margin-top:0.5rem;color:#111;font-size:0.92rem;">{{ q.question_text }}</div>
+                        <div style="margin-top:0.5rem;color:var(--text);font-size:0.92rem;">{{ q.question_text }}</div>
                         {% if q.question_type == 'mcq' %}
-                        <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:#374151;">
-                            <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:#166534;font-weight:600;">✓</span>{% endif %}</li>
+                        <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:var(--text-secondary);">
+                            <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
                         </ol>
                         {% elif q.question_type == 'fill_in_blank' %}
                         {% if q.answer_data.text_template %}
-                        <div style="margin-top:0.5rem;padding:0.5rem;background:#fff;border:1px solid #e5e7eb;border-radius:6px;font-style:italic;font-size:0.88rem;">{{ q.answer_data.text_template }}</div>
+                        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-style:italic;font-size:0.88rem;">{{ q.answer_data.text_template }}</div>
                         {% endif %}
-                        <div style="margin-top:0.4rem;color:#166534;font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                        <div style="margin-top:0.4rem;color:var(--success);font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
                         {% endif %}
                         {% if q.answer_data.figure_svg %}
                         <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|sanitized }}</div>
                         {% endif %}
-                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:#374151;"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
+                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:var(--text-secondary);"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
                         {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
                         <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
                             <button type="button" onclick="editSumQ(this)" class="btn btn-sm" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Edit" %}</button>

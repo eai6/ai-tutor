@@ -8,35 +8,35 @@
 <style>
     .summary-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.2rem; }
     .summary-card {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--surface); border:1px solid var(--border); border-radius:10px;
         padding:0.85rem 1.1rem; flex:1; min-width:160px;
     }
-    .summary-card .label { font-size:0.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
-    .summary-card .value { font-size:1.4rem; font-weight:700; color:#111; line-height:1.1; margin-top:0.15rem; }
+    .summary-card .label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--text); line-height:1.1; margin-top:0.15rem; }
 
-    .matrix { background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow-x: auto; }
+    .matrix { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow-x: auto; }
     .matrix table { width:100%; border-collapse:collapse; min-width: 660px; }
     .matrix th, .matrix td { padding:0.5rem 0.75rem; text-align:left; font-size:0.85rem; vertical-align:middle; }
-    .matrix thead th { background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid #e5e7eb; }
-    .matrix tbody tr { border-bottom:1px solid #f3f4f6; }
-    .matrix .obj { color:#111; font-weight:500; max-width:380px; }
-    .pct { font-weight:600; color:#111; font-variant-numeric: tabular-nums; }
-    .pct-faint { color:#9ca3af; font-size:0.8rem; }
-    .delta-pos { color:#047857; font-weight:600; }
-    .delta-neg { color:#b91c1c; font-weight:600; }
-    .delta-zero { color:#6b7280; }
+    .matrix thead th { background:var(--surface-sunken); color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border); }
+    .matrix tbody tr { border-bottom:1px solid var(--surface-sunken); }
+    .matrix .obj { color:var(--text); font-weight:500; max-width:380px; }
+    .pct { font-weight:600; color:var(--text); font-variant-numeric: tabular-nums; }
+    .pct-faint { color:var(--text-faint); font-size:0.8rem; }
+    .delta-pos { color:var(--success); font-weight:600; }
+    .delta-neg { color:var(--danger); font-weight:600; }
+    .delta-zero { color:var(--text-muted); }
     .pill {
         display:inline-block; padding:0.1rem 0.5rem; border-radius:999px;
         font-size:0.7rem; font-weight:600;
     }
-    .pill.mastered { background:#dcfce7; color:#166534; }
-    .pill.weak { background:#fee2e2; color:#991b1b; }
-    .pill.med { background:#fef3c7; color:#92400e; }
-    .pill.none { background:#f3f4f6; color:#6b7280; }
+    .pill.mastered { background:#dcfce7; color:var(--success); }
+    .pill.weak { background:var(--danger-surface); color:var(--danger); }
+    .pill.med { background:var(--warning-surface); color:var(--warning); }
+    .pill.none { background:var(--surface-sunken); color:var(--text-muted); }
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:#6b7280;font-size:0.85rem;text-decoration:none;">← {% trans "Class competency map" %}</a>
+    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">← {% trans "Class competency map" %}</a>
 </div>
 
 <div class="summary-row">

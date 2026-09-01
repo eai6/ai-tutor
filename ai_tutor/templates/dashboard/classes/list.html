@@ -1,69 +1,134 @@
 {% extends "dashboard/base.html" %}
-{% load i18n %}
+{% load i18n dashboard_ui %}
 
 {% block title %}{% trans "Classes" %}{% endblock %}
 {% block page_title %}{% trans "Classes" %}{% endblock %}
+{% block topbar_eyebrow %}
+<span class="topbar-eyebrow">{% blocktrans count n=classes|length %}{{ n }} class{% plural %}{{ n }} classes{% endblocktrans %}</span>
+{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1.5rem;">
-    <p style="color: var(--gray-500); margin: 0;">
-        {% blocktrans with students=total_students classes_count=classes|length %}{{ students }} students grouped into {{ classes_count }} classes. Open a class to see its courses, mastery averages, and roster. Promotion lives on the class page — pick the students you want to move and confirm there.{% endblocktrans %}
-    </p>
-</div>
+<div class="stack">
 
-{% if classes %}
-<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:1rem;">
-    {% for cls in classes %}
-    {% if cls.is_grade %}
-    <a href="{% url 'dashboard:class_detail' cls.grade %}"
-       class="card class-tile"
-       style="display:flex; flex-direction:column; padding:1.25rem 1.4rem; border-radius:12px; text-decoration:none; color:inherit; gap:0.4rem; border:1px solid var(--gray-200); background:#fff; transition:transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-            <span style="background:var(--primary-light); color:var(--primary); font-weight:700; font-size:0.85rem; padding:0.2rem 0.7rem; border-radius:999px;">
-                {{ cls.grade }}
-            </span>
-            <span style="font-size:0.75rem; color:var(--gray-500);">→</span>
-        </div>
-        <div style="font-size:1.4rem; font-weight:700; color:var(--gray-900); line-height:1.1;">
-            {{ cls.count }}
-        </div>
-        <div style="font-size:0.82rem; color:var(--gray-500);">
-            {% blocktrans count count=cls.count %}student{% plural %}students{% endblocktrans %}
-        </div>
-    </a>
+    {% comment %}
+    One line of orientation, not a paragraph. The old copy explained where
+    promotion lives, which belongs on the class page next to the control —
+    not here, where it is read once and then re-read on every visit.
+    {% endcomment %}
+    <p class="muted text-sm">
+        {% blocktrans with students=total_students %}{{ students }} students by grade. Open a class for its courses, mastery averages and roster.{% endblocktrans %}
+    </p>
+
+    {% if classes %}
+    <ul class="class-grid">
+        {% for cls in classes %}
+        <li>
+            {% if cls.is_grade %}
+            {% comment %}
+            The whole tile is the link, so the target is the card rather than
+            a word inside it — the difference between a 44px target and a
+            12px one on the tablets used in class.
+            {% endcomment %}
+            <a href="{% url 'dashboard:class_detail' cls.grade %}" class="class-tile">
+                <span class="class-tile__head">
+                    {% badge cls.grade tone="accent" %}
+                    <span class="class-tile__go">{% icon "arrow-right" size="sm" %}</span>
+                </span>
+                <span class="class-tile__count">{{ cls.count }}</span>
+                <span class="class-tile__unit">
+                    {% blocktrans count count=cls.count %}student{% plural %}students{% endblocktrans %}
+                </span>
+            </a>
+            {% else %}
+            {% comment %}
+            Students with no grade set. Not a class, so not a link and not
+            styled like one — a dashed edge says "incomplete data", and the
+            copy says what to do about it.
+            {% endcomment %}
+            <div class="class-tile class-tile--unassigned">
+                <span class="class-tile__head">{% badge cls.grade %}</span>
+                <span class="class-tile__count">{{ cls.count }}</span>
+                <span class="class-tile__unit">
+                    {% blocktrans count count=cls.count %}student with no grade on their profile{% plural %}students with no grade on their profile{% endblocktrans %}
+                </span>
+            </div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
     {% else %}
-    <div class="card"
-         style="display:flex; flex-direction:column; padding:1.25rem 1.4rem; border-radius:12px; gap:0.4rem; border:1px dashed var(--gray-200); background:#f9fafb;">
-        <span style="background:var(--gray-100); color:var(--gray-500); font-weight:600; font-size:0.78rem; padding:0.2rem 0.7rem; border-radius:999px; align-self:flex-start;">
-            {{ cls.grade }}
-        </span>
-        <div style="font-size:1.4rem; font-weight:700; color:var(--gray-700); line-height:1.1;">
-            {{ cls.count }}
-        </div>
-        <div style="font-size:0.78rem; color:var(--gray-500);">
-            {% blocktrans count count=cls.count %}student without a grade set on their profile{% plural %}students without a grade set on their profile{% endblocktrans %}
-        </div>
+    <div class="card">
+        {% empty_state title=_("No classes yet") body=_("Classes are grouped from student grade levels. They appear once students join and complete their profiles.") icon_name="classes" %}
     </div>
     {% endif %}
-    {% endfor %}
-</div>
 
-<style>
-    a.class-tile:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-        border-color: var(--primary);
-    }
-</style>
-{% else %}
-<div class="card">
-    <div class="empty-state">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-        </svg>
-        <h3>{% trans "No students yet" %}</h3>
-        <p>{% trans "Students will appear here once they join and complete their profiles." %}</p>
-    </div>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+{% comment %}
+Three rules for one page, kept inline rather than adding a stylesheet request
+for a grid of tiles. Everything they use is a token.
+{% endcomment %}
+<style nonce="{{ request.csp_nonce }}">
+    .class-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: var(--space-3);
+        list-style: none;
+    }
+
+    .class-tile {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        height: 100%;
+        padding: var(--space-4);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        box-shadow: var(--card-shadow);
+        text-decoration: none;
+        color: inherit;
+        transition: border-color var(--dur-fast) var(--ease-out),
+                    box-shadow var(--dur-fast) var(--ease-out),
+                    transform var(--dur-fast) var(--ease-out);
+    }
+
+    a.class-tile:hover {
+        border-color: var(--accent-border);
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+        color: inherit;
+    }
+
+    .class-tile--unassigned {
+        border-style: dashed;
+        background: var(--surface-sunken);
+        box-shadow: none;
+    }
+
+    .class-tile__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--space-1);
+    }
+
+    .class-tile__go { color: var(--text-faint); transition: transform var(--dur-fast) var(--ease-out); }
+    a.class-tile:hover .class-tile__go { color: var(--accent); transform: translateX(2px); }
+
+    .class-tile__count {
+        font-family: var(--font-display);
+        font-size: var(--text-2xl);
+        font-weight: var(--weight-medium);
+        line-height: 1;
+        letter-spacing: var(--tracking-tight);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .class-tile--unassigned .class-tile__count { color: var(--text-secondary); }
+
+    .class-tile__unit { font-size: var(--text-xs); color: var(--text-muted); }
+</style>
 {% endblock %}

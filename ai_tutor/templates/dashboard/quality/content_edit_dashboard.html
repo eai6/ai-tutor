@@ -2,6 +2,7 @@
 {% load i18n %}
 
 {% block title %}{% trans "Content Quality Dashboard" %} · AI Tutor{% endblock %}
+{% block page_title %}{% trans "Content quality" %}{% endblock %}
 
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto; padding: 1rem 1.5rem;">
@@ -45,7 +46,7 @@
         <label style="font-size: 0.8125rem;">{% trans "Lesson ID:" %}
             <input type="number" name="lesson_id" value="{{ filters.lesson_id }}" style="width: 5rem; padding: 0.25rem;">
         </label>
-        <button type="submit" class="btn btn-sm" style="background: var(--primary, #7c3aed); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
+        <button type="submit" class="btn btn-sm" style="background: var(--primary, var(--accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
         {% if filters.content_type or filters.source or filters.tag or filters.lesson_id %}
         <a href="{% url 'dashboard:content_edit_dashboard' %}" style="font-size: 0.8125rem;">{% trans "clear" %}</a>
         {% endif %}
@@ -82,7 +83,7 @@
                       width="{{ bar_width }}"
                       height="{{ c }}"
                       transform="translate({{ forloop.counter0 }}0 0) scale(2 {% widthratio 70 max_volume 1 %})"
-                      fill="#7c3aed" opacity="0.8">
+                      fill="var(--accent)" opacity="0.8">
                     <title>{{ d|date:"M d" }}: {{ c }}</title>
                 </rect>
                 {% endwith %}
@@ -108,7 +109,7 @@
                     <span style="color: var(--gray-500);">{{ count }}</span>
                 </div>
                 <div style="height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, #7c3aed, #ec4899);"></div>
+                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, var(--accent), #ec4899);"></div>
                 </div>
             </div>
             {% empty %}
@@ -155,9 +156,9 @@
                 <tr style="border-bottom: 1px solid var(--gray-200);">
                     <td style="padding: 0.5rem; font-family: monospace;">{{ jname }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: var(--gray-600);">{{ m.support }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: #047857;">{{ m.tp }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--success);">{{ m.tp }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: #b45309;">{{ m.fp }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: #b91c1c;">{{ m.fn }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--danger);">{{ m.fn }}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.precision is not None %}{{ m.precision|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.recall is not None %}{{ m.recall|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td style="padding: 0.5rem; text-align: right; font-weight: 500;">{% if m.f1 is not None %}{{ m.f1|floatformat:2 }}{% else %}—{% endif %}</td>

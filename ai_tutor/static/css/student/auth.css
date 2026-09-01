@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Auth pages — sign in, register, password reset
+   ==========================================================================
+   Every auth page uses .auth-container / .auth-card / .auth-header, but only
+   eight of the twelve defined them, each in its own <style> block. The four
+   that did not are the entire password-reset flow — request a link, link
+   sent, set a new password, done — so the one journey a locked-out person is
+   forced through was the one that rendered as raw browser defaults.
+
+   Defining them once fixed those four, and the other eight then had their
+   duplicate blocks deleted — about 780 lines of copy-pasted CSS that drifted
+   apart page by page. This file is now the only definition, which is what
+   makes the twelve consistent: a change here reaches all of them.
+
+   Only accounts/settings.html keeps a local block, because it is a settings
+   page rather than an auth card and its selectors are genuinely its own.
+   ========================================================================== */
+
+.auth-container {
+    width: 100%;
+    max-width: 26rem;
+    margin: var(--space-8) auto;
+}
+
+.auth-card { padding: var(--space-8); }
+
+.auth-header {
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.auth-icon {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    margin: 0 auto var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--coral-tint);
+    color: var(--coral-ink);
+    font-size: 1.6rem;
+}
+
+.auth-header h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-tight);
+    margin-bottom: var(--space-2);
+}
+
+.auth-header p {
+    color: var(--text-muted);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+/* --------------------------------------------------------------------------
+   Fields
+   ------------------------------------------------------------------------
+   Styled by position rather than by class, because several of these forms
+   render bare <input> tags with no class at all — the reset page's email
+   field among them.
+   -------------------------------------------------------------------------- */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.form-group label {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--text-secondary);
+}
+
+.auth-card input[type="text"],
+.auth-card input[type="email"],
+.auth-card input[type="password"],
+.auth-card input[type="number"],
+.auth-card select,
+.form-group > input,
+.form-group > select {
+    width: 100%;
+    min-height: 48px;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: var(--text-md);
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.auth-card input::placeholder { color: var(--text-muted); }
+
+.auth-card input:focus-visible,
+.auth-card select:focus-visible,
+.form-group > input:focus-visible {
+    outline: none;
+    border-color: var(--coral-fill);
+    box-shadow: 0 0 0 3px var(--coral-tint);
+}
+
+/* Selects need the same chevron the rest of the product uses; without
+   appearance:none they fall back to the platform control and read as a
+   different kind of field from the inputs beside them. */
+.auth-card select,
+.form-group > select {
+    appearance: none;
+    padding-right: var(--space-8);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236E6157' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-3) center;
+    background-size: 1rem;
+    cursor: pointer;
+}
+
+/* The reveal toggle wraps the input, so the wrapper has to fill the column
+   the field used to fill itself. */
+.auth-card .pw-field { width: 100%; }
+
+/* A waiting state, not an error or a success. */
+.auth-icon--wait { background: var(--warning-surface); color: var(--warning); }
+
+/* --------------------------------------------------------------------------
+   Two-up field row
+   ------------------------------------------------------------------------
+   First/last name, password/confirm. Collapses on a phone — two 10-character
+   fields side by side at 380px is worse than two stacked ones.
+   -------------------------------------------------------------------------- */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+
+@media (max-width: 480px) {
+    .form-row { grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   Inline notices
+   ------------------------------------------------------------------------
+   .info-box and .pending-message were each defined once, in one page's own
+   <style>, in hardcoded blue and amber. They are the shared status roles.
+   -------------------------------------------------------------------------- */
+.info-box {
+    padding: var(--space-4);
+    background: var(--info-surface);
+    border: 1px solid var(--info-border);
+    border-radius: var(--radius-md);
+    color: var(--info);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    text-align: left;
+}
+
+.info-box p + p { margin-top: var(--space-2); }
+
+.pending-message {
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-md);
+    color: var(--warning);
+    line-height: var(--leading-normal);
+}
+
+/* --------------------------------------------------------------------------
+   Footer links
+   -------------------------------------------------------------------------- */
+.auth-footer {
+    margin-top: var(--space-6);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.auth-footer a {
+    color: var(--coral-ink);
+    font-weight: var(--weight-bold);
+}
+
+.auth-footer p + p { margin-top: var(--space-2); }
+
+@media (max-width: 480px) {
+    .auth-container { margin-block: var(--space-4); }
+    .auth-card { padding: var(--space-5); }
+}

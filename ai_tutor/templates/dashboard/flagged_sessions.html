@@ -1,95 +1,139 @@
 {% extends "dashboard/base.html" %}
-{% load i18n %}
+{% load i18n dashboard_ui %}
 
-{% block title %}{% trans "Flagged Chats" %}{% endblock %}
-{% block page_title %}{% trans "Flagged Chats" %}{% endblock %}
+{% block title %}{% trans "Flagged chats" %}{% endblock %}
+{% block page_title %}{% trans "Flagged chats" %}{% endblock %}
+{% block topbar_eyebrow %}
+<span class="topbar-eyebrow">{% trans "Safety review" %}</span>
+{% endblock %}
 
 {% block content %}
-<!-- Stats — safety-only (validator flags removed, 2026-05-07) -->
-<div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); max-width: 420px;">
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Safety Flags" %}</div>
-        <div class="stat-value">{{ total_flagged }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Unreviewed" %}</div>
-        <div class="stat-value" style="color: {% if unreviewed_count %}var(--danger){% else %}var(--success){% endif %}">{{ unreviewed_count }}</div>
-    </div>
-</div>
+<div class="stack">
 
-<!-- Filters: status only -->
-<div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-    <div style="display:flex;gap:0.4rem;">
-        <span style="font-size:0.75rem;color:var(--gray-500);align-self:center;text-transform:uppercase;">{% trans "Status:" %}</span>
-        <a href="?status=all" class="btn {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "All" %}</a>
-        <a href="?status=unreviewed" class="btn {% if status_filter == 'unreviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Unreviewed" %}</a>
-        <a href="?status=reviewed" class="btn {% if status_filter == 'reviewed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">{% trans "Reviewed" %}</a>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body" style="padding: 0;">
-        {% if sessions %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>{% trans "Student" %}</th>
-                    <th>{% trans "Lesson" %}</th>
-                    <th>{% trans "Flag Reason" %}</th>
-                    <th>{% trans "Flagged At" %}</th>
-                    <th>{% trans "Status" %}</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for s in sessions %}
-                <tr>
-                    <td>
-                        <div style="font-weight: 500;">{{ s.student.first_name }} {{ s.student.last_name }}</div>
-                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ s.student.username }}</div>
-                    </td>
-                    <td>{{ s.lesson.title }}</td>
-                    <td style="max-width: 240px;">
-                        <div style="font-size: 0.78rem;color:#991b1b;">{% blocktrans with reason=s.flag_reason|truncatewords:10 %}⚠ Safety: {{ reason }}{% endblocktrans %}</div>
-                    </td>
-                    <td style="font-size: 0.875rem;">
-                        {% if s.flagged_at %}{% blocktrans with ts=s.flagged_at|timesince %}{{ ts }} ago{% endblocktrans %}{% else %}&mdash;{% endif %}
-                    </td>
-                    <td>
-                        {% if s.flag_reviewed %}<span class="badge badge-success">{% trans "Reviewed" %}</span>{% else %}<span class="badge badge-danger">{% trans "Unreviewed" %}</span>{% endif %}
-                    </td>
-                    <td>
-                        <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn-secondary btn-sm">{% trans "View" %}</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <!-- Pagination -->
-        {% if sessions.has_other_pages %}
-        <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: center; gap: 0.5rem;">
-            {% if sessions.has_previous %}
-                <a href="?status={{ status_filter }}&page={{ sessions.previous_page_number }}" class="btn btn-secondary btn-sm">&larr; {% trans "Previous" %}</a>
-            {% endif %}
-            <span style="padding: 0.5rem 1rem; color: var(--gray-500);">
-                {% blocktrans with current=sessions.number total=sessions.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
-            </span>
-            {% if sessions.has_next %}
-                <a href="?status={{ status_filter }}&page={{ sessions.next_page_number }}" class="btn btn-secondary btn-sm">{% trans "Next" %} &rarr;</a>
-            {% endif %}
-        </div>
-        {% endif %}
-
+    {% comment %}
+    The queue's own state, in two figures. "Unreviewed" is the actionable
+    one, so it leads and takes the danger tone only when it is non-zero —
+    a red 0 trains teachers to ignore red.
+    {% endcomment %}
+    <section class="metric-row metric-row--fit" aria-label="{% trans 'Review queue' %}">
+        {% if unreviewed_count %}
+        {% stat_tile label=_("Waiting for review") value=unreviewed_count tone="danger" note=_("Each one is a conversation the safety judge stopped on.") %}
         {% else %}
-        <div class="empty-state">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <h3>{% trans "No Flagged Sessions" %}</h3>
-            <p>{% trans "No flagged chat sessions found for this filter." %}</p>
-        </div>
+        {% stat_tile label=_("Waiting for review") value=unreviewed_count tone="success" note=_("Queue is clear.") %}
         {% endif %}
+        {% stat_tile label=_("Flagged all time") value=total_flagged note=_("Includes chats already reviewed and closed.") %}
+    </section>
+
+    <div class="card">
+        <header class="card__header">
+            <h2 class="card__title">{% trans "Review queue" %}</h2>
+            {% comment %}
+            Status filter as a segmented control rather than three loose
+            buttons: it is one choice with three options, and the previous
+            styling made "All" look like a separate action.
+            {% endcomment %}
+            <div class="card__actions">
+                <span class="eyebrow" id="status-filter-label">{% trans "Show" %}</span>
+                <div class="segmented" role="group" aria-labelledby="status-filter-label">
+                    <a href="?status=unreviewed" class="segmented__option"
+                       {% if status_filter == 'unreviewed' %}aria-current="true"{% endif %}>{% trans "Unreviewed" %}</a>
+                    <a href="?status=reviewed" class="segmented__option"
+                       {% if status_filter == 'reviewed' %}aria-current="true"{% endif %}>{% trans "Reviewed" %}</a>
+                    <a href="?status=all" class="segmented__option"
+                       {% if status_filter == 'all' %}aria-current="true"{% endif %}>{% trans "All" %}</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="card__body card__body--flush">
+            {% if sessions %}
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">{% trans "Student" %}</th>
+                            <th scope="col">{% trans "Lesson" %}</th>
+                            <th scope="col">{% trans "Why it was flagged" %}</th>
+                            <th scope="col">{% trans "Flagged" %}</th>
+                            <th scope="col">{% trans "Status" %}</th>
+                            <th scope="col"><span class="sr-only">{% trans "Actions" %}</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sessions %}
+                        <tr>
+                            <td>
+                                <span class="cell-primary__name">{{ s.student.first_name }} {{ s.student.last_name }}</span>
+                                <span class="cell-primary__meta">{{ s.student.username }}</span>
+                            </td>
+                            <td class="text-sm">{{ s.lesson.title }}</td>
+                            <td class="flag-reason">
+                                {# 22 words instead of 10 — enough to judge without #}
+                                {# opening the chat. Body ink, not red: the badge #}
+                                {# already carries the status, and red on every row #}
+                                {# spends the alarm colour on something that isn't one. #}
+                                <span class="flag-reason__text">{{ s.flag_reason|truncatewords:22 }}</span>
+                            </td>
+                            <td class="text-sm nowrap">
+                                {% if s.flagged_at %}{% blocktrans with ts=s.flagged_at|timesince %}{{ ts }} ago{% endblocktrans %}
+                                {% else %}<span class="muted">—</span>{% endif %}
+                            </td>
+                            <td>
+                                {% if s.flag_reviewed %}
+                                {% badge _("Reviewed") tone="success" icon_name="check-circle" %}
+                                {% else %}
+                                {% badge _("Unreviewed") tone="danger" icon_name="alert" %}
+                                {% endif %}
+                            </td>
+                            <td class="row-actions">
+                                <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn--secondary btn--sm">
+                                    {% trans "Review" %}<span class="sr-only"> {{ s.student.first_name }} {{ s.student.last_name }}</span>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if sessions.has_other_pages %}
+            <nav class="pagination" aria-label="{% trans 'Flagged chat pages' %}">
+                {% if sessions.has_previous %}
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.previous_page_number }}" class="btn btn--secondary btn--sm">
+                    {% icon "arrow-left" size="sm" %}{% trans "Previous" %}
+                </a>
+                {% endif %}
+                <span class="pagination__status">
+                    {% blocktrans with current=sessions.number total=sessions.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
+                </span>
+                {% if sessions.has_next %}
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.next_page_number }}" class="btn btn--secondary btn--sm">
+                    {% trans "Next" %}{% icon "arrow-right" size="sm" %}
+                </a>
+                {% endif %}
+            </nav>
+            {% endif %}
+
+            {% elif status_filter == 'unreviewed' %}
+            {% empty_state title=_("Nothing waiting for review") body=_("The safety judge has not flagged any new conversations. Flags you have already closed are under Reviewed.") icon_name="check-circle" %}
+            {% else %}
+            {% empty_state title=_("No flagged chats for this filter") body=_("Try a different status.") icon_name="flag" %}
+            {% endif %}
+        </div>
     </div>
+
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style nonce="{{ request.csp_nonce }}">
+    .flag-reason { max-width: 34rem; }
+
+    .flag-reason__text {
+        display: block;
+        font-size: var(--text-xs);
+        line-height: var(--leading-snug);
+        color: var(--text-secondary);
+    }
+</style>
 {% endblock %}

@@ -1,0 +1,13 @@
+{% load dashboard_ui %}
+{% comment %}
+role="progressbar" carries the number for screen readers; the bar is the
+sighted rendering of the same value, never the only copy of it.
+{% endcomment %}
+<div class="progress-pair">
+    <div class="progress" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"{% if label %} aria-label="{{ label }}"{% endif %}>
+        <div class="progress__fill {% tone_class 'progress__fill' tone %}" style="width: {{ pct }}%"></div>
+    </div>
+    {% if show_value %}
+    <span class="progress-pair__value">{% if count is not None %}{{ count }}/{{ total }}{% else %}{{ pct }}%{% endif %}</span>
+    {% endif %}
+</div>

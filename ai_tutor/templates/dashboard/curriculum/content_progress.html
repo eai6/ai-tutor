@@ -30,16 +30,16 @@
         font-weight: 500;
     }
     .status-badge.processing {
-        background: #fef3c7;
-        color: #92400e;
+        background: var(--warning-surface);
+        color: var(--warning);
     }
     .status-badge.completed {
-        background: #d1fae5;
-        color: #065f46;
+        background: var(--success-surface);
+        color: var(--success);
     }
     .status-badge.failed {
-        background: #fee2e2;
-        color: #991b1b;
+        background: var(--danger-surface);
+        color: var(--danger);
     }
     
     .spinner {
@@ -56,7 +56,7 @@
     
     .log-container {
         background: var(--gray-900);
-        color: #10B981;
+        color: var(--success-solid);
         padding: 1rem;
         border-radius: 8px;
         font-family: 'Monaco', 'Menlo', monospace;
@@ -91,7 +91,7 @@
                 </span>
                 <form method="post" action="{% url 'dashboard:cancel_generation' upload.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating content? Lessons already completed will be kept." %}');">
+                    <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating content? Lessons already completed will be kept." %}');">
                         ⛔ {% trans "Stop Generation" %}
                     </button>
                 </form>
@@ -135,7 +135,7 @@
         {% endif %}
 
         {% if upload.status == 'failed' and upload.error_message %}
-        <div style="margin-top: 1rem; padding: 1rem; background: #fee2e2; border-radius: 8px; color: #991b1b;">
+        <div style="margin-top: 1rem; padding: 1rem; background: var(--danger-surface); border-radius: 8px; color: var(--danger);">
             <strong>{% trans "Error:" %}</strong> {{ upload.error_message }}
         </div>
         {% endif %}

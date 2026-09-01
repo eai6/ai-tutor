@@ -8,15 +8,15 @@
 <style>
     .rv-wrap { max-width: 760px; margin: 1rem auto 4rem; padding: 0 1rem; }
     .rv-hero {
-        background: linear-gradient(135deg, #5b21b6 0%, #8b5cf6 100%);
-        color: #fff;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-solid) 100%);
+        color: var(--surface);
         border-radius: 16px;
         padding: 1.6rem 1.8rem;
         margin-bottom: 1.25rem;
         box-shadow: 0 12px 32px rgba(91,33,182,0.25);
     }
     .rv-hero.failed {
-        background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+        background: linear-gradient(135deg, #b45309 0%, var(--warning-solid) 100%);
         box-shadow: 0 12px 32px rgba(180,83,9,0.25);
     }
     .rv-score { font-size: 2.6rem; font-weight: 800; line-height: 1; }
@@ -24,26 +24,26 @@
     .rv-status { display: inline-block; background: rgba(255,255,255,0.2); padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; margin-top: 0.4rem; }
 
     .rv-q {
-        background: #fff;
-        border: 1px solid #e5e7eb;
+        background: var(--surface);
+        border: 1px solid var(--border);
         border-radius: 12px;
         padding: 1rem 1.2rem;
         margin-bottom: 0.75rem;
     }
-    .rv-q.correct { border-left: 4px solid #10b981; }
-    .rv-q.wrong { border-left: 4px solid #ef4444; }
-    .rv-stem { color: #111; font-size: 0.95rem; line-height: 1.55; margin: 0 0 0.5rem; }
-    .rv-stem .num { display: inline-block; background: #f3f4f6; color: #5b21b6; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
-    .rv-row { font-size: 0.86rem; color: #374151; margin: 0.3rem 0; }
-    .rv-row strong { color: #111; }
+    .rv-q.correct { border-left: 4px solid var(--success-solid); }
+    .rv-q.wrong { border-left: 4px solid var(--danger-solid); }
+    .rv-stem { color: var(--text); font-size: 0.95rem; line-height: 1.55; margin: 0 0 0.5rem; }
+    .rv-stem .num { display: inline-block; background: var(--surface-sunken); color: var(--accent); padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
+    .rv-row { font-size: 0.86rem; color: var(--text-secondary); margin: 0.3rem 0; }
+    .rv-row strong { color: var(--text); }
     .rv-row.you { color: #6b21a8; }
-    .rv-row.correct { color: #047857; }
-    .rv-row.expl { color: #6b7280; font-style: italic; margin-top: 0.5rem; }
+    .rv-row.correct { color: var(--success); }
+    .rv-row.expl { color: var(--text-muted); font-style: italic; margin-top: 0.5rem; }
     .rv-fig { margin: 0.5rem 0; max-width: 100%; }
     .rv-fig svg { max-width: 100%; height: auto; }
     .rv-objective {
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
+        background: var(--surface-sunken);
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 0.6rem 0.85rem;
         margin-bottom: 0.4rem;
@@ -51,7 +51,7 @@
         justify-content: space-between;
         font-size: 0.86rem;
     }
-    .rv-objective.weak { background: #fef2f2; border-color: #fca5a5; }
+    .rv-objective.weak { background: var(--danger-surface); border-color: #fca5a5; }
 </style>
 
 <div class="rv-wrap">
@@ -79,18 +79,18 @@
     </div>
 
     {% if attempt.answers.next_url %}
-    <div style="background:#5b21b6;color:#fff;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+    <div style="background:var(--accent);color:var(--surface);border-radius:14px;padding:1rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
         <div>
             <div style="font-weight:700;font-size:0.95rem;">Lessons unlocked 🚀</div>
             <div style="font-size:0.85rem;opacity:0.9;">Continue to the lesson you started.</div>
         </div>
-        <a href="{{ attempt.answers.next_url }}" style="background:#fff;color:#5b21b6;padding:0.55rem 1.1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.92rem;">Continue →</a>
+        <a href="{{ attempt.answers.next_url }}" style="background:var(--surface);color:var(--accent);padding:0.55rem 1.1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.92rem;">Continue →</a>
     </div>
     {% endif %}
 
     {% if result.by_concept %}
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.2rem;margin-bottom:1rem;">
-        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">By teaching objective</h3>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--text);">By teaching objective</h3>
         {% for tag, stats in result.by_concept.items %}
         <div class="rv-objective {% if stats.correct == 0 %}weak{% endif %}">
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ tag }}</span>
@@ -100,7 +100,7 @@
     </div>
     {% endif %}
 
-    <h3 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;color:#111;">Question by question</h3>
+    <h3 style="margin:1.25rem 0 0.5rem;font-size:0.95rem;color:var(--text);">Question by question</h3>
     {% for q in questions %}
     {% with row=per_q_by_id|default_if_none:'' %}
     <div class="rv-q {% if q.id in per_q_by_id and per_q_by_id|get_item:q.id|get_item:'is_correct' %}correct{% else %}wrong{% endif %}">
@@ -125,11 +125,11 @@
     {% endfor %}
 
     {% if prior_attempts %}
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.2rem;margin-top:1.5rem;">
-        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:#111;">Your attempts</h3>
-        <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.5rem;">All-time progressive scores on this course's summative.</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;margin-top:1.5rem;">
+        <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--text);">Your attempts</h3>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem;">All-time progressive scores on this course's summative.</div>
         {% for prior in prior_attempts %}
-        <div style="display:flex;justify-content:space-between;padding:0.45rem 0.65rem;border-radius:8px;background:{% if prior.id == attempt.id %}#ede9fe{% else %}#fafafa{% endif %};margin-bottom:0.3rem;font-size:0.86rem;">
+        <div style="display:flex;justify-content:space-between;padding:0.45rem 0.65rem;border-radius:8px;background:{% if prior.id == attempt.id %}var(--accent-surface){% else %}var(--surface-sunken){% endif %};margin-bottom:0.3rem;font-size:0.86rem;">
             <span>
                 {% if prior.purpose == 'baseline' %}🟢 Baseline
                 {% elif prior.purpose == 'final' %}🔵 Final
@@ -140,7 +140,7 @@
             <span>
                 <strong>{{ prior.score }} / {{ prior.questions_per_attempt }}</strong>
                 {% if prior.id != attempt.id %}
-                <a href="{% url 'tutoring:summative_review' course.id prior.id %}" style="margin-left:0.4rem;color:#6b7280;font-size:0.78rem;">view →</a>
+                <a href="{% url 'tutoring:summative_review' course.id prior.id %}" style="margin-left:0.4rem;color:var(--text-muted);font-size:0.78rem;">view →</a>
                 {% endif %}
             </span>
         </div>
@@ -150,11 +150,11 @@
 
     <div style="display:flex;gap:0.6rem;justify-content:center;margin-top:1.5rem;flex-wrap:wrap;">
         <a href="{% url 'tutoring:summative_take' course.id %}"
-           style="background:#5b21b6;color:#fff;padding:0.65rem 1.4rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.92rem;"
+           style="background:var(--accent);color:var(--surface);padding:0.65rem 1.4rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.92rem;"
            onclick="return confirm('Take the summative again? Your previous attempts stay in the record — this is for tracking growth over time.');">
             🔁 Retake summative
         </a>
-        <a href="{% url 'tutoring:catalog' %}" style="background:#fff;color:#5b21b6;border:1.5px solid #ddd6fe;padding:0.65rem 1.4rem;border-radius:999px;font-weight:600;text-decoration:none;font-size:0.92rem;">← Back to lessons</a>
+        <a href="{% url 'tutoring:catalog' %}" style="background:var(--surface);color:var(--accent);border:1.5px solid #ddd6fe;padding:0.65rem 1.4rem;border-radius:999px;font-weight:600;text-decoration:none;font-size:0.92rem;">← Back to lessons</a>
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,380 @@
+/* ==========================================================================
+   Teacher dashboard — components: surfaces
+   ==========================================================================
+   Things that hold content: the card, the section heading that sits on
+   the bare canvas, the metric tile, the triage row, the empty state and the
+   progressive-disclosure footnote.
+
+   Every component here is a compound: a root class plus named parts that only
+   have meaning inside it (.card / .card__header / .card__body). Parts are
+   scoped by their own class rather than by descendant selectors, so a card
+   nested inside a card doesn't inherit the outer card's padding, and no
+   selector needs to out-specify another.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Card
+   -------------------------------------------------------------------------- */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+/* Interactive card — a whole card that is one link. */
+.card--link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+}
+
+.card--link:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    color: inherit;
+}
+
+.card--link:active { transform: translateY(0); }
+
+.card--quiet { box-shadow: none; background: var(--surface-sunken); }
+.card--flush { overflow: visible; }
+
+.card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+}
+
+.card__title {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-tight);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.card__meta {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.card__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.card__body { padding: var(--space-5); }
+.card__body--tight { padding: var(--space-4); }
+.card__body--flush { padding: 0; }
+
+.card__footer {
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--border);
+    background: var(--surface-sunken);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Section header — a heading that sits on the canvas, outside any card.
+   -------------------------------------------------------------------------- */
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+}
+
+.section-head__title {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-tight);
+}
+
+.section-head__note {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Metric tile
+   ------------------------------------------------------------------------
+   Label on top, figure, then one line of context. The figure is the only
+   thing at display size, so a row of tiles scans as a row of numbers rather
+   than a row of paragraphs.
+   -------------------------------------------------------------------------- */
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--space-3);
+}
+
+/* For rows of two or three: tiles keep a sane measure instead of stretching
+   to half the viewport each. */
+.metric-row--fit { grid-template-columns: repeat(auto-fit, minmax(190px, 280px)); }
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+}
+
+.tile__label {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.tile__figure {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-medium);
+    line-height: 1.05;
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.tile__figure--success { color: var(--success); }
+.tile__figure--warning { color: var(--warning); }
+.tile__figure--danger  { color: var(--danger); }
+.tile__figure--accent  { color: var(--accent); }
+
+.tile__note {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: var(--leading-snug);
+}
+
+.tile__note--success { color: var(--success); font-weight: var(--weight-medium); }
+.tile__note--danger  { color: var(--danger);  font-weight: var(--weight-medium); }
+
+/* --------------------------------------------------------------------------
+   Attention item — the triage row at the top of the overview.
+   ------------------------------------------------------------------------
+   A whole row is one link. Severity is carried by the left edge AND the
+   icon AND the wording, never by colour alone.
+   -------------------------------------------------------------------------- */
+.attention {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-3);
+}
+
+.attention-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    padding-left: calc(var(--space-4) + 3px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+}
+
+.attention-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    color: inherit;
+}
+
+.attention-item__icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: var(--radius-sm);
+    font-size: 1.125rem;
+}
+
+.attention-item__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.attention-item__figure,
+.attention-item__label,
+.attention-item__detail { display: block; }
+
+.attention-item__figure {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    line-height: 1.1;
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+}
+
+.attention-item__label {
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+}
+
+.attention-item__detail {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: var(--leading-snug);
+    margin-top: 2px;
+}
+
+.attention-item__go {
+    margin-left: auto;
+    align-self: center;
+    color: var(--text-faint);
+    font-size: 1rem;
+    transition: transform var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+}
+
+.attention-item:hover .attention-item__go {
+    color: var(--text-secondary);
+    transform: translateX(2px);
+}
+
+/* Severity skins. Only the edge, the icon chip and the figure take colour —
+   the body text stays at full-contrast ink so it is always readable. */
+.attention-item--danger { border-left-color: var(--danger-solid); }
+.attention-item--danger .attention-item__icon { background: var(--danger-surface); color: var(--danger); }
+.attention-item--danger .attention-item__figure { color: var(--danger); }
+.attention-item--danger:hover { border-color: var(--danger-border); }
+
+.attention-item--warning { border-left-color: var(--warning-solid); }
+.attention-item--warning .attention-item__icon { background: var(--warning-surface); color: var(--warning); }
+.attention-item--warning .attention-item__figure { color: var(--warning); }
+.attention-item--warning:hover { border-color: var(--warning-border); }
+
+.attention-item--info { border-left-color: var(--info-solid); }
+.attention-item--info .attention-item__icon { background: var(--info-surface); color: var(--info); }
+.attention-item--info .attention-item__figure { color: var(--info); }
+.attention-item--info:hover { border-color: var(--info-border); }
+
+.attention-item--success { border-left-color: var(--success-solid); }
+.attention-item--success .attention-item__icon { background: var(--success-surface); color: var(--success); }
+.attention-item--success .attention-item__figure { color: var(--success); }
+
+/* All-clear state: same shape as an item so the row doesn't jump when the
+   last flag is cleared. */
+.attention-clear {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--success-surface);
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius-md);
+    color: var(--success);
+    font-weight: var(--weight-medium);
+    font-size: var(--text-base);
+}
+
+/* --------------------------------------------------------------------------
+   Empty state
+   -------------------------------------------------------------------------- */
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-2);
+    padding: var(--space-10) var(--space-6);
+    color: var(--text-muted);
+}
+
+.empty .icon {
+    font-size: 2rem;
+    color: var(--text-faint);
+    margin-bottom: var(--space-1);
+}
+
+.empty__title {
+    font-size: var(--text-md);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+}
+
+.empty__body {
+    font-size: var(--text-sm);
+    max-width: 46ch;
+    line-height: var(--leading-normal);
+}
+
+/* --------------------------------------------------------------------------
+   Footnote — progressive disclosure for "how is this computed"
+   ------------------------------------------------------------------------
+   Replaces title="" tooltips, which are invisible to keyboard users, absent
+   on touch, and unreadable at a glance. This is a real disclosure: focusable,
+   announced, and it stays open while the teacher reads it.
+   -------------------------------------------------------------------------- */
+.footnote {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.footnote > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    cursor: pointer;
+    list-style: none;
+    color: var(--text-muted);
+    border-radius: var(--radius-xs);
+    padding: 2px 0;
+}
+
+.footnote > summary::-webkit-details-marker { display: none; }
+.footnote > summary:hover { color: var(--text-secondary); }
+
+.footnote > summary .icon {
+    transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.footnote[open] > summary .icon { transform: rotate(90deg); }
+
+.footnote__body {
+    margin-top: var(--space-2);
+    padding: var(--space-3);
+    background: var(--surface-sunken);
+    border-radius: var(--radius-sm);
+    border-left: 2px solid var(--border-strong);
+    line-height: var(--leading-normal);
+    max-width: 72ch;
+}

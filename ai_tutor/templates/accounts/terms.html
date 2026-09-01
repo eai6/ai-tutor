@@ -1,27 +1,79 @@
 {% extends "base.html" %}
-{% load dashboard_extras %}
+{% load static i18n dashboard_extras dashboard_ui %}
 
-{% block title %}{% if terms %}{{ terms.title }}{% else %}Terms{% endif %} — AI Tutor{% endblock %}
+{% block title %}{% if terms %}{{ terms.title }}{% else %}{% trans "Terms of use" %}{% endif %} — AI Tutor{% endblock %}
+
+{% block page_class %}page--wide{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/marketing/legal.css' %}">
+{% endblock %}
 
 {% block content %}
-<style>
-    .terms-wrap { max-width: 760px; margin: 1.5rem auto 4rem; padding: 0 1rem; line-height: 1.7; color: #111; }
-    .terms-wrap h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
-    .terms-meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 1.5rem; }
-    .terms-body { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem 1.75rem; font-size: 0.95rem; }
-    .terms-body h3 { color: #111; margin: 1.4rem 0 0.4rem; font-size: 1.05rem; }
-    .terms-body p { margin: 0.5rem 0; }
-    .terms-body strong { color: #111; }
-    .terms-body hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
-</style>
-<div class="terms-wrap">
-    {% if terms %}
-        <h1>{{ terms.title }}</h1>
-        <div class="terms-meta">Version {{ terms.version }}{% if terms.effective_date %} · effective {{ terms.effective_date|date:"M j, Y" }}{% endif %}</div>
-        <div class="terms-body">{{ terms.body|render_markdown }}</div>
-    {% else %}
-        <h1>Terms not published</h1>
-        <p>No platform terms are currently published.</p>
-    {% endif %}
+{% if terms %}
+
+<header class="legal__head">
+    <h1 class="legal__title">{{ terms.title }}</h1>
+    <p class="legal__meta">
+        <span>{% blocktrans with v=terms.version %}Version {{ v }}{% endblocktrans %}</span>
+        {% if terms.effective_date %}
+        <span>·</span>
+        <span>{% blocktrans with d=terms.effective_date|date:"j F Y" %}In effect from {{ d }}{% endblocktrans %}</span>
+        {% endif %}
+    </p>
+</header>
+
+<div class="legal">
+    {% comment %}
+    Built from the document's own headings by legal-toc.js rather than
+    maintained by hand, so it cannot drift from the text an administrator
+    edits. Hidden until it is filled: an empty "Contents" box on a document
+    with no headings is worse than none.
+    {% endcomment %}
+    <nav class="legal__toc" id="legal-toc" aria-labelledby="toc-label" hidden>
+        <p class="legal__toc-label" id="toc-label">{% trans "Contents" %}</p>
+        <ol id="legal-toc-list"></ol>
+    </nav>
+
+    <div>
+        <article class="legal__body" id="legal-body">{{ terms.body|render_markdown }}</article>
+
+        <div class="legal__foot">
+            <button type="button" class="btn btn--secondary btn--sm" id="legal-print">
+                {% icon "download" size="sm" %}{% trans "Print or save as PDF" %}
+            </button>
+            <a href="{% url 'tutoring:catalog' %}" class="btn btn--ghost btn--sm">
+                {% icon "back" size="sm" %}{% trans "Back to my subjects" %}
+            </a>
+            <p class="legal__foot-note">
+                {% blocktrans with v=terms.version %}You are reading version {{ v }}. Older versions are kept by your school.{% endblocktrans %}
+            </p>
+        </div>
+    </div>
 </div>
+
+{% else %}
+
+{% comment %}
+Not an error page — an unpublished terms document is an administrative gap,
+and the person reading this cannot fix it. Say who can.
+{% endcomment %}
+<div class="card">
+    <div class="empty">
+        {% icon "list" %}
+        <p class="empty__title">{% trans "No terms are published yet" %}</p>
+        <p class="empty__body">
+            {% trans "Your school has not published a terms-of-use document for this platform. A platform administrator can add one from the dashboard settings." %}
+        </p>
+        <a href="{% url 'tutoring:catalog' %}" class="btn btn--secondary btn--sm">
+            {% trans "Back to my subjects" %}
+        </a>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/legal-toc.js' %}" defer></script>
 {% endblock %}

@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load static i18n dashboard_ui %}
 
 {% block title %}{% trans "My Subjects" %} - AI Tutor{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/student/catalog.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="catalog-container">
@@ -9,7 +13,7 @@
     <!-- Not logged in -->
     <div class="welcome-section animate-in">
         <div class="welcome-card card">
-            <div class="welcome-icon">🎓</div>
+            <div class="welcome-icon">{% icon "courses" %}</div>
             <h1>{% trans "Welcome to AI Tutor" %}</h1>
             <p class="text-muted">{% trans "Your personal learning companion for Seychelles secondary students" %}</p>
             <div class="welcome-actions">
@@ -23,7 +27,7 @@
     <!-- No subjects available -->
     <div class="empty-section animate-in">
         <div class="empty-card card text-center">
-            <div class="empty-icon">📚</div>
+            <div class="empty-icon">{% icon "courses" %}</div>
             <h2>{% trans "No subjects available yet" %}</h2>
             {% if is_staff_viewer %}
             {% if selected_school %}
@@ -45,7 +49,7 @@
         {% if is_staff_user %}
         <div class="school-switcher" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <a href="{% url 'dashboard:home' %}"
-               style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
+               style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:var(--accent-surface); color:var(--accent); border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
                title="{% trans 'Return to teacher dashboard' %}">
                 ← {% trans "Dashboard" %}
             </a>
@@ -117,17 +121,17 @@
 
     {% if weekly_assignments %}
     <div class="continue-section animate-in" style="animation-delay: 0.03s; background:#fef9c3; border:1px solid #fde047; border-radius:14px; padding:1rem 1.25rem; margin-bottom:1.5rem;">
-        <h2 style="font-size:1.05rem; margin:0 0 0.5rem; color:#78350f;">📅 {% trans "This week's lessons" %}</h2>
+        <h2 class="section__title">{% icon "calendar" %}{% trans "This week's lessons" %}</h2>
         {% for wa in weekly_assignments %}
         <div style="margin-top:0.6rem;">
-            <div style="font-size:0.85rem; color:#92400e; font-weight:600;">{{ wa.course.title }} · {% blocktrans with date=wa.week_end|date:"M j" %}due Sunday {{ date }}{% endblocktrans %}</div>
+            <div style="font-size:0.85rem; color:var(--warning); font-weight:600;">{{ wa.course.title }} · {% blocktrans with date=wa.week_end|date:"M j" %}due Sunday {{ date }}{% endblocktrans %}</div>
             {% if wa.notes %}
-            <div style="font-size:0.82rem; color:#78350f; font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
+            <div style="font-size:0.82rem; color:var(--warning); font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
             {% endif %}
             <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
                 {% for lesson in wa.lessons %}
                 <a href="{% url 'tutoring:tutor_interface' lesson.id %}"
-                   style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; background:#fff; border:1px solid #fde047; border-radius:999px; font-size:0.82rem; color:#78350f; text-decoration:none; font-weight:500;">
+                   style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; background:var(--surface); border:1px solid #fde047; border-radius:999px; font-size:0.82rem; color:var(--warning); text-decoration:none; font-weight:500;">
                     {% if lesson.mastery_level == 'mastered' %}✅
                     {% elif lesson.mastery_level == 'in_progress' %}⏳
                     {% else %}📖
@@ -144,7 +148,7 @@
     {% if active_sessions %}
     <!-- Continue Learning Section -->
     <div class="continue-section animate-in" style="animation-delay: 0.05s">
-        <h2 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-dark);">⏳ {% trans "Continue where you left off" %}</h2>
+        <h2 class="section__title">{% icon "clock" %}{% trans "Continue where you left off" %}</h2>
         <div class="active-sessions-grid">
             {% for session in active_sessions %}
             <a href="{% url 'tutoring:tutor_interface' session.lesson_id %}" class="active-session-card card">
@@ -200,27 +204,27 @@
         </div>
 
         {% if selected_subject.baseline_required %}
-        <div class="card" style="background:linear-gradient(135deg,#5b21b6 0%,#8b5cf6 100%);color:#fff;padding:1.4rem 1.6rem;margin-bottom:1.5rem;border-radius:14px;box-shadow:0 12px 28px rgba(91,33,182,0.25);">
-            <h3 style="margin:0 0 0.4rem;color:#fff;font-size:1.1rem;">🎯 Take your baseline first</h3>
+        <div class="card" style="background:linear-gradient(135deg,var(--accent) 0%,var(--accent-solid) 100%);color:var(--surface);padding:1.4rem 1.6rem;margin-bottom:1.5rem;border-radius:14px;box-shadow:0 12px 28px rgba(91,33,182,0.25);">
+            <h3 style="margin:0 0 0.4rem;color:var(--surface);font-size:1.1rem;">🎯 Take your baseline first</h3>
             <p style="margin:0 0 1rem;color:rgba(255,255,255,0.92);font-size:0.92rem;line-height:1.55;">
                 Lessons unlock after a quick baseline. It's not a test — we use it to figure out exactly what to teach you next, so you don't waste time on stuff you already know.
             </p>
-            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:#fff;color:#5b21b6;font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">{% trans "Start baseline" %} →</a>
+            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:var(--surface);color:var(--accent);font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">{% trans "Start baseline" %} →</a>
         </div>
         {% elif selected_subject.summative_published and selected_subject.summative_attempts_count > 0 %}
         <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:#5b21b6;background:#ede9fe;border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="{% trans 'Retake the course summative — useful for tracking growth over time.' %}">
+            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:var(--accent);background:var(--accent-surface);border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="{% trans 'Retake the course summative — useful for tracking growth over time.' %}">
                 📝 Retake course exam ({{ selected_subject.summative_attempts_count }} attempt{{ selected_subject.summative_attempts_count|pluralize }})
             </a>
         </div>
         {% endif %}
         {% if selected_subject.recommended_lesson_id %}
-        <div class="card" style="background:#fef3c7;border:1px solid #fcd34d;padding:1rem 1.2rem;margin-bottom:1.25rem;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+        <div class="card" style="background:var(--warning-surface);border:1px solid var(--warning-border);padding:1rem 1.2rem;margin-bottom:1.25rem;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
             <div style="flex:1;min-width:200px;">
-                <div style="font-weight:700;color:#92400e;font-size:0.95rem;">⭐ Recommended next</div>
-                <div style="color:#78350f;font-size:0.85rem;margin-top:0.2rem;">{{ selected_subject.recommended_reason }}</div>
+                <div style="font-weight:700;color:var(--warning);font-size:0.95rem;">⭐ Recommended next</div>
+                <div style="color:var(--warning);font-size:0.85rem;margin-top:0.2rem;">{{ selected_subject.recommended_reason }}</div>
             </div>
-            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:#92400e;color:#fff;padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">{% trans "Start" %} →</a>
+            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:var(--warning);color:var(--surface);padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">{% trans "Start" %} →</a>
         </div>
         {% endif %}
 
@@ -252,20 +256,20 @@
                     </div>
                 </div>
                 {% else %}
-                <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}{% if lesson.recommended %} lesson-recommended{% endif %}"{% if lesson.recommended %} style="background:#fef3c7;border-color:#fcd34d;"{% endif %}>
+                <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}{% if lesson.recommended %} lesson-recommended{% endif %}"{% if lesson.recommended %} style="background:var(--warning-surface);border-color:var(--warning-border);"{% endif %}>
                     <div class="lesson-status-icon">
                         {% if lesson.status == 'completed' %}
                             <span class="icon-completed">✓</span>
                         {% elif lesson.status == 'in_progress' %}
                             <span class="icon-progress">◐</span>
                         {% elif lesson.recommended %}
-                            <span class="icon-new" style="color:#92400e;">⭐</span>
+                            <span class="icon-new" style="color:var(--warning);">⭐</span>
                         {% else %}
                             <span class="icon-new">○</span>
                         {% endif %}
                     </div>
                     <div class="lesson-info">
-                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:#92400e;color:#fff;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">{% trans "recommended" %}</span>{% endif %}</h4>
+                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:var(--warning);color:var(--surface);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">{% trans "recommended" %}</span>{% endif %}</h4>
                         <p>{{ lesson.objective }}</p>
                         {% if lesson.competency_pct is not None %}
                         <div class="competency-bar" style="margin-top:0.4rem;">
@@ -291,7 +295,7 @@
                     <div class="lesson-meta">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
                         {% if lesson.status != 'completed' %}
-                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:#92400e;background:#fef3c7;padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid #fcd34d;" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
+                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:var(--warning);background:var(--warning-surface);padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid var(--warning-border);" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
                         {% endif %}
                         {# The bare arrow is gone. The whole row is already a #}
                         {# link, so it added no affordance — but rendered as a #}
@@ -313,638 +317,6 @@
     {% endif %}
     {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .grade-badge {
-        font-size: 0.7rem;
-        font-weight: 600;
-        padding: 0.15rem 0.45rem;
-        background: #e0e7ff;
-        color: #4338ca;
-        border-radius: 999px;
-        vertical-align: middle;
-        margin-left: 0.25rem;
-    }
-    .catalog-container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-    
-    /* Welcome Section */
-    .welcome-section {
-        padding: 3rem 0;
-    }
-    
-    .welcome-card {
-        text-align: center;
-        padding: 3rem 2rem;
-    }
-    
-    .welcome-icon {
-        font-size: 4rem;
-        margin-bottom: 1rem;
-    }
-    
-    .welcome-card h1 {
-        font-size: 2rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
-    }
-    
-    .welcome-card p {
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-    }
-    
-    .welcome-actions {
-        display: flex;
-        gap: 1rem;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    
-    /* Catalog Header */
-    .catalog-header {
-        margin-bottom: 1.5rem;
-    }
-
-    .catalog-header h1 {
-        font-size: 1.75rem;
-        font-weight: 800;
-        margin-bottom: 0.25rem;
-    }
-
-    /* School Switcher */
-    .school-switcher {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-top: 0.75rem;
-        padding: 0.5rem 0.75rem;
-        background: #EEF2FF;
-        border: 1px solid #C7D2FE;
-        border-radius: var(--radius-md, 8px);
-        width: fit-content;
-    }
-
-    .school-switcher label {
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #4338CA;
-        white-space: nowrap;
-    }
-
-    .school-switcher select {
-        font-size: 0.85rem;
-        font-weight: 600;
-        padding: 0.25rem 0.5rem;
-        border: 1px solid #A5B4FC;
-        border-radius: 6px;
-        background: white;
-        color: var(--text-dark);
-        cursor: pointer;
-    }
-    
-    /* Continue Learning Section */
-    .continue-section {
-        margin-bottom: 2rem;
-        padding: 1.25rem;
-        background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
-        border-radius: var(--radius-lg);
-        border: 1px solid #FED7AA;
-    }
-    
-    .active-sessions-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1rem;
-    }
-    
-    .active-session-card {
-        padding: 1rem 1.25rem;
-        text-decoration: none;
-        color: inherit;
-        display: block;
-        transition: all 0.2s ease;
-        border: 2px solid transparent;
-    }
-    
-    .active-session-card:hover {
-        border-color: var(--primary);
-        transform: translateY(-2px);
-    }
-    
-    .session-course {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: var(--primary);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.25rem;
-    }
-    
-    .session-lesson {
-        font-weight: 700;
-        font-size: 1rem;
-        margin-bottom: 0.5rem;
-        color: var(--text-dark);
-    }
-    
-    .session-meta {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.8rem;
-        color: var(--text-light);
-        margin-bottom: 0.75rem;
-    }
-    
-    .session-phase {
-        color: var(--text-dark);
-    }
-    
-    .session-cta {
-        font-size: 0.875rem;
-        font-weight: 700;
-        color: var(--primary);
-    }
-    
-    /* Subject Cards Grid */
-    .subjects-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 1rem;
-        margin-bottom: 2rem;
-    }
-    
-    .subject-card {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1.25rem;
-        text-decoration: none;
-        color: inherit;
-        border: 2px solid transparent;
-        transition: all 0.2s ease;
-    }
-    
-    .subject-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-    }
-    
-    .subject-card.active {
-        border-color: var(--primary);
-        background: #FFF5F0;
-    }
-    
-    .subject-icon {
-        font-size: 2.5rem;
-        flex-shrink: 0;
-    }
-    
-    .subject-info {
-        flex: 1;
-    }
-    
-    .subject-info h3 {
-        font-size: 1.1rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
-    
-    .subject-progress {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-    
-    .progress-bar {
-        height: 6px;
-        background: rgba(0,0,0,0.08);
-        border-radius: 3px;
-        overflow: hidden;
-    }
-    
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, var(--secondary), var(--primary));
-        border-radius: 3px;
-        transition: width 0.3s ease;
-    }
-    
-    .progress-text {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        font-weight: 600;
-    }
-    
-    /* Topics Section */
-    .topics-section {
-        margin-top: 1rem;
-    }
-    
-    .topics-header {
-        margin-bottom: 1.5rem;
-    }
-    
-    .topics-header h2 {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 0.25rem;
-    }
-    
-    /* Unit Cards */
-    .unit-card {
-        margin-bottom: 1.5rem;
-        padding: 0;
-        overflow: hidden;
-    }
-    
-    .unit-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.5rem;
-        background: var(--bg-warm);
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .unit-header:hover {
-        background: #f0ebe4;
-    }
-
-    .unit-header-left {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .unit-toggle-icon {
-        font-size: 0.7rem;
-        transition: transform 0.2s ease;
-        color: var(--text-muted);
-    }
-
-    .unit-card.collapsed .unit-toggle-icon {
-        transform: rotate(-90deg);
-    }
-
-    .unit-card.collapsed .lessons-list {
-        display: none;
-    }
-
-    .unit-card.collapsed .unit-description {
-        display: none;
-    }
-
-    .unit-description {
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        padding: 0.5rem 1.5rem;
-        margin: 0;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .unit-header h3 {
-        font-size: 1rem;
-        font-weight: 700;
-        margin: 0;
-    }
-    
-    .lesson-count {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        font-weight: 600;
-    }
-    
-    /* Lesson Items */
-    .lessons-list {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .lesson-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem 1.5rem;
-        text-decoration: none;
-        color: inherit;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        transition: background 0.2s ease;
-    }
-    
-    .lesson-item:last-child {
-        border-bottom: none;
-    }
-    
-    .lesson-item:hover {
-        background: var(--bg-warm);
-    }
-    
-    .lesson-status-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        font-size: 1rem;
-    }
-    
-    .status-completed .lesson-status-icon {
-        background: var(--success);
-        color: white;
-    }
-    
-    .status-in_progress .lesson-status-icon {
-        background: var(--accent);
-        color: var(--text-dark);
-    }
-    
-    .status-not_started .lesson-status-icon {
-        background: #E8E8E8;
-        color: var(--text-muted);
-    }
-    
-    .icon-completed { font-weight: bold; }
-    .icon-progress { font-size: 1.25rem; }
-    .icon-new { font-size: 0.875rem; }
-    
-    .lesson-info {
-        flex: 1;
-        min-width: 0;
-    }
-    
-    .lesson-info h4 {
-        font-size: 0.95rem;
-        font-weight: 700;
-        margin-bottom: 0.25rem;
-        color: var(--text-dark);
-    }
-    
-    .lesson-info p {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        margin: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .lesson-meta {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        flex-shrink: 0;
-    }
-    
-    .lesson-meta .time {
-        font-size: 0.75rem;
-        color: var(--text-light);
-        font-weight: 600;
-    }
-    
-    .lesson-meta .review-hint {
-        color: var(--primary);
-        font-weight: 600;
-        font-size: 0.75rem;
-    }
-    
-    /* Empty state */
-    .empty-section {
-        padding: 3rem 0;
-    }
-    
-    .empty-card {
-        padding: 3rem 2rem;
-    }
-    
-    .empty-icon {
-        font-size: 4rem;
-        margin-bottom: 1rem;
-    }
-    
-    .empty-card h2 {
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Locked lessons */
-    .status-locked {
-        opacity: 0.55;
-        cursor: pointer;
-    }
-    .status-locked .lesson-status-icon {
-        background: #D1D5DB;
-        color: #6B7280;
-    }
-    .status-locked .lesson-info h4 {
-        color: #9CA3AF;
-    }
-    .locked-hint {
-        color: #9CA3AF !important;
-        font-style: italic;
-    }
-    .status-locked:hover {
-        opacity: 0.7;
-        background: #F3F4F6;
-    }
-
-    /* Prereq modal */
-    .prereq-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.4);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 200;
-        padding: 1rem;
-    }
-    .prereq-modal {
-        background: #fff;
-        border-radius: 1rem;
-        max-width: 400px;
-        width: 100%;
-        padding: 2rem;
-        box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-        text-align: center;
-    }
-    .prereq-modal h3 {
-        font-size: 1.1rem;
-        margin-bottom: 0.75rem;
-    }
-    .prereq-modal ul {
-        text-align: left;
-        margin: 1rem 0 1.5rem 1.5rem;
-        color: var(--text-dark);
-    }
-    .prereq-modal li {
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-    }
-
-    /* ── Gamification Bar ── */
-    .gamification-bar {
-        display: flex !important;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.75rem 1.25rem;
-        margin-bottom: 1.5rem;
-        gap: 1rem;
-        flex-wrap: wrap;
-        background: linear-gradient(135deg, #EDE9FE 0%, #F3E8FF 100%);
-        border: 1px solid #C4B5FD;
-    }
-    .gbar-left { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-    .gbar-right { display: flex; align-items: center; gap: 0.5rem; }
-    .gbar-level {
-        font-weight: 800; font-size: 0.9rem;
-        background: linear-gradient(135deg, #7C3AED, #A855F7);
-        color: #fff; padding: 0.2rem 0.6rem; border-radius: 999px;
-    }
-    .gbar-xp-wrap { display: flex; align-items: center; gap: 0.5rem; }
-    .gbar-xp-track {
-        width: 120px; height: 8px; background: rgba(0,0,0,0.1);
-        border-radius: 4px; overflow: hidden;
-    }
-    .gbar-xp-fill {
-        height: 100%; border-radius: 4px; transition: width 0.5s ease;
-        background: linear-gradient(90deg, #7C3AED, #A855F7);
-    }
-    .gbar-xp-text { font-size: 0.78rem; font-weight: 600; color: #6D28D9; }
-    .gbar-streak { font-size: 0.85rem; font-weight: 600; }
-    .gbar-stats {
-        display: flex; align-items: center; gap: 1rem;
-        width: 100%; padding-top: 0.5rem;
-        border-top: 1px solid rgba(0,0,0,0.08);
-        margin-top: 0.25rem;
-    }
-    .gbar-stat {
-        font-size: 0.78rem; font-weight: 600; color: #6D28D9;
-    }
-    .gbar-btn {
-        font-size: 0.8rem; font-weight: 600; padding: 0.35rem 0.75rem;
-        border-radius: 999px; border: 1.5px solid #C4B5FD; background: #fff;
-        color: #6D28D9; cursor: pointer; transition: all 0.15s ease;
-    }
-    .gbar-btn:hover { background: #EDE9FE; }
-
-    /* ── Modal overlays ── */
-    .modal-overlay {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-        backdrop-filter: blur(4px); display: flex; align-items: center;
-        justify-content: center; z-index: 300; padding: 1rem;
-    }
-    .modal-box {
-        background: #fff; border-radius: 1rem; max-width: 480px; width: 100%;
-        padding: 2rem; box-shadow: 0 25px 50px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;
-    }
-    .modal-box h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.25rem; }
-
-    /* ── Personality picker ── */
-    .personality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .personality-card {
-        border: 2px solid #E5E7EB; border-radius: 0.75rem; padding: 1rem;
-        text-align: center; cursor: pointer; transition: all 0.15s ease; background: #fff;
-    }
-    .personality-card:hover { border-color: #A855F7; background: #FAF5FF; }
-    .personality-card.selected { border-color: #7C3AED; background: #EDE9FE; }
-    .personality-card .p-emoji { font-size: 2rem; margin-bottom: 0.25rem; }
-    .personality-card .p-name { font-weight: 700; font-size: 0.95rem; }
-    .personality-card .p-desc { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem; }
-    .personality-card .p-check { font-size: 0.8rem; color: #7C3AED; font-weight: 600; margin-top: 0.4rem; }
-
-    /* ── Leaderboard ── */
-    .lb-row {
-        display: flex; align-items: center; gap: 0.75rem;
-        padding: 0.6rem 0.75rem; border-radius: 0.5rem;
-        font-size: 0.9rem; border-bottom: 1px solid #F3F4F6;
-    }
-    .lb-row.is-you { background: #EDE9FE; font-weight: 700; }
-    .lb-rank { width: 2rem; text-align: center; font-weight: 700; color: var(--text-muted); }
-    .lb-name { flex: 1; }
-    .lb-xp { font-weight: 700; color: #6D28D9; }
-
-    /* ── Trophy Case ── */
-    .trophy-case {
-        margin-bottom: 1.5rem; padding: 1.25rem;
-        background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-        border: 1px solid #FCD34D;
-    }
-    .trophy-header {
-        display: flex; justify-content: space-between; align-items: center;
-        margin-bottom: 1rem;
-    }
-    .trophy-header h3 { font-size: 1rem; font-weight: 700; margin: 0; }
-    .trophy-close {
-        background: none; border: none; font-size: 1.25rem; cursor: pointer;
-        color: var(--text-muted); line-height: 1;
-    }
-    .trophy-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;
-    }
-    .trophy-item {
-        text-align: center; padding: 0.75rem 0.5rem; border-radius: 0.75rem;
-        background: #fff; border: 1.5px solid #E5E7EB; transition: all 0.15s ease;
-    }
-    .trophy-item.earned {
-        border-color: #F59E0B; background: #FFFBEB;
-    }
-    .trophy-item.locked { opacity: 0.55; }
-    .trophy-emoji { font-size: 1.75rem; margin-bottom: 0.25rem; }
-    .trophy-name { font-size: 0.78rem; font-weight: 700; margin-bottom: 0.15rem; }
-    .trophy-desc { font-size: 0.68rem; color: var(--text-muted); }
-    .trophy-progress {
-        font-size: 0.68rem; font-weight: 600; color: #D97706; margin-top: 0.25rem;
-    }
-
-    /* ── Leaderboard extras ── */
-    .lb-level {
-        font-size: 0.7rem; font-weight: 700; background: #EDE9FE;
-        color: #7C3AED; padding: 0.1rem 0.4rem; border-radius: 999px;
-    }
-    .lb-streak {
-        font-size: 0.75rem; color: #EA580C; font-weight: 600; white-space: nowrap;
-    }
-
-    /* ── Achievement toasts ── */
-    .achievement-toast {
-        background: #fff; border-radius: 0.75rem; padding: 1rem 1.25rem;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.15); display: flex; gap: 0.75rem;
-        align-items: center; min-width: 280px; max-width: 360px;
-        animation: slideUp 0.3s ease;
-    }
-    .achievement-toast .at-emoji { font-size: 1.75rem; }
-    .achievement-toast .at-body { flex: 1; }
-    .achievement-toast .at-label { font-size: 0.7rem; font-weight: 700; color: #A855F7; text-transform: uppercase; letter-spacing: 0.5px; }
-    .achievement-toast .at-name { font-weight: 700; font-size: 0.95rem; }
-    .achievement-toast .at-desc { font-size: 0.78rem; color: var(--text-muted); }
-    @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-
-    /* Mobile adjustments */
-    @media (max-width: 600px) {
-        .lesson-info p {
-            display: none;
-        }
-
-        .lesson-meta .time {
-            display: none;
-        }
-
-        .gamification-bar { flex-direction: column; align-items: stretch; }
-        .gbar-right { justify-content: center; flex-wrap: wrap; }
-        .personality-grid { grid-template-columns: 1fr; }
-        .trophy-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
-    }
-</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -969,7 +341,7 @@ function showPrereqModal(el) {
     overlay.innerHTML = `
         <div class="prereq-modal">
             <h3>🔒 ${gettext('Lesson Locked')}</h3>
-            <p style="color:#6B7280;">${gettext('Complete these lessons first:')}</p>
+            <p style="color:var(--text-muted);">${gettext('Complete these lessons first:')}</p>
             <ul>${list}</ul>
             <button class="btn btn-primary" onclick="this.closest('.prereq-overlay').remove()">${gettext('Got it')}</button>
         </div>
@@ -1147,7 +519,7 @@ async function openLeaderboardModal() {
             </div>`
         ).join('');
     } catch(e) {
-        body.innerHTML = '<p style="text-align:center;color:#ef4444;">' + gettext('Failed to load leaderboard.') + '</p>';
+        body.innerHTML = '<p style="text-align:center;color:var(--danger-solid);">' + gettext('Failed to load leaderboard.') + '</p>';
     }
 }
 

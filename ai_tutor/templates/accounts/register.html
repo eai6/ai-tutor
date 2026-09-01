@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load dashboard_ui %}
 
 {% block title %}Create Account - AI Tutor{% endblock %}
 
@@ -6,7 +7,7 @@
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
-            <div class="auth-icon">🎓</div>
+            <div class="auth-icon">{% icon "courses" %}</div>
             <h1>Join AI Tutor</h1>
             <p class="text-muted">Start your learning journey in Seychelles</p>
         </div>
@@ -90,9 +91,10 @@
                         type="password" 
                         id="password" 
                         name="password" 
-                        placeholder="Min 6 characters"
+                        placeholder="At least 8 characters"
                         required
-                    >
+                    data-pw-strength
+                    data-pw-similar-to="#first_name,#username,#email">
                 </div>
                 
                 <div class="form-group">
@@ -103,7 +105,7 @@
                         name="password_confirm" 
                         placeholder="Repeat password"
                         required
-                    >
+                    data-pw-confirms="#password">
                 </div>
             </div>
             
@@ -117,135 +119,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .auth-container {
-        max-width: 500px;
-        margin: 2rem auto;
-    }
-    
-    .auth-card {
-        padding: 2.5rem;
-    }
-    
-    .auth-header {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    
-    .auth-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-    }
-    
-    .auth-header h1 {
-        font-size: 1.75rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
-    }
-    
-    .auth-form {
-        display: flex;
-        flex-direction: column;
-        gap: 1.25rem;
-    }
-    
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
-    .form-group label {
-        font-weight: 700;
-        font-size: 0.875rem;
-        color: var(--text-dark);
-    }
-    
-    .form-group input,
-    .form-group select {
-        padding: 0.875rem 1rem;
-        border: 2px solid #E8E8E8;
-        border-radius: var(--radius-md);
-        font-family: inherit;
-        font-size: 1rem;
-        transition: all 0.2s ease;
-        background: white;
-    }
-    
-    .form-group input:focus,
-    .form-group select:focus {
-        outline: none;
-        border-color: var(--primary);
-        background: white;
-    }
-    
-    .form-group input::placeholder {
-        color: var(--text-light);
-    }
-    
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-    
-    @media (max-width: 500px) {
-        .form-row {
-            grid-template-columns: 1fr;
-        }
-    }
-    
-    .btn-full {
-        width: 100%;
-        padding: 1rem;
-        font-size: 1.1rem;
-        margin-top: 0.5rem;
-    }
-    
-    .auth-footer {
-        text-align: center;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid rgba(0,0,0,0.08);
-    }
-    
-    .auth-footer a {
-        color: var(--primary);
-        font-weight: 700;
-        text-decoration: none;
-    }
-    
-    .auth-footer a:hover {
-        text-decoration: underline;
-    }
-    
-    .alert {
-        padding: 1rem;
-        border-radius: var(--radius-sm);
-        margin-bottom: 1.5rem;
-        font-weight: 600;
-    }
-    
-    .alert-error {
-        background: #FEF5F5;
-        color: var(--error);
-        border-left: 3px solid var(--error);
-    }
-    
-    .alert-error ul {
-        margin: 0;
-        padding-left: 1.25rem;
-    }
-    
-    .alert-error li {
-        margin-bottom: 0.25rem;
-    }
-    
-    .alert-error li:last-child {
-        margin-bottom: 0;
-    }
-</style>
 {% endblock %}

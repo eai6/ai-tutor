@@ -1,0 +1,15 @@
+{% load dashboard_ui %}
+{% comment %}
+One triage row. The whole row is the link — a teacher scanning this should
+never have to aim at a small "view" button. Severity is carried three ways
+(left edge, icon, wording) so it survives greyscale and colour-blindness.
+{% endcomment %}
+<a href="{{ item.url }}" class="attention-item attention-item--{{ item.tone }}">
+    <span class="attention-item__icon">{% icon item.icon %}</span>
+    <span class="attention-item__body">
+        <span class="attention-item__figure">{{ item.figure }}</span>
+        <span class="attention-item__label">{{ item.label }}</span>
+        <span class="attention-item__detail">{{ item.detail }}</span>
+    </span>
+    <span class="attention-item__go">{% icon "arrow-right" %}</span>
+</a>

@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load static i18n %}
 {# Served at /self-hosting/. The commands stay on the fast path; everything #}
 {# that is a decision or a symptom folds into a <details> beside the step it #}
 {# belongs to — see apps/desktop/public_views.py for why. #}
@@ -9,24 +9,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>AI Tutor — Run it yourself</title>
+<link rel="preload" as="font" type="font/woff2" href="{% static 'vendor/fonts/SpaceGrotesk-latin.woff2' %}" crossorigin>
+<link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
 <style>
-  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8;
-          --card:#fff; --bg:#f9fafb; --codebg:#f3f4f6; --warnbg:#fffbeb;
-          --warnline:#fcd34d; --warn:#92400e; --foldbg:#fff; }
+  {% comment %}
+  These names are the page's own vocabulary; every rule below uses them. Only
+  this block changed: it now resolves to the design tokens, so the page tracks
+  the palette without a thousand rules being rewritten.
+
+  The dark-mode block that used to sit at the bottom of this stylesheet is
+  gone. Nothing else in the product has a dark theme, so honouring
+  prefers-color-scheme here made these two pages the only ones that flipped —
+  which is exactly the inconsistency it looked like.
+  {% endcomment %}
+  :root { --ink:var(--text); --muted:var(--text-muted); --line:var(--border);
+          --brand:var(--coral-ink);
+          --card:var(--surface); --bg:var(--canvas); --codebg:var(--surface-sunken);
+          --warnbg:var(--warning-surface); --warnline:var(--warning-border);
+          --warn:var(--warning); --foldbg:var(--surface); }
   * { box-sizing:border-box; }
   body { margin:0; padding:2.5rem 1.25rem 5rem; color:var(--ink); background:var(--bg);
-         font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  main { max-width:44rem; margin:0 auto; }
-  h1 { font-size:1.85rem; margin:0 0 .3rem; letter-spacing:-.01em; }
+         font: 16px/1.6 var(--font-body); }
+  {% comment %}
+  56rem rather than 44. This page is mostly shell commands, and at the old
+  width a docker run line wrapped three times — which on a page of commands
+  is worse than a long line, because you cannot tell a wrapped line from a
+  real one. Running prose is capped separately below so widening the column
+  for the code does not push paragraphs out to 120 characters.
+  {% endcomment %}
+  main { max-width:56rem; margin:0 auto; }
+
+  h1 { font-size:1.85rem; margin:0 0 .3rem; letter-spacing: var(--tracking-tight); }
   .sub { color:var(--muted); margin:0 0 2rem; }
   h2 { font-size:1.15rem; margin:2.5rem 0 .35rem; }
-  h2 .tag { font-size:.75rem; font-weight:600; color:#fff; background:var(--brand);
+  h2 .tag { font-size:.75rem; font-weight:600; color:var(--text-on-accent); background:var(--brand);
             border-radius:99px; padding:.15rem .55rem; vertical-align:middle; margin-left:.4rem; }
   /* Steps. Numbered so someone reading over a colleague's shoulder can say
      "you are on 3" — the folds make position otherwise hard to see. */
   h3 { font-size:.95rem; margin:1.9rem 0 .5rem; }
   h3 .n { display:inline-block; min-width:1.4rem; height:1.4rem; line-height:1.4rem;
-          text-align:center; border-radius:99px; background:var(--brand); color:#fff;
+          text-align:center; border-radius:99px; background:var(--brand); color:var(--text-on-accent);
           font-size:.75rem; margin-right:.45rem; }
   .need { color:var(--muted); font-size:.87rem; margin:0 0 1rem; }
   /* Wrap rather than scroll. These are commands someone is reading off the
@@ -35,13 +60,13 @@
      Wrapping adds no characters, so copy-paste is unaffected. */
   pre { background:var(--codebg); border:1px solid var(--line); border-radius:10px;
         padding:1rem 1.1rem; font-size:.82rem; line-height:1.55; margin:0 0 .75rem;
-        white-space:pre-wrap; overflow-wrap:anywhere; }
+        white-space:pre-wrap; overflow-wrap:break-word; overflow-x:auto; }
   code { font-size:.85em; }
   pre code { font-size:1em; }
   p code, li code, td code, summary code { background:var(--codebg); padding:.1rem .35rem;
         border-radius:4px; }
   a { color:var(--brand); }
-  a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
+  a.btn { display:inline-block; background:var(--brand); color:var(--text-on-accent); text-decoration:none;
           padding:.55rem .95rem; border-radius:8px; font-weight:600; font-size:.88rem; }
   a.btn.ghost { background:transparent; color:var(--brand); border:1px solid var(--brand); }
   .fill { background:var(--warnbg); border:1px solid var(--warnline); border-radius:10px;
@@ -75,13 +100,42 @@
   footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line);
            padding-top:1rem; margin-top:2rem; }
   footer a { color:var(--muted); }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --card:#1f2937; --bg:#111827;
-            --codebg:#0b1220; --brand:#60a5fa; --warnbg:#3b2f0b; --warnline:#a16207;
-            --warn:#fcd34d; --foldbg:#1f2937; }
-    .fill code { background:rgba(255,255,255,.08); }
-    .fill pre { background:rgba(0,0,0,.28); border-color:rgba(255,255,255,.14); }
+
+  /* ── Copy button on code blocks ──────────────────────────────────────── */
+  .copy-wrap { position:relative; }
+
+  .copy-btn {
+    position:absolute; top:.5rem; right:.5rem;
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.3rem .6rem;
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius-sm);
+    color:var(--muted); font:inherit; font-size:.75rem; font-weight:600;
+    cursor:pointer;
+    /* Hidden until the block is hovered or the button itself is focused, so a
+       page of twenty commands is not a page of twenty buttons. Always visible
+       on touch, where there is no hover to reveal it. */
+    opacity:0; transition:opacity .12s ease, color .12s ease, border-color .12s ease;
   }
+
+  .copy-wrap:hover .copy-btn,
+  .copy-btn:focus-visible { opacity:1; }
+
+  @media (hover: none) { .copy-btn { opacity:1; } }
+
+  .copy-btn:hover { color:var(--ink); border-color:var(--muted); }
+  .copy-btn.is-done { color:var(--success); border-color:var(--success-border); opacity:1; }
+  .copy-btn.is-failed { color:var(--danger); border-color:var(--danger-border); opacity:1; }
+
+  /* The status text is for screen readers; the button's own label already
+     shows the result on screen. */
+  .copy-status {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  /* Room for the button so it never sits on the first line of a command. */
+  .copy-wrap pre { padding-right:5.5rem; }
 </style>
 </head>
 <body>
@@ -222,16 +276,16 @@ tar -xf deploy.tar</code></pre>
     <p class="need">
       {% blocktrans trimmed %}
         That first <code>docker run</code> already pulls the full image
-        (~7 GB), so the <code>docker compose pull</code> in step 4 is usually
+        (~7 GB), so the <code>docker compose pull</code> in step 3 is usually
         instant.
       {% endblocktrans %}
     </p>
     <p class="need">
       {% blocktrans trimmed %}
         Read <code>docker-compose.yml</code> and <code>Caddyfile</code> before
-        running them. Both are commented and short. <code>Caddyfile</code> in
-        particular contains a ready-made plain-HTTP block you will need if you
-        are not on the public-server shape.
+        running them. Both are commented and short. Deployments that are not
+        on a public domain need a different Caddy block — see
+        <code>docs/self-hosting.md</code> in the repository.
       {% endblocktrans %}
     </p>
     <p class="need">
@@ -323,65 +377,7 @@ HTTPS_EDGE=false</code></pre>
 <pre><code>grep -n 'HTTPS_EDGE\|ALLOWED_HOSTS\|CSRF_TRUSTED\|SITE_DOMAIN' .env</code></pre>
   </details>
 
-  <h3><span class="n">3</span>{% trans "Configure Caddy — only if you are not on a public domain" %}</h3>
-  <p class="need">
-    {% blocktrans trimmed %}
-      On the public-server shape there is nothing to do here. Skip to step 4.
-    {% endblocktrans %}
-  </p>
-
-  <details>
-    <summary>{% trans "Switching Caddy to plain HTTP (LAN-only or laptop)" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Keep a copy of the original first: <code>cp Caddyfile Caddyfile.orig</code>.
-        Then delete the global <code>email</code> block and replace the whole
-        <code>{$SITE_DOMAIN}</code> block with the plain-HTTP block already
-        commented at the bottom of the file:
-      {% endblocktrans %}
-    </p>
-<pre><code>:80 {
-    encode gzip
-
-    reverse_proxy app:8000 {
-        header_up X-Real-IP {remote_host}
-        transport http {
-            read_timeout 300s
-            write_timeout 300s
-        }
-    }
-
-    log {
-        output stdout
-        format console
-    }
-}</code></pre>
-    <div class="fill">
-      {% blocktrans trimmed %}
-        Both changes are needed — this one <strong>and</strong>
-        <code>HTTPS_EDGE=false</code>. Doing only one gives you a silent 403;
-        see troubleshooting.
-      {% endblocktrans %}
-    </div>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <strong>Laptop only:</strong> in <code>docker-compose.yml</code>, bind
-        Caddy to loopback and drop 443, which nothing listens on now.
-      {% endblocktrans %}
-    </p>
-<pre><code>    ports:
-      - "127.0.0.1:80:80"</code></pre>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <code>"80:80"</code> binds every interface including wifi. Docker
-        writes its own iptables rules ahead of ufw, so a firewall rule will
-        not substitute for this — the bind address is the only control that
-        works.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <h3><span class="n">4</span>{% trans "Start it" %}</h3>
+  <h3><span class="n">3</span>{% trans "Start it" %}</h3>
 
 <pre><code>docker compose pull        # ~7 GB, once
 docker compose up -d
@@ -397,37 +393,10 @@ docker compose logs -f app</code></pre>
     {% endblocktrans %}
   </div>
 
-  <details>
-    <summary>{% trans "What “ready” looks like in the log" %}</summary>
-    <p class="need">{% trans "A line like this one:" %}</p>
-<pre><code>Indexed. Collection size: 0 → 151.</code></pre>
-    <p class="need">{% trans "Or check the health state, which is the same signal:" %}</p>
-<pre><code>docker compose ps    # wait for app to show (healthy)</code></pre>
-    <p class="need">
-      {% blocktrans trimmed %}
-        A <code>BertModel LOAD REPORT</code> line flagging
-        <code>embeddings.position_ids</code> as <code>UNEXPECTED</code> during
-        this is normal and can be ignored.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <h3><span class="n">5</span>{% trans "Create the admin account" %}</h3>
+  <h3><span class="n">4</span>{% trans "Create the admin account" %}</h3>
   <p class="need">{% trans "Only after the app reports healthy." %}</p>
 
 <pre><code>docker compose exec app python manage.py createsuperuser</code></pre>
-
-  <details>
-    <summary>{% trans "Type a username — do not accept the default" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Leaving it blank accepts the container's OS user, which gives you an
-        account called <code>root</code> — easy to do by accident and
-        confusing later. To fix it afterwards:
-      {% endblocktrans %}
-    </p>
-<pre><code>docker compose exec app python manage.py changepassword &lt;name&gt;</code></pre>
-  </details>
 
   <p class="need">
     {% blocktrans trimmed %}
@@ -451,7 +420,6 @@ docker compose logs -f app</code></pre>
     {% endblocktrans %}
   </p>
 
-{% if server_wheel %}
   <div class="fill">
     <p>
       <strong>{% trans "Decide the service account first." %}</strong>
@@ -501,8 +469,13 @@ sudo python3 -m venv /opt/ai-tutor/venv
 
   <h3><span class="n">2</span>{% trans "Install the wheel" %}</h3>
 
+{% comment %}
+  The published package when no wheel has been built for this deployment —
+  docs/self-hosting.md uses the same name. Only this line depends on the
+  artefact; every other step is identical either way.
+{% endcomment %}
 <pre><code>sudo /opt/ai-tutor/venv/bin/pip install --upgrade pip
-sudo /opt/ai-tutor/venv/bin/pip install {{ server_wheel_url }}</code></pre>
+sudo /opt/ai-tutor/venv/bin/pip install {% if server_wheel %}{{ server_wheel_url }}{% else %}ai-tutor{% endif %}</code></pre>
 
   <p class="need">
     {% blocktrans trimmed %}
@@ -649,16 +622,6 @@ run createsuperuser</code></pre>
     </p>
   </div>
 
-  <details>
-    <summary>{% trans "Type a username at createsuperuser" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Leaving it blank accepts the OS user and silently gives you an account
-        called <code>root</code> — the same trap as the Docker path.
-      {% endblocktrans %}
-    </p>
-  </details>
-
   <h3><span class="n">7</span>{% trans "Install the service" %}</h3>
 
 <pre><code>sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
@@ -731,14 +694,11 @@ curl -sI http://127.0.0.1:8000/admin/     # want 302 to /admin/login/</code></pr
     {% endblocktrans %}
   </p>
 
+{% if server_wheel %}
   <p class="need">
     <a href="{% url 'downloads:server' 'wheel' %}"><code>{{ server_wheel }}</code></a>
     &middot;
     <a href="{% url 'downloads:server' 'sdist' %}">{% trans "source archive" %}</a>
-  </p>
-{% else %}
-  <p class="need">
-    {% trans "No wheel has been published yet. docs/self-hosting.md in the repository has the full procedure in the meantime." %}
   </p>
 {% endif %}
 
@@ -766,181 +726,6 @@ curl -sI http://127.0.0.1:8000/admin/     # want 302 to /admin/login/</code></pr
       not wired to the active config.
     {% endblocktrans %}
   </p>
-
-  <h2>{% trans "Troubleshooting" %}</h2>
-
-  <details>
-    <summary>{% trans "Login form reloads, no error message" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        The commonest failure, and a silent one. Django marks session and CSRF
-        cookies <code>Secure</code>; a browser will not send those over plain
-        HTTP, so the login simply bounces.
-      {% endblocktrans %}
-    </p>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Finish the HTTPS setup, <strong>or</strong> set
-        <code>HTTPS_EDGE=false</code> <strong>and</strong> switch the Caddyfile
-        to the <code>:80</code> block. Both are required. Then run
-        <code>docker compose up -d</code> — not <code>restart</code>, see
-        below.
-      {% endblocktrans %}
-    </p>
-    <p class="need">{% trans "If it persists, check what Django actually resolved:" %}</p>
-<pre><code>docker compose exec app python -c "
-import django; django.setup()
-from django.conf import settings
-print(settings.ALLOWED_HOSTS, settings.CSRF_TRUSTED_ORIGINS)
-"</code></pre>
-  </details>
-
-  <details>
-    <summary><code>.env</code> {% trans "edits appear to do nothing" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <code>docker compose restart</code> does <strong>not</strong> re-read
-        <code>.env</code>. Neither do port or volume changes take effect.
-        Always use <code>docker compose up -d</code>, which recreates the
-        affected containers.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary><code>relation "auth_user" does not exist</code></summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        You ran <code>createsuperuser</code> before migrations finished — most
-        likely by pasting it together with <code>up -d</code>. Nothing is
-        broken. Wait for the app to report healthy and run it again.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary><code>ERR_SSL_PROTOCOL_ERROR</code> {% trans "/ “sent an invalid response”" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Caddy is redirecting to HTTPS but has no certificate to serve for the
-        hostname you asked for. Either the certificate was never issued (see
-        the next entry), or you are browsing to <code>localhost</code> while
-        the only site block is for <code>{$SITE_DOMAIN}</code> — no site
-        matches, so the handshake is aborted before any HTTP happens. Switch to
-        the <code>:80</code> block.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary><code>invalidContact</code> — {% trans "domain does not end with a valid public suffix" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <code>ACME_EMAIL</code> is still the placeholder from
-        <code>env.example</code>. <code>.xx</code> is not a real TLD, so Let's
-        Encrypt refuses the account and Caddy falls back to ZeroSSL, which
-        refuses too. Caddy then retries with backoff <strong>for 30
-        days</strong>.
-      {% endblocktrans %}
-    </p>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Set a real address, or remove the ACME block entirely if you are not
-        using a public domain. The same applies to <code>SITE_DOMAIN</code>:
-        issuance also needs the domain to already resolve to this server, with
-        ports 80 and 443 reachable from the internet. A laptop behind NAT
-        cannot satisfy that.
-      {% endblocktrans %}
-    </p>
-    <p class="need">{% trans "To clear the failed account state afterwards:" %}</p>
-<pre><code>docker compose down &amp;&amp; docker volume rm ai-tutor_caddy_data</code></pre>
-  </details>
-
-  <details>
-    <summary>{% trans "Browser still redirects to HTTPS after fixing the Caddyfile" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        The old redirect was a <strong>308 Permanent</strong>, and browsers
-        cache those aggressively — you will be sent to <code>https://</code>
-        without Caddy ever being asked. Use a private window, or clear site
-        data for that host.
-      {% endblocktrans %}
-    </p>
-    <p class="need">{% trans "Confirm from the shell, which does not cache:" %}</p>
-<pre><code>curl -sI http://localhost/admin/    # want 302 to /admin/login/, not 308</code></pre>
-  </details>
-
-  <details>
-    <summary>{% trans "Docker on Kali: apt has no repository for it" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Docker's apt repository has no <code>kali-rolling</code> suite. Use
-        Kali's own package, then install the Compose plugin binary directly
-        rather than falling back to the v1 <code>docker-compose</code> script:
-      {% endblocktrans %}
-    </p>
-<pre><code>sudo apt install docker.io
-mkdir -p ~/.docker/cli-plugins
-curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
-  -o ~/.docker/cli-plugins/docker-compose
-chmod +x ~/.docker/cli-plugins/docker-compose</code></pre>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Adding yourself to the <code>docker</code> group is effectively
-        passwordless root — anyone who can reach the Docker socket can mount
-        <code>/</code> into a container. On a workstation, consider
-        <code>sudo docker</code> instead.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary>{% trans "pip path: the service crash-loops with PermissionError on ai-tutor.env" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <code>ai-tutor init</code> runs as root and writes the file
-        <code>0600 root:root</code>. <code>ai-tutor systemd</code> generates a
-        unit that runs as an unprivileged user. Nothing reconciles them.
-      {% endblocktrans %}
-    </p>
-    <p class="need">
-      {% blocktrans trimmed %}
-        See pip step 5 — <code>chown root:&lt;user&gt;</code> and
-        <code>chmod 640</code> the env file, <code>chown -R</code> the data
-        directory, then <code>systemctl reset-failed</code> before restarting.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary>{% trans "pip path: every page returns 500, “Missing staticfiles manifest entry”" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        <code>collectstatic</code> was never run. Django's manifest storage
-        raises rather than degrading to unstyled output, so even the login form
-        fails. See pip step 6.
-      {% endblocktrans %}
-    </p>
-    <p class="need">
-      {% blocktrans trimmed %}
-        Note that <code>curl -I /admin/</code> still returns a healthy
-        <code>302</code>, because a redirect renders no template — this failure
-        is only visible in a browser.
-      {% endblocktrans %}
-    </p>
-  </details>
-
-  <details>
-    <summary>{% trans "pip path: it started, but is it using the right database?" %}</summary>
-    <p class="need">
-      {% blocktrans trimmed %}
-        If <code>DATABASE_URL</code> is unset, Django falls back to SQLite and
-        everything appears to work — with no pgvector behind retrieval. Run
-        <code>ls -la /var/lib/ai-tutor/</code>: a <code>db.sqlite3</code> there
-        means the fallback happened.
-      {% endblocktrans %}
-    </p>
-  </details>
 
   <div class="more">
     <h2 style="margin-top:0">{% trans "Keep it running" %}</h2>
@@ -1012,5 +797,6 @@ sudo systemctl restart ai-tutor</code></pre>
   </footer>
 
 </main>
+<script src="{% static 'js/copy-code.js' %}" defer></script>
 </body>
 </html>

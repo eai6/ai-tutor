@@ -2,13 +2,14 @@
 {% load i18n %}
 
 {% block title %}{% trans "Content Edit Events" %} · AI Tutor{% endblock %}
+{% block page_title %}{% trans "Edit events" %}{% endblock %}
 
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto; padding: 1rem 1.5rem;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         <h1 style="margin: 0;">{% trans "Content Edit Events" %} <span style="font-weight: normal; color: var(--gray-500); font-size: 1rem;">({{ total }})</span></h1>
         <div style="display: flex; gap: 0.5rem;">
-            <a class="btn btn-sm" href="{% url 'dashboard:content_edit_dashboard' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" style="background: var(--primary, #7c3aed); color: white; border: none;">📊 {% trans "Dashboard" %}</a>
+            <a class="btn btn-sm" href="{% url 'dashboard:content_edit_dashboard' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" style="background: var(--primary, var(--accent)); color: white; border: none;">📊 {% trans "Dashboard" %}</a>
             <a class="btn btn-sm" href="export.csv{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ CSV</a>
             <a class="btn btn-sm" href="export.jsonl{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ JSONL</a>
         </div>
@@ -46,7 +47,7 @@
         <label style="font-size: 0.8125rem;">{% trans "Lesson ID:" %}
             <input type="number" name="lesson_id" value="{{ filters.lesson_id }}" style="width: 5rem; padding: 0.25rem;">
         </label>
-        <button type="submit" class="btn btn-sm" style="background: var(--primary, #7c3aed); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
+        <button type="submit" class="btn btn-sm" style="background: var(--primary, var(--accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
         {% if filters.content_type or filters.source or filters.tag or filters.lesson_id %}
         <a href="{% url 'dashboard:content_edit_events_list' %}" style="font-size: 0.8125rem;">{% trans "clear" %}</a>
         {% endif %}
@@ -55,7 +56,7 @@
     <div style="margin-bottom: 1rem; font-size: 0.8125rem; color: var(--gray-600);">
         <strong>{% trans "Tag frequency:" %}</strong>
         {% for t,n in tag_counts %}
-            <a href="?tag={{ t }}" style="display: inline-block; margin-right: 0.5rem; padding: 0.125rem 0.5rem; background: #e0e7ff; color: #1e40af; border-radius: 9999px; text-decoration: none;">{{ t }} ({{ n }})</a>
+            <a href="?tag={{ t }}" style="display: inline-block; margin-right: 0.5rem; padding: 0.125rem 0.5rem; background: var(--info-surface); color: var(--info); border-radius: 9999px; text-decoration: none;">{{ t }} ({{ n }})</a>
         {% empty %}
             <em>{% trans "(no events tagged yet)" %}</em>
         {% endfor %}
@@ -82,7 +83,7 @@
                 <td style="padding: 0.5rem; color: var(--gray-600);">{{ evt.get_source_display }}</td>
                 <td style="padding: 0.5rem;">
                     {% for tag in evt.error_tags %}
-                    <span style="display: inline-block; padding: 0.125rem 0.375rem; background: #fef3c7; color: #92400e; border-radius: 0.25rem; font-size: 0.75rem; margin-right: 0.25rem;">{{ tag }}</span>
+                    <span style="display: inline-block; padding: 0.125rem 0.375rem; background: var(--warning-surface); color: var(--warning); border-radius: 0.25rem; font-size: 0.75rem; margin-right: 0.25rem;">{{ tag }}</span>
                     {% empty %}
                     <span style="color: var(--gray-400);">—</span>
                     {% endfor %}

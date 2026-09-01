@@ -1,0 +1,4 @@
+{% load dashboard_ui %}
+<span class="badge {% tone_class 'badge' tone %}"{% if title %} title="{{ title }}"{% endif %}>
+    {% if icon_name %}{% icon icon_name size="sm" %}{% endif %}{{ label }}
+</span>

@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load static i18n %}
 {# Served at /download/ from the cloud. The buttons 302 to S3 — see #}
 {# apps/desktop/public_views.py for why we redirect rather than proxy. #}
 {# ops/download_page.html is the standalone copy hosted IN the bucket; #}
@@ -10,39 +10,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>AI Tutor — Desktop app</title>
+<link rel="preload" as="font" type="font/woff2" href="{% static 'vendor/fonts/SpaceGrotesk-latin.woff2' %}" crossorigin>
+<link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
 <style>
-  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --brand:#1d4ed8; --warn:#92400e; --warnbg:#fffbeb; --warnline:#fcd34d; }
+  {# See downloads/self_hosting.html for why the dark block is gone. #}
+  :root { --ink:var(--text); --muted:var(--text-muted); --line:var(--border);
+          --brand:var(--coral-ink); --warn:var(--warning);
+          --card:var(--surface); --codebg:var(--surface-sunken);
+          --warnbg:var(--warning-surface); --warnline:var(--warning-border); }
   * { box-sizing: border-box; }
-  body { margin:0; padding:2.5rem 1.25rem 4rem; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:#f9fafb; }
-  main { max-width: 46rem; margin: 0 auto; }
+  body { margin:0; padding:2.5rem 1.25rem 4rem; font: 16px/1.6 var(--font-body); color:var(--ink); background:var(--canvas); }
+  {# Wider so the two OS cards and the warning steps get room; #}
+  main { max-width: 56rem; margin: 0 auto; }
   h1 { font-size:1.75rem; margin:0 0 .25rem; }
   .sub { color:var(--muted); margin:0 0 2rem; }
   .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:1rem; margin-bottom:2.5rem; }
-  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:1.25rem; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:1.25rem; }
   .card h2 { font-size:1rem; margin:0 0 .15rem; }
   .card p { color:var(--muted); font-size:.85rem; margin:0 0 1rem; }
-  a.btn { display:inline-block; background:var(--brand); color:#fff; text-decoration:none; padding:.6rem 1rem; border-radius:8px; font-weight:600; font-size:.9rem; }
+  a.btn { display:inline-block; background:var(--brand); color:var(--text-on-accent); text-decoration:none; padding:.6rem 1rem; border-radius:8px; font-weight:600; font-size:.9rem; }
   a.btn:hover { filter:brightness(1.08); }
   .note { background:var(--warnbg); border:1px solid var(--warnline); border-radius:12px; padding:1.25rem; margin-bottom:2rem; }
   .note h2 { font-size:1rem; margin:0 0 .5rem; color:var(--warn); }
   .note ol { margin:.5rem 0 0; padding-left:1.25rem; }
   .note li { margin-bottom:.4rem; }
-  code { background:#f3f4f6; padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
+  code { background:var(--surface-sunken); padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
   h3 { font-size:.95rem; margin:1.25rem 0 .35rem; }
   /* The install command contains a long bucket URL. Wrapping rather than
      scrolling matters here: someone is copying it by eye onto a server. */
-  pre.cmd { background:#f3f4f6; border:1px solid var(--line); border-radius:8px;
+  pre.cmd { background:var(--surface-sunken); border:1px solid var(--line); border-radius:8px;
             padding:1rem; font-size:.8rem; margin:0 0 .5rem;
             white-space:pre-wrap; overflow-wrap:anywhere; }
   pre.cmd code { background:none; padding:0; }
   footer { color:var(--muted); font-size:.8rem; border-top:1px solid var(--line); padding-top:1rem; margin-top:2.5rem; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink:#f3f4f6; --muted:#9ca3af; --line:#374151; --warnbg:#3b2f0b; --warnline:#a16207; --warn:#fcd34d; }
-    body { background:#111827; }
-    .card { background:#1f2937; }
-    code { background:#374151; }
-    pre.cmd { background:#0b1220; }
+
+  pre { background:var(--codebg); border:1px solid var(--line); border-radius:10px;
+        padding:1rem 1.1rem; font-size:.82rem; line-height:1.55; margin:.5rem 0 0;
+        white-space:pre-wrap; overflow-wrap:break-word; overflow-x:auto; }
+  pre code { font-size:1em; background:none; padding:0; }
+  /* A code block inside the warning keeps the warning's ground rather than the
+     page's, so the box still reads as one thing. */
+  .note pre { background:rgba(0,0,0,.05); border-color:rgba(0,0,0,.13); color:inherit; }
+
+  /* ── Copy button on code blocks ──────────────────────────────────────── */
+  .copy-wrap { position:relative; }
+
+  .copy-btn {
+    position:absolute; top:.5rem; right:.5rem;
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.3rem .6rem;
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius-sm);
+    color:var(--muted); font:inherit; font-size:.75rem; font-weight:600;
+    cursor:pointer;
+    /* Hidden until the block is hovered or the button itself is focused, so a
+       page of twenty commands is not a page of twenty buttons. Always visible
+       on touch, where there is no hover to reveal it. */
+    opacity:0; transition:opacity .12s ease, color .12s ease, border-color .12s ease;
   }
+
+  .copy-wrap:hover .copy-btn,
+  .copy-btn:focus-visible { opacity:1; }
+
+  @media (hover: none) { .copy-btn { opacity:1; } }
+
+  .copy-btn:hover { color:var(--ink); border-color:var(--muted); }
+  .copy-btn.is-done { color:var(--success); border-color:var(--success-border); opacity:1; }
+  .copy-btn.is-failed { color:var(--danger); border-color:var(--danger-border); opacity:1; }
+
+  /* The status text is for screen readers; the button's own label already
+     shows the result on screen. */
+  .copy-status {
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  /* Room for the button so it never sits on the first line of a command. */
+  .copy-wrap pre { padding-right:5.5rem; }
 </style>
 </head>
 <body>
@@ -77,10 +124,8 @@
       <li>In Applications, <strong>right-click</strong> AI Tutor and choose <strong>Open</strong> (do not double-click).</li>
       <li>Click <strong>Open</strong> in the dialog. You only do this once.</li>
     </ol>
-    <p style="font-size:.85rem; margin:.5rem 0 0;">
-      Still blocked? In Terminal:
-      <code>xattr -d com.apple.quarantine "/Applications/AI Tutor.app"</code>
-    </p>
+    <p style="font-size:.85rem; margin:.5rem 0 0;">Still blocked? In Terminal:</p>
+<pre><code>xattr -d com.apple.quarantine "/Applications/AI Tutor.app"</code></pre>
 
     <h3>Windows — "Windows protected your PC"</h3>
     <ol>
@@ -113,5 +158,6 @@
     Internal testing build. Please report problems rather than passing this link on.
   </footer>
 </main>
+<script src="{% static 'js/copy-code.js' %}" defer></script>
 </body>
 </html>

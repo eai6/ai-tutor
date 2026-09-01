@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 {% load static %}
 {% load i18n %}
+{% load dashboard_ui %}
 <html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
@@ -29,347 +30,170 @@
     offline on a Jetson serving students over its own WiFi hotspot, where any
     external request simply fails. Regenerate with scripts/vendor_assets.sh.
     {% endcomment %}
+    <link rel="preload" as="font" type="font/woff2" href="{% static 'vendor/fonts/SpaceGrotesk-latin.woff2' %}" crossorigin>
     <link href="{% static 'vendor/css/google-fonts.css' %}" rel="stylesheet">
-    <style>
+    <link href="{% static 'vendor/css/space-grotesk.css' %}" rel="stylesheet">
+
+    {% comment %}
+    Same foundation as the teacher dashboard — one type scale, one spacing
+    scale, one set of status roles — then a student skin over the top. See
+    css/student/brand.css for why every brand hue has three versions.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/flash.css' %}">
+    <link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
+    <link rel="stylesheet" href="{% static 'css/student/shell.css' %}">
+    <link rel="stylesheet" href="{% static 'css/student/components.css' %}">
+    {% comment %}
+    Compatibility shim for the 28 pages still written against the class names
+    the old base.html <style> block defined (.btn-primary, .container,
+    .text-muted …). Delete it, and this link, once the last page is migrated.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/student/auth.css' %}">
+    <link rel="stylesheet" href="{% static 'css/student/legacy.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/password-field.css' %}">
+
+    {% if theme_primary %}
+    <style nonce="{{ request.csp_nonce }}">
         :root {
-            --bg-warm: #FFF9F5;
-            --bg-card: #FFFFFF;
-            --primary: {{ theme_primary|default:"#FF6B35" }};
-            --primary-dark: {{ theme_primary_dark|default:"#E55A2B" }};
-            --secondary: {{ theme_secondary|default:"#4ECDC4" }};
-            --accent: {{ theme_accent|default:"#FFE66D" }};
-            --text-dark: #2D3436;
-            --text-muted: #636E72;
-            --text-light: #B2BEC3;
-            --success: #00B894;
-            --error: #FF7675;
-            --shadow-sm: 0 2px 8px rgba(45, 52, 54, 0.08);
-            --shadow-md: 0 4px 20px rgba(45, 52, 54, 0.12);
-            --shadow-lg: 0 8px 40px rgba(45, 52, 54, 0.16);
-            --radius-sm: 8px;
-            --radius-md: 16px;
-            --radius-lg: 24px;
-            --radius-full: 9999px;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-warm);
-            color: var(--text-dark);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-        
-        /* Header */
-        .header {
-            background: var(--bg-card);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            padding: 1rem 1.5rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .header-content {
-            max-width: 900px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-            color: var(--text-dark);
-        }
-        
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-        }
-        
-        .logo-text {
-            font-weight: 800;
-            font-size: 1.25rem;
-        }
-        
-        .logo-text span {
-            color: var(--primary);
-        }
-        
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .user-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 0.85rem;
-            background: var(--bg-warm);
-            border-radius: var(--radius-full);
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-dark);
-            text-decoration: none;
-            transition: background 0.15s ease;
-        }
-        .user-badge-link:hover, .user-badge-link:focus-visible {
-            background: #F0E6E0;
-            outline: none;
-        }
-        
-        .user-avatar {
-            width: 28px;
-            height: 28px;
-            background: var(--secondary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        
-        /* Main container */
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
-        }
-        
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-sm);
-            padding: 1.5rem;
-        }
-        
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.875rem 1.75rem;
-            font-family: inherit;
-            font-size: 1rem;
-            font-weight: 700;
-            border: none;
-            border-radius: var(--radius-full);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 4px 14px rgba(255, 107, 53, 0.4);
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
-        }
-        
-        .btn-secondary {
-            background: var(--bg-warm);
-            color: var(--text-dark);
-        }
-        
-        .btn-secondary:hover {
-            background: #F0E6E0;
-        }
-        
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        /* Utilities */
-        .text-muted { color: var(--text-muted); }
-        .text-center { text-align: center; }
-        .mt-1 { margin-top: 0.5rem; }
-        .mt-2 { margin-top: 1rem; }
-        .mt-3 { margin-top: 1.5rem; }
-        .mb-1 { margin-bottom: 0.5rem; }
-        .mb-2 { margin-bottom: 1rem; }
-        
-        /* Animations */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        
-        .animate-in {
-            animation: fadeInUp 0.4s ease-out forwards;
-        }
-
-        /* Offline banner — slides in from the top when the network drops. */
-        .offline-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            background: var(--text-dark);
-            color: #fff;
-            font-size: 0.85rem;
-            font-weight: 600;
-            padding: 0.55rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-            animation: slideDown 0.18s ease-out;
-        }
-        .offline-banner[hidden] { display: none; }
-        .offline-banner svg { width: 14px; height: 14px; }
-        @keyframes slideDown {
-            from { transform: translateY(-100%); }
-            to { transform: translateY(0); }
-        }
-
-        /* Tap targets — 44px min on mobile per Apple HIG / Material. */
-        @media (max-width: 640px) {
-            .btn { min-height: 44px; }
-            .header { padding: 0.75rem 1rem; }
-            .container { padding: 1rem; }
-            .user-badge { padding: 0.4rem 0.6rem; font-size: 0.8rem; gap: 0.4rem; }
-        }
-        @media (max-width: 420px) {
-            .user-badge-name { display: none; }
+            --coral: {{ theme_primary }};
+            --coral-fill: {{ theme_primary_dark|default:theme_primary }};
+            --coral-ink: {{ theme_primary_dark|default:theme_primary }};
+            --coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};
         }
     </style>
+    {% endif %}
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% comment %}
-    Email-verify banner removed 2026-05-29 (Seychelles government review).
-    It was a normal-flow element above the chat tutor's 100dvh container —
-    pushed the typing bar below the viewport fold. The full template lives
-    at templates/accounts/_email_verify_banner.html if it needs to return;
-    restore by un-commenting the include below.
-    {% endcomment %}
-    {# include 'accounts/_email_verify_banner.html' — see comment above #}
-    {% include '_includes/_baseline_recommend_banner.html' %}
-    <div class="offline-banner" id="offline-banner" role="status" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="1" y1="1" x2="23" y2="23"/>
-            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
-            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-        </svg>
-        <span>{% trans "You're offline — messages will send when you reconnect." %}</span>
-    </div>
+{% include "_includes/icon_sprite.html" %}
 
-    <header class="header">
-        <div class="header-content">
-            <a href="/tutor/" class="logo">
-                {% if theme_logo_url %}
-                <img src="{{ theme_logo_url }}" alt="{{ theme_institution_name|default:'AI Tutor' }}" style="width:40px;height:40px;border-radius:var(--radius-sm);object-fit:cover;">
-                {% else %}
-                <div class="logo-icon">🎓</div>
-                {% endif %}
-                <div class="logo-text">{{ theme_institution_name|default:"AI <span>Tutor</span>" }}</div>
-            </a>
-            {% if user.is_authenticated %}
-            <div class="user-menu" style="display:flex;gap:0.5rem;align-items:center;">
-                <a href="{% url 'dashboard:help_index' %}" title="{% trans 'Help & FAQ' %}" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    {% trans "Help" %}
+<a class="skip-link" href="#main">{% trans "Skip to content" %}</a>
+
+{% comment %}
+Email-verify banner removed 2026-05-29 (Seychelles government review).
+It was a normal-flow element above the chat tutor's 100dvh container —
+pushed the typing bar below the viewport fold. The full template lives
+at templates/accounts/_email_verify_banner.html if it needs to return;
+restore by un-commenting the include below.
+{% endcomment %}
+{# include 'accounts/_email_verify_banner.html' — see comment above #}
+{% include '_includes/_baseline_recommend_banner.html' %}
+
+{# id and class are read by static/js/network-helpers.js — keep both. #}
+<div class="offline-banner" id="offline-banner" role="status" hidden>
+    {% icon "wifi-off" %}
+    <span>{% trans "You're offline — messages will send when you reconnect." %}</span>
+</div>
+
+<header class="app-header">
+    <div class="app-header__inner">
+        {% comment %}
+        The wordmark goes to the front door, not straight to the catalog.
+        accounts:landing redirects a signed-in user by role, so one link is
+        correct for everyone: a student lands on their subjects, a teacher on
+        the dashboard, and someone signed out — on an auth page, say — gets
+        the landing page instead of a login redirect loop.
+        {% endcomment %}
+        <a href="{% url 'accounts:landing' %}" class="brand">
+            {% if theme_logo_url %}
+            <img src="{{ theme_logo_url }}" alt="" class="brand__mark">
+            {% else %}
+            <span class="brand__mark">{% icon "courses" size="md" %}</span>
+            {% endif %}
+            <span class="brand__name">
+                {{ theme_institution_name|default:"AI Tutor" }}
+                <span class="brand__sub">{% trans "Learn" %}</span>
+            </span>
+        </a>
+
+        {% if user.is_authenticated %}
+        {% comment %}
+        Help, Terms, Settings and Sign out used to sit side by side in the bar,
+        four competing targets next to the logo. A student needs none of them
+        most days, so they collapse behind the one thing they do recognise —
+        their own name. <details> gives keyboard operation and correct
+        semantics without script, which matters on the offline desktop build.
+        {% endcomment %}
+        <details class="account" id="account-menu">
+            <summary aria-label="{% trans 'Account menu' %}">
+                <span class="account__avatar" aria-hidden="true">{{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}</span>
+                <span class="account__name">{{ user.first_name|default:user.username }}</span>
+                {% icon "chevron-down" size="sm" %}
+            </summary>
+            <div class="account__menu">
+                <a href="{% url 'accounts:settings' %}" class="account__item">
+                    {% icon "settings" %}{% trans "Account settings" %}
                 </a>
-                <a href="{% url 'accounts:terms' %}" title="{% trans 'Terms' %}" style="color:var(--text-muted);font-size:0.78rem;text-decoration:none;">{% trans "Terms" %}</a>
-                <a href="{% url 'accounts:settings' %}" class="user-badge user-badge-link" title="{% trans 'Account settings' %}">
-                    <div class="user-avatar">{{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}</div>
-                    <span class="user-badge-name">{{ user.first_name|default:user.username }}</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text-muted);">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
+                <a href="{% url 'dashboard:help_index' %}" class="account__item">
+                    {% icon "help" %}{% trans "Help & FAQ" %}
                 </a>
-                <a href="{% url 'accounts:logout' %}" title="{% trans 'Log out' %}"
-                   style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;padding:0.4rem 0.7rem;border:1px solid var(--gray-200);border-radius:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                        <polyline points="16 17 21 12 16 7"/>
-                        <line x1="21" y1="12" x2="9" y2="12"/>
-                    </svg>
-                    {% trans "Logout" %}
+                <a href="{% url 'accounts:terms' %}" class="account__item">
+                    {% icon "list" %}{% trans "Terms of use" %}
+                </a>
+                <div class="account__sep"></div>
+                <a href="{% url 'accounts:logout' %}" class="account__item account__item--danger">
+                    {% icon "logout" %}{% trans "Sign out" %}
                 </a>
             </div>
-            {% else %}
-            <a href="{% url 'accounts:login' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">{% trans "Sign In" %}</a>
-            {% endif %}
-        </div>
-    </header>
-    
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+        </details>
+        {% else %}
+        <a href="{% url 'accounts:login' %}" class="btn btn--primary btn--sm" style="margin-left:auto">{% trans "Sign in" %}</a>
+        {% endif %}
+    </div>
+</header>
 
-    {% include "_includes/feedback_button.html" %}
-
-    {# JS gettext() catalog — load before any inline JS uses it. #}
-    <script src="{% url 'javascript-catalog' %}"></script>
-
+<main class="page {% block page_class %}{% endblock %}" id="main" tabindex="-1">
     {% comment %}
-    Not deferred: network-helpers.js reads this at parse time to decide whether
-    navigator.onLine means anything. On the desktop build the server and the
-    model are both on this machine, so it does not.
+    This shell rendered no messages at all, so anything queued on a student
+    page — a login welcome, most of all — stayed in the session unread and
+    surfaced later, all at once, on the first page that did render them: the
+    teacher dashboard. That is where the stack of four came from. Same markup
+    and same region as dashboard/base.html so one stylesheet and one script
+    serve both.
     {% endcomment %}
-    <script nonce="{{ request.csp_nonce }}">
-        window.AITUTOR_LOCAL_SERVER = {{ is_desktop_build|yesno:"true,false" }};
-    </script>
-    <script src="{% static 'js/network-helpers.js' %}" defer></script>
-    <script defer nonce="{{ request.csp_nonce }}">
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.NetHelpers) {
-                window.NetHelpers.installOfflineBanner();
-                window.NetHelpers.registerServiceWorker();
-            }
-        });
-    </script>
+    {% if messages %}
+    <div class="messages" role="status" aria-live="polite">
+        {% for message in messages %}
+        {% comment %}
+        level_tag, not tags: `tags` concatenates extra_tags with the level, so
+        a message sent with extra_tags='sticky' rendered class="alert--sticky
+        success" — the tone skin silently gone. Extra tags go on separately.
+        {% endcomment %}
+        <div class="alert alert--{{ message.level_tag|default:'info' }} {{ message.extra_tags }}">
+            {% if message.level_tag == 'success' %}{% icon "check-circle" %}
+            {% elif message.level_tag == 'error' %}{% icon "alert" %}
+            {% elif message.level_tag == 'warning' %}{% icon "alert" %}
+            {% else %}{% icon "info" %}{% endif %}
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
-    {% block extra_js %}{% endblock %}
+    {% block content %}{% endblock %}
+</main>
+
+{% include "_includes/feedback_button.html" %}
+
+{# JS gettext() catalog — load before any inline JS uses it. #}
+<script src="{% url 'javascript-catalog' %}"></script>
+
+{% comment %}
+Not deferred: network-helpers.js reads this at parse time to decide whether
+navigator.onLine means anything. On the desktop build the server and the
+model are both on this machine, so it does not.
+{% endcomment %}
+<script nonce="{{ request.csp_nonce }}">
+    window.AITUTOR_LOCAL_SERVER = {{ is_desktop_build|yesno:"true,false" }};
+</script>
+<script src="{% static 'js/network-helpers.js' %}" defer></script>
+<script src="{% static 'js/student-shell.js' %}" defer></script>
+<script src="{% static 'js/password-field.js' %}" defer></script>
+
+{% block extra_js %}{% endblock %}
+<script src="{% static 'js/flash.js' %}" defer></script>
 </body>
 </html>

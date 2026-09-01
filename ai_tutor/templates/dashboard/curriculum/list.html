@@ -41,7 +41,7 @@
                     <td>
                         <span style="font-weight: 500;">{{ c.course.title }}</span>
                         {% if c.is_platform_wide %}
-                        <span class="badge" style="background:#DBEAFE;color:#1E40AF;font-size:0.7rem;margin-left:0.5rem;">{% trans "Platform" %}</span>
+                        <span class="badge" style="background:var(--info-surface);color:var(--info);font-size:0.7rem;margin-left:0.5rem;">{% trans "Platform" %}</span>
                         {% endif %}
                         {% if c.course.description %}
                         <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ c.course.description|truncatewords:10 }}</div>
@@ -76,7 +76,7 @@
                 </tr>
                 {% if c.material_count %}
                 <tr class="materials-row" id="materials-row-{{ c.course.id }}" style="display: none;">
-                    <td colspan="7" style="padding: 0.5rem 1rem 1rem 2rem; background: var(--gray-50, #f9fafb);">
+                    <td colspan="7" style="padding: 0.5rem 1rem 1rem 2rem; background: var(--gray-50, var(--surface-sunken));">
                         <table class="table" style="margin: 0; font-size: 0.875rem;">
                             <thead>
                                 <tr>

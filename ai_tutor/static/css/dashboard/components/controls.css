@@ -1,0 +1,285 @@
+/* ==========================================================================
+   Teacher dashboard — components: controls
+   ==========================================================================
+   Things a teacher operates or reads a status from: buttons, the
+   segmented control, status badges, form fields and message alerts.
+
+   Every component here is a compound: a root class plus named parts that only
+   have meaning inside it (.card / .card__header / .card__body). Parts are
+   scoped by their own class rather than by descendant selectors, so a card
+   nested inside a card doesn't inherit the outer card's padding, and no
+   selector needs to out-specify another.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    /* 38px tall at default size — comfortably above the 24x24 WCAG 2.2
+       target minimum, and thumb-friendly on the tablets used in class. */
+    min-height: 38px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* --primary-fill, not --primary: white on the brand orange is 3.6:1 and
+   fails AA for the label. Two steps down the same hue reads as the same
+   button and clears 5:1. */
+.btn--primary {
+    background: var(--primary-fill);
+    border-color: var(--primary-fill);
+    color: var(--text-on-accent);
+}
+
+.btn--primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: var(--text-on-accent);
+}
+
+.btn--primary:active { box-shadow: inset 0 1px 3px rgba(27, 24, 21, 0.25); }
+
+.btn--secondary {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+}
+
+.btn--secondary:hover {
+    background: var(--surface-hover);
+    border-color: var(--warm-400);
+    color: var(--text);
+}
+
+.btn--ghost {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.btn--ghost:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.btn--danger {
+    background: var(--danger-solid);
+    border-color: var(--danger-solid);
+    color: var(--text-on-accent);
+}
+
+.btn--danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--text-on-accent);
+}
+
+.btn--sm {
+    min-height: 30px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+}
+
+.btn--icon {
+    padding: var(--space-2);
+    width: 38px;
+    min-height: 38px;
+}
+
+/* Segmented control — the period presets. One roving group, not five
+   loose buttons, so the current window is unambiguous. */
+.segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    padding: 2px;
+    gap: 2px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.segmented__option {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-xs);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+    line-height: 1.7;
+    transition: background var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+}
+
+.segmented__option:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.segmented__option[aria-pressed='true'],
+.segmented__option[aria-current='true'] {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: var(--weight-bold);
+    box-shadow: var(--shadow-xs);
+}
+
+/* --------------------------------------------------------------------------
+   Badge
+   ------------------------------------------------------------------------
+   Tinted surface + AA-contrast ink + matching border. The border is what
+   keeps a badge legible when a school themes the page or a teacher prints
+   in greyscale.
+   -------------------------------------------------------------------------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 1px var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-bold);
+    line-height: 1.6;
+    white-space: nowrap;
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+
+.badge--success { background: var(--success-surface); color: var(--success); border-color: var(--success-border); }
+.badge--warning { background: var(--warning-surface); color: var(--warning); border-color: var(--warning-border); }
+.badge--danger  { background: var(--danger-surface);  color: var(--danger);  border-color: var(--danger-border); }
+.badge--info    { background: var(--info-surface);    color: var(--info);    border-color: var(--info-border); }
+.badge--accent  { background: var(--accent-surface);  color: var(--accent);  border-color: var(--accent-border); }
+
+/* Status dot — pairs with a badge or stands alone in a dense table. Always
+   accompanied by text; never the only carrier of meaning. */
+.dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: var(--radius-full);
+    background: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Forms
+   -------------------------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: var(--space-1); }
+
+.field__label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    color: var(--text-secondary);
+}
+
+.field__hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.field__error {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--danger);
+}
+
+.input,
+.select,
+.textarea {
+    width: 100%;
+    min-height: 38px;
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--border-field);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    color: var(--text);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* Placeholders are text. --text-faint is 2.6:1 and would fail. */
+.input::placeholder,
+.textarea::placeholder { color: var(--text-muted); }
+
+.input:hover,
+.select:hover,
+.textarea:hover { border-color: var(--warm-400); }
+
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.input[aria-invalid='true'] {
+    border-color: var(--danger-solid);
+}
+
+.select {
+    appearance: none;
+    padding-right: var(--space-8);
+    /* Chevron drawn as a background image so the control stays one element.
+       currentColor can't be used in a data URI, so the stroke is the muted
+       ink from the ramp — the only literal colour outside tokens.css, and
+       it is here because SVG data URIs cannot read CSS variables. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%237C7469' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-2) center;
+    background-size: 1rem;
+    cursor: pointer;
+}
+
+.input--sm,
+.select--sm {
+    min-height: 30px;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+    font-size: var(--text-sm);
+}
+
+/* Search field with a leading icon. */
+.search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search .icon {
+    position: absolute;
+    left: var(--space-3);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 1rem;
+}
+
+.search .input { padding-left: calc(var(--space-3) + 1rem + var(--space-2)); }
+
+/* Alerts and the message region moved to css/shared/flash.css — the student
+   shell needs them too, and defining them here put them out of its reach. */

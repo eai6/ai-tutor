@@ -1,3 +1,4 @@
+{% load static %}
 {% comment %}
 First-run setup for the offline desktop app.
 
@@ -16,15 +17,21 @@ in place.
 <head>
 <meta charset="utf-8">
 <title>Set up AI Tutor</title>
+<link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
+<link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
+<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
 <style>
-  :root { color-scheme: light dark; --bg:#faf9f7; --fg:#1c1b19; --muted:#6b6862;
-          --line:#e5e1db; --card:#fff; --accent:#e8590c; --ok:#2f9e5f; --bad:#d1493f; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#17161a; --fg:#ece9e6; --muted:#9a958e; --line:#2c2a30; --card:#1f1e24; }
-  }
+  {% comment %}
+  Same treatment as downloads/self_hosting.html: the page keeps its own
+  variable names, they now resolve to the design tokens, and the dark
+  override is gone because nothing else in the product has one.
+  {% endcomment %}
+  :root { --bg:var(--canvas); --fg:var(--text); --muted:var(--text-muted);
+          --line:var(--border); --card:var(--surface); --accent:var(--coral-ink);
+          --ok:var(--success); --bad:var(--danger); }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 -apple-system,
-         "Segoe UI",Inter,system-ui,sans-serif; padding:40px 20px; }
+  body { margin:0; background:var(--bg); color:var(--fg); font: 15px/1.55 var(--font-body); padding:40px 20px; }
   .wrap { max-width:640px; margin:0 auto; }
   h1 { font-size:24px; margin:0 0 6px; letter-spacing:-.02em; }
   .lede { color:var(--muted); margin:0 0 28px; }
@@ -36,10 +43,10 @@ in place.
   button { font:inherit; font-weight:600; border-radius:8px; padding:10px 16px;
            border:1px solid var(--line); background:transparent; color:var(--fg);
            cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:var(--text-on-accent); }
   button:disabled { opacity:.45; cursor:default; }
   .state { display:flex; align-items:center; gap:9px; font-size:13.5px; margin-bottom:14px; }
-  .dot { width:9px; height:9px; border-radius:50%; background:#c9c6c1; flex:none; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--border-strong); flex:none; }
   .ok .dot { background:var(--ok); } .bad .dot { background:var(--bad); }
   .bar { height:6px; background:var(--line); border-radius:99px; overflow:hidden; margin:14px 0 8px; }
   .bar > i { display:block; height:100%; width:0; background:var(--accent);
@@ -50,7 +57,7 @@ in place.
   .hint { font-size:12.5px; color:var(--muted); margin-top:14px;
           border-top:1px solid var(--line); padding-top:12px; }
   .done { text-align:center; padding:14px 0 4px; }
-  a.launch { display:inline-block; background:var(--accent); color:#fff; font-weight:600;
+  a.launch { display:inline-block; background:var(--accent); color:var(--text-on-accent); font-weight:600;
              text-decoration:none; padding:12px 22px; border-radius:8px; }
 </style>
 </head>

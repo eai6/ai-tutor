@@ -13,17 +13,17 @@
         <div class="card-body">
             <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
                 <div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #059669;">{{ results.created }}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: var(--success-solid);">{{ results.created }}</div>
                     <div style="font-size: 0.8125rem; color: var(--gray-500);">{% trans "Students Created" %}</div>
                 </div>
                 <div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">{{ results.skipped }}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: var(--danger-solid);">{{ results.skipped }}</div>
                     <div style="font-size: 0.8125rem; color: var(--gray-500);">{% trans "Skipped" %}</div>
                 </div>
             </div>
             {% if results.errors %}
             <details>
-                <summary style="cursor: pointer; font-weight: 600; font-size: 0.875rem; color: #dc2626;">{% blocktrans count counter=results.errors|length %}Show error ({{ counter }}){% plural %}Show errors ({{ counter }}){% endblocktrans %}</summary>
+                <summary style="cursor: pointer; font-weight: 600; font-size: 0.875rem; color: var(--danger-solid);">{% blocktrans count counter=results.errors|length %}Show error ({{ counter }}){% plural %}Show errors ({{ counter }}){% endblocktrans %}</summary>
                 <ul style="margin-top: 0.5rem; font-size: 0.8125rem; color: var(--gray-600);">
                     {% for err in results.errors %}
                     <li>{{ err }}</li>
@@ -68,7 +68,7 @@
             <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 1rem;">
                 {% trans "Your CSV file must have these column headers (first row):" %}
             </p>
-            <div style="background: #f4f4f5; border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.8125rem; overflow-x: auto;">
+            <div style="background: var(--surface-sunken); border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.8125rem; overflow-x: auto;">
                 student_id,first_name,last_name,username,password,grade_level<br>
                 STU-001,John,Smith,john.smith,Pass1234,S1<br>
                 STU-002,Mary,Jones,mary.jones,Pass5678,S1<br>

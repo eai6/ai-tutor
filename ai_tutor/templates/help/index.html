@@ -6,7 +6,7 @@
 {% block content %}
 <style>
     .help-wrap { max-width: 760px; margin: 1.5rem auto 4rem; padding: 0 1rem; }
-    .help-wrap h1 { font-size: 1.6rem; color: #111; margin: 0 0 0.5rem; }
+    .help-wrap h1 { font-size: 1.6rem; color: var(--text); margin: 0 0 0.5rem; }
     .help-wrap > p.lead { color: #555; margin: 0 0 1.5rem; line-height: 1.6; }
     .video-frame {
         position: relative;
@@ -30,7 +30,7 @@
 <div class="help-wrap">
     {% if is_staff_user %}
     <a href="{% url 'dashboard:home' %}"
-       style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem; margin-bottom:1rem;"
+       style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:var(--accent-surface); color:var(--accent); border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem; margin-bottom:1rem;"
        title="Return to teacher dashboard">
         ← Dashboard
     </a>

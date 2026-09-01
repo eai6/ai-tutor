@@ -1,0 +1,276 @@
+/* ==========================================================================
+   Teacher dashboard — base
+   ==========================================================================
+   Reset, document typography, focus policy, a11y helpers, loading skeletons.
+   No component lives here.
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+/* The UA's [hidden] rule is a type-less selector, so any class that sets
+   display beats it — .empty[hidden] stayed visible. Templates toggle
+   visibility with the attribute, so the attribute has to win. */
+[hidden] { display: none !important; }
+
+body {
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--text);
+    background: var(--canvas);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   ------------------------------------------------------------------------
+   Headings take the display face and negative tracking; body text keeps the
+   humanist face. Sizes are set by the utility classes below rather than by
+   the tag, so an h2 can be a small section label without a specificity war.
+   -------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--text);
+}
+
+a {
+    color: var(--text-link);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+a:hover {
+    color: var(--primary-dark);
+}
+
+strong, b { font-weight: var(--weight-bold); }
+
+small { font-size: var(--text-xs); }
+
+/* Numerals must line up in columns and must not reflow as a counter ticks. */
+.num,
+.u-tabular {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+}
+
+/* Eyebrow: the small uppercase label above a figure or section. The mono
+   face is used here and essentially nowhere else — it is the page's
+   texture, and it stops the label competing with the figure below it. */
+.eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-normal);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* --------------------------------------------------------------------------
+   Focus
+   ------------------------------------------------------------------------
+   One ring for the whole product. :focus-visible so a mouse click on a card
+   doesn't paint a ring, but every keyboard path does.
+   -------------------------------------------------------------------------- */
+:focus { outline: none; }
+
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-sm);
+}
+
+/* Form controls opt out of the gap ring.
+   An <input> already carries a border, so adding a ring with a gap in it drew
+   a second concentric line and the field looked double-outlined. One border,
+   thickened and coloured, plus a soft halo — and !important because eight auth
+   pages set their own `input:focus { border-color }` at higher specificity,
+   several of them to the decorative hue that fails contrast as a border. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.form-control:focus-visible {
+    box-shadow: var(--focus-halo);
+    border-color: var(--primary-fill) !important;
+}
+
+/* Elements that already clip to their own radius keep it while focused. */
+.card:focus-visible,
+.tile:focus-visible { border-radius: var(--card-radius); }
+
+/* Windows High Contrast Mode paints box-shadow as nothing — fall back to a
+   real outline so the ring survives. */
+@media (forced-colors: active) {
+    :focus-visible {
+        outline: 3px solid Highlight;
+        outline-offset: 2px;
+    }
+}
+
+/* Skip link: first tab stop on every page. */
+.skip-link {
+    position: absolute;
+    left: var(--space-4);
+    top: calc(-1 * var(--space-12));
+    z-index: 1000;
+    padding: var(--space-2) var(--space-4);
+    background: var(--surface);
+    color: var(--text-link);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-sm);
+    font-weight: var(--weight-medium);
+    font-size: var(--text-sm);
+    box-shadow: var(--shadow-md);
+    transition: top var(--dur-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+    top: var(--space-4);
+}
+
+/* --------------------------------------------------------------------------
+   Accessibility helpers
+   -------------------------------------------------------------------------- */
+
+/* Visible to screen readers, invisible on screen. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-visible {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+
+/* --------------------------------------------------------------------------
+   Icons
+   ------------------------------------------------------------------------
+   Every icon is a <svg><use href="#icon-name"> against the sprite, sized by
+   font-size so it scales with the text it sits beside. Decorative by
+   default (aria-hidden is set in the template tag); an icon that carries
+   meaning gets a <title> from the tag instead.
+   -------------------------------------------------------------------------- */
+.icon {
+    width: 1em;
+    height: 1em;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.125em;
+}
+
+.icon--sm { font-size: 0.875rem; }
+.icon--md { font-size: 1.125rem; }
+.icon--lg { font-size: 1.5rem; }
+.icon--xl { font-size: 2.5rem; }
+
+/* Filled glyphs (avatars, solid status dots) opt out of the stroke default. */
+.icon--solid {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* --------------------------------------------------------------------------
+   Loading skeletons
+   ------------------------------------------------------------------------
+   A shimmering block that occupies the exact height of the content it
+   stands in for, so nothing shifts when the real thing lands (CLS).
+   -------------------------------------------------------------------------- */
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--skeleton-base);
+    border-radius: var(--radius-sm);
+    /* Blocks are placeholders, not text — never announce them. */
+    color: transparent;
+    user-select: none;
+}
+
+.skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--skeleton-sheen) 50%,
+        transparent 100%
+    );
+    animation: skeleton-sheen 1.4s var(--ease-out) infinite;
+}
+
+@keyframes skeleton-sheen {
+    100% { transform: translateX(100%); }
+}
+
+.skeleton--text   { height: 0.75em; margin: 0.25em 0; }
+.skeleton--line   { height: 1em; }
+.skeleton--figure { height: var(--text-2xl); width: 4ch; }
+.skeleton--block  { height: 100%; width: 100%; border-radius: var(--radius-md); }
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   ------------------------------------------------------------------------
+   Everything decorative stops. The skeleton keeps a static tint so it still
+   reads as "not loaded yet" without the sweep.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .skeleton::after { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Print — teachers do print rosters and reports.
+   -------------------------------------------------------------------------- */
+@media print {
+    .app-rail,
+    .app-topbar,
+    .skip-link,
+    .no-print { display: none !important; }
+
+    .app-main { margin-left: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none; }
+}

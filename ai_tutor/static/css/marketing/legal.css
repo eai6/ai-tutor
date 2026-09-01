@@ -1,0 +1,226 @@
+/* ==========================================================================
+   Legal documents — terms of use
+   ==========================================================================
+   A terms page is read in three different ways and has to serve all of them:
+
+     * A student or parent skimming for one thing — "what do you do with my
+       data?". They need a table of contents and headings they can scan.
+     * A school or ministry reading it end to end before signing off. They
+       need a comfortable measure and real paragraph rhythm.
+     * Someone printing it for a file. They need it to print without the
+       chrome and without a link colour that disappears in greyscale.
+
+   The old page was a single 760px column of undifferentiated markdown with no
+   contents, no anchors and no print handling.
+   ========================================================================== */
+
+.legal {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: start;
+}
+
+/* The contents column earns its place only when there is room for it beside
+   the text AND the document actually has sections to list. legal-toc.js adds
+   .legal--with-toc once it has filled the list; without that guard a hidden
+   nav drops out of grid flow and the document takes the 15rem column. */
+@media (min-width: 62rem) {
+    .legal--with-toc { grid-template-columns: 15rem minmax(0, 1fr); }
+    .legal--with-toc .legal__toc {
+        position: sticky;
+        top: calc(var(--space-6) + 60px);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Masthead
+   -------------------------------------------------------------------------- */
+.legal__head { margin-bottom: var(--space-6); }
+
+.legal__title {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.legal__meta {
+    display: flex;
+    gap: var(--space-2) var(--space-4);
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.legal__meta strong { color: var(--text-secondary); font-weight: var(--weight-bold); }
+
+/* --------------------------------------------------------------------------
+   Contents
+   -------------------------------------------------------------------------- */
+.legal__toc {
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.legal__toc-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+}
+
+.legal__toc ol { list-style: none; }
+
+.legal__toc a {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    line-height: var(--leading-snug);
+}
+
+.legal__toc a:hover { background: var(--surface-hover); color: var(--text); }
+
+/* --------------------------------------------------------------------------
+   Document body
+   -------------------------------------------------------------------------- */
+.legal__body {
+    padding: var(--space-8);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    /* 68 characters is the readable measure for continuous prose; the old
+       page ran the full 760px column regardless of type size. */
+    font-size: var(--text-md);
+    line-height: 1.7;
+    color: var(--text-secondary);
+}
+
+.legal__body > * + * { margin-top: var(--space-4); }
+
+.legal__body h2,
+.legal__body h3 {
+    font-family: var(--font-display);
+    letter-spacing: var(--tracking-tight);
+    color: var(--text);
+    /* scroll-margin so an anchor jump does not tuck the heading under the
+       sticky page header. */
+    scroll-margin-top: calc(var(--space-8) + 60px);
+}
+
+.legal__body h2 {
+    font-size: var(--text-xl);
+    margin-top: var(--space-10);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--border);
+}
+
+.legal__body h3 { font-size: var(--text-lg); margin-top: var(--space-6); }
+
+.legal__body > h2:first-child,
+.legal__body > h3:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+.legal__body p { max-width: 68ch; }
+
+.legal__body ul,
+.legal__body ol { padding-left: var(--space-6); max-width: 68ch; }
+
+.legal__body li + li { margin-top: var(--space-2); }
+
+.legal__body strong { color: var(--text); font-weight: var(--weight-bold); }
+
+.legal__body a { color: var(--coral-ink); }
+
+.legal__body hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin-block: var(--space-6);
+}
+
+.legal__body code {
+    padding: 0.1em 0.35em;
+    background: var(--surface-sunken);
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+}
+
+.legal__body blockquote {
+    padding-left: var(--space-4);
+    border-left: 3px solid var(--coral-edge);
+    color: var(--text-muted);
+}
+
+.legal__body table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+
+.legal__body th,
+.legal__body td {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    text-align: left;
+}
+
+.legal__body th { background: var(--surface-sunken); }
+
+/* --------------------------------------------------------------------------
+   Footer actions
+   -------------------------------------------------------------------------- */
+.legal__foot {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: var(--space-6);
+}
+
+.legal__foot-note { font-size: var(--text-sm); color: var(--text-muted); }
+
+/* --------------------------------------------------------------------------
+   Print
+   ------------------------------------------------------------------------
+   Someone printing this for a school file wants the document, not the app.
+   -------------------------------------------------------------------------- */
+@media print {
+    .app-header,
+    .legal__toc,
+    .legal__foot,
+    .feedback-fab,
+    .offline-banner,
+    .skip-link { display: none !important; }
+
+    .legal { display: block; }
+
+    .legal__body {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        font-size: 11pt;
+        color: #000;
+    }
+
+    .legal__body h2 { break-after: avoid; }
+    .legal__body p, .legal__body li { break-inside: avoid; }
+
+    /* A URL is worth nothing in greyscale unless it is spelled out. */
+    .legal__body a::after { content: " (" attr(href) ")"; font-size: 0.85em; }
+}
+
+@media (max-width: 640px) {
+    .legal__body { padding: var(--space-5); font-size: var(--text-base); }
+}

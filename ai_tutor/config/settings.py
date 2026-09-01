@@ -330,6 +330,21 @@ LANGUAGES = [
     ('en-us', '🇸🇨 Seychelles — English'),
     ('pt-mz', '🇲🇿 Moçambique — Português'),
 ]
+
+# Language-only labels for the public language switcher.
+#
+# LANGUAGES above stays country-forward because it is wired to `choices` on
+# three locale fields (Course.locale, Institution.default_locale,
+# StudentProfile locale) — a teacher choosing a course locale needs to know
+# whether it is the Seychelles or the Mozambique one, and editing those labels
+# would also generate a migration on every one of those fields.
+#
+# A visitor picking the interface language does not need the country: they are
+# choosing what language to read, not which deployment they belong to.
+LANGUAGE_SHORT_LABELS = {
+    'en-us': 'English',
+    'pt-mz': 'Português',
+}
 LOCALE_PATHS = [PACKAGE_DIR / 'locale']
 TIME_ZONE = 'UTC'
 USE_I18N = True

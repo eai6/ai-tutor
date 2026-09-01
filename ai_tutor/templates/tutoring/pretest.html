@@ -8,20 +8,20 @@
     /* Hide base.html chrome — the modal is the page. */
     .header { display: none !important; }
     .container { max-width: 100% !important; padding: 0 !important; }
-    body { background: #f4f4f5; overflow: hidden; }
+    body { background: var(--surface-sunken); overflow: hidden; }
 
     .pretest-page {
         min-height: 100vh;
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
-        background: #f4f4f5;
+        background: var(--surface-sunken);
     }
 
     .pretest-topbar {
         flex-shrink: 0;
-        background: #fff;
-        border-bottom: 1px solid #e4e4e7;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
         padding: 0.75rem 1rem;
         display: flex;
         align-items: center;
@@ -33,13 +33,13 @@
         justify-content: center;
         width: 36px; height: 36px;
         border-radius: 8px;
-        color: #71717a; text-decoration: none;
+        color: var(--text-muted); text-decoration: none;
     }
-    .pretest-topbar .back-link:hover { background: #f4f4f5; color: #18181b; }
+    .pretest-topbar .back-link:hover { background: var(--surface-sunken); color: var(--text); }
     .pretest-topbar h1 {
         font-size: 0.95rem;
         font-weight: 600;
-        color: #18181b;
+        color: var(--text);
         margin: 0;
         flex: 1;
         min-width: 0;
@@ -49,14 +49,14 @@
     }
     .pretest-topbar .skip {
         font-size: 0.8rem;
-        color: #71717a;
+        color: var(--text-muted);
         text-decoration: none;
         padding: 0.25rem 0.6rem;
         border-radius: 999px;
-        border: 1px solid #e4e4e7;
+        border: 1px solid var(--border);
         white-space: nowrap;
     }
-    .pretest-topbar .skip:hover { background: #fafafa; color: #18181b; }
+    .pretest-topbar .skip:hover { background: var(--surface-sunken); color: var(--text); }
 
     /* The modal renders via the partial; the page underneath stays
        blank-but-styled so there's never a flash of stem-less content. */
@@ -116,12 +116,12 @@
             const redirectUrl = (data && data.redirect_url) || (passed ? CATALOG_URL : TUTOR_URL);
 
             const summaryDiv = document.createElement('div');
-            summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+            summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid var(--border);';
             summaryDiv.innerHTML = `
-                <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
-                <div style="font-size:0.95rem;color:#71717a;">${passed ? 'Great work! You passed.' : 'Some gaps — the tutor will focus there.'}</div>
+                <div style="font-size:2rem;font-weight:800;color:${passed ? 'var(--success-solid)' : 'var(--danger-solid)'};margin-bottom:0.25rem;">${score} / ${total}</div>
+                <div style="font-size:0.95rem;color:var(--text-muted);">${passed ? 'Great work! You passed.' : 'Some gaps — the tutor will focus there.'}</div>
                 <div style="font-size:0.9rem;color:#52525b;margin:0.75rem 0 1.25rem;">${message}</div>
-                <a href="${redirectUrl}" class="btn btn-primary" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:#18181b;color:#fff;text-decoration:none;font-weight:600;">
+                <a href="${redirectUrl}" class="btn btn-primary" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:var(--text);color:var(--surface);text-decoration:none;font-weight:600;">
                     ${passed ? '✓ Continue' : '→ Start the lesson'}
                 </a>
             `;

@@ -51,7 +51,7 @@
 
             {% if upload.status == 'pending_confirmation' %}
             {% if cost_verdict_label == 'red' %}
-                {% with bgcolor='#FEE2E2' textcolor='#991B1B' bordercolor='#F87171' %}
+                {% with bgcolor='var(--danger-surface)' textcolor='var(--danger)' bordercolor='#F87171' %}
                 <div style="background:{{ bgcolor }};border:1px solid {{ bordercolor }};border-radius:8px;padding:1.25rem;margin-top:1rem;color:{{ textcolor }};">
                     <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;">{% trans "⛔ Cost over hard-block threshold" %}</div>
                     <div style="font-size:0.9rem;margin-bottom:0.75rem;">
@@ -62,7 +62,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="mode" value="rich">
                         <input type="hidden" name="force" value="1">
-                        <button type="submit" class="btn btn-sm" style="background:#DC2626;color:white;border:none;" onclick="return confirm('{% blocktrans with cost=cost_estimate.estimated_cost_usd %}Force-start a ${{ cost }} processing job?{% endblocktrans %}');">{% trans "Force-start (Rich)" %}</button>
+                        <button type="submit" class="btn btn-sm" style="background:var(--danger-solid);color:white;border:none;" onclick="return confirm('{% blocktrans with cost=cost_estimate.estimated_cost_usd %}Force-start a ${{ cost }} processing job?{% endblocktrans %}');">{% trans "Force-start (Rich)" %}</button>
                     </form>
                     <form method="post" action="{% url 'dashboard:material_confirm_processing' upload.id %}" style="display:inline-block;margin-left:0.5rem;">
                         {% csrf_token %}
@@ -80,9 +80,9 @@
                 {% endwith %}
             {% else %}
                 {% if cost_verdict_label == 'yellow' %}
-                    {% with bgcolor='#FEF3C7' textcolor='#92400E' bordercolor='#FBBF24' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                    {% with bgcolor='var(--warning-surface)' textcolor='var(--warning)' bordercolor='#FBBF24' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
                 {% else %}
-                    {% with bgcolor='#ECFDF5' textcolor='#065F46' bordercolor='#34D399' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                    {% with bgcolor='var(--success-surface)' textcolor='var(--success)' bordercolor='#34D399' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
                 {% endif %}
             {% endif %}
             {% endif %}
@@ -101,12 +101,12 @@
 
             {% if upload.error_message %}
             {% if error_detail %}
-            <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
+            <div style="background: var(--danger-surface); border-radius: 8px; padding: 1rem; margin-top: 1rem; color: var(--danger);">
                 <strong>{% trans "Failed:" %}</strong> {{ error_detail.reason }}<br>
                 <span style="font-size:0.875rem;color:#7F1D1D;">{{ error_detail.detail|default:error_detail.message }}</span>
             </div>
             {% else %}
-            <div style="background: #FEF2F2; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #991B1B;">
+            <div style="background: var(--danger-surface); border-radius: 8px; padding: 1rem; margin-top: 1rem; color: var(--danger);">
                 <strong>{% trans "Error:" %}</strong> {{ upload.error_message }}
             </div>
             {% endif %}
@@ -183,7 +183,7 @@
             <h3 class="card-title" style="margin: 0;">{% trans "Processing Log" %}</h3>
         </div>
         <div class="card-body">
-            <pre style="background: var(--gray-900); color: #10B981; padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
+            <pre style="background: var(--gray-900); color: var(--success-solid); padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{{ upload.processing_log }}</pre>
         </div>
     </div>
     {% endif %}

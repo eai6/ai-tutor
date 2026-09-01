@@ -7,10 +7,10 @@
         right: 18px;
         bottom: 18px;
         z-index: 8500;
-        background: #5b21b6;
-        color: #fff;
+        background: var(--accent);
+        color: var(--surface);
         border: none;
-        border-radius: 999px;
+        border-radius: var(--radius-lg);
         padding: 10px 16px;
         font-size: 0.85rem;
         font-weight: 600;
@@ -33,8 +33,8 @@
     }
     .fb-overlay.open { display: flex; }
     .fb-modal {
-        background: #fff;
-        border-radius: 14px;
+        background: var(--surface);
+        border-radius: var(--radius-md);
         padding: 1.4rem 1.6rem;
         max-width: 720px;
         width: 92%;
@@ -44,49 +44,49 @@
         box-shadow: 0 16px 40px rgba(0,0,0,0.22);
         font-family: inherit;
     }
-    .fb-modal h3 { margin: 0 0 0.4rem; font-size: 1.1rem; color: #111; }
-    .fb-modal p.fb-help { margin: 0 0 1rem; font-size: 0.85rem; color: #555; }
+    .fb-modal h3 { margin: 0 0 0.4rem; font-size: 1.1rem; color: var(--text); }
+    .fb-modal p.fb-help { margin: 0 0 1rem; font-size: 0.85rem; color: var(--text-secondary); }
     .fb-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .fb-pill {
         padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        background: #f3f4f6;
-        border: 1px solid #e5e7eb;
+        border-radius: var(--radius-lg);
+        background: var(--surface-sunken);
+        border: 1px solid var(--border);
         font-size: 0.8rem;
-        color: #374151;
+        color: var(--text-secondary);
         cursor: pointer;
         font-weight: 500;
     }
-    .fb-pill.active { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+    .fb-pill.active { background: var(--accent-surface); border-color: var(--accent-border); color: var(--accent); }
     .fb-textarea {
         width: 100%;
         min-height: 110px;
         padding: 0.65rem 0.8rem;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-sm);
         font-family: inherit;
         font-size: 0.9rem;
-        color: #111;
+        color: var(--text);
         resize: vertical;
         box-sizing: border-box;
     }
-    .fb-textarea:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .fb-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .fb-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
     .fb-cancel {
-        background: #fff;
-        border: 1px solid #d1d5db;
-        color: #374151;
-        border-radius: 8px;
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        color: var(--text-secondary);
+        border-radius: var(--radius-sm);
         padding: 0.5rem 1rem;
         cursor: pointer;
         font-weight: 500;
         font-family: inherit;
     }
     .fb-submit {
-        background: #5b21b6;
-        color: #fff;
+        background: var(--primary-fill);
+        color: var(--surface);
         border: none;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         padding: 0.5rem 1.1rem;
         cursor: pointer;
         font-weight: 600;
@@ -94,21 +94,21 @@
     }
     .fb-submit[disabled] { opacity: 0.6; cursor: wait; }
     .fb-success {
-        background: #ecfdf5;
-        border: 1px solid #6ee7b7;
-        color: #065f46;
+        background: var(--success-surface);
+        border: 1px solid var(--success-border);
+        color: var(--success);
         padding: 0.6rem 0.8rem;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         font-size: 0.85rem;
         margin-bottom: 0.75rem;
         display: none;
     }
     .fb-error {
-        background: #fef2f2;
-        border: 1px solid #fca5a5;
-        color: #991b1b;
+        background: var(--danger-surface);
+        border: 1px solid var(--danger-border);
+        color: var(--danger);
         padding: 0.6rem 0.8rem;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         font-size: 0.85rem;
         margin-bottom: 0.75rem;
         display: none;
@@ -130,17 +130,17 @@
         <h3 id="fb-title">{% trans "Help & Support" %}</h3>
 
         <!-- Tab bar -->
-        <div style="display:flex;gap:0.4rem;margin:0.4rem 0 0.9rem;border-bottom:1px solid #e5e7eb;">
-            <button type="button" id="fb-tab-ai" class="fb-tab fb-tab-active" style="background:none;border:none;border-bottom:2px solid #5b21b6;padding:0.5rem 0.9rem;font-weight:600;color:#5b21b6;cursor:pointer;">💬 {% trans "Ask the AI" %}</button>
-            <button type="button" id="fb-tab-support" class="fb-tab" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.5rem 0.9rem;font-weight:600;color:#6b7280;cursor:pointer;">📩 {% trans "Send to support" %}</button>
+        <div style="display:flex;gap:0.4rem;margin:0.4rem 0 0.9rem;border-bottom:1px solid var(--border);">
+            <button type="button" id="fb-tab-ai" class="fb-tab fb-tab-active" style="background:none;border:none;border-bottom:2px solid var(--accent);padding:0.5rem 0.9rem;font-weight:600;color:var(--accent);cursor:pointer;">💬 {% trans "Ask the AI" %}</button>
+            <button type="button" id="fb-tab-support" class="fb-tab" style="background:none;border:none;border-bottom:2px solid transparent;padding:0.5rem 0.9rem;font-weight:600;color:var(--text-muted);cursor:pointer;">📩 {% trans "Send to support" %}</button>
         </div>
 
         <!-- TAB 1: AI chat -->
         <section id="fb-pane-ai" style="display:flex;flex-direction:column;gap:0.6rem;flex:1;min-height:0;">
-            <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.7rem;flex:1;min-height:280px;max-height:60vh;overflow-y:auto;padding:0.6rem 0.4rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;"></div>
+            <div id="fb-ai-thread" style="display:flex;flex-direction:column;gap:0.7rem;flex:1;min-height:280px;max-height:60vh;overflow-y:auto;padding:0.6rem 0.4rem;background:var(--surface-sunken);border:1px solid var(--border);border-radius: var(--radius-sm);"></div>
             <div style="display:flex;gap:0.4rem;align-items:flex-end;">
-                <textarea id="fb-ai-input" rows="2" placeholder="{% trans 'Ask anything about the platform — how do I…, where is…' %}" style="flex:1;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:10px;font-size:0.92rem;font-family:inherit;resize:vertical;min-height:46px;max-height:140px;"></textarea>
-                <button type="button" id="fb-ai-send" style="background:#5b21b6;color:#fff;border:none;border-radius:10px;padding:0.6rem 1.05rem;font-weight:600;cursor:pointer;font-size:0.9rem;">{% trans "Send" %}</button>
+                <textarea id="fb-ai-input" rows="2" aria-label="{% trans 'Ask a question about the platform' %}" placeholder="{% trans 'Ask anything about the platform — how do I…, where is…' %}" style="flex:1;padding:0.6rem 0.75rem;border:1px solid var(--border-strong);border-radius: var(--radius-sm);font-size:0.92rem;font-family:inherit;resize:vertical;min-height:46px;max-height:140px;"></textarea>
+                <button type="button" id="fb-ai-send" style="background:var(--accent);color:var(--surface);border:none;border-radius: var(--radius-sm);padding:0.6rem 1.05rem;font-weight:600;cursor:pointer;font-size:0.9rem;">{% trans "Send" %}</button>
             </div>
             <div id="fb-ai-error" class="fb-error" style="margin-top:0.4rem;"></div>
         </section>
@@ -162,11 +162,11 @@
                 <button type="button" class="fb-pill" data-severity="high">{% trans "High — pilot blocker" %}</button>
             </div>
 
-            <textarea class="fb-textarea" id="fb-message" placeholder="{% trans 'Describe what happened, what you expected, or any feedback…' %}"></textarea>
+            <textarea class="fb-textarea" id="fb-message" aria-label="{% trans 'Your message' %}" placeholder="{% trans 'Describe what happened, what you expected, or any feedback…' %}"></textarea>
 
-            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:#374151;margin-top:0.5rem;cursor:pointer;">
-                <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:#5b21b6;">
-                <span>{% trans "Include a screenshot of my current screen" %} <span style="color:#6b7280;font-size:0.78rem;">{% trans "(your browser will ask which screen / window to share)" %}</span></span>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text-secondary);margin-top:0.5rem;cursor:pointer;">
+                <input type="checkbox" id="fb-include-screenshot" checked style="accent-color:var(--accent);">
+                <span>{% trans "Include a screenshot of my current screen" %} <span style="color:var(--text-muted);font-size:0.78rem;">{% trans "(your browser will ask which screen / window to share)" %}</span></span>
             </label>
 
             <div class="fb-actions">
@@ -238,10 +238,10 @@
         const isAi = which === 'ai';
         paneAi.style.display = isAi ? 'flex' : 'none';
         paneSupport.style.display = isAi ? 'none' : 'block';
-        tabAi.style.borderBottom = isAi ? '2px solid #5b21b6' : '2px solid transparent';
-        tabAi.style.color = isAi ? '#5b21b6' : '#6b7280';
-        tabSupport.style.borderBottom = isAi ? '2px solid transparent' : '2px solid #5b21b6';
-        tabSupport.style.color = isAi ? '#6b7280' : '#5b21b6';
+        tabAi.style.borderBottom = isAi ? '2px solid var(--accent)' : '2px solid transparent';
+        tabAi.style.color = isAi ? 'var(--accent)' : 'var(--text-muted)';
+        tabSupport.style.borderBottom = isAi ? '2px solid transparent' : '2px solid var(--accent)';
+        tabSupport.style.color = isAi ? 'var(--text-muted)' : 'var(--accent)';
     }
     tabAi.addEventListener('click', () => activateTab('ai'));
     tabSupport.addEventListener('click', () => activateTab('support'));
@@ -264,10 +264,10 @@
         let s = escape(text || '');
         // Code blocks (```...```)
         s = s.replace(/```([\s\S]*?)```/g, (_, code) =>
-            `<pre style="background:#f1f5f9;padding:0.5rem 0.7rem;border-radius:6px;overflow-x:auto;font-size:0.82rem;margin:0.4rem 0;"><code>${code}</code></pre>`
+            `<pre style="background:var(--surface-sunken);padding:0.5rem 0.7rem;border-radius: var(--radius-xs);overflow-x:auto;font-size:0.82rem;margin:0.4rem 0;"><code>${code}</code></pre>`
         );
         // Inline code
-        s = s.replace(/`([^`\n]+)`/g, '<code style="background:#f1f5f9;padding:0.05rem 0.3rem;border-radius:4px;font-size:0.85em;">$1</code>');
+        s = s.replace(/`([^`\n]+)`/g, '<code style="background:var(--surface-sunken);padding:0.05rem 0.3rem;border-radius: var(--radius-xs);font-size:0.85em;">$1</code>');
         // Bold (**) — must come before italic
         s = s.replace(/\*\*([^*\n][^*]*[^*\n])\*\*/g, '<strong>$1</strong>');
         s = s.replace(/\*\*([^*\s][^*]*?)\*\*/g, '<strong>$1</strong>');
@@ -275,7 +275,7 @@
         s = s.replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,!?]|$)/g, '$1<em>$2</em>');
         // Links [text](url)
         s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g,
-            '<a href="$2" target="_blank" rel="noopener" style="color:#5b21b6;text-decoration:underline;">$1</a>');
+            '<a href="$2" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">$1</a>');
 
         // Lists: split into lines, group consecutive list items
         const lines = s.split('\n');
@@ -315,8 +315,8 @@
     function aiAppendBubble(role, text) {
         const wrap = document.createElement('div');
         wrap.style.cssText = role === 'user'
-            ? 'align-self:flex-end;max-width:80%;background:#ede9fe;color:#3b0764;padding:0.6rem 0.9rem;border-radius:14px 14px 4px 14px;font-size:0.92rem;line-height:1.55;'
-            : 'align-self:flex-start;max-width:90%;background:#fff;color:#111827;padding:0.7rem 0.95rem;border:1px solid #e5e7eb;border-radius:14px 14px 14px 4px;font-size:0.92rem;line-height:1.6;box-shadow:0 1px 2px rgba(0,0,0,0.03);';
+            ? 'align-self:flex-end;max-width:80%;background:var(--accent-surface);color:var(--accent);padding:0.6rem 0.9rem;border-radius: var(--radius-md) 14px 4px 14px;font-size:0.92rem;line-height:1.55;'
+            : 'align-self:flex-start;max-width:90%;background:var(--surface);color:var(--text)827;padding:0.7rem 0.95rem;border:1px solid var(--border);border-radius: var(--radius-md) 14px 14px 4px;font-size:0.92rem;line-height:1.6;box-shadow:0 1px 2px rgba(0,0,0,0.03);';
         if (role === 'assistant') {
             wrap.innerHTML = aiRenderMarkdown(text);
         } else {
@@ -334,23 +334,23 @@
 
     function aiAppendToolCard(prop, msgIndex) {
         const card = document.createElement('div');
-        card.style.cssText = 'align-self:flex-start;max-width:90%;background:#fef3c7;border:1px solid #fde68a;color:#78350f;padding:0.6rem 0.8rem;border-radius:10px;font-size:0.86rem;';
+        card.style.cssText = 'align-self:flex-start;max-width:90%;background:var(--warning-surface);border:1px solid var(--warning-border);color:var(--warning);padding:0.6rem 0.8rem;border-radius: var(--radius-sm);font-size:0.86rem;';
         const summary = document.createElement('div');
         summary.style.fontWeight = '600';
         summary.style.marginBottom = '0.3rem';
         summary.textContent = '⚡ ' + gettext('Proposed action:') + ' ' + prop.name;
         const inputs = document.createElement('pre');
-        inputs.style.cssText = 'font-size:0.78rem;background:#fff;padding:0.4rem;border-radius:6px;overflow-x:auto;margin:0.25rem 0;color:#374151;';
+        inputs.style.cssText = 'font-size:0.78rem;background:var(--surface);padding:0.4rem;border-radius: var(--radius-xs);overflow-x:auto;margin:0.25rem 0;color:var(--text-secondary);';
         inputs.textContent = JSON.stringify(prop.inputs, null, 2);
         const actions = document.createElement('div');
         actions.style.cssText = 'display:flex;gap:0.4rem;margin-top:0.4rem;';
         const confirmBtn = document.createElement('button');
         confirmBtn.type = 'button';
-        confirmBtn.style.cssText = 'background:#16a34a;color:#fff;border:none;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;font-weight:600;cursor:pointer;';
+        confirmBtn.style.cssText = 'background:var(--success-solid);color:var(--surface);border:none;border-radius: var(--radius-xs);padding:0.3rem 0.7rem;font-size:0.8rem;font-weight:600;cursor:pointer;';
         confirmBtn.textContent = gettext('Confirm');
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
-        cancelBtn.style.cssText = 'background:#f9fafb;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;';
+        cancelBtn.style.cssText = 'background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius: var(--radius-xs);padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;';
         cancelBtn.textContent = gettext('Cancel');
         confirmBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, true, card));
         cancelBtn.addEventListener('click', () => aiResolveTool(prop.tool_use_id, false, card));
@@ -369,7 +369,7 @@
         if (!url.startsWith('/') && !url.match(/^https?:\/\/(ai-tutor\.|localhost)/)) return;
         const link = document.createElement('a');
         link.href = url;
-        link.style.cssText = 'align-self:flex-start;background:#5b21b6;color:#fff;padding:0.4rem 0.95rem;border-radius:999px;text-decoration:none;font-size:0.85rem;font-weight:600;';
+        link.style.cssText = 'align-self:flex-start;background:var(--accent);color:var(--surface);padding:0.4rem 0.95rem;border-radius: var(--radius-lg);text-decoration:none;font-size:0.85rem;font-weight:600;';
         link.textContent = '🔗 ' + (label || gettext('Take me there →'));
         aiThread.appendChild(link);
     }
@@ -379,7 +379,7 @@
         row.style.cssText = 'align-self:flex-start;margin-top:-0.1rem;';
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.style.cssText = 'background:transparent;color:#6b7280;border:none;text-decoration:underline;font-size:0.78rem;cursor:pointer;padding:0;';
+        btn.style.cssText = 'background:transparent;color:var(--text-muted);border:none;text-decoration:underline;font-size:0.78rem;cursor:pointer;padding:0;';
         btn.textContent = gettext('Send this to support →');
         btn.addEventListener('click', () => {
             // Switch to support tab and pre-fill the message field

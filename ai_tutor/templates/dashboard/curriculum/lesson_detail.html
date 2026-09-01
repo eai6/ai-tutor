@@ -94,10 +94,10 @@
         text-transform: uppercase;
         font-weight: 600;
     }
-    .step-phase.engage { background: #fef3c7; color: #92400e; }
-    .step-phase.explore { background: #dbeafe; color: #1e40af; }
-    .step-phase.explain { background: #d1fae5; color: #065f46; }
-    .step-phase.practice { background: #ede9fe; color: #5b21b6; }
+    .step-phase.engage { background: var(--warning-surface); color: var(--warning); }
+    .step-phase.explore { background: var(--info-surface); color: var(--info); }
+    .step-phase.explain { background: var(--success-surface); color: var(--success); }
+    .step-phase.practice { background: var(--accent-surface); color: var(--accent); }
     .step-phase.evaluate { background: #fce7f3; color: #9d174d; }
     
     .step-body {
@@ -135,12 +135,12 @@
     }
     .media-item {
         padding: 0.5rem;
-        background: #fef3c7;
+        background: var(--warning-surface);
         border-radius: 4px;
         font-size: 0.8rem;
     }
     .media-item.has-url {
-        background: #d1fae5;
+        background: var(--success-surface);
     }
     
     .vocab-list {
@@ -149,7 +149,7 @@
         gap: 0.5rem;
     }
     .vocab-item {
-        background: #eff6ff;
+        background: var(--info-surface);
         padding: 0.25rem 0.5rem;
         border-radius: 4px;
         font-size: 0.8rem;
@@ -170,15 +170,15 @@
 
 <div id="lesson-live-region" data-is-generating="{% if is_generating %}1{% else %}0{% endif %}">
 {% if is_generating %}
-<div style="background:#dbeafe; border:1px solid #93c5fd; border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
+<div style="background:var(--info-surface); border:1px solid #93c5fd; border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
     <span id="lesson-regen-spinner" style="font-size:1.25rem; display:inline-block;">⏳</span>
     <div style="flex:1; min-width:0;">
-        <strong style="color:#1e40af;">Regenerating content…</strong>
-        <div style="font-size:0.82rem; color:#3b82f6; margin-top:0.15rem;">
+        <strong style="color:var(--info);">Regenerating content…</strong>
+        <div style="font-size:0.82rem; color:var(--info-solid); margin-top:0.15rem;">
             Running in the background. This page checks every 6 seconds and reloads automatically when the regen finishes — usually 30 seconds for an exit-ticket-only refresh, 1–3 minutes if lesson steps are being rebuilt.
         </div>
     </div>
-    <span id="lesson-regen-elapsed" style="font-size:0.78rem; color:#3b82f6; white-space:nowrap;">0s</span>
+    <span id="lesson-regen-elapsed" style="font-size:0.78rem; color:var(--info-solid); white-space:nowrap;">0s</span>
 </div>
 <style>
     #lesson-regen-spinner { animation: lesson-regen-spin 1.4s linear infinite; }
@@ -246,7 +246,7 @@
                     {% if lesson.content_quality in 'tier_3,tier_4' and not lesson.teacher_approved %}
                     <form method="post" action="{% url 'dashboard:lesson_approve' lesson.id %}" style="display: inline;">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm" style="background: #f59e0b; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
+                        <button type="submit" class="btn btn-sm" style="background: var(--warning-solid); color: var(--surface); border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
                             {% trans "Approve Content" %}
                         </button>
                     </form>
@@ -264,7 +264,7 @@
                 </form>
                 {% endif %}
                 {% if is_generating and can_regenerate_courses %}
-                <span style="display:inline-flex; align-items:center; gap:0.4rem; background:#dbeafe; border:1px solid #93c5fd; padding:0.3rem 0.7rem; border-radius:8px; font-size:0.78rem; color:#1e40af; font-weight:600;">
+                <span style="display:inline-flex; align-items:center; gap:0.4rem; background:var(--info-surface); border:1px solid #93c5fd; padding:0.3rem 0.7rem; border-radius:8px; font-size:0.78rem; color:var(--info); font-weight:600;">
                     <span style="display:inline-block; animation:lesson-regen-spin 1.4s linear infinite;">⏳</span>
                     Regenerating…
                 </span>
@@ -273,14 +273,14 @@
                       style="display:inline-flex; align-items:center; gap:0.4rem; flex-wrap:wrap; background:#f5f3ff; border:1px solid #ddd6fe; padding:0.3rem 0.6rem; border-radius:8px;">
                     {% csrf_token %}
                     <input type="hidden" name="scope_marker" value="1">
-                    <label style="font-size:0.75rem; color:#5b21b6; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+                    <label style="font-size:0.75rem; color:var(--accent); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
                            title="Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching script and only refresh the exit ticket.">
-                        <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:#7c3aed;">
+                        <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:var(--accent);">
                         Steps
                     </label>
-                    <label style="font-size:0.75rem; color:#5b21b6; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+                    <label style="font-size:0.75rem; color:var(--accent); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
                            title="Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved.">
-                        <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:#7c3aed;">
+                        <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:var(--accent);">
                         Exit ticket
                     </label>
                     <button type="submit" class="btn btn-primary btn-sm"
@@ -290,38 +290,38 @@
                 </form>
                 {% endif %}
                 {% endif %}
-                <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
+                <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
                     Session Report
                 </a>
-                <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="btn btn-sm" style="background:#8b5cf6;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
+                <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="btn btn-sm" style="background:var(--accent-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
                     Live Monitor
                 </a>
             </div>
         </div>
         
         {% if lesson.objective %}
-        <div style="margin-top: 1rem; padding: 1rem; background: #eff6ff; border-radius: 8px;">
-            <strong style="color: #1e40af;">Learning Objective:</strong>
-            <p style="margin: 0.5rem 0 0 0; color: #1e40af;">{{ lesson.objective }}</p>
+        <div style="margin-top: 1rem; padding: 1rem; background: var(--info-surface); border-radius: 8px;">
+            <strong style="color: var(--info);">Learning Objective:</strong>
+            <p style="margin: 0.5rem 0 0 0; color: var(--info);">{{ lesson.objective }}</p>
         </div>
         {% endif %}
 
-        <details style="margin-top:1rem;padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
-            <summary style="cursor:pointer;font-weight:600;color:#374151;">
+        <details style="margin-top:1rem;padding:1rem;background:var(--surface-sunken);border:1px solid var(--border);border-radius:8px;">
+            <summary style="cursor:pointer;font-weight:600;color:var(--text-secondary);">
                 👥 Group session settings
-                {% if lesson.allow_group_mode %}<span style="font-size:0.75rem;background:#dcfce7;color:#166534;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">enabled</span>
-                {% else %}<span style="font-size:0.75rem;background:#f3f4f6;color:#6b7280;padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">solo only</span>{% endif %}
+                {% if lesson.allow_group_mode %}<span style="font-size:0.75rem;background:#dcfce7;color:var(--success);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">enabled</span>
+                {% else %}<span style="font-size:0.75rem;background:var(--surface-sunken);color:var(--text-muted);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">solo only</span>{% endif %}
             </summary>
             <form method="post" action="{% url 'dashboard:lesson_group_settings' lesson.id %}" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.85rem;">
                 {% csrf_token %}
-                <label style="display:flex;align-items:center;gap:0.5rem;color:#374151;">
+                <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary);">
                     <input type="checkbox" name="allow_group_mode" {% if lesson.allow_group_mode %}checked{% endif %}>
                     <span><strong>Allow group sessions</strong> — students may complete this lesson together on one device. When enabled, group sessions start immediately (no separate teacher approval).</span>
                 </label>
-                <label style="display:flex;align-items:center;gap:0.5rem;color:#374151;">
+                <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary);">
                     <span><strong>Max group size:</strong></span>
-                    <input type="number" name="max_group_size" value="{{ lesson.max_group_size|default:4 }}" min="2" max="10" style="width:5rem;padding:0.25rem 0.5rem;border:1px solid #d1d5db;border-radius:4px;">
-                    <span style="font-size:0.85rem;color:#6b7280;">(2–10 students)</span>
+                    <input type="number" name="max_group_size" value="{{ lesson.max_group_size|default:4 }}" min="2" max="10" style="width:5rem;padding:0.25rem 0.5rem;border:1px solid var(--border-strong);border-radius:4px;">
+                    <span style="font-size:0.85rem;color:var(--text-muted);">(2–10 students)</span>
                 </label>
                 <div>
                     <button type="submit" class="btn btn-primary btn-sm">Save group settings</button>
@@ -330,9 +330,9 @@
         </details>
 
         {% if unit_terminal_objectives %}
-        <div style="margin-top: 0.75rem; padding: 1rem; background: #fefce8; border: 1px solid #fde68a; border-radius: 8px;">
+        <div style="margin-top: 0.75rem; padding: 1rem; background: #fefce8; border: 1px solid var(--warning-border); border-radius: 8px;">
             <strong style="color: #854d0e; font-size: 0.875rem;">Terminal Objectives ({{ unit_terminal_objectives|length }})</strong>
-            <div style="font-size: 0.7rem; color: #92400e; margin-top: 0.15rem;">From the parent unit — broader outcomes this lesson contributes to.</div>
+            <div style="font-size: 0.7rem; color: var(--warning); margin-top: 0.15rem;">From the parent unit — broader outcomes this lesson contributes to.</div>
             <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem;">
                 {% for to in unit_terminal_objectives %}
                 <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: #a16207;">
@@ -351,14 +351,14 @@
           review time (L1, commit 706b141) and post-publish.
           See memory/lesson_objectives_management_plan.md.
         {% endcomment %}
-        <div style="margin-top: 0.75rem; padding: 1rem; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px;">
+        <div style="margin-top: 0.75rem; padding: 1rem; background: var(--info-surface); border: 1px solid var(--info-border); border-radius: 8px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
                 <div>
-                    <strong style="color: #4338ca; font-size: 0.875rem;">Lesson Terminal Objectives ({{ lesson.enabling_objectives|length }})</strong>
+                    <strong style="color: var(--info); font-size: 0.875rem;">Lesson Terminal Objectives ({{ lesson.enabling_objectives|length }})</strong>
                     <div style="font-size: 0.7rem; color: #4f46e5; margin-top: 0.15rem;">What this lesson teaches. Click any TO to edit; ✕ to remove; + Add TO to add a new one. Click Save to persist.</div>
                 </div>
                 {% if can_edit_content %}
-                <button type="button" id="lesson-eo-toggle" onclick="toggleLessonEoEdit()" style="background:#4338ca;color:#fff;border:none;border-radius:4px;padding:0.25rem 0.6rem;font-size:0.75rem;cursor:pointer;">Edit</button>
+                <button type="button" id="lesson-eo-toggle" onclick="toggleLessonEoEdit()" style="background:var(--info);color:var(--surface);border:none;border-radius:4px;padding:0.25rem 0.6rem;font-size:0.75rem;cursor:pointer;">Edit</button>
                 {% endif %}
             </div>
 
@@ -366,11 +366,11 @@
             <div id="lesson-eo-view" style="display:flex;flex-direction:column;gap:0.375rem;">
                 {% for eo in lesson.enabling_objectives %}
                 <div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.8125rem;color:#3730a3;">
-                    <span style="background:#ddd6fe;color:#4338ca;padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;">TO{{ forloop.counter }}</span>
+                    <span style="background:#ddd6fe;color:var(--info);padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;">TO{{ forloop.counter }}</span>
                     <span>{{ eo }}</span>
                 </div>
                 {% empty %}
-                <div style="font-size:0.8125rem;color:#6b7280;font-style:italic;">No Terminal Objectives yet. Click Edit to add some.</div>
+                <div style="font-size:0.8125rem;color:var(--text-muted);font-style:italic;">No Terminal Objectives yet. Click Edit to add some.</div>
                 {% endfor %}
             </div>
 
@@ -381,25 +381,25 @@
                 <div id="lesson-eo-rows" style="display:flex;flex-direction:column;gap:0.375rem;">
                     {% for eo in lesson.enabling_objectives %}
                     <div class="lesson-eo-row" style="display:flex;align-items:flex-start;gap:0.375rem;">
-                        <span style="background:#ddd6fe;color:#4338ca;padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
-                        <textarea name="enabling_objectives" rows="1" data-original-eo="{{ eo }}" style="flex:1;font-size:0.8125rem;border:1px solid #c7d2fe;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;">{{ eo }}</textarea>
+                        <span style="background:#ddd6fe;color:var(--info);padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
+                        <textarea name="enabling_objectives" rows="1" data-original-eo="{{ eo }}" style="flex:1;font-size:0.8125rem;border:1px solid var(--info-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;">{{ eo }}</textarea>
                         {% if sibling_lessons %}
-                        <select onchange="moveLessonEo(this, {{ lesson.id }})" style="font-size:0.7rem;border:1px solid #c7d2fe;border-radius:4px;padding:2px 4px;background:#fff;color:#4338ca;flex-shrink:0;max-width:140px;" title="Move this TO to another lesson in the same unit">
+                        <select onchange="moveLessonEo(this, {{ lesson.id }})" style="font-size:0.7rem;border:1px solid var(--info-border);border-radius:4px;padding:2px 4px;background:var(--surface);color:var(--info);flex-shrink:0;max-width:140px;" title="Move this TO to another lesson in the same unit">
                             <option value="">Move to…</option>
                             {% for sib in sibling_lessons %}
                             <option value="{{ sib.id }}">→ {{ sib.title|truncatechars:32 }}</option>
                             {% endfor %}
                         </select>
                         {% endif %}
-                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
+                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
                     </div>
                     {% endfor %}
                 </div>
                 <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                    <button type="button" onclick="addLessonEoRow()" style="font-size:0.75rem;color:#4338ca;background:none;border:1px dashed #c7d2fe;border-radius:4px;padding:3px 10px;cursor:pointer;">+ Add TO</button>
+                    <button type="button" onclick="addLessonEoRow()" style="font-size:0.75rem;color:var(--info);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:3px 10px;cursor:pointer;">+ Add TO</button>
                     <span style="flex:1;"></span>
-                    <button type="button" onclick="toggleLessonEoEdit()" style="font-size:0.75rem;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:4px;padding:3px 10px;cursor:pointer;">Cancel</button>
-                    <button type="submit" style="font-size:0.75rem;background:#4338ca;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">Save</button>
+                    <button type="button" onclick="toggleLessonEoEdit()" style="font-size:0.75rem;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;">Cancel</button>
+                    <button type="submit" style="font-size:0.75rem;background:var(--info);color:var(--surface);border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">Save</button>
                 </div>
             </form>
             {% if sibling_lessons %}
@@ -432,9 +432,9 @@
                     row.className = 'lesson-eo-row';
                     row.style.cssText = 'display:flex;align-items:flex-start;gap:0.375rem;';
                     row.innerHTML = `
-                        <span style="background:#ddd6fe;color:#4338ca;padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
-                        <textarea name="enabling_objectives" rows="1" style="flex:1;font-size:0.8125rem;border:1px solid #c7d2fe;border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" placeholder="Type Terminal Objective..."></textarea>
-                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
+                        <span style="background:#ddd6fe;color:var(--info);padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
+                        <textarea name="enabling_objectives" rows="1" style="flex:1;font-size:0.8125rem;border:1px solid var(--info-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" placeholder="Type Terminal Objective..."></textarea>
+                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
                     `;
                     rows.appendChild(row);
                     row.querySelector('textarea').focus();
@@ -500,7 +500,7 @@
     <div class="card-body">
         <div id="prereq-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
             {% for p in prerequisites %}
-            <span class="prereq-pill" data-prereq-id="{{ p.prerequisite.id }}" style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: #eff6ff; border-radius: 9999px; font-size: 0.875rem;">
+            <span class="prereq-pill" data-prereq-id="{{ p.prerequisite.id }}" style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: var(--info-surface); border-radius: 9999px; font-size: 0.875rem;">
                 {{ p.prerequisite.title }}
                 {% if user.is_superuser %}
                 <button type="button" onclick="removePrereq(this, {{ p.prerequisite.id }})" style="background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1rem; line-height: 1; padding: 0;" title="Remove prerequisite">&times;</button>
@@ -530,10 +530,10 @@
 {% with step_corrs=audit.step_corrections|default_if_none:'' et_corrs=audit.exit_ticket_corrections|default_if_none:'' answer_key_mismatches=audit.answer_key_mismatches|default_if_none:'' layer4_rejections=audit.layer4_rejections|default_if_none:'' %}
 {% if step_corrs or et_corrs or answer_key_mismatches or layer4_rejections %}
 <!-- Layers 1 + 2 — content arithmetic verification audit -->
-<div class="card" style="border-left:4px solid #8b5cf6;">
+<div class="card" style="border-left:4px solid var(--accent-solid);">
     <div class="card-header">
         <h3 class="card-title" style="margin:0;">🧮 Arithmetic Verification</h3>
-        <span style="color:#71717a;font-size:0.75rem;">at content generation time · {{ audit.generated_at|default:"(no timestamp)" }}</span>
+        <span style="color:var(--text-muted);font-size:0.75rem;">at content generation time · {{ audit.generated_at|default:"(no timestamp)" }}</span>
     </div>
     <div class="card-body" style="padding:1rem;">
         {% with auto_step=0 detect_step=0 auto_q=0 detect_q=0 %}
@@ -545,29 +545,29 @@
             <span><strong>{{ et_corrs|length }}</strong> exit-ticket correction{{ et_corrs|length|pluralize }}</span>
             {% if answer_key_mismatches %}
             <span>·</span>
-            <span style="color:#b91c1c;"><strong>{{ answer_key_mismatches|length }}</strong> answer-key mismatch{{ answer_key_mismatches|length|pluralize:"es" }}</span>
+            <span style="color:var(--danger);"><strong>{{ answer_key_mismatches|length }}</strong> answer-key mismatch{{ answer_key_mismatches|length|pluralize:"es" }}</span>
             {% endif %}
             {% if layer4_rejections %}
             <span>·</span>
-            <span style="color:#b91c1c;"><strong>{{ layer4_rejections|length }}</strong> Layer 4 rejection{{ layer4_rejections|length|pluralize }}{% if audit.layer4_retry_count %} (retry: {{ audit.layer4_retry_count }}){% endif %}</span>
+            <span style="color:var(--danger);"><strong>{{ layer4_rejections|length }}</strong> Layer 4 rejection{{ layer4_rejections|length|pluralize }}{% if audit.layer4_retry_count %} (retry: {{ audit.layer4_retry_count }}){% endif %}</span>
             {% endif %}
             {% if audit.exit_ticket_questions_created %}
             <span>·</span>
-            <span style="color:#1e40af;"><strong>{{ audit.exit_ticket_questions_created }}</strong> question{{ audit.exit_ticket_questions_created|pluralize }} in bank</span>
+            <span style="color:var(--info);"><strong>{{ audit.exit_ticket_questions_created }}</strong> question{{ audit.exit_ticket_questions_created|pluralize }} in bank</span>
             {% endif %}
         </div>
         <details style="font-size:0.8rem;">
-            <summary style="cursor:pointer;color:#5b21b6;font-weight:600;">Show details</summary>
+            <summary style="cursor:pointer;color:var(--accent);font-weight:600;">Show details</summary>
             <div style="margin-top:0.6rem;">
                 {% if step_corrs %}
                 <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#3f3f46;">Step content</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in step_corrs %}
                     <li style="margin-bottom:0.4rem;">
-                        Step {{ c.step_order|add:1 }}, <code style="background:#f4f4f5;padding:0.1rem 0.35rem;border-radius:3px;">{{ c.field }}</code> —
+                        Step {{ c.step_order|add:1 }}, <code style="background:var(--surface-sunken);padding:0.1rem 0.35rem;border-radius:3px;">{{ c.field }}</code> —
                         {% if c.auto_corrected %}<span style="color:#15803d;">auto-corrected</span>{% else %}<span style="color:#b45309;">detect-only (Layer 3 retry)</span>{% endif %}
                         {% for fix in c.corrections %}
-                        <div style="margin:0.2rem 0 0.2rem 1rem;color:#71717a;">
+                        <div style="margin:0.2rem 0 0.2rem 1rem;color:var(--text-muted);">
                             <code>{{ fix.expression }} = {{ fix.claimed }}</code> → <code>{{ fix.expression }} = {{ fix.correct }}</code>
                         </div>
                         {% endfor %}
@@ -580,10 +580,10 @@
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in et_corrs %}
                     <li style="margin-bottom:0.4rem;">
-                        Q{{ c.question_index|add:1 }}, <code style="background:#f4f4f5;padding:0.1rem 0.35rem;border-radius:3px;">{{ c.field }}</code> —
+                        Q{{ c.question_index|add:1 }}, <code style="background:var(--surface-sunken);padding:0.1rem 0.35rem;border-radius:3px;">{{ c.field }}</code> —
                         {% if c.auto_corrected %}<span style="color:#15803d;">auto-corrected</span>{% else %}<span style="color:#b45309;">detect-only (Layer 3 retry)</span>{% endif %}
                         {% for fix in c.corrections %}
-                        <div style="margin:0.2rem 0 0.2rem 1rem;color:#71717a;">
+                        <div style="margin:0.2rem 0 0.2rem 1rem;color:var(--text-muted);">
                             <code>{{ fix.expression }} = {{ fix.claimed }}</code> → <code>{{ fix.expression }} = {{ fix.correct }}</code>
                         </div>
                         {% endfor %}
@@ -592,27 +592,27 @@
                 </ul>
                 {% endif %}
                 {% if answer_key_mismatches %}
-                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#b91c1c;">Answer-key mismatches (Layer 2 — most damaging class; questions dropped)</h4>
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:var(--danger);">Answer-key mismatches (Layer 2 — most damaging class; questions dropped)</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in answer_key_mismatches %}
                     <li style="margin-bottom:0.4rem;">
-                        Q{{ c.question_index|add:1 }}, pattern <code style="background:#f4f4f5;padding:0.1rem 0.35rem;border-radius:3px;">{{ c.pattern }}</code>
-                        <div style="margin:0.2rem 0 0.2rem 1rem;color:#71717a;">
+                        Q{{ c.question_index|add:1 }}, pattern <code style="background:var(--surface-sunken);padding:0.1rem 0.35rem;border-radius:3px;">{{ c.pattern }}</code>
+                        <div style="margin:0.2rem 0 0.2rem 1rem;color:var(--text-muted);">
                             stem computes <code>{{ c.computed }}</code>, stored answer was <code>{{ c.claimed }}</code>
                         </div>
-                        <div style="margin:0.1rem 0 0.2rem 1rem;color:#9ca3af;font-size:0.75rem;">{{ c.reason }}</div>
+                        <div style="margin:0.1rem 0 0.2rem 1rem;color:var(--text-faint);font-size:0.75rem;">{{ c.reason }}</div>
                     </li>
                     {% endfor %}
                 </ul>
                 {% endif %}
                 {% if layer4_rejections %}
-                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#b91c1c;">Layer 4 — parametric template rejections{% if audit.layer4_unresolved %} (bank below floor; lesson marked READY_WITH_WARNINGS){% endif %}</h4>
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:var(--danger);">Layer 4 — parametric template rejections{% if audit.layer4_unresolved %} (bank below floor; lesson marked READY_WITH_WARNINGS){% endif %}</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for r in layer4_rejections %}
                     <li style="margin-bottom:0.4rem;">
-                        Q{{ r.question_index|add:1 }} — <code style="background:#f4f4f5;padding:0.1rem 0.35rem;border-radius:3px;">{{ r.reason }}</code>
-                        <div style="margin:0.2rem 0 0.2rem 1rem;color:#71717a;">{{ r.message }}</div>
-                        {% if r.question_text %}<div style="margin:0.1rem 0 0.2rem 1rem;color:#9ca3af;font-size:0.75rem;font-style:italic;">"{{ r.question_text }}"</div>{% endif %}
+                        Q{{ r.question_index|add:1 }} — <code style="background:var(--surface-sunken);padding:0.1rem 0.35rem;border-radius:3px;">{{ r.reason }}</code>
+                        <div style="margin:0.2rem 0 0.2rem 1rem;color:var(--text-muted);">{{ r.message }}</div>
+                        {% if r.question_text %}<div style="margin:0.1rem 0 0.2rem 1rem;color:var(--text-faint);font-size:0.75rem;font-style:italic;">"{{ r.question_text }}"</div>{% endif %}
                     </li>
                     {% endfor %}
                 </ul>
@@ -648,11 +648,11 @@
                         {% with fs=step.judge_outputs.factual_step ra=step.judge_outputs.regen_audit %}
                         {% if step.content_quality_status == 'auto_flagged' %}
                             <span title="{{ fs.recommended_fix|default:fs.reasoning|default:'Judge flagged this step and the regen ensemble could not produce a clean rewrite' }}"
-                                  style="font-size: 0.75rem; color: white; background: #b91c1c;
+                                  style="font-size: 0.75rem; color: white; background: var(--danger);
                                          padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">⚠ Needs Review</span>
                         {% elif step.content_quality_status == 'auto_ok' and ra %}
                             <span title="Original step had factual issues; regen produced a clean rewrite (cycle {{ ra.cycles_run }} of {{ ra.cycles|length }})"
-                                  style="font-size: 0.75rem; color: #047857; font-weight: 500;">✓ Auto-fixed</span>
+                                  style="font-size: 0.75rem; color: var(--success); font-weight: 500;">✓ Auto-fixed</span>
                         {% elif step.content_quality_status == 'auto_ok' and fs.violations %}
                             <span title="{{ fs.recommended_fix|default:fs.reasoning }}"
                                   style="font-size: 0.75rem; color: #b45309; font-weight: 500;">⚠ Review</span>
@@ -660,9 +660,9 @@
                             <span title="Factual judge passed via {{ fs.provider }}"
                                   style="font-size: 0.75rem; color: var(--success);">✓ AI</span>
                         {% elif step.content_quality_status == 'human_approved' %}
-                            <span title="Teacher reviewed and approved" style="font-size: 0.75rem; color: #1e40af;">👤 Approved</span>
+                            <span title="Teacher reviewed and approved" style="font-size: 0.75rem; color: var(--info);">👤 Approved</span>
                         {% elif step.content_quality_status == 'human_edited' %}
-                            <span title="Teacher edited" style="font-size: 0.75rem; color: #1e40af;">✏ Edited</span>
+                            <span title="Teacher edited" style="font-size: 0.75rem; color: var(--info);">✏ Edited</span>
                         {% elif fs and fs.skipped %}
                             <span title="Factual judge skipped: {{ fs.skip_reason }}"
                                   style="font-size: 0.75rem; color: var(--gray-400);">⊘</span>
@@ -685,13 +685,13 @@
                     {% if fs and not fs.skipped %}
                     <div class="step-content-section">
                         {% if step.content_quality_status == 'auto_flagged' %}
-                            <h4 style="color: #b91c1c;">⚠ AI Review — Needs Human Review</h4>
+                            <h4 style="color: var(--danger);">⚠ AI Review — Needs Human Review</h4>
                         {% elif step.content_quality_status == 'auto_ok' and ra %}
-                            <h4 style="color: #047857;">✓ AI Review — Auto-fixed by regen</h4>
+                            <h4 style="color: var(--success);">✓ AI Review — Auto-fixed by regen</h4>
                         {% elif fs.violations and fs.passed %}
                             <h4 style="color: #b45309;">⚠ AI Review — Teacher review suggested</h4>
                         {% elif not fs.passed %}
-                            <h4 style="color: #b91c1c;">⚠ AI Review — Factual issues found</h4>
+                            <h4 style="color: var(--danger);">⚠ AI Review — Factual issues found</h4>
                         {% else %}
                             <h4 style="color: var(--success);">✓ AI Review — Factual check passed</h4>
                         {% endif %}
@@ -702,13 +702,13 @@
                         {% endif %}
                         {% if fs.recommended_fix %}
                         <div style="font-size: 0.875rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem;
-                                    background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 0.25rem;
+                                    background: var(--warning-surface); border-left: 3px solid var(--warning-solid); border-radius: 0.25rem;
                                     white-space: pre-line;">{{ fs.recommended_fix }}</div>
                         {% endif %}
                         {% if ra %}
                         <div style="font-size: 0.8125rem; margin-top: 0.625rem; padding: 0.5rem 0.75rem;
-                                    background: {% if step.content_quality_status == 'auto_flagged' %}#fef2f2{% else %}#ecfdf5{% endif %};
-                                    border-left: 3px solid {% if step.content_quality_status == 'auto_flagged' %}#b91c1c{% else %}#047857{% endif %};
+                                    background: {% if step.content_quality_status == 'auto_flagged' %}var(--danger-surface){% else %}var(--success-surface){% endif %};
+                                    border-left: 3px solid {% if step.content_quality_status == 'auto_flagged' %}var(--danger){% else %}var(--success){% endif %};
                                     border-radius: 0.25rem;">
                             <strong>Regen audit:</strong>
                             tried {{ ra.cycles_run }} cycle{{ ra.cycles_run|pluralize }},
@@ -732,14 +732,14 @@
                               style="margin-top: 0.5rem; display:inline;">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-secondary btn-sm"
-                                    style="border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;"
+                                    style="border-color:#93c5fd; color:var(--info); background:var(--info-surface);"
                                     onclick="return confirm('Mark this step as reviewed? The flag will clear and the step will be tagged as human-approved.');">
                                 ✓ Mark as Reviewed
                             </button>
                         </form>
                         {% endif %}
                         {% if step.reviewed_by and step.reviewed_at %}
-                        <div style="font-size: 0.75rem; color: #1d4ed8; margin-top: 0.5rem;">
+                        <div style="font-size: 0.75rem; color: var(--info); margin-top: 0.5rem;">
                             👤 Approved by {{ step.reviewed_by.username }} on {{ step.reviewed_at|date:"M j, Y H:i" }}
                         </div>
                         {% endif %}
@@ -760,7 +760,7 @@
                         <div class="step-script">{{ step.teacher_script }}</div>
 
                         <div class="regen-panel" data-step-id="{{ step.id }}" hidden
-                             style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                             style="margin-top:0.625rem; padding:0.75rem; background:var(--surface-sunken);
                                     border:1px solid var(--gray-200); border-radius:0.375rem;">
                             <div style="display:flex; gap:0.5rem; margin-bottom:0.625rem; font-size:0.8125rem;">
                                 <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
@@ -781,7 +781,7 @@
                             <div style="display:flex; gap:0.5rem;">
                                 <button type="button" class="regen-apply-btn" data-step-id="{{ step.id }}"
                                         style="font-size:0.8125rem; padding:0.375rem 0.75rem;
-                                               background:var(--primary,#7c3aed); color:white; border:none;
+                                               background:var(--primary,var(--accent)); color:white; border:none;
                                                border-radius:0.25rem; cursor:pointer;">Apply</button>
                                 <button type="button" class="regen-cancel-btn" data-step-id="{{ step.id }}"
                                         style="font-size:0.8125rem; padding:0.375rem 0.75rem;
@@ -805,7 +805,7 @@
                                 <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
                                     <button type="button" class="regen-save-btn" data-step-id="{{ step.id }}"
                                             style="font-size:0.8125rem; padding:0.375rem 0.75rem;
-                                                   background:#047857; color:white; border:none;
+                                                   background:var(--success); color:white; border:none;
                                                    border-radius:0.25rem; cursor:pointer;">Save to Step</button>
                                     <button type="button" class="regen-discard-btn" data-step-id="{{ step.id }}"
                                             style="font-size:0.8125rem; padding:0.375rem 0.75rem;
@@ -928,11 +928,11 @@
                     Q{{ forloop.counter }}: {{ question.question_text }}
                 </div>
                 <div style="display: flex; gap: 0.375rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.question_type == 'mcq' %}#e0e7ff{% elif question.question_type == 'fill_in_blank' %}#fce7f3{% elif question.question_type == 'matching' %}#ede9fe{% elif question.question_type == 'short_answer' %}#ecfdf5{% else %}#fff7ed{% endif %};">{{ question.get_question_type_display }}</span>
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.question_type == 'mcq' %}var(--info-surface){% elif question.question_type == 'fill_in_blank' %}#fce7f3{% elif question.question_type == 'matching' %}var(--accent-surface){% elif question.question_type == 'short_answer' %}var(--success-surface){% else %}#fff7ed{% endif %};">{{ question.get_question_type_display }}</span>
                     {% if question.difficulty %}
-                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}#d1fae5{% elif question.difficulty == 'hard' %}#fee2e2{% else %}#fef3c7{% endif %};">{{ question.difficulty }}</span>
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}var(--success-surface){% elif question.difficulty == 'hard' %}var(--danger-surface){% else %}var(--warning-surface){% endif %};">{{ question.difficulty }}</span>
                     {% endif %}
-                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe;" title="Teaching objective">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--info-surface);" title="Teaching objective">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
                     {% comment %}Pick whichever judge ran for this question type — MCQ → exit_question; FIB/SA/Matching → their dedicated judges. Each writes to judge_outputs.<type> with the same shape, so the badge logic below is uniform.{% endcomment %}
                     {% with eq=question.judge_outputs.exit_question fib=question.judge_outputs.fill_in_blank sa=question.judge_outputs.short_answer mt=question.judge_outputs.matching %}
                     {% with verdict=eq|default:fib|default:sa|default:mt %}
@@ -941,13 +941,13 @@
                             <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--gray-100); color: var(--gray-500);"
                                   title="Judge skipped: {{ verdict.skip_reason }}">⊘ AI</span>
                         {% elif not verdict.passed %}
-                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fee2e2; color: #991b1b; font-weight: 600;"
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--danger-surface); color: var(--danger); font-weight: 600;"
                                   title="{{ verdict.recommended_fix|default:verdict.reasoning }}">⚠ {{ verdict.violations|join:", " }}</span>
                         {% elif verdict.violations %}
-                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #fef3c7; color: #92400e;"
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--warning-surface); color: var(--warning);"
                                   title="{{ verdict.recommended_fix|default:verdict.reasoning }}">⚠ Review: {{ verdict.violations|join:", " }}</span>
                         {% else %}
-                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #d1fae5; color: #047857; font-weight: 600;"
+                            <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--success-surface); color: var(--success); font-weight: 600;"
                                   title="AI Verified via {{ verdict.provider }}/{{ verdict.model_name }}">✓ AI Verified</span>
                         {% endif %}
                     {% else %}
@@ -962,7 +962,7 @@
                     {% endif %}
                     {% endwith %}
                     {% if question.content_quality_status == 'human_approved' %}
-                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #dbeafe; color: #1d4ed8;"
+                        <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--info-surface); color: var(--info);"
                               {% if question.reviewed_by %}title="Approved by {{ question.reviewed_by.username }}{% if question.reviewed_at %} on {{ question.reviewed_at|date:'M j, Y H:i' }}{% endif %}"{% endif %}>👤 Approved</span>
                     {% endif %}
                     {% endwith %}
@@ -980,7 +980,7 @@
                       style="margin-bottom: 0.75rem; display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-secondary btn-sm"
-                            style="border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;"
+                            style="border-color:#93c5fd; color:var(--info); background:var(--info-surface);"
                             onclick="return confirm('Mark this exit-ticket question as reviewed? The flag will clear and it will be tagged as human-approved.');">
                         ✓ Mark as Reviewed
                     </button>
@@ -990,7 +990,7 @@
                 <!-- Full teaching objective shown below the stem so
                      teachers can see the complete reference without
                      truncation. -->
-                <div style="margin: 0.4rem 0 0.6rem 1rem; padding: 0.45rem 0.6rem; background: #f9fafb; border-left: 3px solid #c7d2fe; border-radius: 4px; font-size: 0.78rem; color: #4b5563; line-height: 1.5;">
+                <div style="margin: 0.4rem 0 0.6rem 1rem; padding: 0.45rem 0.6rem; background: var(--surface-sunken); border-left: 3px solid var(--info-border); border-radius: 4px; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;">
                     <div><strong style="color:#1e3a8a;">Teaching objective:</strong>
                         {% if question.concept_tag %}{{ question.concept_tag }}{% else %}<em style="color:#a16207;">untagged</em>{% endif %}
                     </div>
@@ -1020,7 +1020,7 @@
                     {% elif question.question_type == 'fill_in_blank' %}
                     <!-- Fill in the Blank -->
                     {% if question.answer_data.text_template %}
-                    <div style="padding: 0.5rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 6px; font-style: italic; margin-bottom: 0.5rem;">
+                    <div style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--gray-200); border-radius: 6px; font-style: italic; margin-bottom: 0.5rem;">
                         {{ question.answer_data.text_template }}
                     </div>
                     {% endif %}
@@ -1057,7 +1057,7 @@
                     {% elif question.question_type == 'short_answer' or question.question_type == 'data_interpretation' %}
                     <!-- Short Answer / Data Interpretation -->
                     {% if question.answer_data.figure_svg %}
-                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;">
+                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:var(--surface);padding:0.75rem;">
                         {{ question.answer_data.figure_svg|sanitized }}
                     </div>
                     {% if user.is_superuser %}
@@ -1068,7 +1068,7 @@
                     </div>
                     {% endif %}
                     {% elif question.answer_data.figure_url %}
-                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:#fff;padding:0.75rem;text-align:center;">
+                    <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:var(--surface);padding:0.75rem;text-align:center;">
                         <img src="{{ question.answer_data.figure_url }}" alt="Question figure" style="max-width:100%;border-radius:4px;">
                     </div>
                     {% if user.is_superuser %}
@@ -1096,13 +1096,13 @@
                     </div>
                     {% endif %}
                     {% if question.answer_data.model_answer %}
-                    <div style="padding: 0.5rem; background: #d1fae5; border-radius: 6px; font-size: 0.875rem;">
+                    <div style="padding: 0.5rem; background: var(--success-surface); border-radius: 6px; font-size: 0.875rem;">
                         <strong>Model answer:</strong> {{ question.answer_data.model_answer }}
                     </div>
                     {% endif %}
                     {% if question.answer_data.keywords %}
                     <div style="padding: 0.375rem 0; font-size: 0.8rem; color: var(--gray-500);">
-                        Keywords: {% for kw in question.answer_data.keywords %}<span style="background: #fef3c7; padding: 0.125rem 0.375rem; border-radius: 4px; margin-right: 0.25rem;">{{ kw }}</span>{% endfor %}
+                        Keywords: {% for kw in question.answer_data.keywords %}<span style="background: var(--warning-surface); padding: 0.125rem 0.375rem; border-radius: 4px; margin-right: 0.25rem;">{{ kw }}</span>{% endfor %}
                         {% if question.answer_data.min_keywords %}(min {{ question.answer_data.min_keywords }} required){% endif %}
                     </div>
                     {% endif %}
@@ -1125,7 +1125,7 @@
                 </div>
 
                 {% if question.explanation %}
-                <div style="margin-top: 0.75rem; padding: 0.5rem; background: #d1fae5; border-radius: 4px; font-size: 0.875rem;">
+                <div style="margin-top: 0.75rem; padding: 0.5rem; background: var(--success-surface); border-radius: 4px; font-size: 0.875rem;">
                     <strong>Explanation:</strong> {{ question.explanation }}
                 </div>
                 {% endif %}
@@ -1150,7 +1150,7 @@
                 {% if question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
                 {% comment %}Non-MCQ regen panel — auto-review + prompt mode. Persists in place + reloads on success (no candidate-review UI for now).{% endcomment %}
                 <div class="exitq-inplace-panel" data-question-id="{{ question.id }}" hidden
-                     style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                     style="margin-top:0.625rem; padding:0.75rem; background:var(--surface-sunken);
                             border:1px solid var(--gray-200); border-radius:0.375rem;">
                     <div style="display:flex; gap:0.75rem; margin-bottom:0.5rem; font-size:0.8125rem;">
                         <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
@@ -1172,7 +1172,7 @@
                         <button type="button" class="exitq-ip-apply btn btn-sm"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;
-                                       background:var(--primary,#7c3aed); color:white; border:none;
+                                       background:var(--primary,var(--accent)); color:white; border:none;
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
                         <button type="button" class="exitq-ip-cancel btn btn-sm"
                                 data-question-id="{{ question.id }}"
@@ -1185,7 +1185,7 @@
 
                 {% if question.question_type == 'mcq' %}
                 <div class="exitq-regen-panel" data-question-id="{{ question.id }}" hidden
-                     style="margin-top:0.625rem; padding:0.75rem; background:#f9fafb;
+                     style="margin-top:0.625rem; padding:0.75rem; background:var(--surface-sunken);
                             border:1px solid var(--gray-200); border-radius:0.375rem;">
                     <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; font-size:0.8125rem;">
                         <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer;">
@@ -1207,7 +1207,7 @@
                         <button type="button" class="exitq-regen-apply btn btn-sm"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;
-                                       background:var(--primary,#7c3aed); color:white; border:none;
+                                       background:var(--primary,var(--accent)); color:white; border:none;
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
                         <button type="button" class="exitq-regen-cancel btn btn-sm"
                                 data-question-id="{{ question.id }}"
@@ -1251,7 +1251,7 @@
                             <button type="button" class="exitq-regen-save btn btn-sm"
                                     data-question-id="{{ question.id }}"
                                     style="font-size:0.75rem; padding:0.25rem 0.75rem;
-                                           background:#047857; color:white; border:none;
+                                           background:var(--success); color:white; border:none;
                                            border-radius:0.25rem; cursor:pointer;">Save to Question</button>
                             <button type="button" class="exitq-regen-discard btn btn-sm"
                                     data-question-id="{{ question.id }}"
@@ -1818,7 +1818,7 @@ function addPrereq() {
             const pill = document.createElement('span');
             pill.className = 'prereq-pill';
             pill.dataset.prereqId = prereqId;
-            pill.style = 'display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: #eff6ff; border-radius: 9999px; font-size: 0.875rem;';
+            pill.style = 'display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: var(--info-surface); border-radius: 9999px; font-size: 0.875rem;';
             pill.innerHTML = `${label.split(' › ').pop()} <button type="button" onclick="removePrereq(this, ${prereqId})" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:1rem;line-height:1;padding:0;" title="Remove prerequisite">&times;</button>`;
             list.appendChild(pill);
 
@@ -1943,16 +1943,16 @@ function previewPlotEdit(qid) {
         spec = JSON.parse(ta.value);
     } catch (e) {
         status.textContent = 'Invalid JSON: ' + e.message;
-        status.style.color = '#dc2626';
+        status.style.color = 'var(--danger-solid)';
         return;
     }
     const inst = renderPlotPreview(canvas, spec, 'edit-' + qid);
     if (inst) {
         status.textContent = 'Preview rendered.';
-        status.style.color = '#059669';
+        status.style.color = 'var(--success-solid)';
     } else {
         status.textContent = 'Preview failed (see console).';
-        status.style.color = '#dc2626';
+        status.style.color = 'var(--danger-solid)';
     }
 }
 
@@ -1964,7 +1964,7 @@ async function savePlotEdit(qid) {
     try { spec = JSON.parse(ta.value); }
     catch (e) {
         status.textContent = 'Cannot save invalid JSON.';
-        status.style.color = '#dc2626';
+        status.style.color = 'var(--danger-solid)';
         return;
     }
     status.textContent = 'Saving…';
@@ -1981,11 +1981,11 @@ async function savePlotEdit(qid) {
         const data = await r.json();
         if (!r.ok || data.error) {
             status.textContent = 'Save failed: ' + (data.error || r.status);
-            status.style.color = '#dc2626';
+            status.style.color = 'var(--danger-solid)';
             return;
         }
         status.textContent = 'Saved.';
-        status.style.color = '#059669';
+        status.style.color = 'var(--success-solid)';
         // Update the visible preview above the edit panel.
         const previewWrap = document.querySelector(`.lesson-plot-preview[data-qid="${qid}"]`);
         if (previewWrap) {
@@ -1995,7 +1995,7 @@ async function savePlotEdit(qid) {
         }
     } catch (e) {
         status.textContent = 'Network error: ' + e.message;
-        status.style.color = '#dc2626';
+        status.style.color = 'var(--danger-solid)';
     }
 }
 

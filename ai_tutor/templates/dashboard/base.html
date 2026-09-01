@@ -1,7 +1,8 @@
 {% load static %}
 {% load i18n %}
+{% load dashboard_ui %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,816 +13,301 @@
     {% endcomment %}
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}{% trans "Teacher Dashboard" %}{% endblock %} | AI Tutor</title>
-    <script src="{% static 'js/csrf.js' %}"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+
+    {% comment %}
+    Fonts. Both faces are self-hosted: production runs behind a CSP with no
+    external font source, and pilot schools are frequently offline. Preloaded
+    because the display face sets every heading and figure on the page — a
+    swap after first paint is the most visible layout shift here.
+    {% endcomment %}
+    <link rel="preload" as="font" type="font/woff2" href="{% static 'vendor/fonts/SpaceGrotesk-latin.woff2' %}" crossorigin>
+    <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
+
+    {% comment %}
+    Stylesheets, in cascade order: tokens define the vocabulary, base sets the
+    document, layout the shell, components the parts, charts the figures.
+    tokens/ and base/ live under css/shared/ because the student side and the
+    public pages use the same type scale, spacing and status colours.
+    Nothing below tokens.css contains a literal colour.
+
+    Components are split by what a part does — surfaces hold content,
+    controls are operated, data presents rows and quantities — so no single
+    file has to be scrolled to find one rule. See css/dashboard/README.md.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/flash.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/layout.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/components/surfaces.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/components/controls.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/components/data.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/charts.css' %}">
+    {% comment %}
+    Compatibility shim for the ~20 pages still written against the class names
+    the old base.html <style> block defined (.card-header, .form-control,
+    .btn-primary …). It re-implements those names on the new tokens, so an
+    unmigrated page renders correctly and in the new palette. Delete it, and
+    this link, once the last page is migrated — see css/dashboard/README.md.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/dashboard/legacy.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/password-field.css' %}">
+
+    {% comment %}
+    Institution theming. These three land in the primitive layer of
+    tokens.css and everything else derives from them, so a school's brand
+    colour still flows through the whole page. --primary-ink is the
+    AA-contrast text version of the brand colour: #E8590C on white is 3.6:1,
+    which is fine for a bar or a fill but fails for text, and the old sheet
+    used it for both.
+    {% endcomment %}
+    {% if theme_primary %}
+    <style nonce="{{ request.csp_nonce }}">
         :root {
-            --primary: {{ theme_primary|default:"#E8590C" }};
-            --primary-dark: {{ theme_primary_dark|default:"#D14800" }};
-            --primary-light: {{ theme_primary_light|default:"#FFF4F0" }};
-            --success: #10B981;
-            --warning: #F59E0B;
-            --danger: #EF4444;
-            --gray-50: #F9FAFB;
-            --gray-100: #F3F4F6;
-            --gray-200: #E5E7EB;
-            --gray-300: #D1D5DB;
-            --gray-500: #6B7280;
-            --gray-700: #374151;
-            --gray-900: #111827;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--gray-50);
-            color: var(--gray-900);
-            min-height: 100vh;
-        }
-        
-        /* Layout */
-        .dashboard-layout {
-            display: flex;
-            min-height: 100vh;
-        }
-        
-        /* Sidebar */
-        .sidebar {
-            width: 260px;
-            background: white;
-            border-right: 1px solid var(--gray-200);
-            padding: 1.5rem 0;
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-        }
-        
-        .sidebar-header {
-            padding: 0 1.5rem 1.5rem;
-            border-bottom: 1px solid var(--gray-200);
-        }
-        
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-            color: var(--gray-900);
-        }
-        
-        .sidebar-logo svg {
-            width: 36px;
-            height: 36px;
-        }
-        
-        .sidebar-logo span {
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-        
-        .sidebar-logo small {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--gray-500);
-            font-weight: normal;
-        }
-        
-        .sidebar-nav {
-            padding: 1rem 0;
-        }
-        
-        .nav-section {
-            margin-bottom: 1.5rem;
-        }
-        
-        .nav-section-title {
-            padding: 0.5rem 1.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: var(--gray-500);
-            letter-spacing: 0.05em;
-        }
-        
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1.5rem;
-            color: var(--gray-700);
-            text-decoration: none;
-            transition: all 0.15s;
-        }
-        
-        .nav-link:hover {
-            background: var(--gray-50);
-            color: var(--primary);
-        }
-        
-        .nav-link.active {
-            background: var(--primary-light);
-            color: var(--primary);
-            font-weight: 500;
-        }
-        
-        .nav-link svg {
-            width: 20px;
-            height: 20px;
-            opacity: 0.7;
-        }
-        
-        .nav-link.active svg {
-            opacity: 1;
-        }
-        
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            margin-left: 260px;
-            min-height: 100vh;
-        }
-        
-        .top-bar {
-            background: white;
-            border-bottom: 1px solid var(--gray-200);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        
-        .page-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-        
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .user-info {
-            text-align: right;
-        }
-        
-        .user-name {
-            font-weight: 500;
-        }
-        
-        .user-role {
-            font-size: 0.875rem;
-            color: var(--gray-500);
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--primary);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-        }
-        
-        .content-area {
-            padding: 2rem;
-        }
-        
-        /* Cards */
-        .card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid var(--gray-200);
-            overflow: hidden;
-        }
-        
-        .card-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--gray-200);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-        
-        .card-body {
-            padding: 1.5rem;
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            border: 1px solid var(--gray-200);
-            padding: 1.5rem;
-        }
-        
-        .stat-label {
-            font-size: 0.875rem;
-            color: var(--gray-500);
-            margin-bottom: 0.5rem;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--gray-900);
-        }
-        
-        .stat-change {
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-        }
-        
-        .stat-change.positive {
-            color: var(--success);
-        }
-        
-        .stat-change.negative {
-            color: var(--danger);
-        }
-        
-        /* Tables */
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .table th,
-        .table td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--gray-200);
-        }
-        
-        .table th {
-            background: var(--gray-50);
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: var(--gray-700);
-        }
-        
-        .table tbody tr:hover {
-            background: var(--gray-50);
-        }
-        
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.625rem 1.25rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s;
-            text-decoration: none;
-            border: none;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-dark);
-        }
-        
-        .btn-secondary {
-            background: var(--gray-100);
-            color: var(--gray-700);
-        }
-        
-        .btn-secondary:hover {
-            background: var(--gray-200);
-        }
-        
-        .btn-sm {
-            padding: 0.375rem 0.75rem;
-            font-size: 0.8125rem;
-        }
-        
-        /* Progress Bar */
-        .progress-bar {
-            height: 8px;
-            background: var(--gray-200);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 4px;
-            transition: width 0.3s;
-        }
-        
-        .progress-fill.success {
-            background: var(--success);
-        }
-        
-        /* Badges */
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.625rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        
-        .badge-success {
-            background: #D1FAE5;
-            color: #065F46;
-        }
-        
-        .badge-warning {
-            background: #FEF3C7;
-            color: #92400E;
-        }
-        
-        .badge-danger {
-            background: #FEE2E2;
-            color: #991B1B;
-        }
-        
-        .badge-info {
-            background: #DBEAFE;
-            color: #1E40AF;
-        }
-        
-        /* Forms */
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-        
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-            color: var(--gray-700);
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 0.625rem 0.875rem;
-            border: 1px solid var(--gray-300);
-            border-radius: 8px;
-            font-size: 0.9375rem;
-            transition: all 0.15s;
-        }
-        
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(232, 89, 12, 0.1);
-        }
-        
-        select.form-control {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            background-size: 1rem;
-            padding-right: 2.5rem;
-        }
-        
-        /* Messages */
-        .alert {
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .alert-success {
-            background: #D1FAE5;
-            color: #065F46;
-        }
-        
-        .alert-error {
-            background: #FEE2E2;
-            color: #991B1B;
-        }
-        
-        .alert-warning {
-            background: #FEF3C7;
-            color: #92400E;
-        }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 3rem;
-            color: var(--gray-500);
-        }
-        
-        .empty-state svg {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-        
-        .empty-state h3 {
-            font-size: 1.125rem;
-            color: var(--gray-700);
-            margin-bottom: 0.5rem;
-        }
-        
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar {
-                width: 200px;
-            }
-            .main-content {
-                margin-left: 200px;
-            }
-        }
-
-        /* Mobile: sidebar becomes an off-canvas drawer behind a
-           hamburger button; body shifts to full-width. */
-        .menu-btn {
-            display: none;
-            background: transparent;
-            border: 1px solid var(--gray-200);
-            border-radius: 8px;
-            width: 40px;
-            height: 40px;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--gray-700);
-            padding: 0;
-            margin-right: 0.75rem;
-            flex-shrink: 0;
-        }
-        .menu-btn:active { background: var(--gray-100); }
-        .sidebar-backdrop {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(17, 24, 39, 0.5);
-            z-index: 199;
-        }
-        .sidebar-backdrop.open { display: block; }
-        body.sidebar-open { overflow: hidden; }
-
-        @media (max-width: 768px) {
-            .menu-btn { display: inline-flex; }
-            /* Sidebar slides in as a drawer, with the backdrop on top. */
-            .sidebar {
-                display: block;
-                width: 280px;
-                transform: translateX(-100%);
-                transition: transform 0.2s ease-out;
-                z-index: 200;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-            }
-            .sidebar.open { transform: translateX(0); }
-
-            .main-content { margin-left: 0; }
-
-            /* Tighter topbar at this width. */
-            .top-bar {
-                padding: 0.75rem 1rem;
-                gap: 0.5rem;
-            }
-            .page-title { font-size: 1.05rem; }
-            .user-menu { gap: 0.5rem; min-width: 0; }
-            .user-info { display: none; }
-            /* School selector takes too much room when present.
-               Allow it to shrink. */
-            .user-menu select.form-control {
-                min-width: 0 !important;
-                width: auto !important;
-                max-width: 140px;
-                font-size: 0.78rem !important;
-            }
-
-            .content-area { padding: 1rem; }
-
-            .stats-grid {
-                grid-template-columns: 1fr !important;
-                gap: 0.75rem !important;
-            }
-
-            /* Generic cards stack rather than sit in 2-3 column grids
-               that overflow horizontally. */
-            .card-header {
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-        }
-
-        /* Tables — desktop dashboard pages assume horizontal room.
-           Wrap them in scrollable containers below 768px so they
-           don't blow out the layout. Opt-out classes (.session-table,
-           .obj-table, .responsive-cards) provide their own card-style
-           transform — see the lesson_monitor + lesson_session_report
-           templates. */
-        @media (max-width: 768px) {
-            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) {
-                display: block;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                white-space: nowrap;
-                font-size: 0.85rem;
-            }
-            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) th,
-            .content-area table:not(.session-table):not(.obj-table):not(.responsive-cards) td {
-                padding: 0.5rem 0.75rem !important;
-            }
+            --primary: {{ theme_primary }};
+            --primary-fill: {{ theme_primary_dark|default:theme_primary }};
+            --primary-dark: {{ theme_primary_dark|default:theme_primary }};
+            --primary-light: {{ theme_primary_light|default:'#FFF3EC' }};
+            --primary-ink: {{ theme_primary_ink|default:theme_primary_dark|default:theme_primary }};
         }
     </style>
+    {% endif %}
+
+    <script src="{% static 'js/csrf.js' %}"></script>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {# Email-verify banner removed 2026-05-29 — see templates/base.html for rationale. #}
-    <div class="dashboard-layout">
-        <!-- Sidebar -->
-        <aside class="sidebar" id="dashboard-sidebar">
-            <div class="sidebar-header">
-                <a href="{% url 'dashboard:home' %}" class="sidebar-logo">
-                    {% if theme_logo_url %}
-                    <img src="{{ theme_logo_url }}" alt="{{ theme_institution_name|default:'AI Tutor' }}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
-                    {% else %}
-                    <svg viewBox="0 0 40 40" fill="none">
-                        <rect width="40" height="40" rx="8" fill="{{ theme_primary|default:'#E8590C' }}"/>
-                        <path d="M12 28V12h4l4 10 4-10h4v16h-3V18l-3.5 10h-3L15 18v10h-3z" fill="white"/>
-                    </svg>
+{% include "_includes/icon_sprite.html" %}
+
+{# First tab stop on every page: jump the whole rail. #}
+<a class="skip-link" href="#main-content">{% trans "Skip to main content" %}</a>
+
+<div class="app">
+
+    {# ================================================================ rail #}
+    <aside class="app-rail" id="app-rail" aria-label="{% trans 'Dashboard sections' %}">
+        <div class="rail-head">
+            {# Same as the student shell: landing redirects by role. #}
+            <a href="{% url 'accounts:landing' %}" class="rail-brand">
+                {% if theme_logo_url %}
+                <img src="{{ theme_logo_url }}" alt="" class="rail-brand__mark">
+                {% else %}
+                <svg class="rail-brand__mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+                    <rect width="40" height="40" rx="9" fill="var(--primary)"/>
+                    <path d="M12 28V12h4l4 10 4-10h4v16h-3V18l-3.5 10h-3L15 18v10h-3z" fill="var(--surface)"/>
+                </svg>
+                {% endif %}
+                <span class="rail-brand__name">
+                    {{ theme_institution_name|default:"AI Tutor" }}
+                    <span class="rail-brand__role">{% trans "Teacher/Admin" %}</span>
+                </span>
+            </a>
+        </div>
+
+        {% comment %}
+        Nav order follows the working day, not the data model: what needs
+        attention, then who, then what they are learning, then admin. The
+        two staff-only groups collapse, and remember their state, so the
+        rail a classroom teacher sees is six links rather than fourteen.
+        {% endcomment %}
+        <nav class="rail-nav">
+            <div class="nav-group">
+                <a href="{% url 'dashboard:home' %}" class="nav-link"
+                   {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>
+                    {% icon "overview" %}{% trans "Overview" %}
+                </a>
+                <a href="{% url 'dashboard:flagged_sessions' %}" class="nav-link"
+                   {% if 'flagged' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "flag" %}{% trans "Flagged chats" %}
+                    {% if unreviewed_flag_count %}
+                    <span class="nav-count">{{ unreviewed_flag_count }}</span>
+                    <span class="sr-only">{% blocktrans count n=unreviewed_flag_count %}{{ n }} unreviewed{% plural %}{{ n }} unreviewed{% endblocktrans %}</span>
                     {% endif %}
-                    <span>
-                        {{ theme_institution_name|default:"AI Tutor" }}
-                        <small>{% trans "Teacher Dashboard" %}</small>
-                    </span>
                 </a>
             </div>
-            
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <a href="{% url 'dashboard:home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                        </svg>
-                        {% trans "Dashboard" %}
-                    </a>
-                </div>
 
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Students" %}</div>
-                    <a href="{% url 'dashboard:student_list' %}" class="nav-link {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                        {% trans "All Students" %}
-                    </a>
-                    <a href="{% url 'dashboard:class_list' %}" class="nav-link {% if 'class' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                        </svg>
-                        {% trans "Classes" %}
-                    </a>
-                    <a href="{% url 'dashboard:student_groups' %}" class="nav-link {% if 'student_group' in request.resolver_match.url_name or 'institution_session_mode' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        {% trans "Student Groups" %}
-                    </a>
-                    {% if can_edit_content %}
-                    <a href="{% url 'accounts:bulk_student_upload' %}" class="nav-link {% if 'bulk' in request.path %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                        </svg>
-                        {% trans "Bulk Upload" %}
-                    </a>
-                    {% endif %}
-                </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Curriculum" %}</div>
-                    <a href="{% url 'dashboard:curriculum_list' %}" class="nav-link {% if request.resolver_match.url_name == 'curriculum_list' %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                        </svg>
-                        {% trans "Courses" %}
-                    </a>
-                </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Reports & Safety" %}</div>
-                    <a href="{% url 'dashboard:flagged_sessions' %}" class="nav-link {% if 'flagged' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        {% trans "Flagged Chats" %}
-                        {% if unreviewed_flag_count %}<span style="background:#EF4444;color:#fff;font-size:0.7rem;font-weight:700;padding:0.125rem 0.5rem;border-radius:999px;margin-left:auto;">{{ unreviewed_flag_count }}</span>{% endif %}
-                    </a>
-                    {% if user.is_staff %}
-                    <a href="{% url 'dashboard:feedback_list' %}" class="nav-link {% if 'feedback' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                        </svg>
-                        {% trans "Feedback & Bugs" %}
-                    </a>
-                    {% endif %}
-                    <a href="{% url 'dashboard:help_index' %}" class="nav-link {% if 'help' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        {% trans "Help & FAQ" %}
-                    </a>
-                </div>
-
-                {% if user.is_staff %}
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Staff" %}</div>
-                    <a href="{% url 'dashboard:staff_list' %}" class="nav-link {% if 'staff' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                        </svg>
-                        {% trans "Staff" %}
-                    </a>
-                </div>
+            <div class="nav-group">
+                <p class="nav-group__title">{% trans "People" %}</p>
+                <a href="{% url 'dashboard:student_list' %}" class="nav-link"
+                   {% if 'student' in request.resolver_match.url_name and 'group' not in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "students" %}{% trans "Students" %}
+                </a>
+                <a href="{% url 'dashboard:class_list' %}" class="nav-link"
+                   {% if 'class' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "classes" %}{% trans "Classes" %}
+                </a>
+                <a href="{% url 'dashboard:student_groups' %}" class="nav-link"
+                   {% if 'student_group' in request.resolver_match.url_name or 'institution_session_mode' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "groups" %}{% trans "Groups" %}
+                </a>
+                {% if can_edit_content %}
+                <a href="{% url 'accounts:bulk_student_upload' %}" class="nav-link"
+                   {% if 'bulk' in request.path %}aria-current="page"{% endif %}>
+                    {% icon "upload" %}{% trans "Bulk upload" %}
+                </a>
                 {% endif %}
-
-                {% if user.is_staff %}
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Developer" %}</div>
-                    <a href="{% url 'dashboard:benchmark:session_list' %}" class="nav-link {% if request.resolver_match.url_name == 'session_list' or request.resolver_match.url_name == 'session_review' or request.resolver_match.url_name == 'session_annotate' %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                        </svg>
-                        {% trans "Tutoring Evaluation" %}
-                    </a>
-                    <a href="{% url 'dashboard:benchmark:session_scores' %}" class="nav-link {% if request.resolver_match.url_name == 'session_scores' %}active{% endif %}" style="padding-left:2.75rem;">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
-                        </svg>
-                        {% trans "Scores &amp; Export" %}
-                    </a>
-                    {% if user.is_superuser %}
-                    <a href="{% url 'dashboard:content_edit_dashboard' %}" class="nav-link {% if 'content_edit' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
-                        </svg>
-                        {% trans "Content Quality" %}
-                    </a>
-                    <a href="{% url 'dashboard:content_edit_events_list' %}" class="nav-link {% if request.resolver_match.url_name == 'content_edit_events_list' or request.resolver_match.url_name == 'content_edit_event_detail' %}active{% endif %}" style="padding-left:2.75rem;">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                        </svg>
-                        {% trans "Edit events" %}
-                    </a>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <div class="nav-section">
-                    <div class="nav-section-title">{% trans "Settings" %}</div>
-                    <a href="{% url 'dashboard:settings' %}" class="nav-link {% if 'settings' in request.resolver_match.url_name %}active{% endif %}">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        {% trans "Settings" %}
-                    </a>
-                    <a href="{% url 'tutoring:catalog' %}" class="nav-link">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/>
-                        </svg>
-                        {% trans "Back to Tutor" %}
-                    </a>
-                    <a href="{% url 'accounts:logout' %}" class="nav-link">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                        </svg>
-                        {% trans "Logout" %}
-                    </a>
-                    {% comment %}Delete account moved to the Settings page (Danger Zone) so it's not a single-tap mistake from the sidebar.{% endcomment %}
-                </div>
-            </nav>
-        </aside>
-        
-        <!-- Backdrop for mobile drawer -->
-        <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="top-bar">
-                <button type="button" class="menu-btn" id="menu-btn"
-                        aria-label="{% trans 'Open navigation' %}"
-                        aria-controls="dashboard-sidebar"
-                        aria-expanded="false"
-                        onclick="openSidebar()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
-                <h1 class="page-title">{% block page_title %}{% trans "Dashboard" %}{% endblock %}</h1>
-                <div class="user-menu">
-                    {% if all_schools %}
-                    <form method="post" action="{% url 'dashboard:switch_school' %}" style="margin:0;">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.path }}">
-                        <select name="school_id" class="form-control" style="width:auto;min-width:180px;font-size:0.875rem;" onchange="this.form.submit()">
-                            {% if user.is_staff %}
-                            <option value="all" {% if is_aggregated %}selected{% endif %}>{% trans "All Schools" %}</option>
-                            {% endif %}
-                            {% for school in all_schools %}
-                            <option value="{{ school.id }}" {% if institution.id == school.id %}selected{% endif %}>{{ school.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                    {% endif %}
-                    <div class="user-info">
-                        <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
-                        <div class="user-role">{% if user.is_staff %}{% trans "Super Admin" %}{% elif membership %}{{ membership.get_role_display }}{% endif %}{% if institution %} &bull; {{ institution.name }}{% endif %}</div>
-                    </div>
-                    <div class="user-avatar">
-                        {{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
-                    </div>
-                </div>
-            </header>
-            
-            <div class="content-area">
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                
-                {% block content %}{% endblock %}
             </div>
+
+            <div class="nav-group">
+                <p class="nav-group__title">{% trans "Teaching" %}</p>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="nav-link"
+                   {% if request.resolver_match.url_name == 'curriculum_list' %}aria-current="page"{% endif %}>
+                    {% icon "courses" %}{% trans "Courses" %}
+                </a>
+                <a href="{% url 'dashboard:help_index' %}" class="nav-link"
+                   {% if 'help' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "help" %}{% trans "Help & FAQ" %}
+                </a>
+            </div>
+
+            {% if user.is_staff %}
+            <details class="nav-group nav-group--collapsible" id="nav-admin" open>
+                <summary>{% trans "Administration" %}{% icon "chevron-right" size="sm" %}</summary>
+                <a href="{% url 'dashboard:staff_list' %}" class="nav-link"
+                   {% if 'staff' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "staff" %}{% trans "Staff" %}
+                </a>
+                <a href="{% url 'dashboard:feedback_list' %}" class="nav-link"
+                   {% if 'feedback' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "feedback" %}{% trans "Feedback & bugs" %}
+                </a>
+            </details>
+
+            <details class="nav-group nav-group--collapsible" id="nav-dev">
+                <summary>{% trans "Evaluation" %}{% icon "chevron-right" size="sm" %}</summary>
+                <a href="{% url 'dashboard:benchmark:session_list' %}" class="nav-link"
+                   {% if request.resolver_match.url_name == 'session_list' or request.resolver_match.url_name == 'session_review' or request.resolver_match.url_name == 'session_annotate' %}aria-current="page"{% endif %}>
+                    {% icon "evaluation" %}{% trans "Tutoring evaluation" %}
+                </a>
+                <a href="{% url 'dashboard:benchmark:session_scores' %}" class="nav-link nav-link--sub"
+                   {% if request.resolver_match.url_name == 'session_scores' %}aria-current="page"{% endif %}>
+                    {% trans "Scores & export" %}
+                </a>
+                {% if user.is_superuser %}
+                <a href="{% url 'dashboard:content_edit_dashboard' %}" class="nav-link"
+                   {% if 'content_edit' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "quality" %}{% trans "Content quality" %}
+                </a>
+                <a href="{% url 'dashboard:content_edit_events_list' %}" class="nav-link nav-link--sub"
+                   {% if request.resolver_match.url_name == 'content_edit_events_list' or request.resolver_match.url_name == 'content_edit_event_detail' %}aria-current="page"{% endif %}>
+                    {% trans "Edit events" %}
+                </a>
+                {% endif %}
+            </details>
+            {% endif %}
+
+            <div class="nav-group">
+                <p class="nav-group__title">{% trans "Account" %}</p>
+                <a href="{% url 'dashboard:settings' %}" class="nav-link"
+                   {% if 'settings' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "settings" %}{% trans "Settings" %}
+                </a>
+                <a href="{% url 'tutoring:catalog' %}" class="nav-link">
+                    {% icon "back" %}{% trans "Back to tutor" %}
+                </a>
+                <a href="{% url 'accounts:logout' %}" class="nav-link">
+                    {% icon "logout" %}{% trans "Log out" %}
+                </a>
+                {% comment %}Delete account lives in Settings (Danger Zone) so it is not a single tap from the rail.{% endcomment %}
+            </div>
+        </nav>
+    </aside>
+
+    <div class="rail-scrim" id="rail-scrim" aria-hidden="true"></div>
+
+    {# ================================================================ main #}
+    <div class="app-main">
+        <header class="app-topbar">
+            <button type="button" class="rail-toggle" id="rail-toggle"
+                    aria-label="{% trans 'Open navigation' %}"
+                    aria-controls="app-rail" aria-expanded="false">
+                {% icon "menu" size="md" %}
+            </button>
+
+            <div class="topbar-heading">
+                {% block topbar_eyebrow %}
+                <span class="topbar-eyebrow">{% trans "Teacher dashboard" %}</span>
+                {% endblock %}
+                {# Generic on purpose: "Overview" is a real page, so a template that #}
+                {# forgets this block must not claim to be it. #}
+                <h1 class="topbar-title">{% block page_title %}{% trans "Dashboard" %}{% endblock %}</h1>
+            </div>
+
+            <div class="topbar-actions">
+                {% block topbar_actions %}{% endblock %}
+
+                {% if all_schools %}
+                {% comment %}
+                The school switcher changes what every figure on the page
+                means, so it is labelled rather than left as a bare select.
+                {% endcomment %}
+                <form method="post" action="{% url 'dashboard:switch_school' %}" class="row row--tight">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <label for="school-switch" class="sr-only">{% trans "Showing data for school" %}</label>
+                    <select name="school_id" id="school-switch" class="select select--sm" onchange="this.form.submit()">
+                        {% if user.is_staff %}
+                        <option value="all" {% if is_aggregated %}selected{% endif %}>{% trans "All schools" %}</option>
+                        {% endif %}
+                        {% for school in all_schools %}
+                        <option value="{{ school.id }}" {% if institution.id == school.id %}selected{% endif %}>{{ school.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <noscript><button type="submit" class="btn btn--secondary btn--sm">{% trans "Switch" %}</button></noscript>
+                </form>
+                {% endif %}
+
+                <div class="identity">
+                    <div class="identity__text">
+                        <div class="identity__name">{{ user.get_full_name|default:user.username }}</div>
+                        <div class="identity__role">{{ request.staff_ctx.role_label }}{% if institution %} · {{ institution.name }}{% endif %}</div>
+                    </div>
+                    <div class="avatar" aria-hidden="true">{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</div>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-canvas" id="main-content" tabindex="-1">
+            {% if messages %}
+            {% comment %}
+            Messages are announced: a teacher who submits a form and gets a
+            success banner should hear it, not have to go looking.
+            {% endcomment %}
+            <div class="messages" role="status" aria-live="polite">
+                {% for message in messages %}
+                {% comment %}
+                level_tag, not tags: `tags` concatenates extra_tags with the
+                level, so a message sent with extra_tags='sticky' rendered
+                class="alert--sticky success" — the tone skin silently gone.
+                Extra tags go on separately.
+                {% endcomment %}
+                <div class="alert alert--{{ message.level_tag|default:'info' }} {{ message.extra_tags }}">
+                    {% if message.level_tag == 'success' %}{% icon "check-circle" %}
+                    {% elif message.level_tag == 'error' %}{% icon "alert" %}
+                    {% elif message.level_tag == 'warning' %}{% icon "alert" %}
+                    {% else %}{% icon "info" %}{% endif %}
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
         </main>
     </div>
-    
-    <script nonce="{{ request.csp_nonce }}">
-        // Mobile sidebar drawer — toggled by the hamburger button.
-        // Closes on backdrop tap, Escape, link tap, or viewport resize
-        // back above the mobile breakpoint.
-        function openSidebar() {
-            document.getElementById('dashboard-sidebar').classList.add('open');
-            document.getElementById('sidebar-backdrop').classList.add('open');
-            document.body.classList.add('sidebar-open');
-            document.getElementById('menu-btn').setAttribute('aria-expanded', 'true');
-        }
-        function closeSidebar() {
-            document.getElementById('dashboard-sidebar').classList.remove('open');
-            document.getElementById('sidebar-backdrop').classList.remove('open');
-            document.body.classList.remove('sidebar-open');
-            document.getElementById('menu-btn').setAttribute('aria-expanded', 'false');
-        }
-        // Tapping any nav link inside the drawer should close it.
-        document.querySelectorAll('#dashboard-sidebar .nav-link').forEach(function (link) {
-            link.addEventListener('click', function () {
-                if (window.matchMedia('(max-width: 768px)').matches) closeSidebar();
-            });
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') closeSidebar();
-        });
-        // If the user resizes back to desktop, drop the drawer state
-        // so the sidebar shows in its full form.
-        window.addEventListener('resize', function () {
-            if (!window.matchMedia('(max-width: 768px)').matches) {
-                closeSidebar();
-            }
-        });
-    </script>
+</div>
 
-    {% block extra_js %}{% endblock %}
+{% comment %}
+JS gettext() catalog. The student shell has always loaded this; the dashboard
+had not, so password-field.js fell back to English here for a teacher on a
+pt-mz deployment. Loaded before any script that calls gettext().
+{% endcomment %}
+<script src="{% url 'javascript-catalog' %}"></script>
+<script src="{% static 'js/dashboard-shell.js' %}" defer></script>
+<script src="{% static 'js/password-field.js' %}" defer></script>
+{% block extra_js %}{% endblock %}
 
-    {% include "_includes/feedback_button.html" %}
+{% include "_includes/feedback_button.html" %}
+<script src="{% static 'js/flash.js' %}" defer></script>
 </body>
 </html>

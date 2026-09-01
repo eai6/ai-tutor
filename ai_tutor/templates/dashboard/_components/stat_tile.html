@@ -1,0 +1,12 @@
+{% load i18n dashboard_ui %}
+<div class="tile">
+    <span class="tile__label">{{ label }}</span>
+    <span class="tile__figure {% if tone != 'neutral' %}{% tone_class 'tile__figure' tone %}{% endif %}">{{ value }}</span>
+    {% if note %}<span class="tile__note {% if note_tone %}{% tone_class 'tile__note' note_tone %}{% endif %}">{{ note }}</span>{% endif %}
+    {% if hint %}
+    <details class="footnote">
+        <summary>{% icon "chevron-right" size="sm" %}{% trans "How this is counted" %}</summary>
+        <div class="footnote__body">{{ hint }}</div>
+    </details>
+    {% endif %}
+</div>

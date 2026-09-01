@@ -1,11 +1,149 @@
 {% extends "dashboard/base.html" %}
-{% load i18n %}
+{% load static i18n %}
 
 {% block title %}{% trans "Settings" %}{% endblock %}
 {% block page_title %}{% trans "Settings" %}{% endblock %}
 
+{% block extra_css %}
+{% comment %}
+Settings used to sit in a hard `max-width: 700px` column, which left most of a
+laptop screen empty and pushed the lower sections a long way down. The sections
+are independent, so they pair into two columns once there is room; anything
+holding a table, a repeating row, or a full-width textarea keeps the whole
+width. One column below 1080px.
+{% endcomment %}
+<style nonce="{{ request.csp_nonce }}">
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-5);
+        /* Cards keep their natural height rather than stretching to match the
+           tallest in the row. */
+        align-items: start;
+    }
+
+    @media (min-width: 1080px) {
+        .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .settings-grid__wide { grid-column: 1 / -1; }
+
+    /* The three model-picker cards live inside one <form>, so the form spans
+       and grids its own children. */
+    .settings-grid__group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+        gap: var(--space-5);
+        align-items: start;
+    }
+
+    /* The cards carry inline margins from before this page had a grid. Gap
+       owns the spacing now, and only !important beats a style attribute —
+       cheaper and safer than editing thirteen of them by hand. */
+    .settings-grid > *,
+    .settings-grid > * > .card,
+    .settings-grid__group > .card {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* --------------------------------------------------------------------
+       Model picker
+       ------------------------------------------------------------------ */
+    /* The custom-id box only appears when "Other" is chosen; model-picker.js
+       toggles it. Hidden by default in CSS too, so it does not flash on a
+       slow load before the script runs. */
+    .model-custom { margin-top: var(--space-2); }
+    .model-custom[hidden] { display: none; }
+
+    .model-custom__hint {
+        margin-top: var(--space-1);
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+    }
+
+    /* Model ids are long and one character wrong is a runtime failure, so
+       they are set in the mono face wherever they are typed or shown. */
+    .model-picker,
+    #tutor_model, #gen_model, #img_model {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+    }
+
+    /* --------------------------------------------------------------------
+       Read-only profile field
+       ------------------------------------------------------------------
+       A value the account holder can see but not change. Deliberately NOT a
+       disabled <input>: a greyed-out control invites clicking and reads as
+       broken, where plain text beside an explanation reads as "this is
+       administered elsewhere". Matches the Role field it sits next to.
+       ------------------------------------------------------------------ */
+    .settings-readonly {
+        margin-top: var(--space-1);
+        font-weight: var(--weight-medium);
+        color: var(--text);
+    }
+
+    /* --------------------------------------------------------------------
+       Personality form
+       ------------------------------------------------------------------ */
+    .personality-row {
+        display: grid;
+        grid-template-columns: 5.5rem minmax(0, 1fr);
+        gap: var(--space-3);
+    }
+
+    .personality-emoji {
+        text-align: center;
+        font-size: 1.35rem;
+        padding-inline: var(--space-2);
+    }
+
+    /* --------------------------------------------------------------------
+       Prompt editors
+       ------------------------------------------------------------------ */
+    .form-control.mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        line-height: 1.55;
+    }
+
+    /* A tutor system prompt runs to a couple of hundred lines. Six rows made
+       it a peephole; fourteen plus a resize handle makes it editable. */
+    .prompt-editor {
+        min-height: 20rem;
+        resize: vertical;
+        white-space: pre;
+        overflow-wrap: normal;
+        overflow-x: auto;
+    }
+
+    /* A page-level notice, not a settings section — no card chrome competing
+       with the real ones. */
+    .settings-grid__notice { background: var(--surface-sunken); box-shadow: none; }
+
+    /* The paired field rows inside each card carry their own inline
+       `grid-template-columns`. Two columns in a 420px card truncates a school
+       name to "Seychelles Pilot Sch…", so they stack. !important is the only
+       thing that beats a style attribute. */
+    @media (max-width: 600px) {
+        .settings-grid .card-body div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+        }
+    }
+
+    /* Separated by a rule rather than by proximity, so it reads as the end of
+       the page and not as part of whatever sits above it. */
+    .settings-grid__danger {
+        margin-top: var(--space-4) !important;
+        padding-top: var(--space-6);
+        border-top: 1px solid var(--border);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 700px;">
+<div class="settings-grid">
 
     {# ── School Settings (superadmin only, when a specific school is selected) ── #}
     {% if institution and is_superadmin %}
@@ -37,7 +175,7 @@
         <button type="submit" class="btn btn-primary">{% trans "Save School Settings" %}</button>
     </form>
     {% elif is_superadmin %}
-    <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card settings-grid__wide settings-grid__notice">
         <div class="card-body">
             <p style="color:var(--gray-500);">{% trans "Select a specific school from the dropdown above to edit its settings, or manage all schools below." %}</p>
         </div>
@@ -67,19 +205,22 @@
                         <label class="form-label" for="email">{% trans "Email" %}</label>
                         <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
                     </div>
-                    {% if user_school_choices %}
+                    {% comment %}
+                    Read-only. Moving a staff member between schools is a
+                    membership change that re-scopes everything they can see,
+                    so it belongs to whoever administers the school rather than
+                    to a dropdown on the member's own profile. The view ignores
+                    the field too — this is the label, not the enforcement.
+                    {% endcomment %}
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="school">{% trans "School" %}</label>
-                        <select class="form-control" id="school" name="school">
-                            {% for inst in user_school_choices %}
-                            <option value="{{ inst.id }}" {% if membership and membership.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="form-label">{% trans "School" %}</div>
+                        <div class="settings-readonly">
+                            {% if membership %}{{ membership.institution.name }}{% else %}{% trans "All schools" %}{% endif %}
+                        </div>
                     </div>
-                    {% endif %}
                     <div>
                         <div style="font-size: 0.875rem; color: var(--gray-500);">{% trans "Role" %}</div>
-                        <div style="font-weight: 500; margin-top: 0.25rem;">{% if user.is_staff %}{% trans "Super Admin" %}{% elif membership %}{{ membership.get_role_display }}{% endif %}</div>
+                        <div style="font-weight: 500; margin-top: 0.25rem;">{{ request.staff_ctx.role_label }}</div>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
                             {% if membership %}{% blocktrans with date=membership.joined_at|date:"M d, Y" %}Member since {{ date }}{% endblocktrans %}{% else %}{% blocktrans with date=user.date_joined|date:"M d, Y" %}Member since {{ date }}{% endblocktrans %}{% endif %}
                         </div>
@@ -120,11 +261,14 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="new_password">{% trans "New Password" %}</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required
+                    data-pw-strength
+                    data-pw-similar-to="#first_name,#last_name,#email">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="confirm_password">{% trans "Confirm New Password" %}</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required
+                    data-pw-confirms="#new_password">
                     </div>
                 </div>
             </div>
@@ -133,27 +277,33 @@
         <button type="submit" class="btn btn-primary">{% trans "Change Password" %}</button>
     </form>
 
-    {# ── Delete Account (danger zone) ── #}
-    <div style="margin-top: 2rem;">
-        <div class="card" style="border: 1px solid var(--danger); margin-bottom: 1.5rem;">
-            <div class="card-header" style="background: rgba(220, 53, 69, 0.05);">
-                <h3 class="card-title" style="color: var(--danger);">{% trans "Danger Zone" %}</h3>
+    {% comment %}
+    Was a red "Danger Zone" card, which is the right treatment for a card
+    holding a destructive button and the wrong one for a card holding a
+    sentence. With the button gone this is a note about who to ask, so it is
+    styled as a note.
+    {% endcomment %}
+    <div class="settings-grid__wide settings-grid__danger">
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <h3 class="card-title">{% trans "Deleting your account" %}</h3>
             </div>
             <div class="card-body">
-                {% if user.is_staff %}
+                {% comment %}
+                No self-delete button on a staff account. A teacher's account
+                is the owner of session records, flags and progress rows for
+                real students, so removing it is a decision for whoever
+                administers the school, not a button the account holder can
+                reach on their own settings page. The view refuses the action
+                as well.
+                {% endcomment %}
                 <p style="color: var(--gray-500); font-size: 0.875rem;">
+                    {% if user.is_staff %}
                     {% trans "Super Admin accounts cannot be deleted from this page. Contact another administrator to remove your account." %}
+                    {% else %}
+                    {% trans "Your account cannot be deleted from this page. Contact your school administrator to have it removed — they can also disable it immediately if you have lost access." %}
+                    {% endif %}
                 </p>
-                {% else %}
-                <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 1rem;">
-                    {% trans "Permanently delete your account and all associated data. This action cannot be undone." %}
-                </p>
-                <form method="post" onsubmit="return confirm('{% trans "Are you sure you want to delete your account? This action is permanent and cannot be undone." %}');">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="delete_account">
-                    <button type="submit" class="btn" style="background: var(--danger); color: #fff;">{% trans "Delete My Account" %}</button>
-                </form>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -271,7 +421,7 @@
     </form>
 
     {# ── Manage Schools (superadmin only) ── #}
-    <div style="margin-top: 2rem;">
+    <div class="settings-grid__wide">
         <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header">
                 <h3 class="card-title">{% trans "Manage Schools" %}</h3>
@@ -374,7 +524,7 @@
     </form>
 
     {# ── AI Model Configuration (superadmin only) — per-purpose ── #}
-    <form method="post" style="margin-top: 2rem;" id="ai-model-form">
+    <form method="post" id="ai-model-form" class="settings-grid__wide settings-grid__group">
         {% csrf_token %}
         <input type="hidden" name="action" value="ai_model">
 
@@ -399,6 +549,11 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="tutor_model">{% trans "Model Name" %}</label>
+                        <select class="form-control model-picker" id="tutor_model_picker"
+                                data-model-input="#tutor_model"
+                                data-provider-select="#tutor_provider"
+                                data-catalog="text"
+                                aria-label="{% trans 'Choose a model' %}"></select>
                         <input type="text" class="form-control" id="tutor_model" name="tutor_model" value="{{ tutor_model }}" placeholder="e.g. gemini-3.1-pro-preview">
                     </div>
                 </div>
@@ -416,11 +571,11 @@
                     &nbsp;&bull;&nbsp;
                     <strong>{% trans "Key:" %}</strong>
                     {% if has_tutor_db_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "Stored in DB" %}</span>
                     {% elif has_tutor_env_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
+                        <span style="color: var(--danger, var(--danger-solid));">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -447,6 +602,11 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="gen_model">{% trans "Model Name" %}</label>
+                        <select class="form-control model-picker" id="gen_model_picker"
+                                data-model-input="#gen_model"
+                                data-provider-select="#gen_provider"
+                                data-catalog="text"
+                                aria-label="{% trans 'Choose a model' %}"></select>
                         <input type="text" class="form-control" id="gen_model" name="gen_model" value="{{ gen_model }}" placeholder="e.g. gemini-3.1-pro-preview">
                     </div>
                 </div>
@@ -464,11 +624,11 @@
                     &nbsp;&bull;&nbsp;
                     <strong>{% trans "Key:" %}</strong>
                     {% if has_gen_db_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "Stored in DB" %}</span>
                     {% elif has_gen_env_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
+                        <span style="color: var(--danger, var(--danger-solid));">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -495,6 +655,11 @@
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" for="img_model">{% trans "Model Name" %}</label>
+                        <select class="form-control model-picker" id="img_model_picker"
+                                data-model-input="#img_model"
+                                data-provider-select="#img_provider"
+                                data-catalog="image"
+                                aria-label="{% trans 'Choose a model' %}"></select>
                         <input type="text" class="form-control" id="img_model" name="img_model" value="{{ img_model }}" placeholder="e.g. gemini-3.1-flash-image-preview">
                     </div>
                 </div>
@@ -512,11 +677,11 @@
                     &nbsp;&bull;&nbsp;
                     <strong>{% trans "Key:" %}</strong>
                     {% if has_img_db_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "Stored in DB" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "Stored in DB" %}</span>
                     {% elif has_img_env_key %}
-                        <span style="color: var(--success, #16a34a);">{% trans "From env var" %}</span>
+                        <span style="color: var(--success, var(--success-solid));">{% trans "From env var" %}</span>
                     {% else %}
-                        <span style="color: var(--danger, #dc2626);">{% trans "Not configured" %}</span>
+                        <span style="color: var(--danger, var(--danger-solid));">{% trans "Not configured" %}</span>
                     {% endif %}
                 </div>
             </div>
@@ -526,7 +691,7 @@
     </form>
 
     {# ── Tutor Personalities (superadmin only) ── #}
-    <div class="card" style="margin-top: 2rem; margin-bottom: 1.5rem;">
+    <div class="card settings-grid__wide">
         <div class="card-header" style="cursor:pointer;" onclick="document.getElementById('personalities-body').style.display=document.getElementById('personalities-body').style.display==='none'?'block':'none'">
             <h3 class="card-title">{% trans "Tutor Personalities" %} <small style="font-weight:normal;color:var(--gray-500);">{% trans "(click to expand)" %}</small></h3>
         </div>
@@ -581,19 +746,37 @@
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="add_personality">
-                <div style="display:grid;grid-template-columns:60px 1fr;gap:0.5rem;margin-bottom:0.5rem;">
-                    <input type="text" name="personality_emoji" placeholder="😊" maxlength="10" style="text-align:center;font-size:1.5rem;padding:0.3rem;">
-                    <input type="text" name="personality_name" placeholder="{% trans 'Name (e.g. Friendly)' %}" required maxlength="50">
+                <div class="personality-row">
+                    <div class="form-group">
+                        <label class="form-label" for="personality_emoji">{% trans "Icon" %}</label>
+                        <input type="text" class="form-control personality-emoji" id="personality_emoji"
+                               name="personality_emoji" placeholder="😊" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="personality_name">{% trans "Name" %}</label>
+                        <input type="text" class="form-control" id="personality_name" name="personality_name"
+                               placeholder="{% trans 'e.g. Friendly' %}" required maxlength="50">
+                    </div>
                 </div>
-                <input type="text" name="personality_description" placeholder="{% trans 'Short description shown to students' %}" maxlength="200" style="width:100%;margin-bottom:0.5rem;">
-                <textarea name="personality_prompt" placeholder="{% trans 'System prompt modifier (injected into the tutor system prompt)' %}" required rows="3" style="width:100%;margin-bottom:0.75rem;"></textarea>
+                <div class="form-group">
+                    <label class="form-label" for="personality_description">{% trans "Description" %}</label>
+                    <input type="text" class="form-control" id="personality_description"
+                           name="personality_description"
+                           placeholder="{% trans 'Shown to students when they pick a tutor style' %}" maxlength="200">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="personality_prompt">{% trans "Prompt modifier" %}</label>
+                    <textarea class="form-control mono" id="personality_prompt" name="personality_prompt"
+                              required rows="3"
+                              placeholder="{% trans 'Injected into the tutor system prompt — e.g. Use short sentences and lots of encouragement.' %}"></textarea>
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm">{% trans "Add Personality" %}</button>
             </form>
         </div>
     </div>
 
     {# ── AI System Prompts (superadmin only) ── #}
-    <form method="post" style="margin-top: 2rem;">
+    <form method="post" class="settings-grid__wide">
         {% csrf_token %}
         <input type="hidden" name="action" value="prompts">
 
@@ -610,7 +793,8 @@
                 <div class="form-group" style="margin-bottom:1.5rem;">
                     <label class="form-label" for="{{ pf.name }}">{{ pf.label }}</label>
 
-                    <textarea class="form-control" id="{{ pf.name }}" name="{{ pf.name }}" rows="6" style="font-family:monospace;font-size:0.8rem;">{{ pf.current }}</textarea>
+                    <textarea class="form-control mono prompt-editor" id="{{ pf.name }}"
+                              name="{{ pf.name }}" rows="14">{{ pf.current }}</textarea>
                     <small style="color:var(--gray-500);">{{ pf.desc }}</small>
                 </div>
                 {% endfor %}
@@ -628,6 +812,8 @@
 {% if is_superadmin %}
 {# See the note by gradesData below (finding F-07). #}
 {{ platform_config.grades|json_script:"grades-json" }}
+{{ text_model_catalog|json_script:"text-model-catalog" }}
+{{ image_model_catalog|json_script:"image-model-catalog" }}
 <script nonce="{{ request.csp_nonce }}">
 (function() {
     // AI Model — auto-fill model name on provider change (per-purpose)
@@ -693,4 +879,5 @@
 })();
 </script>
 {% endif %}
+<script src="{% static 'js/model-picker.js' %}" defer></script>
 {% endblock %}

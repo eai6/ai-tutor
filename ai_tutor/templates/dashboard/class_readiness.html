@@ -1,6 +1,7 @@
 {% extends "dashboard/base.html" %}
 {% load i18n %}
 {% block title %}{% blocktrans with title=course.title %}Class Readiness — {{ title }}{% endblocktrans %}{% endblock %}
+{% block page_title %}{% trans "Class readiness" %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -10,7 +11,7 @@
     align-items: center;
     gap: 1.5rem;
     padding: 1.5rem;
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     margin-bottom: 1rem;
@@ -19,14 +20,14 @@
     width: 80px; height: 80px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.5rem; font-weight: 800; color: #fff;
+    font-size: 1.5rem; font-weight: 800; color: var(--surface);
     flex-shrink: 0;
 }
-.score-circle.green { background: #10b981; }
-.score-circle.yellow { background: #f59e0b; }
-.score-circle.red { background: #ef4444; }
+.score-circle.green { background: var(--success-solid); }
+.score-circle.yellow { background: var(--warning-solid); }
+.score-circle.red { background: var(--danger-solid); }
 .score-details h3 { margin: 0 0 0.25rem; font-size: 1.125rem; }
-.score-details p { margin: 0; color: #71717a; font-size: 0.875rem; }
+.score-details p { margin: 0; color: var(--text-muted); font-size: 0.875rem; }
 
 .recommendation-banner {
     padding: 1rem 1.25rem;
@@ -35,41 +36,41 @@
     font-size: 0.9375rem;
     margin-bottom: 1.5rem;
 }
-.recommendation-banner.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-.recommendation-banner.warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-.recommendation-banner.danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.recommendation-banner.success { background: var(--success-surface); color: var(--success); border: 1px solid var(--success-border); }
+.recommendation-banner.warning { background: var(--warning-surface); color: var(--warning); border: 1px solid var(--warning-border); }
+.recommendation-banner.danger { background: var(--danger-surface); color: var(--danger); border: 1px solid var(--danger-border); }
 
 .objectives-table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     margin-bottom: 1.5rem;
 }
 .objectives-table th {
-    background: #f4f4f5;
+    background: var(--surface-sunken);
     padding: 0.75rem 1rem;
     text-align: left;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #71717a;
+    color: var(--text-muted);
 }
 .objectives-table td {
     padding: 0.75rem 1rem;
-    border-top: 1px solid #f4f4f5;
+    border-top: 1px solid var(--surface-sunken);
     font-size: 0.875rem;
     vertical-align: top;
 }
-.objectives-table tr:hover { background: #fafafa; }
+.objectives-table tr:hover { background: var(--surface-sunken); }
 
 .mastery-bar {
     width: 100%;
     height: 8px;
-    background: #e4e4e7;
+    background: var(--border);
     border-radius: 999px;
     overflow: hidden;
 }
@@ -78,9 +79,9 @@
     border-radius: 999px;
     transition: width 0.3s;
 }
-.mastery-bar-fill.green { background: #10b981; }
-.mastery-bar-fill.yellow { background: #f59e0b; }
-.mastery-bar-fill.red { background: #ef4444; }
+.mastery-bar-fill.green { background: var(--success-solid); }
+.mastery-bar-fill.yellow { background: var(--warning-solid); }
+.mastery-bar-fill.red { background: var(--danger-solid); }
 
 .bloom-badge {
     display: inline-block;
@@ -89,20 +90,20 @@
     text-transform: uppercase;
     padding: 2px 6px;
     border-radius: 999px;
-    background: #ede9fe;
-    color: #7c3aed;
+    background: var(--accent-surface);
+    color: var(--accent);
 }
 
 .unit-divider td {
     background: #f8fafc;
     font-weight: 700;
-    color: #3b82f6;
+    color: var(--info-solid);
     font-size: 0.8125rem;
     padding: 0.5rem 1rem;
 }
 
 .student-gaps {
-    background: #fff;
+    background: var(--surface);
     border-radius: 0.75rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     padding: 1.5rem;
@@ -113,12 +114,12 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 0.625rem 0;
-    border-bottom: 1px solid #f4f4f5;
+    border-bottom: 1px solid var(--surface-sunken);
 }
 .gap-item:last-child { border-bottom: none; }
 .gap-name { font-weight: 600; font-size: 0.875rem; }
-.gap-count { color: #ef4444; font-weight: 700; font-size: 0.8125rem; }
-.gap-objectives { color: #71717a; font-size: 0.75rem; margin-top: 0.25rem; }
+.gap-count { color: var(--danger-solid); font-weight: 700; font-size: 0.8125rem; }
+.gap-objectives { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem; }
 
 @media (max-width: 768px) {
     .readiness-score { flex-direction: column; text-align: center; }
@@ -129,13 +130,13 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:#71717a;text-decoration:none;margin-bottom:1rem;">
+<a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:var(--text-muted);text-decoration:none;margin-bottom:1rem;">
     &larr; {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <div class="readiness-header">
     <h2 style="margin:0 0 0.25rem;">{% trans "Class Readiness Report" %}</h2>
-    <p style="color:#71717a;margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>
+    <p style="color:var(--text-muted);margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>
 </div>
 
 <!-- Class Readiness Score -->
@@ -187,14 +188,14 @@
                         <span style="font-weight:600;font-size:0.8125rem;">{{ obj.avg_mastery }}%</span>
                     </div>
                 </td>
-                <td style="color:#10b981;font-weight:600;">{{ obj.mastered_pct }}%</td>
-                <td style="color:{% if obj.struggling_pct > 30 %}#ef4444{% else %}#71717a{% endif %};font-weight:600;">{{ obj.struggling_pct }}%</td>
+                <td style="color:var(--success-solid);font-weight:600;">{{ obj.mastered_pct }}%</td>
+                <td style="color:{% if obj.struggling_pct > 30 %}var(--danger-solid){% else %}var(--text-muted){% endif %};font-weight:600;">{{ obj.struggling_pct }}%</td>
             </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<div style="padding:2rem;text-align:center;color:#71717a;background:#fff;border-radius:0.75rem;">
+<div style="padding:2rem;text-align:center;color:var(--text-muted);background:var(--surface);border-radius:0.75rem;">
     {% trans "No enabling objectives found for this course. Upload a curriculum with enabling objectives to see the readiness report." %}
 </div>
 {% endif %}

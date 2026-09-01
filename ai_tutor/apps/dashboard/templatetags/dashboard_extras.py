@@ -35,6 +35,18 @@ _ITALIC_RE = re.compile(r'(?<![\*\w])\*([^*\n]+)\*(?![\*\w])')
 _HR_RE = re.compile(r'^---+\s*$')
 
 
+def _heading_slug(text, seen):
+    """URL-safe id for a heading, unique within one rendered document.
+
+    Duplicates get a numeric suffix rather than silently colliding, because
+    two sections called "Your data" would otherwise share an anchor and the
+    second would be unreachable.
+    """
+    base = re.sub(r'[^a-z0-9]+', '-', str(text).lower()).strip('-') or 'section'
+    seen[base] = seen.get(base, 0) + 1
+    return base if seen[base] == 1 else f'{base}-{seen[base]}'
+
+
 @register.filter
 def render_markdown(text):
     """Render the limited Markdown subset used by PlatformTerms / FAQ.
@@ -53,6 +65,7 @@ def render_markdown(text):
     blocks = []
     current_para = []
     current_list = []
+    seen_slugs = {}
 
     def _flush_para():
         if current_para:
@@ -119,6 +132,11 @@ def render_markdown(text):
             items = ''.join(f'<li>{_inline(item)}</li>' for item in content)
             out.append(f'<ul>{items}</ul>')
         elif kind in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
-            out.append(f'<{kind}>{_inline(content)}</{kind}>')
+            # Headings carry a slug id so the terms page can build a table of
+            # contents and so a section can be linked to directly — a school
+            # asking "which clause covers data?" wants to send a URL, not a
+            # page number.
+            out.append(f'<{kind} id="{_heading_slug(content, seen_slugs)}">'
+                       f'{_inline(content)}</{kind}>')
 
     return mark_safe(''.join(out))
