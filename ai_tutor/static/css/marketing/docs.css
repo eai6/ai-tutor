@@ -8,7 +8,9 @@
                   teams. The bands are the document's own division, and it is
                   the single most useful thing to tell a reader before they
                   pick a link, because half the document is not addressed to
-                  them.
+                  them. Which is why both bands are sized to sit above the
+                  fold together: a reader who has to scroll to find Part II
+                  has already been told the document is only Part I.
 
      a section    a contents rail and a measured column of prose, with the
                   document's tables, shell blocks and boxed asides.
@@ -34,6 +36,15 @@
 
 .docs-page {
     padding-block: var(--space-10) var(--space-12);
+}
+
+/* The index opens tighter than a section does: it has to hold two card bands
+   and a reader who has to scroll to find Part II reads Part I as the whole
+   document. The masthead, utility bar, part bands and cards below are all
+   index-only markup and are sized for that; this is the one rule the two page
+   shapes share, so it is the one that needs saying which page it is for. */
+.docs-page--index {
+    padding-block: var(--space-4) var(--space-10);
 }
 
 /* --------------------------------------------------------------------------
@@ -90,7 +101,7 @@
 
 .docs-masthead h1 {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+    font-size: clamp(1.75rem, 1.3rem + 1.5vw, 2.5rem);
     font-weight: var(--weight-bold);
     letter-spacing: var(--tracking-tight);
     line-height: var(--leading-tight);
@@ -99,15 +110,15 @@
 }
 
 .docs-masthead__lede {
-    margin: var(--space-3) 0 0;
+    margin: var(--space-2) 0 0;
     max-width: 46rem;
-    font-size: var(--text-md);
+    font-size: var(--text-base);
     line-height: var(--leading-normal);
     color: var(--text-secondary);
 }
 
 /* ---------------------------------------------------------------- search */
-.docs-search { flex: 0 1 22rem; padding-top: var(--space-2); }
+.docs-search { flex: 0 1 22rem; }
 
 .docs-search__label {
     display: block;
@@ -138,7 +149,7 @@
     min-width: 0;
     border: 0;
     background: transparent;
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-4);
     font-family: var(--font-body);
     font-size: var(--text-base);
     color: var(--text);
@@ -179,8 +190,7 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
-    gap: var(--space-5);
-    margin-top: var(--space-8);
+    gap: var(--space-4);
     font-size: var(--text-base);
 }
 
@@ -205,7 +215,7 @@
     background: var(--accent-surface);
     border: 1px solid var(--accent-border);
     border-radius: var(--radius-full);
-    padding: var(--space-1) var(--space-3);
+    padding: 1px var(--space-2);
 }
 
 .docs-meta__current { color: var(--text); font-weight: var(--weight-medium); }
@@ -250,22 +260,47 @@
     color: var(--text-muted);
 }
 
+/* The breadcrumb and the meta row are both one line of chrome, so they take
+   one line between them: where you are on the left, what you can do about it
+   on the right. Stacked they cost 84px, which is most of a card's list, and
+   the page has two card bands to fit above the fold. */
+.docs-utility {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-6);
+    margin-top: var(--space-4);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border);
+}
+
+.docs-utility .docs-crumbs {
+    margin-top: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.docs-utility .docs-crumbs__date { margin-left: var(--space-3); }
+
 /* --------------------------------------------------------------------------
    Part bands
    ------------------------------------------------------------------------
    The document is two documents. Saying so above the cards costs one line and
    saves a technical reader from starting at section 1 — or, worse, a director
-   from starting at appendix E.
+   from starting at appendix E. One line is the literal budget: label, title
+   and blurb share a baseline so the band announces itself in the height of a
+   sentence, because the second band has to be on screen with the first.
    -------------------------------------------------------------------------- */
-.docs-part { margin-top: var(--space-12); }
+.docs-part { margin-top: var(--space-5); }
 
 .docs-part__head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
     align-items: baseline;
-    column-gap: var(--space-4);
+    column-gap: var(--space-3);
     row-gap: var(--space-1);
-    padding-bottom: var(--space-4);
+    padding-bottom: var(--space-2);
     border-bottom: 2px solid var(--text);
 }
 
@@ -283,14 +318,15 @@
     grid-row: 1;
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--text-lg);
+    font-size: var(--text-md);
     font-weight: var(--weight-bold);
     letter-spacing: var(--tracking-tight);
     color: var(--text);
 }
 
 .docs-part__blurb {
-    grid-column: 2;
+    grid-column: 3;
+    grid-row: 1;
     margin: 0;
     font-size: var(--text-base);
     color: var(--text-muted);
@@ -302,8 +338,8 @@
 .docs-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-    gap: var(--space-5);
-    margin-top: var(--space-6);
+    gap: var(--space-4);
+    margin-top: var(--space-3);
 }
 
 .docs-card {
@@ -323,7 +359,7 @@
     border-color: var(--border-strong);
 }
 
-.docs-card__body { flex: 1; padding: var(--space-6); }
+.docs-card__body { flex: 1; padding: var(--space-3) var(--space-5); }
 
 .docs-card__title {
     margin: 0;
@@ -335,8 +371,8 @@
 }
 
 .docs-card__lede {
-    margin: var(--space-2) 0 var(--space-5);
-    font-size: var(--text-base);
+    margin: var(--space-1) 0 var(--space-3);
+    font-size: var(--text-sm);
     line-height: var(--leading-snug);
     color: var(--text-muted);
 }
@@ -346,15 +382,14 @@
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--space-1);
 }
 
 .docs-card__item a {
     display: grid;
-    grid-template-columns: 2.25rem minmax(0, 1fr);
+    grid-template-columns: 2rem minmax(0, 1fr);
     align-items: baseline;
     gap: var(--space-2);
-    padding: var(--space-2);
+    padding: 3px var(--space-2);
     margin-inline: calc(var(--space-2) * -1);
     border-radius: var(--radius-sm);
     text-decoration: none;
@@ -381,14 +416,14 @@
     color: var(--primary-ink);
     background: var(--accent-surface);
     border-radius: var(--radius-xs);
-    padding: var(--space-1) var(--space-2);
+    padding: 2px var(--space-2);
     text-align: center;
     white-space: nowrap;
 }
 
 .docs-card__more {
     margin: 0;
-    padding: var(--space-4) var(--space-6);
+    padding: var(--space-2) var(--space-5);
     border-top: 1px solid var(--border);
     background: var(--surface-sunken);
 }
@@ -778,6 +813,7 @@
     .docs-part__label,
     .docs-part__title,
     .docs-part__blurb { grid-row: auto; grid-column: 1; }
+    .docs-utility { justify-content: flex-start; }
     .docs-pager { grid-template-columns: minmax(0, 1fr); }
     .docs-pager__link--next { grid-column: 1; }
 }

@@ -10,12 +10,15 @@ flat list of 23 links reads none of them. Each card is a question a country
 actually arrives with; the sections under it are the document's own answer,
 carrying the document's own numbering so nobody loses their place.
 
-The full contents list is still here, at the bottom, for the reader who wants
-the shape of the whole thing.
+Both parts have to be on screen together. A reader who has to scroll to learn
+that Part II exists reads Part I as the whole document — and Part I is the
+half not addressed to their technical team. So the page chrome is one masthead
+band and one utility line, the part headings are single rules rather than
+stacked blocks, and the cards are sized to their lists.
 {% endcomment %}
 
 {% block content %}
-<div class="lp-wrap docs-page">
+<div class="lp-wrap docs-page docs-page--index">
 
     <div class="docs-masthead">
         <div class="docs-masthead__titles">
@@ -41,20 +44,24 @@ the shape of the whole thing.
         </form>
     </div>
 
-    <div class="docs-meta">
-        <span class="docs-meta__chip">{% icon "courses" size="sm" %}{% blocktrans %}Playbook v{{ version }}{% endblocktrans %}</span>
-        <span class="docs-meta__current" aria-current="page">{% icon "list" size="sm" %}{% trans "Overview" %}</span>
-        <a href="{% url 'self_hosting' %}">{% icon "download" size="sm" %}{% trans "Run it yourself" %}</a>
-        <a href="{% url 'dashboard:help_index' %}">{% icon "help" size="sm" %}{% trans "Help & FAQ" %}</a>
-        <button type="button" class="docs-meta__btn" id="docs-print">{% trans "Print" %}</button>
-    </div>
+    {# Where you are on the left, what you can do about it on the right. Two #}
+    {# lines of chrome on one line: the row they gave up is a row of cards.  #}
+    <div class="docs-utility">
+        <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
+            <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
+            <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
+            <span class="docs-crumbs__here">{% trans "Country adoption playbook" %}</span>
+            <span class="docs-crumbs__date">{{ version_date }}</span>
+        </nav>
 
-    <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
-        <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
-        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
-        <span class="docs-crumbs__here">{% trans "Country adoption playbook" %}</span>
-        <span class="docs-crumbs__date">{{ version_date }}</span>
-    </nav>
+        <div class="docs-meta">
+            <span class="docs-meta__chip">{% icon "courses" size="sm" %}{% blocktrans %}Playbook v{{ version }}{% endblocktrans %}</span>
+            <span class="docs-meta__current" aria-current="page">{% icon "list" size="sm" %}{% trans "Overview" %}</span>
+            <a href="{% url 'self_hosting' %}">{% icon "download" size="sm" %}{% trans "Run it yourself" %}</a>
+            <a href="{% url 'dashboard:help_index' %}">{% icon "help" size="sm" %}{% trans "Help & FAQ" %}</a>
+            <button type="button" class="docs-meta__btn" id="docs-print">{% trans "Print" %}</button>
+        </div>
+    </div>
 
     <p class="docs-search__status" id="docs-search-status" role="status" hidden></p>
 
