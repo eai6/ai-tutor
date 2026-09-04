@@ -295,11 +295,19 @@ AXES_HTTP_RESPONSE_CODE = 429
 # on. axes writes both to the 'axes' logger, which the root handler picks up.
 AXES_VERBOSE = True
 
+# The sign-up form states four rules beside the password box — eight
+# characters, a letter, a number, a symbol — and static/js/password-field.js
+# ticks them off live. CharacterVarietyValidator is what makes the last three
+# true on the server; without it the checklist would be advice rather than
+# the rule. The other four run as well and are stated under the list as
+# checks made on submit: they cannot be decided in the browser (the common
+# list is 20,000 entries) or are not worth a red cross while someone types.
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME': 'ai_tutor.apps.accounts.password_validators.CharacterVarietyValidator'},
 ]
 
 

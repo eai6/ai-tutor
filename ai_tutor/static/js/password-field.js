@@ -5,21 +5,37 @@
  * advisory strength meter. With JavaScript off, every form works exactly as
  * it did before.
  *
- * ── Why these three rules and not others ────────────────────────────────
- * The checklist mirrors AUTH_PASSWORD_VALIDATORS in config/settings.py, so
- * a green tick means the server will accept that aspect. Three of the four
- * configured validators are decidable in the browser:
+ * ── Which rules are listed, and why ─────────────────────────────────────
+ * The checklist mirrors AUTH_PASSWORD_VALIDATORS in config/settings.py, so a
+ * green tick means the server will accept that aspect. Four rules are always
+ * listed, because they are the four a person can act on directly:
  *
- *   MinimumLengthValidator          → at least 8 characters
- *   NumericPasswordValidator        → not entirely digits
- *   UserAttributeSimilarityValidator→ not too like the name/username/email,
- *                                     reimplemented below against the same
- *                                     0.7 quick_ratio threshold Django uses
+ *   MinimumLengthValidator      → at least 8 characters
+ *   CharacterVarietyValidator   → a letter, a number, a symbol
  *
- * The fourth, CommonPasswordValidator, tests a 20,000-entry list. Shipping a
- * subset would show a green tick for passwords the server then rejects, which
- * is worse than not showing the rule — so it is stated as a note instead and
- * enforced on submit.
+ * Their character classes are ASCII and are copied character-for-character
+ * from apps/accounts/password_validators.py. Widening them means changing
+ * both files together; see that module for why they are ASCII at all.
+ *
+ * Two more validators run on the server and are named under the list rather
+ * than ticked in it:
+ *
+ *   CommonPasswordValidator     → a 20,000-entry list. Shipping a subset
+ *                                 would tick green for passwords the server
+ *                                 then refuses, which is worse than silence.
+ *   UserAttributeSimilarityValidator
+ *                               → decidable here (quickRatio below matches
+ *                                 Django's 0.7 threshold), but it is a trap
+ *                                 rather than a target: nobody sets out to
+ *                                 satisfy it. It joins the list only at the
+ *                                 moment it fails, so the everyday list stays
+ *                                 the four rules that are worth aiming at,
+ *                                 and nobody sees four green ticks and is
+ *                                 then refused on submit.
+ *
+ * ── When the checklist appears ──────────────────────────────────────────
+ * Not until the first keystroke. Sitting open on an untouched field, it is
+ * four rules nobody has broken yet taking up a third of the form.
  *
  * ── Markup contract ──────────────────────────────────────────────────────
  *   data-pw-strength            build the checklist for this field
@@ -133,6 +149,8 @@
     /* ---------------------------------------------------------- checklist */
 
     function buildRules(input) {
+        /* Kept in step with LETTER / NUMBER / SYMBOL in
+           apps/accounts/password_validators.py. */
         var RULES = [
             {
                 key: 'length',
@@ -140,19 +158,35 @@
                 test: function (pw) { return pw.length >= 8; }
             },
             {
-                key: 'not-numeric',
-                text: T('Not only numbers'),
-                test: function (pw) { return !/^\d+$/.test(pw); }
+                key: 'letter',
+                text: T('A letter'),
+                test: function (pw) { return /[A-Za-z]/.test(pw); }
             },
             {
+                key: 'number',
+                text: T('A number'),
+                test: function (pw) { return /[0-9]/.test(pw); }
+            },
+            {
+                key: 'symbol',
+                text: T('A symbol, such as ! ? # or @'),
+                test: function (pw) { return /[^A-Za-z0-9]/.test(pw); }
+            }
+        ];
+
+        /* Shown only while it is failing — see the header note. Not counted
+           towards the meter, which reports on the four rules above. */
+        var GUARDS = [
+            {
                 key: 'not-similar',
-                text: T('Not too like your name, username or email'),
+                text: T('Too like your name, username or email'),
                 test: function (pw) { return !tooSimilar(pw, readSimilarValues(input)); }
             }
         ];
 
         var box = document.createElement('div');
-        box.className = 'pw-rules pw-rules--idle';
+        box.className = 'pw-rules';
+        box.hidden = true;
 
         var label = document.createElement('p');
         label.className = 'pw-rules__label';
@@ -162,7 +196,7 @@
         var list = document.createElement('ul');
         list.className = 'pw-rules__list';
 
-        RULES.forEach(function (rule) {
+        RULES.concat(GUARDS).forEach(function (rule) {
             var li = document.createElement('li');
             li.className = 'pw-rule';
             li.setAttribute('data-rule', rule.key);
@@ -218,16 +252,16 @@
         var host = input.closest('.pw-field') || input;
         host.parentNode.insertBefore(box, host.nextSibling);
 
+        /* Once the four rules are met the password already holds a letter, a
+           digit and a symbol, so counting character classes no longer tells
+           two passing passwords apart — length does, and length is what
+           actually buys entropy. Mixed case is the one class not required,
+           so it is the only variety still worth a look. */
         function score(pw, metCount) {
             if (!pw) { return null; }
             if (metCount < RULES.length) { return 'weak'; }
-            var variety = 0;
-            if (/[a-z]/.test(pw)) { variety += 1; }
-            if (/[A-Z]/.test(pw)) { variety += 1; }
-            if (/\d/.test(pw)) { variety += 1; }
-            if (/[^A-Za-z0-9]/.test(pw)) { variety += 1; }
-            if (pw.length >= 14 && variety >= 3) { return 'strong'; }
-            if (pw.length >= 12 || variety >= 3) { return 'fair'; }
+            var mixedCase = /[a-z]/.test(pw) && /[A-Z]/.test(pw);
+            if (pw.length >= 14 || (pw.length >= 12 && mixedCase)) { return 'strong'; }
             return 'fair';
         }
 
@@ -235,13 +269,19 @@
 
         function evaluate() {
             var pw = input.value;
-            box.classList.toggle('pw-rules--idle', pw.length === 0);
+            box.hidden = pw.length === 0;
 
             var met = 0;
             RULES.forEach(function (rule) {
-                var ok = pw.length > 0 && rule.test(pw);
+                var ok = rule.test(pw);
                 rule.el.classList.toggle('pw-rule--met', ok);
                 if (ok) { met += 1; }
+            });
+
+            /* A guard is invisible until it trips, so it never reads as a
+               rule left to satisfy. */
+            GUARDS.forEach(function (rule) {
+                rule.el.hidden = rule.test(pw);
             });
 
             var level = score(pw, met);
