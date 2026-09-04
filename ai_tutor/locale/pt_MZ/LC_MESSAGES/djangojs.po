@@ -99,12 +99,12 @@ msgid "Got it"
 msgstr "Entendido"
 
 #: templates/tutoring/catalog.html:1015
-#, fuzzy, javascript-format
+#, javascript-format
 #| msgid "%s day streak"
 msgid "%s day streak"
 msgid_plural "%s day streak"
-msgstr[0] "Sequência de %s dias"
-msgstr[1] "Sequência de %s dias"
+msgstr[0] "%s dia seguido"
+msgstr[1] "%s dias seguidos"
 
 #: templates/tutoring/catalog.html:1030
 msgid "Trophies (%(earned)s/%(total)s)"
