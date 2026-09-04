@@ -1,0 +1,291 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ai-tutor-js\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-03 18:07+0000\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: templates/_includes/feedback_button.html:343
+msgid "Proposed action:"
+msgstr "Action proposée :"
+
+#: templates/_includes/feedback_button.html:352
+msgid "Confirm"
+msgstr "Confirmer"
+
+#: templates/_includes/feedback_button.html:356
+msgid "Cancel"
+msgstr "Annuler"
+
+#: templates/_includes/feedback_button.html:375
+msgid "Take me there →"
+msgstr "M'y emmener →"
+
+#: templates/_includes/feedback_button.html:385
+msgid "Send this to support →"
+msgstr "Envoyer ceci à l'assistance →"
+
+#: templates/_includes/feedback_button.html:408
+msgid "Could not start chat."
+msgstr "Impossible de démarrer la conversation."
+
+#: templates/_includes/feedback_button.html:424
+msgid "Assistant failed."
+msgstr "L'assistant a échoué."
+
+#: templates/_includes/feedback_button.html:453
+msgid "Could not run that action."
+msgstr "Impossible d'exécuter cette action."
+
+#: templates/_includes/feedback_button.html:463
+msgid "Cancelled."
+msgstr "Annulé."
+
+#: templates/_includes/feedback_button.html:466
+msgid "Done."
+msgstr "Terminé."
+
+#: templates/_includes/feedback_button.html:569
+msgid "Please describe what happened."
+msgstr "Veuillez décrire ce qui s'est passé."
+
+#: templates/_includes/feedback_button.html:575
+msgid "Pick a window…"
+msgstr "Choisissez une fenêtre…"
+
+#: templates/_includes/feedback_button.html:575
+#: templates/_includes/feedback_button.html:598
+msgid "Sending…"
+msgstr "Envoi…"
+
+#: templates/_includes/feedback_button.html:617
+msgid "Submission failed. Please try again."
+msgstr "L'envoi a échoué. Veuillez réessayer."
+
+#: templates/_includes/feedback_button.html:625
+msgid "Network error. Try again in a moment."
+msgstr "Erreur réseau. Réessayez dans un instant."
+
+#: templates/_includes/feedback_button.html:629
+msgid "Send"
+msgstr "Envoyer"
+
+#: templates/tutoring/_partials/exit_modal.html:713
+msgid "Correct!"
+msgstr "Correct !"
+
+#: templates/tutoring/_partials/exit_modal.html:716
+msgid "Hint:"
+msgstr "Indice :"
+
+#: templates/tutoring/_partials/exit_modal.html:717
+msgid "Not quite — review this topic during remediation."
+msgstr "Pas tout à fait — revoyez ce sujet pendant la remédiation."
+
+#: templates/tutoring/catalog.html:963
+msgid "Lesson Locked"
+msgstr "Leçon verrouillée"
+
+#: templates/tutoring/catalog.html:964
+msgid "Complete these lessons first:"
+msgstr "Terminez d'abord ces leçons :"
+
+#: templates/tutoring/catalog.html:966
+msgid "Got it"
+msgstr "Compris"
+
+#: templates/tutoring/catalog.html:1015
+#, javascript-format
+#| msgid "%s day streak"
+msgid "%s day streak"
+msgid_plural "%s day streak"
+msgstr[0] "%s jour d'affilée"
+msgstr[1] "%s jours d'affilée"
+
+#: templates/tutoring/catalog.html:1030
+msgid "Trophies (%(earned)s/%(total)s)"
+msgstr "Trophées (%(earned)s/%(total)s)"
+
+#: templates/tutoring/catalog.html:1039
+msgid "Lessons:"
+msgstr "Leçons :"
+
+#: templates/tutoring/catalog.html:1040
+msgid "Hours:"
+msgstr "Heures :"
+
+#: templates/tutoring/catalog.html:1043
+msgid "Accuracy:"
+msgstr "Précision :"
+
+#: templates/tutoring/catalog.html:1129
+msgid "Loading..."
+msgstr "Chargement..."
+
+#: templates/tutoring/catalog.html:1134
+msgid "No data yet. Complete lessons to appear!"
+msgstr "Aucune donnée pour l'instant. Terminez des leçons pour apparaître !"
+
+#: templates/tutoring/catalog.html:1137
+msgid " (You)"
+msgstr " (vous)"
+
+#: templates/tutoring/catalog.html:1148
+msgid "Failed to load leaderboard."
+msgstr "Impossible de charger le classement."
+
+#: templates/tutoring/catalog.html:1167
+msgid "Achievement Unlocked!"
+msgstr "Réussite débloquée !"
+
+#: templates/tutoring/chat_tutor.html:1386
+msgid "Areas to revisit:"
+msgstr "Points à revoir :"
+
+#: templates/tutoring/chat_tutor.html:1388
+#, javascript-format
+msgid "%s attempt"
+msgid_plural "%s attempts"
+msgstr[0] "%s tentative"
+msgstr[1] "%s tentatives"
+
+#: templates/tutoring/chat_tutor.html:1390
+msgid "Your best:"
+msgstr "Votre meilleure note :"
+
+#: templates/tutoring/chat_tutor.html:1392
+msgid "%(score)s% — passing threshold %(threshold)s%"
+msgstr "%(score)s % — seuil de réussite %(threshold)s %"
+
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Great work! You passed!"
+msgstr "Excellent travail ! Vous avez réussi !"
+
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Keep going — review the explanations above, then continue."
+msgstr "Continuez — relisez les explications ci-dessus, puis poursuivez."
+
+#: templates/tutoring/chat_tutor.html:1400
+msgid "Scroll up to review your answers and explanations."
+msgstr "Faites défiler vers le haut pour revoir vos réponses et les explications."
+
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue"
+msgstr "Continuer"
+
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue to Review"
+msgstr "Passer à la révision"
+
+#: templates/tutoring/chat_tutor.html:1471
+msgid "Engage"
+msgstr "Susciter l'intérêt"
+
+#: templates/tutoring/chat_tutor.html:1472
+msgid "Explore"
+msgstr "Explorer"
+
+#: templates/tutoring/chat_tutor.html:1473
+msgid "Explain"
+msgstr "Expliquer"
+
+#: templates/tutoring/chat_tutor.html:1474
+msgid "Practice"
+msgstr "Entraînement"
+
+#: templates/tutoring/chat_tutor.html:1475
+msgid "Evaluate"
+msgstr "Évaluer"
+
+#: templates/tutoring/chat_tutor.html:1476
+msgid "Exit Quiz"
+msgstr "Questionnaire de sortie"
+
+#: templates/tutoring/chat_tutor.html:1477
+msgid "Review"
+msgstr "Révision"
+
+#: templates/tutoring/chat_tutor.html:1478
+msgid "Completed"
+msgstr "Terminé"
+
+#: templates/tutoring/chat_tutor.html:1606
+msgid "Show how you got there — formulas, steps, reasoning…"
+msgstr "Montrez votre démarche — formules, étapes, raisonnement…"
+
+#: templates/tutoring/chat_tutor.html:1654
+msgid "Your answer…"
+msgstr "Votre réponse…"
+
+#: templates/tutoring/chat_tutor.html:1657
+msgid "Submit answer"
+msgstr "Valider la réponse"
+
+#: templates/tutoring/chat_tutor.html:1698
+msgid "Pick an option first."
+msgstr "Choisissez d'abord une option."
+
+#: templates/tutoring/chat_tutor.html:1709
+msgid "Fill in at least one blank."
+msgstr "Remplissez au moins un blanc."
+
+#: templates/tutoring/chat_tutor.html:1717
+msgid "Type a final answer first."
+msgstr "Saisissez d'abord une réponse finale."
+
+#: templates/tutoring/chat_tutor.html:1812
+msgid "Welcome back — your previous question is still waiting in the panel on the right."
+msgstr "Bon retour — votre question précédente vous attend toujours dans le panneau de droite."
+
+#: templates/tutoring/chat_tutor.html:1904
+msgid "earlier messages"
+msgstr "messages précédents"
+
+#: templates/tutoring/chat_tutor.html:1959
+msgid "Ask your teacher to add you to a group to share this lesson."
+msgstr "Demandez à votre enseignant de vous ajouter à un groupe pour partager cette leçon."
+
+#: templates/tutoring/chat_tutor.html:2024
+#, javascript-format
+msgid "Could not add %s: %s"
+msgstr "Impossible d'ajouter %s : %s"
+
+#: templates/tutoring/chat_tutor.html:2024
+msgid "student"
+msgstr "élève"
+
+#: templates/tutoring/chat_tutor.html:2024
+msgid "unknown"
+msgstr "inconnu"
+
+#: templates/tutoring/chat_tutor.html:2030
+msgid "Network error adding student."
+msgstr "Erreur réseau lors de l'ajout de l'élève."
+
+#: templates/tutoring/chat_tutor.html:2035
+msgid "Remove this student from the group session?"
+msgstr "Retirer cet élève de la séance de groupe ?"
+
+#: templates/tutoring/chat_tutor.html:2188
+msgid "Interactive Content"
+msgstr "Contenu interactif"
+
+#: templates/tutoring/chat_tutor.html:2374
+msgid "Type your answer…"
+msgstr "Saisissez votre réponse…"
+
+#: templates/tutoring/chat_tutor.html:2416
+msgid "Check answer"
+msgstr "Vérifier la réponse"
+
+#: templates/tutoring/chat_tutor.html:2483
+msgid "Will send when online"
+msgstr "Sera envoyé une fois en ligne"
+
+#: templates/tutoring/chat_tutor.html:2700
+msgid "Could not restart the lesson. Please try again."
+msgstr "Impossible de recommencer la leçon. Veuillez réessayer."

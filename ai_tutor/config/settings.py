@@ -337,6 +337,13 @@ LANGUAGE_CODE = os.getenv('DEFAULT_LANGUAGE', 'en-us')
 LANGUAGES = [
     ('en-us', '🇸🇨 Seychelles — English'),
     ('pt-mz', '🇲🇿 Moçambique — Português'),
+    # 'fr' is language-level, not deployment-level, which is why it carries a
+    # language flag where the other two carry a country. The first two exist
+    # because a Seychelles course and a Mozambique course are different things
+    # a teacher picks between; French was added for the interface, and no
+    # francophone deployment has claimed it yet. Give it a country the day one
+    # does — that is a label change plus a data migration, not a new locale.
+    ('fr', '🇫🇷 Français'),
 ]
 
 # Language-only labels for the public language switcher.
@@ -352,6 +359,7 @@ LANGUAGES = [
 LANGUAGE_SHORT_LABELS = {
     'en-us': 'English',
     'pt-mz': 'Português',
+    'fr': 'Français',
 }
 LOCALE_PATHS = [PACKAGE_DIR / 'locale']
 TIME_ZONE = 'UTC'
