@@ -12,24 +12,34 @@ Extracted alongside the header for the same reason — see _marketing_header.htm
             <a href="{% url 'self_hosting' %}">{% trans "Run it yourself" %}</a>
 
             {% comment %}
-            One form, one button per language — not a form per button relying
-            on `display: contents`, which collapses into a stack wherever that
-            does not apply. Labels are language-only; the country-forward
-            names in settings.LANGUAGES are for a teacher choosing a course
-            locale, not a visitor choosing what to read.
+            A select rather than a button per language: the row was fine at
+            two and stops being a row at four. Labels are language-only; the
+            country-forward names in settings.LANGUAGES are for a teacher
+            choosing a course locale, not a visitor choosing what to read.
+
+            The submit button is real, not a progressive-enhancement stub —
+            static/js/lang-switch.js hides it and submits on change. With no
+            script the picker still works, which the offline classroom build
+            depends on.
             {% endcomment %}
             {% get_current_language as CURRENT_LANG %}
             <form action="{% url 'set_language' %}" method="post"
-                  class="lang-switch" aria-label="{% trans 'Language' %}">
+                  class="lang-switch" data-lang-switch>
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.path }}">
-                {% for code, label in LANGUAGES %}
-                    {% if code|lower == CURRENT_LANG|lower %}
-                        <span class="lang-switch__on" aria-current="true">{{ code|language_label }}</span>
-                    {% else %}
-                        <button type="submit" name="language" value="{{ code }}" class="lang-switch__btn">{{ code|language_label }}</button>
-                    {% endif %}
-                {% endfor %}
+                <label class="lang-switch__label" for="lang-switch-select">
+                    {% icon "globe" size="sm" %}
+                    <span class="sr-only">{% trans "Language" %}</span>
+                </label>
+                <select name="language" id="lang-switch-select"
+                        class="lang-switch__select"
+                        data-current="{{ CURRENT_LANG }}">
+                    {% for code, label in LANGUAGES %}
+                    <option value="{{ code }}"
+                            {% if code|lower == CURRENT_LANG|lower %}selected{% endif %}>{{ code|language_label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="lang-switch__go" data-lang-go>{% trans "Go" %}</button>
             </form>
         </div>
         <p class="lp-footer__legal">© 2026 The World Bank Group</p>
