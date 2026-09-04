@@ -86,7 +86,7 @@ class TestPages:
         response = client.get(reverse('docs:index'))
         assert response.status_code == 200
         body = response.content.decode()
-        assert 'Documentation' in body
+        assert 'Country Adoption' in body
         # Every section is listed somewhere on the page, card or contents.
         for section in playbook.SECTIONS:
             assert reverse('docs:section', args=[section.slug]) in body
@@ -127,14 +127,31 @@ class TestPages:
 @pytest.mark.django_db
 class TestHeaderLink:
 
-    def test_landing_page_links_to_the_documentation(self, client):
+    def test_landing_page_links_to_the_playbook(self, client):
         body = client.get(reverse('accounts:landing')).content.decode()
         assert reverse('docs:index') in body
-        assert 'Documentation' in body
+        assert 'Country Adoption' in body
 
-    def test_documentation_marks_itself_current(self, client):
+    def test_playbook_marks_itself_current(self, client):
         body = client.get(reverse('docs:index')).content.decode()
         link = re.search(r'<a href="/docs/" class="lp-header__link"[^>]*>', body)
+        assert link and 'aria-current="page"' in link.group(0)
+
+    def test_both_public_pages_carry_the_home_link(self, client):
+        # The header is shared so that neither page can quietly lose a link.
+        # This is the assertion that makes that true rather than intended.
+        landing = reverse('accounts:landing')
+        for url in (landing, reverse('docs:index')):
+            body = client.get(url).content.decode()
+            assert re.search(
+                r'<a href="%s" class="lp-header__link"[^>]*>\s*Home' % re.escape(landing),
+                body), url
+
+    def test_home_marks_itself_current_on_the_landing_page(self, client):
+        landing = reverse('accounts:landing')
+        body = client.get(landing).content.decode()
+        link = re.search(
+            r'<a href="%s" class="lp-header__link"[^>]*>' % re.escape(landing), body)
         assert link and 'aria-current="page"' in link.group(0)
 
 

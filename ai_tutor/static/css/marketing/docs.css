@@ -48,45 +48,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   Header link
-   ------------------------------------------------------------------------
-   Lives in landing.css's header, so it is defined against that geometry: a
-   quiet text link between the wordmark and the two sign-in buttons, which
-   keeps the buttons the only filled things up there.
-   -------------------------------------------------------------------------- */
-.lp-header__nav {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    margin-left: var(--space-6);
-}
-
-.lp-header__link {
-    font-family: var(--font-body);
-    font-size: var(--text-base);
-    font-weight: var(--weight-medium);
-    color: var(--text-secondary);
-    text-decoration: none;
-    padding: var(--space-2) 0;
-    border-bottom: 2px solid transparent;
-    transition: color var(--dur-fast) var(--ease-out),
-                border-color var(--dur-fast) var(--ease-out);
-}
-
-.lp-header__link:hover { color: var(--text); }
-
-.lp-header__link[aria-current="page"] {
-    color: var(--primary-ink);
-    border-bottom-color: var(--primary);
-}
-
-.lp-header__link:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-    border-radius: var(--radius-xs);
-}
-
-/* --------------------------------------------------------------------------
    Masthead
    -------------------------------------------------------------------------- */
 .docs-masthead {
@@ -816,22 +777,6 @@
     .docs-utility { justify-content: flex-start; }
     .docs-pager { grid-template-columns: minmax(0, 1fr); }
     .docs-pager__link--next { grid-column: 1; }
-}
-
-/* The wordmark, the nav link and a sign-in button do not fit one phone row:
-   at 390px they overrun by 9px, and at 375px by rather more. The link drops to
-   its own row rather than being hidden — it is the way into the documentation,
-   and a reader on a phone is exactly the reader who was sent the link. */
-@media (max-width: 40rem) {
-    .lp-header__inner { flex-wrap: wrap; row-gap: var(--space-2); }
-    .lp-header__nav {
-        order: 3;
-        flex-basis: 100%;
-        margin-left: 0;
-        padding-top: var(--space-1);
-        border-top: 1px solid var(--border);
-    }
-    .lp-header__link { padding-top: var(--space-1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

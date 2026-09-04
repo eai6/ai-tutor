@@ -4,8 +4,8 @@ The public header, shared by the landing page and the documentation site.
 
 Extracted rather than copied because it carries navigation: a link that exists
 on one public page and not the other is the failure mode, and it is invisible
-until someone reports it. Pass `nav_current` as "docs" to mark the current
-section.
+until someone reports it. Pass `nav_current` as "home" or "docs" to mark the
+current section.
 
 Returning users are the majority of traffic on a school platform, so signing
 in stays reachable without scrolling past the explainer.
@@ -21,9 +21,16 @@ in stays reachable without scrolling past the explainer.
             <span class="lp-brand__name">{{ theme_institution_name|default:"AI Tutor" }}</span>
         </a>
 
-        <nav class="lp-header__nav" aria-label="{% trans 'Documentation' %}">
+        {% comment %}
+        The wordmark already goes home, but a wordmark is a convention rather
+        than a label — "Home" is the word someone looks for, and with a second
+        destination in the bar the first one has to be named to be a choice.
+        {% endcomment %}
+        <nav class="lp-header__nav" aria-label="{% trans 'Main' %}">
+            <a href="{% url 'accounts:landing' %}" class="lp-header__link"
+               {% if nav_current == 'home' %}aria-current="page"{% endif %}>{% trans "Home" %}</a>
             <a href="{% url 'docs:index' %}" class="lp-header__link"
-               {% if nav_current == 'docs' %}aria-current="page"{% endif %}>{% trans "Documentation" %}</a>
+               {% if nav_current == 'docs' %}aria-current="page"{% endif %}>{% trans "Country Adoption" %}</a>
         </nav>
 
         <div class="lp-header__actions">
