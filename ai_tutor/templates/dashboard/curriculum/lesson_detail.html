@@ -173,7 +173,7 @@
 <div style="background:var(--info-surface); border:1px solid #93c5fd; border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem;">
     <span id="lesson-regen-spinner" style="font-size:1.25rem; display:inline-block;">⏳</span>
     <div style="flex:1; min-width:0;">
-        <strong style="color:var(--info);">Regenerating content…</strong>
+        <strong style="color:var(--info);">{% trans "Regenerating content…" %}</strong>
         <div style="font-size:0.82rem; color:var(--info-solid); margin-top:0.15rem;">
             Running in the background. This page checks every 6 seconds and reloads automatically when the regen finishes — usually 30 seconds for an exit-ticket-only refresh, 1–3 minutes if lesson steps are being rebuilt.
         </div>
@@ -274,12 +274,12 @@
                     {% csrf_token %}
                     <input type="hidden" name="scope_marker" value="1">
                     <label style="font-size:0.75rem; color:var(--accent); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
-                           title="Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching script and only refresh the exit ticket.">
+                           title="{% trans 'Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching script and only refresh the exit ticket.' %}">
                         <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:var(--accent);">
                         Steps
                     </label>
                     <label style="font-size:0.75rem; color:var(--accent); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
-                           title="Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved.">
+                           title="{% trans 'Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved.' %}">
                         <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:var(--accent);">
                         Exit ticket
                     </label>
@@ -301,7 +301,7 @@
         
         {% if lesson.objective %}
         <div style="margin-top: 1rem; padding: 1rem; background: var(--info-surface); border-radius: 8px;">
-            <strong style="color: var(--info);">Learning Objective:</strong>
+            <strong style="color: var(--info);">{% trans "Learning Objective:" %}</strong>
             <p style="margin: 0.5rem 0 0 0; color: var(--info);">{{ lesson.objective }}</p>
         </div>
         {% endif %}
@@ -316,15 +316,15 @@
                 {% csrf_token %}
                 <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary);">
                     <input type="checkbox" name="allow_group_mode" {% if lesson.allow_group_mode %}checked{% endif %}>
-                    <span><strong>Allow group sessions</strong> — students may complete this lesson together on one device. When enabled, group sessions start immediately (no separate teacher approval).</span>
+                    <span><strong>{% trans "Allow group sessions" %}</strong> — students may complete this lesson together on one device. When enabled, group sessions start immediately (no separate teacher approval).</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary);">
-                    <span><strong>Max group size:</strong></span>
+                    <span><strong>{% trans "Max group size:" %}</strong></span>
                     <input type="number" name="max_group_size" value="{{ lesson.max_group_size|default:4 }}" min="2" max="10" style="width:5rem;padding:0.25rem 0.5rem;border:1px solid var(--border-strong);border-radius:4px;">
                     <span style="font-size:0.85rem;color:var(--text-muted);">(2–10 students)</span>
                 </label>
                 <div>
-                    <button type="submit" class="btn btn-primary btn-sm">Save group settings</button>
+                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Save group settings" %}</button>
                 </div>
             </form>
         </details>
@@ -332,7 +332,7 @@
         {% if unit_terminal_objectives %}
         <div style="margin-top: 0.75rem; padding: 1rem; background: #fefce8; border: 1px solid var(--warning-border); border-radius: 8px;">
             <strong style="color: #854d0e; font-size: 0.875rem;">Terminal Objectives ({{ unit_terminal_objectives|length }})</strong>
-            <div style="font-size: 0.7rem; color: var(--warning); margin-top: 0.15rem;">From the parent unit — broader outcomes this lesson contributes to.</div>
+            <div style="font-size: 0.7rem; color: var(--warning); margin-top: 0.15rem;">{% trans "From the parent unit — broader outcomes this lesson contributes to." %}</div>
             <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem;">
                 {% for to in unit_terminal_objectives %}
                 <div style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: #a16207;">
@@ -355,7 +355,7 @@
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
                 <div>
                     <strong style="color: var(--info); font-size: 0.875rem;">Lesson Terminal Objectives ({{ lesson.enabling_objectives|length }})</strong>
-                    <div style="font-size: 0.7rem; color: #4f46e5; margin-top: 0.15rem;">What this lesson teaches. Click any TO to edit; ✕ to remove; + Add TO to add a new one. Click Save to persist.</div>
+                    <div style="font-size: 0.7rem; color: #4f46e5; margin-top: 0.15rem;">{% trans "What this lesson teaches. Click any TO to edit; ✕ to remove; + Add TO to add a new one. Click Save to persist." %}</div>
                 </div>
                 {% if can_edit_content %}
                 <button type="button" id="lesson-eo-toggle" onclick="toggleLessonEoEdit()" style="background:var(--info);color:var(--surface);border:none;border-radius:4px;padding:0.25rem 0.6rem;font-size:0.75rem;cursor:pointer;">Edit</button>
@@ -370,7 +370,7 @@
                     <span>{{ eo }}</span>
                 </div>
                 {% empty %}
-                <div style="font-size:0.8125rem;color:var(--text-muted);font-style:italic;">No Terminal Objectives yet. Click Edit to add some.</div>
+                <div style="font-size:0.8125rem;color:var(--text-muted);font-style:italic;">{% trans "No Terminal Objectives yet. Click Edit to add some." %}</div>
                 {% endfor %}
             </div>
 
@@ -384,21 +384,21 @@
                         <span style="background:#ddd6fe;color:var(--info);padding:0.0625rem 0.375rem;border-radius:4px;font-size:0.6875rem;font-weight:600;flex-shrink:0;margin-top:4px;">TO</span>
                         <textarea name="enabling_objectives" rows="1" data-original-eo="{{ eo }}" style="flex:1;font-size:0.8125rem;border:1px solid var(--info-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;">{{ eo }}</textarea>
                         {% if sibling_lessons %}
-                        <select onchange="moveLessonEo(this, {{ lesson.id }})" style="font-size:0.7rem;border:1px solid var(--info-border);border-radius:4px;padding:2px 4px;background:var(--surface);color:var(--info);flex-shrink:0;max-width:140px;" title="Move this TO to another lesson in the same unit">
-                            <option value="">Move to…</option>
+                        <select onchange="moveLessonEo(this, {{ lesson.id }})" style="font-size:0.7rem;border:1px solid var(--info-border);border-radius:4px;padding:2px 4px;background:var(--surface);color:var(--info);flex-shrink:0;max-width:140px;" title="{% trans 'Move this TO to another lesson in the same unit' %}">
+                            <option value="">{% trans "Move to…" %}</option>
                             {% for sib in sibling_lessons %}
                             <option value="{{ sib.id }}">→ {{ sib.title|truncatechars:32 }}</option>
                             {% endfor %}
                         </select>
                         {% endif %}
-                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="Remove">✕</button>
+                        <button type="button" onclick="this.closest('.lesson-eo-row').remove()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" title="{% trans 'Remove' %}">✕</button>
                     </div>
                     {% endfor %}
                 </div>
                 <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
                     <button type="button" onclick="addLessonEoRow()" style="font-size:0.75rem;color:var(--info);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:3px 10px;cursor:pointer;">+ Add TO</button>
                     <span style="flex:1;"></span>
-                    <button type="button" onclick="toggleLessonEoEdit()" style="font-size:0.75rem;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;">Cancel</button>
+                    <button type="button" onclick="toggleLessonEoEdit()" style="font-size:0.75rem;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;">{% trans "Cancel" %}</button>
                     <button type="submit" style="font-size:0.75rem;background:var(--info);color:var(--surface);border:none;border-radius:4px;padding:3px 10px;cursor:pointer;">Save</button>
                 </div>
             </form>
@@ -484,11 +484,11 @@
     </div>
     <div class="stat-box">
         <div class="stat-value">{{ exit_ticket_count }}</div>
-        <div class="stat-label">Exit Questions</div>
+        <div class="stat-label">{% trans "Exit Questions" %}</div>
     </div>
     <div class="stat-box">
         <div class="stat-value">{{ students_completed }}</div>
-        <div class="stat-label">Students Completed</div>
+        <div class="stat-label">{% trans "Students Completed" %}</div>
     </div>
 </div>
 
@@ -503,11 +503,11 @@
             <span class="prereq-pill" data-prereq-id="{{ p.prerequisite.id }}" style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: var(--info-surface); border-radius: 9999px; font-size: 0.875rem;">
                 {{ p.prerequisite.title }}
                 {% if user.is_superuser %}
-                <button type="button" onclick="removePrereq(this, {{ p.prerequisite.id }})" style="background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1rem; line-height: 1; padding: 0;" title="Remove prerequisite">&times;</button>
+                <button type="button" onclick="removePrereq(this, {{ p.prerequisite.id }})" style="background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1rem; line-height: 1; padding: 0;" title="{% trans 'Remove prerequisite' %}">&times;</button>
                 {% endif %}
             </span>
             {% empty %}
-            <span id="prereq-empty" style="color: var(--gray-500); font-size: 0.875rem;">No prerequisites. Students can start this lesson immediately.</span>
+            <span id="prereq-empty" style="color: var(--gray-500); font-size: 0.875rem;">{% trans "No prerequisites. Students can start this lesson immediately." %}</span>
             {% endfor %}
         </div>
 
@@ -557,10 +557,10 @@
             {% endif %}
         </div>
         <details style="font-size:0.8rem;">
-            <summary style="cursor:pointer;color:var(--accent);font-weight:600;">Show details</summary>
+            <summary style="cursor:pointer;color:var(--accent);font-weight:600;">{% trans "Show details" %}</summary>
             <div style="margin-top:0.6rem;">
                 {% if step_corrs %}
-                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#3f3f46;">Step content</h4>
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#3f3f46;">{% trans "Step content" %}</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in step_corrs %}
                     <li style="margin-bottom:0.4rem;">
@@ -576,7 +576,7 @@
                 </ul>
                 {% endif %}
                 {% if et_corrs %}
-                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#3f3f46;">Exit-ticket questions</h4>
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:#3f3f46;">{% trans "Exit-ticket questions" %}</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in et_corrs %}
                     <li style="margin-bottom:0.4rem;">
@@ -592,7 +592,7 @@
                 </ul>
                 {% endif %}
                 {% if answer_key_mismatches %}
-                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:var(--danger);">Answer-key mismatches (Layer 2 — most damaging class; questions dropped)</h4>
+                <h4 style="font-size:0.85rem;margin:0.6rem 0 0.3rem;color:var(--danger);">{% trans "Answer-key mismatches (Layer 2 — most damaging class; questions dropped)" %}</h4>
                 <ul style="margin:0;padding-left:1.2rem;list-style:disc;">
                     {% for c in answer_key_mismatches %}
                     <li style="margin-bottom:0.4rem;">
@@ -630,7 +630,7 @@
 <div class="card" style="margin-top: 1.25rem;">
     <div class="card-header">
         <h3 class="card-title">Lesson Steps ({{ steps.count }})</h3>
-        <button class="btn btn-secondary btn-sm" onclick="toggleAllSteps()">Expand All</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleAllSteps()">{% trans "Expand All" %}</button>
     </div>
     <div class="card-body" style="padding: 1rem;">
         {% if steps %}
@@ -660,9 +660,9 @@
                             <span title="Factual judge passed via {{ fs.provider }}"
                                   style="font-size: 0.75rem; color: var(--success);">✓ AI</span>
                         {% elif step.content_quality_status == 'human_approved' %}
-                            <span title="Teacher reviewed and approved" style="font-size: 0.75rem; color: var(--info);">👤 Approved</span>
+                            <span title="{% trans 'Teacher reviewed and approved' %}" style="font-size: 0.75rem; color: var(--info);">👤 Approved</span>
                         {% elif step.content_quality_status == 'human_edited' %}
-                            <span title="Teacher edited" style="font-size: 0.75rem; color: var(--info);">✏ Edited</span>
+                            <span title="{% trans 'Teacher edited' %}" style="font-size: 0.75rem; color: var(--info);">✏ Edited</span>
                         {% elif fs and fs.skipped %}
                             <span title="Factual judge skipped: {{ fs.skip_reason }}"
                                   style="font-size: 0.75rem; color: var(--gray-400);">⊘</span>
@@ -710,7 +710,7 @@
                                     background: {% if step.content_quality_status == 'auto_flagged' %}var(--danger-surface){% else %}var(--success-surface){% endif %};
                                     border-left: 3px solid {% if step.content_quality_status == 'auto_flagged' %}var(--danger){% else %}var(--success){% endif %};
                                     border-radius: 0.25rem;">
-                            <strong>Regen audit:</strong>
+                            <strong>{% trans "Regen audit:" %}</strong>
                             tried {{ ra.cycles_run }} cycle{{ ra.cycles_run|pluralize }},
                             {% if ra.clean %}clean candidate adopted (model {{ ra.picked_model }}){% else %}no clean candidate found — flagged for human review{% endif %}.
                             {% if ra.elapsed_seconds %}<span style="color: var(--gray-500);">{{ ra.elapsed_seconds }}s</span>{% endif %}
@@ -773,7 +773,7 @@
                                 </label>
                             </div>
                             <textarea class="regen-prompt-input" data-step-id="{{ step.id }}"
-                                      placeholder="e.g. make this shorter / less abstract / add a Seychelles example"
+                                      placeholder="{% trans 'e.g. make this shorter / less abstract / add a Seychelles example' %}"
                                       rows="2" hidden
                                       style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
                                              border:1px solid var(--gray-300); border-radius:0.25rem;
@@ -787,7 +787,7 @@
                                         style="font-size:0.8125rem; padding:0.375rem 0.75rem;
                                                background:white; color:var(--gray-700);
                                                border:1px solid var(--gray-300); border-radius:0.25rem;
-                                               cursor:pointer;">Cancel</button>
+                                               cursor:pointer;">{% trans "Cancel" %}</button>
                                 <span class="regen-status" data-step-id="{{ step.id }}"
                                       style="font-size:0.8125rem; color:var(--gray-500); align-self:center;"></span>
                             </div>
@@ -806,12 +806,12 @@
                                     <button type="button" class="regen-save-btn" data-step-id="{{ step.id }}"
                                             style="font-size:0.8125rem; padding:0.375rem 0.75rem;
                                                    background:var(--success); color:white; border:none;
-                                                   border-radius:0.25rem; cursor:pointer;">Save to Step</button>
+                                                   border-radius:0.25rem; cursor:pointer;">{% trans "Save to Step" %}</button>
                                     <button type="button" class="regen-discard-btn" data-step-id="{{ step.id }}"
                                             style="font-size:0.8125rem; padding:0.375rem 0.75rem;
                                                    background:white; color:var(--gray-700);
                                                    border:1px solid var(--gray-300); border-radius:0.25rem;
-                                                   cursor:pointer;">Discard</button>
+                                                   cursor:pointer;">{% trans "Discard" %}</button>
                                 </div>
                             </div>
                         </div>
@@ -825,12 +825,12 @@
                             {{ step.question }}
                             {% if step.expected_answer %}
                             <div style="margin-top: 0.5rem; color: var(--success);">
-                                <strong>Expected:</strong> {{ step.expected_answer }}
+                                <strong>{% trans "Expected:" %}</strong> {{ step.expected_answer }}
                             </div>
                             {% endif %}
                             {% if step.choices %}
                             <div style="margin-top: 0.5rem;">
-                                <strong>Choices:</strong>
+                                <strong>{% trans "Choices:" %}</strong>
                                 <ul style="margin: 0.25rem 0 0 1.5rem;">
                                     {% for choice in step.choices %}
                                     <li>{{ choice }}</li>
@@ -869,7 +869,7 @@
                         <h4>📚 Educational Content</h4>
                         {% if step.educational_content.key_vocabulary %}
                         <div style="margin-bottom: 0.5rem;">
-                            <strong>Vocabulary:</strong>
+                            <strong>{% trans "Vocabulary:" %}</strong>
                             <div class="vocab-list" style="margin-top: 0.25rem;">
                                 {% for vocab in step.educational_content.key_vocabulary %}
                                 <span class="vocab-item" title="{{ vocab.definition }}">{{ vocab.term }}</span>
@@ -879,7 +879,7 @@
                         {% endif %}
                         {% if step.educational_content.key_points %}
                         <div>
-                            <strong>Key Points:</strong>
+                            <strong>{% trans "Key Points:" %}</strong>
                             <ul style="margin: 0.25rem 0 0 1.5rem; font-size: 0.875rem;">
                                 {% for point in step.educational_content.key_points %}
                                 <li>{{ point }}</li>
@@ -892,7 +892,7 @@
                     
                     {% if user.is_superuser %}
                     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-100);">
-                        <a href="{% url 'dashboard:step_edit' step.id %}" class="btn btn-secondary btn-sm">Edit Step</a>
+                        <a href="{% url 'dashboard:step_edit' step.id %}" class="btn btn-secondary btn-sm">{% trans "Edit Step" %}</a>
                     </div>
                     {% endif %}
                 </div>
@@ -900,7 +900,7 @@
             {% endfor %}
         {% else %}
             <div style="text-align: center; padding: 2rem; color: var(--gray-500);">
-                <p>No steps generated yet.</p>
+                <p>{% trans "No steps generated yet." %}</p>
                 {% if user.is_superuser %}
                 <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="margin-top: 1rem;">
                     {% csrf_token %}
@@ -932,7 +932,7 @@
                     {% if question.difficulty %}
                     <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: {% if question.difficulty == 'easy' %}var(--success-surface){% elif question.difficulty == 'hard' %}var(--danger-surface){% else %}var(--warning-surface){% endif %};">{{ question.difficulty }}</span>
                     {% endif %}
-                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--info-surface);" title="Teaching objective">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
+                    <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--info-surface);" title="{% trans 'Teaching objective' %}">{% if question.concept_tag %}{{ question.concept_tag }}{% else %}<span style="color:#a16207;">no teaching objective</span>{% endif %}</span>
                     {% comment %}Pick whichever judge ran for this question type — MCQ → exit_question; FIB/SA/Matching → their dedicated judges. Each writes to judge_outputs.<type> with the same shape, so the badge logic below is uniform.{% endcomment %}
                     {% with eq=question.judge_outputs.exit_question fib=question.judge_outputs.fill_in_blank sa=question.judge_outputs.short_answer mt=question.judge_outputs.matching %}
                     {% with verdict=eq|default:fib|default:sa|default:mt %}
@@ -953,7 +953,7 @@
                     {% else %}
                         {# No judge verdict at all — surface so teacher knows it wasn't validated #}
                         <span style="font-size: 0.7rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--gray-100); color: var(--gray-500);"
-                              title="No AI judge verdict on file">⊘ Unreviewed</span>
+                              title="{% trans 'No AI judge verdict on file' %}">⊘ Unreviewed</span>
                     {% endif %}
                     {% with ra=question.judge_outputs.regen_audit %}
                     {% if ra and ra.cycles_run %}
@@ -991,7 +991,7 @@
                      teachers can see the complete reference without
                      truncation. -->
                 <div style="margin: 0.4rem 0 0.6rem 1rem; padding: 0.45rem 0.6rem; background: var(--surface-sunken); border-left: 3px solid var(--info-border); border-radius: 4px; font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;">
-                    <div><strong style="color:#1e3a8a;">Teaching objective:</strong>
+                    <div><strong style="color:#1e3a8a;">{% trans "Teaching objective:" %}</strong>
                         {% if question.concept_tag %}{{ question.concept_tag }}{% else %}<em style="color:#a16207;">untagged</em>{% endif %}
                     </div>
                 </div>
@@ -1069,7 +1069,7 @@
                     {% endif %}
                     {% elif question.answer_data.figure_url %}
                     <div style="margin-bottom:0.5rem;border:1px solid #bfdbfe;border-radius:6px;background:var(--surface);padding:0.75rem;text-align:center;">
-                        <img src="{{ question.answer_data.figure_url }}" alt="Question figure" style="max-width:100%;border-radius:4px;">
+                        <img src="{{ question.answer_data.figure_url }}" alt="{% trans 'Question figure' %}" style="max-width:100%;border-radius:4px;">
                     </div>
                     {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
@@ -1097,7 +1097,7 @@
                     {% endif %}
                     {% if question.answer_data.model_answer %}
                     <div style="padding: 0.5rem; background: var(--success-surface); border-radius: 6px; font-size: 0.875rem;">
-                        <strong>Model answer:</strong> {{ question.answer_data.model_answer }}
+                        <strong>{% trans "Model answer:" %}</strong> {{ question.answer_data.model_answer }}
                     </div>
                     {% endif %}
                     {% if question.answer_data.keywords %}
@@ -1126,7 +1126,7 @@
 
                 {% if question.explanation %}
                 <div style="margin-top: 0.75rem; padding: 0.5rem; background: var(--success-surface); border-radius: 4px; font-size: 0.875rem;">
-                    <strong>Explanation:</strong> {{ question.explanation }}
+                    <strong>{% trans "Explanation:" %}</strong> {{ question.explanation }}
                 </div>
                 {% endif %}
 
@@ -1144,7 +1144,7 @@
                             data-question-type="{{ question.question_type }}"
                             style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
                     {% endif %}
-                    <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">Delete</button>
+                    <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">{% trans "Delete" %}</button>
                 </div>
 
                 {% if question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
@@ -1163,7 +1163,7 @@
                         </label>
                     </div>
                     <textarea class="exitq-ip-prompt" data-question-id="{{ question.id }}"
-                              placeholder="e.g. simpler wording / focus on the geological process / replace this distractor"
+                              placeholder="{% trans 'e.g. simpler wording / focus on the geological process / replace this distractor' %}"
                               rows="2" hidden
                               style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
                                      border:1px solid var(--gray-300); border-radius:0.25rem;
@@ -1176,7 +1176,7 @@
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
                         <button type="button" class="exitq-ip-cancel btn btn-sm"
                                 data-question-id="{{ question.id }}"
-                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">Cancel</button>
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                         <span class="exitq-ip-status" data-question-id="{{ question.id }}"
                               style="font-size:0.75rem; color:var(--gray-500); align-self:center;"></span>
                     </div>
@@ -1198,7 +1198,7 @@
                         </label>
                     </div>
                     <textarea class="exitq-regen-prompt" data-question-id="{{ question.id }}"
-                              placeholder="e.g. make the distractors more plausible / simpler wording / focus on the scientific term"
+                              placeholder="{% trans 'e.g. make the distractors more plausible / simpler wording / focus on the scientific term' %}"
                               rows="2" hidden
                               style="width:100%; font-size:0.875rem; padding:0.375rem 0.5rem;
                                      border:1px solid var(--gray-300); border-radius:0.25rem;
@@ -1211,7 +1211,7 @@
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
                         <button type="button" class="exitq-regen-cancel btn btn-sm"
                                 data-question-id="{{ question.id }}"
-                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">Cancel</button>
+                                style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                         <span class="exitq-regen-status" data-question-id="{{ question.id }}"
                               style="font-size:0.75rem; color:var(--gray-500); align-self:center;"></span>
                     </div>
@@ -1220,7 +1220,7 @@
                             Candidate (review then save or discard):
                         </div>
                         <div style="display:grid; grid-template-columns:auto 1fr; gap:0.375rem 0.5rem; font-size:0.8125rem;">
-                            <label style="font-weight:500; align-self:center;">Question</label>
+                            <label style="font-weight:500; align-self:center;">{% trans "Question" %}</label>
                             <textarea class="exitq-cand-text" data-question-id="{{ question.id }}" rows="2"
                                       style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem; font-family:inherit;"></textarea>
                             <label style="font-weight:500; align-self:center;">A</label>
@@ -1235,13 +1235,13 @@
                             <label style="font-weight:500; align-self:center;">D</label>
                             <input type="text" class="exitq-cand-d" data-question-id="{{ question.id }}"
                                    style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
-                            <label style="font-weight:500; align-self:center;">Correct</label>
+                            <label style="font-weight:500; align-self:center;">{% trans "Correct" %}</label>
                             <select class="exitq-cand-correct" data-question-id="{{ question.id }}"
                                     style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem;">
                                 <option value="A">A</option><option value="B">B</option>
                                 <option value="C">C</option><option value="D">D</option>
                             </select>
-                            <label style="font-weight:500; align-self:start;">Explanation</label>
+                            <label style="font-weight:500; align-self:start;">{% trans "Explanation" %}</label>
                             <textarea class="exitq-cand-expl" data-question-id="{{ question.id }}" rows="2"
                                       style="font-size:0.8125rem; padding:0.25rem 0.375rem; border:1px solid var(--gray-300); border-radius:0.25rem; font-family:inherit;"></textarea>
                         </div>
@@ -1252,10 +1252,10 @@
                                     data-question-id="{{ question.id }}"
                                     style="font-size:0.75rem; padding:0.25rem 0.75rem;
                                            background:var(--success); color:white; border:none;
-                                           border-radius:0.25rem; cursor:pointer;">Save to Question</button>
+                                           border-radius:0.25rem; cursor:pointer;">{% trans "Save to Question" %}</button>
                             <button type="button" class="exitq-regen-discard btn btn-sm"
                                     data-question-id="{{ question.id }}"
-                                    style="font-size:0.75rem; padding:0.25rem 0.75rem;">Discard</button>
+                                    style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Discard" %}</button>
                         </div>
                     </div>
                 </div>
@@ -1266,7 +1266,7 @@
             <!-- Edit mode (hidden by default) -->
             <div class="q-edit" style="display: none;">
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem; font-weight: 600;">Question</label>
+                    <label style="font-size: 0.75rem; font-weight: 600;">{% trans "Question" %}</label>
                     <textarea class="eq-question_text" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.question_text }}</textarea>
                 </div>
 
@@ -1291,7 +1291,7 @@
                     </div>
                 </div>
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Correct Answer</label>
+                    <label style="font-size: 0.75rem;">{% trans "Correct Answer" %}</label>
                     <select class="eq-correct_answer" style="padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                         <option value="A" {% if question.correct_answer == 'A' %}selected{% endif %}>A</option>
                         <option value="B" {% if question.correct_answer == 'B' %}selected{% endif %}>B</option>
@@ -1303,18 +1303,18 @@
                 {% elif question.question_type == 'fill_in_blank' %}
                 <!-- Fill-in-blank edit -->
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Sentence template (use ___ for blanks)</label>
+                    <label style="font-size: 0.75rem;">{% trans "Sentence template (use ___ for blanks)" %}</label>
                     <input class="eq-fill_template" value="{{ question.answer_data.text_template }}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                 </div>
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Correct answers (comma-separated)</label>
+                    <label style="font-size: 0.75rem;">{% trans "Correct answers (comma-separated)" %}</label>
                     <input class="eq-fill_answers" value="{% for b in question.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                 </div>
 
                 {% elif question.question_type == 'matching' %}
                 <!-- Matching edit -->
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Pairs (one per line: term = definition)</label>
+                    <label style="font-size: 0.75rem;">{% trans "Pairs (one per line: term = definition)" %}</label>
                     <textarea class="eq-matching_pairs" rows="4" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{% if question.answer_data.pairs %}{% for p in question.answer_data.pairs %}{{ p.left }} = {{ p.right }}
 {% endfor %}{% endif %}</textarea>
                 </div>
@@ -1323,41 +1323,41 @@
                 <!-- Short answer / Data interpretation edit -->
                 {% if question.question_type == 'data_interpretation' %}
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Data description</label>
+                    <label style="font-size: 0.75rem;">{% trans "Data description" %}</label>
                     <textarea class="eq-data_description" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.answer_data.data_description }}</textarea>
                 </div>
                 {% endif %}
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Model answer</label>
+                    <label style="font-size: 0.75rem;">{% trans "Model answer" %}</label>
                     <textarea class="eq-model_answer" rows="3" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.answer_data.model_answer }}</textarea>
                 </div>
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Keywords (comma-separated)</label>
+                    <label style="font-size: 0.75rem;">{% trans "Keywords (comma-separated)" %}</label>
                     <input class="eq-keywords" value="{% for kw in question.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                 </div>
                 {% endif %}
 
                 <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <div>
-                        <label style="font-size: 0.75rem;">Difficulty</label>
+                        <label style="font-size: 0.75rem;">{% trans "Difficulty" %}</label>
                         <select class="eq-difficulty" style="padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                             <option value="easy" {% if question.difficulty == 'easy' %}selected{% endif %}>Easy</option>
-                            <option value="medium" {% if question.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="medium" {% if question.difficulty == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
                             <option value="hard" {% if question.difficulty == 'hard' %}selected{% endif %}>Hard</option>
                         </select>
                     </div>
                     <div>
-                        <label style="font-size: 0.75rem;">Concept Tag</label>
+                        <label style="font-size: 0.75rem;">{% trans "Concept Tag" %}</label>
                         <input class="eq-concept_tag" value="{{ question.concept_tag }}" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">
                     </div>
                 </div>
                 <div style="margin-bottom: 0.5rem;">
-                    <label style="font-size: 0.75rem;">Explanation</label>
+                    <label style="font-size: 0.75rem;">{% trans "Explanation" %}</label>
                     <textarea class="eq-explanation" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.explanation }}</textarea>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <button type="button" onclick="saveQuestion(this)" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Save</button>
-                    <button type="button" onclick="cancelEdit(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Cancel</button>
+                    <button type="button" onclick="cancelEdit(this)" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                 </div>
             </div>
         </div>
@@ -1370,8 +1370,8 @@
         <h3 class="card-title">📝 Exit Ticket</h3>
     </div>
     <div class="card-body" style="text-align: center; padding: 2rem; color: var(--gray-500);">
-        <p>No exit questions generated yet.</p>
-        <p style="font-size: 0.875rem;">Exit questions will be generated when you regenerate the lesson content.</p>
+        <p>{% trans "No exit questions generated yet." %}</p>
+        <p style="font-size: 0.875rem;">{% trans "Exit questions will be generated when you regenerate the lesson content." %}</p>
     </div>
 </div>
 {% endif %}

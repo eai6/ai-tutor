@@ -117,7 +117,7 @@
                                 <span style="font-weight:600;">
                                     {% if lesson.mastery_level == 'mastered' %}✓{% elif lesson.mastery_level == 'in_progress' %}◐{% else %}○{% endif %}
                                     {{ lesson.lesson.title }}
-                                    {% if lesson.last_completion_was_group %}<span title="Completed as part of a group" style="margin-left:0.25rem;">👥</span>{% endif %}
+                                    {% if lesson.last_completion_was_group %}<span title="{% trans 'Completed as part of a group' %}" style="margin-left:0.25rem;">👥</span>{% endif %}
                                 </span>
                                 {% if lesson.best_score_pct is not None %}
                                 <span style="font-size:0.78rem;color:var(--gray-500);">

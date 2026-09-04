@@ -138,14 +138,14 @@
                         {% if r.has_attempt %}
                             <strong>{{ r.best_score }} / {{ questions_per_attempt }}</strong>
                             <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.best_pct }}%</span>
-                            {% if r.best_was_group %}<span title="Best score earned in a group session" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
+                            {% if r.best_was_group %}<span title="{% trans 'Best score earned in a group session' %}" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
                         {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             {{ r.latest_score }} / {{ questions_per_attempt }}
                             <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.latest_pct }}%</span>
-                            {% if r.latest_was_group %}<span title="Latest attempt was a group session" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
+                            {% if r.latest_was_group %}<span title="{% trans 'Latest attempt was a group session' %}" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
                         {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
@@ -224,7 +224,7 @@
             <!-- Edit mode (hidden by default) -->
             <div class="q-edit" style="display:none;">
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;font-weight:600;">Question</label>
+                    <label style="font-size:0.72rem;font-weight:600;">{% trans "Question" %}</label>
                     <textarea class="eq-question_text" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.question_text }}</textarea>
                 </div>
                 {% if q.question_type == 'mcq' %}
@@ -235,7 +235,7 @@
                     <div><label style="font-size:0.72rem;">D)</label><input class="eq-option_d" value="{{ q.option_d }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
                 </div>
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Correct</label>
+                    <label style="font-size:0.72rem;">{% trans "Correct" %}</label>
                     <select class="eq-correct_answer" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                         <option value="A" {% if q.correct_answer == 'A' %}selected{% endif %}>A</option>
                         <option value="B" {% if q.correct_answer == 'B' %}selected{% endif %}>B</option>
@@ -245,39 +245,39 @@
                 </div>
                 {% elif q.question_type == 'fill_in_blank' %}
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Sentence template (use ___ for blanks)</label>
+                    <label style="font-size:0.72rem;">{% trans "Sentence template (use ___ for blanks)" %}</label>
                     <input class="eq-fill_template" value="{{ q.answer_data.text_template }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Answers (comma-separated)</label>
+                    <label style="font-size:0.72rem;">{% trans "Answers (comma-separated)" %}</label>
                     <input class="eq-fill_answers" value="{% for b in q.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 {% else %}
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Model answer</label>
+                    <label style="font-size:0.72rem;">{% trans "Model answer" %}</label>
                     <textarea class="eq-model_answer" rows="3" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.answer_data.model_answer }}</textarea>
                 </div>
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Keywords (comma-separated)</label>
+                    <label style="font-size:0.72rem;">{% trans "Keywords (comma-separated)" %}</label>
                     <input class="eq-keywords" value="{% for kw in q.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 {% endif %}
                 <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;margin-bottom:0.5rem;">
                     <div>
-                        <label style="font-size:0.72rem;">Difficulty</label>
+                        <label style="font-size:0.72rem;">{% trans "Difficulty" %}</label>
                         <select class="eq-difficulty" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                             <option value="easy" {% if q.difficulty == 'easy' %}selected{% endif %}>Easy</option>
-                            <option value="medium" {% if q.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="medium" {% if q.difficulty == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
                             <option value="hard" {% if q.difficulty == 'hard' %}selected{% endif %}>Hard</option>
                         </select>
                     </div>
                     <div>
-                        <label style="font-size:0.72rem;">Concept tag</label>
+                        <label style="font-size:0.72rem;">{% trans "Concept tag" %}</label>
                         <input class="eq-concept_tag" value="{{ q.concept_tag }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
                     </div>
                 </div>
                 <div style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.72rem;">Explanation</label>
+                    <label style="font-size:0.72rem;">{% trans "Explanation" %}</label>
                     <textarea class="eq-explanation" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.explanation }}</textarea>
                 </div>
                 <div style="display:flex;gap:0.4rem;">

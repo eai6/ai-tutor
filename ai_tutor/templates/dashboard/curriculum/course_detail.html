@@ -182,16 +182,16 @@
                 {# Subject classification (M8) — drives is_math + tutor rules #}
                 <form method="post" action="{% url 'dashboard:course_subject_type' course.id %}" style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;">
                     {% csrf_token %}
-                    <label style="font-size:0.8125rem;color:var(--gray-500);">Subject:</label>
+                    <label style="font-size:0.8125rem;color:var(--gray-500);">{% trans "Subject:" %}</label>
                     <select name="subject_type" onchange="this.form.submit()" {% if not can_edit_content %}disabled{% endif %} style="padding:0.2rem 0.5rem;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;">
-                        <option value="" {% if not course.subject_type %}selected{% endif %}>Auto-detect from title</option>
+                        <option value="" {% if not course.subject_type %}selected{% endif %}>{% trans "Auto-detect from title" %}</option>
                         <option value="math" {% if course.subject_type == 'math' %}selected{% endif %}>Math</option>
-                        <option value="science" {% if course.subject_type == 'science' %}selected{% endif %}>Science</option>
-                        <option value="humanities" {% if course.subject_type == 'humanities' %}selected{% endif %}>Humanities</option>
-                        <option value="language" {% if course.subject_type == 'language' %}selected{% endif %}>Language</option>
+                        <option value="science" {% if course.subject_type == 'science' %}selected{% endif %}>{% trans "Science" %}</option>
+                        <option value="humanities" {% if course.subject_type == 'humanities' %}selected{% endif %}>{% trans "Humanities" %}</option>
+                        <option value="language" {% if course.subject_type == 'language' %}selected{% endif %}>{% trans "Language" %}</option>
                         <option value="other" {% if course.subject_type == 'other' %}selected{% endif %}>Other</option>
                     </select>
-                    {% if course.is_math %}<span title="Math-specific tutor rules apply (working before evaluation, named subskills, etc.)" style="font-size:0.7rem;background:var(--accent-surface);color:var(--accent);padding:0.1rem 0.4rem;border-radius:999px;">math rules on</span>{% endif %}
+                    {% if course.is_math %}<span title="{% trans 'Math-specific tutor rules apply (working before evaluation, named subskills, etc.)' %}" style="font-size:0.7rem;background:var(--accent-surface);color:var(--accent);padding:0.1rem 0.4rem;border-radius:999px;">math rules on</span>{% endif %}
                 </form>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -226,17 +226,17 @@
                         <input type="text" name="title" class="form-control" value="{{ course.title }}" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Subject <span style="color:var(--danger);">*</span></label>
+                        <label class="form-label">{% trans "Subject" %} <span style="color:var(--danger);">*</span></label>
                         <select name="subject_code" class="form-control" required>
                             <option value="" {% if not course.subject_code %}selected{% endif %}>— Select subject —</option>
                             {% for code, label in subject_code_choices %}
                             <option value="{{ code }}" {% if course.subject_code == code %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
-                        <small style="color:var(--gray-500);font-size:0.7rem;">Used to inherit platform-wide materials for this subject.</small>
+                        <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Used to inherit platform-wide materials for this subject." %}</small>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Grade levels (multi-select)</label>
+                        <label class="form-label">{% trans "Grade levels (multi-select)" %}</label>
                         <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
                             {% for code, label in secondary_year_choices %}
                             <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer;background:white;">
@@ -246,22 +246,22 @@
                             </label>
                             {% endfor %}
                         </div>
-                        <small style="color:var(--gray-500);font-size:0.7rem;">Tick all years this course covers. Used to match platform-wide courses for material inheritance.</small>
+                        <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Tick all years this course covers. Used to match platform-wide courses for material inheritance." %}</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Grade label (display)</label>
-                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="auto from grade levels">
-                        <small style="color:var(--gray-500);font-size:0.7rem;">Optional free-text label. Auto-derived from grade levels if blank.</small>
+                        <label class="form-label">{% trans "Grade label (display)" %}</label>
+                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="{% trans 'auto from grade levels' %}">
+                        <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Optional free-text label. Auto-derived from grade levels if blank." %}</small>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Description</label>
+                        <label class="form-label">{% trans "Description" %}</label>
                         <textarea name="description" class="form-control" rows="2">{{ course.description }}</textarea>
                     </div>
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;">
                             <input type="checkbox" name="tutoring_images_enabled" value="1"
                                    {% if course.tutoring_images_enabled %}checked{% endif %}>
-                            <span class="form-label" style="margin:0;">Show images in tutoring sessions</span>
+                            <span class="form-label" style="margin:0;">{% trans "Show images in tutoring sessions" %}</span>
                         </label>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
                             When off, the AI tutor sees no images and cannot reference figures. Useful for text-only courses or when image generation isn't appropriate.
@@ -271,7 +271,7 @@
                         <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;">
                             <input type="checkbox" name="prerequisites_enabled" value="1"
                                    {% if course.prerequisites_enabled %}checked{% endif %}>
-                            <span class="form-label" style="margin:0;">Enforce lesson prerequisites</span>
+                            <span class="form-label" style="margin:0;">{% trans "Enforce lesson prerequisites" %}</span>
                         </label>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
                             When off, every lesson is unlocked from the start — students can take them in any order. Use for review courses, exam-prep collections, and demo content.
@@ -279,8 +279,8 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Save Changes" %}</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">{% trans "Cancel" %}</button>
                 </div>
             </form>
         </div>
@@ -292,8 +292,8 @@
                 <span style="font-size:0.7rem;background:var(--danger-surface);color:var(--danger);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">super-admin only</span>
             </summary>
             <p style="font-size: 0.8125rem; color: #7f1d1d; margin: 0.75rem 0;">
-                Re-assigns the course (and any linked teaching materials) to another institution. <strong>Only allowed when no lesson has generated content</strong> — moving a content-bearing course would orphan its ChromaDB chunks and student session data.
-                <br><span style="color:var(--gray-500);font-size:0.75rem;">Current owner: <strong>{% if course.institution %}{{ course.institution.name }}{% else %}All Schools (platform-wide){% endif %}</strong></span>
+                Re-assigns the course (and any linked teaching materials) to another institution. <strong>{% trans "Only allowed when no lesson has generated content" %}</strong> — moving a content-bearing course would orphan its ChromaDB chunks and student session data.
+                <br><span style="color:var(--gray-500);font-size:0.75rem;">{% trans "Current owner:" %} <strong>{% if course.institution %}{{ course.institution.name }}{% else %}All Schools (platform-wide){% endif %}</strong></span>
             </p>
             <form method="post" action="{% url 'dashboard:course_change_institution' course.id %}" onsubmit="return confirm('Move this course to the selected institution?\n\nLinked teaching materials will follow.');" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
                 {% csrf_token %}
@@ -304,7 +304,7 @@
                     <option value="{{ school.id }}" {% if course.institution_id == school.id %}disabled{% endif %}>{{ school.name }}{% if course.institution_id == school.id %} — current{% endif %}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.4rem 1rem; font-weight: 600;">Move course</button>
+                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.4rem 1rem; font-weight: 600;">{% trans "Move course" %}</button>
             </form>
         </details>
         {% endif %}
@@ -317,7 +317,7 @@
             </summary>
             <p style="font-size: 0.8125rem; color: var(--gray-500); margin: 0.75rem 0;">
                 Re-analyze the original curriculum document to refresh the unit/lesson skeleton. This is non-destructive — existing lessons with the same titles are upserted, student mastery + competency transcripts survive. Lesson duration is no longer set here; use the green "Default lesson duration" form on the course page.
-                {% if not course.curriculum_upload_id %}<br><strong style="color:var(--danger);">This course is not linked to an uploaded PDF, so re-parse cannot run. Re-upload the curriculum to enable.</strong>{% endif %}
+                {% if not course.curriculum_upload_id %}<br><strong style="color:var(--danger);">{% trans "This course is not linked to an uploaded PDF, so re-parse cannot run. Re-upload the curriculum to enable." %}</strong>{% endif %}
             </p>
             <form method="post" action="{% url 'dashboard:course_edit' course.id %}" onsubmit="return confirm('Re-parse the curriculum document for this course?\n\nThis is non-destructive — existing lessons upsert by title, student mastery + transcripts survive.');">
                 {% csrf_token %}
@@ -325,7 +325,7 @@
                 <input type="hidden" name="title" value="{{ course.title }}">
                 <input type="hidden" name="description" value="{{ course.description }}">
                 <input type="hidden" name="grade_level" value="{{ course.grade_level }}">
-                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;" {% if not course.curriculum_upload_id %}disabled title="No source PDF linked to this course"{% endif %}>
+                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;" {% if not course.curriculum_upload_id %}disabled title="{% trans 'No source PDF linked to this course' %}"{% endif %}>
                     Re-parse &amp; Re-plan
                 </button>
             </form>
@@ -348,7 +348,7 @@
                 <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-bottom:0.75rem;">
                     <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
                         First page
-                        <input type="number" name="first_page" min="1" step="1" placeholder="start"
+                        <input type="number" name="first_page" min="1" step="1" placeholder="{% trans 'start' %}"
                                class="form-control" style="width:5.5rem;">
                     </label>
                     <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
@@ -444,12 +444,12 @@
             <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--gray-50);border-bottom:1px solid var(--gray-200);flex-wrap:wrap;gap:0.5rem;">
                 <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
                     <div style="display:flex;gap:0.25rem;align-items:center;">
-                        <span style="font-size:0.75rem;color:var(--gray-500);">Status:</span>
+                        <span style="font-size:0.75rem;color:var(--gray-500);">{% trans "Status:" %}</span>
                         <button type="button" class="btn btn-sm mat-filter active" data-filter="all" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="pending" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Pending</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="processing" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Processing</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="completed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Completed</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="failed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Failed</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="pending" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Pending" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="processing" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Processing" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="completed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Completed" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter" data-filter="failed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Failed" %}</button>
                     </div>
                     <div style="display:flex;gap:0.25rem;align-items:center;">
                         <span style="font-size:0.75rem;color:var(--gray-500);">Type:</span>
@@ -479,11 +479,11 @@
             <table class="table" id="materials-table">
                 <thead>
                     <tr>
-                        {% if can_edit_content %}<th style="width:32px;"><input type="checkbox" id="select-all-mat" onchange="toggleAllMaterials(this)" title="Select all"></th>{% endif %}
+                        {% if can_edit_content %}<th style="width:32px;"><input type="checkbox" id="select-all-mat" onchange="toggleAllMaterials(this)" title="{% trans 'Select all' %}"></th>{% endif %}
                         <th>Title</th>
                         <th>Type</th>
-                        <th>Status</th>
-                        <th>Chunks</th>
+                        <th>{% trans "Status" %}</th>
+                        <th>{% trans "Chunks" %}</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -500,9 +500,9 @@
                         <td><span class="badge badge-secondary" style="font-size:0.6875rem;">{{ m.get_material_type_display }}</span></td>
                         <td>
                             {% if m.status == 'completed' %}
-                                <span class="badge badge-success">Completed</span>
+                                <span class="badge badge-success">{% trans "Completed" %}</span>
                             {% elif m.status == 'processing' %}
-                                <span class="badge badge-warning">Processing</span>
+                                <span class="badge badge-warning">{% trans "Processing" %}</span>
                                 {% if m.pages_total > 0 %}
                                 <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">
                                     {{ m.pages_processed }} / {{ m.pages_total }} pages
@@ -512,29 +512,29 @@
                                 </div>
                                 {% endif %}
                             {% elif m.status == 'pending_confirmation' %}
-                                <span class="badge" style="background:var(--warning-surface);color:var(--warning);">Confirm to start</span>
+                                <span class="badge" style="background:var(--warning-surface);color:var(--warning);">{% trans "Confirm to start" %}</span>
                                 <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">{{ m.pages_total }} pages</div>
                             {% elif m.status == 'failed' %}
-                                <span class="badge badge-danger" title="{{ m.error_message|truncatechars:200 }}">Failed</span>
+                                <span class="badge badge-danger" title="{{ m.error_message|truncatechars:200 }}">{% trans "Failed" %}</span>
                             {% else %}
-                                <span class="badge badge-secondary">Pending</span>
+                                <span class="badge badge-secondary">{% trans "Pending" %}</span>
                             {% endif %}
                         </td>
                         <td>{{ m.chunks_created }}</td>
                         <td style="white-space: nowrap;">
-                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.5rem;">Details</a>
+                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.5rem;">{% trans "Details" %}</a>
                             {% if can_edit_content and m.status != 'completed' %}
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
                                 <input type="hidden" name="mode" value="rich">
-                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--info-solid);color:var(--surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="Process with LLM vision">Rich</button>
+                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--info-solid);color:var(--surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="{% trans 'Process with LLM vision' %}">Rich</button>
                             </form>
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
                                 <input type="hidden" name="mode" value="fast">
-                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;" onclick="this.innerHTML='...';" title="Process text only">Fast</button>
+                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;" onclick="this.innerHTML='...';" title="{% trans 'Process text only' %}">Fast</button>
                             </form>
                             <form method="post" action="{% url 'dashboard:material_delete' material_id=m.id %}" style="display:inline;" onsubmit="return confirm('Delete {{ m.title|escapejs }}?');">
                                 {% csrf_token %}
@@ -558,12 +558,12 @@
                     {% csrf_token %}
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">Files (select multiple)</label>
+                            <label class="form-label">{% trans "Files (select multiple)" %}</label>
                             <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Title</label>
-                            <input type="text" name="material_title" class="form-control" placeholder="e.g., S3 Geography Worksheets" required>
+                            <input type="text" name="material_title" class="form-control" placeholder="{% trans 'e.g., S3 Geography Worksheets' %}" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Type</label>
@@ -574,28 +574,28 @@
                             </select>
                         </div>
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">Processing Mode</label>
+                            <label class="form-label">{% trans "Processing Mode" %}</label>
                             <div style="display:flex;gap:1rem;">
                                 <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:0.5rem;cursor:pointer;flex:1;">
                                     <input type="radio" name="processing_mode" value="rich" checked style="accent-color:var(--info-solid);">
                                     <div>
-                                        <div style="font-weight:600;font-size:0.875rem;">Rich (LLM Vision)</div>
-                                        <div style="font-size:0.75rem;color:var(--gray-500);">Extracts questions, figures, mark schemes. Slower but more accurate.</div>
+                                        <div style="font-weight:600;font-size:0.875rem;">{% trans "Rich (LLM Vision)" %}</div>
+                                        <div style="font-size:0.75rem;color:var(--gray-500);">{% trans "Extracts questions, figures, mark schemes. Slower but more accurate." %}</div>
                                     </div>
                                 </label>
                                 <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:0.5rem;cursor:pointer;flex:1;">
                                     <input type="radio" name="processing_mode" value="fast" style="accent-color:var(--success-solid);">
                                     <div>
-                                        <div style="font-weight:600;font-size:0.875rem;">Fast (Text Only)</div>
-                                        <div style="font-size:0.75rem;color:var(--gray-500);">Quick text embedding into knowledge base. Good for textbooks and notes.</div>
+                                        <div style="font-weight:600;font-size:0.875rem;">{% trans "Fast (Text Only)" %}</div>
+                                        <div style="font-size:0.75rem;color:var(--gray-500);">{% trans "Quick text embedding into knowledge base. Good for textbooks and notes." %}</div>
                                     </div>
                                 </label>
                             </div>
                         </div>
                     </div>
                     <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                        <button type="submit" class="btn btn-primary btn-sm">Upload & Process</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">{% trans "Upload & Process" %}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">{% trans "Cancel" %}</button>
                     </div>
                 </form>
             </div>
@@ -610,8 +610,8 @@
 <div class="bulk-actions" style="background: var(--info-surface); border: 1px solid #93c5fd;">
     <span class="spinner-icon" style="font-size: 1.25rem;">⏳</span>
     <div style="flex: 1;">
-        <strong style="color: var(--info);">Content generation in progress...</strong>
-        <div style="font-size: 0.8rem; color: var(--info-solid);">Lessons are being generated in the background. The lesson list will update automatically.</div>
+        <strong style="color: var(--info);">{% trans "Content generation in progress..." %}</strong>
+        <div style="font-size: 0.8rem; color: var(--info-solid);">{% trans "Lessons are being generated in the background. The lesson list will update automatically." %}</div>
     </div>
     {% if active_upload %}
     <form method="post" action="{% url 'dashboard:cancel_generation' active_upload.id %}" style="display: inline;">
@@ -621,7 +621,7 @@
         </button>
     </form>
     {% else %}
-    <button class="btn btn-secondary" disabled>Generating...</button>
+    <button class="btn btn-secondary" disabled>{% trans "Generating..." %}</button>
     {% endif %}
 </div>
 {% elif lessons_without_content > 0 and can_edit_content %}
@@ -629,7 +629,7 @@
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
         <strong style="color: var(--warning);">{{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }} need{{ lessons_without_content|pluralize:"s," }} content</strong>
-        <div style="font-size: 0.8rem; color: #A16207;">Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons.</div>
+        <div style="font-size: 0.8rem; color: #A16207;">{% trans "Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons." %}</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display:inline;">
         {% csrf_token %}
@@ -644,10 +644,10 @@
 <div class="bulk-actions" style="background: var(--success-surface); border: 1px solid #6ee7b7; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">⏱️</span>
     <div style="flex: 1; min-width: 240px;">
-        <strong style="color: var(--success);">Default lesson duration</strong>
+        <strong style="color: var(--success);">{% trans "Default lesson duration" %}</strong>
         <div style="font-size: 0.8rem; color: var(--success);">Sets <code>estimated_minutes</code> on every lesson in this course. The tutoring engine adapts depth at runtime — no regeneration needed. Active student sessions keep their existing pacing.</div>
         <div style="font-size: 0.78rem; color: var(--success); margin-top: 0.4rem;">
-            Current policy: students {% if course.allow_student_duration_override %}<strong>CAN</strong> pick their own session duration{% else %}<strong>CANNOT</strong> change duration — everyone uses the default{% endif %}.
+            Current policy: students {% if course.allow_student_duration_override %}<strong>CAN</strong> pick their own session duration{% else %}<strong>{% trans "CANNOT" %}</strong> change duration — everyone uses the default{% endif %}.
         </div>
     </div>
     <form method="post" action="{% url 'dashboard:course_set_default_duration' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
@@ -673,7 +673,7 @@
             <option value="20" {% if current_lesson_duration == 20 %}selected{% endif %}>20 min · 4 steps</option>
             <option value="25" {% if current_lesson_duration == 25 %}selected{% endif %}>25 min · 5 steps</option>
         </select>
-        <label style="font-size:0.78rem; color:var(--success); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="When unchecked, the chat-page picker is hidden and every session uses the default duration.">
+        <label style="font-size:0.78rem; color:var(--success); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="{% trans 'When unchecked, the chat-page picker is hidden and every session uses the default duration.' %}">
             <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:var(--success-solid);">
             Allow students to change
         </label>
@@ -694,8 +694,8 @@ can_regenerate_courses.
 <div class="bulk-actions" style="background: #f0f9ff; border: 1px solid #bae6fd; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🧹</span>
     <div style="flex: 1; min-width: 240px;">
-        <strong style="color: #0369a1;">Catch up on pending work</strong>
-        <div style="font-size: 0.8rem; color: #0c4a6e;">Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216).</div>
+        <strong style="color: #0369a1;">{% trans "Catch up on pending work" %}</strong>
+        <div style="font-size: 0.8rem; color: #0c4a6e;">{% trans "Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216)." %}</div>
     </div>
     {% comment %}
     Images form: provider dropdown + force checkbox + button. The
@@ -709,20 +709,20 @@ can_regenerate_courses.
           style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"
           onsubmit="var pv=this.image_provider.value?(' using ' + this.image_provider.options[this.image_provider.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-generate ALL images in {{ course.title }}'+pv+'? This will OVERWRITE every existing image URL — much higher cost. Continue?') : ('Generate every pending image in {{ course.title }}'+pv+'? Runs in the background — already-generated images are skipped.'); return confirm(msg);">
         {% csrf_token %}
-        <select name="image_provider" title="Force a specific image provider for this run"
+        <select name="image_provider" title="{% trans 'Force a specific image provider for this run' %}"
                 style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:var(--surface);">
-            <option value="">Default</option>
+            <option value="">{% trans "Default" %}</option>
             <option value="openai">OpenAI gpt-image-2</option>
             <option value="gemini">Gemini Flash Image</option>
         </select>
         <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
-               title="When checked: re-generate every image, overwriting existing URLs. Otherwise: only fill in images whose URL is empty.">
+               title="{% trans 'When checked: re-generate every image, overwriting existing URLs. Otherwise: only fill in images whose URL is empty.' %}">
             <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
             Re-do already-done
         </label>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Generate any image whose URL is empty. With 'Re-do already-done' checked: regenerate every image.">
+                title='{% trans "Generate any image whose URL is empty. With Re-do already-done checked: regenerate every image." %}'>
             🖼️ Generate images
         </button>
     </form>
@@ -737,9 +737,9 @@ can_regenerate_courses.
           style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"
           onsubmit="var jm=this.judge_model.value?(' using ' + this.judge_model.options[this.judge_model.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-judge ALL steps + exit-Qs in {{ course.title }}'+jm+'? This will OVERWRITE every existing judge verdict — much higher cost than the unreviewed-only sweep. Continue?') : ('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}'+jm+'? Already-reviewed content is skipped.'); return confirm(msg);">
         {% csrf_token %}
-        <select name="judge_model" title="Force a specific judge model for this run (default = use configured chain)"
+        <select name="judge_model" title="{% trans 'Force a specific judge model for this run (default = use configured chain)' %}"
                 style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:var(--surface);">
-            <option value="">Default (configured chain)</option>
+            <option value="">{% trans "Default (configured chain)" %}</option>
             <option value="anthropic:claude-opus-4-7">Claude Opus 4.7</option>
             <option value="anthropic:claude-sonnet-4-6">Claude Sonnet 4.6</option>
             <option value="anthropic:claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
@@ -748,13 +748,13 @@ can_regenerate_courses.
             <option value="google:gemini-3-flash-preview">Gemini 3 Flash</option>
         </select>
         <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
-               title="When checked: re-judge every step + exit-Q, overwriting existing verdicts. Otherwise: only judge content whose judge_outputs is empty.">
+               title="{% trans 'When checked: re-judge every step + exit-Q, overwriting existing verdicts. Otherwise: only judge content whose judge_outputs is empty.' %}">
             <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
             Re-do already-done
         </label>
         <button type="submit" class="btn btn-secondary btn-sm"
                 style="border-color:#7dd3fc; color:#0369a1;"
-                title="Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With 'Re-do already-done' checked: re-judge everything (overwrite).">
+                title='{% trans "Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With Re-do already-done checked: re-judge everything (overwrite)." %}'>
             🔍 Run AI review
         </button>
     </form>
@@ -770,21 +770,21 @@ regeneration.
 <div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1; min-width: 240px;">
-        <strong style="color: var(--accent);">Regenerate content</strong>
+        <strong style="color: var(--accent);">{% trans "Regenerate content" %}</strong>
         <div style="font-size: 0.8rem; color: #6d28d9;">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. All student data — mastery levels, permanent competency transcript, AND exit-ticket attempt history — is preserved across the regen.</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
-        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Wipe + regenerate LessonStep rows. ~2 min/lesson.">
+        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="{% trans 'Wipe + regenerate LessonStep rows. ~2 min/lesson.' %}">
             <input type="checkbox" name="regen_steps" value="1" checked style="accent-color:var(--accent);">
             Lesson steps
         </label>
-        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Replace ExitTicketQuestion rows in place. Attempt history is preserved (FK is to ExitTicket, not the questions). ~30s/lesson.">
+        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="{% trans 'Replace ExitTicketQuestion rows in place. Attempt history is preserved (FK is to ExitTicket, not the questions). ~30s/lesson.' %}">
             <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:var(--accent);">
             Exit tickets
         </label>
         {% if course.is_math %}
-        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="Re-sample the summative bank from current exit tickets. No LLM call. Attempt history preserved.">
+        <label style="font-size:0.78rem; color:var(--accent); display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="{% trans 'Re-sample the summative bank from current exit tickets. No LLM call. Attempt history preserved.' %}">
             <input type="checkbox" name="regen_summative" value="1" checked style="accent-color:var(--accent);">
             Summative bank
         </label>
@@ -814,14 +814,14 @@ lessons even when curriculum editing is locked down.
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
                 <div>
                     <strong style="color:var(--text);">Week of {{ w.week_start|date:"M j" }} – {{ w.week_end|date:"M j, Y" }}</strong>
-                    {% if w.is_current %}<span style="background:var(--warning);color:var(--surface);padding:1px 8px;border-radius:999px;font-size:0.7rem;margin-left:0.4rem;">This week</span>{% endif %}
+                    {% if w.is_current %}<span style="background:var(--warning);color:var(--surface);padding:1px 8px;border-radius:999px;font-size:0.7rem;margin-left:0.4rem;">{% trans "This week" %}</span>{% endif %}
                     {% if w.assignment %}
                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.2rem;">
                         {{ w.assignment.lessons.count }} lesson{{ w.assignment.lessons.count|pluralize }} assigned
                         {% if w.assignment.notes %} · note: "{{ w.assignment.notes|truncatechars:80 }}"{% endif %}
                     </div>
                     {% else %}
-                    <div style="font-size:0.8rem; color:var(--text-faint); margin-top:0.2rem;">No lessons assigned for this week.</div>
+                    <div style="font-size:0.8rem; color:var(--text-faint); margin-top:0.2rem;">{% trans "No lessons assigned for this week." %}</div>
                     {% endif %}
                 </div>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('wa-form-{{ forloop.counter0 }}').style.display='block'; this.style.display='none';">
@@ -839,14 +839,14 @@ lessons even when curriculum editing is locked down.
                         <span>{{ lesson.unit.title|truncatechars:30 }} → {{ lesson.title }}</span>
                     </label>
                     {% empty %}
-                    <em style="color:var(--text-faint); font-size:0.82rem;">No lessons in this course yet.</em>
+                    <em style="color:var(--text-faint); font-size:0.82rem;">{% trans "No lessons in this course yet." %}</em>
                     {% endfor %}
                 </div>
-                <textarea name="notes" rows="2" placeholder="Optional message to students for this week..." style="width:100%; margin-top:0.5rem; padding:0.45rem; border:1px solid var(--border); border-radius:8px; font-size:0.86rem; font-family:inherit;">{% if w.assignment %}{{ w.assignment.notes }}{% endif %}</textarea>
+                <textarea name="notes" rows="2" placeholder="{% trans 'Optional message to students for this week...' %}" style="width:100%; margin-top:0.5rem; padding:0.45rem; border:1px solid var(--border); border-radius:8px; font-size:0.86rem; font-family:inherit;">{% if w.assignment %}{{ w.assignment.notes }}{% endif %}</textarea>
                 <div style="display:flex; gap:0.4rem; margin-top:0.5rem; flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary btn-sm">Save assignment</button>
+                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Save assignment" %}</button>
                     {% if w.assignment %}
-                    <button type="submit" name="action" value="delete" class="btn btn-sm" style="color:var(--danger); border:1px solid var(--danger-border);" onclick="return confirm('Clear this week\'s assignment?');">Clear week</button>
+                    <button type="submit" name="action" value="delete" class="btn btn-sm" style="color:var(--danger); border:1px solid var(--danger-border);" onclick="return confirm('Clear this week\'s assignment?');">{% trans "Clear week" %}</button>
                     {% endif %}
                 </div>
             </form>
@@ -979,7 +979,7 @@ lessons even when curriculum editing is locked down.
                             {% if can_regenerate_courses %}
                             <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5; font-size: 0.75rem;" title="Stop generating this lesson">
+                                <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5; font-size: 0.75rem;" title="{% trans 'Stop generating this lesson' %}">
                                     ⛔
                                 </button>
                             </form>
@@ -1023,9 +1023,9 @@ lessons even when curriculum editing is locked down.
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px;">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
         </svg>
-        <h3>No Units Yet</h3>
-        <p>Upload a curriculum document to automatically create units and lessons.</p>
-        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">Upload Curriculum</a>
+        <h3>{% trans "No Units Yet" %}</h3>
+        <p>{% trans "Upload a curriculum document to automatically create units and lessons." %}</p>
+        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">{% trans "Upload Curriculum" %}</a>
     </div>
 </div>
 {% endfor %}

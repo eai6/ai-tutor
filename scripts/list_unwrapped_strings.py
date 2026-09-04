@@ -88,6 +88,14 @@ _IGNORE_TEXT = re.compile(
     r'|AI Tutor'
     r'|Seychelles'
     r'|Tutor'                       # Brand fragments
+    # Provider and model names. Not copy — translating "Gemini" or
+    # "OpenAI gpt-image-2" would leave a teacher picking a model that no
+    # longer matches anything in the provider's own docs.
+    r'|OpenAI[\w\s.-]*'
+    r'|Gemini[\w\s.-]*'
+    r'|Anthropic[\w\s.-]*'
+    r'|Claude[\w\s.-]*'
+    r'|Ollama[\w\s.-]*'
     r'|.*\bDOCTYPE\b.*'
     r'|.*\{\{.*\}\}.*'              # Pure variable lookup (no surrounding text)
     r')$',
@@ -95,11 +103,23 @@ _IGNORE_TEXT = re.compile(
 )
 
 
+def _blank_out(match: 're.Match[str]') -> str:
+    """Replace a matched block with the same number of newlines.
+
+    Deleting the block outright shifted every line after it, so the
+    reported line numbers pointed at the wrong lines — the further down a
+    template the finding was, and the more script it had above it, the
+    further off. Blanking preserves the offsets, which is the difference
+    between output you can act on and output you have to re-derive.
+    """
+    return '\n' * match.group(0).count('\n')
+
+
 def _strip_blocks(text: str) -> str:
-    """Strip <script> and <style> blocks so we don't false-positive on
-    their content."""
-    text = _SCRIPT_BLOCK.sub('', text)
-    text = _STYLE_BLOCK.sub('', text)
+    """Blank out <script> and <style> blocks so we don't false-positive on
+    their content, without moving any line."""
+    text = _SCRIPT_BLOCK.sub(_blank_out, text)
+    text = _STYLE_BLOCK.sub(_blank_out, text)
     return text
 
 
