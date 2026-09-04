@@ -310,6 +310,19 @@ def run_unified_judge(
     the failure recorded in skip_reason.
     """
     result = CombinedJudgeResult(corrected_response=response_text or "")
+    # A step verdict has NOT been produced until _map_to_combined reads
+    # one, and it sets this back to False when it does.
+    #
+    # The dataclass default is False, which on any early return here —
+    # a pre-gate, a provider outage, an unparseable verdict — told the
+    # engine "the judge evaluated the answer and had no opinion". The
+    # engine trusts that: `combined_judge_result is not None and not
+    # step_eval_skipped` is what makes it skip its own _evaluate_step
+    # fallback (conversational_tutor.py). So a judge that never ran
+    # silently suppressed the fallback, and a correct answer came back
+    # unmarked with eval_layer='combined_judge' — a verdict nothing had
+    # actually reached.
+    result.step_eval_skipped = True
     if not response_text or not response_text.strip():
         result.skipped = True
         result.skip_reason = "empty_response"
@@ -600,8 +613,15 @@ def _solo_provider(llm_client):
 
 
 def _parse_unified_json(text: Optional[str]) -> Optional[dict]:
-    """Tolerant JSON extraction — strip code fences, find {...}."""
-    if not text:
+    """Tolerant JSON extraction — strip code fences, find {...}.
+
+    "Tolerant" has to mean tolerant of the wrong type too, not just of
+    bad JSON. This is the default judge on every tutoring turn and its
+    caller is fail-soft on a None return, so anything that is not a
+    string is a parse failure here rather than a TypeError thrown
+    through `run_unified_judge` and out into the turn.
+    """
+    if not text or not isinstance(text, str):
         return None
     text = text.strip()
     if text.startswith('```'):
@@ -616,10 +636,13 @@ def _parse_unified_json(text: Optional[str]) -> Optional[dict]:
     if start == -1 or end == -1:
         return None
     try:
-        return json.loads(text[start:end + 1])
-    except json.JSONDecodeError as exc:
+        parsed = json.loads(text[start:end + 1])
+    except ValueError as exc:      # JSONDecodeError is a ValueError
         logger.warning("[UnifiedJudge] JSON parse failed: %s", exc)
         return None
+    # A bare list or scalar parses fine and then breaks every
+    # `_section` lookup downstream, so it is a parse failure here.
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _map_to_combined(

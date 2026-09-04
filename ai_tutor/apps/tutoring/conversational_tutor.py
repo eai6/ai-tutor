@@ -10635,6 +10635,22 @@ Be encouraging. Break concepts into smaller steps. Use different examples than b
                 is_correct = step_eval_result.answer_correct  # may be None
                 eval_layer = 'llm_evaluator'
                 eval_reasoning = getattr(step_eval_result, 'reasoning', '') or ''
+            elif math_check is not None and math_check.is_correct is not None:
+                # This method's contract, stated in its own docstring: the
+                # deterministic numeric comparison "takes precedence over
+                # the LLM evaluator — numeric equality is always
+                # authoritative for math". With no LLM verdict this turn
+                # there is nothing to weigh it against, and it outranks the
+                # keyword fallback below by a distance: it compares parsed
+                # values, where the keyword pass reads the tutor's own
+                # prose — which on a wrong answer is the "Brilliant, you've
+                # got it!" false positive this whole layer exists to stop.
+                is_correct = bool(math_check.is_correct)
+                eval_layer = 'deterministic_numeric'
+                eval_reasoning = (
+                    'no LLM verdict this turn; deterministic numeric check '
+                    'is authoritative'
+                )
             else:
                 # Keyword fallback only applies when the tutor's response
                 # gives a clear positive/negative signal. Otherwise leave
