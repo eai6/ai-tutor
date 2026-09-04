@@ -1,121 +1,125 @@
-{% extends 'base.html' %}
+{% extends 'accounts/_auth_shell.html' %}
 {% load dashboard_ui %}
+{% load i18n %}
 
-{% block title %}Create Account - AI Tutor{% endblock %}
+{% block title %}{% trans "Create Account" %} - AI Tutor{% endblock %}
 
-{% block content %}
-<div class="auth-container">
+{% block auth_art %}student{% endblock %}
+
+{% block auth_body %}
+<div class="auth-container auth-container--wide">
     <div class="auth-card card animate-in">
         <div class="auth-header">
             <div class="auth-icon">{% icon "courses" %}</div>
-            <h1>Join AI Tutor</h1>
-            <p class="text-muted">Start your learning journey in Seychelles</p>
+            <h1>{% trans "Join AI Tutor" %}</h1>
+            <p class="text-muted">{% trans "Start your learning journey in Seychelles" %}</p>
         </div>
-        
+
         {% if errors %}
         <div class="alert alert-error">
-            <ul>
+            <ul class="alert__list">
             {% for error in errors %}
                 <li>{{ error }}</li>
             {% endfor %}
             </ul>
         </div>
         {% endif %}
-        
-        <form method="post" class="auth-form">
+
+        <form method="post" class="auth-form auth-form--two-up">
             {% csrf_token %}
-            
-            <div class="form-group">
-                <label for="first_name">Your Name *</label>
-                <input 
-                    type="text" 
-                    id="first_name" 
-                    name="first_name" 
+
+            <div class="form-group form-group--full">
+                <label for="first_name">{% trans "Your Name" %} *</label>
+                <input
+                    type="text"
+                    id="first_name"
+                    name="first_name"
                     value="{{ first_name|default:'' }}"
-                    placeholder="What should we call you?"
+                    placeholder="{% trans 'What should we call you?' %}"
+                    autocomplete="given-name"
                     required
                     autofocus
                 >
             </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="school">School *</label>
-                    <select id="school" name="school" required>
-                        <option value="">Select your school</option>
-                        {% for code, name in school_choices %}
-                        <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="grade_level">Grade *</label>
-                    <select id="grade_level" name="grade_level" required>
-                        <option value="">Select grade</option>
-                        {% for code, name in grade_choices %}
-                        <option value="{{ code }}" {% if grade_level == code %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            
+
             <div class="form-group">
-                <label for="username">Username *</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
+                <label for="school">{% trans "School" %} *</label>
+                <select id="school" name="school" required>
+                    <option value="">{% trans "Select your school" %}</option>
+                    {% for code, name in school_choices %}
+                    <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="grade_level">{% trans "Grade" %} *</label>
+                <select id="grade_level" name="grade_level" required>
+                    <option value="">{% trans "Select grade" %}</option>
+                    {% for code, name in grade_choices %}
+                    <option value="{{ code }}" {% if grade_level == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="username">{% trans "Username" %} *</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
                     value="{{ username|default:'' }}"
-                    placeholder="Choose a username"
+                    placeholder="{% trans 'Choose a username' %}"
+                    autocomplete="username"
                     required
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="email">Email *</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
+                <label for="email">{% trans "Email" %} *</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
                     value="{{ email|default:'' }}"
                     placeholder="your@email.com"
+                    autocomplete="email"
                     required
                 >
             </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="password">Password *</label>
-                    <input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        placeholder="At least 8 characters"
-                        required
+
+            <div class="form-group">
+                <label for="password">{% trans "Password" %} *</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="{% trans 'Create a password' %}"
+                    autocomplete="new-password"
+                    required
                     data-pw-strength
                     data-pw-similar-to="#first_name,#username,#email">
-                </div>
-                
-                <div class="form-group">
-                    <label for="password_confirm">Confirm *</label>
-                    <input 
-                        type="password" 
-                        id="password_confirm" 
-                        name="password_confirm" 
-                        placeholder="Repeat password"
-                        required
-                    data-pw-confirms="#password">
-                </div>
             </div>
-            
-            <button type="submit" class="btn btn-primary btn-full">
-                Create Account →
+
+            <div class="form-group">
+                <label for="password_confirm">{% trans "Confirm" %} *</label>
+                <input
+                    type="password"
+                    id="password_confirm"
+                    name="password_confirm"
+                    placeholder="{% trans 'Repeat password' %}"
+                    autocomplete="new-password"
+                    required
+                    data-pw-confirms="#password">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full form-group--full">
+                {% trans "Create Account" %} →
             </button>
         </form>
-        
+
         <div class="auth-footer">
-            <p>Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a></p>
+            <p>{% trans "Already have an account?" %} <a href="{% url 'accounts:login' %}">{% trans "Sign in" %}</a></p>
         </div>
     </div>
 </div>

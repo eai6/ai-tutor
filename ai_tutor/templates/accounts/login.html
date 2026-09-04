@@ -1,10 +1,12 @@
-{% extends 'base.html' %}
+{% extends 'accounts/_auth_shell.html' %}
 {% load dashboard_ui %}
 {% load i18n %}
 
 {% block title %}{% trans "Sign In" %} - AI Tutor{% endblock %}
 
-{% block content %}
+{% block auth_art %}student{% endblock %}
+
+{% block auth_body %}
 <div class="auth-container">
     <div class="auth-card card animate-in">
         <div class="auth-header">
@@ -30,6 +32,7 @@
                     name="username"
                     value="{{ username|default:'' }}"
                     placeholder="{% trans 'Enter your username' %}"
+                    autocomplete="username"
                     required
                     autofocus
                 >
@@ -42,6 +45,7 @@
                     id="password"
                     name="password"
                     placeholder="{% trans 'Enter your password' %}"
+                    autocomplete="current-password"
                     required
                 >
             </div>
@@ -52,6 +56,7 @@
         </form>
 
         <div class="auth-footer">
+            <p><a href="{% url 'accounts:password_reset' %}">{% trans "Forgot your password?" %}</a></p>
             <p>{% trans "Don't have an account?" %} <a href="{% url 'accounts:register' %}">{% trans "Create one" %}</a></p>
         </div>
     </div>

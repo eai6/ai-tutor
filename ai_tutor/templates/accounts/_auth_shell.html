@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% comment %}
+Split-screen shell for the four front-door pages: sign in and create an
+account, for a student and for a teacher.
+
+The photograph is not decoration for its own sake. These four pages are where
+someone who has only been told "use the tutor" arrives, and a card floating in
+the middle of an empty cream page tells them nothing about what they are
+signing in to. The picture on the left says "a classroom, in a school like
+yours" before the form is read.
+
+It is a background-image on an empty element rather than an <img>: it carries
+no information the page does not already state in words, so it is presentation
+and gets no alt text and no place in the accessibility tree.
+
+Pages fill two blocks:
+  auth_art   the picture to use — "student" or "teacher"
+  auth_body  the card itself
+{% endcomment %}
+
+{% block page_class %}page--auth{% endblock %}
+
+{% block content %}
+<div class="auth-split">
+    <div class="auth-art auth-art--{% block auth_art %}student{% endblock %}" role="presentation"></div>
+
+    <div class="auth-panel">
+        {% block auth_body %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

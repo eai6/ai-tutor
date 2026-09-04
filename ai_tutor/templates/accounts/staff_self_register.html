@@ -1,20 +1,23 @@
-{% extends 'base.html' %}
+{% extends 'accounts/_auth_shell.html' %}
 {% load dashboard_ui %}
+{% load i18n %}
 
-{% block title %}Create Teacher Account - AI Tutor{% endblock %}
+{% block title %}{% trans "Create Teacher Account" %} - AI Tutor{% endblock %}
 
-{% block content %}
-<div class="auth-container">
+{% block auth_art %}teacher{% endblock %}
+
+{% block auth_body %}
+<div class="auth-container auth-container--wide">
     <div class="auth-card card animate-in">
         <div class="auth-header">
             <div class="auth-icon">{% icon "classes" %}</div>
-            <h1>Create Teacher Account</h1>
-            <p class="text-muted">Your account will be reviewed by an administrator</p>
+            <h1>{% trans "Create Teacher Account" %}</h1>
+            <p class="text-muted">{% trans "Your account will be reviewed by an administrator" %}</p>
         </div>
 
         {% if errors %}
         <div class="alert alert-error">
-            <ul style="margin: 0; padding-left: 1.25rem;">
+            <ul class="alert__list">
                 {% for error in errors %}
                 <li>{{ error }}</li>
                 {% endfor %}
@@ -22,63 +25,65 @@
         </div>
         {% endif %}
 
-        <form method="post" class="auth-form">
+        <form method="post" class="auth-form auth-form--two-up">
             {% csrf_token %}
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="first_name">First Name</label>
-                    <input
-                        type="text"
-                        id="first_name"
-                        name="first_name"
-                        value="{{ first_name|default:'' }}"
-                        placeholder="Your first name"
-                        required
-                        autofocus
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="last_name">Last Name</label>
-                    <input
-                        type="text"
-                        id="last_name"
-                        name="last_name"
-                        value="{{ last_name|default:'' }}"
-                        placeholder="Your last name"
-                    >
-                </div>
+            <div class="form-group">
+                <label for="first_name">{% trans "First Name" %}</label>
+                <input
+                    type="text"
+                    id="first_name"
+                    name="first_name"
+                    value="{{ first_name|default:'' }}"
+                    placeholder="{% trans 'Your first name' %}"
+                    autocomplete="given-name"
+                    required
+                    autofocus
+                >
             </div>
 
             <div class="form-group">
-                <label for="username">Username</label>
+                <label for="last_name">{% trans "Last Name" %}</label>
+                <input
+                    type="text"
+                    id="last_name"
+                    name="last_name"
+                    value="{{ last_name|default:'' }}"
+                    placeholder="{% trans 'Your last name' %}"
+                    autocomplete="family-name"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="username">{% trans "Username" %}</label>
                 <input
                     type="text"
                     id="username"
                     name="username"
                     value="{{ username|default:'' }}"
-                    placeholder="Choose a username"
+                    placeholder="{% trans 'Choose a username' %}"
+                    autocomplete="username"
                     required
                 >
             </div>
 
             <div class="form-group">
-                <label for="email">Email</label>
+                <label for="email">{% trans "Email" %}</label>
                 <input
                     type="email"
                     id="email"
                     name="email"
                     value="{{ email|default:'' }}"
                     placeholder="your.email@example.com"
+                    autocomplete="email"
                     required
                 >
             </div>
 
-            <div class="form-group">
-                <label for="school">School</label>
+            <div class="form-group form-group--full">
+                <label for="school">{% trans "School" %}</label>
                 <select id="school" name="school" required>
-                    <option value="">Select your school</option>
+                    <option value="">{% trans "Select your school" %}</option>
                     {% for code, name in school_choices %}
                     <option value="{{ code }}" {% if school == code %}selected{% endif %}>{{ name }}</option>
                     {% endfor %}
@@ -86,50 +91,52 @@
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
+                <label for="password">{% trans "Password" %}</label>
                 <input
                     type="password"
                     id="password"
                     name="password"
-                    placeholder="At least 8 characters"
+                    placeholder="{% trans 'Create a password' %}"
+                    autocomplete="new-password"
                     required
                     data-pw-strength
                     data-pw-similar-to="#first_name,#last_name,#username,#email">
             </div>
 
             <div class="form-group">
-                <label for="password_confirm">Confirm Password</label>
+                <label for="password_confirm">{% trans "Confirm Password" %}</label>
                 <input
                     type="password"
                     id="password_confirm"
                     name="password_confirm"
-                    placeholder="Re-enter your password"
+                    placeholder="{% trans 'Re-enter your password' %}"
+                    autocomplete="new-password"
                     required
                     data-pw-confirms="#password">
             </div>
 
             {% if active_terms %}
-            <div class="form-group" style="background:var(--surface-sunken);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;">
-                <label style="display:flex;gap:0.55rem;align-items:flex-start;font-weight:500;color:var(--text);cursor:pointer;">
-                    <input type="checkbox" name="accept_terms" required style="margin-top:0.25rem;transform:scale(1.15);accent-color:var(--accent);">
-                    <span style="line-height:1.5;font-size:0.9rem;">
-                        I agree to the <a href="{% url 'accounts:terms' %}" target="_blank" style="color:var(--accent);font-weight:600;">AI Tutor terms</a>.
-                        {% if active_terms.summary %}<br><span style="color:var(--text-muted);font-weight:400;font-size:0.82rem;">{{ active_terms.summary }}</span>{% endif %}
+            <div class="form-group form-group--full">
+                <label class="auth-terms">
+                    <input type="checkbox" name="accept_terms" class="auth-terms__box" required>
+                    <span>
+                        {% trans "I agree to the" %}
+                        <a href="{% url 'accounts:terms' %}" target="_blank">{% trans "AI Tutor terms" %}</a>.
+                        {% if active_terms.summary %}<span class="auth-terms__summary">{{ active_terms.summary }}</span>{% endif %}
                     </span>
                 </label>
             </div>
             {% endif %}
 
-            <button type="submit" class="btn btn-primary btn-full">
-                Create Account
+            <button type="submit" class="btn btn-primary btn-full form-group--full">
+                {% trans "Create Account" %} →
             </button>
         </form>
 
         <div class="auth-footer">
-            <p>Already have an account? <a href="{% url 'accounts:staff_login' %}">Sign in</a></p>
-            <p style="margin-top: 0.5rem;"><a href="{% url 'accounts:landing' %}">← Back to home</a></p>
+            <p>{% trans "Already have an account?" %} <a href="{% url 'accounts:staff_login' %}">{% trans "Sign in" %}</a></p>
+            <p class="auth-footer__home"><a href="{% url 'accounts:landing' %}">← {% trans "Back to home" %}</a></p>
         </div>
     </div>
 </div>
 {% endblock %}
-

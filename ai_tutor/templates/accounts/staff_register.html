@@ -1,45 +1,52 @@
-{% extends 'base.html' %}
+{% extends 'accounts/_auth_shell.html' %}
 {% load dashboard_ui %}
+{% load i18n %}
 
-{% block title %}Complete Registration - AI Tutor{% endblock %}
+{% block title %}{% trans "Complete Registration" %} - AI Tutor{% endblock %}
 
-{% block content %}
-<div class="auth-container">
+{% block auth_art %}teacher{% endblock %}
+
+{% block auth_body %}
+{% comment %}
+Two pages in one template: a dead invitation link, and the form the live one
+opens. The dead one keeps the narrow card — there is nothing to fill a wide
+one with — so .auth-container--wide is only added on the branch that has a
+form in it.
+{% endcomment %}
+<div class="auth-container{% if not no_invitation %} auth-container--wide{% endif %}">
     <div class="auth-card card animate-in">
         {% if no_invitation %}
-        <!-- Invalid invitation -->
         <div class="auth-header">
             <div class="auth-icon">{% icon "alert" %}</div>
-            <h1>Invalid Invitation</h1>
+            <h1>{% trans "Invalid Invitation" %}</h1>
             <p class="text-muted">{{ error }}</p>
         </div>
         <div class="auth-footer">
-            <a href="{% url 'accounts:landing' %}" class="btn btn-primary btn-full">← Back to Home</a>
+            <a href="{% url 'accounts:landing' %}" class="btn btn-primary btn-full">← {% trans "Back to Home" %}</a>
         </div>
-        
+
         {% else %}
-        <!-- Valid invitation -->
         <div class="auth-header">
             <div class="auth-icon">{% icon "staff" %}</div>
-            <h1>You're Invited!</h1>
-            <p class="text-muted">Complete your registration to join <strong>{{ invitation.institution.name }}</strong> as a staff member.</p>
+            <h1>{% trans "You're Invited!" %}</h1>
+            <p class="text-muted">{% blocktrans with school=invitation.institution.name %}Complete your registration to join <strong>{{ school }}</strong> as a staff member.{% endblocktrans %}</p>
         </div>
-        
+
         {% if errors %}
         <div class="alert alert-error">
-            <ul style="margin: 0; padding-left: 1.25rem;">
+            <ul class="alert__list">
                 {% for error in errors %}
                 <li>{{ error }}</li>
                 {% endfor %}
             </ul>
         </div>
         {% endif %}
-        
-        <form method="post" class="auth-form">
+
+        <form method="post" class="auth-form auth-form--two-up">
             {% csrf_token %}
-            
-            <div class="form-group">
-                <label for="email">Email <span style="font-weight:normal;color:var(--text-muted);">(optional)</span></label>
+
+            <div class="form-group form-group--full">
+                <label for="email">{% trans "Email" %} <span class="form-label__note">{% trans "(optional)" %}</span></label>
                 {% if invitation.email %}
                 <input type="email" value="{{ invitation.email }}" disabled class="disabled">
                 {% else %}
@@ -48,78 +55,81 @@
                     id="email"
                     name="email"
                     value="{{ email|default:'' }}"
-                    placeholder="Your email address (optional)"
+                    placeholder="{% trans 'Your email address (optional)' %}"
+                    autocomplete="email"
                 >
                 {% endif %}
             </div>
-            
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="first_name">First Name</label>
-                    <input 
-                        type="text" 
-                        id="first_name" 
-                        name="first_name" 
-                        value="{{ first_name|default:'' }}"
-                        placeholder="Your first name"
-                        required
-                        autofocus
-                    >
-                </div>
-                
-                <div class="form-group">
-                    <label for="last_name">Last Name</label>
-                    <input 
-                        type="text" 
-                        id="last_name" 
-                        name="last_name" 
-                        value="{{ last_name|default:'' }}"
-                        placeholder="Your last name"
-                    >
-                </div>
-            </div>
-            
+
             <div class="form-group">
-                <label for="username">Username</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
+                <label for="first_name">{% trans "First Name" %}</label>
+                <input
+                    type="text"
+                    id="first_name"
+                    name="first_name"
+                    value="{{ first_name|default:'' }}"
+                    placeholder="{% trans 'Your first name' %}"
+                    autocomplete="given-name"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="last_name">{% trans "Last Name" %}</label>
+                <input
+                    type="text"
+                    id="last_name"
+                    name="last_name"
+                    value="{{ last_name|default:'' }}"
+                    placeholder="{% trans 'Your last name' %}"
+                    autocomplete="family-name"
+                >
+            </div>
+
+            <div class="form-group form-group--full">
+                <label for="username">{% trans "Username" %}</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
                     value="{{ username|default:'' }}"
-                    placeholder="Choose a username"
+                    placeholder="{% trans 'Choose a username' %}"
+                    autocomplete="username"
                     required
                 >
             </div>
-            
+
             <div class="form-group">
-                <label for="password">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="At least 8 characters"
+                <label for="password">{% trans "Password" %}</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="{% trans 'Create a password' %}"
+                    autocomplete="new-password"
                     required
                     data-pw-strength
                     data-pw-similar-to="#first_name,#last_name,#username,#email">
             </div>
-            
+
             <div class="form-group">
-                <label for="password_confirm">Confirm Password</label>
-                <input 
-                    type="password" 
-                    id="password_confirm" 
-                    name="password_confirm" 
-                    placeholder="Re-enter your password"
+                <label for="password_confirm">{% trans "Confirm Password" %}</label>
+                <input
+                    type="password"
+                    id="password_confirm"
+                    name="password_confirm"
+                    placeholder="{% trans 'Re-enter your password' %}"
+                    autocomplete="new-password"
                     required
                     data-pw-confirms="#password">
             </div>
-            
-            <button type="submit" class="btn btn-primary btn-full">
-                Complete Registration →
+
+            <button type="submit" class="btn btn-primary btn-full form-group--full">
+                {% trans "Complete Registration" %} →
             </button>
         </form>
         {% endif %}
     </div>
 </div>
 {% endblock %}
-

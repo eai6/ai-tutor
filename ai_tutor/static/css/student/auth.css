@@ -16,11 +16,145 @@
    page rather than an auth card and its selectors are genuinely its own.
    ========================================================================== */
 
+/* --------------------------------------------------------------------------
+   Split shell — picture beside the form
+   ------------------------------------------------------------------------
+   The four front-door pages (sign in / create an account, student / teacher)
+   put a photograph of a classroom down the left and the card down the right.
+   Everything else that uses .auth-container — the password-reset flow, the
+   pending and invite pages — is unaffected: it never opts into .page--auth,
+   so it keeps the centred card it has.
+
+   Below 60rem the picture is dropped rather than stacked. A photograph above
+   the form on a phone is a screenful of scrolling before the first field, and
+   these are the pages someone is trying to get past, not linger on.
+   -------------------------------------------------------------------------- */
+.page--auth {
+    /* .app-header__inner: a 40px brand mark plus 2 x --space-3, and the 1px
+       rule under it. The split fills what is left of the viewport. */
+    --auth-header-h: 65px;
+
+    max-width: none;
+    padding: 0;
+}
+
+/* base.html renders flash messages inside <main>, above this block, and the
+   padding they used to inherit from .page has just been taken away. */
+.page--auth .messages {
+    max-width: var(--student-max, 62rem);
+    margin-inline: auto;
+    padding: var(--space-5) var(--space-5) 0;
+}
+
+.auth-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: calc(100dvh - var(--auth-header-h));
+}
+
+@media (min-width: 60rem) {
+    .auth-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+}
+
+.auth-art {
+    display: none;
+    background-color: var(--surface-sunken);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+@media (min-width: 60rem) {
+    .auth-art {
+        display: block;
+        /* Sticks while a long form scrolls past it, so the picture is a wall
+           of the room rather than a thing that slides away. */
+        position: sticky;
+        top: var(--auth-header-h);
+        align-self: start;
+        height: calc(100dvh - var(--auth-header-h));
+    }
+}
+
+/* Students see students, teachers see a teacher. Both are photographs of the
+   same room in the same light as the landing page's, so arriving here from
+   the front door does not feel like arriving at a different product. */
+.auth-art--student { background-image: url('../../img/marketing/auth-students.webp'); }
+.auth-art--teacher { background-image: url('../../img/marketing/auth-teacher.webp'); }
+
+/* The page's cream, laid over the photograph's edge, so the join between the
+   picture and the panel is a fade rather than a cut. */
+.auth-art::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--coral) 10%, transparent) 0%,
+        transparent 30%,
+        color-mix(in srgb, var(--canvas) 45%, transparent) 100%);
+}
+
+.auth-panel {
+    display: grid;
+    place-items: center;
+    padding: var(--space-6) var(--space-5);
+}
+
 .auth-container {
     width: 100%;
     max-width: 26rem;
     margin: var(--space-8) auto;
 }
+
+/* A two-column form needs the room for two columns. */
+.auth-container--wide { max-width: 40rem; }
+
+/* --------------------------------------------------------------------------
+   Compact chrome for the sign-up forms
+   ------------------------------------------------------------------------
+   Pairing the fields halved the form; the page furniture around it is what
+   is left. The stacked, centred header spends 76px of height on an icon
+   directly above an <h1> that says the same thing, so on these two pages it
+   sits beside the title instead — left-aligned to the first column of
+   fields, which is where the eye starts anyway. The rest is rhythm: a step
+   down in padding and row gap, taken once rather than a little everywhere.
+   -------------------------------------------------------------------------- */
+.auth-container--wide .auth-card { padding: var(--space-6) var(--space-8); }
+
+.auth-container--wide .auth-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-1) var(--space-4);
+    text-align: left;
+    margin-bottom: var(--space-5);
+}
+
+.auth-container--wide .auth-icon {
+    grid-row: span 2;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    font-size: 1.3rem;
+}
+
+.auth-container--wide .auth-header h1 {
+    align-self: end;
+    margin-bottom: 0;
+}
+
+.auth-container--wide .auth-header p { align-self: start; }
+
+.auth-container--wide .auth-footer {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+}
+
+/* Inside the split the panel already centres the card, and the container's
+   own vertical margin would push it off centre. */
+.auth-panel .auth-container { margin-block: 0; }
 
 .auth-card { padding: var(--space-8); }
 
@@ -148,6 +282,101 @@
 }
 
 /* --------------------------------------------------------------------------
+   Two-up registration form
+   ------------------------------------------------------------------------
+   The sign-up forms are nine fields long. One per row, they ran about a
+   screen and a half, so the person filling one in could not see how much was
+   left — and the submit button was never on screen with the first field.
+
+   Fields pair off instead. .form-group--full is for the items that are
+   genuinely one thing across the width: the optional student ID with its
+   hint, the terms checkbox, the submit button.
+
+   Grid rather than wrapped flex, because the two columns have to line up
+   across every row — a flex row of fields with different label lengths does
+   not, and the eye reads the ragged edge as a mistake. Rows are start-aligned
+   so the password field's checklist can grow underneath it without
+   stretching the confirm field beside it.
+   -------------------------------------------------------------------------- */
+@media (min-width: 30rem) {
+    .auth-form--two-up {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-4);
+        align-items: start;
+    }
+
+    .auth-form--two-up > .form-group--full,
+    .auth-form--two-up > .alert,
+    .auth-form--two-up > button { grid-column: 1 / -1; }
+}
+
+.form-hint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: var(--leading-snug);
+}
+
+/* "(optional)" beside a label — part of the label, but not part of the name
+   of the field, so it does not carry the label's weight. */
+.form-label__note {
+    font-weight: var(--weight-regular);
+    color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Terms checkbox
+   ------------------------------------------------------------------------
+   Was six inline style attributes repeated across two templates, one of them
+   pointing at --accent, which the student skin does not define — so the tick
+   rendered in the browser default blue on the one page a school's brand
+   colour matters most.
+   -------------------------------------------------------------------------- */
+/* .form-group .auth-terms, not .auth-terms: legacy.css blockifies every
+   `.form-group label` and loads after this file, so a single class loses the
+   tie on display. The extra class is what wins it. */
+.form-group .auth-terms {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-base);
+    font-weight: var(--weight-regular);
+    line-height: var(--leading-normal);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.form-group .auth-terms__box {
+    flex: none;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin-top: 0.15rem;
+    accent-color: var(--coral-fill);
+}
+
+.form-group .auth-terms a {
+    color: var(--coral-ink);
+    font-weight: var(--weight-bold);
+}
+
+.form-group .auth-terms__summary {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+/* The error summary above a form: a list, not a bulleted paragraph. */
+.alert__list {
+    margin: 0;
+    padding-left: var(--space-5);
+}
+
+/* --------------------------------------------------------------------------
    Inline notices
    ------------------------------------------------------------------------
    .info-box and .pending-message were each defined once, in one page's own
@@ -188,14 +417,22 @@
     color: var(--text-muted);
 }
 
-.auth-footer a {
+/* :not(.btn), because this rule is about the text links in the footer. The
+   invalid-invitation page puts its only control here, and unqualified the
+   rule painted that button's label dark orange on an orange fill — a button
+   that read as an empty bar. */
+.auth-footer a:not(.btn) {
     color: var(--coral-ink);
     font-weight: var(--weight-bold);
 }
 
 .auth-footer p + p { margin-top: var(--space-2); }
 
+.auth-footer__note { font-size: var(--text-xs); }
+.auth-footer__home { margin-top: var(--space-4) !important; }
+
 @media (max-width: 480px) {
     .auth-container { margin-block: var(--space-4); }
     .auth-card { padding: var(--space-5); }
+    .auth-panel { padding: var(--space-5) var(--space-4); }
 }
