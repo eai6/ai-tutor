@@ -18,7 +18,9 @@ from pathlib import Path
 import pytest
 from django.template import TemplateDoesNotExist, loader
 from django.test import Client
+from django.conf import settings
 from django.urls import reverse
+from django.utils import translation
 
 from ai_tutor.apps.docs import playbook
 
@@ -92,10 +94,13 @@ class TestPages:
             assert reverse('docs:section', args=[section.slug]) in body
 
     def test_every_section_page_renders(self, client):
+        # str() on the title: it is a lazy translation now, and a lazy proxy
+        # is not a string as far as `in` is concerned.
         for section in playbook.SECTIONS:
             response = client.get(reverse('docs:section', args=[section.slug]))
             assert response.status_code == 200, section.slug
-            assert section.title in response.content.decode(), section.slug
+            assert str(section.title) in response.content.decode(), section.slug
+
 
     def test_unknown_section_is_a_404_not_a_template_error(self, client):
         assert client.get('/docs/not-a-section/').status_code == 404
@@ -122,6 +127,60 @@ class TestPages:
         assert 'docker compose pull' in body
         assert 'doc-note' in body
         assert 'doc-table' in body
+
+
+
+
+def _read_in(client, lang, slug='costs'):
+    """Fetch a section as a reader who has picked `lang`.
+
+    The language cookie, not translation.override: the request goes through
+    LocaleResolverMiddleware, which re-resolves the language per request and
+    would discard an override set outside it. The cookie is what the footer
+    picker actually sets.
+    """
+    client.cookies[settings.LANGUAGE_COOKIE_NAME] = lang
+    return client.get(reverse('docs:section', args=[slug])).content.decode()
+
+
+@pytest.mark.django_db
+class TestSectionLanguage:
+    """A section's chrome translates; its prose is a whole translated file
+    or nothing. Both halves need to behave, and the reader needs telling
+    which one they got."""
+
+    def test_a_section_falls_back_to_english_and_says_so(self, client):
+        body = _read_in(client, 'fr')
+        assert 'docs-untranslated' in body
+        # ... and the chrome around it IS translated, so the notice is not
+        # covering for a language that simply does not work.
+        assert 'Ce que cela coûte' in body
+
+    def test_english_gets_no_untranslated_notice(self, client):
+        body = _read_in(client, 'en-us')
+        assert 'docs-untranslated' not in body
+        assert 'What it costs' in body
+
+    def test_a_translated_body_is_preferred_over_english(self, tmp_path, settings):
+        """The mechanism itself: drop a French partial in and it wins."""
+        from django.template import engines
+        marker = 'MARQUEUR-DE-TRADUCTION'
+        d = tmp_path / 'docs' / 'sections' / 'fr'
+        d.mkdir(parents=True)
+        (d / 'costs.html').write_text(f'<p>{marker}</p>')
+
+        dirs = list(settings.TEMPLATES[0]['DIRS'])
+        settings.TEMPLATES = [{**settings.TEMPLATES[0],
+                               'DIRS': [str(tmp_path)] + dirs}]
+        engines._engines = {}
+        try:
+            from ai_tutor.apps.docs import views as docs_views
+            with translation.override('fr'):
+                template, translated = docs_views._body_template('costs')
+            assert template == 'docs/sections/fr/costs.html'
+            assert translated is True
+        finally:
+            engines._engines = {}
 
 
 @pytest.mark.django_db

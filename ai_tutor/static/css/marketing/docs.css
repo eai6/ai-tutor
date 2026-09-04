@@ -47,6 +47,19 @@
     padding-block: var(--space-4) var(--space-10);
 }
 
+/* An honest banner, not an error: the section is readable, just not in the
+   language that was asked for. Sits above the prose it is describing. */
+.docs-untranslated {
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    background: var(--warning-surface);
+    border: 1px solid var(--warning-border);
+    border-radius: var(--radius-md);
+    color: var(--warning);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
 /* --------------------------------------------------------------------------
    Masthead
    -------------------------------------------------------------------------- */

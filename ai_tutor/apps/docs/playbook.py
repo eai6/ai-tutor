@@ -16,19 +16,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from django.utils.translation import gettext_lazy as _
+
 from ._index import HEADINGS, WORDS
 
 # Front matter from the document control table. Shown on the index page so a
 # reader knows what vintage of a moving argument they are reading.
 VERSION = '1.0'
 VERSION_DATE = '31 August 2026'
-STATUS = 'For discussion — not a commercial offer or a quotation'
-EVIDENCE_BASE = (
+STATUS = _('For discussion — not a commercial offer or a quotation')
+EVIDENCE_BASE = _(
     'Seychelles national pilot (live, secondary geography and mathematics); '
     'a second-locale adaptation in preparation; platform source and '
     'evaluation harnesses as at August 2026.'
 )
-COSTS_NOTE = (
+COSTS_NOTE = _(
     'Observed pilot figures, given as planning inputs. They are not prices '
     'and must be re-derived for each country.'
 )
@@ -43,6 +45,11 @@ class Section:
     title: str
     summary: str
     part: str
+
+    @property
+    def part_label(self) -> str:
+        """The reader-facing part name. `part` itself is a grouping key."""
+        return PART_LABELS.get(self.part, self.part)
 
     @property
     def headings(self) -> list[tuple[str, str]]:
@@ -61,103 +68,116 @@ class Section:
         inline <script> of any type is the thing the content security policy
         exists to refuse.
         """
-        parts = [self.label, self.title, self.summary] + [h[1] for h in self.headings]
+        # str() on the lazy ones: join needs a real string, and the filter
+        # should match whatever language the reader is actually seeing.
+        parts = ([self.label, str(self.title), str(self.summary)]
+                 + [h[1] for h in self.headings])
         return ' '.join(parts).lower()
 
 
+# Grouping keys, deliberately NOT translated. They are dictionary keys and
+# the index compares `card.part == part_one` to decide which row a card
+# belongs in; a translated key would put every card in neither row the moment
+# someone switched language. PART_LABELS below is what a reader sees.
 PART_ONE = 'The decision'
 PART_TWO = 'The implementation'
 APPENDICES = 'Appendices'
 
+PART_LABELS = {
+    PART_ONE: _('The decision'),
+    PART_TWO: _('The implementation'),
+    APPENDICES: _('Appendices'),
+}
+
 # The document's own division. A reader who lands on section F from a search
 # needs to know it is a technical appendix before they read a word of it.
 PART_NUMERALS = {
-    PART_ONE: 'Part I',
-    PART_TWO: 'Part II',
+    PART_ONE: _('Part I'),
+    PART_TWO: _('Part II'),
     # The appendices name themselves; "Appendix · Appendices" says it twice.
     APPENDICES: '',
 }
 
 PART_BLURBS = {
-    PART_ONE: 'For ministry officials, programme leads and advisors. '
-              'No technical knowledge assumed.',
-    PART_TWO: 'For the technical team that will stand up and run a '
-              'national instance.',
-    APPENDICES: 'Reference material for both audiences.',
+    PART_ONE: _('For ministry officials, programme leads and advisors. '
+                'No technical knowledge assumed.'),
+    PART_TWO: _('For the technical team that will stand up and run a '
+                'national instance.'),
+    APPENDICES: _('Reference material for both audiences.'),
 }
 
 # Reading order — the document's, unchanged. The index page reorders nothing;
 # it only offers several ways in.
 SECTIONS: list[Section] = [
-    Section('executive-summary', '1', 'Executive summary',
-            'What adoption involves, what a country adapts, and how long a '
-            'first cohort takes.', PART_ONE),
-    Section('what-is-adopted', '2', 'What is actually being adopted',
-            'The product as a student, a teacher and a ministry each meet it '
-            '— and what it is not.', PART_ONE),
-    Section('five-layers', '3', 'The five layers of adaptation',
-            'Language, curriculum, local context, national structures and '
-            'infrastructure — five projects, not one.', PART_ONE),
-    Section('adoption-models', '4', 'Four models of adoption',
-            'Managed, country cloud, single server and offline: who operates '
-            'it and where the data lives.', PART_ONE),
-    Section('data-sovereignty', '5', 'Data sovereignty: the honest account',
-            'What stays in country, what leaves and why no setting changes '
-            'it, and the three ways to close the gap.', PART_ONE),
-    Section('costs', '6', 'What it costs, and what drives the cost',
-            'The fixed infrastructure line, the model spend that dominates '
-            'it, and the levers worth pulling.', PART_ONE),
-    Section('cost-sharing', '7', 'Cost sharing and sustainability',
-            'Who pays for which line, four funding models, and whether it is '
-            'still funded in year three.', PART_ONE),
-    Section('evidence', '8', 'Evidence, evaluation and quality assurance',
-            'Three layers of answer to "how do you know it teaches well", '
-            'and the gate to apply before a cohort.', PART_ONE),
-    Section('roadmap', '9', 'A phased adoption roadmap',
-            'Six phases from decision to scale, each with an owner and an '
-            'exit criterion.', PART_ONE),
-    Section('teacher-training', '10', 'Teacher training and support',
-            'The part that cannot be bought or deployed: champions, '
-            'accompaniment, clinics and three lines of support.', PART_ONE),
-    Section('governance', '11', 'Governance and what the country must provide',
-            'The five roles that need a name against them, and what each '
-            'side supplies.', PART_ONE),
-    Section('risks', '12', 'Risks and how they are managed',
-            'Ten risks, why each one happens, and the control already in '
-            'place for it.', PART_ONE),
+    Section('executive-summary', '1', _('Executive summary'),
+            _('What adoption involves, what a country adapts, and how long a '
+            'first cohort takes.'), PART_ONE),
+    Section('what-is-adopted', '2', _('What is actually being adopted'),
+            _('The product as a student, a teacher and a ministry each meet it '
+            '— and what it is not.'), PART_ONE),
+    Section('five-layers', '3', _('The five layers of adaptation'),
+            _('Language, curriculum, local context, national structures and '
+            'infrastructure — five projects, not one.'), PART_ONE),
+    Section('adoption-models', '4', _('Four models of adoption'),
+            _('Managed, country cloud, single server and offline: who operates '
+            'it and where the data lives.'), PART_ONE),
+    Section('data-sovereignty', '5', _('Data sovereignty: the honest account'),
+            _('What stays in country, what leaves and why no setting changes '
+            'it, and the three ways to close the gap.'), PART_ONE),
+    Section('costs', '6', _('What it costs, and what drives the cost'),
+            _('The fixed infrastructure line, the model spend that dominates '
+            'it, and the levers worth pulling.'), PART_ONE),
+    Section('cost-sharing', '7', _('Cost sharing and sustainability'),
+            _('Who pays for which line, four funding models, and whether it is '
+            'still funded in year three.'), PART_ONE),
+    Section('evidence', '8', _('Evidence, evaluation and quality assurance'),
+            _('Three layers of answer to "how do you know it teaches well", '
+            'and the gate to apply before a cohort.'), PART_ONE),
+    Section('roadmap', '9', _('A phased adoption roadmap'),
+            _('Six phases from decision to scale, each with an owner and an '
+            'exit criterion.'), PART_ONE),
+    Section('teacher-training', '10', _('Teacher training and support'),
+            _('The part that cannot be bought or deployed: champions, '
+            'accompaniment, clinics and three lines of support.'), PART_ONE),
+    Section('governance', '11', _('Governance and what the country must provide'),
+            _('The five roles that need a name against them, and what each '
+            'side supplies.'), PART_ONE),
+    Section('risks', '12', _('Risks and how they are managed'),
+            _('Ten risks, why each one happens, and the control already in '
+            'place for it.'), PART_ONE),
 
-    Section('onboarding-checklist', 'A', 'Country onboarding checklist',
-            'Nine steps in order, and where each one lives. Content is step '
-            'five for a reason.', PART_TWO),
-    Section('language-locale', 'B', 'Language and locale adaptation',
-            'The five places a locale is registered, which language wins per '
-            'request, and the register decisions to settle first.', PART_TWO),
-    Section('curriculum-pipeline', 'C', 'Curriculum ingestion and the content pipeline',
-            'Two routes in, the eight generation steps, and why review '
-            'throughput is the schedule.', PART_TWO),
-    Section('national-structures', 'D', 'National structures',
-            'Grades, schools, terminology and competency thresholds — all '
-            'configuration, no migration.', PART_TWO),
-    Section('hosting', 'E', 'Hosting the platform',
-            'Three server paths and two offline shapes, with the commands, '
-            'the symptoms and the backup rules.', PART_TWO),
-    Section('quality-gates', 'F', 'Quality gates before a cohort',
-            'Three harnesses at three units of analysis, and why judges are '
-            'a filter rather than a gate.', PART_TWO),
-    Section('operations', 'G', 'Operating the platform',
-            'Backups, upgrades, secrets, monitoring, flagged sessions and '
-            'the login lockout rule.', PART_TWO),
-    Section('integration', 'H', 'Integration surface',
-            'A versioned REST API, a published schema, and a realistic '
-            'integration scope for a pilot.', PART_TWO),
+    Section('onboarding-checklist', 'A', _('Country onboarding checklist'),
+            _('Nine steps in order, and where each one lives. Content is step '
+            'five for a reason.'), PART_TWO),
+    Section('language-locale', 'B', _('Language and locale adaptation'),
+            _('The five places a locale is registered, which language wins per '
+            'request, and the register decisions to settle first.'), PART_TWO),
+    Section('curriculum-pipeline', 'C', _('Curriculum ingestion and the content pipeline'),
+            _('Two routes in, the eight generation steps, and why review '
+            'throughput is the schedule.'), PART_TWO),
+    Section('national-structures', 'D', _('National structures'),
+            _('Grades, schools, terminology and competency thresholds — all '
+            'configuration, no migration.'), PART_TWO),
+    Section('hosting', 'E', _('Hosting the platform'),
+            _('Three server paths and two offline shapes, with the commands, '
+            'the symptoms and the backup rules.'), PART_TWO),
+    Section('quality-gates', 'F', _('Quality gates before a cohort'),
+            _('Three harnesses at three units of analysis, and why judges are '
+            'a filter rather than a gate.'), PART_TWO),
+    Section('operations', 'G', _('Operating the platform'),
+            _('Backups, upgrades, secrets, monitoring, flagged sessions and '
+            'the login lockout rule.'), PART_TWO),
+    Section('integration', 'H', _('Integration surface'),
+            _('A versioned REST API, a published schema, and a realistic '
+            'integration scope for a pilot.'), PART_TWO),
 
-    Section('case-study', 'A1', 'Case study: what a second adaptation changed',
-            'The real change list from taking the platform to a second '
-            'country. No schema redesign appears in it.', APPENDICES),
-    Section('before-phase-1', 'A2', 'Questions to answer before Phase 1',
-            'Ten questions. A country that can answer them can start; one '
-            'that cannot will stall on the unanswered one.', APPENDICES),
-    Section('glossary', 'A3', 'Glossary',
+    Section('case-study', 'A1', _('Case study: what a second adaptation changed'),
+            _('The real change list from taking the platform to a second '
+            'country. No schema redesign appears in it.'), APPENDICES),
+    Section('before-phase-1', 'A2', _('Questions to answer before Phase 1'),
+            _('Ten questions. A country that can answer them can start; one '
+            'that cannot will stall on the unanswered one.'), APPENDICES),
+    Section('glossary', 'A3', _('Glossary'),
             'The eleven terms this document uses in a particular way.',
             APPENDICES),
 ]
@@ -191,52 +211,52 @@ class Card:
 # reader of these three most often needs next.
 CARDS: list[Card] = [
     Card(
-        title='Start here',
-        lede='What the thing is, before deciding anything about it.',
+        title=_('Start here'),
+        lede=_('What the thing is, before deciding anything about it.'),
         part=PART_ONE,
         slugs=['executive-summary', 'what-is-adopted', 'five-layers', 'glossary'],
         more_slug='before-phase-1',
-        more_label='Questions to answer before Phase 1',
+        more_label=_('Questions to answer before Phase 1'),
     ),
     Card(
-        title='Decide the shape',
-        lede='Where it runs, where the data lives, and who owns each decision.',
+        title=_('Decide the shape'),
+        lede=_('Where it runs, where the data lives, and who owns each decision.'),
         part=PART_ONE,
         slugs=['adoption-models', 'data-sovereignty', 'governance', 'risks'],
         more_slug='case-study',
-        more_label='What a second adaptation changed',
+        more_label=_('What a second adaptation changed'),
     ),
     Card(
-        title='Plan and fund it',
-        lede='What it costs, who carries which line, and how a first cohort is sequenced.',
+        title=_('Plan and fund it'),
+        lede=_('What it costs, who carries which line, and how a first cohort is sequenced.'),
         part=PART_ONE,
         slugs=['costs', 'cost-sharing', 'roadmap', 'teacher-training'],
         more_slug='evidence',
-        more_label='Evidence, evaluation and quality assurance',
+        more_label=_('Evidence, evaluation and quality assurance'),
     ),
     Card(
-        title='Stand it up',
-        lede='Provision the deployment, then run it without anyone needing to be called.',
+        title=_('Stand it up'),
+        lede=_('Provision the deployment, then run it without anyone needing to be called.'),
         part=PART_TWO,
         slugs=['onboarding-checklist', 'hosting', 'operations'],
-        more_label='Run it yourself — the short version',
+        more_label=_('Run it yourself — the short version'),
         more_url_name='self_hosting',
     ),
     Card(
-        title='Make it yours',
-        lede='Register the locale, ingest the syllabus, configure the country.',
+        title=_('Make it yours'),
+        lede=_('Register the locale, ingest the syllabus, configure the country.'),
         part=PART_TWO,
         slugs=['language-locale', 'curriculum-pipeline', 'national-structures'],
         more_slug='five-layers',
-        more_label='The five layers of adaptation',
+        more_label=_('The five layers of adaptation'),
     ),
     Card(
-        title='Prove it, then connect it',
-        lede='The gate to pass before students arrive, and the surface other systems talk to.',
+        title=_('Prove it, then connect it'),
+        lede=_('The gate to pass before students arrive, and the surface other systems talk to.'),
         part=PART_TWO,
         slugs=['quality-gates', 'evidence', 'integration'],
         more_slug='risks',
-        more_label='Risks and how they are managed',
+        more_label=_('Risks and how they are managed'),
     ),
 ]
 

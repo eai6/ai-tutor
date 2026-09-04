@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 12:20+0000\n"
+"POT-Creation-Date: 2026-09-04 16:42+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -68,7 +68,6 @@ msgid "Tutor preference saved."
 msgstr "Preferência de tutor guardada."
 
 #: apps/dashboard/attention.py:88
-#| msgid "Flagged Chats"
 msgid "flagged chats to review"
 msgstr "conversas sinalizadas por rever"
 
@@ -82,16 +81,20 @@ msgstr "alunos com pior nota na repetição"
 
 #: apps/dashboard/attention.py:103
 msgid "Their latest exit ticket is below their first. Check what changed."
-msgstr "A última ficha de saída está abaixo da primeira. Verifique o que mudou."
+msgstr ""
+"A última ficha de saída está abaixo da primeira. Verifique o que mudou."
 
 #: apps/dashboard/attention.py:118
-#| msgid "No sessions found for this lesson yet."
 msgid "of sessions stopped before the exit ticket"
 msgstr "das sessões terminaram antes da ficha de saída"
 
 #: apps/dashboard/attention.py:119
-msgid "These lessons produced no score. Lesson length or difficulty is the usual cause."
-msgstr "Estas lições não produziram nota. A duração ou a dificuldade da lição é a causa habitual."
+msgid ""
+"These lessons produced no score. Lesson length or difficulty is the usual "
+"cause."
+msgstr ""
+"Estas lições não produziram nota. A duração ou a dificuldade da lição é a "
+"causa habitual."
 
 #: apps/dashboard/attention.py:132
 msgid "mean exit ticket score"
@@ -99,10 +102,11 @@ msgstr "nota média da ficha de saída"
 
 #: apps/dashboard/attention.py:133
 msgid "Below the 60% floor across the class. Likely a lesson, not a cohort."
-msgstr "Abaixo do mínimo de 60% em toda a turma. Provavelmente é a lição, não a turma."
+msgstr ""
+"Abaixo do mínimo de 60% em toda a turma. Provavelmente é a lição, não a "
+"turma."
 
 #: apps/dashboard/attention.py:146
-#| msgid "No session data for this period"
 msgid "students had no session this period"
 msgstr "alunos não tiveram nenhuma sessão neste período"
 
@@ -117,7 +121,6 @@ msgid "Super Admin"
 msgstr "Super Administrador"
 
 #: apps/dashboard/views.py:124
-#| msgid "I'm a Teacher"
 msgid "Teacher"
 msgstr "Professor"
 
@@ -159,15 +162,18 @@ msgstr "Isso não parece um endereço de servidor."
 
 #: apps/desktop/server_config.py:90
 #, python-format
-msgid "Refusing to use an unencrypted connection to %(host)s — student work would be sent in the clear. Use https:// instead, or a server on your own network."
-msgstr "Ligação não encriptada a %(host)s recusada — o trabalho dos alunos seria enviado sem protecção. Use https:// ou um servidor na sua própria rede."
+msgid ""
+"Refusing to use an unencrypted connection to %(host)s — student work would "
+"be sent in the clear. Use https:// instead, or a server on your own network."
+msgstr ""
+"Ligação não encriptada a %(host)s recusada — o trabalho dos alunos seria "
+"enviado sem protecção. Use https:// ou um servidor na sua própria rede."
 
 #: apps/desktop/server_config.py:128
 msgid "Set the server address first."
 msgstr "Defina primeiro o endereço do servidor."
 
 #: apps/desktop/server_config.py:132
-#| msgid "Enter your username"
 msgid "Enter your username and password."
 msgstr "Introduza o seu nome de utilizador e a palavra-passe."
 
@@ -178,8 +184,11 @@ msgstr "Não foi possível verificar o certificado de segurança de %(host)s."
 
 #: apps/desktop/server_config.py:146
 #, python-format
-msgid "Could not reach %(host)s. Check the address and that this computer is online."
-msgstr "Não foi possível contactar %(host)s. Verifique o endereço e se este computador está ligado à rede."
+msgid ""
+"Could not reach %(host)s. Check the address and that this computer is online."
+msgstr ""
+"Não foi possível contactar %(host)s. Verifique o endereço e se este "
+"computador está ligado à rede."
 
 #: apps/desktop/server_config.py:153
 #, python-format
@@ -204,21 +213,321 @@ msgid "Choose a password of at least 4 characters."
 msgstr "Escolha uma palavra-passe com pelo menos 4 caracteres."
 
 #: apps/desktop/views.py:225
-msgid "That name has already been set up on this device. Sign in instead, or ask your teacher."
-msgstr "Esse nome já foi configurado neste dispositivo. Inicie sessão ou fale com o seu professor."
+msgid ""
+"That name has already been set up on this device. Sign in instead, or ask "
+"your teacher."
+msgstr ""
+"Esse nome já foi configurado neste dispositivo. Inicie sessão ou fale com o "
+"seu professor."
 
 #: apps/desktop/views.py:294
 #, python-format
 msgid "Saved. Sign in below so your work can be sent to %(url)s."
-msgstr "Guardado. Inicie sessão abaixo para que o seu trabalho possa ser enviado para %(url)s."
+msgstr ""
+"Guardado. Inicie sessão abaixo para que o seu trabalho possa ser enviado "
+"para %(url)s."
 
 #: apps/desktop/views.py:305
-msgid "Cleared. Lessons and student work stay on this computer and are not sent anywhere."
-msgstr "Limpo. As lições e o trabalho dos alunos ficam neste computador e não são enviados para lado nenhum."
+msgid ""
+"Cleared. Lessons and student work stay on this computer and are not sent "
+"anywhere."
+msgstr ""
+"Limpo. As lições e o trabalho dos alunos ficam neste computador e não são "
+"enviados para lado nenhum."
 
 #: apps/desktop/views.py:322
-msgid "Signed in. Work finished on this computer will be sent to your school automatically."
-msgstr "Sessão iniciada. O trabalho concluído neste computador será enviado automaticamente para a sua escola."
+msgid ""
+"Signed in. Work finished on this computer will be sent to your school "
+"automatically."
+msgstr ""
+"Sessão iniciada. O trabalho concluído neste computador será enviado "
+"automaticamente para a sua escola."
+
+#: apps/docs/playbook.py:27
+msgid "For discussion — not a commercial offer or a quotation"
+msgstr "Para discussão — não é uma oferta comercial nem um orçamento"
+
+#: apps/docs/playbook.py:29
+msgid "Seychelles national pilot (live, secondary geography and mathematics); a second-locale adaptation in preparation; platform source and evaluation harnesses as at August 2026."
+msgstr "Projecto-piloto nacional das Seicheles (em curso, geografia e matemática do secundário); adaptação a uma segunda localidade em preparação; código da plataforma e ferramentas de avaliação em Agosto de 2026."
+
+#: apps/docs/playbook.py:34
+msgid "Observed pilot figures, given as planning inputs. They are not prices and must be re-derived for each country."
+msgstr "Valores observados no piloto, apresentados como dados de planeamento. Não são preços e devem ser recalculados para cada país."
+
+#: apps/docs/playbook.py:87
+#| msgid "Precision"
+msgid "The decision"
+msgstr "A decisão"
+
+#: apps/docs/playbook.py:88
+msgid "The implementation"
+msgstr "A implementação"
+
+#: apps/docs/playbook.py:89
+msgid "Appendices"
+msgstr "Anexos"
+
+#: apps/docs/playbook.py:95 templates/docs/index.html:71
+msgid "Part I"
+msgstr "Parte I"
+
+#: apps/docs/playbook.py:96 templates/docs/index.html:84
+msgid "Part II"
+msgstr "Parte II"
+
+#: apps/docs/playbook.py:102
+msgid "For ministry officials, programme leads and advisors. No technical knowledge assumed."
+msgstr "Para quadros do ministério, responsáveis de programa e assessores. Não pressupõe conhecimentos técnicos."
+
+#: apps/docs/playbook.py:104
+msgid "For the technical team that will stand up and run a national instance."
+msgstr "Para a equipa técnica que vai instalar e operar uma instância nacional."
+
+#: apps/docs/playbook.py:106
+msgid "Reference material for both audiences."
+msgstr "Material de referência para ambos os públicos."
+
+#: apps/docs/playbook.py:112
+msgid "Executive summary"
+msgstr "Resumo executivo"
+
+#: apps/docs/playbook.py:113
+msgid "What adoption involves, what a country adapts, and how long a first cohort takes."
+msgstr "O que envolve a adopção, o que um país adapta e quanto tempo demora uma primeira turma."
+
+#: apps/docs/playbook.py:115
+msgid "What is actually being adopted"
+msgstr "O que está realmente a ser adoptado"
+
+#: apps/docs/playbook.py:116
+msgid "The product as a student, a teacher and a ministry each meet it — and what it is not."
+msgstr "O produto tal como o encontram um aluno, um professor e um ministério — e o que ele não é."
+
+#: apps/docs/playbook.py:118 apps/docs/playbook.py:251
+msgid "The five layers of adaptation"
+msgstr "As cinco camadas de adaptação"
+
+#: apps/docs/playbook.py:119
+msgid "Language, curriculum, local context, national structures and infrastructure — five projects, not one."
+msgstr "Língua, currículo, contexto local, estruturas nacionais e infra-estrutura — cinco projectos, não um."
+
+#: apps/docs/playbook.py:121
+msgid "Four models of adoption"
+msgstr "Quatro modelos de adopção"
+
+#: apps/docs/playbook.py:122
+msgid "Managed, country cloud, single server and offline: who operates it and where the data lives."
+msgstr "Gerido, nuvem do país, servidor único e offline: quem o opera e onde ficam os dados."
+
+#: apps/docs/playbook.py:124
+msgid "Data sovereignty: the honest account"
+msgstr "Soberania dos dados: o relato honesto"
+
+#: apps/docs/playbook.py:125
+msgid "What stays in country, what leaves and why no setting changes it, and the three ways to close the gap."
+msgstr "O que fica no país, o que sai e porque nenhuma configuração o altera, e as três formas de fechar essa lacuna."
+
+#: apps/docs/playbook.py:127
+msgid "What it costs, and what drives the cost"
+msgstr "Quanto custa e o que determina o custo"
+
+#: apps/docs/playbook.py:128
+msgid "The fixed infrastructure line, the model spend that dominates it, and the levers worth pulling."
+msgstr "A rubrica fixa de infra-estrutura, a despesa com modelos que a domina e as alavancas que vale a pena accionar."
+
+#: apps/docs/playbook.py:130
+msgid "Cost sharing and sustainability"
+msgstr "Partilha de custos e sustentabilidade"
+
+#: apps/docs/playbook.py:131
+msgid "Who pays for which line, four funding models, and whether it is still funded in year three."
+msgstr "Quem paga cada rubrica, quatro modelos de financiamento e se continua financiado no terceiro ano."
+
+#: apps/docs/playbook.py:133 apps/docs/playbook.py:235
+msgid "Evidence, evaluation and quality assurance"
+msgstr "Evidência, avaliação e garantia de qualidade"
+
+#: apps/docs/playbook.py:134
+msgid "Three layers of answer to \"how do you know it teaches well\", and the gate to apply before a cohort."
+msgstr "Três níveis de resposta a «como sabe que ensina bem» e o critério a aplicar antes de uma turma."
+
+#: apps/docs/playbook.py:136
+msgid "A phased adoption roadmap"
+msgstr "Um roteiro de adopção por fases"
+
+#: apps/docs/playbook.py:137
+msgid "Six phases from decision to scale, each with an owner and an exit criterion."
+msgstr "Seis fases da decisão à escala, cada uma com um responsável e um critério de saída."
+
+#: apps/docs/playbook.py:139
+#| msgid "Teacher reviewed and approved"
+msgid "Teacher training and support"
+msgstr "Formação e apoio aos professores"
+
+#: apps/docs/playbook.py:140
+msgid "The part that cannot be bought or deployed: champions, accompaniment, clinics and three lines of support."
+msgstr "A parte que não se compra nem se instala: dinamizadores, acompanhamento, sessões de apoio e três linhas de suporte."
+
+#: apps/docs/playbook.py:142
+msgid "Governance and what the country must provide"
+msgstr "Governação e o que o país tem de fornecer"
+
+#: apps/docs/playbook.py:143
+msgid "The five roles that need a name against them, and what each side supplies."
+msgstr "Os cinco papéis que precisam de um nome associado e o que cada parte fornece."
+
+#: apps/docs/playbook.py:145 apps/docs/playbook.py:259
+msgid "Risks and how they are managed"
+msgstr "Riscos e como são geridos"
+
+#: apps/docs/playbook.py:146
+msgid "Ten risks, why each one happens, and the control already in place for it."
+msgstr "Dez riscos, porque ocorre cada um e o controlo já existente para o mitigar."
+
+#: apps/docs/playbook.py:149
+msgid "Country onboarding checklist"
+msgstr "Lista de verificação para integrar um país"
+
+#: apps/docs/playbook.py:150
+msgid "Nine steps in order, and where each one lives. Content is step five for a reason."
+msgstr "Nove passos por ordem e onde cada um se realiza. O conteúdo é o quinto passo por uma razão."
+
+#: apps/docs/playbook.py:152
+msgid "Language and locale adaptation"
+msgstr "Adaptação de língua e localidade"
+
+#: apps/docs/playbook.py:153
+msgid "The five places a locale is registered, which language wins per request, and the register decisions to settle first."
+msgstr "Os cinco sítios onde uma localidade é registada, que língua prevalece em cada pedido e as decisões de registo a resolver primeiro."
+
+#: apps/docs/playbook.py:155
+msgid "Curriculum ingestion and the content pipeline"
+msgstr "Ingestão do currículo e pipeline de conteúdos"
+
+#: apps/docs/playbook.py:156
+msgid "Two routes in, the eight generation steps, and why review throughput is the schedule."
+msgstr "Duas vias de entrada, os oito passos de geração e porque é a capacidade de revisão que define o calendário."
+
+#: apps/docs/playbook.py:158
+msgid "National structures"
+msgstr "Estruturas nacionais"
+
+#: apps/docs/playbook.py:159
+msgid "Grades, schools, terminology and competency thresholds — all configuration, no migration."
+msgstr "Anos, escolas, terminologia e limiares de competência — tudo configuração, sem migração."
+
+#: apps/docs/playbook.py:161
+#| msgid "Ask a question about the platform"
+msgid "Hosting the platform"
+msgstr "Alojar a plataforma"
+
+#: apps/docs/playbook.py:162
+msgid "Three server paths and two offline shapes, with the commands, the symptoms and the backup rules."
+msgstr "Três caminhos de servidor e dois formatos offline, com os comandos, os sintomas e as regras de cópia de segurança."
+
+#: apps/docs/playbook.py:164
+msgid "Quality gates before a cohort"
+msgstr "Critérios de qualidade antes de uma turma"
+
+#: apps/docs/playbook.py:165
+msgid "Three harnesses at three units of analysis, and why judges are a filter rather than a gate."
+msgstr "Três ferramentas em três unidades de análise e porque os avaliadores são um filtro e não um crivo."
+
+#: apps/docs/playbook.py:167
+#| msgid "Ask a question about the platform"
+msgid "Operating the platform"
+msgstr "Operar a plataforma"
+
+#: apps/docs/playbook.py:168
+msgid "Backups, upgrades, secrets, monitoring, flagged sessions and the login lockout rule."
+msgstr "Cópias de segurança, actualizações, segredos, monitorização, sessões sinalizadas e a regra de bloqueio de início de sessão."
+
+#: apps/docs/playbook.py:170
+msgid "Integration surface"
+msgstr "Superfície de integração"
+
+#: apps/docs/playbook.py:171
+msgid "A versioned REST API, a published schema, and a realistic integration scope for a pilot."
+msgstr "Uma API REST versionada, um esquema publicado e um âmbito de integração realista para um piloto."
+
+#: apps/docs/playbook.py:174
+msgid "Case study: what a second adaptation changed"
+msgstr "Estudo de caso: o que mudou numa segunda adaptação"
+
+#: apps/docs/playbook.py:175
+msgid "The real change list from taking the platform to a second country. No schema redesign appears in it."
+msgstr "A lista real de alterações ao levar a plataforma a um segundo país. Não inclui qualquer redesenho do esquema de dados."
+
+#: apps/docs/playbook.py:177 apps/docs/playbook.py:219
+msgid "Questions to answer before Phase 1"
+msgstr "Perguntas a responder antes da Fase 1"
+
+#: apps/docs/playbook.py:178
+msgid "Ten questions. A country that can answer them can start; one that cannot will stall on the unanswered one."
+msgstr "Dez perguntas. Um país que saiba respondê-las pode começar; o que não souber ficará bloqueado naquela que ficou por responder."
+
+#: apps/docs/playbook.py:180
+msgid "Glossary"
+msgstr "Glossário"
+
+#: apps/docs/playbook.py:214
+#| msgid "Started"
+msgid "Start here"
+msgstr "Comece aqui"
+
+#: apps/docs/playbook.py:215
+msgid "What the thing is, before deciding anything about it."
+msgstr "O que isto é, antes de decidir seja o que for a seu respeito."
+
+#: apps/docs/playbook.py:222
+msgid "Decide the shape"
+msgstr "Decida o formato"
+
+#: apps/docs/playbook.py:223
+msgid "Where it runs, where the data lives, and who owns each decision."
+msgstr "Onde funciona, onde ficam os dados e a quem cabe cada decisão."
+
+#: apps/docs/playbook.py:227
+msgid "What a second adaptation changed"
+msgstr "O que mudou numa segunda adaptação"
+
+#: apps/docs/playbook.py:230
+msgid "Plan and fund it"
+msgstr "Planeie e financie"
+
+#: apps/docs/playbook.py:231
+msgid "What it costs, who carries which line, and how a first cohort is sequenced."
+msgstr "Quanto custa, quem suporta cada rubrica e como se sequencia uma primeira turma."
+
+#: apps/docs/playbook.py:238
+msgid "Stand it up"
+msgstr "Ponha-o de pé"
+
+#: apps/docs/playbook.py:239
+msgid "Provision the deployment, then run it without anyone needing to be called."
+msgstr "Provisione a instalação e depois opere-a sem que ninguém tenha de ser chamado."
+
+#: apps/docs/playbook.py:242
+msgid "Run it yourself — the short version"
+msgstr "Instale por si próprio — a versão curta"
+
+#: apps/docs/playbook.py:246
+#| msgid "Back to Course"
+msgid "Make it yours"
+msgstr "Torne-o seu"
+
+#: apps/docs/playbook.py:247
+msgid "Register the locale, ingest the syllabus, configure the country."
+msgstr "Registe a localidade, ingira o programa, configure o país."
+
+#: apps/docs/playbook.py:254
+msgid "Prove it, then connect it"
+msgstr "Comprove-o e depois ligue-o"
+
+#: apps/docs/playbook.py:255
+msgid "The gate to pass before students arrive, and the surface other systems talk to."
+msgstr "O critério a cumprir antes de os alunos chegarem e a superfície com que outros sistemas comunicam."
 
 #: apps/support/views.py:74
 msgid ""
@@ -279,7 +588,9 @@ msgstr ""
 #: apps/tutoring/views.py:631
 #, python-format
 msgid "This device still needs: %(items)s. Finish setup to start lessons."
-msgstr "Este dispositivo ainda precisa de: %(items)s. Conclua a configuração para começar as lições."
+msgstr ""
+"Este dispositivo ainda precisa de: %(items)s. Conclua a configuração para "
+"começar as lições."
 
 #: templates/_includes/_marketing_footer.html:9 templates/base.html:137
 #: templates/dashboard/base.html:165 templates/docs/index.html:61
@@ -289,7 +600,6 @@ msgstr "Ajuda e FAQ"
 #: templates/_includes/_marketing_footer.html:10
 #: templates/_includes/_marketing_header.html:34 templates/docs/base.html:7
 #: templates/docs/index.html:25 templates/docs/section.html:20
-#| msgid "More options"
 msgid "Country Adoption"
 msgstr "Adopção por País"
 
@@ -300,7 +610,6 @@ msgstr "Termos de utilização"
 
 #: templates/_includes/_marketing_footer.html:12
 #: templates/accounts/landing.html:190 templates/docs/index.html:60
-#| msgid "Edit Course"
 msgid "Run it yourself"
 msgstr "Instale por si próprio"
 
@@ -329,7 +638,6 @@ msgid "Teacher/Admin sign in"
 msgstr "Entrada de professor/administrador"
 
 #: templates/_includes/_marketing_header.html:39
-#| msgid "Student Sign In"
 msgid "Student sign in"
 msgstr "Entrada de aluno"
 
@@ -402,8 +710,6 @@ msgid "High — pilot blocker"
 msgstr "Alta — bloqueia o piloto"
 
 #: templates/_includes/feedback_button.html:166
-#| msgid "%(count)s message"
-#| msgid_plural "%(count)s messages"
 msgid "Your message"
 msgstr "A sua mensagem"
 
@@ -547,16 +853,19 @@ msgid "Curriculum tutoring for secondary school"
 msgstr "Tutoria do currículo para o ensino secundário"
 
 #: templates/accounts/landing.html:8
-msgid "A tutor that works through your school curriculum one lesson at a time, checks what was learned, and reports it to the teacher. Runs without an internet connection."
-msgstr "Um tutor que percorre o currículo da sua escola lição a lição, verifica o que foi aprendido e comunica-o ao professor. Funciona sem ligação à Internet."
+msgid ""
+"A tutor that works through your school curriculum one lesson at a time, "
+"checks what was learned, and reports it to the teacher. Runs without an "
+"internet connection."
+msgstr ""
+"Um tutor que percorre o currículo da sua escola lição a lição, verifica o "
+"que foi aprendido e comunica-o ao professor. Funciona sem ligação à Internet."
 
 #: templates/accounts/landing.html:34
-#| msgid "Sign in"
 msgid "Skip to sign in"
 msgstr "Ir para o início de sessão"
 
 #: templates/accounts/landing.html:49
-#| msgid "Secondary Color"
 msgid "Secondary school"
 msgstr "Ensino secundário"
 
@@ -565,8 +874,14 @@ msgid "AI Powered Tutor"
 msgstr "Tutor com Inteligência Artificial"
 
 #: templates/accounts/landing.html:54
-msgid "Students learn by talking through a lesson, not by watching one. The tutor asks, listens, and only moves on when the answer shows understanding — then tells the teacher what it saw."
-msgstr "Os alunos aprendem conversando sobre a lição, não assistindo a ela. O tutor pergunta, ouve e só avança quando a resposta mostra compreensão — depois conta ao professor o que observou."
+msgid ""
+"Students learn by talking through a lesson, not by watching one. The tutor "
+"asks, listens, and only moves on when the answer shows understanding — then "
+"tells the teacher what it saw."
+msgstr ""
+"Os alunos aprendem conversando sobre a lição, não assistindo a ela. O tutor "
+"pergunta, ouve e só avança quando a resposta mostra compreensão — depois "
+"conta ao professor o que observou."
 
 #: templates/accounts/landing.html:58
 #: templates/dashboard/classes/detail.html:145
@@ -580,13 +895,13 @@ msgid "Student"
 msgstr "Aluno"
 
 #: templates/accounts/landing.html:59 templates/dashboard/base.html:107
-#| msgid "Create Admin"
 msgid "Teacher/Admin"
 msgstr "Professor/Administrador"
 
 #: templates/accounts/landing.html:63
 msgid "New here? You can create an account on either sign-in page."
-msgstr "É a primeira vez? Pode criar uma conta em qualquer das páginas de entrada."
+msgstr ""
+"É a primeira vez? Pode criar uma conta em qualquer das páginas de entrada."
 
 #: templates/accounts/landing.html:74
 msgid "How one lesson goes"
@@ -606,7 +921,8 @@ msgstr "Explorar"
 
 #: templates/accounts/landing.html:87
 msgid "The student works the idea out loud; the tutor asks rather than tells."
-msgstr "O aluno trabalha a ideia em voz alta; o tutor pergunta em vez de dizer."
+msgstr ""
+"O aluno trabalha a ideia em voz alta; o tutor pergunta em vez de dizer."
 
 #: templates/accounts/landing.html:93 templates/tutoring/catalog.html:161
 msgid "Explain"
@@ -625,86 +941,130 @@ msgid "A harder case, to see whether it holds outside the first example."
 msgstr "Um caso mais difícil, para ver se se mantém fora do primeiro exemplo."
 
 #: templates/accounts/landing.html:107
-#| msgid "Exit Ticket"
 msgid "Exit ticket"
 msgstr "Ficha de saída"
 
 #: templates/accounts/landing.html:108
 msgid "A short check. The score is what the teacher sees the next morning."
-msgstr "Uma verificação curta. A nota é o que o professor vê na manhã seguinte."
+msgstr ""
+"Uma verificação curta. A nota é o que o professor vê na manhã seguinte."
 
 #: templates/accounts/landing.html:120
 msgid "It teaches the syllabus the school already uses"
 msgstr "Ensina o programa que a escola já usa"
 
 #: templates/accounts/landing.html:121
-msgid "A teacher uploads the curriculum — schemes of work, past papers, worksheets. The platform turns it into lessons and keeps every answer grounded in that material, so a student is not being taught a different course from the one they sit an exam in."
-msgstr "Um professor carrega o currículo — planificações, exames anteriores, fichas de trabalho. A plataforma transforma-o em lições e mantém todas as respostas assentes nesse material, para que o aluno não aprenda um curso diferente daquele em que faz exame."
+msgid ""
+"A teacher uploads the curriculum — schemes of work, past papers, worksheets. "
+"The platform turns it into lessons and keeps every answer grounded in that "
+"material, so a student is not being taught a different course from the one "
+"they sit an exam in."
+msgstr ""
+"Um professor carrega o currículo — planificações, exames anteriores, fichas "
+"de trabalho. A plataforma transforma-o em lições e mantém todas as respostas "
+"assentes nesse material, para que o aluno não aprenda um curso diferente "
+"daquele em que faz exame."
 
 #: templates/accounts/landing.html:127
 msgid "Talks, doesn't lecture"
 msgstr "Conversa, não faz palestras"
 
 #: templates/accounts/landing.html:128
-msgid "Every step is a question. A student who answers correctly moves on; a student who doesn't gets a smaller step, not the answer."
-msgstr "Cada passo é uma pergunta. O aluno que responde correctamente avança; o que não responde recebe um passo mais pequeno, não a resposta."
+msgid ""
+"Every step is a question. A student who answers correctly moves on; a "
+"student who doesn't gets a smaller step, not the answer."
+msgstr ""
+"Cada passo é uma pergunta. O aluno que responde correctamente avança; o que "
+"não responde recebe um passo mais pequeno, não a resposta."
 
 #: templates/accounts/landing.html:133
 msgid "Measures what stuck"
 msgstr "Mede o que ficou"
 
 #: templates/accounts/landing.html:134
-msgid "Each lesson ends with an exit ticket. Scores are per objective, so a teacher sees which idea a class missed, not just who scored low."
-msgstr "Cada lição termina com uma ficha de saída. As notas são por objectivo, para que o professor veja que ideia a turma falhou, e não apenas quem teve nota baixa."
+msgid ""
+"Each lesson ends with an exit ticket. Scores are per objective, so a teacher "
+"sees which idea a class missed, not just who scored low."
+msgstr ""
+"Cada lição termina com uma ficha de saída. As notas são por objectivo, para "
+"que o professor veja que ideia a turma falhou, e não apenas quem teve nota "
+"baixa."
 
 #: templates/accounts/landing.html:139
 msgid "Watched, not unattended"
 msgstr "Vigiado, não deixado ao acaso"
 
 #: templates/accounts/landing.html:140
-msgid "Conversations are checked for harmful, inappropriate and manipulative content. Anything flagged goes to a named teacher to review."
-msgstr "As conversas são verificadas quanto a conteúdo nocivo, inadequado ou manipulador. Tudo o que for sinalizado segue para um professor designado rever."
+msgid ""
+"Conversations are checked for harmful, inappropriate and manipulative "
+"content. Anything flagged goes to a named teacher to review."
+msgstr ""
+"As conversas são verificadas quanto a conteúdo nocivo, inadequado ou "
+"manipulador. Tudo o que for sinalizado segue para um professor designado "
+"rever."
 
 #: templates/accounts/landing.html:145
-#| msgid "Back to Students"
 msgid "One device, two students"
 msgstr "Um dispositivo, dois alunos"
 
 #: templates/accounts/landing.html:146
-msgid "Where devices are shared, a teacher can pair students into groups and the tutor runs the lesson for the pair."
-msgstr "Onde os dispositivos são partilhados, o professor pode juntar alunos em grupos e o tutor dá a lição ao par."
+msgid ""
+"Where devices are shared, a teacher can pair students into groups and the "
+"tutor runs the lesson for the pair."
+msgstr ""
+"Onde os dispositivos são partilhados, o professor pode juntar alunos em "
+"grupos e o tutor dá a lição ao par."
 
 #: templates/accounts/landing.html:151
 msgid "Reports for the teacher"
 msgstr "Relatórios para o professor"
 
 #: templates/accounts/landing.html:152
-msgid "A dashboard shows who has been active, how the class scored, and which students went backwards on a retry."
-msgstr "Um painel mostra quem esteve activo, como a turma se saiu e que alunos pioraram na repetição."
+msgid ""
+"A dashboard shows who has been active, how the class scored, and which "
+"students went backwards on a retry."
+msgstr ""
+"Um painel mostra quem esteve activo, como a turma se saiu e que alunos "
+"pioraram na repetição."
 
 #: templates/accounts/landing.html:157
 msgid "In the classroom's language"
 msgstr "Na língua da sala de aula"
 
 #: templates/accounts/landing.html:158
-msgid "The interface and the lessons follow the language the course is taught in, set per school."
-msgstr "A interface e as lições seguem a língua em que o curso é leccionado, definida por escola."
+msgid ""
+"The interface and the lessons follow the language the course is taught in, "
+"set per school."
+msgstr ""
+"A interface e as lições seguem a língua em que o curso é leccionado, "
+"definida por escola."
 
 #: templates/accounts/landing.html:174
 msgid "Run it on your own hardware"
 msgstr "Execute no seu próprio equipamento"
 
 #: templates/accounts/landing.html:175
-msgid "Neither option needs a connection to us. Pick the one that matches who is running it — a teacher in one classroom, or a ministry across a district."
-msgstr "Nenhuma das opções precisa de ligação connosco. Escolha a que corresponde a quem a vai usar — um professor numa sala de aula ou um ministério em todo um distrito."
+msgid ""
+"Neither option needs a connection to us. Pick the one that matches who is "
+"running it — a teacher in one classroom, or a ministry across a district."
+msgstr ""
+"Nenhuma das opções precisa de ligação connosco. Escolha a que corresponde a "
+"quem a vai usar — um professor numa sala de aula ou um ministério em todo um "
+"distrito."
 
 #: templates/accounts/landing.html:181
 msgid "No internet? It still teaches."
 msgstr "Sem Internet? Continua a ensinar."
 
 #: templates/accounts/landing.html:182
-msgid "The desktop build runs the whole platform — tutor, curriculum and marking — on one machine in the classroom, serving students over its own WiFi. Nothing leaves the room, and nothing needs a connection."
-msgstr "A versão para computador executa toda a plataforma — tutor, currículo e correcção — numa única máquina na sala de aula, servindo os alunos pela sua própria rede WiFi. Nada sai da sala e nada precisa de ligação."
+msgid ""
+"The desktop build runs the whole platform — tutor, curriculum and marking — "
+"on one machine in the classroom, serving students over its own WiFi. Nothing "
+"leaves the room, and nothing needs a connection."
+msgstr ""
+"A versão para computador executa toda a plataforma — tutor, currículo e "
+"correcção — numa única máquina na sala de aula, servindo os alunos pela sua "
+"própria rede WiFi. Nada sai da sala e nada precisa de ligação."
 
 #: templates/accounts/landing.html:183
 msgid "Get the offline app"
@@ -715,11 +1075,16 @@ msgid "Host it on your own servers"
 msgstr "Alojar nos seus próprios servidores"
 
 #: templates/accounts/landing.html:189
-msgid "For a school group or a ministry that needs the data to stay on infrastructure it controls. The whole platform is deployable from source, with your own models and your own storage."
-msgstr "Para um grupo de escolas ou um ministério que precise de manter os dados em infra-estrutura própria. Toda a plataforma pode ser instalada a partir do código, com os seus próprios modelos e o seu próprio armazenamento."
+msgid ""
+"For a school group or a ministry that needs the data to stay on "
+"infrastructure it controls. The whole platform is deployable from source, "
+"with your own models and your own storage."
+msgstr ""
+"Para um grupo de escolas ou um ministério que precise de manter os dados em "
+"infra-estrutura própria. Toda a plataforma pode ser instalada a partir do "
+"código, com os seus próprios modelos e o seu próprio armazenamento."
 
 #: templates/accounts/landing.html:200
-#| msgid "Get Started"
 msgid "Get started"
 msgstr "Começar"
 
@@ -735,8 +1100,12 @@ msgid "Students"
 msgstr "Alunos"
 
 #: templates/accounts/landing.html:207
-msgid "Pick a subject and carry on where you left off. Your teacher gives you your school and grade."
-msgstr "Escolha uma disciplina e continue de onde parou. O seu professor indica-lhe a escola e o ano."
+msgid ""
+"Pick a subject and carry on where you left off. Your teacher gives you your "
+"school and grade."
+msgstr ""
+"Escolha uma disciplina e continue de onde parou. O seu professor indica-lhe "
+"a escola e o ano."
 
 #: templates/accounts/landing.html:209 templates/accounts/landing.html:219
 #: templates/accounts/register.html:122
@@ -747,18 +1116,20 @@ msgid "Sign in"
 msgstr "Entrar"
 
 #: templates/accounts/landing.html:210 templates/accounts/landing.html:220
-#| msgid "Create Account"
 msgid "Create account"
 msgstr "Criar conta"
 
 #: templates/accounts/landing.html:216
-#| msgid "Create Admin"
 msgid "Teachers & Admins"
 msgstr "Professores e administradores"
 
 #: templates/accounts/landing.html:217
-msgid "Upload your curriculum, watch how the class is doing, and review anything the safety check flagged."
-msgstr "Carregue o seu currículo, acompanhe o desempenho da turma e reveja tudo o que a verificação de segurança sinalizou."
+msgid ""
+"Upload your curriculum, watch how the class is doing, and review anything "
+"the safety check flagged."
+msgstr ""
+"Carregue o seu currículo, acompanhe o desempenho da turma e reveja tudo o "
+"que a verificação de segurança sinalizou."
 
 #: templates/accounts/login.html:5 templates/accounts/login.html:54
 #: templates/accounts/staff_login.html:54
@@ -826,7 +1197,6 @@ msgid "Create Account"
 msgstr "Criar conta"
 
 #: templates/accounts/register.html:14
-#| msgid "Welcome to AI Tutor"
 msgid "Join AI Tutor"
 msgstr "Aderir ao AI Tutor"
 
@@ -835,7 +1205,6 @@ msgid "Start your learning journey in Seychelles"
 msgstr "Comece o seu percurso de aprendizagem nas Seicheles"
 
 #: templates/accounts/register.html:32
-#| msgid "Your last name"
 msgid "Your Name"
 msgstr "O seu nome"
 
@@ -884,7 +1253,6 @@ msgstr "Email"
 #: templates/accounts/staff_register.html:109
 #: templates/accounts/staff_self_register.html:99
 #: templates/accounts/student_register.html:121
-#| msgid "Current password"
 msgid "Create a password"
 msgstr "Crie uma palavra-passe"
 
@@ -894,7 +1262,6 @@ msgid "Confirm"
 msgstr "Confirmar"
 
 #: templates/accounts/register.html:110
-#| msgid "Reset password"
 msgid "Repeat password"
 msgstr "Repita a palavra-passe"
 
@@ -972,39 +1339,51 @@ msgstr "Tutor"
 
 #: templates/accounts/settings.html:222
 msgid "Choose which tutor to learn with. This is remembered for every lesson."
-msgstr "Escolha com que tutor quer aprender. A escolha é memorizada para todas as lições."
+msgstr ""
+"Escolha com que tutor quer aprender. A escolha é memorizada para todas as "
+"lições."
 
 #: templates/accounts/settings.html:228
 msgid "Which tutor"
 msgstr "Que tutor"
 
 #: templates/accounts/settings.html:235
-msgid "Automatic uses the internet tutor when you are connected and switches to the offline one when you are not, so a lost connection will not stop your lesson."
-msgstr "O modo automático usa o tutor da Internet quando está ligado e muda para o tutor offline quando não está, para que uma quebra de ligação não interrompa a lição."
+msgid ""
+"Automatic uses the internet tutor when you are connected and switches to the "
+"offline one when you are not, so a lost connection will not stop your lesson."
+msgstr ""
+"O modo automático usa o tutor da Internet quando está ligado e muda para o "
+"tutor offline quando não está, para que uma quebra de ligação não interrompa "
+"a lição."
 
 #: templates/accounts/settings.html:249
 msgid "Offline tutor"
 msgstr "Tutor offline"
 
 #: templates/accounts/settings.html:251
-#| msgid "— Select school —"
 msgid "— Let the app choose —"
 msgstr "— Deixar a aplicação escolher —"
 
 #: templates/accounts/settings.html:257
-msgid "Which offline tutor to use. Larger ones understand more but answer more slowly."
-msgstr "Que tutor offline usar. Os maiores compreendem mais, mas respondem mais devagar."
+msgid ""
+"Which offline tutor to use. Larger ones understand more but answer more "
+"slowly."
+msgstr ""
+"Que tutor offline usar. Os maiores compreendem mais, mas respondem mais "
+"devagar."
 
 #: templates/accounts/settings.html:264
 msgid "Internet tutor: available right now."
 msgstr "Tutor da Internet: disponível neste momento."
 
 #: templates/accounts/settings.html:266
-msgid "Internet tutor: not reachable right now — lessons will use the offline tutor."
-msgstr "Tutor da Internet: inacessível neste momento — as lições vão usar o tutor offline."
+msgid ""
+"Internet tutor: not reachable right now — lessons will use the offline tutor."
+msgstr ""
+"Tutor da Internet: inacessível neste momento — as lições vão usar o tutor "
+"offline."
 
 #: templates/accounts/settings.html:270
-#| msgid "Save profile"
 msgid "Save tutor choice"
 msgstr "Guardar escolha de tutor"
 
@@ -1030,13 +1409,15 @@ msgstr "Alterar palavra-passe"
 
 #: templates/accounts/settings.html:319 templates/desktop/server.html:16
 #: templates/desktop/server.html:58
-#| msgid "School Name"
 msgid "School server"
 msgstr "Servidor da escola"
 
 #: templates/accounts/settings.html:321
-msgid "Where this computer sends finished work. Optional — it teaches without one."
-msgstr "Para onde este computador envia o trabalho concluído. Opcional — ensina sem ele."
+msgid ""
+"Where this computer sends finished work. Optional — it teaches without one."
+msgstr ""
+"Para onde este computador envia o trabalho concluído. Opcional — ensina sem "
+"ele."
 
 #: templates/accounts/settings.html:324
 msgid "Change server address"
@@ -1080,7 +1461,9 @@ msgstr "Para professores e administradores escolares"
 
 #: templates/accounts/staff_login.html:61
 msgid "Your account will need admin approval before you can sign in."
-msgstr "A sua conta precisa da aprovação de um administrador antes de poder iniciar sessão."
+msgstr ""
+"A sua conta precisa da aprovação de um administrador antes de poder iniciar "
+"sessão."
 
 #: templates/accounts/staff_login.html:62
 #: templates/accounts/staff_self_register.html:138
@@ -1091,17 +1474,14 @@ msgstr "Voltar ao início"
 
 #: templates/accounts/staff_register.html:5
 #: templates/accounts/staff_register.html:129
-#| msgid "Student Registration"
 msgid "Complete Registration"
 msgstr "Concluir registo"
 
 #: templates/accounts/staff_register.html:21
-#| msgid "Open navigation"
 msgid "Invalid Invitation"
 msgstr "Convite inválido"
 
 #: templates/accounts/staff_register.html:25
-#| msgid "Back to home"
 msgid "Back to Home"
 msgstr "Voltar ao início"
 
@@ -1111,8 +1491,12 @@ msgstr "Foi convidado!"
 
 #: templates/accounts/staff_register.html:32
 #, python-format
-msgid "Complete your registration to join <strong>%(school)s</strong> as a staff member."
-msgstr "Conclua o seu registo para aderir a <strong>%(school)s</strong> como membro do pessoal."
+msgid ""
+"Complete your registration to join <strong>%(school)s</strong> as a staff "
+"member."
+msgstr ""
+"Conclua o seu registo para aderir a <strong>%(school)s</strong> como membro "
+"do pessoal."
 
 #: templates/accounts/staff_register.html:49
 #: templates/dashboard/curriculum/upload.html:305
@@ -1121,7 +1505,6 @@ msgid "(optional)"
 msgstr "(opcional)"
 
 #: templates/accounts/staff_register.html:58
-#| msgid "Notes (optional)"
 msgid "Your email address (optional)"
 msgstr "O seu endereço de e-mail (opcional)"
 
@@ -1167,7 +1550,6 @@ msgstr "Insere novamente a tua palavra-passe"
 
 #: templates/accounts/staff_self_register.html:5
 #: templates/accounts/staff_self_register.html:14
-#| msgid "Create Account"
 msgid "Create Teacher Account"
 msgstr "Criar conta de professor"
 
@@ -1243,7 +1625,6 @@ msgid "In effect from %(d)s"
 msgstr "Em vigor desde %(d)s"
 
 #: templates/accounts/terms.html:35
-#| msgid "Content"
 msgid "Contents"
 msgstr "Índice"
 
@@ -1252,26 +1633,30 @@ msgid "Print or save as PDF"
 msgstr "Imprimir ou guardar como PDF"
 
 #: templates/accounts/terms.html:47 templates/accounts/terms.html:70
-#| msgid "Back to Students"
 msgid "Back to my subjects"
 msgstr "Voltar às minhas disciplinas"
 
 #: templates/accounts/terms.html:50
 #, python-format
 msgid "You are reading version %(v)s. Older versions are kept by your school."
-msgstr "Está a ler a versão %(v)s. As versões anteriores são guardadas pela sua escola."
+msgstr ""
+"Está a ler a versão %(v)s. As versões anteriores são guardadas pela sua "
+"escola."
 
 #: templates/accounts/terms.html:65
-#| msgid "No tags applied yet."
 msgid "No terms are published yet"
 msgstr "Ainda não há termos publicados"
 
 #: templates/accounts/terms.html:67
-msgid "Your school has not published a terms-of-use document for this platform. A platform administrator can add one from the dashboard settings."
-msgstr "A sua escola ainda não publicou um documento de termos de utilização para esta plataforma. Um administrador da plataforma pode adicionar um nas definições do painel."
+msgid ""
+"Your school has not published a terms-of-use document for this platform. A "
+"platform administrator can add one from the dashboard settings."
+msgstr ""
+"A sua escola ainda não publicou um documento de termos de utilização para "
+"esta plataforma. Um administrador da plataforma pode adicionar um nas "
+"definições do painel."
 
 #: templates/base.html:77
-#| msgid "No content"
 msgid "Skip to content"
 msgstr "Ir para o conteúdo"
 
@@ -1285,7 +1670,6 @@ msgid "Learn"
 msgstr "Aprender"
 
 #: templates/base.html:127
-#| msgid "Account"
 msgid "Account menu"
 msgstr "Menu da conta"
 
@@ -1294,7 +1678,6 @@ msgid "Account settings"
 msgstr "Definições da conta"
 
 #: templates/base.html:144
-#| msgid "Sign In"
 msgid "Sign out"
 msgstr "Terminar sessão"
 
@@ -1307,31 +1690,26 @@ msgid "Teacher Dashboard"
 msgstr "Painel do professor"
 
 #: templates/dashboard/base.html:88
-#| msgid "No content"
 msgid "Skip to main content"
 msgstr "Ir para o conteúdo principal"
 
 #: templates/dashboard/base.html:93
-#| msgid "Dashboard Overview"
 msgid "Dashboard sections"
 msgstr "Secções do painel"
 
 #: templates/dashboard/base.html:123 templates/dashboard/home.html:4
 #: templates/dashboard/home.html:5 templates/docs/index.html:59
-#| msgid "Review"
 msgid "Overview"
 msgstr "Visão geral"
 
 #: templates/dashboard/base.html:127
 #: templates/dashboard/flagged_sessions.html:4
 #: templates/dashboard/flagged_sessions.html:5
-#| msgid "Flagged Chats"
 msgid "Flagged chats"
 msgstr "Conversas sinalizadas"
 
 #: templates/dashboard/base.html:130
 #, python-format
-#| msgid "Unreviewed"
 msgid "%(n)s unreviewed"
 msgid_plural "%(n)s unreviewed"
 msgstr[0] "%(n)s por rever"
@@ -1347,17 +1725,14 @@ msgid "Classes"
 msgstr "Turmas"
 
 #: templates/dashboard/base.html:147
-#| msgid "Group name"
 msgid "Groups"
 msgstr "Grupos"
 
 #: templates/dashboard/base.html:152
-#| msgid "Bulk Upload"
 msgid "Bulk upload"
 msgstr "Carregamento em massa"
 
 #: templates/dashboard/base.html:158
-#| msgid "Teaching objective"
 msgid "Teaching"
 msgstr "Ensino"
 
@@ -1366,7 +1741,6 @@ msgid "Courses"
 msgstr "Cursos"
 
 #: templates/dashboard/base.html:171
-#| msgid "Student Registration"
 msgid "Administration"
 msgstr "Administração"
 
@@ -1377,28 +1751,23 @@ msgid "Staff"
 msgstr "Equipa"
 
 #: templates/dashboard/base.html:178
-#| msgid "Feedback & Bugs"
 msgid "Feedback & bugs"
 msgstr "Comentários e erros"
 
 #: templates/dashboard/base.html:183
-#| msgid "Evaluate"
 msgid "Evaluation"
 msgstr "Avaliação"
 
 #: templates/dashboard/base.html:186
-#| msgid "Tutoring Evaluation"
 msgid "Tutoring evaluation"
 msgstr "Avaliação da tutoria"
 
 #: templates/dashboard/base.html:190
-#| msgid "Session Report"
 msgid "Scores & export"
 msgstr "Notas e exportação"
 
 #: templates/dashboard/base.html:195
 #: templates/dashboard/quality/content_edit_dashboard.html:5
-#| msgid "Content Quality"
 msgid "Content quality"
 msgstr "Qualidade do conteúdo"
 
@@ -1408,7 +1777,6 @@ msgid "Edit events"
 msgstr "Editar eventos"
 
 #: templates/dashboard/base.html:212
-#| msgid "Back to Tutor"
 msgid "Back to tutor"
 msgstr "Voltar ao tutor"
 
@@ -1421,7 +1789,6 @@ msgid "Open navigation"
 msgstr "Abrir navegação"
 
 #: templates/dashboard/base.html:236
-#| msgid "Teacher Dashboard"
 msgid "Teacher dashboard"
 msgstr "Painel do professor"
 
@@ -1432,12 +1799,10 @@ msgid "Dashboard"
 msgstr "Painel"
 
 #: templates/dashboard/base.html:255
-#| msgid "Session Mode for this school"
 msgid "Showing data for school"
 msgstr "A mostrar dados da escola"
 
 #: templates/dashboard/base.html:258 templates/dashboard/settings.html:219
-#| msgid "All Schools"
 msgid "All schools"
 msgstr "Todas as escolas"
 
@@ -1688,7 +2053,6 @@ msgstr ""
 
 #: templates/dashboard/classes/list.html:7
 #, python-format
-#| msgid "%(g)s class"
 msgid "%(n)s class"
 msgid_plural "%(n)s classes"
 msgstr[0] "%(n)s turma"
@@ -1696,8 +2060,12 @@ msgstr[1] "%(n)s turmas"
 
 #: templates/dashboard/classes/list.html:20
 #, python-format
-msgid "%(students)s students by grade. Open a class for its courses, mastery averages and roster."
-msgstr "%(students)s alunos por ano. Abra uma turma para ver os seus cursos, médias de domínio e lista de alunos."
+msgid ""
+"%(students)s students by grade. Open a class for its courses, mastery "
+"averages and roster."
+msgstr ""
+"%(students)s alunos por ano. Abra uma turma para ver os seus cursos, médias "
+"de domínio e lista de alunos."
 
 #: templates/dashboard/classes/list.html:41
 msgid "student"
@@ -1706,23 +2074,22 @@ msgstr[0] "aluno"
 msgstr[1] "aluno"
 
 #: templates/dashboard/classes/list.html:55
-#| msgid "student without a grade set on their profile"
-#| msgid_plural "students without a grade set on their profile"
 msgid "student with no grade on their profile"
 msgid_plural "students with no grade on their profile"
 msgstr[0] "aluno sem ano no perfil"
 msgstr[1] "alunos sem ano no perfil"
 
 #: templates/dashboard/classes/list.html:64
-#| msgid "No students yet"
 msgid "No classes yet"
 msgstr "Ainda não há turmas"
 
 #: templates/dashboard/classes/list.html:64
-#| msgid ""
-#| "Students will appear here once they join and complete their profiles."
-msgid "Classes are grouped from student grade levels. They appear once students join and complete their profiles."
-msgstr "As turmas são agrupadas a partir dos anos de escolaridade dos alunos. Aparecem assim que os alunos aderirem e completarem os seus perfis."
+msgid ""
+"Classes are grouped from student grade levels. They appear once students "
+"join and complete their profiles."
+msgstr ""
+"As turmas são agrupadas a partir dos anos de escolaridade dos alunos. "
+"Aparecem assim que os alunos aderirem e completarem os seus perfis."
 
 #: templates/dashboard/competency/class.html:4
 #: templates/dashboard/competency/class.html:5
@@ -2001,7 +2368,6 @@ msgid "Auto-detect from title"
 msgstr "Detectar automaticamente pelo título"
 
 #: templates/dashboard/curriculum/course_detail.html:189
-#| msgid "Sentence"
 msgid "Science"
 msgstr "Ciências"
 
@@ -2010,8 +2376,12 @@ msgid "Humanities"
 msgstr "Humanidades"
 
 #: templates/dashboard/curriculum/course_detail.html:194
-msgid "Math-specific tutor rules apply (working before evaluation, named subskills, etc.)"
-msgstr "Aplicam-se regras de tutor específicas da matemática (raciocínio antes da avaliação, subcompetências nomeadas, etc.)"
+msgid ""
+"Math-specific tutor rules apply (working before evaluation, named subskills, "
+"etc.)"
+msgstr ""
+"Aplicam-se regras de tutor específicas da matemática (raciocínio antes da "
+"avaliação, subcompetências nomeadas, etc.)"
 
 #: templates/dashboard/curriculum/course_detail.html:198
 msgid "Summative Exam"
@@ -2065,9 +2435,6 @@ msgid "Subject"
 msgstr "Disciplina"
 
 #: templates/dashboard/curriculum/course_detail.html:236
-#| msgid ""
-#| "Canonical subject — used to match this course with platform-wide teaching "
-#| "materials for the same subject + grade."
 msgid "Used to inherit platform-wide materials for this subject."
 msgstr "Usado para herdar materiais de toda a plataforma para esta disciplina."
 
@@ -2076,21 +2443,26 @@ msgid "Grade levels (multi-select)"
 msgstr "Anos de escolaridade (selecção múltipla)"
 
 #: templates/dashboard/curriculum/course_detail.html:249
-msgid "Tick all years this course covers. Used to match platform-wide courses for material inheritance."
-msgstr "Assinale todos os anos que este curso abrange. Usado para corresponder a cursos de toda a plataforma na herança de materiais."
+msgid ""
+"Tick all years this course covers. Used to match platform-wide courses for "
+"material inheritance."
+msgstr ""
+"Assinale todos os anos que este curso abrange. Usado para corresponder a "
+"cursos de toda a plataforma na herança de materiais."
 
 #: templates/dashboard/curriculum/course_detail.html:252
 msgid "Grade label (display)"
 msgstr "Etiqueta do ano (visível)"
 
 #: templates/dashboard/curriculum/course_detail.html:253
-#| msgid "Save Grade Levels"
 msgid "auto from grade levels"
 msgstr "automático a partir dos anos"
 
 #: templates/dashboard/curriculum/course_detail.html:254
 msgid "Optional free-text label. Auto-derived from grade levels if blank."
-msgstr "Etiqueta livre opcional. Derivada automaticamente dos anos se ficar em branco."
+msgstr ""
+"Etiqueta livre opcional. Derivada automaticamente dos anos se ficar em "
+"branco."
 
 #: templates/dashboard/curriculum/course_detail.html:257
 #: templates/dashboard/materials/process.html:151
@@ -2099,7 +2471,6 @@ msgid "Description"
 msgstr "Descrição"
 
 #: templates/dashboard/curriculum/course_detail.html:264
-#| msgid "No messages in this session."
 msgid "Show images in tutoring sessions"
 msgstr "Mostrar imagens nas sessões de tutoria"
 
@@ -2118,27 +2489,27 @@ msgid "Only allowed when no lesson has generated content"
 msgstr "Só permitido quando nenhuma lição tem conteúdo gerado"
 
 #: templates/dashboard/curriculum/course_detail.html:296
-#| msgid "Current:"
 msgid "Current owner:"
 msgstr "Proprietário actual:"
 
 #: templates/dashboard/curriculum/course_detail.html:307
-#| msgid "View Course"
 msgid "Move course"
 msgstr "Mover curso"
 
 #: templates/dashboard/curriculum/course_detail.html:320
-msgid "This course is not linked to an uploaded PDF, so re-parse cannot run. Re-upload the curriculum to enable."
-msgstr "Este curso não está ligado a nenhum PDF carregado, por isso não é possível reprocessar. Volte a carregar o currículo para activar."
+msgid ""
+"This course is not linked to an uploaded PDF, so re-parse cannot run. Re-"
+"upload the curriculum to enable."
+msgstr ""
+"Este curso não está ligado a nenhum PDF carregado, por isso não é possível "
+"reprocessar. Volte a carregar o currículo para activar."
 
 #: templates/dashboard/curriculum/course_detail.html:328
-#| msgid "No students enrolled in this course yet."
 msgid "No source PDF linked to this course"
 msgstr "Nenhum PDF de origem ligado a este curso"
 
 #: templates/dashboard/curriculum/course_detail.html:351
 #: templates/dashboard/curriculum/upload.html:342
-#| msgid "Start"
 msgid "start"
 msgstr "início"
 
@@ -2203,7 +2574,6 @@ msgid "Chunks"
 msgstr "Blocos"
 
 #: templates/dashboard/curriculum/course_detail.html:515
-#| msgid "Confirm and start (Rich)"
 msgid "Confirm to start"
 msgstr "Confirme para começar"
 
@@ -2225,12 +2595,10 @@ msgid "Files (select multiple)"
 msgstr "Ficheiros (seleccione vários)"
 
 #: templates/dashboard/curriculum/course_detail.html:566
-#| msgid "e.g., Geography Worksheet Unit 5"
 msgid "e.g., S3 Geography Worksheets"
 msgstr "ex.: Fichas de Geografia da 9ª classe"
 
 #: templates/dashboard/curriculum/course_detail.html:577
-#| msgid "Processing Log"
 msgid "Processing Mode"
 msgstr "Modo de processamento"
 
@@ -2240,16 +2608,19 @@ msgstr "Completo (visão LLM)"
 
 #: templates/dashboard/curriculum/course_detail.html:583
 msgid "Extracts questions, figures, mark schemes. Slower but more accurate."
-msgstr "Extrai perguntas, figuras e critérios de correcção. Mais lento, mas mais rigoroso."
+msgstr ""
+"Extrai perguntas, figuras e critérios de correcção. Mais lento, mas mais "
+"rigoroso."
 
 #: templates/dashboard/curriculum/course_detail.html:589
-#| msgid "Fast (text only, free)"
 msgid "Fast (Text Only)"
 msgstr "Rápido (apenas texto)"
 
 #: templates/dashboard/curriculum/course_detail.html:590
 msgid "Quick text embedding into knowledge base. Good for textbooks and notes."
-msgstr "Indexação rápida do texto na base de conhecimento. Adequado para manuais e apontamentos."
+msgstr ""
+"Indexação rápida do texto na base de conhecimento. Adequado para manuais e "
+"apontamentos."
 
 #: templates/dashboard/curriculum/course_detail.html:597
 #: templates/dashboard/curriculum/upload.html:465
@@ -2257,25 +2628,30 @@ msgid "Upload & Process"
 msgstr "Carregar e processar"
 
 #: templates/dashboard/curriculum/course_detail.html:613
-#| msgid "Content Generation Progress"
 msgid "Content generation in progress..."
 msgstr "Geração de conteúdo em curso..."
 
 #: templates/dashboard/curriculum/course_detail.html:614
-msgid "Lessons are being generated in the background. The lesson list will update automatically."
-msgstr "As lições estão a ser geradas em segundo plano. A lista de lições será actualizada automaticamente."
+msgid ""
+"Lessons are being generated in the background. The lesson list will update "
+"automatically."
+msgstr ""
+"As lições estão a ser geradas em segundo plano. A lista de lições será "
+"actualizada automaticamente."
 
 #: templates/dashboard/curriculum/course_detail.html:624
-#| msgid "Generating"
 msgid "Generating..."
 msgstr "A gerar..."
 
 #: templates/dashboard/curriculum/course_detail.html:632
-msgid "Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons."
-msgstr "Gerar tudo em paralelo (2 processos, ~2 min por lição) ou usar ⚡ em lições individuais."
+msgid ""
+"Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on "
+"individual lessons."
+msgstr ""
+"Gerar tudo em paralelo (2 processos, ~2 min por lição) ou usar ⚡ em lições "
+"individuais."
 
 #: templates/dashboard/curriculum/course_detail.html:647
-#| msgid "Target Lesson Duration"
 msgid "Default lesson duration"
 msgstr "Duração predefinida da lição"
 
@@ -2284,53 +2660,84 @@ msgid "CANNOT"
 msgstr "NÃO PODE"
 
 #: templates/dashboard/curriculum/course_detail.html:678
-msgid "When unchecked, the chat-page picker is hidden and every session uses the default duration."
-msgstr "Quando desmarcado, o selector da página de conversa fica oculto e todas as sessões usam a duração predefinida."
+msgid ""
+"When unchecked, the chat-page picker is hidden and every session uses the "
+"default duration."
+msgstr ""
+"Quando desmarcado, o selector da página de conversa fica oculto e todas as "
+"sessões usam a duração predefinida."
 
 #: templates/dashboard/curriculum/course_detail.html:699
 msgid "Catch up on pending work"
 msgstr "Recuperar trabalho pendente"
 
 #: templates/dashboard/curriculum/course_detail.html:700
-msgid "Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216)."
-msgstr "Percorre o curso à procura de duas falhas comuns: imagens que nunca foram geradas e conteúdo de lições ou fichas de saída ainda não auditado pelos avaliadores de IA. Ambos correm em segundo plano e são idempotentes — os itens já concluídos são ignorados. Pode escolher um fornecedor/modelo específico em cada execução."
+msgid ""
+"Sweep the course for two common gaps: images that never rendered, and "
+"lesson / exit-ticket content that hasn't been audited by the AI judges yet. "
+"Both run in the background and are idempotent — already-done items are "
+"skipped. You can pick a specific provider/model per run (task #216)."
+msgstr ""
+"Percorre o curso à procura de duas falhas comuns: imagens que nunca foram "
+"geradas e conteúdo de lições ou fichas de saída ainda não auditado pelos "
+"avaliadores de IA. Ambos correm em segundo plano e são idempotentes — os "
+"itens já concluídos são ignorados. Pode escolher um fornecedor/modelo "
+"específico em cada execução."
 
 #: templates/dashboard/curriculum/course_detail.html:715
 msgid "Force a specific image provider for this run"
 msgstr "Forçar um fornecedor de imagens específico nesta execução"
 
 #: templates/dashboard/curriculum/course_detail.html:717
-#| msgid "Default (config)"
 msgid "Default"
 msgstr "Predefinido"
 
 #: templates/dashboard/curriculum/course_detail.html:722
-msgid "When checked: re-generate every image, overwriting existing URLs. Otherwise: only fill in images whose URL is empty."
-msgstr "Quando marcado: gera de novo todas as imagens, substituindo os URL existentes. Caso contrário: preenche apenas as imagens cujo URL está vazio."
+msgid ""
+"When checked: re-generate every image, overwriting existing URLs. Otherwise: "
+"only fill in images whose URL is empty."
+msgstr ""
+"Quando marcado: gera de novo todas as imagens, substituindo os URL "
+"existentes. Caso contrário: preenche apenas as imagens cujo URL está vazio."
 
 #: templates/dashboard/curriculum/course_detail.html:728
-msgid "Generate any image whose URL is empty. With Re-do already-done checked: regenerate every image."
-msgstr "Gera todas as imagens cujo URL está vazio. Com a opção Refazer já concluídos marcada: gera de novo todas as imagens."
+msgid ""
+"Generate any image whose URL is empty. With Re-do already-done checked: "
+"regenerate every image."
+msgstr ""
+"Gera todas as imagens cujo URL está vazio. Com a opção Refazer já concluídos "
+"marcada: gera de novo todas as imagens."
 
 #: templates/dashboard/curriculum/course_detail.html:744
-msgid "Force a specific judge model for this run (default = use configured chain)"
-msgstr "Forçar um modelo avaliador específico nesta execução (predefinição = usar a cadeia configurada)"
+msgid ""
+"Force a specific judge model for this run (default = use configured chain)"
+msgstr ""
+"Forçar um modelo avaliador específico nesta execução (predefinição = usar a "
+"cadeia configurada)"
 
 #: templates/dashboard/curriculum/course_detail.html:746
-#| msgid "Default (config)"
 msgid "Default (configured chain)"
 msgstr "Predefinido (cadeia configurada)"
 
 #: templates/dashboard/curriculum/course_detail.html:755
-msgid "When checked: re-judge every step + exit-Q, overwriting existing verdicts. Otherwise: only judge content whose judge_outputs is empty."
-msgstr "Quando marcado: reavalia todos os passos e perguntas de saída, substituindo os veredictos existentes. Caso contrário: avalia apenas o conteúdo sem veredicto."
+msgid ""
+"When checked: re-judge every step + exit-Q, overwriting existing verdicts. "
+"Otherwise: only judge content whose judge_outputs is empty."
+msgstr ""
+"Quando marcado: reavalia todos os passos e perguntas de saída, substituindo "
+"os veredictos existentes. Caso contrário: avalia apenas o conteúdo sem "
+"veredicto."
 
 #: templates/dashboard/curriculum/course_detail.html:761
-msgid "Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With Re-do already-done checked: re-judge everything (overwrite)."
-msgstr "Executa os avaliadores de conteúdo (factual, pedagógico, segurança, pergunta de saída). Pendentes: apenas os não revistos. Com a opção Refazer já concluídos marcada: reavalia tudo (substitui)."
+msgid ""
+"Run content judges (factual, pedagogy, safety, exit-question). Pending: only "
+"unreviewed. With Re-do already-done checked: re-judge everything (overwrite)."
+msgstr ""
+"Executa os avaliadores de conteúdo (factual, pedagógico, segurança, pergunta "
+"de saída). Pendentes: apenas os não revistos. Com a opção Refazer já "
+"concluídos marcada: reavalia tudo (substitui)."
 
 #: templates/dashboard/curriculum/course_detail.html:777
-#| msgid "Generate Content"
 msgid "Regenerate content"
 msgstr "Gerar conteúdo de novo"
 
@@ -2339,25 +2746,30 @@ msgid "Wipe + regenerate LessonStep rows. ~2 min/lesson."
 msgstr "Apaga e gera de novo os passos da lição. ~2 min por lição."
 
 #: templates/dashboard/curriculum/course_detail.html:786
-msgid "Replace ExitTicketQuestion rows in place. Attempt history is preserved (FK is to ExitTicket, not the questions). ~30s/lesson."
-msgstr "Substitui as perguntas da ficha de saída no lugar. O histórico de tentativas é preservado. ~30 s por lição."
+msgid ""
+"Replace ExitTicketQuestion rows in place. Attempt history is preserved (FK "
+"is to ExitTicket, not the questions). ~30s/lesson."
+msgstr ""
+"Substitui as perguntas da ficha de saída no lugar. O histórico de tentativas "
+"é preservado. ~30 s por lição."
 
 #: templates/dashboard/curriculum/course_detail.html:791
-msgid "Re-sample the summative bank from current exit tickets. No LLM call. Attempt history preserved."
-msgstr "Volta a recolher o banco sumativo a partir das fichas de saída actuais. Sem chamada ao LLM. Histórico de tentativas preservado."
+msgid ""
+"Re-sample the summative bank from current exit tickets. No LLM call. Attempt "
+"history preserved."
+msgstr ""
+"Volta a recolher o banco sumativo a partir das fichas de saída actuais. Sem "
+"chamada ao LLM. Histórico de tentativas preservado."
 
 #: templates/dashboard/curriculum/course_detail.html:821
-#| msgid "This week's lessons"
 msgid "This week"
 msgstr "Esta semana"
 
 #: templates/dashboard/curriculum/course_detail.html:828
-#| msgid "No sessions found for this lesson yet."
 msgid "No lessons assigned for this week."
 msgstr "Nenhuma lição atribuída a esta semana."
 
 #: templates/dashboard/curriculum/course_detail.html:846
-#| msgid "No lessons in this unit yet"
 msgid "No lessons in this course yet."
 msgstr "Ainda não há lições neste curso."
 
@@ -2426,7 +2838,6 @@ msgid "No Content"
 msgstr "Com Conteúdo"
 
 #: templates/dashboard/curriculum/course_detail.html:986
-#| msgid "Stop Generation"
 msgid "Stop generating this lesson"
 msgstr "Parar a geração desta lição"
 
@@ -2446,16 +2857,14 @@ msgid "No lessons in this unit yet"
 msgstr "Ainda não há sessões para esta lição."
 
 #: templates/dashboard/curriculum/course_detail.html:1031
-#| msgid "No Students Yet"
 msgid "No Units Yet"
 msgstr "Ainda não há unidades"
 
 #: templates/dashboard/curriculum/course_detail.html:1032
-#| msgid ""
-#| "Upload a curriculum document to automatically generate courses and "
-#| "lessons."
 msgid "Upload a curriculum document to automatically create units and lessons."
-msgstr "Carregue um documento do currículo para criar unidades e lições automaticamente."
+msgstr ""
+"Carregue um documento do currículo para criar unidades e lições "
+"automaticamente."
 
 #: templates/dashboard/curriculum/course_detail.html:1033
 #: templates/dashboard/curriculum/list.html:15
@@ -2504,7 +2913,6 @@ msgid "Create Lesson"
 msgstr "Criar Lição"
 
 #: templates/dashboard/curriculum/lesson_detail.html:176
-#| msgid "Generate Content"
 msgid "Regenerating content…"
 msgstr "A gerar conteúdo de novo…"
 
@@ -2531,20 +2939,25 @@ msgid "Unpublish"
 msgstr "Despublicar"
 
 #: templates/dashboard/curriculum/lesson_detail.html:277
-msgid "Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching script and only refresh the exit ticket."
-msgstr "Apaga e gera de novo os passos da lição. ~2 min. Desmarque para manter o guião de ensino e actualizar apenas a ficha de saída."
+msgid ""
+"Wipe + regenerate LessonStep rows. ~2 min. Uncheck to keep the teaching "
+"script and only refresh the exit ticket."
+msgstr ""
+"Apaga e gera de novo os passos da lição. ~2 min. Desmarque para manter o "
+"guião de ensino e actualizar apenas a ficha de saída."
 
 #: templates/dashboard/curriculum/lesson_detail.html:282
-msgid "Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved."
-msgstr "Substitui à força as perguntas da ficha de saída. ~30 s. O histórico de tentativas é preservado."
+msgid ""
+"Force-replace ExitTicketQuestion rows. ~30s. Attempt history is preserved."
+msgstr ""
+"Substitui à força as perguntas da ficha de saída. ~30 s. O histórico de "
+"tentativas é preservado."
 
 #: templates/dashboard/curriculum/lesson_detail.html:304
-#| msgid "Learning Objective"
 msgid "Learning Objective:"
 msgstr "Objectivo de aprendizagem:"
 
 #: templates/dashboard/curriculum/lesson_detail.html:319
-#| msgid "All %(count)s questions"
 msgid "Allow group sessions"
 msgstr "Permitir sessões de grupo"
 
@@ -2553,20 +2966,24 @@ msgid "Max group size:"
 msgstr "Dimensão máxima do grupo:"
 
 #: templates/dashboard/curriculum/lesson_detail.html:327
-#| msgid "Save School Settings"
 msgid "Save group settings"
 msgstr "Guardar definições de grupo"
 
 #: templates/dashboard/curriculum/lesson_detail.html:335
 msgid "From the parent unit — broader outcomes this lesson contributes to."
-msgstr "Da unidade a que pertence — resultados mais amplos para que esta lição contribui."
+msgstr ""
+"Da unidade a que pertence — resultados mais amplos para que esta lição "
+"contribui."
 
 #: templates/dashboard/curriculum/lesson_detail.html:359
-msgid "What this lesson teaches. Click any TO to edit; ✕ to remove; + Add TO to add a new one. Click Save to persist."
-msgstr "O que esta lição ensina. Clique num objectivo para o editar; ✕ para remover; + Adicionar para criar um novo. Clique em Guardar para gravar."
+msgid ""
+"What this lesson teaches. Click any TO to edit; ✕ to remove; + Add TO to add "
+"a new one. Click Save to persist."
+msgstr ""
+"O que esta lição ensina. Clique num objectivo para o editar; ✕ para remover; "
+"+ Adicionar para criar um novo. Clique em Guardar para gravar."
 
 #: templates/dashboard/curriculum/lesson_detail.html:374
-#| msgid "No terminal objectives extracted. Click + Add TO to add manually."
 msgid "No Terminal Objectives yet. Click Edit to add some."
 msgstr "Ainda não há objectivos terminais. Clique em Editar para adicionar."
 
@@ -2590,12 +3007,10 @@ msgid "Exit Questions"
 msgstr "Perguntas de saída"
 
 #: templates/dashboard/curriculum/lesson_detail.html:492
-#| msgid "Students Created"
 msgid "Students Completed"
 msgstr "Alunos que concluíram"
 
 #: templates/dashboard/curriculum/lesson_detail.html:507
-#| msgid "Remove unit"
 msgid "Remove prerequisite"
 msgstr "Remover pré-requisito"
 
@@ -2604,23 +3019,23 @@ msgid "No prerequisites. Students can start this lesson immediately."
 msgstr "Sem pré-requisitos. Os alunos podem começar esta lição imediatamente."
 
 #: templates/dashboard/curriculum/lesson_detail.html:561
-#| msgid "Details"
 msgid "Show details"
 msgstr "Mostrar detalhes"
 
 #: templates/dashboard/curriculum/lesson_detail.html:564
-#| msgid "No content"
 msgid "Step content"
 msgstr "Conteúdo do passo"
 
 #: templates/dashboard/curriculum/lesson_detail.html:580
-#| msgid "Edit figure — Exit ticket question"
 msgid "Exit-ticket questions"
 msgstr "Perguntas da ficha de saída"
 
 #: templates/dashboard/curriculum/lesson_detail.html:596
-msgid "Answer-key mismatches (Layer 2 — most damaging class; questions dropped)"
-msgstr "Discrepâncias na chave de respostas (camada 2 — a classe mais prejudicial; perguntas removidas)"
+msgid ""
+"Answer-key mismatches (Layer 2 — most damaging class; questions dropped)"
+msgstr ""
+"Discrepâncias na chave de respostas (camada 2 — a classe mais prejudicial; "
+"perguntas removidas)"
 
 #: templates/dashboard/curriculum/lesson_detail.html:634
 #: templates/dashboard/curriculum/process.html:388
@@ -2632,21 +3047,20 @@ msgid "Teacher reviewed and approved"
 msgstr "Revisto e aprovado pelo professor"
 
 #: templates/dashboard/curriculum/lesson_detail.html:666
-#| msgid "Teacher override:"
 msgid "Teacher edited"
 msgstr "Editado pelo professor"
 
 #: templates/dashboard/curriculum/lesson_detail.html:714
-#| msgid "Regenerate"
 msgid "Regen audit:"
 msgstr "Auditoria de regeneração:"
 
 #: templates/dashboard/curriculum/lesson_detail.html:778
 msgid "e.g. make this shorter / less abstract / add a Seychelles example"
-msgstr "ex.: tornar mais curto / menos abstracto / acrescentar um exemplo das Seicheles"
+msgstr ""
+"ex.: tornar mais curto / menos abstracto / acrescentar um exemplo das "
+"Seicheles"
 
 #: templates/dashboard/curriculum/lesson_detail.html:811
-#| msgid "Save mode"
 msgid "Save to Step"
 msgstr "Guardar no passo"
 
@@ -2656,7 +3070,6 @@ msgid "Discard"
 msgstr "Descartar"
 
 #: templates/dashboard/curriculum/lesson_detail.html:830
-#| msgid "Expected"
 msgid "Expected:"
 msgstr "Esperado:"
 
@@ -2678,17 +3091,14 @@ msgid "Edit Step"
 msgstr "Editar Passo"
 
 #: templates/dashboard/curriculum/lesson_detail.html:905
-#| msgid "No courses generated for %(g)s yet."
 msgid "No steps generated yet."
 msgstr "Ainda não foram gerados passos."
 
 #: templates/dashboard/curriculum/lesson_detail.html:959
-#| msgid "AI judge verdicts at edit time"
 msgid "No AI judge verdict on file"
 msgstr "Sem veredicto do avaliador de IA registado"
 
 #: templates/dashboard/curriculum/lesson_detail.html:998
-#| msgid "Teaching objective"
 msgid "Teaching objective:"
 msgstr "Objectivo de ensino:"
 
@@ -2698,7 +3108,6 @@ msgid "Question figure"
 msgstr "Figura da pergunta"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1104
-#| msgid "Model Name"
 msgid "Model answer:"
 msgstr "Resposta-modelo:"
 
@@ -2708,17 +3117,24 @@ msgid "Explanation:"
 msgstr "Explicação:"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1172
-msgid "e.g. simpler wording / focus on the geological process / replace this distractor"
-msgstr "ex.: linguagem mais simples / focar o processo geológico / substituir este distractor"
+msgid ""
+"e.g. simpler wording / focus on the geological process / replace this "
+"distractor"
+msgstr ""
+"ex.: linguagem mais simples / focar o processo geológico / substituir este "
+"distractor"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1207
-msgid "e.g. make the distractors more plausible / simpler wording / focus on the scientific term"
-msgstr "ex.: tornar os distractores mais plausíveis / linguagem mais simples / focar o termo científico"
+msgid ""
+"e.g. make the distractors more plausible / simpler wording / focus on the "
+"scientific term"
+msgstr ""
+"ex.: tornar os distractores mais plausíveis / linguagem mais simples / focar "
+"o termo científico"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1229
 #: templates/dashboard/curriculum/lesson_detail.html:1275
 #: templates/dashboard/summative/review.html:227
-#| msgid "Question figure"
 msgid "Question"
 msgstr "Pergunta"
 
@@ -2731,17 +3147,14 @@ msgstr "Correto"
 #: templates/dashboard/curriculum/lesson_detail.html:1250
 #: templates/dashboard/curriculum/lesson_detail.html:1361
 #: templates/dashboard/summative/review.html:280
-#| msgid "Explanation:"
 msgid "Explanation"
 msgstr "Explicação"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1261
-#| msgid "Save School Settings"
 msgid "Save to Question"
 msgstr "Guardar na pergunta"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1300
-#| msgid "Expected Answer"
 msgid "Correct Answer"
 msgstr "Resposta correcta"
 
@@ -2759,13 +3172,11 @@ msgid "Pairs (one per line: term = definition)"
 msgstr "Pares (um por linha: termo = definição)"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1332
-#| msgid "Description"
 msgid "Data description"
 msgstr "Descrição dos dados"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1337
 #: templates/dashboard/summative/review.html:257
-#| msgid "Model Name"
 msgid "Model answer"
 msgstr "Resposta-modelo"
 
@@ -2784,13 +3195,15 @@ msgid "Concept Tag"
 msgstr "Etiqueta do conceito"
 
 #: templates/dashboard/curriculum/lesson_detail.html:1379
-#| msgid "No courses generated for %(g)s yet."
 msgid "No exit questions generated yet."
 msgstr "Ainda não foram geradas perguntas de saída."
 
 #: templates/dashboard/curriculum/lesson_detail.html:1380
-msgid "Exit questions will be generated when you regenerate the lesson content."
-msgstr "As perguntas de saída serão geradas quando voltar a gerar o conteúdo da lição."
+msgid ""
+"Exit questions will be generated when you regenerate the lesson content."
+msgstr ""
+"As perguntas de saída serão geradas quando voltar a gerar o conteúdo da "
+"lição."
 
 #: templates/dashboard/curriculum/list.html:4
 #: templates/dashboard/curriculum/list.html:5
@@ -2930,7 +3343,8 @@ msgstr "Iniciar processamento"
 
 #: templates/dashboard/curriculum/process.html:335
 msgid "This may take a few minutes. This page refreshes automatically."
-msgstr "Isto pode demorar alguns minutos. Esta página actualiza-se automaticamente."
+msgstr ""
+"Isto pode demorar alguns minutos. Esta página actualiza-se automaticamente."
 
 #: templates/dashboard/curriculum/process.html:365
 msgid "Review & Edit Structure"
@@ -3001,42 +3415,34 @@ msgid "Add EO"
 msgstr "Adicionar OE"
 
 #: templates/dashboard/curriculum/process.html:451
-#| msgid "Lesson Title *"
 msgid "Lesson title"
 msgstr "Título da lição"
 
 #: templates/dashboard/curriculum/process.html:452
-#| msgid "Learning Objective"
 msgid "Learning objective"
 msgstr "Objectivo de aprendizagem"
 
 #: templates/dashboard/curriculum/process.html:458
-#| msgid "Learning Objective"
 msgid "Lesson Terminal Objectives"
 msgstr "Objectivos terminais da lição"
 
 #: templates/dashboard/curriculum/process.html:474
-#| msgid "Teaching objectives"
 msgid "Teaching Steps"
 msgstr "Passos de ensino"
 
 #: templates/dashboard/curriculum/process.html:484
-#| msgid "Review Lesson"
 msgid "Remove lesson"
 msgstr "Remover lição"
 
 #: templates/dashboard/curriculum/process.html:503
-#| msgid "Generate Content"
 msgid "Generate tutoring steps"
 msgstr "Gerar passos de tutoria"
 
 #: templates/dashboard/curriculum/process.html:507
-#| msgid "Generated"
 msgid "Generate media"
 msgstr "Gerar materiais visuais"
 
 #: templates/dashboard/curriculum/process.html:511
-#| msgid "Generate Content"
 msgid "Generate exit tickets"
 msgstr "Gerar fichas de saída"
 
@@ -3053,7 +3459,6 @@ msgid "Re-upload"
 msgstr "Carregamento em Massa"
 
 #: templates/dashboard/curriculum/process.html:541
-#| msgid "Edit Details"
 msgid "View details"
 msgstr "Ver detalhes"
 
@@ -3284,11 +3689,12 @@ msgstr ""
 "Classe' (p. ex. 'Geografia S3')."
 
 #: templates/dashboard/curriculum/upload.html:310
-#| msgid ""
-#| "Leave blank to use the subject label. Course title becomes 'Display name "
-#| "Grade' (e.g. 'Geography S3')."
-msgid "Leave blank to use the subject label. Course title becomes 'Display name Grade' (e.g. 'Biologia 10ª Classe')."
-msgstr "Deixe em branco para usar a etiqueta da disciplina. O título do curso passa a ser 'Nome visível Ano' (ex.: 'Biologia 10ª Classe')."
+msgid ""
+"Leave blank to use the subject label. Course title becomes 'Display name "
+"Grade' (e.g. 'Biologia 10ª Classe')."
+msgstr ""
+"Deixe em branco para usar a etiqueta da disciplina. O título do curso passa "
+"a ser 'Nome visível Ano' (ex.: 'Biologia 10ª Classe')."
 
 #: templates/dashboard/curriculum/upload.html:316
 msgid "Grade Levels to Process"
@@ -3307,27 +3713,36 @@ msgid "Page range (optional — for multi-grade PDFs)"
 msgstr "Intervalo de páginas (opcional — para PDF com vários anos)"
 
 #: templates/dashboard/curriculum/upload.html:339
-#| msgid "First name"
 msgid "First page"
 msgstr "Primeira página"
 
 #: templates/dashboard/curriculum/upload.html:345
-#| msgid "Last name"
 msgid "Last page"
 msgstr "Última página"
 
 #: templates/dashboard/curriculum/upload.html:348
-#| msgid "Send"
 msgid "end"
 msgstr "fim"
 
 #: templates/dashboard/curriculum/upload.html:352
-msgid "Leave blank to read the whole document and auto-detect grade(s) from its content. To upload one grade at a time from a syllabus that covers several, enter the first and last page for that grade — and select just that one grade above."
-msgstr "Deixe em branco para ler o documento inteiro e detectar automaticamente o ano ou anos a partir do conteúdo. Para carregar um ano de cada vez a partir de um programa que abrange vários, indique a primeira e a última página desse ano — e seleccione apenas esse ano acima."
+msgid ""
+"Leave blank to read the whole document and auto-detect grade(s) from its "
+"content. To upload one grade at a time from a syllabus that covers several, "
+"enter the first and last page for that grade — and select just that one "
+"grade above."
+msgstr ""
+"Deixe em branco para ler o documento inteiro e detectar automaticamente o "
+"ano ou anos a partir do conteúdo. Para carregar um ano de cada vez a partir "
+"de um programa que abrange vários, indique a primeira e a última página "
+"desse ano — e seleccione apenas esse ano acima."
 
 #: templates/dashboard/curriculum/upload.html:356
-msgid "You've set a page range — these pages should belong to a single grade. Select just one grade above."
-msgstr "Definiu um intervalo de páginas — estas páginas devem pertencer a um único ano. Seleccione apenas um ano acima."
+msgid ""
+"You've set a page range — these pages should belong to a single grade. "
+"Select just one grade above."
+msgstr ""
+"Definiu um intervalo de páginas — estas páginas devem pertencer a um único "
+"ano. Seleccione apenas um ano acima."
 
 #: templates/dashboard/curriculum/upload.html:362
 msgid "Target Lesson Duration"
@@ -3577,7 +3992,7 @@ msgstr "Página %(current)s de %(total)s"
 
 #: templates/dashboard/feedback/list.html:102
 #: templates/dashboard/flagged_sessions.html:113
-#: templates/dashboard/students/list.html:106 templates/docs/section.html:67
+#: templates/dashboard/students/list.html:106 templates/docs/section.html:80
 msgid "Next"
 msgstr "Seguinte"
 
@@ -3638,13 +4053,11 @@ msgstr[0] "%(count)s mensagem"
 msgstr[1] "%(count)s mensagem"
 
 #: templates/dashboard/flagged_sessions.html:7
-#| msgid "Preview"
 msgid "Safety review"
 msgstr "Revisão de segurança"
 
 #: templates/dashboard/flagged_sessions.html:19
 #: templates/dashboard/flagged_sessions.html:30
-#| msgid "Review Structure"
 msgid "Review queue"
 msgstr "Fila de revisão"
 
@@ -3662,7 +4075,6 @@ msgid "Queue is clear."
 msgstr "A fila está vazia."
 
 #: templates/dashboard/flagged_sessions.html:25
-#| msgid "Flagged At"
 msgid "Flagged all time"
 msgstr "Sinalizadas desde sempre"
 
@@ -3684,7 +4096,6 @@ msgid "Why it was flagged"
 msgstr "Porque foi sinalizada"
 
 #: templates/dashboard/flagged_sessions.html:59
-#| msgid "Flagged At"
 msgid "Flagged"
 msgstr "Sinalizada"
 
@@ -3696,12 +4107,11 @@ msgid "Actions"
 msgstr "Ações"
 
 #: templates/dashboard/flagged_sessions.html:102
-#| msgid "Flagged Chats"
 msgid "Flagged chat pages"
 msgstr "Páginas de conversas sinalizadas"
 
 #: templates/dashboard/flagged_sessions.html:105
-#: templates/dashboard/students/list.html:98 templates/docs/section.html:58
+#: templates/dashboard/students/list.html:98 templates/docs/section.html:71
 msgid "Previous"
 msgstr "Anterior"
 
@@ -3710,11 +4120,14 @@ msgid "Nothing waiting for review"
 msgstr "Nada à espera de revisão"
 
 #: templates/dashboard/flagged_sessions.html:120
-msgid "The safety judge has not flagged any new conversations. Flags you have already closed are under Reviewed."
-msgstr "O avaliador de segurança não sinalizou novas conversas. As sinalizações que já encerrou estão em Revistas."
+msgid ""
+"The safety judge has not flagged any new conversations. Flags you have "
+"already closed are under Reviewed."
+msgstr ""
+"O avaliador de segurança não sinalizou novas conversas. As sinalizações que "
+"já encerrou estão em Revistas."
 
 #: templates/dashboard/flagged_sessions.html:122
-#| msgid "No flagged chat sessions found for this filter."
 msgid "No flagged chats for this filter"
 msgstr "Nenhuma conversa sinalizada para este filtro"
 
@@ -3732,7 +4145,8 @@ msgstr "Mais urgentes primeiro"
 
 #: templates/dashboard/home.html:45
 msgid "Nothing needs review. No safety flags, no students going backwards."
-msgstr "Nada precisa de revisão. Sem sinalizações de segurança e sem alunos a piorar."
+msgstr ""
+"Nada precisa de revisão. Sem sinalizações de segurança e sem alunos a piorar."
 
 #: templates/dashboard/home.html:58
 msgid "Showing"
@@ -3741,7 +4155,9 @@ msgstr "A mostrar"
 #: templates/dashboard/home.html:79
 #, python-format
 msgid "Download the rows behind every figure on this page, for %(label)s"
-msgstr "Descarregar os dados por detrás de todos os números desta página, para %(label)s"
+msgstr ""
+"Descarregar os dados por detrás de todos os números desta página, para "
+"%(label)s"
 
 #: templates/dashboard/home.html:80
 msgid "Export this period"
@@ -3760,23 +4176,19 @@ msgid "To"
 msgstr "Até"
 
 #: templates/dashboard/home.html:94
-#| msgid "Apply"
 msgid "Apply range"
 msgstr "Aplicar intervalo"
 
 #: templates/dashboard/home.html:106
-#| msgid "Edit figure"
 msgid "Headline figures"
 msgstr "Números principais"
 
 #: templates/dashboard/home.html:107
 #, python-format
-#| msgid "%(count)s active this week"
 msgid "%(count)s active this period"
 msgstr "%(count)s activos neste período"
 
 #: templates/dashboard/home.html:108
-#| msgid "Student Tutoring Model"
 msgid "Students on roll"
 msgstr "Alunos inscritos"
 
@@ -3786,31 +4198,39 @@ msgid "%(n)s reached the exit ticket (%(pct)s%%)"
 msgstr "%(n)s chegaram à ficha de saída (%(pct)s%%)"
 
 #: templates/dashboard/home.html:111
-msgid "Sessions that got as far as the exit ticket. The rest stopped during the lesson, which means they produced no assessment evidence at all."
-msgstr "Sessões que chegaram à ficha de saída. As restantes pararam durante a lição, o que significa que não produziram qualquer evidência de avaliação."
+msgid ""
+"Sessions that got as far as the exit ticket. The rest stopped during the "
+"lesson, which means they produced no assessment evidence at all."
+msgstr ""
+"Sessões que chegaram à ficha de saída. As restantes pararam durante a lição, "
+"o que significa que não produziram qualquer evidência de avaliação."
 
 #: templates/dashboard/home.html:112
-#| msgid "Lessons Mastered"
 msgid "Sessions started"
 msgstr "Sessões iniciadas"
 
 #: templates/dashboard/home.html:123
 #, python-format
-#| msgid "%(attempted)s of %(total)s attempted"
 msgid "%(n)s of %(total)s who attempted"
 msgstr "%(n)s de %(total)s que tentaram"
 
 #: templates/dashboard/home.html:124
-msgid "Of the students who attempted an exit ticket in this period, the share who passed at least one. A lesson's pass mark is its mastery threshold, so passing is mastering that lesson. Counted over the same sessions as the figures beside it, so it moves with the period above."
-msgstr "Dos alunos que tentaram uma ficha de saída neste período, a proporção dos que passaram pelo menos uma. A nota de passagem de uma lição é o seu limiar de domínio, por isso passar equivale a dominar a lição. Contado sobre as mesmas sessões dos números ao lado, pelo que acompanha o período acima."
+msgid ""
+"Of the students who attempted an exit ticket in this period, the share who "
+"passed at least one. A lesson's pass mark is its mastery threshold, so "
+"passing is mastering that lesson. Counted over the same sessions as the "
+"figures beside it, so it moves with the period above."
+msgstr ""
+"Dos alunos que tentaram uma ficha de saída neste período, a proporção dos "
+"que passaram pelo menos uma. A nota de passagem de uma lição é o seu limiar "
+"de domínio, por isso passar equivale a dominar a lição. Contado sobre as "
+"mesmas sessões dos números ao lado, pelo que acompanha o período acima."
 
 #: templates/dashboard/home.html:125
-#| msgid "Student answer"
 msgid "Students mastering"
 msgstr "Alunos a dominar"
 
 #: templates/dashboard/home.html:135
-#| msgid "Sessions Over Time"
 msgid "Sessions over time"
 msgstr "Sessões ao longo do tempo"
 
@@ -3924,7 +4344,6 @@ msgid "Session Report — %(title)s"
 msgstr "Relatório da Sessão — %(title)s"
 
 #: templates/dashboard/lesson_session_report.html:4
-#| msgid "Session Report"
 msgid "Session report"
 msgstr "Relatório da sessão"
 
@@ -4712,7 +5131,6 @@ msgid "Confirm New Password"
 msgstr "Confirmar Nova Palavra-passe"
 
 #: templates/dashboard/settings.html:291
-#| msgid "Delete my account"
 msgid "Deleting your account"
 msgstr "Eliminar a sua conta"
 
@@ -4725,11 +5143,14 @@ msgstr ""
 "Contacta outro administrador para remover a tua conta."
 
 #: templates/dashboard/settings.html:307
-#| msgid ""
-#| "Super Admin accounts cannot be deleted from this page. Contact another "
-#| "administrator to remove your account."
-msgid "Your account cannot be deleted from this page. Contact your school administrator to have it removed — they can also disable it immediately if you have lost access."
-msgstr "A sua conta não pode ser eliminada nesta página. Contacte o administrador da sua escola para a remover — também a pode desactivar imediatamente se perdeu o acesso."
+msgid ""
+"Your account cannot be deleted from this page. Contact your school "
+"administrator to have it removed — they can also disable it immediately if "
+"you have lost access."
+msgstr ""
+"A sua conta não pode ser eliminada nesta página. Contacte o administrador da "
+"sua escola para a remover — também a pode desactivar imediatamente se perdeu "
+"o acesso."
 
 #: templates/dashboard/settings.html:322
 msgid "Appearance & Branding"
@@ -4964,7 +5385,6 @@ msgstr "Nome do Modelo"
 
 #: templates/dashboard/settings.html:559 templates/dashboard/settings.html:612
 #: templates/dashboard/settings.html:665
-#| msgid "Choose a username"
 msgid "Choose a model"
 msgstr "Escolher um modelo"
 
@@ -5102,7 +5522,6 @@ msgid "Icon"
 msgstr "Ícone"
 
 #: templates/dashboard/settings.html:761
-#| msgid "Name (e.g. Friendly)"
 msgid "e.g. Friendly"
 msgstr "ex.: Simpático"
 
@@ -5115,8 +5534,12 @@ msgid "Prompt modifier"
 msgstr "Modificador do prompt"
 
 #: templates/dashboard/settings.html:774
-msgid "Injected into the tutor system prompt — e.g. Use short sentences and lots of encouragement."
-msgstr "Inserido no prompt de sistema do tutor — ex.: Use frases curtas e muito incentivo."
+msgid ""
+"Injected into the tutor system prompt — e.g. Use short sentences and lots of "
+"encouragement."
+msgstr ""
+"Inserido no prompt de sistema do tutor — ex.: Use frases curtas e muito "
+"incentivo."
 
 #: templates/dashboard/settings.html:776
 msgid "Add Personality"
@@ -5644,31 +6067,26 @@ msgstr "Ainda sem sessões"
 
 #: templates/dashboard/students/list.html:7
 #, python-format
-#| msgid "%(n)s open"
 msgid "%(n)s on roll"
 msgid_plural "%(n)s on roll"
 msgstr[0] "%(n)s inscrito"
 msgstr[1] "%(n)s inscritos"
 
 #: templates/dashboard/students/list.html:18
-#| msgid "Search students..."
 msgid "Search students by name"
 msgstr "Procurar alunos por nome"
 
 #: templates/dashboard/students/list.html:20
-#| msgid "Search students..."
 msgid "Search students…"
 msgstr "Procurar alunos…"
 
 #: templates/dashboard/students/list.html:35
 #: templates/dashboard/students/list.html:69
 #: templates/dashboard/students/list.html:71
-#| msgid "Lessons Mastered"
 msgid "Lessons mastered"
 msgstr "Lições dominadas"
 
 #: templates/dashboard/students/list.html:36
-#| msgid "Last Active"
 msgid "Last active"
 msgstr "Última actividade"
 
@@ -5677,12 +6095,10 @@ msgid "Never"
 msgstr "Nunca"
 
 #: templates/dashboard/students/list.html:91
-#| msgid "No students in this school yet."
 msgid "No students match that search."
 msgstr "Nenhum aluno corresponde a essa pesquisa."
 
 #: templates/dashboard/students/list.html:95
-#| msgid "Student's last name"
 msgid "Student list pages"
 msgstr "Páginas da lista de alunos"
 
@@ -5691,10 +6107,11 @@ msgid "No students yet"
 msgstr "Ainda sem alunos"
 
 #: templates/dashboard/students/list.html:113
-#| msgid ""
-#| "Students will appear here once they join and complete their profiles."
-msgid "Students appear here once they join your institution and complete a profile."
-msgstr "Os alunos aparecem aqui assim que aderirem à sua instituição e completarem um perfil."
+msgid ""
+"Students appear here once they join your institution and complete a profile."
+msgstr ""
+"Os alunos aparecem aqui assim que aderirem à sua instituição e completarem "
+"um perfil."
 
 #: templates/dashboard/summative/review.html:5
 #: templates/dashboard/summative/review.html:6
@@ -5804,12 +6221,10 @@ msgid "Last attempted"
 msgstr "Última tentativa"
 
 #: templates/dashboard/summative/review.html:141
-#| msgid "Attempts taken in a group session vs solo"
 msgid "Best score earned in a group session"
 msgstr "Melhor nota obtida numa sessão de grupo"
 
 #: templates/dashboard/summative/review.html:148
-#| msgid "Attempts taken in a group session vs solo"
 msgid "Latest attempt was a group session"
 msgstr "A última tentativa foi uma sessão de grupo"
 
@@ -5855,21 +6270,22 @@ msgid "Who are you?"
 msgstr "Quem é?"
 
 #: templates/desktop/claim.html:9
-#| msgid "Enter your username"
 msgid "Find your name"
 msgstr "Encontre o seu nome"
 
 #: templates/desktop/claim.html:11
-msgid "Pick your name from your school's list, then choose a password. You'll use that password to sign in from now on."
-msgstr "Escolha o seu nome na lista da sua escola e defina uma palavra-passe. Passará a usar essa palavra-passe para iniciar sessão."
+msgid ""
+"Pick your name from your school's list, then choose a password. You'll use "
+"that password to sign in from now on."
+msgstr ""
+"Escolha o seu nome na lista da sua escola e defina uma palavra-passe. "
+"Passará a usar essa palavra-passe para iniciar sessão."
 
 #: templates/desktop/claim.html:22
-#| msgid "Enter your username"
 msgid "Search your name"
 msgstr "Procurar o seu nome"
 
 #: templates/desktop/claim.html:43
-#| msgid "Change password"
 msgid "Choose a password"
 msgstr "Escolha uma palavra-passe"
 
@@ -5879,7 +6295,8 @@ msgstr "Sou eu — começar a aprender"
 
 #: templates/desktop/claim.html:53
 msgid "No match. Check the spelling, or ask your teacher."
-msgstr "Sem correspondência. Verifique a ortografia ou fale com o seu professor."
+msgstr ""
+"Sem correspondência. Verifique a ortografia ou fale com o seu professor."
 
 #: templates/desktop/claim.html:55
 msgid "Everyone on this device's list has already been set up."
@@ -5895,8 +6312,12 @@ msgid "Already set up? Sign in"
 msgstr "Já está configurado? Inicie sessão"
 
 #: templates/desktop/server.html:60
-msgid "Optional. This computer teaches without a connection — an address here only lets finished work reach your school's server."
-msgstr "Opcional. Este computador ensina sem ligação — um endereço aqui apenas permite que o trabalho concluído chegue ao servidor da sua escola."
+msgid ""
+"Optional. This computer teaches without a connection — an address here only "
+"lets finished work reach your school's server."
+msgstr ""
+"Opcional. Este computador ensina sem ligação — um endereço aqui apenas "
+"permite que o trabalho concluído chegue ao servidor da sua escola."
 
 #: templates/desktop/server.html:76
 msgid "Set by your administrator"
@@ -5904,8 +6325,12 @@ msgstr "Definido pelo seu administrador"
 
 #: templates/desktop/server.html:78
 #, python-format
-msgid "This computer is set to use <code>%(server)s</code>. To change it, contact whoever set it up."
-msgstr "Este computador está configurado para usar <code>%(server)s</code>. Para alterar, contacte quem o configurou."
+msgid ""
+"This computer is set to use <code>%(server)s</code>. To change it, contact "
+"whoever set it up."
+msgstr ""
+"Este computador está configurado para usar <code>%(server)s</code>. Para "
+"alterar, contacte quem o configurou."
 
 #: templates/desktop/server.html:88
 msgid "Server address"
@@ -5913,7 +6338,9 @@ msgstr "Endereço do servidor"
 
 #: templates/desktop/server.html:89
 msgid "The web address teachers use to sign in. Your administrator has it."
-msgstr "O endereço web que os professores usam para iniciar sessão. O seu administrador tem-no."
+msgstr ""
+"O endereço web que os professores usam para iniciar sessão. O seu "
+"administrador tem-no."
 
 #: templates/desktop/server.html:91
 msgid "Address"
@@ -5924,21 +6351,24 @@ msgid "Example: tutor.education.gov.xx"
 msgstr "Exemplo: tutor.education.gov.xx"
 
 #: templates/desktop/server.html:107
-#| msgid "Sign in"
 msgid "Signed in"
 msgstr "Sessão iniciada"
 
 #: templates/desktop/server.html:110
 #, python-format
 msgid "Signed in as %(who)s. Finished work is sent automatically."
-msgstr "Sessão iniciada como %(who)s. O trabalho concluído é enviado automaticamente."
+msgstr ""
+"Sessão iniciada como %(who)s. O trabalho concluído é enviado automaticamente."
 
 #: templates/desktop/server.html:114
-msgid "Use the same username and password you use on the school website. After this you can sign in on this computer with no internet."
-msgstr "Use o mesmo nome de utilizador e palavra-passe do site da escola. Depois disto poderá iniciar sessão neste computador sem Internet."
+msgid ""
+"Use the same username and password you use on the school website. After this "
+"you can sign in on this computer with no internet."
+msgstr ""
+"Use o mesmo nome de utilizador e palavra-passe do site da escola. Depois "
+"disto poderá iniciar sessão neste computador sem Internet."
 
 #: templates/desktop/server.html:133
-#| msgid "Sign in"
 msgid "Sign in again"
 msgstr "Iniciar sessão de novo"
 
@@ -5948,28 +6378,37 @@ msgstr "Trabalhar apenas offline"
 
 #: templates/desktop/server.html:143
 msgid "Removes the address. Lessons and student work stay on this computer."
-msgstr "Remove o endereço. As lições e o trabalho dos alunos ficam neste computador."
+msgstr ""
+"Remove o endereço. As lições e o trabalho dos alunos ficam neste computador."
 
 #: templates/desktop/server.html:148
 msgid "Clear address"
 msgstr "Limpar endereço"
 
 #: templates/desktop/server.html:161
-#| msgid "Back to Course"
 msgid "Back to setup"
 msgstr "Voltar à configuração"
 
 #: templates/docs/base.html:8
-msgid "How a country adopts the AI Tutor: what it adapts, what it must decide, what it costs, and how to get a first cohort teaching."
-msgstr "Como um país adopta o AI Tutor: o que adapta, o que tem de decidir, quanto custa e como pôr uma primeira turma a aprender."
+msgid ""
+"How a country adopts the AI Tutor: what it adapts, what it must decide, what "
+"it costs, and how to get a first cohort teaching."
+msgstr ""
+"Como um país adopta o AI Tutor: o que adapta, o que tem de decidir, quanto "
+"custa e como pôr uma primeira turma a aprender."
 
 #: templates/docs/base.html:35
 msgid "Skip to the documentation"
 msgstr "Ir para a documentação"
 
 #: templates/docs/index.html:27
-msgid "Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, what it costs, and how to get a first cohort teaching."
-msgstr "Adoptar o AI Tutor num sistema nacional de educação — o que se adapta, o que é preciso decidir, quanto custa e como pôr uma primeira turma a aprender."
+msgid ""
+"Adopting the AI Tutor in a national education system — what a country "
+"adapts, what it must decide, what it costs, and how to get a first cohort "
+"teaching."
+msgstr ""
+"Adoptar o AI Tutor num sistema nacional de educação — o que se adapta, o que "
+"é preciso decidir, quanto custa e como pôr uma primeira turma a aprender."
 
 #: templates/docs/index.html:35 templates/docs/index.html:38
 msgid "Search the playbook"
@@ -5992,20 +6431,11 @@ msgstr "Manual v%(version)s"
 msgid "Print"
 msgstr "Imprimir"
 
-#: templates/docs/index.html:71
-msgid "Part I"
-msgstr "Parte I"
-
-#: templates/docs/index.html:84
-msgid "Part II"
-msgstr "Parte II"
-
 #: templates/docs/index.html:98
 msgid "About this document"
 msgstr "Sobre este documento"
 
 #: templates/docs/index.html:100
-#| msgid "Session"
 msgid "Version"
 msgstr "Versão"
 
@@ -6018,12 +6448,14 @@ msgid "Costs"
 msgstr "Custos"
 
 #: templates/docs/section.html:30 templates/docs/section.html:31
-#| msgid "First name"
 msgid "On this page"
 msgstr "Nesta página"
 
-#: templates/docs/section.html:53
-#| msgid "Open navigation"
+#: templates/docs/section.html:56
+msgid "This section has not been translated yet, and is shown in English."
+msgstr "Esta secção ainda não foi traduzida e é apresentada em inglês."
+
+#: templates/docs/section.html:66
 msgid "Section navigation"
 msgstr "Navegação da secção"
 
@@ -6032,48 +6464,76 @@ msgid "Running it for a whole school?"
 msgstr "Vai usar numa escola inteira?"
 
 #: templates/downloads/index.html:146
-msgid "The desktop app teaches one student on one computer. To run the full platform — teacher dashboards, student accounts, a shared curriculum — install it on a server instead."
-msgstr "A aplicação para computador ensina um aluno num computador. Para executar a plataforma completa — painéis de professor, contas de aluno, um currículo partilhado — instale-a antes num servidor."
+msgid ""
+"The desktop app teaches one student on one computer. To run the full "
+"platform — teacher dashboards, student accounts, a shared curriculum — "
+"install it on a server instead."
+msgstr ""
+"A aplicação para computador ensina um aluno num computador. Para executar a "
+"plataforma completa — painéis de professor, contas de aluno, um currículo "
+"partilhado — instale-a antes num servidor."
 
 #: templates/downloads/index.html:153
 msgid "Self-hosting instructions"
 msgstr "Instruções de alojamento próprio"
 
 #: templates/downloads/self_hosting.html:146
-#| msgid "AI Tutor terms"
 msgid "Run AI Tutor yourself"
 msgstr "Execute o AI Tutor por si próprio"
 
 #: templates/downloads/self_hosting.html:148
 msgid "On your own server, with student data inside your own borders."
-msgstr "No seu próprio servidor, com os dados dos alunos dentro das suas fronteiras."
+msgstr ""
+"No seu próprio servidor, com os dados dos alunos dentro das suas fronteiras."
 
 #: templates/downloads/self_hosting.html:153
 msgid "Where data goes."
 msgstr "Para onde vão os dados."
 
 #: templates/downloads/self_hosting.html:154
-msgid "Course material, uploaded figures and student records stay in your database and on your disk. Embeddings are computed locally — the <code>all-MiniLM-L6-v2</code> model runs inside the app container, so your curriculum is never sent anywhere to be indexed. But <strong>the text of each student message is sent to Anthropic, OpenAI or Google to be answered</strong>, leaving your network. If that is not acceptable, run a local model instead — see below."
-msgstr "O material dos cursos, as figuras carregadas e os registos dos alunos ficam na sua base de dados e no seu disco. Os embeddings são calculados localmente — o modelo <code>all-MiniLM-L6-v2</code> corre dentro do contentor da aplicação, por isso o seu currículo nunca é enviado para lado nenhum para ser indexado. Mas <strong>o texto de cada mensagem do aluno é enviado à Anthropic, OpenAI ou Google para ser respondido</strong>, saindo da sua rede. Se isso não for aceitável, execute antes um modelo local — ver abaixo."
+msgid ""
+"Course material, uploaded figures and student records stay in your database "
+"and on your disk. Embeddings are computed locally — the <code>all-MiniLM-L6-"
+"v2</code> model runs inside the app container, so your curriculum is never "
+"sent anywhere to be indexed. But <strong>the text of each student message is "
+"sent to Anthropic, OpenAI or Google to be answered</strong>, leaving your "
+"network. If that is not acceptable, run a local model instead — see below."
+msgstr ""
+"O material dos cursos, as figuras carregadas e os registos dos alunos ficam "
+"na sua base de dados e no seu disco. Os embeddings são calculados localmente "
+"— o modelo <code>all-MiniLM-L6-v2</code> corre dentro do contentor da "
+"aplicação, por isso o seu currículo nunca é enviado para lado nenhum para "
+"ser indexado. Mas <strong>o texto de cada mensagem do aluno é enviado à "
+"Anthropic, OpenAI ou Google para ser respondido</strong>, saindo da sua "
+"rede. Se isso não for aceitável, execute antes um modelo local — ver abaixo."
 
 #: templates/downloads/self_hosting.html:165
 msgid "First start needs internet"
 msgstr "O primeiro arranque precisa de Internet"
 
 #: templates/downloads/self_hosting.html:166
-msgid "even with a local model: the app downloads the embedding model (~90 MB) from HuggingFace on first boot. For an air-gapped install, warm the cache on a connected machine first and copy the volume across."
-msgstr "mesmo com um modelo local: no primeiro arranque a aplicação descarrega o modelo de embeddings (~90 MB) do HuggingFace. Para uma instalação isolada da rede, prepare primeiro a cache numa máquina ligada e copie o volume."
+msgid ""
+"even with a local model: the app downloads the embedding model (~90 MB) from "
+"HuggingFace on first boot. For an air-gapped install, warm the cache on a "
+"connected machine first and copy the volume across."
+msgstr ""
+"mesmo com um modelo local: no primeiro arranque a aplicação descarrega o "
+"modelo de embeddings (~90 MB) do HuggingFace. Para uma instalação isolada da "
+"rede, prepare primeiro a cache numa máquina ligada e copie o volume."
 
 #: templates/downloads/self_hosting.html:176
 msgid "Pick your deployment shape before you start"
 msgstr "Escolha o formato da instalação antes de começar"
 
 #: templates/downloads/self_hosting.html:178
-msgid "Almost every install problem below comes from picking the wrong one, because the default configuration assumes the first."
-msgstr "Quase todos os problemas de instalação abaixo resultam de escolher o formato errado, porque a configuração predefinida assume o primeiro."
+msgid ""
+"Almost every install problem below comes from picking the wrong one, because "
+"the default configuration assumes the first."
+msgstr ""
+"Quase todos os problemas de instalação abaixo resultam de escolher o formato "
+"errado, porque a configuração predefinida assume o primeiro."
 
 #: templates/downloads/self_hosting.html:187
-#| msgid "Published"
 msgid "Public server"
 msgstr "Servidor público"
 
@@ -6094,7 +6554,6 @@ msgid "internet"
 msgstr "Internet"
 
 #: templates/downloads/self_hosting.html:196
-#| msgid "No schools yet."
 msgid "school network"
 msgstr "rede da escola"
 
@@ -6112,7 +6571,6 @@ msgstr "sim"
 
 #: templates/downloads/self_hosting.html:202
 #: templates/downloads/self_hosting.html:203
-#| msgid "none"
 msgid "no"
 msgstr "não"
 
@@ -6133,16 +6591,22 @@ msgid "Caddy site block"
 msgstr "Bloco de site do Caddy"
 
 #: templates/downloads/self_hosting.html:230
-#| msgid "Pending"
 msgid "Port binding"
 msgstr "Ligação de porta"
 
 #: templates/downloads/self_hosting.html:238
-msgid "The <strong>LAN-only</strong> and <strong>laptop</strong> shapes send session and CSRF cookies in the clear. Only use them where the traffic never leaves a building you control, or on a single machine. Never on café or conference wifi with real student data."
-msgstr "Os formatos <strong>apenas rede local</strong> e <strong>portátil</strong> enviam os cookies de sessão e CSRF sem encriptação. Use-os apenas onde o tráfego nunca sai de um edifício que controla, ou numa única máquina. Nunca em WiFi de café ou de conferência com dados reais de alunos."
+msgid ""
+"The <strong>LAN-only</strong> and <strong>laptop</strong> shapes send "
+"session and CSRF cookies in the clear. Only use them where the traffic never "
+"leaves a building you control, or on a single machine. Never on café or "
+"conference wifi with real student data."
+msgstr ""
+"Os formatos <strong>apenas rede local</strong> e <strong>portátil</strong> "
+"enviam os cookies de sessão e CSRF sem encriptação. Use-os apenas onde o "
+"tráfego nunca sai de um edifício que controla, ou numa única máquina. Nunca "
+"em WiFi de café ou de conferência com dados reais de alunos."
 
 #: templates/downloads/self_hosting.html:247
-#| msgid "With Content"
 msgid "With Docker"
 msgstr "Com Docker"
 
@@ -6152,8 +6616,14 @@ msgid "recommended"
 msgstr "recomendado"
 
 #: templates/downloads/self_hosting.html:249
-msgid "A Linux server with 4 vCPU, 8 GB RAM and 60 GB disk; Docker with the Compose plugin; a domain pointing at it, for the public-server shape only. Brings its own database and certificates."
-msgstr "Um servidor Linux com 4 vCPU, 8 GB de RAM e 60 GB de disco; Docker com o plugin Compose; um domínio a apontar para ele, apenas no formato de servidor público. Traz a sua própria base de dados e certificados."
+msgid ""
+"A Linux server with 4 vCPU, 8 GB RAM and 60 GB disk; Docker with the Compose "
+"plugin; a domain pointing at it, for the public-server shape only. Brings "
+"its own database and certificates."
+msgstr ""
+"Um servidor Linux com 4 vCPU, 8 GB de RAM e 60 GB de disco; Docker com o "
+"plugin Compose; um domínio a apontar para ele, apenas no formato de servidor "
+"público. Traz a sua própria base de dados e certificados."
 
 #: templates/downloads/self_hosting.html:256
 msgid "Get the deployment files"
@@ -6164,28 +6634,61 @@ msgid "Where the files land, and what to read before running them"
 msgstr "Onde ficam os ficheiros e o que ler antes de os executar"
 
 #: templates/downloads/self_hosting.html:271
-msgid "Files land <strong>flat in <code>ai-tutor/</code></strong>, not in a <code>deploy/compose/</code> subdirectory. This is also where <code>backup.sh</code> lives, so that is the directory you run it from later."
-msgstr "Os ficheiros ficam <strong>directamente em <code>ai-tutor/</code></strong>, e não numa subpasta <code>deploy/compose/</code>. É também aí que está o <code>backup.sh</code>, por isso é dessa pasta que o executará mais tarde."
+msgid ""
+"Files land <strong>flat in <code>ai-tutor/</code></strong>, not in a "
+"<code>deploy/compose/</code> subdirectory. This is also where "
+"<code>backup.sh</code> lives, so that is the directory you run it from later."
+msgstr ""
+"Os ficheiros ficam <strong>directamente em <code>ai-tutor/</code></strong>, "
+"e não numa subpasta <code>deploy/compose/</code>. É também aí que está o "
+"<code>backup.sh</code>, por isso é dessa pasta que o executará mais tarde."
 
 #: templates/downloads/self_hosting.html:279
-msgid "That first <code>docker run</code> already pulls the full image (~7 GB), so the <code>docker compose pull</code> in step 3 is usually instant."
-msgstr "Esse primeiro <code>docker run</code> já descarrega a imagem completa (~7 GB), por isso o <code>docker compose pull</code> do passo 3 costuma ser imediato."
+msgid ""
+"That first <code>docker run</code> already pulls the full image (~7 GB), so "
+"the <code>docker compose pull</code> in step 3 is usually instant."
+msgstr ""
+"Esse primeiro <code>docker run</code> já descarrega a imagem completa (~7 "
+"GB), por isso o <code>docker compose pull</code> do passo 3 costuma ser "
+"imediato."
 
 #: templates/downloads/self_hosting.html:286
-msgid "Read <code>docker-compose.yml</code> and <code>Caddyfile</code> before running them. Both are commented and short. Deployments that are not on a public domain need a different Caddy block — see <code>docs/self-hosting.md</code> in the repository."
-msgstr "Leia o <code>docker-compose.yml</code> e o <code>Caddyfile</code> antes de os executar. Ambos são curtos e comentados. As instalações que não estão num domínio público precisam de um bloco Caddy diferente — ver <code>docs/self-hosting.md</code> no repositório."
+msgid ""
+"Read <code>docker-compose.yml</code> and <code>Caddyfile</code> before "
+"running them. Both are commented and short. Deployments that are not on a "
+"public domain need a different Caddy block — see <code>docs/self-hosting.md</"
+"code> in the repository."
+msgstr ""
+"Leia o <code>docker-compose.yml</code> e o <code>Caddyfile</code> antes de "
+"os executar. Ambos são curtos e comentados. As instalações que não estão num "
+"domínio público precisam de um bloco Caddy diferente — ver <code>docs/self-"
+"hosting.md</code> no repositório."
 
 #: templates/downloads/self_hosting.html:294
-msgid "Optionally pin the exact image, so a later <code>pull</code> cannot drift from the compose file you just extracted:"
-msgstr "Opcionalmente fixe a imagem exacta, para que um <code>pull</code> posterior não divirja do ficheiro compose que acabou de extrair:"
+msgid ""
+"Optionally pin the exact image, so a later <code>pull</code> cannot drift "
+"from the compose file you just extracted:"
+msgstr ""
+"Opcionalmente fixe a imagem exacta, para que um <code>pull</code> posterior "
+"não divirja do ficheiro compose que acabou de extrair:"
 
 #: templates/downloads/self_hosting.html:305
 msgid "Configure .env"
 msgstr "Configurar o .env"
 
 #: templates/downloads/self_hosting.html:310
-msgid "<code>env.example</code> ships <strong>placeholder values, not blanks</strong> — <code>SITE_DOMAIN=tutor.education.gov.xx</code> and <code>ACME_EMAIL=ict@education.gov.xx</code>. These look filled in and are not. Replace both, or Caddy will spend thirty days failing to get a certificate for a domain that does not exist."
-msgstr "O <code>env.example</code> traz <strong>valores de exemplo, não campos vazios</strong> — <code>SITE_DOMAIN=tutor.education.gov.xx</code> e <code>ACME_EMAIL=ict@education.gov.xx</code>. Parecem preenchidos e não estão. Substitua ambos, ou o Caddy passará trinta dias a falhar na obtenção de um certificado para um domínio que não existe."
+msgid ""
+"<code>env.example</code> ships <strong>placeholder values, not blanks</"
+"strong> — <code>SITE_DOMAIN=tutor.education.gov.xx</code> and "
+"<code>ACME_EMAIL=ict@education.gov.xx</code>. These look filled in and are "
+"not. Replace both, or Caddy will spend thirty days failing to get a "
+"certificate for a domain that does not exist."
+msgstr ""
+"O <code>env.example</code> traz <strong>valores de exemplo, não campos "
+"vazios</strong> — <code>SITE_DOMAIN=tutor.education.gov.xx</code> e "
+"<code>ACME_EMAIL=ict@education.gov.xx</code>. Parecem preenchidos e não "
+"estão. Substitua ambos, ou o Caddy passará trinta dias a falhar na obtenção "
+"de um certificado para um domínio que não existe."
 
 #: templates/downloads/self_hosting.html:320
 msgid "Every required variable, and what to put in it"
@@ -6196,23 +6699,30 @@ msgid "Variable"
 msgstr "Variável"
 
 #: templates/downloads/self_hosting.html:332
-msgid "avoid <code>@ : / ?</code> — they break <code>DATABASE_URL</code> parsing"
-msgstr "evite <code>@ : / ?</code> — quebram a leitura do <code>DATABASE_URL</code>"
+msgid ""
+"avoid <code>@ : / ?</code> — they break <code>DATABASE_URL</code> parsing"
+msgstr ""
+"evite <code>@ : / ?</code> — quebram a leitura do <code>DATABASE_URL</code>"
 
 #: templates/downloads/self_hosting.html:336
-msgid "compose enforces this with <code>:?</code>. Use <code>localhost</code> if you have no domain"
-msgstr "o compose obriga a isto com <code>:?</code>. Use <code>localhost</code> se não tiver domínio"
+msgid ""
+"compose enforces this with <code>:?</code>. Use <code>localhost</code> if "
+"you have no domain"
+msgstr ""
+"o compose obriga a isto com <code>:?</code>. Use <code>localhost</code> se "
+"não tiver domínio"
 
 #: templates/downloads/self_hosting.html:340
 msgid "the hostname students will type, comma-separated if more than one"
-msgstr "o nome de anfitrião que os alunos vão escrever, separado por vírgulas se for mais do que um"
+msgstr ""
+"o nome de anfitrião que os alunos vão escrever, separado por vírgulas se for "
+"mais do que um"
 
 #: templates/downloads/self_hosting.html:344
 msgid "must include the scheme"
 msgstr "tem de incluir o esquema"
 
 #: templates/downloads/self_hosting.html:347
-#| msgid "Enter API key..."
 msgid "one provider API key"
 msgstr "uma chave de API de um fornecedor"
 
@@ -6221,11 +6731,14 @@ msgid "or use the <code>local-llm</code> profile"
 msgstr "ou use o perfil <code>local-llm</code>"
 
 #: templates/downloads/self_hosting.html:353
-msgid "Optional: <code>ACME_EMAIL</code> (only used when requesting a certificate) and <code>HTTPS_EDGE</code>."
-msgstr "Opcional: <code>ACME_EMAIL</code> (usado apenas ao pedir um certificado) e <code>HTTPS_EDGE</code>."
+msgid ""
+"Optional: <code>ACME_EMAIL</code> (only used when requesting a certificate) "
+"and <code>HTTPS_EDGE</code>."
+msgstr ""
+"Opcional: <code>ACME_EMAIL</code> (usado apenas ao pedir um certificado) e "
+"<code>HTTPS_EDGE</code>."
 
 #: templates/downloads/self_hosting.html:359
-#| msgid "Published"
 msgid "Public server:"
 msgstr "Servidor público:"
 
@@ -6234,20 +6747,31 @@ msgid "LAN-only or laptop:"
 msgstr "Apenas rede local ou portátil:"
 
 #: templates/downloads/self_hosting.html:374
-msgid "Duplicate keys are easy to introduce while editing, and the last one silently wins. Check:"
-msgstr "É fácil introduzir chaves duplicadas ao editar, e a última prevalece em silêncio. Verifique:"
+msgid ""
+"Duplicate keys are easy to introduce while editing, and the last one "
+"silently wins. Check:"
+msgstr ""
+"É fácil introduzir chaves duplicadas ao editar, e a última prevalece em "
+"silêncio. Verifique:"
 
 #: templates/downloads/self_hosting.html:382
-#| msgid "Start"
 msgid "Start it"
 msgstr "Iniciar"
 
 #: templates/downloads/self_hosting.html:389
-msgid "<strong>Wait before doing anything else.</strong> <code>up -d</code> returns when containers have <em>started</em>, not when the app is usable. First boot runs 200+ database migrations, downloads the embedding model and indexes the seeded curriculum — a couple of minutes on modest hardware."
-msgstr "<strong>Espere antes de fazer mais alguma coisa.</strong> O <code>up -d</code> devolve quando os contentores <em>arrancaram</em>, não quando a aplicação está utilizável. O primeiro arranque executa mais de 200 migrações da base de dados, descarrega o modelo de embeddings e indexa o currículo inicial — alguns minutos em hardware modesto."
+msgid ""
+"<strong>Wait before doing anything else.</strong> <code>up -d</code> returns "
+"when containers have <em>started</em>, not when the app is usable. First "
+"boot runs 200+ database migrations, downloads the embedding model and "
+"indexes the seeded curriculum — a couple of minutes on modest hardware."
+msgstr ""
+"<strong>Espere antes de fazer mais alguma coisa.</strong> O <code>up -d</"
+"code> devolve quando os contentores <em>arrancaram</em>, não quando a "
+"aplicação está utilizável. O primeiro arranque executa mais de 200 migrações "
+"da base de dados, descarrega o modelo de embeddings e indexa o currículo "
+"inicial — alguns minutos em hardware modesto."
 
 #: templates/downloads/self_hosting.html:398
-#| msgid "Create Student Account"
 msgid "Create the admin account"
 msgstr "Criar a conta de administrador"
 
@@ -6256,28 +6780,68 @@ msgid "Only after the app reports healthy."
 msgstr "Só depois de a aplicação se declarar saudável."
 
 #: templates/downloads/self_hosting.html:404
-msgid "No API key? <code>docker compose --profile local-llm up -d</code> runs a small model on the server instead. Weaker at tutoring than a cloud model, and slower without a GPU — but it needs no account anywhere and nothing leaves your network. If you already run an OpenAI-compatible endpoint of your own, point a model config at it instead."
-msgstr "Sem chave de API? O <code>docker compose --profile local-llm up -d</code> executa antes um modelo pequeno no servidor. Ensina pior do que um modelo na nuvem e é mais lento sem GPU — mas não exige conta em lado nenhum e nada sai da sua rede. Se já tem um endpoint compatível com a OpenAI, aponte antes uma configuração de modelo para ele."
+msgid ""
+"No API key? <code>docker compose --profile local-llm up -d</code> runs a "
+"small model on the server instead. Weaker at tutoring than a cloud model, "
+"and slower without a GPU — but it needs no account anywhere and nothing "
+"leaves your network. If you already run an OpenAI-compatible endpoint of "
+"your own, point a model config at it instead."
+msgstr ""
+"Sem chave de API? O <code>docker compose --profile local-llm up -d</code> "
+"executa antes um modelo pequeno no servidor. Ensina pior do que um modelo na "
+"nuvem e é mais lento sem GPU — mas não exige conta em lado nenhum e nada sai "
+"da sua rede. Se já tem um endpoint compatível com a OpenAI, aponte antes uma "
+"configuração de modelo para ele."
 
 #: templates/downloads/self_hosting.html:413
 msgid "With pip, no Docker"
 msgstr "Com pip, sem Docker"
 
 #: templates/downloads/self_hosting.html:415
-msgid "For a server where containers are not allowed. Needs Python <strong>3.12 or newer</strong> and PostgreSQL with the <code>pgvector</code> extension. You supply the database, the reverse proxy and the file ownership yourself: this path automates much less than the Docker one, and every step below that looks fussy is there because skipping it produces a failure that does not name its own cause."
-msgstr "Para um servidor onde não são permitidos contentores. Precisa de Python <strong>3.12 ou superior</strong> e de PostgreSQL com a extensão <code>pgvector</code>. A base de dados, o proxy inverso e as permissões dos ficheiros são da sua responsabilidade: este caminho automatiza muito menos do que o do Docker, e cada passo abaixo que pareça excessivo está lá porque ignorá-lo produz um erro que não indica a sua própria causa."
+msgid ""
+"For a server where containers are not allowed. Needs Python <strong>3.12 or "
+"newer</strong> and PostgreSQL with the <code>pgvector</code> extension. You "
+"supply the database, the reverse proxy and the file ownership yourself: this "
+"path automates much less than the Docker one, and every step below that "
+"looks fussy is there because skipping it produces a failure that does not "
+"name its own cause."
+msgstr ""
+"Para um servidor onde não são permitidos contentores. Precisa de Python "
+"<strong>3.12 ou superior</strong> e de PostgreSQL com a extensão "
+"<code>pgvector</code>. A base de dados, o proxy inverso e as permissões dos "
+"ficheiros são da sua responsabilidade: este caminho automatiza muito menos "
+"do que o do Docker, e cada passo abaixo que pareça excessivo está lá porque "
+"ignorá-lo produz um erro que não indica a sua própria causa."
 
 #: templates/downloads/self_hosting.html:427
 msgid "Decide the service account first."
 msgstr "Decida primeiro a conta de serviço."
 
 #: templates/downloads/self_hosting.html:428
-msgid "The generated systemd unit runs as an unprivileged user and reads files that the install steps create as root. Nothing reconciles those two automatically, so pick the account now — these commands use <code>aitutor</code>; substitute your own throughout."
-msgstr "A unidade systemd gerada corre com um utilizador sem privilégios e lê ficheiros que os passos de instalação criam como root. Nada concilia os dois automaticamente, por isso escolha já a conta — estes comandos usam <code>aitutor</code>; substitua pela sua em todo o processo."
+msgid ""
+"The generated systemd unit runs as an unprivileged user and reads files that "
+"the install steps create as root. Nothing reconciles those two "
+"automatically, so pick the account now — these commands use <code>aitutor</"
+"code>; substitute your own throughout."
+msgstr ""
+"A unidade systemd gerada corre com um utilizador sem privilégios e lê "
+"ficheiros que os passos de instalação criam como root. Nada concilia os dois "
+"automaticamente, por isso escolha já a conta — estes comandos usam "
+"<code>aitutor</code>; substitua pela sua em todo o processo."
 
 #: templates/downloads/self_hosting.html:436
-msgid "Be logged in as that account when you run <code>ai-tutor systemd</code> in step 7: it writes <code>$SUDO_USER</code>, falling back to <code>$USER</code>, into the unit's <code>User=</code> line. The PostgreSQL role created in step 3 happens to share the name; they are separate accounts and need not match."
-msgstr "Tenha sessão iniciada nessa conta quando executar <code>ai-tutor systemd</code> no passo 7: escreve <code>$SUDO_USER</code>, ou <code>$USER</code> em alternativa, na linha <code>User=</code> da unidade. O papel do PostgreSQL criado no passo 3 partilha o nome por acaso; são contas distintas e não têm de coincidir."
+msgid ""
+"Be logged in as that account when you run <code>ai-tutor systemd</code> in "
+"step 7: it writes <code>$SUDO_USER</code>, falling back to <code>$USER</"
+"code>, into the unit's <code>User=</code> line. The PostgreSQL role created "
+"in step 3 happens to share the name; they are separate accounts and need not "
+"match."
+msgstr ""
+"Tenha sessão iniciada nessa conta quando executar <code>ai-tutor systemd</"
+"code> no passo 7: escreve <code>$SUDO_USER</code>, ou <code>$USER</code> em "
+"alternativa, na linha <code>User=</code> da unidade. O papel do PostgreSQL "
+"criado no passo 3 partilha o nome por acaso; são contas distintas e não têm "
+"de coincidir."
 
 #: templates/downloads/self_hosting.html:446
 msgid "Create the virtualenv"
@@ -6288,96 +6852,188 @@ msgid "Use python3, not python3.12 — and do not skip python3-venv"
 msgstr "Use python3, não python3.12 — e não ignore o python3-venv"
 
 #: templates/downloads/self_hosting.html:455
-msgid "The version is a floor, not a pin. Distributions that have moved past 3.12 have no <code>python3.12</code> binary at all, so naming it gives you <code>sudo: python3.12: command not found</code> followed by two misleading cascade errors about <code>pip</code> and <code>ai-tutor</code> not existing."
-msgstr "A versão é um mínimo, não um valor fixo. As distribuições que já passaram do 3.12 não têm sequer o binário <code>python3.12</code>, por isso indicá-lo dá <code>sudo: python3.12: command not found</code>, seguido de dois erros em cascata enganadores sobre o <code>pip</code> e o <code>ai-tutor</code> não existirem."
+msgid ""
+"The version is a floor, not a pin. Distributions that have moved past 3.12 "
+"have no <code>python3.12</code> binary at all, so naming it gives you "
+"<code>sudo: python3.12: command not found</code> followed by two misleading "
+"cascade errors about <code>pip</code> and <code>ai-tutor</code> not existing."
+msgstr ""
+"A versão é um mínimo, não um valor fixo. As distribuições que já passaram do "
+"3.12 não têm sequer o binário <code>python3.12</code>, por isso indicá-lo dá "
+"<code>sudo: python3.12: command not found</code>, seguido de dois erros em "
+"cascata enganadores sobre o <code>pip</code> e o <code>ai-tutor</code> não "
+"existirem."
 
 #: templates/downloads/self_hosting.html:464
-msgid "Without <code>python3-venv</code>, <code>-m venv</code> can create the directory but leave no <code>pip</code> inside — which produces an error identical to the one above, for an entirely different reason."
-msgstr "Sem o <code>python3-venv</code>, o <code>-m venv</code> pode criar a pasta mas não deixar lá o <code>pip</code> — o que produz um erro idêntico ao anterior, por um motivo completamente diferente."
+msgid ""
+"Without <code>python3-venv</code>, <code>-m venv</code> can create the "
+"directory but leave no <code>pip</code> inside — which produces an error "
+"identical to the one above, for an entirely different reason."
+msgstr ""
+"Sem o <code>python3-venv</code>, o <code>-m venv</code> pode criar a pasta "
+"mas não deixar lá o <code>pip</code> — o que produz um erro idêntico ao "
+"anterior, por um motivo completamente diferente."
 
 #: templates/downloads/self_hosting.html:472
 msgid "Install the wheel"
 msgstr "Instalar o pacote wheel"
 
 #: templates/downloads/self_hosting.html:483
-msgid "Several GB and several minutes — torch arrives as a transitive dependency of the embedding stack."
-msgstr "Vários GB e vários minutos — o torch chega como dependência transitiva da camada de embeddings."
+msgid ""
+"Several GB and several minutes — torch arrives as a transitive dependency of "
+"the embedding stack."
+msgstr ""
+"Vários GB e vários minutos — o torch chega como dependência transitiva da "
+"camada de embeddings."
 
 #: templates/downloads/self_hosting.html:490
 msgid "If it stalls on “Building wheel for …”"
 msgstr "Se ficar parado em “Building wheel for …”"
 
 #: templates/downloads/self_hosting.html:492
-msgid "The <code>py3-none-any</code> tag applies to <code>ai_tutor</code> itself, not to its dependencies. If one of those has no wheel for your Python version, pip falls back to a source build. The <code>libpq-dev</code> and <code>build-essential</code> packages installed in step 1 cover the usual culprit."
-msgstr "A etiqueta <code>py3-none-any</code> aplica-se ao próprio <code>ai_tutor</code>, não às suas dependências. Se alguma delas não tiver wheel para a sua versão de Python, o pip recorre a uma compilação a partir do código. Os pacotes <code>libpq-dev</code> e <code>build-essential</code> instalados no passo 1 cobrem o caso habitual."
+msgid ""
+"The <code>py3-none-any</code> tag applies to <code>ai_tutor</code> itself, "
+"not to its dependencies. If one of those has no wheel for your Python "
+"version, pip falls back to a source build. The <code>libpq-dev</code> and "
+"<code>build-essential</code> packages installed in step 1 cover the usual "
+"culprit."
+msgstr ""
+"A etiqueta <code>py3-none-any</code> aplica-se ao próprio <code>ai_tutor</"
+"code>, não às suas dependências. Se alguma delas não tiver wheel para a sua "
+"versão de Python, o pip recorre a uma compilação a partir do código. Os "
+"pacotes <code>libpq-dev</code> e <code>build-essential</code> instalados no "
+"passo 1 cobrem o caso habitual."
 
 #: templates/downloads/self_hosting.html:502
 msgid "Prepare the database"
 msgstr "Preparar a base de dados"
 
 #: templates/downloads/self_hosting.html:509
-msgid "Create the extension <strong>before</strong> migrating. Migrations do run <code>CREATE EXTENSION IF NOT EXISTS vector</code> themselves, but that statement needs a privileged role — and the account in your <code>DATABASE_URL</code> should not be one. Skip this and the migration fails on the first vector column."
-msgstr "Crie a extensão <strong>antes</strong> de migrar. As migrações executam <code>CREATE EXTENSION IF NOT EXISTS vector</code>, mas essa instrução precisa de um papel privilegiado — e a conta do seu <code>DATABASE_URL</code> não deve ser um. Se ignorar isto, a migração falha na primeira coluna vectorial."
+msgid ""
+"Create the extension <strong>before</strong> migrating. Migrations do run "
+"<code>CREATE EXTENSION IF NOT EXISTS vector</code> themselves, but that "
+"statement needs a privileged role — and the account in your "
+"<code>DATABASE_URL</code> should not be one. Skip this and the migration "
+"fails on the first vector column."
+msgstr ""
+"Crie a extensão <strong>antes</strong> de migrar. As migrações executam "
+"<code>CREATE EXTENSION IF NOT EXISTS vector</code>, mas essa instrução "
+"precisa de um papel privilegiado — e a conta do seu <code>DATABASE_URL</"
+"code> não deve ser um. Se ignorar isto, a migração falha na primeira coluna "
+"vectorial."
 
 #: templates/downloads/self_hosting.html:518
-#| msgid "not configured"
 msgid "Initialise and configure"
 msgstr "Inicializar e configurar"
 
 #: templates/downloads/self_hosting.html:523
-msgid "Writes <code>/etc/ai-tutor/ai-tutor.env</code> with a generated <code>SECRET_KEY</code>. Edit it and set at minimum:"
-msgstr "Escreve <code>/etc/ai-tutor/ai-tutor.env</code> com uma <code>SECRET_KEY</code> gerada. Edite-o e defina, no mínimo:"
+msgid ""
+"Writes <code>/etc/ai-tutor/ai-tutor.env</code> with a generated "
+"<code>SECRET_KEY</code>. Edit it and set at minimum:"
+msgstr ""
+"Escreve <code>/etc/ai-tutor/ai-tutor.env</code> com uma <code>SECRET_KEY</"
+"code> gerada. Edite-o e defina, no mínimo:"
 
 #: templates/downloads/self_hosting.html:535
-msgid "Add a provider API key too. Set <code>HTTPS_EDGE=true</code>, and the real scheme in <code>CSRF_TRUSTED_ORIGINS</code>, once a TLS-terminating proxy is in front."
-msgstr "Acrescente também uma chave de API de um fornecedor. Defina <code>HTTPS_EDGE=true</code>, e o esquema real em <code>CSRF_TRUSTED_ORIGINS</code>, assim que houver um proxy com terminação TLS à frente."
+msgid ""
+"Add a provider API key too. Set <code>HTTPS_EDGE=true</code>, and the real "
+"scheme in <code>CSRF_TRUSTED_ORIGINS</code>, once a TLS-terminating proxy is "
+"in front."
+msgstr ""
+"Acrescente também uma chave de API de um fornecedor. Defina "
+"<code>HTTPS_EDGE=true</code>, e o esquema real em "
+"<code>CSRF_TRUSTED_ORIGINS</code>, assim que houver um proxy com terminação "
+"TLS à frente."
 
 #: templates/downloads/self_hosting.html:544
 msgid "DATABASE_URL is not optional, and nothing enforces it."
 msgstr "O DATABASE_URL não é opcional e nada o obriga."
 
 #: templates/downloads/self_hosting.html:545
-msgid "Leave it unset and Django silently falls back to SQLite at <code>/var/lib/ai-tutor/db.sqlite3</code>. <code>migrate</code> succeeds, <code>seed</code> succeeds, the app starts and serves — on a database with no pgvector. You get a working-looking install that is not the system you are evaluating."
-msgstr "Se o deixar por definir, o Django recorre silenciosamente ao SQLite em <code>/var/lib/ai-tutor/db.sqlite3</code>. O <code>migrate</code> corre bem, o <code>seed</code> corre bem, a aplicação arranca e serve — sobre uma base de dados sem pgvector. Fica com uma instalação que parece funcionar mas não é o sistema que está a avaliar."
+msgid ""
+"Leave it unset and Django silently falls back to SQLite at <code>/var/lib/ai-"
+"tutor/db.sqlite3</code>. <code>migrate</code> succeeds, <code>seed</code> "
+"succeeds, the app starts and serves — on a database with no pgvector. You "
+"get a working-looking install that is not the system you are evaluating."
+msgstr ""
+"Se o deixar por definir, o Django recorre silenciosamente ao SQLite em "
+"<code>/var/lib/ai-tutor/db.sqlite3</code>. O <code>migrate</code> corre bem, "
+"o <code>seed</code> corre bem, a aplicação arranca e serve — sobre uma base "
+"de dados sem pgvector. Fica com uma instalação que parece funcionar mas não "
+"é o sistema que está a avaliar."
 
 #: templates/downloads/self_hosting.html:553
 msgid "Check for the tell:"
 msgstr "Procure o sinal:"
 
 #: templates/downloads/self_hosting.html:557
-msgid "If you find one, set <code>DATABASE_URL</code>, move the file aside, and re-run migrate and seed."
-msgstr "Se encontrar um, defina o <code>DATABASE_URL</code>, ponha o ficheiro de lado e volte a correr o migrate e o seed."
+msgid ""
+"If you find one, set <code>DATABASE_URL</code>, move the file aside, and re-"
+"run migrate and seed."
+msgstr ""
+"Se encontrar um, defina o <code>DATABASE_URL</code>, ponha o ficheiro de "
+"lado e volte a correr o migrate e o seed."
 
 #: templates/downloads/self_hosting.html:564
 msgid "Fix ownership — before anything else runs"
 msgstr "Corrigir as permissões — antes de mais nada correr"
 
 #: templates/downloads/self_hosting.html:566
-msgid "The install steps ran as root. The service will not. Reconcile them now, or it crash-loops on startup with <code>PermissionError: [Errno 13] Permission denied: '/etc/ai-tutor/ai-tutor.env'</code> and never reaches Django."
-msgstr "Os passos de instalação correram como root. O serviço não vai correr. Concilie-os agora, ou o serviço entra em ciclo de falhas no arranque com <code>PermissionError: [Errno 13] Permission denied: '/etc/ai-tutor/ai-tutor.env'</code> e nunca chega ao Django."
+msgid ""
+"The install steps ran as root. The service will not. Reconcile them now, or "
+"it crash-loops on startup with <code>PermissionError: [Errno 13] Permission "
+"denied: '/etc/ai-tutor/ai-tutor.env'</code> and never reaches Django."
+msgstr ""
+"Os passos de instalação correram como root. O serviço não vai correr. "
+"Concilie-os agora, ou o serviço entra em ciclo de falhas no arranque com "
+"<code>PermissionError: [Errno 13] Permission denied: '/etc/ai-tutor/ai-"
+"tutor.env'</code> e nunca chega ao Django."
 
 #: templates/downloads/self_hosting.html:583
-msgid "Group-readable rather than world-readable: that file holds the <code>SECRET_KEY</code>, the database password and your provider key."
-msgstr "Legível pelo grupo e não por todos: esse ficheiro contém a <code>SECRET_KEY</code>, a palavra-passe da base de dados e a sua chave de fornecedor."
+msgid ""
+"Group-readable rather than world-readable: that file holds the "
+"<code>SECRET_KEY</code>, the database password and your provider key."
+msgstr ""
+"Legível pelo grupo e não por todos: esse ficheiro contém a <code>SECRET_KEY</"
+"code>, a palavra-passe da base de dados e a sua chave de fornecedor."
 
 #: templates/downloads/self_hosting.html:589
 msgid "Migrate, seed, collect static, create the admin"
 msgstr "Migrar, semear, recolher estáticos, criar o administrador"
 
 #: templates/downloads/self_hosting.html:591
-msgid "Run these <strong>as the service user</strong>, not as root. Running them under plain <code>sudo</code> recreates the ownership problem you just fixed, on every file they touch."
-msgstr "Execute estes comandos <strong>com o utilizador do serviço</strong>, não como root. Executá-los com <code>sudo</code> simples recria o problema de permissões que acabou de corrigir, em todos os ficheiros que tocarem."
+msgid ""
+"Run these <strong>as the service user</strong>, not as root. Running them "
+"under plain <code>sudo</code> recreates the ownership problem you just "
+"fixed, on every file they touch."
+msgstr ""
+"Execute estes comandos <strong>com o utilizador do serviço</strong>, não "
+"como root. Executá-los com <code>sudo</code> simples recria o problema de "
+"permissões que acabou de corrigir, em todos os ficheiros que tocarem."
 
 #: templates/downloads/self_hosting.html:610
 msgid "collectstatic is required."
 msgstr "O collectstatic é obrigatório."
 
 #: templates/downloads/self_hosting.html:611
-msgid "Its omission is fatal rather than cosmetic: the app uses Django's manifest static-files storage, which resolves every asset through a <code>staticfiles.json</code> that only <code>collectstatic</code> generates. Without it every page — including the login form — returns <strong>HTTP 500</strong> with <code>ValueError: Missing staticfiles manifest entry for 'admin/css/base.css'</code>. The Docker image does this at build time, so it only bites the pip path."
-msgstr "A sua omissão é fatal e não estética: a aplicação usa o armazenamento de ficheiros estáticos com manifesto do Django, que resolve cada recurso através de um <code>staticfiles.json</code> que só o <code>collectstatic</code> gera. Sem ele, todas as páginas — incluindo o formulário de início de sessão — devolvem <strong>HTTP 500</strong> com <code>ValueError: Missing staticfiles manifest entry for 'admin/css/base.css'</code>. A imagem Docker faz isto na construção, por isso só afecta o caminho do pip."
+msgid ""
+"Its omission is fatal rather than cosmetic: the app uses Django's manifest "
+"static-files storage, which resolves every asset through a "
+"<code>staticfiles.json</code> that only <code>collectstatic</code> "
+"generates. Without it every page — including the login form — returns "
+"<strong>HTTP 500</strong> with <code>ValueError: Missing staticfiles "
+"manifest entry for 'admin/css/base.css'</code>. The Docker image does this "
+"at build time, so it only bites the pip path."
+msgstr ""
+"A sua omissão é fatal e não estética: a aplicação usa o armazenamento de "
+"ficheiros estáticos com manifesto do Django, que resolve cada recurso "
+"através de um <code>staticfiles.json</code> que só o <code>collectstatic</"
+"code> gera. Sem ele, todas as páginas — incluindo o formulário de início de "
+"sessão — devolvem <strong>HTTP 500</strong> com <code>ValueError: Missing "
+"staticfiles manifest entry for 'admin/css/base.css'</code>. A imagem Docker "
+"faz isto na construção, por isso só afecta o caminho do pip."
 
 #: templates/downloads/self_hosting.html:622
-#| msgid "Confirm"
 msgid "Confirm:"
 msgstr "Confirme:"
 
@@ -6390,39 +7046,82 @@ msgid "Read the generated unit before enabling it."
 msgstr "Leia a unidade gerada antes de a activar."
 
 #: templates/downloads/self_hosting.html:636
-msgid "<code>ProtectHome=yes</code> makes <code>/home</code> invisible to the service, and both the HuggingFace cache and gunicorn's control server default to paths under it — <code>Permission denied: '/home/&lt;user&gt;'</code>. Redirect them with <code>sudo systemctl edit ai-tutor</code>:"
-msgstr "O <code>ProtectHome=yes</code> torna <code>/home</code> invisível ao serviço, e tanto a cache do HuggingFace como o servidor de controlo do gunicorn usam por omissão caminhos dentro dela — <code>Permission denied: '/home/&lt;user&gt;'</code>. Redireccione-os com <code>sudo systemctl edit ai-tutor</code>:"
+msgid ""
+"<code>ProtectHome=yes</code> makes <code>/home</code> invisible to the "
+"service, and both the HuggingFace cache and gunicorn's control server "
+"default to paths under it — <code>Permission denied: '/home/&lt;user&gt;'</"
+"code>. Redirect them with <code>sudo systemctl edit ai-tutor</code>:"
+msgstr ""
+"O <code>ProtectHome=yes</code> torna <code>/home</code> invisível ao "
+"serviço, e tanto a cache do HuggingFace como o servidor de controlo do "
+"gunicorn usam por omissão caminhos dentro dela — <code>Permission denied: '/"
+"home/&lt;user&gt;'</code>. Redireccione-os com <code>sudo systemctl edit ai-"
+"tutor</code>:"
 
 #: templates/downloads/self_hosting.html:650
 msgid "Reading the service state"
 msgstr "Ler o estado do serviço"
 
 #: templates/downloads/self_hosting.html:652
-msgid "<code>Active: activating (auto-restart)</code> means it is crash-looping. Read the traceback with <code>journalctl -u ai-tutor -n 50 --no-pager</code>, fix it, then run <code>sudo systemctl reset-failed ai-tutor</code> before restarting — otherwise the accumulated restart counter gets in the way."
-msgstr "<code>Active: activating (auto-restart)</code> significa que está em ciclo de falhas. Leia o rasto de erro com <code>journalctl -u ai-tutor -n 50 --no-pager</code>, corrija-o e depois execute <code>sudo systemctl reset-failed ai-tutor</code> antes de reiniciar — caso contrário o contador acumulado de reinícios atrapalha."
+msgid ""
+"<code>Active: activating (auto-restart)</code> means it is crash-looping. "
+"Read the traceback with <code>journalctl -u ai-tutor -n 50 --no-pager</"
+"code>, fix it, then run <code>sudo systemctl reset-failed ai-tutor</code> "
+"before restarting — otherwise the accumulated restart counter gets in the "
+"way."
+msgstr ""
+"<code>Active: activating (auto-restart)</code> significa que está em ciclo "
+"de falhas. Leia o rasto de erro com <code>journalctl -u ai-tutor -n 50 --no-"
+"pager</code>, corrija-o e depois execute <code>sudo systemctl reset-failed "
+"ai-tutor</code> antes de reiniciar — caso contrário o contador acumulado de "
+"reinícios atrapalha."
 
 #: templates/downloads/self_hosting.html:661
-msgid "<code>Active: active (running)</code> with <code>Listening at: http://...:8000</code> is success."
-msgstr "<code>Active: active (running)</code> com <code>Listening at: http://...:8000</code> é sinal de sucesso."
+msgid ""
+"<code>Active: active (running)</code> with <code>Listening at: "
+"http://...:8000</code> is success."
+msgstr ""
+"<code>Active: active (running)</code> com <code>Listening at: "
+"http://...:8000</code> é sinal de sucesso."
 
 #: templates/downloads/self_hosting.html:668
 msgid "Bind, proxy and verify"
 msgstr "Ligar, encaminhar e verificar"
 
 #: templates/downloads/self_hosting.html:670
-msgid "Gunicorn binds <code>0.0.0.0:8000</code> by default — reachable from your whole network, in the clear, with no proxy in front. Unlike the Docker path, a firewall is effective here; narrowing the bind is better still."
-msgstr "Por omissão o gunicorn liga-se a <code>0.0.0.0:8000</code> — acessível a toda a sua rede, sem encriptação e sem proxy à frente. Ao contrário do caminho do Docker, aqui uma firewall é eficaz; restringir a ligação é ainda melhor."
+msgid ""
+"Gunicorn binds <code>0.0.0.0:8000</code> by default — reachable from your "
+"whole network, in the clear, with no proxy in front. Unlike the Docker path, "
+"a firewall is effective here; narrowing the bind is better still."
+msgstr ""
+"Por omissão o gunicorn liga-se a <code>0.0.0.0:8000</code> — acessível a "
+"toda a sua rede, sem encriptação e sem proxy à frente. Ao contrário do "
+"caminho do Docker, aqui uma firewall é eficaz; restringir a ligação é ainda "
+"melhor."
 
 #: templates/downloads/self_hosting.html:683
-msgid "Your reverse proxy must allow a <strong>300-second read and write timeout</strong>. A tutoring turn takes 20–90 seconds; a default 60-second timeout cuts the connection, the student sees a blank reply, and your log records a completed request."
-msgstr "O seu proxy inverso tem de permitir um <strong>tempo-limite de leitura e escrita de 300 segundos</strong>. Um turno de tutoria demora 20 a 90 segundos; um tempo-limite predefinido de 60 segundos corta a ligação, o aluno vê uma resposta vazia e o seu registo dá o pedido como concluído."
+msgid ""
+"Your reverse proxy must allow a <strong>300-second read and write timeout</"
+"strong>. A tutoring turn takes 20–90 seconds; a default 60-second timeout "
+"cuts the connection, the student sees a blank reply, and your log records a "
+"completed request."
+msgstr ""
+"O seu proxy inverso tem de permitir um <strong>tempo-limite de leitura e "
+"escrita de 300 segundos</strong>. Um turno de tutoria demora 20 a 90 "
+"segundos; um tempo-limite predefinido de 60 segundos corta a ligação, o "
+"aluno vê uma resposta vazia e o seu registo dá o pedido como concluído."
 
 #: templates/downloads/self_hosting.html:692
-msgid "Then open it in a browser. A <code>302</code> from curl only proves routing works — it never renders a template, so it will not catch a missing <code>collectstatic</code>. The browser will."
-msgstr "Depois abra num navegador. Um <code>302</code> do curl prova apenas que o encaminhamento funciona — nunca compõe um template, por isso não detecta um <code>collectstatic</code> em falta. O navegador detecta."
+msgid ""
+"Then open it in a browser. A <code>302</code> from curl only proves routing "
+"works — it never renders a template, so it will not catch a missing "
+"<code>collectstatic</code>. The browser will."
+msgstr ""
+"Depois abra num navegador. Um <code>302</code> do curl prova apenas que o "
+"encaminhamento funciona — nunca compõe um template, por isso não detecta um "
+"<code>collectstatic</code> em falta. O navegador detecta."
 
 #: templates/downloads/self_hosting.html:703
-#| msgid "archived"
 msgid "source archive"
 msgstr "arquivo do código-fonte"
 
@@ -6431,44 +7130,102 @@ msgid "Then, whichever you chose"
 msgstr "Depois, seja qual for a opção escolhida"
 
 #: templates/downloads/self_hosting.html:709
-msgid "Sign in at <code>/admin/</code>. Under <strong>LLM → Model configs</strong>, add a provider config <strong>and mark it active</strong> — a config that exists but is not selected fails silently later."
-msgstr "Inicie sessão em <code>/admin/</code>. Em <strong>LLM → Model configs</strong>, acrescente uma configuração de fornecedor <strong>e marque-a como activa</strong> — uma configuração que existe mas não está seleccionada falha silenciosamente mais tarde."
+msgid ""
+"Sign in at <code>/admin/</code>. Under <strong>LLM → Model configs</strong>, "
+"add a provider config <strong>and mark it active</strong> — a config that "
+"exists but is not selected fails silently later."
+msgstr ""
+"Inicie sessão em <code>/admin/</code>. Em <strong>LLM → Model configs</"
+"strong>, acrescente uma configuração de fornecedor <strong>e marque-a como "
+"activa</strong> — uma configuração que existe mas não está seleccionada "
+"falha silenciosamente mais tarde."
 
 #: templates/downloads/self_hosting.html:716
-msgid "Then take one tutoring turn against the seeded curriculum, with <code>docker compose logs -f app</code> open beside you. That single action exercises the database, the vector store, the credentials and media serving together — a health check does not."
-msgstr "Depois faça um turno de tutoria sobre o currículo inicial, com <code>docker compose logs -f app</code> aberto ao lado. Essa única acção exercita a base de dados, o armazenamento vectorial, as credenciais e o serviço de media em conjunto — uma verificação de saúde não o faz."
+msgid ""
+"Then take one tutoring turn against the seeded curriculum, with <code>docker "
+"compose logs -f app</code> open beside you. That single action exercises the "
+"database, the vector store, the credentials and media serving together — a "
+"health check does not."
+msgstr ""
+"Depois faça um turno de tutoria sobre o currículo inicial, com <code>docker "
+"compose logs -f app</code> aberto ao lado. Essa única acção exercita a base "
+"de dados, o armazenamento vectorial, as credenciais e o serviço de media em "
+"conjunto — uma verificação de saúde não o faz."
 
 #: templates/downloads/self_hosting.html:724
-msgid "Allow 20–90 seconds for the reply. If it fails, the log names the layer: an auth error is the key, a timeout is egress from the container, and a reply with no retrieved context means the model works but retrieval is not wired to the active config."
-msgstr "Conte 20 a 90 segundos pela resposta. Se falhar, o registo indica a camada: um erro de autenticação é a chave, um tempo-limite é a saída de rede do contentor, e uma resposta sem contexto recuperado significa que o modelo funciona mas a recuperação não está ligada à configuração activa."
+msgid ""
+"Allow 20–90 seconds for the reply. If it fails, the log names the layer: an "
+"auth error is the key, a timeout is egress from the container, and a reply "
+"with no retrieved context means the model works but retrieval is not wired "
+"to the active config."
+msgstr ""
+"Conte 20 a 90 segundos pela resposta. Se falhar, o registo indica a camada: "
+"um erro de autenticação é a chave, um tempo-limite é a saída de rede do "
+"contentor, e uma resposta sem contexto recuperado significa que o modelo "
+"funciona mas a recuperação não está ligada à configuração activa."
 
 #: templates/downloads/self_hosting.html:733
 msgid "Keep it running"
 msgstr "Manter em funcionamento"
 
 #: templates/downloads/self_hosting.html:735
-msgid "<strong>Back up both halves together.</strong> The database holds the reference to every uploaded figure and the disk holds the file, so a database restored against older media leaves lessons with broken images and reports no error."
-msgstr "<strong>Faça cópia de segurança das duas metades em conjunto.</strong> A base de dados guarda a referência a cada figura carregada e o disco guarda o ficheiro, por isso uma base de dados restaurada sobre media mais antiga deixa lições com imagens partidas sem comunicar qualquer erro."
+msgid ""
+"<strong>Back up both halves together.</strong> The database holds the "
+"reference to every uploaded figure and the disk holds the file, so a "
+"database restored against older media leaves lessons with broken images and "
+"reports no error."
+msgstr ""
+"<strong>Faça cópia de segurança das duas metades em conjunto.</strong> A "
+"base de dados guarda a referência a cada figura carregada e o disco guarda o "
+"ficheiro, por isso uma base de dados restaurada sobre media mais antiga "
+"deixa lições com imagens partidas sem comunicar qualquer erro."
 
 #: templates/downloads/self_hosting.html:751
-msgid "A backup that only exists on the machine it backs up is not a backup, and these contain student records — store them encrypted, off the machine."
-msgstr "Uma cópia de segurança que só existe na máquina que copia não é uma cópia de segurança, e estas contêm registos de alunos — guarde-as encriptadas e fora da máquina."
+msgid ""
+"A backup that only exists on the machine it backs up is not a backup, and "
+"these contain student records — store them encrypted, off the machine."
+msgstr ""
+"Uma cópia de segurança que só existe na máquina que copia não é uma cópia de "
+"segurança, e estas contêm registos de alunos — guarde-as encriptadas e fora "
+"da máquina."
 
 #: templates/downloads/self_hosting.html:758
-msgid "<strong>Test a restore before you need it</strong>, while the only data is seed data and your own test conversations. That is the one moment when getting it wrong costs nothing."
-msgstr "<strong>Teste um restauro antes de precisar dele</strong>, enquanto os únicos dados são os iniciais e as suas próprias conversas de teste. É o único momento em que errar não custa nada."
+msgid ""
+"<strong>Test a restore before you need it</strong>, while the only data is "
+"seed data and your own test conversations. That is the one moment when "
+"getting it wrong costs nothing."
+msgstr ""
+"<strong>Teste um restauro antes de precisar dele</strong>, enquanto os "
+"únicos dados são os iniciais e as suas próprias conversas de teste. É o "
+"único momento em que errar não custa nada."
 
 #: templates/downloads/self_hosting.html:765
-msgid "Worth also confirming state survives a stop, which tells you the named volumes are doing their job — sign in again afterwards, and the curriculum should still be indexed:"
-msgstr "Vale também a pena confirmar que o estado sobrevive a uma paragem, o que mostra que os volumes nomeados estão a cumprir a sua função — inicie sessão de novo a seguir e o currículo deve continuar indexado:"
+msgid ""
+"Worth also confirming state survives a stop, which tells you the named "
+"volumes are doing their job — sign in again afterwards, and the curriculum "
+"should still be indexed:"
+msgstr ""
+"Vale também a pena confirmar que o estado sobrevive a uma paragem, o que "
+"mostra que os volumes nomeados estão a cumprir a sua função — inicie sessão "
+"de novo a seguir e o currículo deve continuar indexado:"
 
 #: templates/downloads/self_hosting.html:774
 msgid "Upgrading"
 msgstr "Actualizar"
 
 #: templates/downloads/self_hosting.html:784
-msgid "Take a backup first — migrations are not reversible. And if you edited <code>Caddyfile</code> or <code>docker-compose.yml</code>, keep those edits under version control or in <code>.orig</code> copies: a future release may ship changed versions, and you will want to see what changed rather than re-deriving your local modifications from memory."
-msgstr "Faça primeiro uma cópia de segurança — as migrações não são reversíveis. E se editou o <code>Caddyfile</code> ou o <code>docker-compose.yml</code>, mantenha essas alterações sob controlo de versões ou em cópias <code>.orig</code>: uma versão futura pode trazer ficheiros alterados, e vai querer ver o que mudou em vez de reconstruir de memória as suas modificações locais."
+msgid ""
+"Take a backup first — migrations are not reversible. And if you edited "
+"<code>Caddyfile</code> or <code>docker-compose.yml</code>, keep those edits "
+"under version control or in <code>.orig</code> copies: a future release may "
+"ship changed versions, and you will want to see what changed rather than re-"
+"deriving your local modifications from memory."
+msgstr ""
+"Faça primeiro uma cópia de segurança — as migrações não são reversíveis. E "
+"se editou o <code>Caddyfile</code> ou o <code>docker-compose.yml</code>, "
+"mantenha essas alterações sob controlo de versões ou em cópias <code>.orig</"
+"code>: uma versão futura pode trazer ficheiros alterados, e vai querer ver o "
+"que mudou em vez de reconstruir de memória as suas modificações locais."
 
 #: templates/downloads/self_hosting.html:796
 msgid "Installing on a single classroom computer instead?"
@@ -6479,25 +7236,30 @@ msgid "Download the desktop app"
 msgstr "Descarregar a aplicação para computador"
 
 #: templates/safety/csrf_failure.html:7 templates/safety/csrf_failure.html:104
-#| msgid "No sessions yet"
 msgid "Your session timed out"
 msgstr "A sua sessão expirou"
 
 #: templates/safety/csrf_failure.html:7
-#| msgid "Tutor"
 msgid "AI Tutor"
 msgstr "AI Tutor"
 
 #: templates/safety/csrf_failure.html:107
-msgid "This page had been open long enough that the security check protecting it expired, so we could not accept the form. Nothing was wrong with what you entered."
-msgstr "Esta página esteve aberta tempo suficiente para a verificação de segurança que a protege expirar, por isso não foi possível aceitar o formulário. Não havia nada de errado com o que introduziu."
+msgid ""
+"This page had been open long enough that the security check protecting it "
+"expired, so we could not accept the form. Nothing was wrong with what you "
+"entered."
+msgstr ""
+"Esta página esteve aberta tempo suficiente para a verificação de segurança "
+"que a protege expirar, por isso não foi possível aceitar o formulário. Não "
+"havia nada de errado com o que introduziu."
 
 #: templates/safety/csrf_failure.html:115
 msgid "Your changes were not saved. Open the form again and re-enter them."
-msgstr "As suas alterações não foram guardadas. Abra o formulário de novo e volte a introduzi-las."
+msgstr ""
+"As suas alterações não foram guardadas. Abra o formulário de novo e volte a "
+"introduzi-las."
 
 #: templates/safety/csrf_failure.html:122
-#| msgid "Back to home"
 msgid "Back to the form"
 msgstr "Voltar ao formulário"
 
