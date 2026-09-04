@@ -37,72 +37,79 @@
 
 <main>
     {# ─────────────────────────────────────────── hero ───────────────────── #}
-    <section class="lp-wrap lp-hero">
-        <div>
-            <p class="lp-eyebrow">{% icon "courses" size="sm" %}{% trans "Secondary school" %}</p>
+    {% comment %}
+    The band exists because .lp-wrap is width-capped and the photograph has to
+    bleed to both edges. Picture and scrim live on the band; the hero grid is
+    untouched and simply sits on top of it.
+    {% endcomment %}
+    <div class="lp-band lp-band--hero">
+        <section class="lp-wrap lp-hero">
+            <div>
+                <p class="lp-eyebrow">{% icon "courses" size="sm" %}{% trans "Secondary school" %}</p>
 
-            <h1>{% trans "AI Powered Tutor" %}</h1>
+                <h1>{% trans "AI Powered Tutor" %}</h1>
 
-            <p class="lp-hero__lede">
-                {% blocktrans %}Students learn by talking through a lesson, not by watching one. The tutor asks, listens, and only moves on when the answer shows understanding — then tells the teacher what it saw.{% endblocktrans %}
-            </p>
+                <p class="lp-hero__lede">
+                    {% blocktrans %}Students learn by talking through a lesson, not by watching one. The tutor asks, listens, and only moves on when the answer shows understanding — then tells the teacher what it saw.{% endblocktrans %}
+                </p>
 
-            <div class="lp-hero__cta" id="start">
-                <a href="{% url 'accounts:student_login' %}" class="btn btn--primary">{% trans "Student" %}</a>
-                <a href="{% url 'accounts:staff_login' %}" class="btn btn--secondary">{% trans "Teacher/Admin" %}</a>
+                <div class="lp-hero__cta" id="start">
+                    <a href="{% url 'accounts:student_login' %}" class="btn btn--primary">{% trans "Student" %}</a>
+                    <a href="{% url 'accounts:staff_login' %}" class="btn btn--secondary">{% trans "Teacher/Admin" %}</a>
+                </div>
+
+                <p class="lp-hero__note">
+                    {% trans "New here? You can create an account on either sign-in page." %}
+                </p>
             </div>
 
-            <p class="lp-hero__note">
-                {% trans "New here? You can create an account on either sign-in page." %}
-            </p>
-        </div>
-
-        {% comment %}
-        The lesson arc. Not decoration — this is the sequence the tutoring
-        engine actually runs, and it is the clearest one-glance answer to
-        "what is this?" that the product has.
-        {% endcomment %}
-        <div class="arc">
-            <p class="arc__label">{% trans "How one lesson goes" %}</p>
-            <ol class="arc__list">
-                <li class="arc__step">
-                    <span class="arc__dot" aria-hidden="true">1</span>
-                    <span>
-                        <span class="arc__name">{% trans "Engage" %}</span>
-                        <span class="arc__what">{% trans "Opens with a question about something the student already knows." %}</span>
-                    </span>
-                </li>
-                <li class="arc__step">
-                    <span class="arc__dot" aria-hidden="true">2</span>
-                    <span>
-                        <span class="arc__name">{% trans "Explore" %}</span>
-                        <span class="arc__what">{% trans "The student works the idea out loud; the tutor asks rather than tells." %}</span>
-                    </span>
-                </li>
-                <li class="arc__step">
-                    <span class="arc__dot" aria-hidden="true">3</span>
-                    <span>
-                        <span class="arc__name">{% trans "Explain" %}</span>
-                        <span class="arc__what">{% trans "The idea gets named and tied to the curriculum's own wording." %}</span>
-                    </span>
-                </li>
-                <li class="arc__step">
-                    <span class="arc__dot" aria-hidden="true">4</span>
-                    <span>
-                        <span class="arc__name">{% trans "Elaborate" %}</span>
-                        <span class="arc__what">{% trans "A harder case, to see whether it holds outside the first example." %}</span>
-                    </span>
-                </li>
-                <li class="arc__step">
-                    <span class="arc__dot" aria-hidden="true">5</span>
-                    <span>
-                        <span class="arc__name">{% trans "Exit ticket" %}</span>
-                        <span class="arc__what">{% trans "A short check. The score is what the teacher sees the next morning." %}</span>
-                    </span>
-                </li>
-            </ol>
-        </div>
-    </section>
+            {% comment %}
+            The lesson arc. Not decoration — this is the sequence the tutoring
+            engine actually runs, and it is the clearest one-glance answer to
+            "what is this?" that the product has.
+            {% endcomment %}
+            <div class="arc">
+                <p class="arc__label">{% trans "How one lesson goes" %}</p>
+                <ol class="arc__list">
+                    <li class="arc__step">
+                        <span class="arc__dot" aria-hidden="true">1</span>
+                        <span>
+                            <span class="arc__name">{% trans "Engage" %}</span>
+                            <span class="arc__what">{% trans "Opens with a question about something the student already knows." %}</span>
+                        </span>
+                    </li>
+                    <li class="arc__step">
+                        <span class="arc__dot" aria-hidden="true">2</span>
+                        <span>
+                            <span class="arc__name">{% trans "Explore" %}</span>
+                            <span class="arc__what">{% trans "The student works the idea out loud; the tutor asks rather than tells." %}</span>
+                        </span>
+                    </li>
+                    <li class="arc__step">
+                        <span class="arc__dot" aria-hidden="true">3</span>
+                        <span>
+                            <span class="arc__name">{% trans "Explain" %}</span>
+                            <span class="arc__what">{% trans "The idea gets named and tied to the curriculum's own wording." %}</span>
+                        </span>
+                    </li>
+                    <li class="arc__step">
+                        <span class="arc__dot" aria-hidden="true">4</span>
+                        <span>
+                            <span class="arc__name">{% trans "Elaborate" %}</span>
+                            <span class="arc__what">{% trans "A harder case, to see whether it holds outside the first example." %}</span>
+                        </span>
+                    </li>
+                    <li class="arc__step">
+                        <span class="arc__dot" aria-hidden="true">5</span>
+                        <span>
+                            <span class="arc__name">{% trans "Exit ticket" %}</span>
+                            <span class="arc__what">{% trans "A short check. The score is what the teacher sees the next morning." %}</span>
+                        </span>
+                    </li>
+                </ol>
+            </div>
+        </section>
+    </div>
 
     {# ────────────────────────────────── what it does ────────────────────── #}
     <section class="lp-section lp-section--tint">
@@ -158,7 +165,7 @@
     used to be a footer link, which put a ministry's whole evaluation path
     below the fold and in six-point type.
     {% endcomment %}
-    <section class="lp-section">
+    <section class="lp-section lp-band lp-band--deploy">
         <div class="lp-wrap">
             <div class="lp-section__head">
                 <h2>{% trans "Run it on your own hardware" %}</h2>

@@ -205,6 +205,7 @@
     position: relative;
     padding: var(--space-6);
     background: var(--surface);
+    color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-md);
@@ -277,6 +278,162 @@
     color: var(--text-muted);
     line-height: var(--leading-snug);
     margin-top: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   Photographic bands
+   ------------------------------------------------------------------------
+   Two blocks stand on a photograph instead of the cream canvas: the hero, and
+   "run it on your own hardware". Both pictures are of the thing being
+   described — a classroom with one laptop in it, lit by the window and then
+   by the screen — which is the half of the pitch that prose carries worst.
+
+   Rules that hold for both:
+
+     * The picture is never bare. A scrim sits over it, heaviest on the left
+       where the copy is and lifting to the right where only a card lands, so
+       white text clears AA against the brightest pixel in frame (the laptop
+       screen) without flattening the photograph into a grey rectangle.
+     * Small screens get a 900px file, whatever the pixel ratio. This is used
+       in schools on metered connections; a sharper backdrop is not worth
+       three times the bytes.
+     * Anything that lands on a band is restyled for a dark ground. A control
+       that reads as "quiet" on cream — the white secondary button — is the
+       loudest thing on a photograph if left alone.
+   -------------------------------------------------------------------------- */
+.lp-band {
+    --lp-band-pad: 5rem;
+
+    position: relative;
+    background-color: var(--warm-900);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    color: #fff;
+}
+
+.lp-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--warm-900) 66%, transparent) 0%,
+        color-mix(in srgb, var(--warm-900) 60%, transparent) 45%,
+        color-mix(in srgb, var(--warm-900) 32%, transparent) 100%);
+}
+
+/* The band's own children clear the scrim. Stated once here rather than on
+   each block, because forgetting it makes the content vanish, not shift. */
+.lp-band > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Stacked, the copy no longer sits in a column of its own and the gradient
+   would run diagonally across it. Flat scrim instead. */
+@media (max-width: 61.99rem) {
+    .lp-band { --lp-band-pad: 3rem; }
+    .lp-band::before { background: color-mix(in srgb, var(--warm-900) 70%, transparent); }
+}
+
+@media (prefers-contrast: more) {
+    .lp-band::before { background: color-mix(in srgb, var(--warm-900) 96%, transparent); }
+}
+
+/* -- the pictures ------------------------------------------------------- */
+.lp-band--hero { background-image: url('../../img/marketing/hero-classroom-sm.webp'); }
+.lp-band--deploy { background-image: url('../../img/marketing/offline-classroom-sm.webp'); }
+
+@media (min-width: 56rem) {
+    .lp-band--hero { background-image: url('../../img/marketing/hero-classroom.webp'); }
+    .lp-band--deploy { background-image: url('../../img/marketing/offline-classroom.webp'); }
+}
+
+/* Wide, the band is flatter than the file and only the vertical figure bites:
+   22% keeps the student's head and the lit laptop in frame instead of the
+   ceiling. Narrow, the crop turns horizontal and 28% is what holds the student
+   in shot rather than the empty desks behind them. */
+.lp-band--hero { background-position: 28% 22%; }
+
+/* The lit half of this frame is its top and the cards own the bottom of the
+   section, so the picture is anchored top: the one object worth seeing lands
+   beside the heading rather than behind a card.
+
+   Both classes, because .lp-section sets padding-block further down the file
+   at the same specificity and would otherwise win it. */
+.lp-section.lp-band--deploy {
+    background-position: center top;
+    padding-block: var(--lp-band-pad);
+}
+
+/* Already a near-dark photograph, and the only lit object in it is the point
+   of the section. A lighter scrim, or the laptop stops reading. */
+.lp-band--deploy::before {
+    background: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--warm-900) 62%, transparent) 0%,
+        color-mix(in srgb, var(--warm-900) 46%, transparent) 45%,
+        color-mix(in srgb, var(--warm-900) 18%, transparent) 100%);
+}
+
+@media (max-width: 61.99rem) {
+    .lp-band--deploy::before { background: color-mix(in srgb, var(--warm-900) 66%, transparent); }
+}
+
+/* -- type and controls on a band ---------------------------------------- */
+.lp-band .lp-hero { padding-block: var(--lp-band-pad); }
+
+.lp-band .lp-hero h1,
+.lp-band .lp-section__head h2 { color: #fff; }
+
+.lp-band .lp-hero__lede,
+.lp-band .lp-section__head p { color: rgba(255, 255, 255, 0.84); }
+
+.lp-band .lp-hero__note { color: rgba(255, 255, 255, 0.78); }
+
+.lp-band .lp-eyebrow {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
+
+/* White fill on cream is the quiet half of the pair; white fill on a
+   photograph is the loud half. Outlined instead, so "Student" stays first. */
+.lp-band .btn--secondary {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+}
+
+.lp-band .btn--secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+/* A card that was floating a few pixels above cream has to float above a
+   photograph now, which takes a longer, darker shadow to read as depth. */
+.lp-band .arc,
+.lp-band .lp-deploy__card {
+    box-shadow: 0 24px 48px color-mix(in srgb, var(--warm-900) 45%, transparent),
+                0 4px 12px color-mix(in srgb, var(--warm-900) 30%, transparent);
+}
+
+/* The near-black card and the scrim are the same ink, so on the photograph
+   the card would dissolve into it. Glass with a lit edge instead: the picture
+   carries on through it, and the pair still splits into the dark one and the
+   white one. */
+.lp-band .lp-deploy__card--dark {
+    background: color-mix(in srgb, var(--warm-900) 58%, transparent);
+    border-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px) saturate(1.3);
+    -webkit-backdrop-filter: blur(10px) saturate(1.3);
+}
+
+@supports not (backdrop-filter: blur(4px)) {
+    .lp-band .lp-deploy__card--dark {
+        background: color-mix(in srgb, var(--warm-900) 88%, transparent);
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -421,6 +578,7 @@
     gap: var(--space-3);
     padding: var(--space-6);
     background: var(--surface);
+    color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
