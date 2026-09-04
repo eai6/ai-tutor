@@ -51,7 +51,7 @@ stacked blocks, and the cards are sized to their lists.
             <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
             <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
             <span class="docs-crumbs__here">{% trans "Country adoption playbook" %}</span>
-            <span class="docs-crumbs__date">{{ version_date }}</span>
+            <span class="docs-crumbs__date">{{ version_date|date:"j F Y" }}</span>
         </nav>
 
         <div class="docs-meta">
@@ -97,7 +97,7 @@ stacked blocks, and the cards are sized to their lists.
         <details class="docs-tools__item">
             <summary>{% icon "info" size="sm" %}{% trans "About this document" %}</summary>
             <dl class="docs-about">
-                <dt>{% trans "Version" %}</dt><dd>{{ version }} — {{ version_date }}</dd>
+                <dt>{% trans "Version" %}</dt><dd>{{ version }} — {{ version_date|date:"j F Y" }}</dd>
                 <dt>{% trans "Status" %}</dt><dd>{{ status }}</dd>
                 <dt>{% trans "Evidence base" %}</dt><dd>{{ evidence_base }}</dd>
                 <dt>{% trans "Costs" %}</dt><dd>{{ costs_note }}</dd>

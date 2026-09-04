@@ -1,0 +1,173 @@
+{# Traduit de sections/hosting.html — conservez les id des titres et les commandes tels quels. #}
+<p>Trois parcours pris en charge pour une installation sur serveur, plus deux formats hors ligne. Tous exécutent la même application ; ils diffèrent par la personne qui exploite la machine en dessous et par la quantité de plomberie fournie déjà montée. Ce qui suit est le détail opérationnel — le manuel d&#x27;hébergement autonome accompagne l&#x27;application et fait foi si les deux venaient à diverger.</p>
+<h2 id="choosing-a-path">Choisir un parcours</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"></th><th scope="col"><strong>A — votre propre serveur</strong></th><th scope="col"><strong>B — votre propre compte AWS</strong></th><th scope="col"><strong>C — pip, sans Docker</strong></th></tr></thead><tbody><tr><th scope="row">Ce que vous fournissez</th><td>Un serveur Linux, un domaine</td><td>Un compte AWS, un domaine</td><td>Un serveur Linux, un domaine, Python 3.12+</td></tr><tr><th scope="row">Code source nécessaire</th><td>Non — l&#x27;image publiée suffit</td><td>Oui, pour le programme Pulumi</td><td>Non — le paquet wheel suffit</td></tr><tr><th scope="row">S&#x27;exécute sur</th><td>Docker Compose</td><td>ECS Fargate + RDS, créés par Pulumi</td><td>systemd + gunicorn</td></tr><tr><th scope="row">Base de données</th><td>Conteneur Postgres inclus</td><td>RDS, gérée</td><td>Vous installez et exploitez Postgres</td></tr><tr><th scope="row">TLS</th><td>Automatique, via Caddy</td><td>Automatique, via ACM</td><td>Vous exploitez un proxy inverse</td></tr><tr><th scope="row">Coût mensuel</th><td>Serveur + usage des modèles</td><td>≈ 259 $ d&#x27;infrastructure + usage des modèles</td><td>Serveur + usage des modèles</td></tr><tr><th scope="row">Monte jusqu&#x27;à</th><td>Quelques milliers d&#x27;élèves sur une machine</td><td>Passage à l&#x27;échelle automatique ; ajoutez des tâches et de la base</td><td>Quelques milliers d&#x27;élèves sur une machine</td></tr><tr><th scope="row">Qui met à jour le système</th><td>Vous</td><td>AWS</td><td>Vous</td></tr><tr><th scope="row">Si la machine meurt</th><td>Restaurez depuis la sauvegarde</td><td>Réinstallez ; la base est séparée</td><td>Restaurez depuis la sauvegarde</td></tr><tr><th scope="row">Durée d&#x27;installation</th><td>Un après-midi</td><td>Une journée, plus la propagation DNS</td><td>Un après-midi, si vous connaissez Postgres</td></tr></tbody></table></div>
+<ul class="doc-list">
+<li><strong>Choisissez A</strong> si vous disposez d&#x27;un serveur ou d&#x27;une exigence de centre de données, ou si vous voulez tout le système à l&#x27;intérieur d&#x27;une machine que vous pouvez désigner du doigt. C&#x27;est le plus simple à comprendre et le moins cher à exploiter.</li>
+<li><strong>Choisissez B</strong> si vous êtes déjà sur AWS, s&#x27;il faut que le service survive à la panne d&#x27;une machine sans intervention humaine, ou si vous prévoyez de dépasser un seul serveur.</li>
+<li><strong>Ne choisissez C que si vous ne pouvez pas exécuter de conteneurs</strong> — une politique qui interdit Docker, ou un parc Python géré dans lequel il faut s&#x27;insérer. Vous installez la même application depuis un paquet wheel, mais la base de données, le TLS et la supervision des processus que le parcours A vous livre en une commande deviennent tous votre responsabilité.</li>
+</ul>
+<p>Aucun d&#x27;eux ne change ce que fait le tuteur, ni l&#x27;endroit où le modèle s&#x27;exécute. Cela, c&#x27;est la section 5.</p>
+<h2 id="path-a-one-server">Parcours A — un serveur</h2>
+<p>Trois conteneurs, deux volumes, un serveur. La base de connaissances est stockée sous forme de vecteurs à l&#x27;intérieur de Postgres, il n&#x27;y a donc pas de base vectorielle distincte à exploiter.</p>
+<pre class="doc-code"><code>        Internet
+            │
+          Caddy            le TLS se termine ici ; le certificat est
+            │              obtenu et renouvelé automatiquement
+            ▼
+     Django + Gunicorn  ── volume media (figures téléversées)
+            │
+            ▼
+   PostgreSQL + pgvector ── volume de données</code></pre>
+<h3 id="what-you-need">Ce qu&#x27;il vous faut</h3>
+<ul class="doc-list">
+<li>Un serveur Linux : <strong>4 vCPU, 8 Go de RAM, 60 Go de disque</strong>. Fonctionne sur x86-64 comme sur ARM. Un VPS de 2 Go ne suffira pas — l&#x27;image pèse environ <strong>7 Go</strong>, avec une version CPU de PyTorch, un modèle de reconnaissance vocale et une voix.</li>
+<li>Si vous construisez au lieu de télécharger, prévoyez <strong>25 Go libres</strong> : le cache de couches est nettement plus gros que le résultat.</li>
+<li><strong>Docker</strong> et le <strong>greffon Compose</strong>.</li>
+<li>Un <strong>nom de domaine</strong> pointant vers l&#x27;IP publique du serveur, ports 80 et 443 joignables. Sans cela, impossible d&#x27;émettre du HTTPS.</li>
+<li>Au moins une <strong>clé d&#x27;API de fournisseur de modèle</strong> — ou aucune, si vous utilisez le modèle local intégré décrit ci-dessous.</li>
+</ul>
+<h3 id="install">Installer</h3>
+<p>Il vous faut cinq fichiers : la définition compose, la configuration TLS, un modèle de configuration, et les scripts de sauvegarde et de restauration. Extrayez-les de l&#x27;image publiée — pas de code source, pas d&#x27;accès au dépôt, et ils ne peuvent pas se désynchroniser de l&#x27;image qu&#x27;ils configurent.</p>
+<pre class="doc-code"><code>mkdir -p ai-tutor &amp;&amp; cd ai-tutor
+
+docker run --rm ghcr.io/eai6/ai-tutor:latest \
+  tar -C /app/deploy/compose -c \
+      docker-compose.yml Caddyfile env.example backup.sh restore.sh | tar -x
+
+cp env.example .env
+chmod 600 .env</code></pre>
+<p>Ouvrez le .env et renseignez tout ce qui est marqué REQUIRED ; chaque entrée indique ce qu&#x27;elle est et ce qui casse en son absence. Générez les deux secrets plutôt que de les inventer :</p>
+<pre class="doc-code"><code>python3 -c &quot;import secrets; print(secrets.token_urlsafe(64))&quot;   # SECRET_KEY
+python3 -c &quot;import secrets; print(secrets.token_urlsafe(32))&quot;   # POSTGRES_PASSWORD</code></pre>
+<p>Puis récupérez l&#x27;image et démarrez :</p>
+<pre class="doc-code"><code>docker compose pull        # ~7 Go, une seule fois
+docker compose up -d
+docker compose logs -f app</code></pre>
+<aside class="doc-note"><p class="doc-note__label"><strong>FAITES PULL AVANT UP</strong></p><p>Si l&#x27;image n&#x27;est pas déjà sur la machine, docker compose up la construit depuis le source — ce qui exige le code source, environ 25 Go de disque libre et beaucoup de temps. L&#x27;image publiée est en x86-64 ; sur un serveur ARM, clonez le dépôt et lancez docker compose build, qui est aussi la façon de produire une image ARM. Rien n&#x27;est lié à une architecture.</p></aside>
+<h3 id="starting-with-no-provider-account-at-all">Démarrer sans aucun compte fournisseur</h3>
+<pre class="doc-code"><code>docker compose --profile local-llm up -d</code></pre>
+<p>Cela ajoute un conteneur avec un modèle local, télécharge un modèle d&#x27;environ 2,6 Go au premier démarrage et y dirige le tuteur automatiquement. Voyez-le comme un moyen de commencer sans compte commercial, non comme un équivalent : un petit modèle local enseigne de façon mesurablement moins bonne, réclame environ 4 Go de RAM en plus de l&#x27;application, et est plus lent sur un serveur sans GPU. Ajoutez plus tard une clé de fournisseur et redémarrez — la configuration locale s&#x27;efface d&#x27;elle-même.</p>
+<h3 id="what-you-get-on-first-start">Ce que vous obtenez au premier démarrage</h3>
+<p>L&#x27;image contient déjà un programme chargé — cours, leçons, étapes et tickets de sortie — importé au tout premier démarrage du conteneur. Rien n&#x27;est téléchargé, un premier essai fonctionne donc sans aucune connexion Internet.</p>
+<p><strong>Les figures et les images ne sont pas incluses.</strong> Elles pèsent environ vingt fois le texte. Près des trois quarts des étapes de leçon renvoient à une figure ; ces étapes présenteront donc un vide visible jusqu&#x27;à ce que vous ajoutiez des médias — en téléversant les vôtres depuis le tableau de bord enseignant, ou en important un pack construit avec les médias :</p>
+<pre class="doc-code"><code># sur une installation qui possède les figures
+python manage.py build_curriculum_pack --institution &lt;id&gt; --out dist/
+
+# puis sur celle-ci
+docker compose exec app python manage.py import_curriculum_pack /path/pack.tar.gz --force</code></pre>
+<p>Le premier démarrage prend plusieurs minutes : migrations, données de référence et index d&#x27;aide. C&#x27;est prêt quand le journal montre gunicorn à l&#x27;écoute et que docker compose ps affiche app healthy. S&#x27;il manque une valeur obligatoire, Compose refuse de démarrer et indique laquelle — un serveur à moitié configuré est pire qu&#x27;un serveur qui n&#x27;a pas démarré.</p>
+<h3 id="first-run">Première utilisation</h3>
+<ol class="doc-list">
+<li>Créez le compte administrateur : docker compose exec app python manage.py createsuperuser</li>
+<li>Connectez-vous à https://&lt;votre-domaine&gt;/admin/ et indiquez quel modèle sert quelle finalité dans <strong>LLM → Model configs</strong>. Rien ne fonctionne tant qu&#x27;au minimum le tutorat ne pointe pas vers un fournisseur dont vous avez fourni la clé.</li>
+<li>Créez l&#x27;établissement et téléversez un programme depuis le tableau de bord enseignant.</li>
+<li><strong>Faites un tour de tutorat.</strong> C&#x27;est le vrai test — il sollicite la base de données, la base de connaissances, les identifiants et les médias en une seule action. Un contrôle de santé ne le fait pas.</li>
+</ol>
+<h3 id="upgrading">Mettre à jour</h3>
+<pre class="doc-code"><code>cd ai-tutor
+docker compose pull
+docker compose up -d</code></pre>
+<p>Les migrations s&#x27;exécutent automatiquement au démarrage. <strong>Sauvegardez d&#x27;abord.</strong> Pour figer une version au lieu de suivre la dernière, définissez IMAGE_TAG=v1.2.0 dans le .env — figer fait de la mise à jour une décision, et du retour arrière une ligne à changer.</p>
+<h2 id="path-b-your-own-aws-account">Parcours B — votre propre compte AWS</h2>
+<p>DNS et un pare-feu en façade, un répartiteur de charge qui termine le TLS, l&#x27;application sur Fargate dans des sous-réseaux privés sans adresse publique, un Postgres géré à côté, et un accès Internet sortant uniquement via une passerelle NAT. Le coût de cette configuration figure en section 6.</p>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>Ressource</strong></th><th scope="col"><strong>Ce que c&#x27;est</strong></th><th scope="col"><strong>Pourquoi</strong></th></tr></thead><tbody><tr><th scope="row">ECS Fargate</th><td>Exécute le conteneur : 4 vCPU / 8 Go, 1 tâche, jusqu&#x27;à 4</td><td>Aucun serveur à mettre à jour. L&#x27;image embarque une version CPU de PyTorch et deux modèles vocaux, d&#x27;où la taille de la tâche.</td></tr><tr><th scope="row">RDS PostgreSQL 16</th><td>db.t4g.medium, 50 Go, zone unique, sauvegardes sur 14 jours</td><td>Toutes les données de la plateforme. <strong>pgvector</strong> vit ici aussi, la base de connaissances est donc dans Postgres et non dans une base vectorielle distincte.</td></tr><tr><th scope="row">Répartiteur de charge</th><td>Point d&#x27;entrée public, terminaison TLS</td><td>La seule chose qui possède une adresse publique.</td></tr><tr><th scope="row">WAF</th><td>Limitation de débit (2000 requêtes / 5 min par adresse) plus trois groupes de règles gérés</td><td>La seule limitation de débit sur le trafic non authentifié — le limiteur applicatif s&#x27;indexe sur l&#x27;identifiant utilisateur et ne peut pas voir une requête non connectée.</td></tr><tr><th scope="row">Passerelle NAT</th><td>Internet sortant uniquement pour les sous-réseaux privés</td><td>L&#x27;application appelle les API de modèles et télécharge des images. Rien ne peut entrer.</td></tr><tr><th scope="row">S3 — médias</th><td>Images et figures des leçons. Privé.</td><td>Servi par l&#x27;application sur /media/&lt;path&gt;, jamais par une URL de bucket.</td></tr><tr><th scope="row">S3 — exploitation</th><td>Sauvegardes de base de données lors des restaurations. Privé, expiration à 7 jours.</td><td>Séparé des médias à dessein : les médias sont servis sur Internet, les sauvegardes ne doivent jamais l&#x27;être.</td></tr><tr><th scope="row">Secrets Manager</th><td>Six secrets : URL de la base, clé de signature, quatre clés de fournisseurs</td><td>Injectés au démarrage du conteneur ; jamais dans l&#x27;image ni dans le dépôt.</td></tr><tr><th scope="row">Route 53 + ACM</th><td>DNS et le certificat TLS</td><td>Le renouvellement est automatique parce que l&#x27;enregistrement de validation est géré ici.</td></tr></tbody></table></div>
+<h3 id="what-you-need-first">Ce qu&#x27;il vous faut d&#x27;abord</h3>
+<ul class="doc-list">
+<li>Un compte AWS et un rôle capable de créer des ressources VPC, ECS, RDS, S3, IAM, WAF et Route 53.</li>
+<li>Un domaine que vous contrôlez — on ne peut pas émettre de certificat pour le nom d&#x27;hôte d&#x27;un répartiteur de charge appartenant à AWS.</li>
+<li>Au moins une clé d&#x27;API de fournisseur de modèle.</li>
+<li>Installés localement : git, aws CLI v2, pulumi, docker, Python 3.12.</li>
+<li><strong>Le dépôt</strong>, pour le programme d&#x27;infrastructure-as-code dans infra/aws/. Le parcours A peut fonctionner à partir de la seule image publiée ; celui-ci non.</li>
+</ul>
+<h3 id="step-1-clone-and-configure-the-stack">Étape 1 — Cloner et configurer la stack</h3>
+<pre class="doc-code"><code>git clone &lt;repo&gt; ai-tutor &amp;&amp; cd ai-tutor/infra/aws
+python -m venv venv &amp;&amp; ./venv/bin/pip install -r requirements.txt
+
+aws configure                 # ou aws sso login
+pulumi login --local          # état dans ~/.pulumi ; sauvegardez-le
+pulumi stack init prod
+
+pulumi config set aws:region eu-west-1
+pulumi config set aitutor-aws:db-instance-class db.t4g.medium
+pulumi config set aitutor-aws:db-storage-gb 50
+pulumi config set aitutor-aws:min-tasks 1
+pulumi config set aitutor-aws:max-tasks 4
+
+# Définissez vous-même le mot de passe de la base — ne le laissez PAS être généré
+pulumi config set --secret aitutor-aws:db-password &quot;&lt;un long mot de passe aléatoire&gt;&quot;
+pulumi config set --secret aitutor-aws:django-secret-key &quot;&lt;50+ caractères aléatoires&gt;&quot;
+pulumi config set --secret aitutor-aws:anthropic-api-key &quot;sk-ant-...&quot;</code></pre>
+<h3 id="step-2-bring-up-the-infrastructure">Étape 2 — Monter l&#x27;infrastructure</h3>
+<pre class="doc-code"><code>pulumi up                                        # examinez le plan, puis confirmez
+pulumi config set aitutor-aws:enable-ecs true    # puis ajoutez le service
+pulumi up</code></pre>
+<p>Le service est délibérément derrière ce second commutateur, afin que la fondation puisse être vérifiée avant que quoi que ce soit ne tourne dessus.</p>
+<h3 id="step-3-domain-and-https">Étape 3 — Domaine et HTTPS</h3>
+<pre class="doc-code"><code>pulumi config set aitutor-aws:domain-name tutor.education.gov.xx
+pulumi config set aitutor-aws:hosted-zone-id Z0123456789ABCDEFGHIJ
+pulumi up</code></pre>
+<p>Pulumi demande le certificat, écrit l&#x27;enregistrement de validation, attend l&#x27;émission, ajoute l&#x27;écouteur HTTPS et redirige le port 80. Attendez-vous à une attente pendant la validation ; en cas de dépassement de délai, rien n&#x27;a changé et le site est toujours servi sur le port 80.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>LAISSEZ L&#x27;OUTILLAGE POSSÉDER L&#x27;ENREGISTREMENT DE VALIDATION</strong></p><p>Le certificat est revalidé au renouvellement à l&#x27;aide de cet enregistrement DNS. Un enregistrement ajouté à la main que quelqu&#x27;un range plus tard casse le renouvellement environ onze mois après — bien après que quiconque puisse relier les deux événements.</p></aside>
+<h3 id="step-4-build-and-deploy-the-application-image">Étape 4 — Construire et déployer l&#x27;image applicative</h3>
+<pre class="doc-code"><code>aws ecr get-login-password | docker login --username AWS \
+  --password-stdin &lt;acct&gt;.dkr.ecr.&lt;region&gt;.amazonaws.com
+docker build --platform linux/amd64 -t &lt;ecr-url&gt;:v1 .   # amd64 compte sur Apple Silicon
+docker push &lt;ecr-url&gt;:v1
+pulumi config set aitutor-aws:image-tag v1 &amp;&amp; pulumi up
+
+./ops/migrate_and_seed.sh                               # tâche ponctuelle</code></pre>
+<p>Ou poussez sur la branche main de votre fork et laissez le workflow de déploiement s&#x27;en charger. <strong>Ici, les migrations doivent être une tâche ponctuelle, pas une partie du démarrage du conteneur</strong> : le service lance toutes les tâches en même temps, des migrations dans la commande de démarrage entreraient donc en concurrence entre réplicas.</p>
+<h3 id="steps-5-and-6-firewall-then-verify">Étapes 5 et 6 — Pare-feu, puis vérification</h3>
+<p>Le pare-feu démarre en mode comptage, pour que vous puissiez voir ce qu&#x27;il bloquerait avant qu&#x27;il ne bloque quoi que ce soit de réel. Activez-le, puis vérifiez comme vous le feriez sur n&#x27;importe quel parcours :</p>
+<pre class="doc-code"><code>pulumi config set aitutor-aws:waf-block-mode true &amp;&amp; pulumi up
+
+curl -s https://tutor.education.gov.xx/health/     # {&quot;status&quot;: &quot;ok&quot;, ...}</code></pre>
+<p>Chargez ensuite le site, créez un compte personnel, téléversez un programme et faites un tour de tutorat.</p>
+<h2 id="path-c-pip-install-no-docker">Parcours C — installation par pip, sans Docker</h2>
+<p>La même application installée comme paquet Python, pour un parc où les conteneurs sont exclus.</p>
+<h3 id="what-you-need-first-2">Ce qu&#x27;il vous faut d&#x27;abord</h3>
+<ul class="doc-list">
+<li>Un serveur Linux : 4 vCPU, 8 Go de RAM, 60 Go de disque.</li>
+<li><strong>Python 3.12 ou plus récent</strong> — la version du framework l&#x27;exige.</li>
+<li><strong>PostgreSQL 14+ avec l&#x27;extension </strong><strong>pgvector</strong><strong> disponible.</strong> L&#x27;extension est créée par une migration ; elle doit seulement être disponible, pas activée à la main.</li>
+<li>Un domaine pointant vers le serveur, et de quoi terminer le TLS.</li>
+<li>Environ 3 Go de disque rien que pour les dépendances.</li>
+</ul>
+<pre class="doc-code"><code>sudo apt install python3.12 python3.12-venv postgresql postgresql-16-pgvector
+sudo -u postgres createuser --pwprompt aitutor
+sudo -u postgres createdb --owner aitutor aitutor
+
+sudo python3.12 -m venv /opt/ai-tutor/venv
+sudo /opt/ai-tutor/venv/bin/pip install ai-tutor
+
+sudo /opt/ai-tutor/venv/bin/ai-tutor init      # écrit /etc/ai-tutor/ai-tutor.env (0600)</code></pre>
+<p>init génère une clé de signature et crée le répertoire de données. Le relancer n&#x27;écrase jamais un fichier existant — faire tourner la clé déconnecterait tous les utilisateurs et invaliderait tous les liens de réinitialisation de mot de passe en cours. Éditez ce fichier et renseignez ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS (avec le schéma), DATABASE_URL et au moins une clé de fournisseur.</p>
+<pre class="doc-code"><code>sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo /opt/ai-tutor/venv/bin/ai-tutor seed
+sudo /opt/ai-tutor/venv/bin/ai-tutor collectstatic --noinput
+sudo /opt/ai-tutor/venv/bin/ai-tutor createsuperuser
+
+sudo /opt/ai-tutor/venv/bin/ai-tutor systemd | sudo tee /etc/systemd/system/ai-tutor.service
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now ai-tutor</code></pre>
+<p>L&#x27;unité générée porte les vrais chemins de cette installation, redémarre en cas d&#x27;échec et confine les écritures au répertoire de données. Elle écoute sur 0.0.0.0:8000 avec un délai de 300 secondes — long, parce qu&#x27;un tour de tutorat prend de 20 à 90 secondes et qu&#x27;un délai plus court tue le worker en pleine réponse. Tout proxy que vous placez devant <strong>doit sonder </strong><strong>/health/</strong><strong> en HTTP simple</strong> et transmettre X-Forwarded-Proto ; /health/ est exempté de la redirection HTTPS précisément pour cette raison. Avec nginx, mettez proxy_read_timeout 300s; — la valeur par défaut de 60 secondes coupe les réponses longues au milieu d&#x27;une phrase.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>CE QUE CE PARCOURS NE VOUS DONNE PAS</strong></p><p>La base de données — installer, régler, sécuriser et sauvegarder Postgres est à vous, et rien ici ne crée de calendrier de sauvegarde. Le TLS — aucun certificat n&#x27;est obtenu ni renouvelé pour vous. L&#x27;isolement — l&#x27;application tourne comme un processus ordinaire, pas dans un conteneur. Et notez que laisser l&#x27;URL de base de données non définie bascule sur une base fichier dans le répertoire de données : praticable pour une petite école, mais pgvector n&#x27;y est pas disponible, de sorte que la recherche dans la base de connaissances se dégrade en un balayage exact plus lent, qui ne tiendra pas à l&#x27;échelle d&#x27;une école entière.</p></aside>
+<p><strong>La mise à jour est manuelle sur ce parcours</strong>, et c&#x27;est celle qu&#x27;on rate le plus souvent : pip remplace le code et ne redémarre rien.</p>
+<pre class="doc-code"><code>sudo /opt/ai-tutor/venv/bin/pip install --upgrade ai-tutor
+sudo /opt/ai-tutor/venv/bin/ai-tutor migrate
+sudo /opt/ai-tutor/venv/bin/ai-tutor collectstatic --noinput
+sudo systemctl restart ai-tutor</code></pre>
+<h2 id="the-two-offline-shapes">Les deux formats hors ligne</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>Format</strong></th><th scope="col"><strong>Ce que c&#x27;est</strong></th><th scope="col"><strong>Ce qu&#x27;il faut</strong></th></tr></thead><tbody><tr><th scope="row">Application de bureau hors ligne</th><td>Linux, Windows et macOS. Exécute un modèle sur la machine de la classe et n&#x27;appelle jamais l&#x27;extérieur. Le travail se resynchronise vers un serveur dès qu&#x27;il y en a un joignable ; les portables fournis sont amorcés depuis un pack de contenu sur support amovible.</td><td>Une machine de classe capable d&#x27;exécuter un petit modèle local. Pas d&#x27;Internet.</td></tr><tr><th scope="row">Borne hors ligne</th><td>Une petite carte qui diffuse son propre WiFi et sert le tuteur à une adresse fixe pour tout navigateur de la salle. Pas d&#x27;écran, pas de clavier. La première réponse après un démarrage à froid prend environ quatre-vingt-dix secondes le temps que le modèle se charge ; les tours suivants se stabilisent autour de vingt.</td><td>Matériel de classe Jetson. Il est soit point d&#x27;accès, soit rattaché à votre WiFi, jamais les deux.</td></tr></tbody></table></div>
+<p>Les deux échangent la qualité du tutorat contre l&#x27;indépendance, et la section 8 explique comment mesurer cet écart sur votre propre contenu. Sur la borne, vérifiez quel modèle est réellement sélectionné : un modèle cloud configuré sur une carte hors ligne est la panne qui la casse silencieusement, raison pour laquelle la commande d&#x27;état la signale.</p>
+<h2 id="when-something-is-wrong">Quand quelque chose ne va pas</h2>
+<p>Les symptômes d&#x27;abord, parce que c&#x27;est ainsi qu&#x27;ils se présentent.</p>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>Ce que vous voyez</strong></th><th scope="col"><strong>Cause</strong></th><th scope="col"><strong>Correctif</strong></th></tr></thead><tbody><tr><th scope="row">La connexion renvoie 403 et le formulaire revient, sans aucune erreur nulle part</th><td>Les cookies de session et CSRF sont marqués Secure, et un navigateur ne les envoie pas en HTTP simple</td><td>Terminez la configuration TLS. Ou mettez HTTPS_EDGE=false et passez à la configuration en HTTP simple — uniquement sur un réseau isolé.</td></tr><tr><th scope="row">Chaque POST de formulaire échoue au contrôle CSRF, y compris la connexion</th><td>CSRF_TRUSTED_ORIGINS n&#x27;est pas défini ou il lui manque le schéma</td><td>Il lui faut l&#x27;origine complète — https://tutor.example.gov, pas un simple nom d&#x27;hôte. C&#x27;est l&#x27;échec le plus courant d&#x27;un premier déploiement.</td></tr><tr><th scope="row">Une page d&#x27;erreur DisallowedHost</th><td>L&#x27;en-tête Host ne correspond pas à ALLOWED_HOSTS</td><td>Ajoutez le nom d&#x27;hôte, y compris tout alias utilisé par les élèves.</td></tr><tr><th scope="row">L&#x27;application refuse de démarrer et se plaint de la clé de signature</th><td>C&#x27;est encore la valeur de développement par défaut et le mode debug est désactivé</td><td>Comportement voulu. Générez-en une.</td></tr><tr><th scope="row">Les réponses du tuteur sont tronquées ou reviennent vides sur les réponses longues</th><td>Un délai de proxy plus court que la réponse du modèle</td><td>Caddy et gunicorn sont tous deux réglés à 300 s ici. Portez tout proxy à vous au même niveau.</td></tr><tr><th scope="row">Le certificat n&#x27;est jamais émis</th><td>Le domaine ne résout pas vers ce serveur, ou 80/443 sont bloqués</td><td>Vérifiez le DNS et le pare-feu. Caddy réessaie ; son journal dit lequel des deux.</td></tr><tr><th scope="row">Les leçons affichent des images cassées après une restauration</th><td>La base de données et les médias viennent de moments différents</td><td>Restaurez les deux moitiés depuis le même fichier de sauvegarde.</td></tr><tr><th scope="row">Le proxy renvoie 502 alors que l&#x27;application se déclare saine</th><td>L&#x27;application écoute sur la boucle locale à l&#x27;intérieur de son conteneur, donc rien d&#x27;autre ne peut l&#x27;atteindre — et un contrôle de santé qui ne teste que localhost passe quand même</td><td>Son journal doit dire Listening at: 0.0.0.0:8000, et non 127.0.0.1:8000.</td></tr><tr><th scope="row">Une mise à jour semble ne rien faire (parcours C)</th><td>Le service exécute toujours l&#x27;ancien code</td><td>systemctl restart ai-tutor après chaque mise à jour. Contrairement à Compose, pip ne redémarre rien.</td></tr></tbody></table></div>
+<h2 id="backup-and-restore">Sauvegarde et restauration</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>Parcours</strong></th><th scope="col"><strong>Comment</strong></th></tr></thead><tbody><tr><th scope="row">A</th><td>Les scripts accompagnent le fichier compose : ./backup.sh → ./backups/aitutor-AAAA-MM-JJ-HHMM.tar.gz, et ./restore.sh backups/&lt;fichier&gt;.tar.gz pour le remettre. L&#x27;archive contient la base de données <strong>et</strong> les médias téléversés, pris ensemble.</td></tr><tr><th scope="row">B</th><td>La base gérée effectue des sauvegardes automatiques sur une fenêtre de 14 jours ; restaurez depuis la console ou avec le script de restauration fourni. Les médias sont en stockage objet et versionnés séparément.</td></tr><tr><th scope="row">C</th><td>Rien n&#x27;est planifié pour vous. Les deux moitiés, ensemble : pg_dump -Fc aitutor &gt; /mnt/backup/aitutor-$(date +%F).dump et tar czf /mnt/backup/media-$(date +%F).tar.gz -C /var/lib/ai-tutor media. Mettez les deux dans une minuterie le jour de l&#x27;installation.</td></tr></tbody></table></div>
+<p>La base de données contient la référence de chaque figure et le volume contient le fichier : c&#x27;est pourquoi les deux sont pris ensemble. Une base restaurée face à des médias plus anciens laisse des leçons aux images cassées et ne signale aucune erreur.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>TROIS RÈGLES VALABLES POUR TOUS LES PARCOURS</strong></p><p>Une sauvegarde qui n&#x27;existe que sur la machine qu&#x27;elle sauvegarde n&#x27;est pas une sauvegarde. Les sauvegardes contiennent des dossiers d&#x27;élèves — conservez-les chiffrées, avec un accès restreint aux mêmes personnes qui peuvent atteindre le serveur. Et testez une restauration : une sauvegarde non testée est une supposition, faites-le donc une fois sur une machine de rechange avant d&#x27;en avoir besoin.</p></aside>
+<h2 id="logs">Journaux</h2>
+<pre class="doc-code"><code>docker compose logs -f app          # parcours A
+journalctl -u ai-tutor -f           # parcours C</code></pre>
+<p>Le parcours B envoie les journaux au service de journalisation du fournisseur cloud, dans le groupe de journaux du cluster.</p>

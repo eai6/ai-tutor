@@ -1,0 +1,25 @@
+{# Traduit de sections/language-locale.html — conservez les id des titres. #}
+<h2 id="locale-codes">Codes de localité</h2>
+<p>En minuscules avec trait d'union, suivant la convention de codes de langue du cadre lui-même — une sous-étiquette de langue, un trait d'union, puis une sous-étiquette de pays. Le déploiement testé utilise <strong>en-us</strong>. Le code est la clé de jointure de toutes les couches ci-dessous : choisissez-le une fois et n'en changez pas.</p>
+<h2 id="the-five-places-a-locale-is-registered">Les cinq endroits où une localité est enregistrée</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>#</strong></th><th scope="col"><strong>Point d'enregistrement</strong></th><th scope="col"><strong>Ce qu'il commande</strong></th></tr></thead><tbody><tr><th scope="row">1</th><td>La liste des langues de la plateforme</td><td>Les localités qui apparaissent dans chaque sélecteur — langue par défaut de l'école, préférence de l'élève, langue du cours. Une localité absente d'ici ne peut pas être choisie.</td></tr><tr><th scope="row">2</th><td>Le profil d'identité du tuteur</td><td>La clause de public dans le rôle du tuteur : à qui il croit enseigner — « élèves du secondaire des Seychelles, niveaux S3 à S5 » dans le déploiement testé. Une entrée par pays ; aucune modification de la base de données.</td></tr><tr><th scope="row">3</th><td>La règle de langue à l'exécution</td><td>Le bloc de langue et de registre injecté dans l'invite de tutorat en direct, à chaque tour.</td></tr><tr><th scope="row">4</th><td>La règle de langue pour la génération de contenu</td><td>Les mêmes décisions de registre appliquées lors de la génération des leçons, des scripts d'enseignement et des questions d'évaluation.</td></tr><tr><th scope="row">5</th><td>Le catalogue de traduction de l'interface</td><td>Des fichiers de traduction standard pour les interfaces élève et enseignant, y compris les chaînes JavaScript.</td></tr></tbody></table></div>
+<aside class="doc-note"><p class="doc-note__label"><strong>DEUX MODES DE DÉFAILLANCE À CONNAÎTRE</strong></p><p>Une localité non enregistrée ne produit pas d'erreur. Le tuteur se rabat sur une consigne de langue générique et sur l'identité de pays par défaut — de sorte qu'un cours mal configuré produit un contenu à peu près dans la bonne langue et entièrement dans le mauvais pays. Enregistrez les cinq points et vérifiez avec une séance réelle avant de générer une matière. Par ailleurs : la règle de langue à l'exécution se trouve dans le préfixe mis en cache de l'invite de tutorat. Une fois une localité en production, gardez ses chaînes stables à l'octet près — une modification anodine invalide le cache d'invite de ce pays et augmente son coût par tour jusqu'à ce que le cache se reconstitue.</p></aside>
+<h2 id="which-language-wins-per-request">Quelle langue l'emporte, à chaque requête</h2>
+<p>La résolution se fait dans cet ordre, la première correspondance l'emportant :</p>
+<ul class="doc-list">
+<li><strong>Le cours enseigné</strong> — au sein d'une séance de tutorat, la langue de la leçon l'emporte toujours, quelles que soient les préférences de l'élève ou de l'école. Un cours de géographie rédigé dans une langue s'affiche dans cette langue pour tous ceux qui le suivent.</li>
+<li><strong>Un choix de langue explicite</strong> — la sélection du visiteur lui-même, qui est aussi la façon dont un visiteur non connecté lit la page d'accueil dans sa langue.</li>
+<li><strong>La préférence de l'élève</strong>, s'il en a défini une.</li>
+<li><strong>La langue par défaut de l'école.</strong></li>
+<li><strong>La valeur par défaut de la plateforme.</strong></li>
+</ul>
+<h2 id="register-decisions-to-settle-with-a-native-speaking-educator">Décisions de registre à trancher avec un enseignant locuteur natif</h2>
+<ul class="doc-list">
+<li>La forme d'adresse pour la tranche d'âge — vouvoiement ou tutoiement.</li>
+<li>La norme orthographique, lorsque la langue en compte plusieurs.</li>
+<li>Le vocabulaire technique qui reste dans la forme standard de la langue.</li>
+<li>Si les noms de produits et de marques sont traduits (ils ne doivent pas l'être).</li>
+<li>Les lieux, la monnaie, la géographie et l'écologie sur lesquels les exemples localisés doivent s'appuyer — et les cas où la localisation ne doit pas être forcée, parce que le sujet est abstrait.</li>
+<li>Une interdiction explicite de changer de langue en cours de contenu, y compris pour les titres, les encouragements et les messages d'erreur.</li>
+</ul>
+<p>Ces décisions sont consignées une fois sous forme de règle de langue, puis s'appliquent de façon cohérente au contenu généré et au tutorat en direct — c'est ce qui empêche les deux de diverger.</p>

@@ -1,0 +1,21 @@
+{# Traduit de sections/what-is-adopted.html — conservez les id des titres. #}
+<h2 id="for-the-student">Pour l'élève</h2>
+<p>Un élève se connecte, choisit une leçon dans le catalogue de son niveau et la parcourt sous forme de conversation. La séance suit le <strong>modèle pédagogique 5E</strong> — susciter l'intérêt, explorer, expliquer, s'entraîner, évaluer — avec un questionnement socratique et des indices progressifs plutôt que des réponses livrées. Les leçons comportent figures et schémas. À la fin, un <strong>billet de sortie</strong> tire dix questions d'une banque d'environ trente-cinq ; quatre-vingts pour cent valent réussite, et le résultat est consigné comme maîtrise de cette leçon par cet élève.</p>
+<p>Les séances peuvent se dérouler sur un appareil partagé de la salle de classe, avec deux élèves en binôme, ou sur des comptes individuels — un réglage par école, car les ratios d'équipements varient d'une école à l'autre, et non d'un pays à l'autre.</p>
+<h2 id="for-the-teacher">Pour l'enseignant</h2>
+<p>Les enseignants disposent d'un tableau de bord qui commence par le tri : quels élèves demandent une attention, quelles leçons une classe échoue, quelles séances de tutorat ont été signalées. Ils peuvent relire et modifier le contenu généré des leçons, suivre la progression par élève et par classe au regard des paliers de compétence, et lire les transcriptions signalées. Ce que les enseignants sont autorisés à faire est configurable — modifier le contenu, importer un programme et régénérer des cours sont trois droits indépendants, tous désactivés par défaut, afin qu'un ministère puisse les ouvrir au rythme de sa confiance.</p>
+<h2 id="for-the-ministry">Pour le ministère</h2>
+<p>La multi-location est structurelle. Toute requête touchant aux données des élèves est cloisonnée par établissement, avec un niveau commun à la plateforme pour le contenu que toutes les écoles partagent. Une instance nationale peut donc desservir toutes les écoles du pays tout en gardant séparés les élèves et les résultats de chacune, et en gardant privé le matériel importé par chaque école.</p>
+<h2 id="the-content-pipeline">La chaîne de production du contenu</h2>
+<p>C'est la partie qui rend l'adoption nationale réalisable. Un document de programme entre ; un cours enseigné en sort.</p>
+<pre class="doc-code"><code>programme PDF/DOCX
+   → analyseur      : hiérarchie cours › unité › leçon
+   → générateur     : 8 à 12 étapes d'enseignement par leçon
+   → service d'images : schémas pédagogiques
+   → constructeur de billets : banque d'évaluation d'environ 35 questions par leçon
+   → extracteur de compétences : graphe de compétences + prérequis
+   → relecture enseignant : modifier, valider, publier</code></pre>
+<p>Tout ce qui suit l'analyseur est généré par un modèle de langue et doit être relu, non pas cru sur parole. L'étape de relecture est le moment où une autorité curriculaire exerce son autorité réelle.</p>
+<h2 id="the-quality-layer">La couche qualité</h2>
+<p>Chaque réponse du tuteur est contrôlée avant d'atteindre l'élève par un <strong>évaluateur unifié</strong> — un unique appel de modèle multi-axes notant dix dimensions, dont l'exactitude factuelle, le respect des règles, la cohérence et la sécurité. L'évaluateur s'appuie sur une cascade multi-fournisseurs (Gemini, avec repli sur OpenAI puis sur Claude Haiku), de sorte que la panne d'un seul fournisseur dégrade le service au lieu de l'arrêter.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>CE QUE CE N'EST PAS</strong></p><p>Ce n'est pas un système de gestion de l'apprentissage et cela ne remplace pas un système d'information scolaire — l'intégration se fait par une API. Ce n'est pas une autorité curriculaire : le système produit un contenu brouillon que vos experts de matière valident ou rejettent. Ce n'est pas autonome vis-à-vis des enseignants ; le tableau de bord existe précisément parce que l'enseignant est censé intervenir. Et cela ne remplace pas l'investissement dans les équipements et la connectivité, même si les versions hors ligne en abaissent nettement le seuil.</p></aside>

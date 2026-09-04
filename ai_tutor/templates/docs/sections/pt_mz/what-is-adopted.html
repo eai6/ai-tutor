@@ -1,0 +1,21 @@
+{# Traduzido de sections/what-is-adopted.html — mantenha os id dos títulos. #}
+<h2 id="for-the-student">Para o aluno</h2>
+<p>Um aluno inicia sessão, escolhe uma lição no catálogo do seu ano e percorre-a em conversa. A sessão segue o <strong>modelo de ensino 5E</strong> — Engajar, Explorar, Explicar, Praticar, Avaliar — com questionamento socrático e pistas graduais, em vez de respostas entregues. As lições incluem figuras e diagramas. No final, uma <strong>ficha de saída</strong> retira dez perguntas de um banco de cerca de trinta e cinco; oitenta por cento é a nota de aprovação, e o resultado é registado como domínio dessa lição por esse aluno.</p>
+<p>As sessões podem correr num dispositivo partilhado da sala de aula, com dois alunos emparelhados, ou em contas individuais — uma definição por escola, porque os rácios de equipamentos diferem de escola para escola, e não de país para país.</p>
+<h2 id="for-the-teacher">Para o professor</h2>
+<p>Os professores têm um painel que começa pela triagem: que alunos precisam de atenção, que lições uma turma está a falhar, que sessões de tutoria foram sinalizadas. Podem rever e editar o conteúdo gerado das lições, ver o progresso por aluno e por turma face aos escalões de competência, e ler as transcrições sinalizadas. O que os professores podem fazer é configurável — editar conteúdo, carregar currículo e gerar de novo cursos são três permissões independentes, todas desactivadas por omissão, para que um ministério as possa abrir ao ritmo em que confia.</p>
+<h2 id="for-the-ministry">Para o ministério</h2>
+<p>O multi-inquilinato é estrutural. Todas as consultas que tocam em dados de alunos são delimitadas por instituição, com um nível de toda a plataforma para o conteúdo que todas as escolas partilham. Uma instância nacional pode assim servir todas as escolas do país mantendo separados os alunos e os resultados de cada escola, e mantendo privado o material carregado por cada escola.</p>
+<h2 id="the-content-pipeline">O pipeline de conteúdos</h2>
+<p>É esta a parte que torna a adopção nacional exequível. Entra um documento de programa; sai um curso leccionado.</p>
+<pre class="doc-code"><code>programa PDF/DOCX
+   → analisador     : hierarquia curso › unidade › lição
+   → gerador        : 8 a 12 passos de ensino por lição
+   → serviço de imagens : diagramas educativos
+   → construtor de fichas : banco de avaliação de ~35 perguntas por lição
+   → extractor de competências : grafo de competências + pré-requisitos
+   → revisão do professor : editar, aprovar, publicar</code></pre>
+<p>Tudo o que vem depois do analisador é gerado por um modelo de linguagem e deve ser revisto, não confiado. O passo de revisão é onde uma autoridade curricular exerce a sua autoridade real.</p>
+<h2 id="the-quality-layer">A camada de qualidade</h2>
+<p>Todas as respostas do tutor são verificadas antes de chegarem ao aluno por um <strong>avaliador unificado</strong> — uma única chamada multi-eixo a um modelo que pontua dez dimensões, incluindo rigor factual, cumprimento de regras, coerência e segurança. O avaliador corre contra uma cascata entre fornecedores (Gemini, com recurso a OpenAI e depois a Claude Haiku), pelo que a falha de um único fornecedor degrada o serviço em vez de o interromper.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>O QUE ISTO NÃO É</strong></p><p>Não é um sistema de gestão de aprendizagem e não substitui um sistema de informação escolar — integra-se com eles através de uma API. Não é uma autoridade curricular: gera conteúdo em rascunho que os seus especialistas das disciplinas aprovam ou rejeitam. Não é autónomo face aos professores; o painel existe precisamente porque se espera que o professor intervenha. E não substitui o investimento em equipamentos e ligação, ainda que as versões offline baixem consideravelmente essa exigência.</p></aside>

@@ -1,0 +1,22 @@
+{# Traduzido de sections/curriculum-pipeline.html — mantenha os id dos títulos. #}
+<h2 id="two-routes-in">Duas vias de entrada</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>Via</strong></th><th scope="col"><strong>Quando usar</strong></th><th scope="col"><strong>O que transporta</strong></th></tr></thead><tbody><tr><th scope="row">Gerar a partir do seu próprio programa</th><td>A via normal para um país que adopta o seu currículo nacional</td><td>Aquilo que os documentos do seu programa contiverem</td></tr><tr><th scope="row">Importar um pacote de currículo</th><td>Semear uma nova instalação a partir de conteúdo que já existe — uma disciplina partilhada, um currículo regional ou uma segunda instância nacional</td><td>Cursos, unidades, lições, passos, fichas de saída, fragmentos da base de conhecimento e media. <strong>Nenhum registo de alunos.</strong></td></tr></tbody></table></div>
+<aside class="doc-note"><p class="doc-note__label"><strong>PORQUE OS DOIS FORMATOS DE PACOTE SE RECUSAM MUTUAMENTE</strong></p><p>Um pacote de currículo semeia uma instalação estrangeira e não transporta deliberadamente qualquer lista de alunos. Um pacote de provisionamento de dispositivo transporta uma lista de alunos, porque um portátil de escola tem de ligar as contas locais às contas do servidor, e circula numa pen USB dentro de uma única escola. Os importadores rejeitam liminarmente os ficheiros um do outro, em vez de importarem o subconjunto seguro — porque, de outro modo, o erro é cometido por quem copia o ficheiro errado, muito depois de alguém estar a observar, e entregaria a um terceiro os nomes das crianças de outro país.</p></aside>
+<h2 id="the-generation-pipeline">O pipeline de geração</h2>
+<ul class="doc-list">
+<li><strong>Carregar</strong> o programa de uma disciplina, escolhendo o intervalo de páginas de cada ano. Voltar a carregar aplica alterações por fusão aditiva, em vez de apagar o que os revisores já aprovaram.</li>
+<li><strong>Analisar</strong> e converter na hierarquia de curso, unidade e lição.</li>
+<li><strong>Gerar</strong> oito a doze passos de ensino por lição, na língua do curso, com exemplos resolvidos e vocabulário.</li>
+<li><strong>Gerar figuras</strong> — diagramas educativos, com engenharia de prompts orientada a não inventar dados que não constam da lição.</li>
+<li><strong>Gerar fichas de saída</strong> — cerca de trinta e cinco perguntas por lição, das quais dez são apresentadas em cada tentativa.</li>
+<li><strong>Extrair competências</strong> e inferir os pré-requisitos das lições, construindo o grafo que impede um aluno de começar uma lição para a qual não está preparado.</li>
+<li><strong>Indexar</strong> o texto do currículo, as perguntas de exame e os materiais de ensino na base de conhecimento vectorial, para recuperação durante a tutoria. Os embeddings são calculados localmente, pelo que este passo não precisa de qualquer serviço externo.</li>
+<li><strong>Rever e publicar</strong> no painel. Nada chega aos alunos sem revisão, a não ser que assim o decida.</li>
+</ul>
+<h2 id="practical-notes">Notas práticas</h2>
+<ul class="doc-list">
+<li><strong>As figuras são a lacuna de uma instalação simples.</strong> Cerca de três quartos dos passos de lição referem uma figura. A imagem distribuída publicamente inclui lições mas não media, pelo que esses passos ficam com um vazio até a media ser gerada ou carregada. Planeie a geração de figuras como parte da Fase 2, e não como um acabamento final.</li>
+<li><strong>As falhas de geração deixam lições em estado de geração</strong> e exigem uma reposição manual para pendente — vale uma linha no manual de operações.</li>
+<li><strong>Os direitos sobre o conteúdo acompanham o conteúdo.</strong> Um currículo derivado de um programa nacional pode ter termos próprios; verifique antes de redistribuir um pacote para outro país.</li>
+<li><strong>A capacidade de revisão é o calendário.</strong> Meça-a nas primeiras duas semanas — lições revistas por especialista por dia — e replaneie a Fase 2 com base no número real.</li>
+</ul>

@@ -15,15 +15,20 @@ tell they are reading section 6 of 12 rather than an isolated article.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date as _date
 
+from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 
 from ._index import HEADINGS, WORDS
+from ._index_i18n import HEADINGS_BY_LANGUAGE
 
 # Front matter from the document control table. Shown on the index page so a
 # reader knows what vintage of a moving argument they are reading.
 VERSION = '1.0'
-VERSION_DATE = '31 August 2026'
+# A real date, not a string: rendered through the `date` filter it picks up
+# the reader's language, so a Portuguese page does not carry an English month.
+VERSION_DATE = _date(2026, 8, 31)
 STATUS = _('For discussion — not a commercial offer or a quotation')
 EVIDENCE_BASE = _(
     'Seychelles national pilot (live, secondary geography and mathematics); '
@@ -53,6 +58,20 @@ class Section:
 
     @property
     def headings(self) -> list[tuple[str, str]]:
+        """The contents rail, in the language the prose is being read in.
+
+        A translated section carries its own rail, derived from the
+        translated file by scripts/build_playbook_translations.py. Without
+        that, Portuguese prose renders under an English contents list — the
+        page looks half-finished when it is not. Falls back to English for
+        any section not translated into the active language, which is the
+        same fallback the body itself takes.
+        """
+        lang = (translation.get_language() or '').lower().replace('-', '_')
+        for key in (lang, lang.split('_')[0]):
+            found = HEADINGS_BY_LANGUAGE.get(key, {}).get(self.slug)
+            if found:
+                return found
         return HEADINGS.get(self.slug, [])
 
     @property

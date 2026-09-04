@@ -1,0 +1,12 @@
+{# Traduzido de sections/integration.html — mantenha os id dos títulos. #}
+<p>A plataforma não inclui nenhum conector para sistemas nacionais de gestão da educação. A integração faz-se através de uma API REST versionada com autenticação por token, que abrange:</p>
+<ul class="doc-list">
+<li>Autenticação, registo e utilizador actual.</li>
+<li>Cursos, lições, passos das lições e competência por lição.</li>
+<li>Iniciar e conduzir sessões de tutoria.</li>
+<li>Pacotes offline por lição e sincronização do trabalho feito offline.</li>
+<li>Registo de dispositivos para máquinas provisionadas.</li>
+</ul>
+<p>A própria aplicação publica um esquema de API legível por máquina, para que uma equipa de integração possa gerar um cliente em vez de ler prosa. Os registos dos alunos têm um campo para o identificador usado pelo sistema de informação da escola, que é a chave de junção prevista para uma sincronização de listas de alunos construída sobre a API.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>UM ÂMBITO DE INTEGRAÇÃO REALISTA PARA UM PILOTO</strong></p><p>A importação de listas de alunos e a exportação de resultados, ambas como tarefas agendadas contra a API, bastam para um primeiro trimestre. A sincronização bidireccional em tempo real com um sistema nacional é um projecto por si só e não deve estar no caminho crítico até uma primeira turma.</p></aside>
+<p><br></p>

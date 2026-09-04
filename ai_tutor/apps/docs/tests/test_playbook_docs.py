@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 from django.template import TemplateDoesNotExist, loader
-from django.test import Client
+from django.test import Client, override_settings
 from django.conf import settings
 from django.urls import reverse
 from django.utils import translation
@@ -149,12 +149,31 @@ class TestSectionLanguage:
     or nothing. Both halves need to behave, and the reader needs telling
     which one they got."""
 
-    def test_a_section_falls_back_to_english_and_says_so(self, client):
-        body = _read_in(client, 'fr')
+    def test_every_offered_language_has_every_section(self, client):
+        """Nothing a reader can pick leaves them on an English page.
+
+        The picker offers three languages and the playbook has 23 sections;
+        this is the whole grid. It fails the day someone adds a section
+        without translating it, or offers a fourth language — which is the
+        moment to catch it, not after a ministry has opened the gap.
+        """
+        for lang, _label in settings.LANGUAGES:
+            for entry in playbook.SECTIONS:
+                body = _read_in(client, lang, entry.slug)
+                assert 'docs-untranslated' not in body, f'{lang}/{entry.slug}'
+
+    def test_a_language_with_no_translation_falls_back_and_says_so(self, client):
+        """The fallback still works — it is simply unreachable from the picker.
+
+        Offering a language the sections have no directory for is the only way
+        to reach it now, so that is what this does. German is a stand-in for
+        the next language somebody adds: the reader gets English prose and is
+        told so, rather than a 404 or a blank page.
+        """
+        with override_settings(LANGUAGES=settings.LANGUAGES + [('de', 'Deutsch')]):
+            body = _read_in(client, 'de')
         assert 'docs-untranslated' in body
-        # ... and the chrome around it IS translated, so the notice is not
-        # covering for a language that simply does not work.
-        assert 'Ce que cela coûte' in body
+        assert 'What it costs' in body
 
     def test_english_gets_no_untranslated_notice(self, client):
         body = _read_in(client, 'en-us')

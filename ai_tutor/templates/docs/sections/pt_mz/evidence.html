@@ -1,0 +1,18 @@
+{# Traduzido de sections/evidence.html — mantenha os id dos títulos. #}
+<p>Um ministério que coloca um modelo de linguagem à frente de jovens de treze anos tem de saber responder a duas perguntas: como sabe que ensina bem, e como sabe quando não ensina. A plataforma tem três níveis de resposta.</p>
+<h2 id="layer-1-the-runtime-judge">Nível 1 — O avaliador em execução</h2>
+<p>Todas as respostas do tutor são pontuadas em dez dimensões antes de serem mostradas, numa única chamada ao modelo contra uma cascata entre fornecedores. Detecta erros factuais, violações de regras, incoerências e problemas de segurança à medida que ocorrem, e sinaliza sessões para revisão pelo professor.</p>
+<h2 id="layer-2-turn-level-evaluation-against-a-rubric">Nível 2 — Avaliação por turno segundo uma rubrica</h2>
+<p>Uma bancada de avaliação, integrada no painel, anota turnos individuais do tutor a partir de sessões reais de produção, segundo uma rubrica interna de trinta etiquetas em dezanove categorias de falha. Anotadores humanos e anotadores automáticos pontuam os mesmos turnos, para que os dois possam ser comparados em vez de se presumir que concordam.</p>
+<h2 id="layer-3-session-level-pedagogical-evaluation">Nível 3 — Avaliação pedagógica ao nível da sessão</h2>
+<p>Sessões completas são pontuadas segundo as oito dimensões pedagógicas do quadro de referência de avaliação de tutores de IA na literatura científica (Maurya et al., NAACL 2025) — identificação do erro, localização do erro, revelação da resposta, orientação, accionabilidade, coerência, tom do tutor e semelhança com um humano — numa escala de três níveis e não em aprovado/reprovado.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>UM RESULTADO A LEVAR PARA O SEU PRÓPRIO PLANO</strong></p><p>Em 215 sessões corrigidas à mão no piloto em curso, os avaliadores automáticos e os correctores humanos divergiram 50 vezes — e todas as divergências foram no mesmo sentido: o avaliador aprovou uma sessão que um humano reprovou. A avaliação automática é um filtro útil e um mau crivo. Preveja correcção humana antes de uma nova localidade chegar aos alunos, e não apenas as pontuações dos avaliadores.</p></aside>
+<h2 id="the-quality-gate-to-apply-before-a-cohort">O critério de qualidade a aplicar antes de uma turma</h2>
+<ul class="doc-list">
+<li>Uma amostra de sessões completas por disciplina, corrigidas à mão por um professor da disciplina segundo a rubrica de sessão — suficiente para ver os padrões de falha, não para constituir um estudo científico.</li>
+<li>Uma passagem de revisão de conteúdo: todas as lições no âmbito lidas e aprovadas por um especialista da disciplina, com as figuras verificadas face ao texto que ilustram.</li>
+<li>Uma passagem de revisão linguística por um educador falante nativo, sobre o conteúdo gerado e sobre sessões em directo, verificando o registo e a ausência de alternância de código.</li>
+<li>Uma verificação de segurança: mensagens de aluno deliberadamente fora de tema, perturbadoras e adversariais, confirmando que a sinalização e a visibilidade para o professor funcionam.</li>
+<li>Uma medição de custo sobre o conteúdo revisto, na configuração de modelos que tenciona colocar em produção.</li>
+</ul>
+<p>Se estiver a usar um modelo local em vez de um modelo na nuvem, execute este critério duas vezes — uma por configuração — e compare. Essa comparação é a evidência para o compromisso de soberania, e é o artefacto mais valioso que um piloto nacional pode produzir.</p>

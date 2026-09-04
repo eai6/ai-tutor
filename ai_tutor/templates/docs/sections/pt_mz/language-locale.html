@@ -1,0 +1,25 @@
+{# Traduzido de sections/language-locale.html — mantenha os id dos títulos. #}
+<h2 id="locale-codes">Códigos de localidade</h2>
+<p>Em minúsculas e com hífen, seguindo a convenção de códigos de língua do próprio quadro — uma subetiqueta de língua, um hífen e depois uma subetiqueta de país. A instalação testada usa <strong>en-us</strong>. O código é a chave de junção em todas as camadas abaixo, por isso escolha-o uma vez e não o altere.</p>
+<h2 id="the-five-places-a-locale-is-registered">Os cinco sítios onde uma localidade é registada</h2>
+<div class="doc-table-wrap" tabindex="0" role="region"><table class="doc-table"><thead><tr><th scope="col"><strong>#</strong></th><th scope="col"><strong>Ponto de registo</strong></th><th scope="col"><strong>O que controla</strong></th></tr></thead><tbody><tr><th scope="row">1</th><td>A lista de línguas da plataforma</td><td>Que localidades aparecem em cada selector — predefinição da escola, preferência do aluno, língua do curso. Uma localidade ausente daqui não pode ser seleccionada.</td></tr><tr><th scope="row">2</th><td>O perfil de identidade do tutor</td><td>A cláusula de público no papel do tutor: quem ele julga estar a ensinar — «alunos do secundário das Seicheles, anos S3 a S5» na instalação testada. Uma entrada por país; sem alteração à base de dados.</td></tr><tr><th scope="row">3</th><td>A regra de língua em execução</td><td>O bloco de língua e registo inserido no prompt de tutoria em directo, em cada turno.</td></tr><tr><th scope="row">4</th><td>A regra de língua da geração de conteúdos</td><td>As mesmas decisões de registo aplicadas quando se geram lições, guiões de ensino e perguntas de avaliação.</td></tr><tr><th scope="row">5</th><td>O catálogo de tradução da interface</td><td>Ficheiros de tradução normalizados para as interfaces do aluno e do professor, incluindo as cadeias de JavaScript.</td></tr></tbody></table></div>
+<aside class="doc-note"><p class="doc-note__label"><strong>DOIS MODOS DE FALHA A CONHECER</strong></p><p>Uma localidade não registada não dá erro. O tutor recorre a uma instrução de língua genérica e à identidade de país predefinida — pelo que um curso mal configurado produz conteúdo mais ou menos na língua certa e inteiramente no país errado. Registe os cinco pontos e confirme com uma sessão real antes de gerar uma disciplina. Além disso: a regra de língua em execução fica dentro do prefixo em cache do prompt de tutoria. Depois de uma localidade estar em produção, mantenha as suas cadeias estáveis ao byte — uma edição acidental invalida a cache de prompts desse país e aumenta o custo por turno até a cache voltar a encher.</p></aside>
+<h2 id="which-language-wins-per-request">Que língua prevalece, em cada pedido</h2>
+<p>A resolução decorre por esta ordem, prevalecendo a primeira correspondência:</p>
+<ul class="doc-list">
+<li><strong>O curso que está a ser leccionado</strong> — dentro de uma sessão de tutoria, a língua da lição prevalece sempre, independentemente da preferência do aluno ou da escola. Um curso de geografia redigido numa língua é apresentado nessa língua a todos os que o frequentam.</li>
+<li><strong>Uma escolha explícita de língua</strong> — a opção do próprio visitante, que é também como um visitante sem sessão iniciada lê a página inicial na sua língua.</li>
+<li><strong>A preferência do aluno</strong>, se tiver definido alguma.</li>
+<li><strong>A língua predefinida da escola.</strong></li>
+<li><strong>A predefinição da plataforma.</strong></li>
+</ul>
+<h2 id="register-decisions-to-settle-with-a-native-speaking-educator">Decisões de registo a fechar com um educador falante nativo</h2>
+<ul class="doc-list">
+<li>Forma de tratamento para a faixa etária — formal ou informal.</li>
+<li>Norma ortográfica, quando a língua tem mais do que uma.</li>
+<li>Que vocabulário técnico se mantém na forma padrão da língua.</li>
+<li>Se os nomes de produtos e marcas são traduzidos (não devem ser).</li>
+<li>Que lugares, moeda, geografia e ecologia devem servir de base aos exemplos localizados — e onde a localização não deve ser forçada, por o tema ser abstracto.</li>
+<li>Uma proibição explícita de mudar de língua a meio do conteúdo, incluindo em títulos, afirmações e mensagens de erro.</li>
+</ul>
+<p>Estas decisões são escritas uma vez como regra de língua e aplicam-se depois de forma consistente ao conteúdo gerado e à tutoria em directo, que é o que impede os dois de se afastarem um do outro.</p>

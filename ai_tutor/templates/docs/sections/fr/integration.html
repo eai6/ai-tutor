@@ -1,0 +1,12 @@
+{# Traduit de sections/integration.html — conservez les id des titres. #}
+<p>La plateforme ne fournit aucun connecteur vers un système national de gestion de l'éducation. L'intégration passe par une API REST versionnée avec authentification par jeton, qui couvre :</p>
+<ul class="doc-list">
+<li>L'authentification, l'inscription et l'utilisateur courant.</li>
+<li>Les cours, les leçons, les étapes de leçon et la compétence par leçon.</li>
+<li>Le démarrage et la conduite des séances de tutorat.</li>
+<li>Les paquets hors ligne par leçon et la synchronisation du travail effectué hors ligne.</li>
+<li>L'enregistrement des appareils pour les machines provisionnées.</li>
+</ul>
+<p>L'application publie elle-même un schéma d'API lisible par machine, afin qu'une équipe d'intégration puisse générer un client plutôt que de lire de la prose. Les dossiers des élèves comportent un champ pour l'identifiant utilisé par le système d'information de l'école, qui est la clé de jointure prévue pour une synchronisation des listes d'élèves bâtie sur l'API.</p>
+<aside class="doc-note"><p class="doc-note__label"><strong>UN PÉRIMÈTRE D'INTÉGRATION RÉALISTE POUR UN PILOTE</strong></p><p>L'import des listes d'élèves et l'export des résultats, tous deux sous forme de tâches planifiées contre l'API, suffisent pour un premier trimestre. La synchronisation bidirectionnelle en temps réel avec un système national est un projet à part entière et ne doit pas figurer sur le chemin critique menant à une première cohorte.</p></aside>
+<p><br></p>
