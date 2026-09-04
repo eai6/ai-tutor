@@ -235,7 +235,25 @@ class PoseQuestionMessageHandlerTest(TestCase):
         # Text block content survives verbatim.
         self.assertIn("100°", out)
         self.assertIn("120°", out)
-        # Bank question is also rendered after the text block.
+        # The bank question is NOT appended: the text block already
+        # carries an authored question, and rendering a second one would
+        # leave the student two questions with awaiting_answer pointing
+        # at the wrong one. See AUTHORED_VS_BANK_CONFLICT in
+        # conversational_tutor.py — the guard skips the bank render and
+        # lets the chat-authored grader take the next reply. This test
+        # asserted the pre-guard behaviour.
+        self.assertNotIn("Three angles are 95°, 70°, x°", out)
+
+    def test_bank_question_renders_when_the_text_poses_none(self):
+        """The other half of the conflict guard: with no authored
+        question in the text, the bank question is rendered as usual."""
+        tutor = self._make_tutor()
+        message = _fake_message([
+            _fake_text_block("Angles around a point always add to the same total."),
+            _fake_tool_use_block("pose_question", {"slot": 0}),
+        ])
+        out = tutor._handle_pose_question_message(message, {})
+        self.assertIn("Angles around a point always add", out)
         self.assertIn("Three angles are 95°, 70°, x°", out)
 
     def test_text_only_response_passes_through(self):

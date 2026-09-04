@@ -115,12 +115,33 @@ class RegenerationTriggerTest(unittest.TestCase):
 
     def test_unfounded_praise_does_not_trigger_regen(self):
         from ai_tutor.apps.tutoring.validator import validate_tutor_response
-        # Praise is patched inline (stripped); not a regen trigger.
+        # Praise on a wrong answer is not a regen trigger. The reply has
+        # to carry a question, or `no_question` fires and the assertion
+        # passes or fails on the wrong rule — which is what it had been
+        # doing since the reply "Brilliant! That's it. Let's move on."
+        # stopped being acceptable on its own terms.
         result = validate_tutor_response(
-            "Brilliant! That's it. Let's move on.",
+            "Brilliant! That's it. What would you try next?",
             is_correct=False, bare_answer=False, step_type='practice',
         )
+        self.assertEqual(result.issues, [])
         self.assertFalse(result.needs_regeneration)
+
+    def test_praise_is_left_in_place(self):
+        """`strip_praise_if_wrong` has been a no-op since 2026-05-06 —
+        the stock opener phrases it injected became the next thing the
+        model echoed turn after turn. So praise survives the validator
+        untouched and `unfounded_praise_stripped` is never recorded.
+        """
+        from ai_tutor.apps.tutoring.validator import (
+            validate_tutor_response, ISSUE_UNFOUNDED_PRAISE_STRIPPED,
+        )
+        text = "Brilliant! That's it. What would you try next?"
+        result = validate_tutor_response(
+            text, is_correct=False, bare_answer=True, step_type='practice',
+        )
+        self.assertEqual(result.content, text)
+        self.assertNotIn(ISSUE_UNFOUNDED_PRAISE_STRIPPED, result.issues)
 
     def test_contradicted_claim_triggers_regen(self):
         from ai_tutor.apps.tutoring.validator import (

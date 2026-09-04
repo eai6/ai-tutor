@@ -84,7 +84,14 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
     @patch('ai_tutor.apps.safety.RateLimiter.record_message')
     @patch('ai_tutor.apps.safety.RateLimiter.check_rate_limit')
     @patch('ai_tutor.apps.safety.ContentSafetyFilter.check_content')
-    @patch('ai_tutor.apps.tutoring.conversational_tutor.ConversationalTutor.respond')
+    # simple_tutor.engine.respond_for_view, not
+    # ConversationalTutor.respond: the SIMPLE_TUTOR_ENGINE dispatch was
+    # removed on 2026-06-01 and the view calls the engine directly. With
+    # the old patch in place the real engine ran, failed for want of an
+    # LLM, and the assertion compared the tutor's "I had trouble
+    # responding" fallback against the mock's text — so this test proved
+    # nothing about PII scrubbing, which is the thing it exists for.
+    @patch('ai_tutor.apps.tutoring.simple_tutor.engine.respond_for_view')
     def test_chat_respond_uses_filtered_content(self, mock_respond, mock_check_content, mock_rate_check, mock_record):
         """chat_respond should pass filtered (PII-scrubbed) content to tutor (JsonResponse)."""
         from ai_tutor.apps.tutoring.views import chat_respond
@@ -97,26 +104,17 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
             warnings=['PII detected'],
             blocked=False,
         )
-        # respond() returns a result object; mock it with the expected attributes
-        mock_result = MagicMock()
-        mock_result.content = "Great question!"
-        mock_result.phase = "instruction"
-        mock_result.media = []
-        mock_result.show_exit_ticket = False
-        mock_result.exit_ticket_data = None
-        mock_result.is_complete = False
-        mock_result.step_number = 1
-        mock_result.total_steps = 5
-        mock_result.is_correct = False
-        mock_result.streak_count = 0
-        mock_result.practice_score = ""
-        mock_result.milestone = None
-        mock_result.artifact_html = None
-        # The view reads `probe` via getattr default-None; on a bare
-        # MagicMock that returns a MagicMock (auto-spec) which JSON
-        # can't serialize. Pin every JSON-encoded field explicitly.
-        mock_result.probe = None
-        mock_respond.return_value = mock_result
+        # respond_for_view returns the view payload directly — a plain
+        # dict that JsonResponse serialises, so there is nothing to pin
+        # field by field the way the old result object needed.
+        mock_respond.return_value = {
+            'message': "Great question!",
+            'phase': "instruction",
+            'media': [],
+            'is_complete': False,
+            'step_number': 1,
+            'total_steps': 5,
+        }
 
         session = self._create_session()
         request = self._make_request(self.student_user, {'message': 'my email is test@example.com'})
@@ -126,7 +124,8 @@ class TestR8SafetyWiring(BaseTutoringTestCase):
         data = json.loads(response.content)
         self.assertEqual(data['message'], "Great question!")
 
-        # Tutor should receive filtered content, not original
+        # Tutor should receive filtered content, not original. The
+        # engine takes (session, message), so the scrubbed text is the
+        # second positional argument.
         mock_respond.assert_called_once()
-        call_args = mock_respond.call_args
-        self.assertIn('[REDACTED]', call_args[0][0])
+        self.assertIn('[REDACTED]', mock_respond.call_args[0][1])

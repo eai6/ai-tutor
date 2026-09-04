@@ -351,8 +351,10 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         ]
         snapshots = []
 
+        # **_ so a new keyword on engine._call_llm (config= was the last one)
+        # does not fail this fake with a TypeError the test cannot explain.
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, **_):
             resp = responses.pop(0)
             if on_delta is not None and not responses:
                 # Call 2: hand the text over a character at a time, the way
@@ -395,25 +397,31 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         self.assertEqual(buffered['content'], streamed['content'])
 
     def test_an_unsafe_reply_streams_only_its_corrected_form(self, _kb):
-        """LEAKY is unsafe end to end — a false affirmation on a wrong answer,
-        followed by the reference itself. What streams must be the CORRECTED
-        text: the opener replaced with a verdict-consistent acknowledgement
-        and the reveal sentence gone. The student never sees the model's
-        original claim, not even briefly.
+        """LEAKY opens with a false affirmation on a wrong answer. What
+        streams must be the CORRECTED text: the opener replaced with a
+        verdict-consistent acknowledgement. The student never sees the
+        model's original claim, not even briefly.
 
         This is also the regression test for the Call-1 handover. When the
         gate's buffer was not reset between Call 1's prose and Call 2's
         stream, the opener was no longer at position 0, `_align_reply_polarity`
         took its mid-reply branch instead of its opener branch, and the
-        streamed text differed from the persisted text."""
+        streamed text differed from the persisted text.
+
+        The reveal sentence is NOT redacted, and this test no longer claims
+        it is: `_filter_reveals` was removed on 2026-08-06 because every
+        redaction is also a chance to cut correct teaching, and that one did.
+        Leak prevention is the prompt's job now, with apps/tutoring/
+        answer_leak.py feeding regen as the mechanism if it needs catching
+        again. See the note where the filter used to live in engine.py."""
         session = _make_session(13)
         self._slot(session)
         _out, snapshots = self._run(session, stream=True)
         self.assertTrue(snapshots)
         streamed = snapshots[-1]
         self.assertNotIn('Exactly right', streamed)
-        self.assertNotIn('answer is A', streamed)
-        # Positively assert the correction, not just the absence of the leak.
+        # Positively assert the correction, not just the absence of the
+        # false affirmation.
         self.assertIn('Not quite', streamed)
 
     def test_a_safe_reply_does_stream(self, _kb):
@@ -428,16 +436,19 @@ class StreamedVsBufferedParityTest(DjangoTestCase):
         self.assertTrue(snapshots, 'a benign reply produced no snapshots')
         self.assertIn('Not quite', snapshots[-1])
 
-    def test_the_stream_never_showed_what_the_batch_pass_redacted(self, _kb):
+    def test_the_stream_never_showed_what_the_batch_pass_rewrote(self, _kb):
         session = _make_session(12)
         self._slot(session)
         out, snapshots = self._run(session, stream=True)
-        # The model claimed "Exactly right!" on a WRONG answer and stated the
-        # reference. Neither may survive — in the final text or in any frame
-        # the student saw on the way there.
+        # The model claimed "Exactly right!" on a WRONG answer. The batch
+        # pass rewrites that opener, and no frame the student saw on the way
+        # there may carry the original.
+        #
+        # The reference sentence is a separate matter and is no longer
+        # redacted anywhere — see the note on the test above.
         for snap in snapshots + [out['content']]:
-            self.assertNotIn('The answer is A', snap)
             self.assertNotIn('Exactly right', snap)
+        self.assertIn('Not quite', out['content'])
 
 
 @patch('ai_tutor.apps.tutoring.simple_tutor.engine._retrieve_kb', return_value=[])
@@ -467,8 +478,10 @@ class Call1FlushGuardTest(DjangoTestCase):
         ]
         snapshots = []
 
+        # **_ so a new keyword on engine._call_llm (config= was the last one)
+        # does not fail this fake with a TypeError the test cannot explain.
         def _fake_call(*, system_blocks, tools, messages, tool_choice=None,
-                       on_delta=None):
+                       on_delta=None, **_):
             return responses.pop(0) if responses else _llm_response(text='')
 
         with patch.dict(os.environ, {'TUTOR_MODEL_OVERRIDE': self.KIOSK_MODEL}):

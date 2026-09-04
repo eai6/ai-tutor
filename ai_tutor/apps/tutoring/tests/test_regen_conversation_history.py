@@ -128,11 +128,10 @@ class RepairInstructionsHaveExamplesTest(SimpleTestCase):
         self.assertIn("Example:", out)
         self.assertIn("CONCEPTUAL", out)
 
-    def test_rule1_has_example(self):
-        out = self._build("rule1_violation")
-        self.assertIn("Example:", out)
-        # Discourages defaulting to one phrase
-        self.assertIn("walk me through", out.lower())
+    # test_rule1_has_example removed: the rule1_violation repair handler
+    # was deleted on 2026-05-17 along with the rule itself (the grader is
+    # authoritative on correctness, so praise on a verified-correct bare
+    # answer is justified). The test outlived the behaviour it described.
 
     def test_figure_ref_without_signal_has_example(self):
         out = self._build(

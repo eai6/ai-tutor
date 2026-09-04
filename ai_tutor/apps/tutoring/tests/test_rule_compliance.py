@@ -33,10 +33,16 @@ from ai_tutor.apps.tutoring.rule_compliance import (
 from ai_tutor.apps.tutoring.validator import (
     ISSUE_ARITHMETIC_VIOLATION,
     ISSUE_AUTHORING_VIOLATION,
-    ISSUE_RULE1_VIOLATION,
     ValidationResult,
     validate_tutor_response,
 )
+
+# Removed from the validator on 2026-05-17 with the rule itself. The
+# judge and `rule_compliance.RULE_RULE_1` still exist so stored judge
+# outputs keep deserializing, but nothing translates them into a
+# validator issue any more — so the name is kept here as a literal, for
+# the test that pins exactly that.
+ISSUE_RULE1_VIOLATION = "rule1_violation"
 
 
 # The exact transcript that was shipping past the judge before the
@@ -110,7 +116,11 @@ class CheckRuleComplianceTest(TestCase):
         )
         self.assertIn(RULE_ARITHMETIC, result.violated_rules)
 
-    def test_rule1_violation_propagates(self):
+    def test_rule1_violation_is_ignored(self):
+        """RULE_1 was dropped from VALID_RULES on 2026-05-17, so a judge
+        still emitting it (an older prompt, a stored output being
+        replayed) contributes nothing. The constant survives only so
+        those stored outputs keep deserializing."""
         client = _mock_llm_client({
             "violations": [{
                 "rule": "RULE_1",
@@ -125,7 +135,7 @@ class CheckRuleComplianceTest(TestCase):
             student_input="135",
             answer_was_bare=True,
         )
-        self.assertIn(RULE_RULE_1, result.violated_rules)
+        self.assertNotIn(RULE_RULE_1, result.violated_rules)
 
     def test_skipped_when_no_llm_client(self):
         result = check_rule_compliance(
@@ -253,8 +263,13 @@ class ValidatorIntegrationTest(TestCase):
             fact_check=False,  # isolate to L5
             bank_stems=["different stem"],
         )
+        # Still recorded — analytics reads it. But NOT a regen trigger:
+        # dropped from _REGEN_ISSUES on 2026-05-16 because the regen rate
+        # was destroying tool calls, and the grader now handles
+        # tutor-authored questions. This test asserted the old behaviour
+        # and had been invisible: the module failed to import.
         self.assertIn(ISSUE_AUTHORING_VIOLATION, result.issues)
-        self.assertTrue(result.needs_regeneration)
+        self.assertFalse(result.needs_regeneration)
 
     def test_arithmetic_violation_lands_in_issues(self):
         client = _mock_llm_client({
@@ -276,12 +291,16 @@ class ValidatorIntegrationTest(TestCase):
         self.assertIn(ISSUE_ARITHMETIC_VIOLATION, result.issues)
         self.assertTrue(result.needs_regeneration)
 
-    def test_rule1_violation_lands_in_issues(self):
-        # Use a praise synonym L2's regex blocklist DOES NOT catch
-        # ("you've got the rule" — covered neither by "got it" nor by
-        # "got the rule"). The whole point of L5 is to catch the
-        # synonyms L2 misses; if we used a literal-blocklisted phrase,
-        # L2 would strip it before L5 ever runs.
+    def test_rule1_violation_no_longer_lands_in_issues(self):
+        """RULE_1 ("praise on a bare answer") was retired on 2026-05-17.
+
+        The judge may still return it — the category is kept so stored
+        judge outputs deserialize — but the validator must not turn it
+        into an issue or a regeneration. This test asserted the opposite
+        until the rule was removed; inverted, it is the thing worth
+        pinning, because a re-added translation would silently reinstate
+        a rule the pilot deliberately dropped.
+        """
         client = _mock_llm_client({
             "violations": [{
                 "rule": "RULE_1",
@@ -290,7 +309,7 @@ class ValidatorIntegrationTest(TestCase):
             }],
         })
         result = validate_tutor_response(
-            "You've got the rule down — let's go on!",
+            "You've got the rule down — what would you try next?",
             is_correct=None,
             bare_answer=True,
             step_type='practice',
@@ -298,8 +317,8 @@ class ValidatorIntegrationTest(TestCase):
             llm_client=client,
             fact_check=False,
         )
-        self.assertIn(ISSUE_RULE1_VIOLATION, result.issues)
-        self.assertTrue(result.needs_regeneration)
+        self.assertNotIn(ISSUE_RULE1_VIOLATION, result.issues)
+        self.assertFalse(result.needs_regeneration)
 
     def test_no_violation_means_passed(self):
         client = _mock_llm_client({"violations": []})

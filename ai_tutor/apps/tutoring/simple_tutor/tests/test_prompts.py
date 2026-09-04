@@ -864,19 +864,47 @@ class EndToEndShapeTest(TestCase):
         self.assertIn('Step 1 (Engage)', b2)
         self.assertIn('What is an angle?', b2)
 
-    def test_minimal_render_no_extras(self):
-        # No KB, no history, no figures, no pool — only blocks 0 + 1
+    def test_minimal_render_carries_no_extras(self):
+        """No KB, no history, no figures, no pool.
+
+        The dynamic block still renders, because <reply_length> is
+        unconditional — it is the budget for every reply, not a response
+        to something in the turn. So the assertion is about what block 2
+        does NOT contain rather than about it not existing; the old
+        `len(blocks) == 2` predated that block and had been failing ever
+        since it was added.
+        """
         blocks, tools = build_system_prompt(
             session=_session(), step=_step(),
         )
-        self.assertEqual(len(blocks), 2)   # block 0 + block 1; no block 2
+        self.assertEqual(len(blocks), 3)
+        # Blocks 0 and 1 are stable across turns and cached; the dynamic
+        # one is not, and paying to cache it would be the bug.
+        self.assertIn('cache_control', blocks[0])
+        self.assertIn('cache_control', blocks[1])
+        self.assertNotIn('cache_control', blocks[2])
 
-    def test_no_step_only_block_0(self):
-        # Exit-ticket mode: step is None → only block 0 (rules + safety)
+        b2 = blocks[2]['text']
+        self.assertIn('<reply_length>', b2)
+        for absent in ('<knowledge_base', '<recent_history',
+                       '<figure_catalog', '<lesson_context'):
+            self.assertNotIn(absent, b2)
+
+    def test_no_step_drops_the_step_block(self):
+        """Exit-ticket mode: step is None → rules block plus the dynamic
+        block, and nothing describing a step that isn't running."""
         blocks, _ = build_system_prompt(
             session=_session(), step=None,
         )
-        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks), 2)
+        self.assertTrue(blocks[0]['text'].startswith('<role>'))
+        self.assertTrue(blocks[1]['text'].startswith('<reply_length>'))
+        # startswith, not `assertNotIn`: the rules block names
+        # <current_step> in prose ("Adapt to the 5E phase shown in
+        # <current_step>"), so only the block that OPENS with the tag is
+        # the step block.
+        self.assertFalse(any(b['text'].startswith('<current_step>')
+                             for b in blocks))
 
     def test_empty_pool_renders_status_marker(self):
         # No catalog questions for the step — pool renders status="empty"
