@@ -194,7 +194,7 @@
     </div>
     <div>
         <span style="display:inline-block;padding:0.125rem 0.5rem;border-radius:9999px;font-size:0.6875rem;font-weight:700;text-transform:uppercase;
-            {% if session.status == 'active' %}background:var(--success-surface);color:var(--success-solid);{% elif session.status == 'completed' %}background:var(--info-surface);color:var(--info-solid);{% else %}background:var(--surface-sunken);color:var(--text-muted);{% endif %}">
+            {% if session.status == 'active' %}background:var(--color-success-surface);color:var(--color-success-solid);{% elif session.status == 'completed' %}background:var(--color-info-surface);color:var(--color-info-solid);{% else %}background:var(--color-surface-sunken);color:var(--color-text-muted);{% endif %}">
             {{ session.status }}
         </span>
     </div>
@@ -225,7 +225,7 @@ memory/pilot_session_plan.md).
     <span class="exit-score-big {% if exit_score >= 8 %}exit-pass{% else %}exit-fail{% endif %}">
         {{ exit_score }}/{{ exit_total|default:"10" }}
     </span>
-    <span style="margin-left:0.5rem;font-size:0.875rem;color:var(--text-muted);">
+    <span style="margin-left:0.5rem;font-size:0.875rem;color:var(--color-text-muted);">
         {% if exit_score >= 8 %}{% trans "Passed" %}{% else %}{% trans "Did not pass" %}{% endif %}
     </span>
 </div>
@@ -253,10 +253,10 @@ memory/pilot_session_plan.md).
             {% endcomment %}
             {% for m in turn.metadata.attached_media %}
                 {% if m.url %}
-                <div style="margin-top:0.4rem;max-width:340px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);">
+                <div style="margin-top:0.4rem;max-width:340px;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;background:var(--color-surface);">
                     <img src="{{ m.url }}" alt="{{ m.alt }}" style="display:block;width:100%;height:auto;">
                     {% if m.caption %}
-                    <div style="font-size:0.7rem;color:var(--text-muted);padding:0.35rem 0.5rem;border-top:1px solid var(--surface-sunken);background:var(--surface-sunken);">
+                    <div style="font-size:0.7rem;color:var(--color-text-muted);padding:0.35rem 0.5rem;border-top:1px solid var(--color-surface-sunken);background:var(--color-surface-sunken);">
                         {{ m.caption|truncatechars:160 }}
                     </div>
                     {% endif %}

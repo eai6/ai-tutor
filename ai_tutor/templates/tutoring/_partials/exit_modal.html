@@ -378,7 +378,7 @@ function showExitTicket() {
             const qAnswerData = q.answer_data || {};
             if (qAnswerData.figure_url) {
                 bodyHTML += `<div style="text-align:center;margin-bottom:0.75rem;">
-                    <img src="${qAnswerData.figure_url}" style="max-width:100%;border-radius:0.5rem;border:1px solid var(--border);" alt="Question figure">
+                    <img src="${qAnswerData.figure_url}" style="max-width:100%;border-radius:0.5rem;border:1px solid var(--color-border);" alt="Question figure">
                 </div>`;
             }
 
@@ -441,14 +441,14 @@ function showExitTicket() {
                 const ad = q.answer_data || {};
                 let dataDesc = '';
                 if (ad.figure_svg) {
-                    dataDesc = `<div class="data-description-figure" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;">`
+                    dataDesc = `<div class="data-description-figure" style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:8px;margin-bottom:8px;">`
                         + ad.figure_svg
                         + `</div>`;
                 } else if (ad.figure_url) {
                     const altText = escapeHtml(ad.figure_description || 'Question figure');
                     dataDesc = `<div class="data-description-figure" style="text-align:center;margin-bottom:8px;">`
-                        + `<img src="${escapeHtml(ad.figure_url)}" alt="${altText}" style="max-width:100%;border-radius:8px;border:1px solid var(--border);">`
-                        + (ad.figure_source ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Source: ${escapeHtml(ad.figure_source)}</div>` : ``)
+                        + `<img src="${escapeHtml(ad.figure_url)}" alt="${altText}" style="max-width:100%;border-radius:8px;border:1px solid var(--color-border);">`
+                        + (ad.figure_source ? `<div style="font-size:0.7rem;color:var(--color-text-muted);margin-top:4px;">Source: ${escapeHtml(ad.figure_source)}</div>` : ``)
                         + `</div>`;
                 } else if (ad.data_description) {
                     if (/<[a-z][\s\S]*>/i.test(ad.data_description)) {
@@ -469,7 +469,7 @@ function showExitTicket() {
                 const mathBar = `
                     <div class="math-toolbar" data-q="${origIdx}" style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.4rem;">
                         ${['°','π','√','²','³','±','≤','≥','≠','×','÷','½','¼','¾'].map(sym =>
-                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">${sym}</button>`
+                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">${sym}</button>`
                         ).join('')}
                     </div>`;
                 bodyHTML = `${dataDesc}${mathBar}
@@ -687,11 +687,11 @@ function showExitResults(results) {
                     ? !!perBlank[idx]
                     : r.is_correct;
                 if (ok) {
-                    inp.style.borderColor = 'var(--success-solid)';
-                    inp.style.background = 'var(--success-surface)';
+                    inp.style.borderColor = 'var(--color-success-solid)';
+                    inp.style.background = 'var(--color-success-surface)';
                 } else {
-                    inp.style.borderColor = 'var(--danger-solid)';
-                    inp.style.background = 'var(--danger-surface)';
+                    inp.style.borderColor = 'var(--color-danger-solid)';
+                    inp.style.background = 'var(--color-danger-surface)';
                 }
             });
         } else if (qType === 'matching') {
@@ -707,18 +707,18 @@ function showExitResults(results) {
                     ? !!perPair[idx]
                     : r.is_correct;
                 if (ok) {
-                    sel.style.borderColor = 'var(--success-solid)';
-                    sel.style.background = 'var(--success-surface)';
+                    sel.style.borderColor = 'var(--color-success-solid)';
+                    sel.style.background = 'var(--color-success-surface)';
                 } else {
-                    sel.style.borderColor = 'var(--danger-solid)';
-                    sel.style.background = 'var(--danger-surface)';
+                    sel.style.borderColor = 'var(--color-danger-solid)';
+                    sel.style.background = 'var(--color-danger-surface)';
                 }
             });
         } else if (qType === 'short_answer' || qType === 'data_interpretation' || qType === 'short_numeric') {
             const textarea = qDiv.querySelector('.exit-textarea');
             if (textarea) {
-                textarea.style.borderColor = r.is_correct ? 'var(--success-solid)' : 'var(--danger-solid)';
-                textarea.style.background = r.is_correct ? 'var(--success-surface)' : 'var(--danger-surface)';
+                textarea.style.borderColor = r.is_correct ? 'var(--color-success-solid)' : 'var(--color-danger-solid)';
+                textarea.style.background = r.is_correct ? 'var(--color-success-surface)' : 'var(--color-danger-surface)';
             }
         }
 
@@ -755,7 +755,7 @@ function plotSpecAsTable(spec) {
         return `<tr><th>${escapeHtml(ds.label)}</th>${cells.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`;
     }).join('');
     return `<table class="data-description-fallback" style="width:100%;border-collapse:collapse">
-        <thead><tr>${headers.map(h => `<th style="padding:6px 10px;border:1px solid var(--border);background:var(--surface-sunken);">${escapeHtml(h)}</th>`).join('')}</tr></thead>
+        <thead><tr>${headers.map(h => `<th style="padding:6px 10px;border:1px solid var(--color-border);background:var(--color-surface-sunken);">${escapeHtml(h)}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
 }

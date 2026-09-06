@@ -6,9 +6,9 @@
 
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <p style="color: var(--gray-500);">{% trans "Manage your courses and lessons" %}</p>
+    <p style="color: var(--color-warm-500);">{% trans "Manage your courses and lessons" %}</p>
     {% if can_upload_curriculum %}
-    <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">
+    <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
@@ -18,7 +18,7 @@
 </div>
 
 {% if courses %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% blocktrans with count=courses|length %}All Courses ({{ count }}){% endblocktrans %}</h2>
     </div>
@@ -41,10 +41,10 @@
                     <td>
                         <span style="font-weight: 500;">{{ c.course.title }}</span>
                         {% if c.is_platform_wide %}
-                        <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--info-surface);color:var(--info);font-size:0.7rem;margin-left:0.5rem;">{% trans "Platform" %}</span>
+                        <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--color-info-surface);color:var(--color-info);font-size:0.7rem;margin-left:0.5rem;">{% trans "Platform" %}</span>
                         {% endif %}
                         {% if c.course.description %}
-                        <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ c.course.description|truncatewords:10 }}</div>
+                        <div style="font-size: 0.8125rem; color: var(--color-warm-500);">{{ c.course.description|truncatewords:10 }}</div>
                         {% endif %}
                     </td>
                     <td>
@@ -53,7 +53,7 @@
                     <td>{{ c.unit_count }}</td>
                     <td>{{ c.total_lessons }}</td>
                     <td>
-                        <span style="color: var(--gray-500);">{{ c.published_lessons }}/{{ c.total_lessons }}</span>
+                        <span style="color: var(--color-warm-500);">{{ c.published_lessons }}/{{ c.total_lessons }}</span>
                     </td>
                     <td>
                         {% if c.course.is_published %}
@@ -64,11 +64,11 @@
                     </td>
                     <td>
                         {% if c.read_only %}
-                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                             {% trans "View" %}
                         </a>
                         {% else %}
-                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                        <a href="{% url 'dashboard:course_detail' c.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                             {% trans "Manage" %}
                         </a>
                         {% endif %}
@@ -76,7 +76,7 @@
                 </tr>
                 {% if c.material_count %}
                 <tr class="materials-row" id="materials-row-{{ c.course.id }}" style="display: none;">
-                    <td colspan="7" style="padding: 0.5rem 1rem 1rem 2rem; background: var(--gray-50, var(--surface-sunken));">
+                    <td colspan="7" style="padding: 0.5rem 1rem 1rem 2rem; background: var(--gray-50, var(--color-surface-sunken));">
                         <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]" style="margin: 0; font-size: 0.875rem;">
                             <thead>
                                 <tr>
@@ -93,7 +93,7 @@
                                     <td style="padding: 0.4rem 0.75rem;">
                                         <span style="font-weight: 500;">{{ m.title }}</span>
                                         {% if m.description %}
-                                        <div style="font-size: 0.75rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
+                                        <div style="font-size: 0.75rem; color: var(--color-warm-500);">{{ m.description|truncatewords:8 }}</div>
                                         {% endif %}
                                     </td>
                                     <td style="padding: 0.4rem 0.75rem;"><span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{{ m.get_material_type_display }}</span></td>
@@ -110,7 +110,7 @@
                                     </td>
                                     <td style="padding: 0.4rem 0.75rem;">{{ m.chunks_created }}</td>
                                     <td style="padding: 0.4rem 0.75rem;">
-                                        <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Details" %}</a>
+                                        <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Details" %}</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -132,14 +132,14 @@
     </div>
 </div>
 {% else %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="empty-state flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted text-sm [&_svg]:w-8 [&_svg]:h-8 [&_svg]:text-text-faint [&_svg]:mb-1 [&_h3]:text-md [&_h3]:font-medium [&_h3]:text-text-secondary [&_p]:max-w-[46ch] [&_p]:leading-normal" style="padding: 4rem;">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 64px; height: 64px; margin-bottom: 1rem; color: var(--gray-300);">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 64px; height: 64px; margin-bottom: 1rem; color: var(--color-warm-300);">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
         </svg>
         <h3>{% trans "No Courses Yet" %}</h3>
         <p style="margin-bottom: 1.5rem;">{% trans "Upload a curriculum document to automatically generate courses and lessons." %}</p>
-        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">
+        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
             {% trans "Upload Curriculum" %}
         </a>
     </div>

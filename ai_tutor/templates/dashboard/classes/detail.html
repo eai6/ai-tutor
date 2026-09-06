@@ -5,14 +5,14 @@
 {% block page_title %}{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}{% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:class_list' %}" style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--gray-500); text-decoration:none; margin-bottom:1rem;">
+<a href="{% url 'dashboard:class_list' %}" style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--color-warm-500); text-decoration:none; margin-bottom:1rem;">
     ← {% trans "All classes" %}
 </a>
 
 <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem; gap:1rem; flex-wrap:wrap;">
     <div>
         <h1 style="margin:0; font-size:1.6rem;">{% blocktrans with g=grade %}{{ g }} class{% endblocktrans %}</h1>
-        <p style="color:var(--gray-500); margin:0.25rem 0 0;">
+        <p style="color:var(--color-warm-500); margin:0.25rem 0 0;">
             {% blocktrans count count=student_count %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %}
             ·
             {% blocktrans count count=course_stats|length %}{{ count }} course for this grade{% plural %}{{ count }} courses for this grade{% endblocktrans %}
@@ -21,7 +21,7 @@
 </div>
 
 <!-- Courses for this class -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% blocktrans with g=grade %}Courses for {{ g }}{% endblocktrans %}</h2>
     </div>
@@ -29,39 +29,39 @@
         {% if course_stats %}
         <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;">
             {% for cs in course_stats %}
-            <div style="border:1px solid var(--gray-200); border-radius:10px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.6rem;">
+            <div style="border:1px solid var(--color-warm-200); border-radius:10px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:0.6rem;">
                 <div>
-                    <div style="font-weight:600; color:var(--gray-900); font-size:0.95rem;">{{ cs.course.title }}</div>
-                    <div style="font-size:0.78rem; color:var(--gray-500); margin-top:0.2rem;">
+                    <div style="font-weight:600; color:var(--color-warm-900); font-size:0.95rem;">{{ cs.course.title }}</div>
+                    <div style="font-size:0.78rem; color:var(--color-warm-500); margin-top:0.2rem;">
                         {% blocktrans count count=cs.lesson_count %}{{ count }} lesson{% plural %}{{ count }} lessons{% endblocktrans %}
                         {% if cs.students_with_attempts %} · {% blocktrans count count=cs.students_with_attempts %}{{ count }} student attempted{% plural %}{{ count }} students attempted{% endblocktrans %}{% endif %}
                     </div>
                 </div>
 
                 <div style="display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap;">
-                    <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="font-size:0.78rem;">{% trans "Lessons" %}</a>
-                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:#0891b2; color:var(--surface); border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">{% trans "Competency map" %}</a>
+                    <a href="{% url 'dashboard:course_detail' cs.course.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="font-size:0.78rem;">{% trans "Lessons" %}</a>
+                    <a href="{% url 'dashboard:class_competency' cs.course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:#0891b2; color:var(--color-surface); border:none; font-size:0.78rem; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:600;">{% trans "Competency map" %}</a>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p style="color:var(--gray-500); margin:0;">{% blocktrans with g=grade %}No courses generated for {{ g }} yet.{% endblocktrans %}</p>
+        <p style="color:var(--color-warm-500); margin:0;">{% blocktrans with g=grade %}No courses generated for {{ g }} yet.{% endblocktrans %}</p>
         {% endif %}
     </div>
 </div>
 
 {% if recent_activity %}
 <!-- Recent activity — what's the class working on this week -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "📅 Recent activity (last 7 days)" %}</h2>
-        <span style="font-size:0.78rem;color:var(--gray-500);">{% trans "most recent first · quick links to monitor + report" %}</span>
+        <span style="font-size:0.78rem;color:var(--color-warm-500);">{% trans "most recent first · quick links to monitor + report" %}</span>
     </div>
     <div class="card-body p-5" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-            <thead style="background:var(--surface-sunken);">
-                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+            <thead style="background:var(--color-surface-sunken);">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--color-warm-500);text-transform:uppercase;">
                     <th style="padding:0.55rem 1rem;">{% trans "Lesson" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Course" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Students" %}</th>
@@ -72,23 +72,23 @@
             </thead>
             <tbody>
                 {% for r in recent_activity %}
-                <tr style="border-top:1px solid var(--gray-100);">
+                <tr style="border-top:1px solid var(--color-warm-100);">
                     <td style="padding:0.55rem 1rem;font-weight:500;">
-                        <a href="{% url 'dashboard:lesson_detail' r.lesson.id %}" style="color:var(--gray-900);text-decoration:none;">{{ r.lesson.title }}</a>
+                        <a href="{% url 'dashboard:lesson_detail' r.lesson.id %}" style="color:var(--color-warm-900);text-decoration:none;">{{ r.lesson.title }}</a>
                     </td>
-                    <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">{{ r.course.title }}</td>
+                    <td style="padding:0.55rem 1rem;color:var(--color-warm-500);font-size:0.82rem;">{{ r.course.title }}</td>
                     <td style="padding:0.55rem 1rem;">
                         {% blocktrans count count=r.unique_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %}
-                        {% if r.completed_count %}<div style="font-size:0.72rem;color:var(--success-solid);">{% blocktrans with c=r.completed_count %}{{ c }} completed{% endblocktrans %}</div>{% endif %}
+                        {% if r.completed_count %}<div style="font-size:0.72rem;color:var(--color-success-solid);">{% blocktrans with c=r.completed_count %}{{ c }} completed{% endblocktrans %}</div>{% endif %}
                     </td>
-                    <td style="padding:0.55rem 1rem;color:var(--gray-500);">{{ r.session_count }}</td>
-                    <td style="padding:0.55rem 1rem;color:var(--gray-500);font-size:0.82rem;">
+                    <td style="padding:0.55rem 1rem;color:var(--color-warm-500);">{{ r.session_count }}</td>
+                    <td style="padding:0.55rem 1rem;color:var(--color-warm-500);font-size:0.82rem;">
                         {% blocktrans with ts=r.most_recent|timesince %}{{ ts }} ago{% endblocktrans %}
                     </td>
                     <td style="padding:0.55rem 1rem;">
                         <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--accent-solid);color:var(--surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Monitor" %}</a>
-                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--info-solid);color:var(--surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Report" %}</a>
+                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-accent-solid);color:var(--color-surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Monitor" %}</a>
+                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info-solid);color:var(--color-surface);border:none;font-size:0.72rem;padding:3px 8px;border-radius:5px;text-decoration:none;font-weight:600;">{% trans "Report" %}</a>
                         </div>
                     </td>
                 </tr>
@@ -100,20 +100,20 @@
 {% endif %}
 
 <!-- Students in this class -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; flex-wrap:wrap;">
         <div>
             <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "Students" %}</h2>
-            <p style="font-size:0.875rem; color:var(--gray-500); margin-top:0.25rem;">
+            <p style="font-size:0.875rem; color:var(--color-warm-500); margin-top:0.25rem;">
                 {% blocktrans count count=student_count with g=grade %}{{ count }} student in {{ g }}{% plural %}{{ count }} students in {{ g }}{% endblocktrans %}
             </p>
         </div>
         <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
             {% if next_action %}
-            <button type="button" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="openPromoteForm('up')">{{ next_action }}</button>
+            <button type="button" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="openPromoteForm('up')">{{ next_action }}</button>
             {% endif %}
             {% if prev_action %}
-            <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="openPromoteForm('down')">{{ prev_action }}</button>
+            <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="openPromoteForm('down')">{{ prev_action }}</button>
             {% endif %}
         </div>
     </div>
@@ -124,14 +124,14 @@
         <input type="hidden" name="from_grade" value="{{ grade }}">
         <input type="hidden" name="direction" id="promote-direction" value="up">
         <input type="hidden" name="redirect_to" value="{% url 'dashboard:class_detail' grade %}">
-        <div style="padding:0.75rem 1rem; background:var(--info-surface); border-bottom:1px solid var(--info-surface); display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-            <label style="font-size:0.875rem; font-weight:500; color:var(--info);">
+        <div style="padding:0.75rem 1rem; background:var(--color-info-surface); border-bottom:1px solid var(--color-info-surface); display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <label style="font-size:0.875rem; font-weight:500; color:var(--color-info);">
                 <input type="checkbox" id="select-all" onchange="toggleAllStudents(this)" style="margin-right:0.25rem;">
                 {% trans "Select all" %}
             </label>
-            <span id="selected-count" style="font-size:0.78rem; color:var(--info);">{% trans "0 selected" %}</span>
-            <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" id="confirm-btn">{% trans "Confirm" %}</button>
-            <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="closePromoteForm()">{% trans "Cancel" %}</button>
+            <span id="selected-count" style="font-size:0.78rem; color:var(--color-info);">{% trans "0 selected" %}</span>
+            <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" id="confirm-btn">{% trans "Confirm" %}</button>
+            <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="closePromoteForm()">{% trans "Cancel" %}</button>
         </div>
     </form>
     {% endif %}
@@ -155,15 +155,15 @@
                     </td>
                     <td>
                         <div style="display:flex; align-items:center; gap:0.75rem;">
-                            <div style="width:32px; height:32px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.75rem;">
+                            <div style="width:32px; height:32px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.75rem;">
                                 {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
                             </div>
                             <span style="font-weight:500;">{{ student.first_name }} {{ student.last_name }}</span>
                         </div>
                     </td>
-                    <td style="color:var(--gray-500);">{{ student.email }}</td>
+                    <td style="color:var(--color-warm-500);">{{ student.email }}</td>
                     <td>
-                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "View" %}</a>
+                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "View" %}</a>
                     </td>
                 </tr>
                 {% endfor %}

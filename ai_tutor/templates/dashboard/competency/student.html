@@ -36,7 +36,7 @@
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">← {% trans "Class competency map" %}</a>
+    <a href="{% url 'dashboard:class_competency' course.id %}" style="color:var(--color-text-muted);font-size:0.85rem;text-decoration:none;">← {% trans "Class competency map" %}</a>
 </div>
 
 <div class="summary-row">
@@ -73,10 +73,10 @@
             <tr>
                 <td class="obj">{{ r.tag }}</td>
                 <td>
-                    {% if r.latest_pct is None %}<span class="pill none inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "not assessed" %}</span>
-                    {% elif r.latest_pct >= 70 %}<span class="pill mastered inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "mastered" %}</span>
-                    {% elif r.latest_pct >= 40 %}<span class="pill med inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "developing" %}</span>
-                    {% else %}<span class="pill weak inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "weak" %}</span>{% endif %}
+                    {% if r.latest_pct is None %}<span class="pill none">{% trans "not assessed" %}</span>
+                    {% elif r.latest_pct >= 70 %}<span class="pill mastered">{% trans "mastered" %}</span>
+                    {% elif r.latest_pct >= 40 %}<span class="pill med">{% trans "developing" %}</span>
+                    {% else %}<span class="pill weak">{% trans "weak" %}</span>{% endif %}
                 </td>
                 <td>{% if r.latest_pct is not None %}<span class="pct">{{ r.latest_pct|floatformat:0 }}%</span>{% else %}<span class="pct-faint">—</span>{% endif %}</td>
                 <td><span class="pct-faint">{{ r.attempts }}</span></td>

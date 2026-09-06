@@ -11,13 +11,13 @@
     {% if not user.is_authenticated %}
     <!-- Not logged in -->
     <div class="py-12 px-0 animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]">
-        <div class="welcome-card card text-center py-12 px-8 [&_h1]:text-[2rem] [&_h1]:font-[800] [&_h1]:mb-2 [&_p]:text-[1.1rem] [&_p]:mb-8 bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+        <div class="welcome-card card text-center py-12 px-8 [&_h1]:text-[2rem] [&_h1]:font-[800] [&_h1]:mb-2 [&_p]:text-[1.1rem] [&_p]:mb-8 print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)]">
             <div class="text-[4rem] mb-4">{% icon "courses" %}</div>
             <h1>{% trans "Welcome to AI Tutor" %}</h1>
             <p class="text-muted text-text-muted">{% trans "Your personal learning companion for Seychelles secondary students" %}</p>
             <div class="flex gap-4 justify-center flex-wrap">
-                <a href="{% url 'accounts:register' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Get Started" %} →</a>
-                <a href="{% url 'accounts:login' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Sign In" %}</a>
+                <a href="{% url 'accounts:register' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Get Started" %} →</a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text">{% trans "Sign In" %}</a>
             </div>
         </div>
     </div>
@@ -25,7 +25,7 @@
     {% elif not subjects %}
     <!-- No subjects available -->
     <div class="py-12 px-0 animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]">
-        <div class="empty-card card py-12 px-8 [&_h2]:text-[1.5rem] [&_h2]:mb-2 bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg text-center">
+        <div class="empty-card card py-12 px-8 [&_h2]:text-[1.5rem] [&_h2]:mb-2 print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] text-center">
             <div class="text-[4rem] mb-4">{% icon "courses" %}</div>
             <h2>{% trans "No subjects available yet" %}</h2>
             {% if is_staff_viewer %}
@@ -48,7 +48,7 @@
         {% if is_staff_user %}
         <div class="school-switcher flex items-center gap-2 mt-3 py-2 px-3 bg-info-surface border border-info-border rounded-[var(--radius-md,_8px)] w-fit [&_label]:text-[0.8rem] [&_label]:font-medium [&_label]:text-info [&_label]:whitespace-nowrap [&_select]:text-[0.85rem] [&_select]:font-medium [&_select]:py-1 [&_select]:px-2 [&_select]:border [&_select]:border-info-border [&_select]:rounded-xs [&_select]:bg-white [&_select]:text-text [&_select]:cursor-pointer" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
             <a href="{% url 'dashboard:home' %}"
-               style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:var(--accent-surface); color:var(--accent); border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
+               style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.4rem 0.85rem; background:var(--color-accent-surface); color:var(--color-accent); border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.85rem;"
                title="{% trans 'Return to teacher dashboard' %}">
                 ← {% trans "Dashboard" %}
             </a>
@@ -66,7 +66,7 @@
     </div>
     
     <!-- Gamification Stats Bar -->
-    <div class="card max-[600px]:flex-col max-[600px]:items-stretch flex items-center justify-between gap-4 flex-wrap mb-5 py-3 px-4 bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]" id="gamification-bar" style="display:none; animation-delay:0.03s">
+    <div class="card max-[600px]:flex-col max-[600px]:items-stretch flex items-center justify-between gap-4 flex-wrap mb-5 py-3 px-4 bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]" id="gamification-bar" style="display:none; animation-delay:0.03s">
         <div class="flex items-center gap-3 flex-wrap">
             <span class="font-[800] text-[0.9rem] bg-sunny text-sunny-ink border border-sunny-deep py-[0.2rem] px-[0.7rem] rounded-xl font-display tracking-tight" id="gbar-level">Lv 1</span>
             <div class="flex items-center gap-2">
@@ -88,7 +88,7 @@
     </div>
 
     <!-- Trophy Case (collapsible) -->
-    <div class="card mb-6 p-5 [background:linear-gradient(135deg,_var(--sunny-tint,_var(--color-surface)BEB)_0%,_var(--sunny-tint,_var(--color-surface)BEB)_100%)] border border-sunny-deep bg-surface rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]" id="trophy-case" style="display:none; animation-delay:0.04s">
+    <div class="card mb-6 p-5 [background:linear-gradient(135deg,_var(--sunny-tint,_var(--color-surface)BEB)_0%,_var(--sunny-tint,_var(--color-surface)BEB)_100%)] border border-border print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface rounded-lg shadow-[var(--shadow-sm)] animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]" id="trophy-case" style="display:none; animation-delay:0.04s">
         <div class="trophy-header flex justify-between items-center mb-4 [&_h3]:text-[1rem] [&_h3]:font-bold [&_h3]:m-0">
             <h3 id="trophy-header-text">{% trans "Achievements" %}</h3>
             <button class="bg-none border-0 text-[1.25rem] cursor-pointer text-text-muted leading-[1]" onclick="toggleTrophyCase()">&times;</button>
@@ -102,7 +102,7 @@
             <h3>{% trans "Choose Your Tutor Style" %}</h3>
             <p class="text-muted text-text-muted" style="margin-bottom:1rem;">{% trans "Pick a personality that makes learning fun for you!" %}</p>
             <div class="max-[600px]:grid-cols-[1fr] grid grid-cols-[1fr_1fr] gap-3" id="personality-grid"></div>
-            <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="margin-top:1rem;width:100%" onclick="closePersonalityModal()">{% trans "Close" %}</button>
+            <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text" style="margin-top:1rem;width:100%" onclick="closePersonalityModal()">{% trans "Close" %}</button>
         </div>
     </div>
 
@@ -111,7 +111,7 @@
         <div class="modal-box bg-surface rounded-[1rem] max-w-[480px] w-full p-8 shadow-[0_25px_50px_rgba(0,0,0,0.2)] max-h-[90vh] overflow-y-auto [&_h3]:text-[1.2rem] [&_h3]:font-bold [&_h3]:mb-1">
             <h3>{% trans "Leaderboard" %}</h3>
             <div id="leaderboard-body" style="margin-top:1rem;max-height:400px;overflow-y:auto;"></div>
-            <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="margin-top:1rem;width:100%" onclick="closeLeaderboardModal()">{% trans "Close" %}</button>
+            <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text" style="margin-top:1rem;width:100%" onclick="closeLeaderboardModal()">{% trans "Close" %}</button>
         </div>
     </div>
 
@@ -123,14 +123,14 @@
         <h2 class="font-display text-lg font-bold tracking-tight flex items-center gap-2">{% icon "calendar" %}{% trans "This week's lessons" %}</h2>
         {% for wa in weekly_assignments %}
         <div style="margin-top:0.6rem;">
-            <div style="font-size:0.85rem; color:var(--warning); font-weight:600;">{{ wa.course.title }} · {% blocktrans with date=wa.week_end|date:"M j" %}due Sunday {{ date }}{% endblocktrans %}</div>
+            <div style="font-size:0.85rem; color:var(--color-warning); font-weight:600;">{{ wa.course.title }} · {% blocktrans with date=wa.week_end|date:"M j" %}due Sunday {{ date }}{% endblocktrans %}</div>
             {% if wa.notes %}
-            <div style="font-size:0.82rem; color:var(--warning); font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
+            <div style="font-size:0.82rem; color:var(--color-warning); font-style:italic; margin-top:0.2rem;">"{{ wa.notes }}"</div>
             {% endif %}
             <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.4rem;">
                 {% for lesson in wa.lessons %}
                 <a href="{% url 'tutoring:tutor_interface' lesson.id %}"
-                   style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; background:var(--surface); border:1px solid #fde047; border-radius:999px; font-size:0.82rem; color:var(--warning); text-decoration:none; font-weight:500;">
+                   style="display:inline-flex; align-items:center; gap:0.4rem; padding:0.4rem 0.75rem; background:var(--color-surface); border:1px solid #fde047; border-radius:999px; font-size:0.82rem; color:var(--color-warning); text-decoration:none; font-weight:500;">
                     {% if lesson.mastery_level == 'mastered' %}✅
                     {% elif lesson.mastery_level == 'in_progress' %}⏳
                     {% else %}📖
@@ -150,7 +150,7 @@
         <h2 class="font-display text-lg font-bold tracking-tight flex items-center gap-2">{% icon "clock" %}{% trans "Continue where you left off" %}</h2>
         <div class="grid grid-cols-[repeat(auto-fill,_minmax(280px,_1fr))] gap-4">
             {% for session in active_sessions %}
-            <a href="{% url 'tutoring:tutor_interface' session.lesson_id %}" class="active-session-card card py-4 px-5 no-underline text-inherit block transition-all duration-[0.2s] ease-[ease] border-[2px] border-transparent hover:border-primary hover:[transform:translateY(-2px)] bg-surface rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+            <a href="{% url 'tutoring:tutor_interface' session.lesson_id %}" class="active-session-card card py-4 px-5 no-underline text-inherit block transition-all duration-[0.2s] ease-[ease] border border-border hover:border-primary hover:[transform:translateY(-2px)] print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface rounded-lg shadow-[var(--shadow-sm)]">
                 <div class="text-[0.75rem] font-medium text-primary uppercase tracking-[0.5px] mb-1">{{ session.course_title }}</div>
                 <div class="font-bold text-[1rem] mb-2 text-text">{{ session.lesson_title }}</div>
                 <div class="flex justify-between text-[0.8rem] text-text-faint mb-3">
@@ -177,7 +177,7 @@
     <!-- Subject Cards -->
     <div class="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8 animate-[fadeInUp_var(--dur-slow)_var(--ease-out)_forwards]" style="animation-delay: 0.1s">
         {% for subject in subjects %}
-        <a href="?subject={{ subject.id }}{% if selected_school %}&school={{ selected_school.id }}{% endif %}" class="subject-card card {% if selected_subject.id == subject.id %}active{% endif %} flex items-center gap-4 p-5 no-underline text-inherit border-[2px] border-transparent transition-all duration-[0.2s] ease-[ease] hover:[transform:translateY(-2px)] hover:shadow-[var(--shadow-md)] [&.active]:border-primary [&.active]:bg-coral-tint bg-surface rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+        <a href="?subject={{ subject.id }}{% if selected_school %}&school={{ selected_school.id }}{% endif %}" class="subject-card card {% if selected_subject.id == subject.id %}active{% endif %} flex items-center gap-4 p-5 no-underline text-inherit border border-border transition-all duration-[0.2s] ease-[ease] hover:[transform:translateY(-2px)] hover:shadow-[var(--shadow-md)] [&.active]:border-primary [&.active]:bg-coral-tint print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface rounded-lg shadow-[var(--shadow-sm)]">
             <div class="text-[2.5rem] shrink-0">
                 {% if 'Math' in subject.title %}📐{% elif 'Geography' in subject.title %}🌍{% else %}📖{% endif %}
             </div>
@@ -185,7 +185,7 @@
                 <h3>{{ subject.title }}{% if subject.grade_display %} <span class="text-[0.7rem] font-medium py-[0.15rem] px-[0.45rem] bg-info-surface text-info rounded-xl align-middle ml-1">{{ subject.grade_display }}</span>{% endif %}</h3>
                 <div class="flex flex-col gap-1">
                     <div class="progress-bar h-[6px] bg-[rgba(0,0,0,0.08)] rounded-xs overflow-hidden">
-                        <div class="progress-fill h-full rounded-xs bg-accent-solid transition duration-[0.3s] ease-[ease] [&.success]:bg-success-solid [&.warning]:bg-warning-solid [&.danger]:bg-danger-solid [background:linear-gradient(90deg,_var(--color-teal-solid),_var(--color-primary))]" style="width: {{ subject.progress_percent }}%"></div>
+                        <div class="progress-fill h-full [background:linear-gradient(90deg,_var(--color-teal-solid),_var(--color-primary))] rounded-xs transition duration-[0.3s] ease-[ease]" style="width: {{ subject.progress_percent }}%"></div>
                     </div>
                     <span class="text-[0.75rem] text-text-muted font-medium">{% blocktrans with done=subject.completed_lessons total=subject.total_lessons %}{{ done }}/{{ total }} completed{% endblocktrans %}</span>
                 </div>
@@ -203,27 +203,27 @@
         </div>
 
         {% if selected_subject.baseline_required %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="background:linear-gradient(135deg,var(--accent) 0%,var(--accent-solid) 100%);color:var(--surface);padding:1.4rem 1.6rem;margin-bottom:1.5rem;border-radius:14px;box-shadow:0 12px 28px rgba(91,33,182,0.25);">
-            <h3 style="margin:0 0 0.4rem;color:var(--surface);font-size:1.1rem;">🎯 Take your baseline first</h3>
+        <div class="card print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)]" style="background:linear-gradient(135deg,var(--color-accent) 0%,var(--color-accent-solid) 100%);color:var(--color-surface);padding:1.4rem 1.6rem;margin-bottom:1.5rem;border-radius:14px;box-shadow:0 12px 28px rgba(91,33,182,0.25);">
+            <h3 style="margin:0 0 0.4rem;color:var(--color-surface);font-size:1.1rem;">🎯 Take your baseline first</h3>
             <p style="margin:0 0 1rem;color:rgba(255,255,255,0.92);font-size:0.92rem;line-height:1.55;">
                 Lessons unlock after a quick baseline. It's not a test — we use it to figure out exactly what to teach you next, so you don't waste time on stuff you already know.
             </p>
-            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:var(--surface);color:var(--accent);font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">{% trans "Start baseline" %} →</a>
+            <a href="{{ selected_subject.baseline_url }}" style="display:inline-block;background:var(--color-surface);color:var(--color-accent);font-weight:700;padding:0.6rem 1.2rem;border-radius:999px;text-decoration:none;font-size:0.95rem;">{% trans "Start baseline" %} →</a>
         </div>
         {% elif selected_subject.summative_published and selected_subject.summative_attempts_count > 0 %}
         <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
-            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:var(--accent);background:var(--accent-surface);border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="{% trans 'Retake the course summative — useful for tracking growth over time.' %}">
+            <a href="{{ selected_subject.summative_url }}" style="font-size:0.82rem;color:var(--color-accent);background:var(--color-accent-surface);border:1px solid #ddd6fe;padding:0.35rem 0.85rem;border-radius:999px;text-decoration:none;font-weight:600;" title="{% trans 'Retake the course summative — useful for tracking growth over time.' %}">
                 📝 Retake course exam ({{ selected_subject.summative_attempts_count }} attempt{{ selected_subject.summative_attempts_count|pluralize }})
             </a>
         </div>
         {% endif %}
         {% if selected_subject.recommended_lesson_id %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="background:var(--warning-surface);border:1px solid var(--warning-border);padding:1rem 1.2rem;margin-bottom:1.25rem;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+        <div class="card print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)]" style="background:var(--color-warning-surface);border:1px solid var(--color-warning-border);padding:1rem 1.2rem;margin-bottom:1.25rem;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
             <div style="flex:1;min-width:200px;">
-                <div style="font-weight:700;color:var(--warning);font-size:0.95rem;">⭐ Recommended next</div>
-                <div style="color:var(--warning);font-size:0.85rem;margin-top:0.2rem;">{{ selected_subject.recommended_reason }}</div>
+                <div style="font-weight:700;color:var(--color-warning);font-size:0.95rem;">⭐ Recommended next</div>
+                <div style="color:var(--color-warning);font-size:0.85rem;margin-top:0.2rem;">{{ selected_subject.recommended_reason }}</div>
             </div>
-            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:var(--warning);color:var(--surface);padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">{% trans "Start" %} →</a>
+            <a href="{% url 'tutoring:tutor_interface' selected_subject.recommended_lesson_id %}" style="background:var(--color-warning);color:var(--color-surface);padding:0.5rem 1rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:0.88rem;">{% trans "Start" %} →</a>
         </div>
         {% endif %}
 
@@ -255,38 +255,38 @@
                     </div>
                 </div>
                 {% else %}
-                <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}{% if lesson.recommended %} lesson-recommended{% endif %} flex items-center gap-4 py-4 px-6 no-underline text-inherit border-b border-b-[rgba(0,0,0,0.05)] transition duration-[0.2s] ease-[ease] last:border-b-0 hover:bg-canvas"{% if lesson.recommended %} style="background:var(--warning-surface);border-color:var(--warning-border);"{% endif %}>
+                <a href="{% url 'tutoring:tutor_interface' lesson.id %}" class="lesson-item status-{{ lesson.status }}{% if lesson.recommended %} lesson-recommended{% endif %} flex items-center gap-4 py-4 px-6 no-underline text-inherit border-b border-b-[rgba(0,0,0,0.05)] transition duration-[0.2s] ease-[ease] last:border-b-0 hover:bg-canvas"{% if lesson.recommended %} style="background:var(--color-warning-surface);border-color:var(--color-warning-border);"{% endif %}>
                     <div class="lesson-status-icon w-8 h-8 rounded-[50%] flex items-center justify-center shrink-0 text-[1rem]">
                         {% if lesson.status == 'completed' %}
                             <span class="font-bold">✓</span>
                         {% elif lesson.status == 'in_progress' %}
                             <span class="text-[1.25rem]">◐</span>
                         {% elif lesson.recommended %}
-                            <span class="text-[0.875rem]" style="color:var(--warning);">⭐</span>
+                            <span class="text-[0.875rem]" style="color:var(--color-warning);">⭐</span>
                         {% else %}
                             <span class="text-[0.875rem]">○</span>
                         {% endif %}
                     </div>
                     <div class="lesson-info max-[600px]:[&_p]:hidden flex-1 min-w-0 [&_h4]:text-[0.95rem] [&_h4]:font-bold [&_h4]:mb-1 [&_h4]:text-text [&_p]:text-[0.8rem] [&_p]:text-text-muted [&_p]:m-0 [&_p]:whitespace-nowrap [&_p]:overflow-hidden [&_p]:truncate">
-                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:var(--warning);color:var(--surface);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">{% trans "recommended" %}</span>{% endif %}</h4>
+                        <h4>{{ forloop.counter }}. {{ lesson.title }}{% if lesson.recommended %} <span style="background:var(--color-warning);color:var(--color-surface);font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem;vertical-align:middle;">{% trans "recommended" %}</span>{% endif %}</h4>
                         <p>{{ lesson.objective }}</p>
                         {% if lesson.competency_pct is not None %}
                         <div class="competency-bar" style="margin-top:0.4rem;">
                             <div class="competency-label" style="font-size:0.75rem; color:var(--muted); display:flex; justify-content:space-between;">
                                 <span>
                                     {% if lesson.competency_pct >= 80 %}
-                                        <span style="color:var(--success);">●</span>
+                                        <span style="color:var(--color-success);">●</span>
                                     {% elif lesson.competency_pct >= 50 %}
-                                        <span style="color:var(--warning);">●</span>
+                                        <span style="color:var(--color-warning);">●</span>
                                     {% else %}
-                                        <span style="color:var(--danger);">●</span>
+                                        <span style="color:var(--color-danger);">●</span>
                                     {% endif %}
                                     {% blocktrans with pct=lesson.competency_pct %}{{ pct }}% competency{% endblocktrans %}
                                 </span>
                                 <span>{% blocktrans count count=lesson.attempts_count %}{{ count }} attempt{% plural %}{{ count }} attempts{% endblocktrans %}</span>
                             </div>
-                            <div class="progress-bar h-[6px] bg-[rgba(0,0,0,0.08)] rounded-xs overflow-hidden" style="height:4px; background:var(--border); border-radius:2px; margin-top:0.2rem;">
-                                <div style="width:{{ lesson.competency_pct }}%; height:100%; background:{% if lesson.competency_pct >= 80 %}var(--success){% elif lesson.competency_pct >= 50 %}var(--warning){% else %}var(--danger){% endif %}; border-radius:2px;"></div>
+                            <div class="progress-bar h-[6px] bg-[rgba(0,0,0,0.08)] rounded-xs overflow-hidden" style="height:4px; background:var(--color-border); border-radius:2px; margin-top:0.2rem;">
+                                <div style="width:{{ lesson.competency_pct }}%; height:100%; background:{% if lesson.competency_pct >= 80 %}var(--color-success){% elif lesson.competency_pct >= 50 %}var(--color-warning){% else %}var(--color-danger){% endif %}; border-radius:2px;"></div>
                             </div>
                         </div>
                         {% endif %}
@@ -294,7 +294,7 @@
                     <div class="lesson-meta max-[600px]:[&_.time]:hidden flex items-center gap-4 shrink-0 [&_.time]:text-[0.75rem] [&_.time]:text-text-faint [&_.time]:font-medium [&_.review-hint]:text-primary [&_.review-hint]:font-medium [&_.review-hint]:text-[0.75rem]">
                         <span class="time">⏱️ {{ lesson.estimated_minutes }} min</span>
                         {% if lesson.status != 'completed' %}
-                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:var(--warning);background:var(--warning-surface);padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid var(--warning-border);" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
+                        <a href="{% url 'tutoring:lesson_pretest' lesson.id %}" onclick="event.stopPropagation();" style="font-size:0.72rem;color:var(--color-warning);background:var(--color-warning-surface);padding:0.15rem 0.55rem;border-radius:999px;text-decoration:none;font-weight:600;border:1px solid var(--color-warning-border);" title="{% trans 'Take a 10-question pre-test instead — pass and the lesson is marked complete.' %}">🎯 {% trans "Quick check" %}</a>
                         {% endif %}
                         {# The bare arrow is gone. The whole row is already a #}
                         {# link, so it added no affordance — but rendered as a #}
@@ -340,9 +340,9 @@ function showPrereqModal(el) {
     overlay.innerHTML = `
         <div class="prereq-modal bg-surface rounded-[1rem] max-w-[400px] w-full p-8 shadow-[0_25px_50px_rgba(0,0,0,0.2)] text-center [&_h3]:text-[1.1rem] [&_h3]:mb-3 [&_ul]:text-left [&_ul]:mt-4 [&_ul]:mr-0 [&_ul]:mb-6 [&_ul]:ml-6 [&_ul]:text-text [&_li]:mb-2 [&_li]:font-[500]">
             <h3>🔒 ${gettext('Lesson Locked')}</h3>
-            <p style="color:var(--text-muted);">${gettext('Complete these lessons first:')}</p>
+            <p style="color:var(--color-text-muted);">${gettext('Complete these lessons first:')}</p>
             <ul>${list}</ul>
-            <button class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="this.closest('.prereq-overlay').remove()">${gettext('Got it')}</button>
+            <button class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="this.closest('.prereq-overlay').remove()">${gettext('Got it')}</button>
         </div>
     `;
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
@@ -499,12 +499,12 @@ async function selectPersonality(pid) {
 async function openLeaderboardModal() {
     document.getElementById('leaderboard-overlay').style.display = 'flex';
     const body = document.getElementById('leaderboard-body');
-    body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + gettext('Loading...') + '</p>';
+    body.innerHTML = '<p style="text-align:center;color:var(--color-text-muted);">' + gettext('Loading...') + '</p>';
     try {
         const res = await fetch('/tutor/api/leaderboard/');
         const data = await res.json();
         if (!data.leaderboard || data.leaderboard.length === 0) {
-            body.innerHTML = '<p style="text-align:center;color:var(--text-muted);">' + gettext('No data yet. Complete lessons to appear!') + '</p>';
+            body.innerHTML = '<p style="text-align:center;color:var(--color-text-muted);">' + gettext('No data yet. Complete lessons to appear!') + '</p>';
             return;
         }
         const youSuffix = gettext(' (You)');
@@ -518,7 +518,7 @@ async function openLeaderboardModal() {
             </div>`
         ).join('');
     } catch(e) {
-        body.innerHTML = '<p style="text-align:center;color:var(--danger-solid);">' + gettext('Failed to load leaderboard.') + '</p>';
+        body.innerHTML = '<p style="text-align:center;color:var(--color-danger-solid);">' + gettext('Failed to load leaderboard.') + '</p>';
     }
 }
 

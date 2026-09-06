@@ -391,7 +391,8 @@ SIZE_PROPS = {"width": "w", "height": "h", "min-width": "min-w", "min-height": "
               "max-width": "max-w", "max-height": "max-h", "flex-basis": "basis"}
 
 SIZE_KEYWORDS = {"100%": "full", "auto": "auto", "100vh": "screen", "100dvh": "dvh",
-                 "fit-content": "fit", "max-content": "max", "min-content": "min", "0": "0"}
+                 "fit-content": "fit", "max-content": "max", "min-content": "min",
+                 "0": "0", "none": "none"}
 
 
 def _expand_shorthand(prefix, parts):

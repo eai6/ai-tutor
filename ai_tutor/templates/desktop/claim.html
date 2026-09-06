@@ -7,12 +7,12 @@
 {# their work will sync under. See apps/desktop/views.py::claim_page. #}
 <div style="max-width:34rem;margin:2rem auto;padding:0 1rem;">
   <h1 style="font-size:1.5rem;margin-bottom:.25rem;">{% trans "Find your name" %}</h1>
-  <p style="color:var(--text-muted);margin-top:0;">
+  <p style="color:var(--color-text-muted);margin-top:0;">
     {% trans "Pick your name from your school's list, then choose a password. You'll use that password to sign in from now on." %}
   </p>
 
   {% if error %}
-  <div style="background:var(--danger-surface);border:1px solid var(--danger-border);color:var(--danger);padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem;">
+  <div style="background:var(--color-danger-surface);border:1px solid var(--color-danger-border);color:var(--color-danger);padding:.75rem 1rem;border-radius:8px;margin-bottom:1rem;">
     {{ error }}
   </div>
   {% endif %}
@@ -20,32 +20,32 @@
   <form method="get" style="margin-bottom:1rem;display:flex;gap:.5rem;">
     <input type="search" name="q" value="{{ query|default:'' }}"
            placeholder="{% trans 'Search your name' %}"
-           style="flex:1;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:6px;">
-    <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" type="submit">{% trans "Search" %}</button>
+           style="flex:1;padding:.5rem .6rem;border:1px solid var(--color-border-strong);border-radius:6px;">
+    <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text" type="submit">{% trans "Search" %}</button>
   </form>
 
   {% if entries %}
   <form method="post" action="{% url 'desktop:claim_submit' %}">
     {% csrf_token %}
-    <div style="max-height:22rem;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;">
+    <div style="max-height:22rem;overflow-y:auto;border:1px solid var(--color-border);border-radius:8px;margin-bottom:1rem;">
       {% for e in entries %}
-      <label style="display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;border-bottom:1px solid var(--surface-sunken);cursor:pointer;">
+      <label style="display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;border-bottom:1px solid var(--color-surface-sunken);cursor:pointer;">
         <input type="radio" name="server_user_id" value="{{ e.server_user_id }}" required>
         <span>
           <strong>{{ e.display_name }}</strong>
-          {% if e.grade_level %}<span style="color:var(--text-muted);font-size:.85rem;"> · {{ e.grade_level }}</span>{% endif %}
+          {% if e.grade_level %}<span style="color:var(--color-text-muted);font-size:.85rem;"> · {{ e.grade_level }}</span>{% endif %}
         </span>
       </label>
       {% endfor %}
     </div>
 
-    <label style="display:block;font-size:.85rem;color:var(--text-secondary);margin-bottom:.25rem;">
+    <label style="display:block;font-size:.85rem;color:var(--color-text-secondary);margin-bottom:.25rem;">
       {% trans "Choose a password" %}
     </label>
     <input type="password" name="password" required minlength="4"
-           style="width:100%;padding:.5rem .6rem;border:1px solid var(--border-strong);border-radius:6px;margin-bottom:1rem;">
+           style="width:100%;padding:.5rem .6rem;border:1px solid var(--color-border-strong);border-radius:6px;margin-bottom:1rem;">
 
-    <button class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" type="submit" style="width:100%;padding:.6rem;">
+    <button class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" type="submit" style="width:100%;padding:.6rem;">
       {% trans "That's me — start learning" %}
     </button>
   </form>
@@ -55,7 +55,7 @@
   <p>{% trans "Everyone on this device's list has already been set up." %}</p>
   {% endif %}
 
-  <p style="font-size:.8rem;color:var(--text-muted);margin-top:1.5rem;">
+  <p style="font-size:.8rem;color:var(--color-text-muted);margin-top:1.5rem;">
     {% blocktrans with claimed=claimed_total total=unclaimed_total %}{{ claimed }} set up · {{ total }} still to go{% endblocktrans %}
     · <a href="{% url 'accounts:student_login' %}">{% trans "Already set up? Sign in" %}</a>
   </p>

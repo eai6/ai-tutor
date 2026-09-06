@@ -266,21 +266,21 @@ the table.
                 <td>
                     <a href="{% url 'dashboard:benchmark:annotate' row.item_id %}">{{ row.item_id }}</a>
                 </td>
-                <td><span class="pill pill-subj inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ row.subject }}</span></td>
+                <td><span class="pill pill-subj">{{ row.subject }}</span></td>
                 <td style="max-width:340px;">{{ row.lesson_title|default:"—" }}</td>
                 <td>
-                    {% if row.stratum %}<span class="pill pill-stratum inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ row.stratum }}</span>{% else %}—{% endif %}
+                    {% if row.stratum %}<span class="pill pill-stratum">{{ row.stratum }}</span>{% else %}—{% endif %}
                 </td>
                 <td>{{ row.annotation_count }}</td>
                 <td>
                     {% if row.latest %}
                         {% if row.passes %}
-                            <span class="pill pill-pass inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">pass</span>
+                            <span class="pill pill-pass">pass</span>
                         {% else %}
-                            <span class="pill pill-fail inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">fail</span>
+                            <span class="pill pill-fail">fail</span>
                         {% endif %}
                     {% else %}
-                        <span class="pill pill-none inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">unannotated</span>
+                        <span class="pill pill-none">unannotated</span>
                     {% endif %}
                 </td>
                 <td>{{ row.failure_categories|join:", "|default:"—" }}</td>
@@ -333,7 +333,7 @@ the table.
 </script>
 {% else %}
 <div class="bench-table">
-    <div class="empty flex flex-col items-center text-center gap-3 py-10 px-5 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1 [&_.icon]:text-[2.5rem] [&_.icon]:text-coral-solid">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         <h3 style="color:#374151;margin-bottom:0.5rem;">
             {% if filters.subject or filters.stratum or filters.status %}
                 No items match the current filter.

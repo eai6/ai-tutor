@@ -6,20 +6,20 @@
 
 {% block content %}
 <div style="margin-bottom: 1.5rem;">
-    <a href="{% url 'dashboard:flagged_sessions' %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">&larr; {% trans "Back to Flagged Chats" %}</a>
+    <a href="{% url 'dashboard:flagged_sessions' %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">&larr; {% trans "Back to Flagged Chats" %}</a>
 </div>
 
 <!-- Session Info Card -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom: 1.5rem;">
     <div class="card-body p-5">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
             <div>
                 <h3 style="margin-bottom: 0.25rem;">{{ session.student.first_name }} {{ session.student.last_name }}</h3>
-                <p style="color: var(--gray-500); margin-bottom: 0.5rem; font-size: 0.875rem;">{{ session.lesson.title }}</p>
+                <p style="color: var(--color-warm-500); margin-bottom: 0.5rem; font-size: 0.875rem;">{{ session.lesson.title }}</p>
                 <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
                     <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-danger-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-danger-surface text-danger" style="font-size: 0.8125rem;">{{ session.flag_reason }}</span>
                     {% if session.flagged_at %}
-                    <span style="font-size: 0.8125rem; color: var(--gray-500);">{% blocktrans with ts=session.flagged_at|timesince %}Flagged {{ ts }} ago{% endblocktrans %}</span>
+                    <span style="font-size: 0.8125rem; color: var(--color-warm-500);">{% blocktrans with ts=session.flagged_at|timesince %}Flagged {{ ts }} ago{% endblocktrans %}</span>
                     {% endif %}
                     {% if session.flag_reviewed %}
                         <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-success-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-success-surface text-success">{% blocktrans with first=session.reviewed_by.first_name last=session.reviewed_by.last_name %}Reviewed by {{ first }} {{ last }}{% endblocktrans %}</span>
@@ -32,12 +32,12 @@
             <form method="post" action="{% url 'dashboard:resolve_flag' session.id %}">
                 {% csrf_token %}
                 {% if session.student.student_profile.is_tutor_suspended %}
-                <div style="background:var(--danger-surface);border:1px solid #fca5a5;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:0.75rem;font-size:0.875rem;color:var(--danger);">
+                <div style="background:var(--color-danger-surface);border:1px solid #fca5a5;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:0.75rem;font-size:0.875rem;color:var(--color-danger);">
                     <strong>{% trans "Student suspended from tutor." %}</strong> {% trans "Reviewing this flag will restore their access." %}
                 </div>
-                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Review & Restore Access" %}</button>
+                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Review & Restore Access" %}</button>
                 {% else %}
-                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Mark as Reviewed" %}</button>
+                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Mark as Reviewed" %}</button>
                 {% endif %}
             </form>
             {% endif %}
@@ -46,25 +46,25 @@
 </div>
 
 <!-- Transcript -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "Transcript" %}</h2>
-        <span style="font-size: 0.8125rem; color: var(--gray-500);">{% blocktrans count count=turns|length %}{{ count }} message{% plural %}{{ count }} messages{% endblocktrans %}</span>
+        <span style="font-size: 0.8125rem; color: var(--color-warm-500);">{% blocktrans count count=turns|length %}{{ count }} message{% plural %}{{ count }} messages{% endblocktrans %}</span>
     </div>
     <div class="card-body p-5" style="padding: 0;">
         {% for turn in turns %}
         {% if turn.role != 'system' %}
-        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--gray-200); {% if turn.is_flagged %}border-left: 4px solid var(--danger); background: var(--danger-surface);{% endif %}">
+        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-warm-200); {% if turn.is_flagged %}border-left: 4px solid var(--color-danger); background: var(--color-danger-surface);{% endif %}">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.03em; {% if turn.role == 'student' %}color: var(--primary);{% else %}color: var(--gray-500);{% endif %}">
+                    <span style="font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.03em; {% if turn.role == 'student' %}color: var(--color-primary);{% else %}color: var(--color-warm-500);{% endif %}">
                         {{ turn.role }}
                     </span>
                     {% if turn.is_flagged %}
                     <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-danger-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-danger-surface text-danger">{{ turn.flag_type }}</span>
                     {% endif %}
                 </div>
-                <span style="font-size: 0.75rem; color: var(--gray-500);">{{ turn.created_at|date:"M d, Y H:i" }}</span>
+                <span style="font-size: 0.75rem; color: var(--color-warm-500);">{{ turn.created_at|date:"M d, Y H:i" }}</span>
             </div>
             <div style="font-size: 0.9375rem; line-height: 1.6; white-space: pre-wrap;">{{ turn.content }}</div>
         </div>

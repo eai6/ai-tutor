@@ -106,8 +106,10 @@ def _selector_to_variant(sel):
         return base, f"[&>{_sel(child)}]:"
     if not descendant:
         if rest.startswith("["):
-            # An attribute on the same element: .card[hidden]
-            return base, f"[&{rest}]:"
+            # An attribute on the same element: .card[hidden] — and possibly a
+            # descendant after it, .pw-toggle[aria-pressed='true'] .pw-toggle__off.
+            # _sel because a raw space inside a variant ends the class attribute.
+            return base, f"[&{_sel(rest)}]:"
         if rest.startswith(":"):
             # A pseudo-class not in the table, e.g. :not(...)
             return base, f"[&{rest.replace(' ', '_')}]:"

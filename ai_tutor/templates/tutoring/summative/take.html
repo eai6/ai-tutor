@@ -84,7 +84,7 @@
     <div class="ex-head">
         <div>
             <h1>{{ course.title }} — {% if is_baseline %}Baseline Assessment{% else %}Summative Exam{% endif %}</h1>
-            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">
+            <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:0.2rem;">
                 {{ total_q }} questions{% if is_baseline %} · this is your starting point — answer what you know, skip what you don't{% else %} · pass with {{ pass_threshold }} of {{ total_q }}{% endif %}
             </div>
         </div>
@@ -95,11 +95,11 @@
     </div>
 
     {% if is_baseline %}
-    <div style="background:var(--accent-surface);border:1px solid var(--accent-border);color:var(--accent);padding:0.75rem 1rem;border-radius:10px;font-size:0.88rem;margin-bottom:1rem;line-height:1.55;">
+    <div style="background:var(--color-accent-surface);border:1px solid var(--color-accent-border);color:var(--color-accent);padding:0.75rem 1rem;border-radius:10px;font-size:0.88rem;margin-bottom:1rem;line-height:1.55;">
         🎯 <strong>This is your baseline.</strong> Don't worry if you don't know everything — we use this to figure out exactly what to teach you. Just answer what you can, leave the rest blank.
     </div>
     {% else %}
-    <div style="background:var(--warning-surface);border:1px solid var(--warning-border);color:var(--warning);padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
+    <div style="background:var(--color-warning-surface);border:1px solid var(--color-warning-border);color:var(--color-warning);padding:0.75rem 1rem;border-radius:10px;font-size:0.85rem;margin-bottom:1rem;">
         ⚠️ Once you submit, you can't retake this exam without a teacher reset. Take your time.
     </div>
     {% endif %}
@@ -122,7 +122,7 @@
             <label class="opt" data-letter="D"><input type="radio" name="q_{{ q.id }}" value="D"><span><strong>D.</strong> {{ q.option_d }}</span></label>
         {% elif q.question_type == 'fill_in_blank' %}
             {% if q.answer_data.text_template %}
-            <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
+            <p style="color:var(--color-text-secondary);font-size:0.9rem;margin:0 0 0.5rem;font-style:italic;">{{ q.answer_data.text_template }}</p>
             {% endif %}
             {% for blank in q.answer_data.blanks %}
             <div class="blank-row"><span>Blank {{ forloop.counter }}:</span><input type="text" class="text-input" data-qid="{{ q.id }}" data-blank-index="{{ forloop.counter0 }}" autocomplete="off"></div>
@@ -147,20 +147,20 @@
         {% else %}
             {% if course.is_math %}
             <div class="math-toolbar" data-qid="{{ q.id }}" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.4rem;">
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '°')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">°</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', 'π')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">π</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '√')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">√</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '²')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">²</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '³')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">³</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '±')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">±</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≤')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≤</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≥')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≥</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≠')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">≠</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '×')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">×</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '÷')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">÷</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '½')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">½</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¼')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">¼</button>
-                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¾')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--accent);font-weight:600;">¾</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '°')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">°</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', 'π')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">π</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '√')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">√</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '²')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">²</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '³')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">³</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '±')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">±</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≤')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">≤</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≥')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">≥</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '≠')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">≠</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '×')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">×</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '÷')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">÷</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '½')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">½</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¼')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">¼</button>
+                <button type="button" onclick="insertSummativeMathSymbol('{{ q.id }}', '¾')" style="font-size:0.95rem;padding:0.18rem 0.55rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">¾</button>
             </div>
             {% endif %}
             <textarea class="textarea-input" data-qid="{{ q.id }}" placeholder="Write your answer…"></textarea>

@@ -45,20 +45,20 @@
 </style>
 
 <div style="margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--text-muted);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--color-text-muted);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
 </div>
 
 <div class="summary-row">
-    <div class="summary-card" style="background:linear-gradient(135deg,var(--accent) 0%,var(--accent-solid) 100%);color:var(--surface);border:none;">
+    <div class="summary-card" style="background:linear-gradient(135deg,var(--color-accent) 0%,var(--color-accent-solid) 100%);color:var(--color-surface);border:none;">
         <div class="label" style="color:rgba(255,255,255,0.8);">{% trans "Class readiness" %}</div>
-        <div class="value" style="color:var(--surface);">{{ readiness }}%</div>
+        <div class="value" style="color:var(--color-surface);">{{ readiness }}%</div>
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.85);margin-top:0.2rem;">{% trans "average of class competency across all lessons" %}</div>
     </div>
     <div class="summary-card">
         <div class="label">{% trans "Teaching objectives" %}</div>
         <div class="value">{{ matrix.objectives|length }}</div>
-        {% if struggling_count %}<div style="font-size:0.72rem;color:var(--danger);margin-top:0.2rem;">{% blocktrans with n=struggling_count %}{{ n }} below 50%{% endblocktrans %}</div>{% endif %}
-        {% if untouched_count %}<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">{% blocktrans with n=untouched_count %}{{ n }} not yet assessed{% endblocktrans %}</div>{% endif %}
+        {% if struggling_count %}<div style="font-size:0.72rem;color:var(--color-danger);margin-top:0.2rem;">{% blocktrans with n=struggling_count %}{{ n }} below 50%{% endblocktrans %}</div>{% endif %}
+        {% if untouched_count %}<div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:0.2rem;">{% blocktrans with n=untouched_count %}{{ n }} not yet assessed{% endblocktrans %}</div>{% endif %}
     </div>
     <div class="summary-card">
         <div class="label">{% trans "Roster" %}</div>
@@ -72,9 +72,9 @@
 
 {% if recommendation %}
 <div style="margin-bottom:1rem;padding:0.85rem 1.1rem;border-radius:10px;font-size:0.92rem;line-height:1.5;
-    {% if recommendation_type == 'success' %}background:var(--success-surface);border:1px solid #6ee7b7;color:var(--success);
-    {% elif recommendation_type == 'danger' %}background:var(--danger-surface);border:1px solid #fca5a5;color:var(--danger);
-    {% else %}background:var(--warning-surface);border:1px solid var(--warning-border);color:var(--warning);{% endif %}">
+    {% if recommendation_type == 'success' %}background:var(--color-success-surface);border:1px solid #6ee7b7;color:var(--color-success);
+    {% elif recommendation_type == 'danger' %}background:var(--color-danger-surface);border:1px solid #fca5a5;color:var(--color-danger);
+    {% else %}background:var(--color-warning-surface);border:1px solid var(--color-warning-border);color:var(--color-warning);{% endif %}">
     <strong>{% if recommendation_type == 'success' %}✓{% elif recommendation_type == 'danger' %}!{% else %}⚠{% endif %}</strong>
     {{ recommendation }}
 </div>
@@ -133,19 +133,19 @@
 {% endif %}
 
 {% if student_gaps %}
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;">
-    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--text);">{% trans "Students with the most gaps" %}</h3>
-    <p style="margin:0 0 0.75rem;color:var(--text-muted);font-size:0.82rem;">{% trans "Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown." %}</p>
+<div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;padding:1rem 1.25rem;margin-top:1.25rem;">
+    <h3 style="margin:0 0 0.5rem;font-size:0.95rem;color:var(--color-text);">{% trans "Students with the most gaps" %}</h3>
+    <p style="margin:0 0 0.75rem;color:var(--color-text-muted);font-size:0.82rem;">{% trans "Students whose latest score is below 50% on at least one objective. Click a student to see their per-objective breakdown." %}</p>
     <div style="display:flex;flex-direction:column;gap:0.4rem;">
         {% for gap in student_gaps %}
-        <a href="{% url 'dashboard:student_competency' course.id gap.student.id %}" style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--surface-sunken);border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;">
+        <a href="{% url 'dashboard:student_competency' course.id gap.student.id %}" style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--color-surface-sunken);border:1px solid var(--color-border);border-radius:8px;text-decoration:none;color:inherit;">
             <div style="flex:1;min-width:0;">
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">{{ gap.student.first_name }} {{ gap.student.last_name }} <span style="color:var(--text-faint);font-weight:400;">@{{ gap.student.username }}</span></div>
-                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <div style="font-weight:600;color:var(--color-text);font-size:0.9rem;">{{ gap.student.first_name }} {{ gap.student.last_name }} <span style="color:var(--color-text-faint);font-weight:400;">@{{ gap.student.username }}</span></div>
+                <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:0.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                     {% trans "Weak on:" %} {{ gap.weak_objectives|join:" · "|truncatechars:140 }}
                 </div>
             </div>
-            <span style="background:var(--danger-surface);color:var(--danger);font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{% blocktrans count count=gap.weak_count %}{{ count }} gap{% plural %}{{ count }} gaps{% endblocktrans %}</span>
+            <span style="background:var(--color-danger-surface);color:var(--color-danger);font-size:0.75rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:999px;flex-shrink:0;">{% blocktrans count count=gap.weak_count %}{{ count }} gap{% plural %}{{ count }} gaps{% endblocktrans %}</span>
         </a>
         {% endfor %}
     </div>

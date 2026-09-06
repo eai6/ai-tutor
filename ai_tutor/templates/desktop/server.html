@@ -16,7 +16,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
 <title>{% trans "School server" %}</title>
 <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
-<link rel="stylesheet" href="{% static 'css/app.build.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
 <style>
   {% comment %}
   Same treatment as downloads/self_hosting.html: the page keeps its own
@@ -69,7 +69,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
     Pinned in the environment by whoever imaged this machine; a form here
     would offer a choice the application cannot honour.
     {% endcomment %}
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card">
       <h2>{% trans "Set by your administrator" %}</h2>
       <p class="current" style="margin:0">
         {% blocktrans trimmed with server=state.server_url %}
@@ -81,7 +81,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
   {% else %}
     <form method="post" action="{% url 'desktop:server_save' %}">
       {% csrf_token %}
-      <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+      <div class="card">
         <h2>{% trans "Server address" %}</h2>
         <p>{% trans "The web address teachers use to sign in. Your administrator has it." %}</p>
 
@@ -99,7 +99,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
     {% if state.server_url %}
       <form method="post" action="{% url 'desktop:server_signin' %}">
         {% csrf_token %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+        <div class="card">
           <h2>
             {% if state.signed_in %}{% trans "Signed in" %}{% else %}{% trans "Sign in" %}{% endif %}
           </h2>
@@ -134,7 +134,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
 
       <form method="post" action="{% url 'desktop:server_clear' %}">
         {% csrf_token %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+        <div class="card">
           <h2>{% trans "Work offline only" %}</h2>
           <p>
             {% blocktrans trimmed %}

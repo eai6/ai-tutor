@@ -220,7 +220,7 @@
         <div class="monitor-meta">{{ course.name }} &mdash; {% trans "Live Session Monitor" %}</div>
     </div>
     <div>
-        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:var(--info-solid);">{% trans "Session Report" %}</a>
+        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:var(--color-info-solid);">{% trans "Session Report" %}</a>
     </div>
 </div>
 
@@ -268,7 +268,7 @@
                 {{ s.student_name }}
                 {% if s.is_group %}
                 <span title="{% blocktrans with names=s.participant_names|join:', ' %}Group session — {{ names }}{% endblocktrans %}"
-                      style="display:inline-block;margin-left:0.35rem;padding:0.05rem 0.4rem;border-radius:999px;background:var(--accent-surface);color:var(--accent);font-size:0.65rem;font-weight:700;cursor:help;">👥 +{{ s.participant_count|add:'-1' }}</span>
+                      style="display:inline-block;margin-left:0.35rem;padding:0.05rem 0.4rem;border-radius:999px;background:var(--color-accent-surface);color:var(--color-accent);font-size:0.65rem;font-weight:700;cursor:help;">👥 +{{ s.participant_count|add:'-1' }}</span>
                 {% endif %}
             </td>
             <td data-label="{% trans 'Status' %}">
@@ -279,14 +279,14 @@
                 </span>
             </td>
             <td data-label="{% trans 'Phase' %}">{{ s.display_phase|default:"--" }}</td>
-            <td data-label="{% trans 'Step' %}">{% if s.is_remediation %}<span style="color:var(--text-muted);">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
+            <td data-label="{% trans 'Step' %}">{% if s.is_remediation %}<span style="color:var(--color-text-muted);">--</span>{% else %}{{ s.current_step }}/{{ s.total_steps }}{% endif %}</td>
             <td data-label="{% trans 'Exchanges' %}">{{ s.exchange_count }}</td>
             <td data-label="{% trans 'Duration' %}">{% if s.duration_minutes is not None %}{% blocktrans with mins=s.duration_minutes %}{{ mins }} min{% endblocktrans %}{% else %}--{% endif %}</td>
             <td data-label="{% trans 'Exit Score' %}">
                 {% if s.exit_score is not None %}
                     <span>
-                        <span style="font-weight:600;{% if s.exit_passed %}color:var(--success-solid);{% else %}color:var(--danger-solid);{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
-                        {% if s.exit_passed %}<span style="font-size:0.7rem;color:var(--success-solid);">{% trans "PASS" %}</span>{% else %}<span style="font-size:0.7rem;color:var(--danger-solid);">{% trans "FAIL" %}</span>{% endif %}
+                        <span style="font-weight:600;{% if s.exit_passed %}color:var(--color-success-solid);{% else %}color:var(--color-danger-solid);{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
+                        {% if s.exit_passed %}<span style="font-size:0.7rem;color:var(--color-success-solid);">{% trans "PASS" %}</span>{% else %}<span style="font-size:0.7rem;color:var(--color-danger-solid);">{% trans "FAIL" %}</span>{% endif %}
                     </span>
                 {% else %}
                     --

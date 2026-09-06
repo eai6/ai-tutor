@@ -522,6 +522,19 @@
   strong, b { font-weight: var(--font-weight-bold); }
   small { font-size: var(--text-xs); }
 
+  /* Two places preflight is more opinionated than the sheet it replaces, and
+     the bar here is to match the sheet.
+
+     Preflight gives form controls `font: inherit`, so they take the body's
+     1.55 line-height where they used to keep the UA's `normal`. That is 1.7px
+     on every input, and it accumulates down a form.
+
+     Preflight also gives links `text-decoration: inherit`, which removes the
+     UA underline that the skip link and prose links relied on. Everything
+     that should not be underlined already says so. */
+  input, select, textarea, button { line-height: normal; }
+  a { text-decoration-line: underline; }
+
   /* One ring for the whole product. :focus-visible so a mouse click on a card
      does not paint a ring, but every keyboard path does. */
   :focus { outline: none; }

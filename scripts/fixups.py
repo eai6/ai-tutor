@@ -107,8 +107,62 @@ def student_body(src):
     return re.sub(r"<body\b(?![^>]*\bclass=)", f'<body class="{STUDENT_BODY}"', src, count=1)
 
 
+# The auth shell picks its photograph by building a class name at request
+# time — auth-art--{% block auth_art %}student{% endblock %}. Tailwind's
+# scanner never sees the result, so both photographs went missing and the
+# panel rendered as an empty gradient. The block now carries the whole
+# utility rather than the half of a class name.
+AUTH_ART = {
+    "student": "[background-image:url('../img/marketing/auth-students.webp')]",
+    "teacher": "[background-image:url('../img/marketing/auth-teacher.webp')]",
+}
+
+
+def auth_shell(src):
+    return src.replace(
+        "auth-art auth-art--{% block auth_art %}student{% endblock %}",
+        "auth-art {% block auth_art %}" + AUTH_ART["student"] + "{% endblock %}")
+
+
+def auth_page(src):
+    for who, util in AUTH_ART.items():
+        src = src.replace("{% block auth_art %}" + who + "{% endblock %}",
+                          "{% block auth_art %}" + util + "{% endblock %}")
+    return src
+
+
+# {% block page_class %} builds a modifier on <main> at request time, so the
+# scanner never sees page--auth or page--wide and both pages lost their
+# override: the auth split was squeezed into the 62rem reading column instead
+# of running full-bleed. The `!` is deliberate — the base utility it overrides
+# is also an arbitrary max-width, and which of two equal-specificity utilities
+# wins would otherwise depend on the order Tailwind happens to emit them in.
+PAGE_CLASS = {
+    "accounts/_auth_shell.html": ("page--auth", "max-w-none! p-0!"),
+    "accounts/terms.html": ("page--wide", "max-w-[76rem]!"),
+}
+
+
+def page_class(src, old, new):
+    return src.replace("{% block page_class %}" + old + "{% endblock %}",
+                       "{% block page_class %}" + new + "{% endblock %}")
+
+
 def main():
     done = []
+
+    for rel, (old, new) in PAGE_CLASS.items():
+        if edit(rel, lambda s, o=old, n=new: page_class(s, o, n)):
+            done.append(f"page modifier on {rel}")
+
+    if edit("accounts/_auth_shell.html", auth_shell):
+        done.append("auth photograph on _auth_shell.html")
+    for rel in ["accounts/staff_login.html", "accounts/student_register.html",
+                "accounts/register.html", "accounts/staff_self_register.html",
+                "accounts/staff_register.html", "accounts/login.html",
+                "accounts/student_login.html"]:
+        if edit(rel, auth_page):
+            done.append(f"auth photograph on {rel}")
 
     if edit("base.html", student_body):
         done.append("student body defaults on base.html")
@@ -153,6 +207,28 @@ def main():
                 r'^[ \t]*<title>.*?</title>\n', s, re.M | re.S).end()
             return s[:at] + LINK + s[at:]
         if edit(rel, link):
+            done.append(f"stylesheet link in {rel}")
+
+    # Every document links the built stylesheet. This is not inherited from
+    # the restore point — that commit predates the link — so it is asserted
+    # here: any template with a <head> of its own, except the HTML email.
+    def ensure_link(src):
+        if "app.build.css" in src or "<head" not in src:
+            return src
+        links = list(re.finditer(r'^[ \t]*<link rel="stylesheet"[^>]*>\n', src, re.M))
+        if links:
+            at = links[-1].end()
+        else:
+            m = re.search(r"^[ \t]*<title>.*?</title>\n", src, re.M | re.S)
+            if not m:
+                return src
+            at = m.end()
+        return src[:at] + LINK + src[at:]
+
+    for rel in sorted(p.relative_to(TEMPLATES).as_posix() for p in TEMPLATES.rglob("*.html")):
+        if rel.startswith("email/"):
+            continue
+        if edit(rel, ensure_link):
             done.append(f"stylesheet link in {rel}")
 
     # Any <link> whose stylesheet no longer exists. Removing them by name per

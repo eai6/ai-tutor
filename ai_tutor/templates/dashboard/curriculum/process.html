@@ -211,7 +211,7 @@
     <div class="upload-header">
         <div>
             <h2 style="margin: 0; font-size: 1.25rem;">{% blocktrans with subj=upload.subject_name %}{{ subj }} Curriculum{% endblocktrans %}</h2>
-            <p style="margin: 0.25rem 0 0; color: var(--gray-500); font-size: 0.875rem;">{{ upload.original_filename }}</p>
+            <p style="margin: 0.25rem 0 0; color: var(--color-warm-500); font-size: 0.875rem;">{{ upload.original_filename }}</p>
         </div>
         <div class="upload-meta">
             <div class="upload-meta-item">
@@ -256,7 +256,7 @@
     <div class="complete-banner">
         <div class="complete-icon">🎉</div>
         <div class="complete-title">{% trans "Curriculum Processing Complete!" %}</div>
-        <p style="color: var(--success); margin: 0;">{% trans "Your curriculum has been processed and lesson content generated." %}</p>
+        <p style="color: var(--color-success); margin: 0;">{% trans "Your curriculum has been processed and lesson content generated." %}</p>
 
         <div class="complete-stats">
             <div class="complete-stat">
@@ -275,9 +275,9 @@
 
         <div style="display: flex; gap: 1rem; justify-content: center;">
             {% if upload.created_course %}
-            <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-success inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-success-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent" style="font-size: 1rem; padding: 0.75rem 2rem;">📖 {% trans "View Course" %}</a>
+            <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-success inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-success-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent" style="font-size: 1rem; padding: 0.75rem 2rem;">📖 {% trans "View Course" %}</a>
             {% endif %}
-            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Back to Curriculum" %}</a>
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Back to Curriculum" %}</a>
         </div>
     </div>
 
@@ -288,21 +288,21 @@
             <div class="step-title"><span class="step-number">1</span> {% trans "Extract & Parse Curriculum" %}</div>
         </div>
         <div class="step-body">
-            <p style="color: var(--gray-600); margin-bottom: 1rem;">{% trans "We will extract text from your document and identify units and lessons using AI." %}</p>
+            <p style="color: var(--color-warm-600); margin-bottom: 1rem;">{% trans "We will extract text from your document and identify units and lessons using AI." %}</p>
             <div class="results-grid" style="max-width: 400px;">
                 <div class="result-card">
                     <h4>📄 {% trans "Document" %}</h4>
                     <div style="font-size: 0.875rem; font-weight: 500;">{{ upload.subject_name }}</div>
-                    <div style="font-size: 0.75rem; color: var(--gray-500);">{{ upload.grade_level|default:"S1" }}</div>
+                    <div style="font-size: 0.75rem; color: var(--color-warm-500);">{{ upload.grade_level|default:"S1" }}</div>
                 </div>
                 <div class="result-card">
                     <h4>📋 {% trans "Status" %}</h4>
-                    <div style="font-size: 0.875rem; color: var(--warning); font-weight: 500;">{% trans "Ready" %}</div>
+                    <div style="font-size: 0.875rem; color: var(--color-warning); font-weight: 500;">{% trans "Ready" %}</div>
                 </div>
             </div>
             <div class="step-actions">
-                <button id="start-btn" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="startProcessing()">🚀 {% trans "Start Processing" %}</button>
-                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Cancel" %}</a>
+                <button id="start-btn" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="startProcessing()">🚀 {% trans "Start Processing" %}</button>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Cancel" %}</a>
             </div>
         </div>
     </div>
@@ -320,7 +320,7 @@
         <div class="step-body">
             <div style="text-align: center; padding: 1.5rem;">
                 <div class="spinner" style="width: 48px; height: 48px; border-width: 3px; margin: 0 auto 1rem;"></div>
-                <p style="color: var(--gray-600); font-weight: 500;">
+                <p style="color: var(--color-warm-600); font-weight: 500;">
                     {% if upload.current_step == 1 %}Extracting text from your document...
                     {% elif upload.current_step == 2 %}Analyzing curriculum structure with AI...
                     {% elif upload.current_step == 3 %}Creating units and lessons...
@@ -328,29 +328,29 @@
                     {% else %}Working...{% endif %}
                 </p>
                 {% if upload.current_step == 4 %}
-                <p style="color: var(--gray-500); font-size: 0.875rem;">
+                <p style="color: var(--color-warm-500); font-size: 0.875rem;">
                     Content is being generated for each lesson. This page will auto-refresh every 10 seconds.
                 </p>
                 {% else %}
-                <p style="color: var(--gray-400); font-size: 0.875rem;">{% trans "This may take a few minutes. This page refreshes automatically." %}</p>
+                <p style="color: var(--color-warm-400); font-size: 0.875rem;">{% trans "This may take a few minutes. This page refreshes automatically." %}</p>
                 {% endif %}
             </div>
 
             <!-- Always show progress log during processing -->
             <div style="margin-top: 1rem;">
-                <h4 style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 0.5rem;">📋 Progress Log</h4>
-                <pre id="progress-log" style="background: var(--gray-900); color: var(--success-solid); padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{% if upload.processing_log %}{{ upload.processing_log }}{% else %}Waiting for processing to start...{% endif %}</pre>
+                <h4 style="font-size: 0.875rem; color: var(--color-warm-600); margin-bottom: 0.5rem;">📋 Progress Log</h4>
+                <pre id="progress-log" style="background: var(--color-warm-900); color: var(--color-success-solid); padding: 1rem; border-radius: 8px; font-size: 0.75rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;">{% if upload.processing_log %}{{ upload.processing_log }}{% else %}Waiting for processing to start...{% endif %}</pre>
             </div>
 
             <!-- Auto-refresh every 8 seconds while processing -->
             <script nonce="{{ request.csp_nonce }}">setTimeout(function(){ window.location.reload(); }, 8000);</script>
             
             {% if upload.created_course %}
-            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--gray-100); text-align: center;">
-                <p style="color: var(--gray-500); font-size: 0.875rem; margin-bottom: 0.75rem;">
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--color-warm-100); text-align: center;">
+                <p style="color: var(--color-warm-500); font-size: 0.875rem; margin-bottom: 0.75rem;">
                     Course created! You can view it while content generates:
                 </p>
-                <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                <a href="{% url 'dashboard:course_detail' upload.created_course.id %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     📖 View Course Progress
                 </a>
             </div>
@@ -366,7 +366,7 @@
             <div class="step-status review">👁️ {% trans "Needs Review" %}</div>
         </div>
         <div class="step-body">
-            <div class="info-box p-4 bg-info-surface border border-info-border rounded-md text-info text-sm leading-normal text-left [&_p_+_p]:mt-2">
+            <div class="info-box">
                 <div class="info-box-icon">💡</div>
                 <div class="info-box-content">
                     <div class="info-box-title">{% trans "Review Your Curriculum" %}</div>
@@ -385,9 +385,9 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 0.75rem;">
                 <h4 style="margin: 0;">📚 {% trans "Units & Lessons" %}</h4>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="expandAll()">{% trans "Expand All" %}</button>
-                    <button class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="collapseAll()">{% trans "Collapse All" %}</button>
-                    <button class="btn btn-sm btn-primary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="addUnit()">+ {% trans "Add Unit" %}</button>
+                    <button class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="expandAll()">{% trans "Expand All" %}</button>
+                    <button class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="collapseAll()">{% trans "Collapse All" %}</button>
+                    <button class="btn btn-sm btn-primary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="addUnit()">+ {% trans "Add Unit" %}</button>
                 </div>
             </div>
             
@@ -406,37 +406,37 @@
                     </div>
                     <div class="lesson-review-list">
                         <!-- Unit-level terminal objectives (editable) -->
-                        <div style="padding:0.75rem 1rem;background:#f8fafc;border-bottom:1px solid var(--gray-200);">
+                        <div style="padding:0.75rem 1rem;background:#f8fafc;border-bottom:1px solid var(--color-warm-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                                <div style="font-size:0.75rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Terminal Objectives (Assessment Targets)" %}</div>
-                                <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size:0.6875rem;padding:2px 8px;background:var(--accent-surface);color:var(--info-solid);border:1px solid var(--accent-border);border-radius:4px;" onclick="addObjective(this, 'to')">+ {% trans "Add TO" %}</button>
+                                <div style="font-size:0.75rem;font-weight:700;color:var(--color-info-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Terminal Objectives (Assessment Targets)" %}</div>
+                                <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.6875rem;padding:2px 8px;background:var(--color-accent-surface);color:var(--color-info-solid);border:1px solid var(--color-accent-border);border-radius:4px;" onclick="addObjective(this, 'to')">+ {% trans "Add TO" %}</button>
                             </div>
                             <div class="unit-tos-list">
                             {% for to in unit.terminal_objectives %}
                             <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;">
-                                <span style="font-size:0.6875rem;font-weight:700;color:var(--info-solid);background:var(--accent-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">TO{{ forloop.counter }}</span>
-                                <textarea class="to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1">{{ to }}</textarea>
-                                <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="{% trans 'Remove' %}">✕</button>
+                                <span style="font-size:0.6875rem;font-weight:700;color:var(--color-info-solid);background:var(--color-accent-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">TO{{ forloop.counter }}</span>
+                                <textarea class="to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--color-warm-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1">{{ to }}</textarea>
+                                <button type="button" style="background:none;border:none;color:var(--color-warm-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="{% trans 'Remove' %}">✕</button>
                             </div>
                             {% empty %}
-                            <div style="font-size:0.8125rem;color:var(--gray-400);font-style:italic;">{% trans "No terminal objectives extracted. Click + Add TO to add manually." %}</div>
+                            <div style="font-size:0.8125rem;color:var(--color-warm-400);font-style:italic;">{% trans "No terminal objectives extracted. Click + Add TO to add manually." %}</div>
                             {% endfor %}
                             </div>
                         </div>
 
                         <!-- Unit-level enabling objectives / teaching steps (editable) -->
                         {% if unit.enabling_objectives %}
-                        <div style="padding:0.75rem 1rem;background:#f0fdf4;border-bottom:1px solid var(--gray-200);">
+                        <div style="padding:0.75rem 1rem;background:#f0fdf4;border-bottom:1px solid var(--color-warm-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                                <div style="font-size:0.75rem;font-weight:700;color:var(--success-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Enabling Objectives (Teaching Steps)" %}</div>
-                                <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size:0.6875rem;padding:2px 8px;background:var(--success-surface);color:var(--success-solid);border:1px solid var(--success-border);border-radius:4px;" onclick="addObjective(this, 'eo')">+ {% trans "Add EO" %}</button>
+                                <div style="font-size:0.75rem;font-weight:700;color:var(--color-success-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Enabling Objectives (Teaching Steps)" %}</div>
+                                <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.6875rem;padding:2px 8px;background:var(--color-success-surface);color:var(--color-success-solid);border:1px solid var(--color-success-border);border-radius:4px;" onclick="addObjective(this, 'eo')">+ {% trans "Add EO" %}</button>
                             </div>
                             <div class="unit-eos-list">
                             {% for eo in unit.enabling_objectives %}
                             <div class="objective-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem;">
-                                <span style="font-size:0.6875rem;font-weight:700;color:var(--success-solid);background:var(--success-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">EO{{ forloop.counter }}</span>
-                                <textarea class="eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--gray-200);border-radius:4px;padding:3px 8px;resize:vertical;min-height:24px;color:var(--text-secondary);" rows="1">{{ eo }}</textarea>
-                                <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="{% trans 'Remove' %}">✕</button>
+                                <span style="font-size:0.6875rem;font-weight:700;color:var(--color-success-solid);background:var(--color-success-surface);padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">EO{{ forloop.counter }}</span>
+                                <textarea class="eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--color-warm-200);border-radius:4px;padding:3px 8px;resize:vertical;min-height:24px;color:var(--color-text-secondary);" rows="1">{{ eo }}</textarea>
+                                <button type="button" style="background:none;border:none;color:var(--color-warm-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="{% trans 'Remove' %}">✕</button>
                             </div>
                             {% endfor %}
                             </div>
@@ -455,27 +455,27 @@
                                      always renders (even when empty) so the + Add TO button is
                                      reachable on lessons that the parser left without any TOs. -->
                                 <div style="margin-top:0.5rem;" class="lesson-tos-block">
-                                    <div style="font-size:0.625rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;margin-bottom:0.25rem;">{% trans "Lesson Terminal Objectives" %}</div>
+                                    <div style="font-size:0.625rem;font-weight:700;color:var(--color-info-solid);text-transform:uppercase;margin-bottom:0.25rem;">{% trans "Lesson Terminal Objectives" %}</div>
                                     <div class="lesson-tos-list">
                                     {% for eo in lesson.enabling_objectives %}
                                     <div class="lesson-to-row" style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
-                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--info-solid);margin-top:4px;">TO</span>
-                                        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1">{{ eo }}</textarea>
-                                        <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="{% trans 'Remove' %}">✕</button>
+                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--color-info-solid);margin-top:4px;">TO</span>
+                                        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--color-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1">{{ eo }}</textarea>
+                                        <button type="button" style="background:none;border:none;color:var(--color-warm-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="{% trans 'Remove' %}">✕</button>
                                     </div>
                                     {% endfor %}
                                     </div>
-                                    <button type="button" style="font-size:0.6875rem;color:var(--info-solid);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
+                                    <button type="button" style="font-size:0.6875rem;color:var(--color-info-solid);background:none;border:1px dashed var(--color-info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
                                 </div>
 
                                 <!-- Teaching steps for this lesson (editable) -->
                                 {% if lesson.teaching_steps %}
                                 <div style="margin-top:0.5rem;">
-                                    <div style="font-size:0.625rem;font-weight:700;color:var(--success-solid);text-transform:uppercase;margin-bottom:0.25rem;">{% trans "Teaching Steps" %}</div>
+                                    <div style="font-size:0.625rem;font-weight:700;color:var(--color-success-solid);text-transform:uppercase;margin-bottom:0.25rem;">{% trans "Teaching Steps" %}</div>
                                     {% for ts in lesson.teaching_steps %}
                                     <div style="display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;">
-                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--success-solid);margin-top:4px;">EO</span>
-                                        <textarea class="lesson-eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:22px;color:var(--text-muted);" rows="1">{{ ts }}</textarea>
+                                        <span style="font-size:0.5625rem;font-weight:700;color:var(--color-success-solid);margin-top:4px;">EO</span>
+                                        <textarea class="lesson-eo-input" style="flex:1;font-size:0.75rem;border:1px solid var(--color-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:22px;color:var(--color-text-muted);" rows="1">{{ ts }}</textarea>
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -485,12 +485,12 @@
                         </div>
                         {% endfor %}
                         <div class="lesson-review-item add-lesson-row">
-                            <button type="button" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="addLesson(this)">+ Add Lesson</button>
+                            <button type="button" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="addLesson(this)">+ Add Lesson</button>
                         </div>
                     </div>
                 </div>
                 {% empty %}
-                <div class="empty-units-message" style="padding: 2rem; text-align: center; color: var(--gray-500);">
+                <div class="empty-units-message" style="padding: 2rem; text-align: center; color: var(--color-warm-500);">
                     No units found. Click "+ Add Unit" to create one manually.
                 </div>
                 {% endfor %}
@@ -510,19 +510,19 @@
                     <input type="checkbox" id="generate-exit-tickets" checked>
                     <label for="generate-exit-tickets"><strong>{% trans "Generate exit tickets" %}</strong> - Assessment questions to check understanding</label>
                 </div>
-                <p style="font-size: 0.8rem; color: var(--gray-500); margin: 0.75rem 0 0 1.5rem;">
+                <p style="font-size: 0.8rem; color: var(--color-warm-500); margin: 0.75rem 0 0 1.5rem;">
                     Content generation runs in the background. You can view progress on this page.
                 </p>
             </div>
             
             <div class="step-actions">
-                <button type="button" class="btn btn-success inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-success-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent" onclick="approveAndGenerate()" id="approve-btn">
+                <button type="button" class="btn btn-success inline-flex items-center justify-center gap-2 min-h-[46px] py-3 px-6 border border-success-solid rounded-sm font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent" onclick="approveAndGenerate()" id="approve-btn">
                     ✓ {% trans "Approve & Generate Content" %}
                 </button>
-                <button type="button" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="saveOnly()">
+                <button type="button" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="saveOnly()">
                     💾 {% trans "Save Structure Only" %}
                 </button>
-                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     ✗ {% trans "Re-upload" %}
                 </a>
             </div>
@@ -532,19 +532,19 @@
     {% elif upload.status == 'failed' %}
     <!-- Failed State -->
     <div class="step-card" style="border: 2px solid #FCA5A5;">
-        <div class="step-header" style="background: var(--danger-surface);">
-            <div class="step-title" style="color: var(--danger);">❌ Processing Failed</div>
+        <div class="step-header" style="background: var(--color-danger-surface);">
+            <div class="step-title" style="color: var(--color-danger);">❌ Processing Failed</div>
         </div>
         <div class="step-body">
-            <p style="color: var(--danger); margin-bottom: 1rem;">{{ upload.error_message|default:"An error occurred." }}</p>
+            <p style="color: var(--color-danger); margin-bottom: 1rem;">{{ upload.error_message|default:"An error occurred." }}</p>
             {% if upload.processing_log %}
             <details style="margin-bottom: 1rem;"><summary style="cursor: pointer;">{% trans "View details" %}</summary>
-            <pre style="background: var(--gray-100); padding: 1rem; border-radius: 8px; font-size: 0.75rem; margin-top: 0.5rem;">{{ upload.processing_log }}</pre>
+            <pre style="background: var(--color-warm-100); padding: 1rem; border-radius: 8px; font-size: 0.75rem; margin-top: 0.5rem;">{{ upload.processing_log }}</pre>
             </details>
             {% endif %}
             <div class="step-actions">
-                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">📤 Upload Different File</a>
-                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">Back</a>
+                <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">📤 Upload Different File</a>
+                <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">Back</a>
             </div>
         </div>
     </div>
@@ -622,7 +622,7 @@ function addUnit() {
             </div>
             <div class="lesson-review-list">
                 <div class="lesson-review-item add-lesson-row">
-                    <button type="button" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="addLesson(this)">+ Add Lesson</button>
+                    <button type="button" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="addLesson(this)">+ Add Lesson</button>
                 </div>
             </div>
         </div>`;
@@ -636,16 +636,16 @@ function addObjective(btn, type) {
     const list = btn.closest('div').querySelector(type === 'to' ? '.unit-tos-list' : '.unit-eos-list');
     if (!list) return;
     const count = list.querySelectorAll('.objective-row').length + 1;
-    const color = type === 'to' ? 'var(--info-solid)' : 'var(--success-solid)';
-    const bg = type === 'to' ? 'var(--accent-surface)' : 'var(--success-surface)';
+    const color = type === 'to' ? 'var(--color-info-solid)' : 'var(--color-success-solid)';
+    const bg = type === 'to' ? 'var(--color-accent-surface)' : 'var(--color-success-surface)';
     const label = type === 'to' ? 'TO' : 'EO';
     const row = document.createElement('div');
     row.className = 'objective-row';
     row.style.cssText = 'display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.375rem;';
     row.innerHTML = `
         <span style="font-size:0.6875rem;font-weight:700;color:${color};background:${bg};padding:1px 5px;border-radius:3px;flex-shrink:0;margin-top:4px;">${label}${count}</span>
-        <textarea class="${type}-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--gray-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1" placeholder="Type objective here..."></textarea>
-        <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
+        <textarea class="${type}-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--color-warm-200);border-radius:4px;padding:4px 8px;resize:vertical;min-height:28px;" rows="1" placeholder="Type objective here..."></textarea>
+        <button type="button" style="background:none;border:none;color:var(--color-warm-400);cursor:pointer;font-size:1rem;flex-shrink:0;" onclick="this.closest('.objective-row').remove()" title="Remove">✕</button>
     `;
     list.appendChild(row);
     row.querySelector('textarea').focus();
@@ -661,9 +661,9 @@ function addLesson(btn) {
                 <input type="text" value="New Lesson" placeholder="Lesson title" class="lesson-title-input">
                 <textarea placeholder="Learning objective (e.g., Students will be able to...)" class="lesson-objective-input" rows="2"></textarea>
                 <div style="margin-top:0.5rem;" class="lesson-tos-block">
-                    <div style="font-size:0.625rem;font-weight:700;color:var(--info-solid);text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
+                    <div style="font-size:0.625rem;font-weight:700;color:var(--color-info-solid);text-transform:uppercase;margin-bottom:0.25rem;">Lesson Terminal Objectives</div>
                     <div class="lesson-tos-list"></div>
-                    <button type="button" style="font-size:0.6875rem;color:var(--info-solid);background:none;border:1px dashed var(--info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
+                    <button type="button" style="font-size:0.6875rem;color:var(--color-info-solid);background:none;border:1px dashed var(--color-info-border);border-radius:4px;padding:2px 8px;cursor:pointer;margin-top:0.25rem;" onclick="addLessonTO(this)">+ Add TO</button>
                 </div>
             </div>
             <button type="button" class="btn-icon danger" onclick="removeLesson(this)">✕</button>
@@ -681,9 +681,9 @@ function addLessonTO(btn) {
     row.className = 'lesson-to-row';
     row.style.cssText = 'display:flex;align-items:flex-start;gap:0.375rem;margin-bottom:0.25rem;';
     row.innerHTML = `
-        <span style="font-size:0.5625rem;font-weight:700;color:var(--info-solid);margin-top:4px;">TO</span>
-        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1" placeholder="Type Terminal Objective..."></textarea>
-        <button type="button" style="background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="Remove">✕</button>
+        <span style="font-size:0.5625rem;font-weight:700;color:var(--color-info-solid);margin-top:4px;">TO</span>
+        <textarea class="lesson-to-input" style="flex:1;font-size:0.8125rem;border:1px solid var(--color-border);border-radius:4px;padding:3px 6px;resize:vertical;min-height:24px;" rows="1" placeholder="Type Terminal Objective..."></textarea>
+        <button type="button" style="background:none;border:none;color:var(--color-warm-400);cursor:pointer;font-size:0.85rem;flex-shrink:0;padding:0 4px;" onclick="this.closest('.lesson-to-row').remove()" title="Remove">✕</button>
     `;
     list.appendChild(row);
     row.querySelector('textarea').focus();

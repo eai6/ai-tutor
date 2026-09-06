@@ -112,12 +112,12 @@
             <tr>
                 <td><a href="{% url 'dashboard:benchmark:run_detail' run.id %}">#{{ run.id }}</a></td>
                 <td>{{ run.created_at|date:"M j, H:i" }}</td>
-                <td><span class="pill pill-variant inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ run.get_system_variant_display }}</span></td>
+                <td><span class="pill pill-variant">{{ run.get_system_variant_display }}</span></td>
                 <td>
                     {% if run.annotator_role == 'human' %}
-                        <span class="pill pill-role-human inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">human</span>
+                        <span class="pill pill-role-human">human</span>
                     {% else %}
-                        <span class="pill pill-role-llm inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ run.annotator_role }}</span>
+                        <span class="pill pill-role-llm">{{ run.annotator_role }}</span>
                     {% endif %}
                 </td>
                 <td>{{ run.passed }}/{{ run.total_items }}</td>
@@ -133,7 +133,7 @@
 </div>
 {% else %}
 <div class="runs-table">
-    <div class="empty flex flex-col items-center text-center gap-3 py-10 px-5 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1 [&_.icon]:text-[2.5rem] [&_.icon]:text-coral-solid">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         <h3 style="color:#374151;margin-bottom:0.5rem;">No runs yet.</h3>
         {% if human_annotation_count %}
         <p>{{ human_annotation_count }} annotation{{ human_annotation_count|pluralize }} ready — hit

@@ -7,17 +7,17 @@
 {% block content %}
 <!-- Date Range Filter -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <p style="color: var(--gray-500);">{% trans "Analytics and insights" %}</p>
+    <p style="color: var(--color-warm-500);">{% trans "Analytics and insights" %}</p>
     <div style="display: flex; gap: 0.5rem;">
-        <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55">{% trans "7 days" %}</a>
-        <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55">{% trans "30 days" %}</a>
-        <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55">{% trans "90 days" %}</a>
+        <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">{% trans "7 days" %}</a>
+        <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">{% trans "30 days" %}</a>
+        <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-secondary{% endif %} btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">{% trans "90 days" %}</a>
     </div>
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
     <!-- Sessions Over Time -->
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
             <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Sessions Over Time" %}</h3>
         </div>
@@ -26,7 +26,7 @@
             <div style="height: 200px; display: flex; align-items: flex-end; gap: 2px;">
                 {% for day in sessions_by_day %}
                 <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                    <div style="width: 100%; background: var(--primary); border-radius: 2px; min-height: 4px;"
+                    <div style="width: 100%; background: var(--color-primary); border-radius: 2px; min-height: 4px;"
                          title="{% blocktrans with date=day.date count=day.count %}{{ date }}: {{ count }} sessions{% endblocktrans %}"
                          data-count="{{ day.count }}" data-max="{% if sessions_by_day %}{{ sessions_by_day|length }}{% else %}1{% endif %}">
                     </div>
@@ -50,7 +50,7 @@
     </div>
 
     <!-- Top Students -->
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
             <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Top Performing Students" %}</h3>
         </div>
@@ -88,7 +88,7 @@
 </div>
 
 <!-- Competency Reports -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Competency Reports" %}</h3>
     </div>
@@ -96,12 +96,12 @@
         {% if courses_with_eo %}
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
             {% for item in courses_with_eo %}
-            <div style="border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 1rem;">
+            <div style="border: 1px solid var(--color-warm-200); border-radius: 0.75rem; padding: 1rem;">
                 <div style="font-weight: 700; margin-bottom: 0.25rem;">{{ item.course.title }}</div>
-                <div style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
+                <div style="font-size: 0.8125rem; color: var(--color-warm-500); margin-bottom: 0.75rem;">
                     {% blocktrans with eo=item.eo_count s=item.session_count %}{{ eo }} enabling objectives · {{ s }} sessions{% endblocktrans %}
                 </div>
-                <a href="{% url 'dashboard:class_competency' item.course.id %}" class="btn btn-sm btn-primary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size: 0.8125rem;">
+                <a href="{% url 'dashboard:class_competency' item.course.id %}" class="btn btn-sm btn-primary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="font-size: 0.8125rem;">
                     {% trans "Class Competency & Readiness" %}
                 </a>
             </div>
@@ -117,7 +117,7 @@
 
 <!-- Recent Lesson Sessions -->
 {% if recent_lessons %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Recent Lesson Sessions" %}</h3>
     </div>
@@ -136,11 +136,11 @@
                 {% for lesson in recent_lessons %}
                 <tr>
                     <td style="font-weight: 500;">{{ lesson.title }}</td>
-                    <td style="color: var(--gray-500);">{{ lesson.unit.course.title }}</td>
+                    <td style="color: var(--color-warm-500);">{{ lesson.unit.course.title }}</td>
                     <td style="text-align: center;">{{ lesson.recent_sessions }}</td>
                     <td style="text-align: center;">{{ lesson.recent_completions }}</td>
                     <td style="text-align: right;">
-                        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
+                        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info-solid);color:var(--color-surface);border:none;border-radius:6px;padding:4px 10px;font-size:0.75rem;font-weight:600;text-decoration:none;">
                             {% trans "Session Report" %}
                         </a>
                     </td>
@@ -153,7 +153,7 @@
 {% endif %}
 
 <!-- Lesson Performance -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Lesson Performance" %}</h3>
     </div>
@@ -173,20 +173,20 @@
                 {% for lesson in lessons %}
                 <tr>
                     <td style="font-weight: 500;">{{ lesson.title }}</td>
-                    <td style="color: var(--gray-500);">{{ lesson.unit.course.title }}</td>
+                    <td style="color: var(--color-warm-500);">{{ lesson.unit.course.title }}</td>
                     <td style="text-align: center;">{{ lesson.attempts }}</td>
                     <td style="text-align: center;">{{ lesson.completions }}</td>
                     <td>
                         {% if lesson.attempts > 0 %}
                             {% widthratio lesson.completions lesson.attempts 100 as rate %}
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <div class="progress-bar h-[6px] bg-[rgba(0,0,0,0.08)] rounded-xs overflow-hidden" style="flex: 1;">
-                                    <div class="progress-fill {% if rate >= 70 %}success{% endif %} h-full rounded-xs bg-accent-solid transition duration-[0.3s] ease-[ease] [&.success]:bg-success-solid [&.warning]:bg-warning-solid [&.danger]:bg-danger-solid [background:linear-gradient(90deg,_var(--color-teal-solid),_var(--color-primary))]" style="width: {{ rate }}%;"></div>
+                                <div class="progress-bar h-[6px] bg-warm-200 rounded-full overflow-hidden" style="flex: 1;">
+                                    <div class="progress-fill {% if rate >= 70 %}success{% endif %} h-full rounded-full bg-accent-solid transition duration-[var(--dur-slow)] ease-[var(--ease-out)] [&.success]:bg-success-solid [&.warning]:bg-warning-solid [&.danger]:bg-danger-solid" style="width: {{ rate }}%;"></div>
                                 </div>
-                                <span style="font-size: 0.875rem; color: var(--gray-500); min-width: 35px;">{{ rate }}%</span>
+                                <span style="font-size: 0.875rem; color: var(--color-warm-500); min-width: 35px;">{{ rate }}%</span>
                             </div>
                         {% else %}
-                            <span style="color: var(--gray-400);">—</span>
+                            <span style="color: var(--color-warm-400);">—</span>
                         {% endif %}
                     </td>
                 </tr>

@@ -1,11 +1,15 @@
 #!/usr/bin/env python
-"""Bring the variable names in templates' own <style> blocks up to date.
+"""Bring the variable names in templates up to date, wherever they appear.
 
     python scripts/inline_styles.py --apply
 
-These blocks were written against css/shared/tokens.css. That file is gone, so
-every var(--surface), var(--space-4) and var(--focus-ring) in them resolves to
+The templates were written against css/shared/tokens.css. That file is gone,
+so every var(--surface), var(--space-4) and var(--focus-ring) resolves to
 nothing and the page keeps its layout while losing every colour at once.
+
+They appear in three places, and only the first is CSS: a <style> block, a
+style="" attribute, and an SVG paint attribute — the dashboard's own brand
+mark is <rect fill="var(--primary)">, which rendered as a black square.
 
 It renames and NOTHING else. An earlier version of this script tried to
 convert the blocks into utilities the way the stylesheets were converted, and
@@ -48,16 +52,11 @@ def main(apply=False):
         if "email/" in tpl.as_posix():
             continue
         src = tpl.read_text()
-        if "<style" not in src:
+        if "var(--" not in src:
             continue
-
-        def swap(m):
-            nonlocal renamed
-            new = rename(m.group(2))
-            renamed += sum(1 for _ in re.finditer(r"var\(--", m.group(2))) if new != m.group(2) else 0
-            return m.group(1) + new + m.group(3)
-
-        out = STYLE.sub(swap, src)
+        # The whole template, not just its <style> blocks: a variable is just
+        # as dead inside a style attribute or an SVG fill.
+        out = rename(src)
         if out != src:
             touched += 1
             if apply:

@@ -1,3 +1,49 @@
+// Literal utility strings for the field this file builds.
+//
+// Every element below is created in JavaScript, so none of it was ever in a
+// template for the stylesheet migration to convert. The reveal toggle lost
+// its 36px box and its "show one glyph at a time" rules, and rendered as two
+// full-size black shapes stacked under the input.
+//
+// The BEM names travel alongside the utilities, because rules select through
+// them — the toggle hides .pw-toggle-on by name — and because this file
+// looks .pw-field and .pw-rule--met up itself.
+//
+// The markers this file creates use single hyphens, not BEM's double
+// underscore. Tailwind reads _ as a space inside an arbitrary variant, so the
+// name would need a backslash in the CSS class — and a backslash cannot
+// survive a JavaScript string literal and the scanner's raw read of the same
+// text at once. A hyphen needs no escape from either.
+const PW = {
+    // .icon used to come from css/shared/base.css. Without it the sprite has
+    // no intrinsic size and the browser falls back to the SVG default of
+    // 300x150 — two black shapes stacked under the field.
+    icon: "w-[1em] h-[1em] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round] [vertical-align:-0.125em]",
+    field: "relative block [&>input]:pr-11 [&>input]:w-full",
+    toggle: "absolute top-[50%] right-[6px] [transform:translateY(-50%)] w-9 h-9 grid place-items-center p-0 bg-transparent border border-transparent rounded-sm text-text-muted cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] hover:bg-surface-hover hover:text-text [&_.icon]:text-[1.05rem] [&_.pw-toggle-on]:hidden [&[aria-pressed='true']_.pw-toggle-off]:hidden [&[aria-pressed='true']_.pw-toggle-on]:block [&[aria-pressed='true']]:text-accent",
+    rules: "mt-3 py-3 px-4 bg-surface-sunken border border-border rounded-md [&[hidden]]:hidden",
+    rulesLabel: "text-xs font-bold text-text-secondary mb-2",
+    rulesList: "list-none grid gap-1",
+    rule: "flex items-start gap-2 text-sm leading-snug text-danger transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out)] [&[hidden]]:hidden",
+    ruleMark: "flex-none w-[1.05rem] h-[1.05rem] mt-[1px] grid place-items-center rounded-full bg-danger-surface border border-danger-border text-danger text-[0.65rem] [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.pw-rule-tick]:hidden [&_.pw-rule-dot]:block",
+    rulesNote: "mt-2 pt-2 border-t [border-top-style:dashed] border-t-border text-xs text-text-muted",
+    meter: "flex items-center gap-3 mt-3",
+    meterTrack: "flex-1 h-[6px] bg-surface border border-border rounded-full overflow-hidden",
+    meterFill: "h-full w-0 rounded-full bg-danger-solid [transition:width_var(--dur-base)_var(--ease-out),_background_var(--dur-base)_var(--ease-out)]",
+    meterWord: "text-xs font-bold min-w-18 text-right text-text-muted",
+    match: "flex items-center gap-2 mt-2 text-sm font-medium [&[hidden]]:hidden",
+    srOnly: "absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0",
+    ruleMet: "text-success [&_.pw-rule-mark]:bg-success-surface [&_.pw-rule-mark]:border-success-border [&_.pw-rule-mark]:text-success [&_.pw-rule-tick]:block [&_.pw-rule-dot]:hidden",
+    meterFillWeak: "w-[33%] bg-danger-solid",
+    meterFillFair: "w-[66%] bg-warning-solid",
+    meterFillStrong: "w-full bg-success-solid",
+    meterWordWeak: "text-danger",
+    meterWordFair: "text-warning",
+    meterWordStrong: "text-success",
+    matchOk: "text-success",
+    matchBad: "text-danger",
+};
+
 /* Password fields: reveal toggle, requirement checklist, match indicator.
  *
  * Progressive enhancement. Every <input type="password"> gets a reveal
@@ -52,7 +98,7 @@
 
     function svgIcon(name, extraClass) {
         var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('class', 'icon' + (extraClass ? ' ' + extraClass : ''));
+        svg.setAttribute('class', 'icon ' + PW.icon + (extraClass ? ' ' + extraClass : ''));
         svg.setAttribute('aria-hidden', 'true');
         svg.setAttribute('focusable', 'false');
         var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
@@ -117,18 +163,18 @@
         if (input.parentNode && input.parentNode.classList.contains('pw-field')) { return; }
 
         var wrap = document.createElement('div');
-        wrap.className = 'pw-field';
+        wrap.className = 'pw-field ' + PW.field;
         input.parentNode.insertBefore(wrap, input);
         wrap.appendChild(input);
 
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'pw-toggle';
+        btn.className = 'pw-toggle ' + PW.toggle;
         btn.setAttribute('aria-pressed', 'false');
         btn.setAttribute('aria-label', T('Show password'));
         if (input.id) { btn.setAttribute('aria-controls', input.id); }
-        btn.appendChild(svgIcon('eye', 'pw-toggle__off'));
-        btn.appendChild(svgIcon('eye-off', 'pw-toggle__on'));
+        btn.appendChild(svgIcon('eye', 'pw-toggle-off'));
+        btn.appendChild(svgIcon('eye-off', 'pw-toggle-on'));
 
         btn.addEventListener('click', function () {
             var shown = input.type === 'text';
@@ -185,27 +231,27 @@
         ];
 
         var box = document.createElement('div');
-        box.className = 'pw-rules';
+        box.className = 'pw-rules ' + PW.rules;
         box.hidden = true;
 
         var label = document.createElement('p');
-        label.className = 'pw-rules__label';
+        label.className = 'pw-rules__label ' + PW.rulesLabel;
         label.textContent = T('Your password needs');
         box.appendChild(label);
 
         var list = document.createElement('ul');
-        list.className = 'pw-rules__list';
+        list.className = 'pw-rules__list ' + PW.rulesList;
 
         RULES.concat(GUARDS).forEach(function (rule) {
             var li = document.createElement('li');
-            li.className = 'pw-rule';
+            li.className = 'pw-rule ' + PW.rule;
             li.setAttribute('data-rule', rule.key);
 
             var mark = document.createElement('span');
-            mark.className = 'pw-rule__mark';
-            mark.appendChild(svgIcon('check', 'pw-rule__tick'));
+            mark.className = 'pw-rule-mark ' + PW.ruleMark;
+            mark.appendChild(svgIcon('check', 'pw-rule-tick'));
             var dot = document.createElement('span');
-            dot.className = 'pw-rule__dot';
+            dot.className = 'pw-rule-dot';
             dot.textContent = '·';
             mark.appendChild(dot);
 
@@ -221,21 +267,21 @@
         box.appendChild(list);
 
         var note = document.createElement('p');
-        note.className = 'pw-rules__note';
+        note.className = 'pw-rules__note ' + PW.rulesNote;
         note.textContent = T('Common passwords are also refused when you submit.');
         box.appendChild(note);
 
         /* Advisory meter — not a requirement, and labelled in words as well
            as colour so it survives greyscale. */
         var meter = document.createElement('div');
-        meter.className = 'pw-meter';
+        meter.className = 'pw-meter ' + PW.meter;
         var track = document.createElement('div');
-        track.className = 'pw-meter__track';
+        track.className = 'pw-meter__track ' + PW.meterTrack;
         var fill = document.createElement('div');
-        fill.className = 'pw-meter__fill';
+        fill.className = 'pw-meter__fill ' + PW.meterFill;
         track.appendChild(fill);
         var word = document.createElement('span');
-        word.className = 'pw-meter__word';
+        word.className = 'pw-meter__word ' + PW.meterWord;
         word.textContent = T('Strength');
         meter.appendChild(track);
         meter.appendChild(word);
@@ -244,7 +290,7 @@
         /* One live region for the whole checklist. Announcing each rule as it
            flips would talk over someone still typing. */
         var status = document.createElement('p');
-        status.className = 'sr-only';
+        status.className = 'sr-only ' + PW.srOnly;
         status.setAttribute('role', 'status');
         status.setAttribute('aria-live', 'polite');
         box.appendChild(status);
@@ -275,6 +321,9 @@
             RULES.forEach(function (rule) {
                 var ok = rule.test(pw);
                 rule.el.classList.toggle('pw-rule--met', ok);
+                PW.ruleMet.split(' ').forEach(function (c) {
+                    rule.el.classList.toggle(c, ok);
+                });
                 if (ok) { met += 1; }
             });
 
@@ -285,8 +334,10 @@
             });
 
             var level = score(pw, met);
-            fill.className = 'pw-meter__fill' + (level ? ' pw-meter__fill--' + level : '');
-            word.className = 'pw-meter__word' + (level ? ' pw-meter__word--' + level : '');
+            fill.className = 'pw-meter__fill ' + PW.meterFill
+                + (level ? ' pw-meter__fill--' + level + ' ' + PW['meterFill' + level.charAt(0).toUpperCase() + level.slice(1)] : '');
+            word.className = 'pw-meter__word ' + PW.meterWord
+                + (level ? ' pw-meter__word--' + level + ' ' + PW['meterWord' + level.charAt(0).toUpperCase() + level.slice(1)] : '');
             word.textContent = level
                 ? { weak: T('Weak'), fair: T('Fair'), strong: T('Strong') }[level]
                 : T('Strength');
@@ -318,7 +369,7 @@
         if (!target) { return; }
 
         var out = document.createElement('p');
-        out.className = 'pw-match';
+        out.className = 'pw-match ' + PW.match;
         out.setAttribute('role', 'status');
         out.setAttribute('aria-live', 'polite');
         out.hidden = true;
@@ -330,7 +381,8 @@
             if (!input.value) { out.hidden = true; return; }
             var ok = input.value === target.value;
             out.hidden = false;
-            out.className = 'pw-match ' + (ok ? 'pw-match--ok' : 'pw-match--bad');
+            out.className = 'pw-match ' + PW.match + ' '
+                + (ok ? 'pw-match--ok ' + PW.matchOk : 'pw-match--bad ' + PW.matchBad);
             out.textContent = ok ? T('Passwords match') : T("Passwords don't match yet");
         }
 

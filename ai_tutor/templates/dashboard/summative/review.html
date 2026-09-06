@@ -25,53 +25,53 @@
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
-    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--gray-500);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
+    <a href="{% url 'dashboard:course_detail' course.id %}" style="color:var(--color-warm-500);font-size:0.85rem;text-decoration:none;">← {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}</a>
     <div style="display:flex;gap:0.4rem;">
         {% if summative %}
         <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="return confirm('{% trans "Regenerate the summative? Existing questions will be replaced." %}');">↻ {% trans "Regenerate" %}</button>
+            <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="return confirm('{% trans "Regenerate the summative? Existing questions will be replaced." %}');">↻ {% trans "Regenerate" %}</button>
         </form>
         <form method="post" action="{% url 'dashboard:summative_publish' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="{% if summative.is_published %}background:var(--danger-surface);color:var(--danger);border:1px solid #fca5a5;{% else %}background:var(--accent);color:var(--surface);border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
+            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="{% if summative.is_published %}background:var(--color-danger-surface);color:var(--color-danger);border:1px solid #fca5a5;{% else %}background:var(--color-accent);color:var(--color-surface);border:none;{% endif %}padding:0.45rem 0.9rem;border-radius:6px;font-weight:600;">
                 {% if summative.is_published %}{% trans "Unpublish" %}{% else %}{% trans "Publish" %}{% endif %}
             </button>
         </form>
         {% else %}
         <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">⚡ {% trans "Generate Summative" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">⚡ {% trans "Generate Summative" %}</button>
         </form>
         {% endif %}
     </div>
 </div>
 
 {% if not summative %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="text-align:center;padding:2.5rem 1.5rem;">
-    <h3 style="margin:0 0 0.5rem;color:var(--gray-700);">{% trans "No summative exam yet" %}</h3>
-    <p style="color:var(--gray-500);margin:0 0 1.25rem;font-size:0.92rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="text-align:center;padding:2.5rem 1.5rem;">
+    <h3 style="margin:0 0 0.5rem;color:var(--color-warm-700);">{% trans "No summative exam yet" %}</h3>
+    <p style="color:var(--color-warm-500);margin:0 0 1.25rem;font-size:0.92rem;">
         {% blocktrans with title=course.title %}Generate a 90-question summative covering every teaching objective in <strong>{{ title }}</strong>. Each student attempt sees 30 questions stratified across all objectives.{% endblocktrans %}
     </p>
     <form method="post" action="{% url 'dashboard:summative_generate' course.id %}" style="display:inline;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">⚡ {% trans "Generate Summative" %}</button>
+        <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">⚡ {% trans "Generate Summative" %}</button>
     </form>
-    <p style="color:var(--gray-400);font-size:0.78rem;margin-top:1rem;">
+    <p style="color:var(--color-warm-400);font-size:0.78rem;margin-top:1rem;">
         {% trans "Generation queries the knowledge base for any uploaded question banks / past exam papers and mirrors their format. Takes ~1–2 minutes." %}
     </p>
 </div>
 {% else %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "Bank summary" %}</h2>
-        <span style="font-size:0.8rem;color:var(--gray-500);">
-            {% if summative.is_published %}<span style="color:var(--success);font-weight:600;">● {% trans "Published" %}</span>{% else %}<span style="color:var(--warning);font-weight:600;">● {% trans "Draft" %}</span>{% endif %}
+        <span style="font-size:0.8rem;color:var(--color-warm-500);">
+            {% if summative.is_published %}<span style="color:var(--color-success);font-weight:600;">● {% trans "Published" %}</span>{% else %}<span style="color:var(--color-warning);font-weight:600;">● {% trans "Draft" %}</span>{% endif %}
             · {% blocktrans with date=summative.created_at|date:"M j, H:i" %}created {{ date }}{% endblocktrans %}
         </span>
     </div>
     <div class="card-body p-5">
-        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:var(--text);margin-bottom:0.75rem;">
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem 2rem;font-size:0.9rem;color:var(--color-text);margin-bottom:0.75rem;">
             <div>{% blocktrans with current=coverage.total target=coverage.target_count %}<strong>{{ current }}</strong> / {{ target }} questions in bank{% endblocktrans %}</div>
             <div>{% blocktrans with n=coverage.unique_tags %}<strong>{{ n }}</strong> teaching objectives covered{% endblocktrans %}</div>
             <div>{% blocktrans with n=summative.questions_per_attempt %}<strong>{{ n }}</strong> served per student attempt{% endblocktrans %}</div>
@@ -85,10 +85,10 @@
     </div>
 </div>
 
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "Coverage by teaching objective" %}</h2>
-        <span style="font-size:0.78rem;color:var(--gray-500);">{% trans "objectives with <2 questions are flagged" %}</span>
+        <span style="font-size:0.78rem;color:var(--color-warm-500);">{% trans "objectives with <2 questions are flagged" %}</span>
     </div>
     <div class="card-body p-5">
         <div class="coverage-grid">
@@ -104,12 +104,12 @@
 
 {# Student scores — roster + per-student best/latest/attempts. Added 2026-05-07. #}
 {% if summative %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% trans "Student scores" %}</h2>
-        <div style="font-size:0.78rem;color:var(--gray-500);">
+        <div style="font-size:0.78rem;color:var(--color-warm-500);">
             {% blocktrans with attempted=score_stats.attempted total=score_stats.total_students %}{{ attempted }} of {{ total }} attempted{% endblocktrans %}
-            {% if score_stats.passed %}· <strong style="color:var(--success-solid);">{% blocktrans with n=score_stats.passed %}{{ n }} passed{% endblocktrans %}</strong>{% endif %}
+            {% if score_stats.passed %}· <strong style="color:var(--color-success-solid);">{% blocktrans with n=score_stats.passed %}{{ n }} passed{% endblocktrans %}</strong>{% endif %}
             {% if score_stats.avg_best_pct is not None %}· {% blocktrans with pct=score_stats.avg_best_pct %}avg best <strong>{{ pct }}%</strong>{% endblocktrans %}{% endif %}
             · {% blocktrans with pct=score_stats.passing_pct %}pass {{ pct }}%{% endblocktrans %}
         </div>
@@ -117,8 +117,8 @@
     <div class="card-body p-5" style="padding:0;">
         {% if student_scores %}
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-            <thead style="background:var(--surface-sunken);">
-                <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
+            <thead style="background:var(--color-surface-sunken);">
+                <tr style="text-align:left;font-size:0.75rem;color:var(--color-warm-500);text-transform:uppercase;">
                     <th style="padding:0.55rem 1rem;">{% trans "Student" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Best" %}</th>
                     <th style="padding:0.55rem 1rem;">{% trans "Latest" %}</th>
@@ -129,41 +129,41 @@
             </thead>
             <tbody>
                 {% for r in student_scores %}
-                <tr style="border-top:1px solid var(--gray-100);">
+                <tr style="border-top:1px solid var(--color-warm-100);">
                     <td style="padding:0.5rem 1rem;">
                         <div style="font-weight:500;">{{ r.user.first_name }} {{ r.user.last_name }}</div>
-                        <div style="font-size:0.78rem;color:var(--gray-500);">{{ r.user.username }}</div>
+                        <div style="font-size:0.78rem;color:var(--color-warm-500);">{{ r.user.username }}</div>
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             <strong>{{ r.best_score }} / {{ questions_per_attempt }}</strong>
-                            <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.best_pct }}%</span>
+                            <span style="color:var(--color-warm-500);font-size:0.78rem;">· {{ r.best_pct }}%</span>
                             {% if r.best_was_group %}<span title="{% trans 'Best score earned in a group session' %}" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
-                        {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+                        {% else %}<span style="color:var(--color-warm-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             {{ r.latest_score }} / {{ questions_per_attempt }}
-                            <span style="color:var(--gray-500);font-size:0.78rem;">· {{ r.latest_pct }}%</span>
+                            <span style="color:var(--color-warm-500);font-size:0.78rem;">· {{ r.latest_pct }}%</span>
                             {% if r.latest_was_group %}<span title="{% trans 'Latest attempt was a group session' %}" style="margin-left:0.25rem;font-size:0.7rem;cursor:help;">👥</span>{% endif %}
-                        {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+                        {% else %}<span style="color:var(--color-warm-400);">—</span>{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if r.has_attempt %}
                             {{ r.attempts }}
-                            {% if r.group_attempts %}<span title="{{ r.group_attempts }} of {{ r.attempts }} attempt{{ r.attempts|pluralize }} in a group session" style="margin-left:0.2rem;font-size:0.7rem;color:var(--accent);cursor:help;">({{ r.group_attempts }} 👥)</span>{% endif %}
-                        {% else %}<span style="color:var(--gray-400);">0</span>{% endif %}
+                            {% if r.group_attempts %}<span title="{{ r.group_attempts }} of {{ r.attempts }} attempt{{ r.attempts|pluralize }} in a group session" style="margin-left:0.2rem;font-size:0.7rem;color:var(--color-accent);cursor:help;">({{ r.group_attempts }} 👥)</span>{% endif %}
+                        {% else %}<span style="color:var(--color-warm-400);">0</span>{% endif %}
                     </td>
-                    <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--gray-500);">
+                    <td style="padding:0.5rem 1rem;font-size:0.82rem;color:var(--color-warm-500);">
                         {% if r.last_at %}{% blocktrans with ts=r.last_at|timesince %}{{ ts }} ago{% endblocktrans %}{% else %}—{% endif %}
                     </td>
                     <td style="padding:0.5rem 1rem;">
                         {% if not r.has_attempt %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--surface-sunken);color:var(--text-muted);font-size:0.72rem;font-weight:600;">{% trans "Not taken" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-surface-sunken);color:var(--color-text-muted);font-size:0.72rem;font-weight:600;">{% trans "Not taken" %}</span>
                         {% elif r.passed %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--success-surface);color:var(--success);font-size:0.72rem;font-weight:700;">{% trans "Passed" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-success-surface);color:var(--color-success);font-size:0.72rem;font-weight:700;">{% trans "Passed" %}</span>
                         {% else %}
-                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--danger-surface);color:var(--danger);font-size:0.72rem;font-weight:600;">{% trans "Below pass" %}</span>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:var(--color-danger-surface);color:var(--color-danger);font-size:0.72rem;font-weight:600;">{% trans "Below pass" %}</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -171,7 +171,7 @@
             </tbody>
         </table>
         {% else %}
-        <div style="padding:2rem;text-align:center;color:var(--gray-500);">
+        <div style="padding:2rem;text-align:center;color:var(--color-warm-500);">
             {% trans "No students enrolled in this course yet." %}
         </div>
         {% endif %}
@@ -179,7 +179,7 @@
 </div>
 {% endif %}
 
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h2 class="font-display text-md font-medium tracking-tight m-0">{% blocktrans with count=questions|length %}All {{ count }} questions{% endblocktrans %}</h2>
     </div>
@@ -193,31 +193,31 @@
                         <span class="sm-pill {{ q.question_type }}">{{ q.get_question_type_display }}</span>
                         <span class="sm-pill {{ q.difficulty }}">{{ q.get_difficulty_display }}</span>
                         {% if q.concept_tag %}<span class="sm-pill tag" title="{{ q.concept_tag }}">{{ q.concept_tag|truncatechars:60 }}</span>{% endif %}
-                        <div style="margin-top:0.5rem;color:var(--text);font-size:0.92rem;">{{ q.question_text }}</div>
+                        <div style="margin-top:0.5rem;color:var(--color-text);font-size:0.92rem;">{{ q.question_text }}</div>
                         {% if q.question_type == 'mcq' %}
-                        <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:var(--text-secondary);">
-                            <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
-                            <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:var(--success);font-weight:600;">✓</span>{% endif %}</li>
+                        <ol type="A" style="margin:0.5rem 0 0 1.25rem;padding:0;font-size:0.88rem;color:var(--color-text-secondary);">
+                            <li>{{ q.option_a }}{% if q.correct_answer == 'A' %} <span style="color:var(--color-success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_b }}{% if q.correct_answer == 'B' %} <span style="color:var(--color-success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_c }}{% if q.correct_answer == 'C' %} <span style="color:var(--color-success);font-weight:600;">✓</span>{% endif %}</li>
+                            <li>{{ q.option_d }}{% if q.correct_answer == 'D' %} <span style="color:var(--color-success);font-weight:600;">✓</span>{% endif %}</li>
                         </ol>
                         {% elif q.question_type == 'fill_in_blank' %}
                         {% if q.answer_data.text_template %}
-                        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-style:italic;font-size:0.88rem;">{{ q.answer_data.text_template }}</div>
+                        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;font-style:italic;font-size:0.88rem;">{{ q.answer_data.text_template }}</div>
                         {% endif %}
-                        <div style="margin-top:0.4rem;color:var(--success);font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                        <div style="margin-top:0.4rem;color:var(--color-success);font-size:0.85rem;">✓ Answer: {% for blank in q.answer_data.blanks %}{{ blank }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
                         {% endif %}
                         {% if q.answer_data.figure_svg %}
                         <div style="margin-top:0.5rem;max-width:480px;">{{ q.answer_data.figure_svg|sanitized }}</div>
                         {% endif %}
-                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:var(--text-secondary);"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
+                        {% if q.answer_data.model_answer %}<div class="qmeta" style="margin-top:0.4rem;color:var(--color-text-secondary);"><strong>{% trans "Answer:" %}</strong> {{ q.answer_data.model_answer }}</div>{% endif %}
                         {% if q.explanation %}<div class="qmeta">{{ q.explanation }}</div>{% endif %}
                         <div style="margin-top:0.5rem;display:flex;gap:0.4rem;">
-                            <button type="button" onclick="editSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Edit" %}</button>
-                            <button type="button" onclick="deleteSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size:0.72rem;padding:0.2rem 0.7rem;color:var(--danger);">{% trans "Delete" %}</button>
+                            <button type="button" onclick="editSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Edit" %}</button>
+                            <button type="button" onclick="deleteSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.72rem;padding:0.2rem 0.7rem;color:var(--color-danger);">{% trans "Delete" %}</button>
                         </div>
                     </div>
-                    <div style="font-size:0.7rem;color:var(--gray-400);">#{{ q.order_index|add:1 }}</div>
+                    <div style="font-size:0.7rem;color:var(--color-warm-400);">#{{ q.order_index|add:1 }}</div>
                 </div>
             </div>
 
@@ -225,18 +225,18 @@
             <div class="q-edit" style="display:none;">
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;font-weight:600;">{% trans "Question" %}</label>
-                    <textarea class="eq-question_text" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.question_text }}</textarea>
+                    <textarea class="eq-question_text" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">{{ q.question_text }}</textarea>
                 </div>
                 {% if q.question_type == 'mcq' %}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
-                    <div><label style="font-size:0.72rem;">A)</label><input class="eq-option_a" value="{{ q.option_a }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
-                    <div><label style="font-size:0.72rem;">B)</label><input class="eq-option_b" value="{{ q.option_b }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
-                    <div><label style="font-size:0.72rem;">C)</label><input class="eq-option_c" value="{{ q.option_c }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
-                    <div><label style="font-size:0.72rem;">D)</label><input class="eq-option_d" value="{{ q.option_d }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">A)</label><input class="eq-option_a" value="{{ q.option_a }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">B)</label><input class="eq-option_b" value="{{ q.option_b }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">C)</label><input class="eq-option_c" value="{{ q.option_c }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;"></div>
+                    <div><label style="font-size:0.72rem;">D)</label><input class="eq-option_d" value="{{ q.option_d }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;"></div>
                 </div>
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Correct" %}</label>
-                    <select class="eq-correct_answer" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                    <select class="eq-correct_answer" style="padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                         <option value="A" {% if q.correct_answer == 'A' %}selected{% endif %}>A</option>
                         <option value="B" {% if q.correct_answer == 'B' %}selected{% endif %}>B</option>
                         <option value="C" {% if q.correct_answer == 'C' %}selected{% endif %}>C</option>
@@ -246,26 +246,26 @@
                 {% elif q.question_type == 'fill_in_blank' %}
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Sentence template (use ___ for blanks)" %}</label>
-                    <input class="eq-fill_template" value="{{ q.answer_data.text_template }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                    <input class="eq-fill_template" value="{{ q.answer_data.text_template }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Answers (comma-separated)" %}</label>
-                    <input class="eq-fill_answers" value="{% for b in q.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                    <input class="eq-fill_answers" value="{% for b in q.answer_data.blanks %}{{ b }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 {% else %}
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Model answer" %}</label>
-                    <textarea class="eq-model_answer" rows="3" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.answer_data.model_answer }}</textarea>
+                    <textarea class="eq-model_answer" rows="3" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">{{ q.answer_data.model_answer }}</textarea>
                 </div>
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Keywords (comma-separated)" %}</label>
-                    <input class="eq-keywords" value="{% for kw in q.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                    <input class="eq-keywords" value="{% for kw in q.answer_data.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                 </div>
                 {% endif %}
                 <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem;margin-bottom:0.5rem;">
                     <div>
                         <label style="font-size:0.72rem;">{% trans "Difficulty" %}</label>
-                        <select class="eq-difficulty" style="padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                        <select class="eq-difficulty" style="padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                             <option value="easy" {% if q.difficulty == 'easy' %}selected{% endif %}>Easy</option>
                             <option value="medium" {% if q.difficulty == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
                             <option value="hard" {% if q.difficulty == 'hard' %}selected{% endif %}>Hard</option>
@@ -273,21 +273,21 @@
                     </div>
                     <div>
                         <label style="font-size:0.72rem;">{% trans "Concept tag" %}</label>
-                        <input class="eq-concept_tag" value="{{ q.concept_tag }}" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">
+                        <input class="eq-concept_tag" value="{{ q.concept_tag }}" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">
                     </div>
                 </div>
                 <div style="margin-bottom:0.5rem;">
                     <label style="font-size:0.72rem;">{% trans "Explanation" %}</label>
-                    <textarea class="eq-explanation" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--gray-300);border-radius:4px;font-size:0.86rem;">{{ q.explanation }}</textarea>
+                    <textarea class="eq-explanation" rows="2" style="width:100%;padding:0.375rem;border:1px solid var(--color-warm-300);border-radius:4px;font-size:0.86rem;">{{ q.explanation }}</textarea>
                 </div>
                 <div style="display:flex;gap:0.4rem;">
-                    <button type="button" onclick="saveSumQ(this)" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Save" %}</button>
-                    <button type="button" onclick="cancelSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Cancel" %}</button>
+                    <button type="button" onclick="saveSumQ(this)" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Save" %}</button>
+                    <button type="button" onclick="cancelSumQ(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.72rem;padding:0.2rem 0.7rem;">{% trans "Cancel" %}</button>
                 </div>
             </div>
         </div>
         {% empty %}
-        <p style="color:var(--gray-500);padding:1rem;">{% trans "No questions yet — generation may still be running. Refresh in a minute." %}</p>
+        <p style="color:var(--color-warm-500);padding:1rem;">{% trans "No questions yet — generation may still be running. Refresh in a minute." %}</p>
         {% endfor %}
     </div>
 </div>

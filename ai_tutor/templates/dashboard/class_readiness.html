@@ -130,13 +130,13 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:var(--text-muted);text-decoration:none;margin-bottom:1rem;">
+<a href="{% url 'dashboard:course_detail' course.id %}" style="display:inline-flex;align-items:center;gap:0.5rem;color:var(--color-text-muted);text-decoration:none;margin-bottom:1rem;">
     &larr; {% blocktrans with title=course.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
 <div class="readiness-header">
     <h2 style="margin:0 0 0.25rem;">{% trans "Class Readiness Report" %}</h2>
-    <p style="color:var(--text-muted);margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>
+    <p style="color:var(--color-text-muted);margin:0;">{{ course.title }} &mdash; {% blocktrans count count=total_students %}{{ count }} student{% plural %}{{ count }} students{% endblocktrans %} &mdash; {% blocktrans count count=total_objectives %}{{ count }} enabling objective{% plural %}{{ count }} enabling objectives{% endblocktrans %}</p>
 </div>
 
 <!-- Class Readiness Score -->
@@ -188,14 +188,14 @@
                         <span style="font-weight:600;font-size:0.8125rem;">{{ obj.avg_mastery }}%</span>
                     </div>
                 </td>
-                <td style="color:var(--success-solid);font-weight:600;">{{ obj.mastered_pct }}%</td>
-                <td style="color:{% if obj.struggling_pct > 30 %}var(--danger-solid){% else %}var(--text-muted){% endif %};font-weight:600;">{{ obj.struggling_pct }}%</td>
+                <td style="color:var(--color-success-solid);font-weight:600;">{{ obj.mastered_pct }}%</td>
+                <td style="color:{% if obj.struggling_pct > 30 %}var(--color-danger-solid){% else %}var(--color-text-muted){% endif %};font-weight:600;">{{ obj.struggling_pct }}%</td>
             </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<div style="padding:2rem;text-align:center;color:var(--text-muted);background:var(--surface);border-radius:0.75rem;">
+<div style="padding:2rem;text-align:center;color:var(--color-text-muted);background:var(--color-surface);border-radius:0.75rem;">
     {% trans "No enabling objectives found for this course. Upload a curriculum with enabling objectives to see the readiness report." %}
 </div>
 {% endif %}

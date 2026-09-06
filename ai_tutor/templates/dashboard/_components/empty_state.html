@@ -1,9 +1,9 @@
 {% load dashboard_ui %}
-<div class="empty flex flex-col items-center text-center gap-3 py-10 px-5 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1 [&_.icon]:text-[2.5rem] [&_.icon]:text-coral-solid">
+<div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
     {% icon icon_name %}
-    <p class="text-lg font-bold text-text font-display">{{ title }}</p>
-    {% if body %}<p class="text-base max-w-[42ch] leading-normal text-text-muted">{{ body }}</p>{% endif %}
+    <p class="empty__title text-md font-medium text-text-secondary">{{ title }}</p>
+    {% if body %}<p class="empty__body text-sm max-w-[46ch] leading-normal">{{ body }}</p>{% endif %}
     {% if action_url and action_label %}
-    <a href="{{ action_url }}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{{ action_label }}</a>
+    <a href="{{ action_url }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{{ action_label }}</a>
     {% endif %}
 </div>

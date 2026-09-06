@@ -24,7 +24,7 @@
         {% stat_tile label=_("Flagged all time") value=total_flagged note=_("Includes chats already reviewed and closed.") %}
     </section>
 
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <header class="flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
             <h2 class="font-display text-md font-medium tracking-tight flex items-center gap-2">{% trans "Review queue" %}</h2>
             {% comment %}
@@ -45,7 +45,7 @@
             </div>
         </header>
 
-        <div class="p-0">
+        <div class="card__body p-0">
             {% if sessions %}
             <div class="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
                 <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]">
@@ -86,7 +86,7 @@
                                 {% endif %}
                             </td>
                             <td class="row-actions text-right whitespace-nowrap [&_.btn]:text-text-muted [&_.btn]:border-border [&_.btn:focus-visible]:text-text [&_.btn:focus-visible]:border-border-strong [&_.btn:focus-visible]:bg-surface [tr:hover_&_.btn]:text-text [tr:hover_&_.btn]:border-border-strong [tr:hover_&_.btn]:bg-surface">
-                                <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                                <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                                     {% trans "Review" %}<span class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0"> {{ s.student.first_name }} {{ s.student.last_name }}</span>
                                 </a>
                             </td>
@@ -99,7 +99,7 @@
             {% if sessions.has_other_pages %}
             <nav class="flex items-center justify-center gap-3 py-3 px-5 border-t border-t-border" aria-label="{% trans 'Flagged chat pages' %}">
                 {% if sessions.has_previous %}
-                <a href="?status={{ status_filter }}&amp;page={{ sessions.previous_page_number }}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.previous_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     {% icon "arrow-left" size="sm" %}{% trans "Previous" %}
                 </a>
                 {% endif %}
@@ -107,7 +107,7 @@
                     {% blocktrans with current=sessions.number total=sessions.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
                 </span>
                 {% if sessions.has_next %}
-                <a href="?status={{ status_filter }}&amp;page={{ sessions.next_page_number }}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.next_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     {% trans "Next" %}{% icon "arrow-right" size="sm" %}
                 </a>
                 {% endif %}

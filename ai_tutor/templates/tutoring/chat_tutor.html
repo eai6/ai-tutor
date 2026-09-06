@@ -109,7 +109,7 @@
             <main class="chat-messages" id="chat-messages">
                 <!-- Messages will be inserted here -->
                 <div class="typing-indicator" id="typing">
-                    <div class="avatar w-[34px] h-[34px] flex-none rounded-full grid place-items-center bg-primary-light text-primary-ink border border-primary-tint font-display text-sm font-bold tracking-[0]">🎓</div>
+                    <div class="avatar">🎓</div>
                     <div class="typing-bubble">
                         <div class="typing-dots"><span></span><span></span><span></span></div>
                     </div>
@@ -1417,6 +1417,7 @@ only adds a way for the page to break after a legitimate upgrade.
 {% comment %}Chart.js was used for the interactive plot_spec exit-ticket renderer. That feature was removed in favour of server-rendered SVG via figure_render.py.{% endcomment %}
 {% if is_math_lesson %}
 <link rel="stylesheet" href="{% static 'vendor/css/katex.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
 <script defer src="{% static 'vendor/js/katex.min.js' %}"></script>
 <script defer src="{% static 'vendor/js/katex-auto-render.min.js' %}"></script>
 {% endif %}
@@ -1465,7 +1466,7 @@ window.EXIT_MODAL_CONFIG = {
             <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${statusMsg}</div>
             ${weakHtml}
             <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">${gettext('Scroll up to review your answers and explanations.')}</div>
-            <button onclick="continueAfterExit()" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
+            <button onclick="continueAfterExit()" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
                 ${passed ? '✓ ' + gettext('Continue') : '→ ' + gettext('Continue to Review')}
             </button>
         `;
@@ -2021,12 +2022,12 @@ async function refreshParticipants() {
         const active = (data.participants || []).filter(p => p.is_active);
         active.forEach(p => {
             const chip = document.createElement('span');
-            chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.25rem;padding:0.1rem 0.5rem;border-radius:1rem;background:var(--border);color:var(--muted);';
+            chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.25rem;padding:0.1rem 0.5rem;border-radius:1rem;background:var(--color-border);color:var(--muted);';
             chip.textContent = p.is_primary ? `⭐ ${p.username}` : p.username;
             if (!p.is_primary && !data.lesson_started) {
                 const x = document.createElement('button');
                 x.textContent = '×';
-                x.style.cssText = 'border:none;background:transparent;color:var(--danger);cursor:pointer;padding:0;font-weight:700;';
+                x.style.cssText = 'border:none;background:transparent;color:var(--color-danger);cursor:pointer;padding:0;font-weight:700;';
                 x.title = 'Remove from group';
                 x.onclick = () => removeParticipant(p.user_id);
                 chip.appendChild(x);
@@ -2046,7 +2047,7 @@ async function refreshParticipants() {
             && remainingMates.length > 0) {
             const addBtn = document.createElement('button');
             addBtn.textContent = '+ Add groupmate';
-            addBtn.style.cssText = 'border:1px dashed var(--border);background:transparent;color:var(--accent);border-radius:1rem;padding:0.1rem 0.6rem;cursor:pointer;font-size:0.8rem;';
+            addBtn.style.cssText = 'border:1px dashed var(--color-border);background:transparent;color:var(--color-accent);border-radius:1rem;padding:0.1rem 0.6rem;cursor:pointer;font-size:0.8rem;';
             addBtn.title = data.host_group_name
                 ? `Pick from your group: ${data.host_group_name}`
                 : 'Pick a groupmate';
@@ -2303,7 +2304,7 @@ function addMessage(role, content, media = [], artifactHtml = null, probe = null
         : '';
 
     div.innerHTML = `
-        <div class="avatar w-[34px] h-[34px] flex-none rounded-full grid place-items-center bg-primary-light text-primary-ink border border-primary-tint font-display text-sm font-bold tracking-[0]">${avatar}</div>
+        <div class="avatar">${avatar}</div>
         <div class="bubble-wrapper">
             <div class="bubble">${marked.parse(sanitizeContent(content), { breaks: true, gfm: true })}${mediaHtml}${artifactBlock}</div>
             ${replayBtn}
@@ -3079,7 +3080,7 @@ function createStreamingMessage() {
     const div = document.createElement('div');
     div.className = 'message tutor';
     div.innerHTML = `
-        <div class="avatar w-[34px] h-[34px] flex-none rounded-full grid place-items-center bg-primary-light text-primary-ink border border-primary-tint font-display text-sm font-bold tracking-[0]">🎓</div>
+        <div class="avatar">🎓</div>
         <div class="bubble"></div>
     `;
     chatMessages.insertBefore(div, typing);

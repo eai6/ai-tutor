@@ -57,7 +57,7 @@
         {% endfor %}
     </ul>
     {% else %}
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         {% empty_state title=_("No classes yet") body=_("Classes are grouped from student grade levels. They appear once students join and complete their profiles.") icon_name="classes" %}
     </div>
     {% endif %}

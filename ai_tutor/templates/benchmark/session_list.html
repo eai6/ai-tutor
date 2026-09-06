@@ -226,7 +226,7 @@
         {{ latest_run.screened }} of {{ latest_run.candidates }}.
         Every session goes through the LLM redaction pass, so this takes a few
         minutes. The page refreshes itself.
-        <div class="progress h-[10px] bg-surface-sunken rounded-full overflow-hidden"><span style="width:{{ latest_run.progress_pct }}%"></span></div>
+        <div class="progress h-[6px] bg-warm-200 rounded-full overflow-hidden"><span style="width:{{ latest_run.progress_pct }}%"></span></div>
     {% elif latest_run.status == 'completed' %}
         <strong>Last run:</strong> screened {{ latest_run.screened }} session(s),
         created {{ latest_run.created_items }} new item(s) for review.
@@ -330,24 +330,24 @@
                     <a href="{% url 'dashboard:benchmark:session_review' row.item.item_id %}?engine={{ filters.engine }}&subject={{ filters.subject }}">{{ row.item.item_id }}</a>
                     {% endif %}
                     {% if row.residual %}
-                    <br><span class="pill pill-alert inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">residual identifier</span>
+                    <br><span class="pill pill-alert">residual identifier</span>
                     {% endif %}
                 </td>
-                <td>{% if row.item.subject %}<span class="pill pill-subj inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ row.item.subject }}</span>{% endif %}</td>
+                <td>{% if row.item.subject %}<span class="pill pill-subj">{{ row.item.subject }}</span>{% endif %}</td>
                 <td>{{ row.item.engine|default:"—" }}</td>
                 <td>{{ row.item.outcome|default:"—" }}</td>
                 <td>{{ row.item.turn_count }}</td>
                 <td>
-                    <span class="pill pill-{{ row.item.status }} inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% if row.item.status == 'pending_review' %}Pending review{% else %}{{ row.item.get_status_display }}{% endif %}</span>
+                    <span class="pill pill-{{ row.item.status }}">{% if row.item.status == 'pending_review' %}Pending review{% else %}{{ row.item.get_status_display }}{% endif %}</span>
                 </td>
                 <td>{{ row.annotation_count }}</td>
                 <td>
                     {% if row.passes is None %}
-                    <span class="pill pill-none inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">—</span>
+                    <span class="pill pill-none">—</span>
                     {% elif row.passes %}
-                    <span class="pill pill-pass inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">Pass</span>
+                    <span class="pill pill-pass">Pass</span>
                     {% else %}
-                    <span class="pill pill-fail inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">Fail</span>
+                    <span class="pill pill-fail">Fail</span>
                     {% endif %}
                 </td>
             </tr>
@@ -355,7 +355,7 @@
         </tbody>
     </table>
     {% else %}
-    <div class="empty flex flex-col items-center text-center gap-3 py-10 px-5 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1 [&_.icon]:text-[2.5rem] [&_.icon]:text-coral-solid">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         <p>No sessions match.</p>
         <p style="font-size:0.85rem;">
             Use <strong>Sample sessions</strong> above, or clear the filters if

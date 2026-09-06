@@ -4,8 +4,8 @@ role="progressbar" carries the number for screen readers; the bar is the
 sighted rendering of the same value, never the only copy of it.
 {% endcomment %}
 <div class="progress-pair flex items-center gap-3 [&_.progress]:flex-1 [&_.progress]:min-w-15">
-    <div class="progress h-[10px] bg-surface-sunken rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"{% if label %} aria-label="{{ label }}"{% endif %}>
-        <div class="{% tone_class 'progress__fill' tone %} h-full rounded-full bg-coral-solid transition duration-[var(--dur-slow)] ease-[var(--ease-spring)]" style="width: {{ pct }}%"></div>
+    <div class="progress h-[6px] bg-warm-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"{% if label %} aria-label="{{ label }}"{% endif %}>
+        <div class="progress__fill {% tone_class 'progress__fill' tone %} h-full rounded-full bg-accent-solid transition duration-[var(--dur-slow)] ease-[var(--ease-out)]" style="width: {{ pct }}%"></div>
     </div>
     {% if show_value %}
     <span class="font-display text-xs [font-variant-numeric:tabular-nums] text-text-muted min-w-[5ch] text-right">{% if count is not None %}{{ count }}/{{ total }}{% else %}{{ pct }}%{% endif %}</span>

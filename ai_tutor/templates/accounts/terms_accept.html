@@ -37,7 +37,7 @@
             {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
             <label class="ta-checkbox">
                 <input type="checkbox" name="accept_terms" required>
-                <span>I have read and agree to the AI Tutor terms above.{% if terms.summary %} <span style="color:var(--text-muted);">{{ terms.summary }}</span>{% endif %}</span>
+                <span>I have read and agree to the AI Tutor terms above.{% if terms.summary %} <span style="color:var(--color-text-muted);">{{ terms.summary }}</span>{% endif %}</span>
             </label>
             <div class="ta-actions">
                 <a href="{% url 'accounts:logout' %}" class="ta-link" style="align-self:center;font-size:0.85rem;">Log out</a>

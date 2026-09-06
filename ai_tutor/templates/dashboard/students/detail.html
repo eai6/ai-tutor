@@ -6,7 +6,7 @@
 
 {% block content %}
 <!-- Back link -->
-<a href="{% url 'dashboard:student_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gray-500); text-decoration: none; margin-bottom: 1.5rem;">
+<a href="{% url 'dashboard:student_list' %}" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--color-warm-500); text-decoration: none; margin-bottom: 1.5rem;">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
     </svg>
@@ -14,19 +14,19 @@
 </a>
 
 <!-- Student Header -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom: 1.5rem;">
     <div class="card-body p-5">
         <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 600;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--color-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 600;">
                 {{ student.first_name|slice:":1"|upper }}{{ student.last_name|slice:":1"|upper }}
             </div>
             <div style="flex: 1;">
                 <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">{{ student.first_name }} {{ student.last_name }}</h2>
-                <p style="color: var(--gray-500); margin-bottom: 0.5rem;">{{ student.email }}</p>
+                <p style="color: var(--color-warm-500); margin-bottom: 0.5rem;">{{ student.email }}</p>
                 {% if profile %}
                 <div style="display: flex; gap: 1rem;">
                     <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-info-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-info-surface text-info">{{ profile.grade_level }}</span>
-                    <span style="color: var(--gray-500);">{{ profile.get_school_display_name }}</span>
+                    <span style="color: var(--color-warm-500);">{{ profile.get_school_display_name }}</span>
                 </div>
                 {% endif %}
             </div>
@@ -38,7 +38,7 @@
                     <input type="hidden" name="from_grade" value="{{ current_grade }}">
                     <input type="hidden" name="direction" value="up">
                     <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
-                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="white-space:nowrap;">{{ promote_label }}</button>
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="white-space:nowrap;">{{ promote_label }}</button>
                 </form>
                 {% endif %}
                 {% if demote_label %}
@@ -48,12 +48,12 @@
                     <input type="hidden" name="from_grade" value="{{ current_grade }}">
                     <input type="hidden" name="direction" value="down">
                     <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
-                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="white-space:nowrap;">{{ demote_label }}</button>
+                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="white-space:nowrap;">{{ demote_label }}</button>
                 </form>
                 {% endif %}
                 <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('{% blocktrans with name=student.username %}Permanently delete student account &quot;{{ name }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--danger-surface);color:var(--danger);border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-danger-surface);color:var(--color-danger);border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
                 </form>
             </div>
         </div>
@@ -74,17 +74,17 @@
     </div>
     <div class="flex flex-col gap-1 p-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)]">
         <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Lessons Mastered" %}</div>
-        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--success);">{{ stats.mastered_lessons }}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--color-success);">{{ stats.mastered_lessons }}</div>
     </div>
     <div class="flex flex-col gap-1 p-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)]">
         <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "In Progress" %}</div>
-        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--warning);">{{ stats.in_progress_lessons }}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--color-warning);">{{ stats.in_progress_lessons }}</div>
     </div>
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
     <!-- Course Progress -->
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
             <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Course Progress" %}</h3>
         </div>
@@ -94,11 +94,11 @@
                 <div style="margin-bottom: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span style="font-weight: 600;">{{ cp.course.title }}</span>
-                        <span style="color: var(--gray-500);">{% blocktrans with mastered=cp.mastered total=cp.total %}{{ mastered }}/{{ total }} lessons{% endblocktrans %}</span>
+                        <span style="color: var(--color-warm-500);">{% blocktrans with mastered=cp.mastered total=cp.total %}{{ mastered }}/{{ total }} lessons{% endblocktrans %}</span>
                     </div>
-                    <div class="progress-bar h-[6px] bg-[rgba(0,0,0,0.08)] rounded-xs overflow-hidden" style="margin-bottom: 0.75rem;">
+                    <div class="progress-bar h-[6px] bg-warm-200 rounded-full overflow-hidden" style="margin-bottom: 0.75rem;">
                         {% widthratio cp.mastered cp.total 100 as pct %}
-                        <div class="progress-fill {% if pct >= 70 %}success{% endif %} h-full rounded-xs bg-accent-solid transition duration-[0.3s] ease-[ease] [&.success]:bg-success-solid [&.warning]:bg-warning-solid [&.danger]:bg-danger-solid [background:linear-gradient(90deg,_var(--color-teal-solid),_var(--color-primary))]" style="width: {{ pct|default:0 }}%;"></div>
+                        <div class="progress-fill {% if pct >= 70 %}success{% endif %} h-full rounded-full bg-accent-solid transition duration-[var(--dur-slow)] ease-[var(--ease-out)] [&.success]:bg-success-solid [&.warning]:bg-warning-solid [&.danger]:bg-danger-solid" style="width: {{ pct|default:0 }}%;"></div>
                     </div>
                     
                     <!-- Lesson list (C4 rich display) -->
@@ -106,11 +106,11 @@
                         {% for lesson in cp.lessons %}
                         <div style="padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; border: 1px solid;
                             {% if lesson.mastery_level == 'mastered' %}
-                                background: var(--success-surface); color: var(--success); border-color: var(--success-border);
+                                background: var(--color-success-surface); color: var(--color-success); border-color: var(--color-success-border);
                             {% elif lesson.mastery_level == 'in_progress' %}
-                                background: var(--warning-surface); color: var(--warning); border-color: var(--warning-border);
+                                background: var(--color-warning-surface); color: var(--color-warning); border-color: var(--color-warning-border);
                             {% else %}
-                                background: var(--gray-50); color: var(--gray-500); border-color: var(--gray-200);
+                                background: var(--color-warm-50); color: var(--color-warm-500); border-color: var(--color-warm-200);
                             {% endif %}
                         ">
                             <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
@@ -120,7 +120,7 @@
                                     {% if lesson.last_completion_was_group %}<span title="{% trans 'Completed as part of a group' %}" style="margin-left:0.25rem;">👥</span>{% endif %}
                                 </span>
                                 {% if lesson.best_score_pct is not None %}
-                                <span style="font-size:0.78rem;color:var(--gray-500);">
+                                <span style="font-size:0.78rem;color:var(--color-warm-500);">
                                     {% trans "Best" %} <strong>{{ lesson.best_score_pct }}%</strong>
                                     · {% blocktrans count count=lesson.attempts_count|default:0 %}{{ count }} attempt{% plural %}{{ count }} attempts{% endblocktrans %}
                                 </span>
@@ -128,7 +128,7 @@
                             </div>
                             {% if lesson.weak_concepts %}
                             <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
-                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:var(--warning-surface);padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
+                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:var(--color-warning-surface);padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
                             </div>
                             {% endif %}
                         </div>
@@ -154,21 +154,21 @@
     {% endcomment %}
 
     <!-- Recent Sessions -->
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
             <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Recent Sessions" %}</h3>
         </div>
         <div class="card-body p-5" style="padding: 0;">
             {% if sessions %}
                 {% for session in sessions %}
-                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--gray-100);">
+                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--color-warm-100);">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-weight: 500;">
                                 {{ session.lesson.title }}
-                                {% if session.is_group_for_student %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" title="{% trans 'Joined as a group participant' %}" style="background:var(--accent-surface);color:var(--accent);font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
+                                {% if session.is_group_for_student %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" title="{% trans 'Joined as a group participant' %}" style="background:var(--color-accent-surface);color:var(--color-accent);font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--color-accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
                             </div>
-                            <div style="font-size: 0.8125rem; color: var(--gray-500);">
+                            <div style="font-size: 0.8125rem; color: var(--color-warm-500);">
                                 {{ session.started_at|date:"M d, Y H:i" }}
                             </div>
                         </div>

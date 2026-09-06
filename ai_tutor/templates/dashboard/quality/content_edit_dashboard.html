@@ -9,16 +9,16 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         <h1 style="margin: 0;">{% trans "Content Quality Dashboard" %}</h1>
         <div style="display: flex; gap: 0.5rem;">
-            <a href="{% url 'dashboard:content_edit_events_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55">{% blocktrans with count=total %}All events ({{ count }}){% endblocktrans %}</a>
+            <a href="{% url 'dashboard:content_edit_events_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">{% blocktrans with count=total %}All events ({{ count }}){% endblocktrans %}</a>
         </div>
     </div>
 
-    <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0;">
+    <p style="color: var(--color-warm-600); font-size: 0.9rem; margin-top: 0;">
         {% trans "Aggregate metrics over teacher edits. Per-judge precision compares the AI judge's verdict at edit time against the teacher's confirmed tags — useful for spotting which judges are pulling their weight." %}
     </p>
 
     <!-- Filter form -->
-    <form method="get" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; padding: 0.75rem; background: var(--gray-50); border-radius: 0.375rem;">
+    <form method="get" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; padding: 0.75rem; background: var(--color-warm-50); border-radius: 0.375rem;">
         <label style="font-size: 0.8125rem;">{% trans "Type:" %}
             <select name="content_type" style="margin-left: 0.25rem; padding: 0.25rem;">
                 <option value="">{% trans "All" %}</option>
@@ -46,34 +46,34 @@
         <label style="font-size: 0.8125rem;">{% trans "Lesson ID:" %}
             <input type="number" name="lesson_id" value="{{ filters.lesson_id }}" style="width: 5rem; padding: 0.25rem;">
         </label>
-        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background: var(--primary, var(--accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
+        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--primary, var(--color-accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
         {% if filters.content_type or filters.source or filters.tag or filters.lesson_id %}
         <a href="{% url 'dashboard:content_edit_dashboard' %}" style="font-size: 0.8125rem;">{% trans "clear" %}</a>
         {% endif %}
     </form>
 
     {% if total == 0 %}
-    <div style="padding: 3rem; text-align: center; color: var(--gray-500); background: var(--gray-50); border-radius: 0.5rem;">
+    <div style="padding: 3rem; text-align: center; color: var(--color-warm-500); background: var(--color-warm-50); border-radius: 0.5rem;">
         {% trans "No edit events match these filters yet. Edit a step or exit-ticket question to start populating the benchmark." %}
     </div>
     {% else %}
 
     <!-- Top-line stats row -->
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
-        <div style="padding: 0.875rem; background: var(--gray-50); border-radius: 0.375rem;">
-            <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase;">{% trans "Total events" %}</div>
+        <div style="padding: 0.875rem; background: var(--color-warm-50); border-radius: 0.375rem;">
+            <div style="font-size: 0.75rem; color: var(--color-warm-500); text-transform: uppercase;">{% trans "Total events" %}</div>
             <div style="font-size: 1.75rem; font-weight: 600;">{{ total }}</div>
         </div>
         {% for ct,n in type_counts.items %}
-        <div style="padding: 0.875rem; background: var(--gray-50); border-radius: 0.375rem;">
-            <div style="font-size: 0.75rem; color: var(--gray-500); text-transform: uppercase;">{{ ct }}</div>
+        <div style="padding: 0.875rem; background: var(--color-warm-50); border-radius: 0.375rem;">
+            <div style="font-size: 0.75rem; color: var(--color-warm-500); text-transform: uppercase;">{{ ct }}</div>
             <div style="font-size: 1.75rem; font-weight: 600;">{{ n }}</div>
         </div>
         {% endfor %}
     </div>
 
     <!-- Edit volume sparkline (last 30 days) -->
-    <div style="padding: 1rem; background: white; border: 1px solid var(--gray-200); border-radius: 0.5rem; margin-bottom: 1.25rem;">
+    <div style="padding: 1rem; background: white; border: 1px solid var(--color-warm-200); border-radius: 0.5rem; margin-bottom: 1.25rem;">
         <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">{% trans "Edit volume (last 30 days)" %}</h3>
         <svg viewBox="0 0 600 80" preserveAspectRatio="none" style="width: 100%; height: 80px;">
             {% with bar_width=20 %}
@@ -83,14 +83,14 @@
                       width="{{ bar_width }}"
                       height="{{ c }}"
                       transform="translate({{ forloop.counter0 }}0 0) scale(2 {% widthratio 70 max_volume 1 %})"
-                      fill="var(--accent)" opacity="0.8">
+                      fill="var(--color-accent)" opacity="0.8">
                     <title>{{ d|date:"M d" }}: {{ c }}</title>
                 </rect>
                 {% endwith %}
             {% endfor %}
             {% endwith %}
         </svg>
-        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--gray-500); margin-top: 0.25rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--color-warm-500); margin-top: 0.25rem;">
             {% with first=volume|first last=volume|last %}
             <span>{{ first.0|date:"M d" }}</span>
             <span>{{ last.0|date:"M d" }}</span>
@@ -100,32 +100,32 @@
 
     <!-- Two-column: Tag frequency + Source breakdown -->
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
-        <div style="padding: 1rem; background: white; border: 1px solid var(--gray-200); border-radius: 0.5rem;">
+        <div style="padding: 1rem; background: white; border: 1px solid var(--color-warm-200); border-radius: 0.5rem;">
             <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem;">{% trans "Most common tags" %}</h3>
             {% for tag,count in tag_counts %}
             <div style="margin-bottom: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.125rem;">
                     <a href="?tag={{ tag }}" style="color: inherit; text-decoration: none;">{{ tag }}</a>
-                    <span style="color: var(--gray-500);">{{ count }}</span>
+                    <span style="color: var(--color-warm-500);">{{ count }}</span>
                 </div>
-                <div style="height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, var(--accent), #ec4899);"></div>
+                <div style="height: 8px; background: var(--color-warm-100); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, var(--color-accent), #ec4899);"></div>
                 </div>
             </div>
             {% empty %}
-            <div style="color: var(--gray-500); font-size: 0.875rem;">{% trans "No tags applied yet." %}</div>
+            <div style="color: var(--color-warm-500); font-size: 0.875rem;">{% trans "No tags applied yet." %}</div>
             {% endfor %}
         </div>
 
-        <div style="padding: 1rem; background: white; border: 1px solid var(--gray-200); border-radius: 0.5rem;">
+        <div style="padding: 1rem; background: white; border: 1px solid var(--color-warm-200); border-radius: 0.5rem;">
             <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem;">{% trans "By source" %}</h3>
             <table style="width: 100%; font-size: 0.8125rem;">
                 {% for src,count in source_counts.items %}
-                <tr style="border-bottom: 1px solid var(--gray-100);">
+                <tr style="border-bottom: 1px solid var(--color-warm-100);">
                     <td style="padding: 0.375rem 0;">
                         <a href="?source={{ src }}" style="color: inherit; text-decoration: none;">{{ src }}</a>
                     </td>
-                    <td style="padding: 0.375rem 0; text-align: right; color: var(--gray-700); font-weight: 500;">{{ count }}</td>
+                    <td style="padding: 0.375rem 0; text-align: right; color: var(--color-warm-700); font-weight: 500;">{{ count }}</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -133,14 +133,14 @@
     </div>
 
     <!-- Per-judge precision table -->
-    <div style="padding: 1rem; background: white; border: 1px solid var(--gray-200); border-radius: 0.5rem; margin-bottom: 1.25rem;">
+    <div style="padding: 1rem; background: white; border: 1px solid var(--color-warm-200); border-radius: 0.5rem; margin-bottom: 1.25rem;">
         <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">{% trans "Per-judge precision" %}</h3>
-        <p style="margin: 0 0 0.75rem 0; font-size: 0.75rem; color: var(--gray-500);">
+        <p style="margin: 0 0 0.75rem 0; font-size: 0.75rem; color: var(--color-warm-500);">
             {% trans "TP = judge flagged a violation that mapped to a teacher-confirmed tag. FP = judge flagged a violation the teacher did not confirm. FN = teacher confirmed a tag the judge did not predict. Bias warning: when teachers haven't manually reviewed events, error_tags default to suggested_tags (derived from these same judges) → precision metric is biased high until manual review accumulates." %}
         </p>
         <table style="width: 100%; font-size: 0.8125rem; border-collapse: collapse;">
             <thead>
-                <tr style="background: var(--gray-50); text-align: left;">
+                <tr style="background: var(--color-warm-50); text-align: left;">
                     <th style="padding: 0.5rem;">{% trans "Judge" %}</th>
                     <th style="padding: 0.5rem; text-align: right;">{% trans "Support" %}</th>
                     <th style="padding: 0.5rem; text-align: right;">TP</th>
@@ -153,18 +153,18 @@
             </thead>
             <tbody>
                 {% for jname,m in precision.items %}
-                <tr style="border-bottom: 1px solid var(--gray-200);">
+                <tr style="border-bottom: 1px solid var(--color-warm-200);">
                     <td style="padding: 0.5rem; font-family: monospace;">{{ jname }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: var(--gray-600);">{{ m.support }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: var(--success);">{{ m.tp }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--color-warm-600);">{{ m.support }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--color-success);">{{ m.tp }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: #b45309;">{{ m.fp }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: var(--danger);">{{ m.fn }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--color-danger);">{{ m.fn }}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.precision is not None %}{{ m.precision|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.recall is not None %}{{ m.recall|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td style="padding: 0.5rem; text-align: right; font-weight: 500;">{% if m.f1 is not None %}{{ m.f1|floatformat:2 }}{% else %}—{% endif %}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" style="padding: 1.5rem; text-align: center; color: var(--gray-500);">{% trans "No judge verdicts captured on these events yet." %}</td></tr>
+                <tr><td colspan="8" style="padding: 1.5rem; text-align: center; color: var(--color-warm-500);">{% trans "No judge verdicts captured on these events yet." %}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -172,11 +172,11 @@
 
     <!-- Full tag table for filter clicks -->
     {% if all_tag_counts|length > 8 %}
-    <details style="padding: 0.75rem; background: var(--gray-50); border-radius: 0.375rem;">
+    <details style="padding: 0.75rem; background: var(--color-warm-50); border-radius: 0.375rem;">
         <summary style="cursor: pointer; font-size: 0.875rem;">{% blocktrans with count=all_tag_counts|length %}All {{ count }} tags{% endblocktrans %}</summary>
         <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
             {% for tag,count in all_tag_counts.items %}
-            <a href="?tag={{ tag }}" style="display: inline-block; padding: 0.125rem 0.5rem; background: white; border: 1px solid var(--gray-200); border-radius: 9999px; font-size: 0.75rem; text-decoration: none; color: inherit;">{{ tag }} <span style="color: var(--gray-500);">{{ count }}</span></a>
+            <a href="?tag={{ tag }}" style="display: inline-block; padding: 0.125rem 0.5rem; background: white; border: 1px solid var(--color-warm-200); border-radius: 9999px; font-size: 0.75rem; text-decoration: none; color: inherit;">{{ tag }} <span style="color: var(--color-warm-500);">{{ count }}</span></a>
             {% endfor %}
         </div>
     </details>

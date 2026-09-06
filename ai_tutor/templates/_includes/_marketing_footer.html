@@ -3,8 +3,8 @@
 The public footer, shared by the landing page and the documentation site.
 Extracted alongside the header for the same reason — see _marketing_header.html.
 {% endcomment %}
-<footer class="lp-footer border-t border-t-border py-8 text-sm text-text-muted [&_a]:text-text-secondary [&_a:hover]:text-coral-ink print:hidden">
-    <div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6">
+<footer class="lp-footer border-t border-t-border py-8 text-sm text-text-muted [&_a]:text-text-secondary [&_a:hover]:text-coral-ink">
+    <div class="lp-wrap max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6">
         <div class="flex gap-5 flex-wrap items-center">
             <a href="{% url 'dashboard:help_index' %}">{% trans "Help & FAQ" %}</a>
             <a href="{% url 'docs:index' %}">{% trans "Country Adoption" %}</a>
