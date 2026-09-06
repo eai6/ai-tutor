@@ -8,76 +8,76 @@
     .ex-wrap { max-width: 760px; margin: 1rem auto 5rem; padding: 0 1rem; }
     .ex-head {
         position: sticky; top: 0; z-index: 200;
-        background: var(--surface);
-        border-bottom: 1px solid var(--border);
+        background: var(--color-surface);
+        border-bottom: 1px solid var(--color-border);
         padding: 0.75rem 1rem;
         margin: -1rem -1rem 1.25rem -1rem;
         display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;
         justify-content: space-between;
     }
-    .ex-head h1 { font-size: 1.05rem; margin: 0; color: var(--text); }
-    .ex-progress { background: var(--accent-surface); color: var(--accent); padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .ex-head h1 { font-size: 1.05rem; margin: 0; color: var(--color-text); }
+    .ex-progress { background: var(--color-accent-surface); color: var(--color-accent); padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
     .ex-q {
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
         border-radius: 14px;
         padding: 1.1rem 1.25rem;
         margin-bottom: 0.75rem;
     }
-    .ex-q-stem { color: var(--text); font-size: 1rem; line-height: 1.6; margin: 0 0 0.85rem; }
-    .ex-q-num { display:inline-block; background:var(--surface-sunken); color:var(--accent); padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
+    .ex-q-stem { color: var(--color-text); font-size: 1rem; line-height: 1.6; margin: 0 0 0.85rem; }
+    .ex-q-num { display:inline-block; background:var(--color-surface-sunken); color:var(--color-accent); padding:0.15rem 0.55rem; border-radius:999px; font-size:0.72rem; font-weight:700; margin-right:0.4rem; }
     .ex-q-fig { margin: 0.5rem 0 0.85rem; max-width: 100%; }
     .ex-q-fig svg { max-width: 100%; height: auto; }
     .opt {
         display: flex; gap: 0.6rem; align-items: flex-start;
         padding: 0.55rem 0.8rem;
-        border: 1px solid var(--border);
+        border: 1px solid var(--color-border);
         border-radius: 10px;
         margin-bottom: 0.4rem;
         cursor: pointer;
         transition: border-color 0.12s ease, background 0.12s ease;
         font-size: 0.95rem;
-        color: var(--text);
+        color: var(--color-text);
     }
-    .opt:hover { border-color: var(--accent-border); }
-    .opt input[type=radio] { margin-top: 0.2rem; accent-color: var(--accent); }
-    .opt.selected { border-color: var(--accent); background: var(--accent-surface); }
+    .opt:hover { border-color: var(--color-accent-border); }
+    .opt input[type=radio] { margin-top: 0.2rem; accent-color: var(--color-accent); }
+    .opt.selected { border-color: var(--color-accent); background: var(--color-accent-surface); }
     .text-input, .textarea-input {
         width: 100%;
         padding: 0.6rem 0.8rem;
-        border: 1px solid var(--border-strong);
+        border: 1px solid var(--color-border-strong);
         border-radius: 8px;
         font-family: inherit;
         font-size: 0.95rem;
-        color: var(--text);
+        color: var(--color-text);
         box-sizing: border-box;
     }
-    .text-input:focus, .textarea-input:focus { outline: none; border-color: var(--accent-solid); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .text-input:focus, .textarea-input:focus { outline: none; border-color: var(--color-accent-solid); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .textarea-input { min-height: 100px; resize: vertical; }
-    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.92rem; color: var(--text-secondary); }
+    .blank-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; font-size: 0.92rem; color: var(--color-text-secondary); }
     .blank-row input { flex: 1; min-width: 200px; }
     .match-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
-    .match-row .left { font-weight: 500; color: var(--text); min-width: 140px; }
-    .match-row select { flex: 1; min-width: 180px; padding: 0.45rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 8px; font-family: inherit; font-size: 0.9rem; }
+    .match-row .left { font-weight: 500; color: var(--color-text); min-width: 140px; }
+    .match-row select { flex: 1; min-width: 180px; padding: 0.45rem 0.7rem; border: 1px solid var(--color-border-strong); border-radius: 8px; font-family: inherit; font-size: 0.9rem; }
     .table-fig table { border-collapse: collapse; }
-    .table-fig th, .table-fig td { border: 1px solid var(--border-strong); padding: 0.4rem 0.7rem; }
+    .table-fig th, .table-fig td { border: 1px solid var(--color-border-strong); padding: 0.4rem 0.7rem; }
     .ex-submit {
         position: sticky; bottom: 1rem;
         display: flex; gap: 0.5rem; justify-content: center;
         margin: 1rem 0;
     }
     .ex-submit button {
-        background: var(--accent); color: var(--surface); border: none;
+        background: var(--color-accent); color: var(--color-surface); border: none;
         padding: 0.85rem 2rem; border-radius: 999px;
         font-size: 1rem; font-weight: 700; cursor: pointer;
         box-shadow: 0 8px 24px rgba(91,33,182,0.3);
     }
     .ex-submit button[disabled] { opacity: 0.6; cursor: wait; }
     .answered-bar {
-        height: 6px; background: var(--surface-sunken); border-radius: 3px; overflow: hidden;
+        height: 6px; background: var(--color-surface-sunken); border-radius: 3px; overflow: hidden;
         max-width: 200px; flex: 1;
     }
-    .answered-fill { height: 100%; background: var(--accent-solid); transition: width 0.2s ease; }
+    .answered-fill { height: 100%; background: var(--color-accent-solid); transition: width 0.2s ease; }
 </style>
 
 <div class="ex-wrap">

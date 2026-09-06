@@ -7,8 +7,8 @@
         right: 18px;
         bottom: 18px;
         z-index: 8500;
-        background: var(--accent);
-        color: var(--surface);
+        background: var(--color-accent);
+        color: var(--color-surface);
         border: none;
         border-radius: var(--radius-lg);
         padding: 10px 16px;
@@ -33,7 +33,7 @@
     }
     .fb-overlay.open { display: flex; }
     .fb-modal {
-        background: var(--surface);
+        background: var(--color-surface);
         border-radius: var(--radius-md);
         padding: 1.4rem 1.6rem;
         max-width: 720px;
@@ -44,38 +44,38 @@
         box-shadow: 0 16px 40px rgba(0,0,0,0.22);
         font-family: inherit;
     }
-    .fb-modal h3 { margin: 0 0 0.4rem; font-size: 1.1rem; color: var(--text); }
-    .fb-modal p.fb-help { margin: 0 0 1rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .fb-modal h3 { margin: 0 0 0.4rem; font-size: 1.1rem; color: var(--color-text); }
+    .fb-modal p.fb-help { margin: 0 0 1rem; font-size: 0.85rem; color: var(--color-text-secondary); }
     .fb-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
     .fb-pill {
         padding: 0.35rem 0.75rem;
         border-radius: var(--radius-lg);
-        background: var(--surface-sunken);
-        border: 1px solid var(--border);
+        background: var(--color-surface-sunken);
+        border: 1px solid var(--color-border);
         font-size: 0.8rem;
-        color: var(--text-secondary);
+        color: var(--color-text-secondary);
         cursor: pointer;
         font-weight: 500;
     }
-    .fb-pill.active { background: var(--accent-surface); border-color: var(--accent-border); color: var(--accent); }
+    .fb-pill.active { background: var(--color-accent-surface); border-color: var(--color-accent-border); color: var(--color-accent); }
     .fb-textarea {
         width: 100%;
         min-height: 110px;
         padding: 0.65rem 0.8rem;
-        border: 1px solid var(--border-strong);
+        border: 1px solid var(--color-border-strong);
         border-radius: var(--radius-sm);
         font-family: inherit;
         font-size: 0.9rem;
-        color: var(--text);
+        color: var(--color-text);
         resize: vertical;
         box-sizing: border-box;
     }
-    .fb-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
+    .fb-textarea:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .fb-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
     .fb-cancel {
-        background: var(--surface);
-        border: 1px solid var(--border-strong);
-        color: var(--text-secondary);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border-strong);
+        color: var(--color-text-secondary);
         border-radius: var(--radius-sm);
         padding: 0.5rem 1rem;
         cursor: pointer;
@@ -83,8 +83,8 @@
         font-family: inherit;
     }
     .fb-submit {
-        background: var(--primary-fill);
-        color: var(--surface);
+        background: var(--color-primary-fill);
+        color: var(--color-surface);
         border: none;
         border-radius: var(--radius-sm);
         padding: 0.5rem 1.1rem;
@@ -94,9 +94,9 @@
     }
     .fb-submit[disabled] { opacity: 0.6; cursor: wait; }
     .fb-success {
-        background: var(--success-surface);
-        border: 1px solid var(--success-border);
-        color: var(--success);
+        background: var(--color-success-surface);
+        border: 1px solid var(--color-success-border);
+        color: var(--color-success);
         padding: 0.6rem 0.8rem;
         border-radius: var(--radius-sm);
         font-size: 0.85rem;
@@ -104,9 +104,9 @@
         display: none;
     }
     .fb-error {
-        background: var(--danger-surface);
-        border: 1px solid var(--danger-border);
-        color: var(--danger);
+        background: var(--color-danger-surface);
+        border: 1px solid var(--color-danger-border);
+        color: var(--color-danger);
         padding: 0.6rem 0.8rem;
         border-radius: var(--radius-sm);
         font-size: 0.85rem;

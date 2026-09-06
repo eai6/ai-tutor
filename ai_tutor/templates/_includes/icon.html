@@ -1,2 +1,2 @@
 {% comment %}Sprite icon. Decorative unless a label is passed.{% endcomment %}
-<svg class="icon {{ size_class }} {{ css_class }}" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %} focusable="false"><use href="#i-{{ name }}"/></svg>
+<svg class="icon {{ size_class }} {{ css_class }} w-[1em] h-[1em] flex-none fill-none stroke-current [stroke-width:1.75] [stroke-linecap:round] [stroke-linejoin:round] [vertical-align:-0.125em]" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %} focusable="false"><use href="#i-{{ name }}"/></svg>

@@ -13,24 +13,22 @@ the write for no reason. The native dialog returns a path; the server reads it
 in place.
 {% endcomment %}
 <!doctype html>
-<html lang="en">
+<html data-surface="student" lang="en">
 <head>
 <meta charset="utf-8">
 <title>Set up AI Tutor</title>
 <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
 <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
-<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
 <style>
   {% comment %}
   Same treatment as downloads/self_hosting.html: the page keeps its own
   variable names, they now resolve to the design tokens, and the dark
   override is gone because nothing else in the product has one.
   {% endcomment %}
-  :root { --bg:var(--canvas); --fg:var(--text); --muted:var(--text-muted);
-          --line:var(--border); --card:var(--surface); --accent:var(--coral-ink);
-          --ok:var(--success); --bad:var(--danger); }
+  :root { --bg:var(--color-canvas); --fg:var(--color-text); --muted:var(--color-text-muted);
+          --line:var(--color-border); --card:var(--color-surface); --accent:var(--color-coral-ink);
+          --ok:var(--color-success); --bad:var(--color-danger); }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font: 15px/1.55 var(--font-body); padding:40px 20px; }
   .wrap { max-width:640px; margin:0 auto; }
@@ -44,13 +42,13 @@ in place.
   button { font:inherit; font-weight:600; border-radius:8px; padding:10px 16px;
            border:1px solid var(--line); background:transparent; color:var(--fg);
            cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:var(--text-on-accent); }
+  button.primary { background:var(--color-accent); border-color:var(--color-accent); color:var(--color-text-on-accent); }
   button:disabled { opacity:.45; cursor:default; }
   .state { display:flex; align-items:center; gap:9px; font-size:13.5px; margin-bottom:14px; }
-  .dot { width:9px; height:9px; border-radius:50%; background:var(--border-strong); flex:none; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--color-border-strong); flex:none; }
   .ok .dot { background:var(--ok); } .bad .dot { background:var(--bad); }
   .bar { height:6px; background:var(--line); border-radius:99px; overflow:hidden; margin:14px 0 8px; }
-  .bar > i { display:block; height:100%; width:0; background:var(--accent);
+  .bar > i { display:block; height:100%; width:0; background:var(--color-accent);
              transition:width .4s ease; }
   .detail { font-size:12.5px; color:var(--muted); min-height:1.4em;
             word-break:break-word; font-variant-numeric:tabular-nums; }
@@ -58,7 +56,7 @@ in place.
   .hint { font-size:12.5px; color:var(--muted); margin-top:14px;
           border-top:1px solid var(--line); padding-top:12px; }
   .done { text-align:center; padding:14px 0 4px; }
-  a.launch { display:inline-block; background:var(--accent); color:var(--text-on-accent); font-weight:600;
+  a.launch { display:inline-block; background:var(--color-accent); color:var(--color-text-on-accent); font-weight:600;
              text-decoration:none; padding:12px 22px; border-radius:8px; }
 </style>
 </head>
@@ -69,7 +67,7 @@ in place.
     unless you set a school server in step 3.</p>
 
   <!-- ── model ─────────────────────────────────────────────────────── -->
-  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="model-card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" id="model-card">
     <h2>1. Tutor model</h2>
     <p>The model is about 2.5&nbsp;GB, so it is not included in the installer.
        Add it from a setup drive, or download it if this computer is online.</p>
@@ -97,7 +95,7 @@ in place.
   lesson content still answers — it just answers ungrounded, and nothing on
   screen would say so.
   {% endcomment %}
-  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="assets-card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" id="assets-card">
     <h2>2. Model files</h2>
     <p>The tutor's content search and read-aloud voice. Kept out of the app
       download so updates stay small.</p>
@@ -117,7 +115,7 @@ in place.
   </div>
 
   <!-- ── lessons ───────────────────────────────────────────────────── -->
-  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <h2>2. Lessons</h2>
     <p>Course content, exercises and pictures for your school.</p>
     <div class="state" id="pack-state"><span class="dot w-[7px] h-[7px] flex-none rounded-full bg-current"></span><span id="pack-label">Checking…</span></div>
@@ -133,7 +131,7 @@ in place.
   required-looking third step would imply this computer is not ready until
   someone finds a server address.
   {% endcomment %}
-  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <h2>3. School server <span style="font-weight:400;color:var(--muted)">— optional</span></h2>
     <p>Send finished work to your school's server. Leave this out to work
        entirely offline.</p>
@@ -141,7 +139,7 @@ in place.
        href="{% url 'desktop:server' %}">Set server address</a></div>
   </div>
 
-  <div class="card done bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="finish" hidden>
+  <div class="card done bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" id="finish" hidden>
     <h2 style="margin-bottom:10px">Ready to teach</h2>
     <a class="launch" href="/student/login/">Start</a>
   </div>

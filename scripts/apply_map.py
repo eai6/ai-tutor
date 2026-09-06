@@ -154,6 +154,18 @@ def classes_defined_elsewhere(converting):
     for tpl in (repo / "templates").rglob("*.html"):
         for block in re.findall(r"<style[^>]*>(.*?)</style>", tpl.read_text(errors="ignore"), re.S):
             names.update(re.findall(r"\.([A-Za-z][\w-]*)", block))
+    # JavaScript looks classes up by name. A name it queries is structural even
+    # when nothing styles it any more: flash.js finds its container with
+    # .messages, and removing that name left the student shell with nowhere to
+    # put a message.
+    for js in (repo / "static" / "js").rglob("*.js"):
+        if "Sortable" in js.name:
+            continue
+        text = js.read_text(errors="ignore")
+        for sel in re.findall(r"""(?:querySelector(?:All)?|closest|matches)\(\s*['"]([^'"]+)['"]""", text):
+            names.update(re.findall(r"\.([A-Za-z][\w-]*)", sel))
+        for name in re.findall(r"""classList\.\w+\(\s*['"]([\w -]+)['"]""", text):
+            names.update(name.split())
     return names
 
 

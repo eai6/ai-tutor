@@ -1,5 +1,5 @@
 {% load i18n dashboard_ui %}
-<div class="tile flex flex-col gap-1 p-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)]">
+<div class="tile flex flex-col gap-1 p-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)] focus-visible:rounded-lg">
     <span class="font-mono text-2xs tracking-wide uppercase text-text-muted">{{ label }}</span>
     <span class="{% if tone != 'neutral' %}{% tone_class 'tile__figure' tone %}{% endif %} font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ value }}</span>
     {% if note %}<span class="{% if note_tone %}{% tone_class 'tile__note' note_tone %}{% endif %} text-xs text-text-muted leading-snug">{{ note }}</span>{% endif %}

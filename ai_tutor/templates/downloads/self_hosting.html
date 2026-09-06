@@ -3,7 +3,7 @@
 {# that is a decision or a symptom folds into a <details> beside the step it #}
 {# belongs to — see apps/desktop/public_views.py for why. #}
 <!doctype html>
-<html lang="en">
+<html data-surface="student" lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,8 +12,6 @@
 <link rel="preload" as="font" type="font/woff2" href="{% static 'vendor/fonts/SpaceGrotesk-latin.woff2' %}" crossorigin>
 <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
-<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
     <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
 <style>
   {% comment %}
@@ -26,11 +24,11 @@
   prefers-color-scheme here made these two pages the only ones that flipped —
   which is exactly the inconsistency it looked like.
   {% endcomment %}
-  :root { --ink:var(--text); --muted:var(--text-muted); --line:var(--border);
-          --brand:var(--coral-ink);
-          --card:var(--surface); --bg:var(--canvas); --codebg:var(--surface-sunken);
-          --warnbg:var(--warning-surface); --warnline:var(--warning-border);
-          --warn:var(--warning); --foldbg:var(--surface); }
+  :root { --ink:var(--color-text); --muted:var(--color-text-muted); --line:var(--color-border);
+          --brand:var(--color-coral-ink);
+          --card:var(--color-surface); --bg:var(--color-canvas); --codebg:var(--color-surface-sunken);
+          --warnbg:var(--color-warning-surface); --warnline:var(--color-warning-border);
+          --warn:var(--color-warning); --foldbg:var(--color-surface); }
   * { box-sizing:border-box; }
   body { margin:0; padding:2.5rem 1.25rem 5rem; color:var(--ink); background:var(--bg);
          font: 16px/1.6 var(--font-body); }
@@ -46,13 +44,13 @@
   h1 { font-size:1.85rem; margin:0 0 .3rem; letter-spacing: var(--tracking-tight); }
   .sub { color:var(--muted); margin:0 0 2rem; }
   h2 { font-size:1.15rem; margin:2.5rem 0 .35rem; }
-  h2 .tag { font-size:.75rem; font-weight:600; color:var(--text-on-accent); background:var(--brand);
+  h2 .tag { font-size:.75rem; font-weight:600; color:var(--color-text-on-accent); background:var(--brand);
             border-radius:99px; padding:.15rem .55rem; vertical-align:middle; margin-left:.4rem; }
   /* Steps. Numbered so someone reading over a colleague's shoulder can say
      "you are on 3" — the folds make position otherwise hard to see. */
   h3 { font-size:.95rem; margin:1.9rem 0 .5rem; }
   h3 .n { display:inline-block; min-width:1.4rem; height:1.4rem; line-height:1.4rem;
-          text-align:center; border-radius:99px; background:var(--brand); color:var(--text-on-accent);
+          text-align:center; border-radius:99px; background:var(--brand); color:var(--color-text-on-accent);
           font-size:.75rem; margin-right:.45rem; }
   .need { color:var(--muted); font-size:.87rem; margin:0 0 1rem; }
   /* Wrap rather than scroll. These are commands someone is reading off the
@@ -67,7 +65,7 @@
   p code, li code, td code, summary code { background:var(--codebg); padding:.1rem .35rem;
         border-radius:4px; }
   a { color:var(--brand); }
-  a.btn { display:inline-block; background:var(--brand); color:var(--text-on-accent); text-decoration:none;
+  a.btn { display:inline-block; background:var(--brand); color:var(--color-text-on-accent); text-decoration:none;
           padding:.55rem .95rem; border-radius:8px; font-weight:600; font-size:.88rem; }
   a.btn.ghost { background:transparent; color:var(--brand); border:1px solid var(--brand); }
   .fill { background:var(--warnbg); border:1px solid var(--warnline); border-radius:10px;
@@ -125,8 +123,8 @@
   @media (hover: none) { .copy-btn { opacity:1; } }
 
   .copy-btn:hover { color:var(--ink); border-color:var(--muted); }
-  .copy-btn.is-done { color:var(--success); border-color:var(--success-border); opacity:1; }
-  .copy-btn.is-failed { color:var(--danger); border-color:var(--danger-border); opacity:1; }
+  .copy-btn.is-done { color:var(--color-success); border-color:var(--color-success-border); opacity:1; }
+  .copy-btn.is-failed { color:var(--color-danger); border-color:var(--color-danger-border); opacity:1; }
 
   /* The status text is for screen readers; the button's own label already
      shows the result on screen. */

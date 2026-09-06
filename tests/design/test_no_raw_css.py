@@ -70,9 +70,8 @@ def test_no_runtime_class_name_concatenation():
     assert offenders == [], f"{len(offenders)} templates build a class name at runtime"
 
 
-@pytest.mark.xfail(strict=True, reason="true once phase 4 deletes the last stylesheet")
 def test_only_the_built_stylesheet_is_linked():
-    """One stylesheet, not twenty-three."""
+    """One stylesheet, not twenty. True since phase 4; the ratchet is off."""
     linked = set()
     for rel, p in _sources():
         if rel.endswith(".html"):

@@ -8,26 +8,24 @@
 <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
 <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
-<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-<link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
 <style nonce="{{ request.csp_nonce }}">
     body {
         display: grid;
         place-items: center;
         min-height: 100vh;
         margin: 0;
-        padding: var(--space-6);
-        background: var(--canvas);
-        color: var(--text);
+        padding: calc(var(--spacing)*6);
+        background: var(--color-canvas);
+        color: var(--color-text);
         font-family: var(--font-body);
     }
 
     .recover {
         width: 100%;
         max-width: 30rem;
-        padding: var(--space-8);
-        background: var(--surface);
-        border: 1px solid var(--border);
+        padding: calc(var(--spacing)*8);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
         border-radius: var(--radius-lg);
         box-shadow: var(--card-shadow);
     }
@@ -37,14 +35,14 @@
         place-items: center;
         width: 3rem;
         height: 3rem;
-        margin-bottom: var(--space-5);
+        margin-bottom: calc(var(--spacing)*5);
         border-radius: var(--radius-md);
-        background: var(--warning-surface);
-        color: var(--warning);
+        background: var(--color-warning-surface);
+        color: var(--color-warning);
     }
 
     .recover h1 {
-        margin: 0 0 var(--space-3);
+        margin: 0 0 calc(var(--spacing)*3);
         font-family: var(--font-display);
         font-size: var(--text-xl);
         font-weight: var(--weight-bold);
@@ -52,35 +50,35 @@
     }
 
     .recover p {
-        margin: 0 0 var(--space-4);
-        color: var(--text-secondary);
+        margin: 0 0 calc(var(--spacing)*4);
+        color: var(--color-text-secondary);
         line-height: var(--leading-normal);
     }
 
     /* The one thing the reader most needs to know, and the one thing Django's
        own page never says. */
     .recover__lost {
-        padding: var(--space-3) var(--space-4);
-        background: var(--warning-surface);
-        border: 1px solid var(--warning-border);
+        padding: calc(var(--spacing)*3) calc(var(--spacing)*4);
+        background: var(--color-warning-surface);
+        border: 1px solid var(--color-warning-border);
         border-radius: var(--radius-md);
-        color: var(--warning);
+        color: var(--color-warning);
         font-size: var(--text-sm);
     }
 
     .recover__actions {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-3);
-        margin-top: var(--space-6);
+        gap: calc(var(--spacing)*3);
+        margin-top: calc(var(--spacing)*6);
     }
 
     .recover__btn {
         display: inline-block;
-        padding: var(--space-3) var(--space-5);
+        padding: calc(var(--spacing)*3) calc(var(--spacing)*5);
         border-radius: var(--radius-sm);
-        background: var(--primary-fill);
-        color: var(--text-on-accent);
+        background: var(--color-primary-fill);
+        color: var(--color-text-on-accent);
         font-weight: var(--weight-bold);
         font-size: var(--text-sm);
         text-decoration: none;
@@ -88,8 +86,8 @@
 
     .recover__btn--ghost {
         background: transparent;
-        color: var(--primary-ink);
-        border: 1px solid var(--border-strong);
+        color: var(--color-primary-ink);
+        border: 1px solid var(--color-border-strong);
     }
 </style>
 </head>

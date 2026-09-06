@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static i18n dashboard_ui %}
-<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<html data-surface="student" lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,24 +14,20 @@
     <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
 
     <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
-    <link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-    <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
-    <link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
-    <link rel="stylesheet" href="{% static 'css/student/components.css' %}">
 
     {% if theme_primary %}
     <style nonce="{{ request.csp_nonce }}">
         :root {
-            --coral: {{ theme_primary }};
-            --coral-fill: {{ theme_primary_dark|default:theme_primary }};
-            --coral-ink: {{ theme_primary_dark|default:theme_primary }};
+            --color-coral: {{ theme_primary }};
+            --color-coral-fill: {{ theme_primary_dark|default:theme_primary }};
+            --color-coral-ink: {{ theme_primary_dark|default:theme_primary }};
         }
     </style>
     {% endif %}
 </head>
 <body class="docs bg-canvas text-text">
 {% include "_includes/icon_sprite.html" %}
-<a class="skip-link print:hidden" href="#docs-content">{% trans "Skip to the documentation" %}</a>
+<a class="skip-link print:hidden absolute left-4 top-[calc(-1_*_calc(var(--spacing)*12))] z-1000 py-2 px-4 bg-surface text-text-link border border-primary rounded-sm font-medium text-sm shadow-[var(--shadow-md)] transition duration-[var(--dur-fast)] ease-[var(--ease-out)] focus:top-4" href="#docs-content">{% trans "Skip to the documentation" %}</a>
 
 {% include "_includes/_marketing_header.html" with nav_current="docs" %}
 

@@ -59,31 +59,70 @@ def theme_block(src, pairs):
     return src
 
 
-def student_theme_block(src):
-    """The student shell keeps BOTH spellings until phase 4.
+# Every shell that injects the institution's brand colour. Three of them write
+# --coral*, one writes --primary*, and all four were writing names the theme
+# no longer uses. Renaming in place is enough: nothing else reads the old
+# spelling once the stylesheets are gone.
+CORAL_SHELLS = ["base.html", "docs/base.html", "accounts/landing.html"]
 
-    css/student/ still reads --coral*; the utilities read --color-coral*.
-    Writing one and not the other would break whichever half is not yet
-    converted.
-    """
-    old = "            --coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};\n"
-    if old not in src or "--color-coral:" in src:
+
+def coral_theme_block(src):
+    """Rename --coral* to --color-coral* inside the DB-driven theme block."""
+    if "--color-coral" in src:
         return src
-    add = ("            --color-coral: {{ theme_primary }};\n"
-           "            --color-coral-fill: {{ theme_primary_dark|default:theme_primary }};\n"
-           "            --color-coral-ink: {{ theme_primary_dark|default:theme_primary }};\n"
-           "            --color-coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};\n")
-    return src.replace(old, old + add)
+    return re.sub(r"(\n\s+)--coral(-(?:fill|ink|tint))?:", r"\1--color-coral\2:", src)
+
+
+# Every shell that used to load css/student/brand.css. The skin now lives in
+# app.css scoped to [data-surface="student"], so the scope has to be declared
+# where the stylesheet used to be linked — including the marketing and
+# documentation shells, which have always worn the student skin.
+STUDENT_SURFACES = [
+    "base.html", "docs/base.html", "accounts/landing.html",
+    "downloads/index.html", "downloads/self_hosting.html",
+    "desktop/setup.html", "desktop/server.html",
+]
+
+
+def mark_student_surface(src):
+    if 'data-surface="student"' in src:
+        return src
+    # On <html>, not <body>: the scope has to cover the DB-driven theme block
+    # in <head> as well as the page.
+    return re.sub(r"<html(?![^>]*data-surface)", '<html data-surface="student"',
+                  src, count=1)
+
+
+# css/student/shell.css styled `body` directly — an element selector, which no
+# class map can carry. It is the only rule that made the student app 16px
+# rather than the dashboard's 14px, and losing it shrank every student page.
+STUDENT_BODY = ("font-body text-md leading-normal text-text bg-canvas "
+                "min-h-screen [min-height:100dvh] "
+                "[-webkit-font-smoothing:antialiased]")
+
+
+def student_body(src):
+    if STUDENT_BODY.split()[0] in src.split("<body", 1)[-1][:400]:
+        return src
+    return re.sub(r"<body\b(?![^>]*\bclass=)", f'<body class="{STUDENT_BODY}"', src, count=1)
 
 
 def main():
     done = []
 
+    if edit("base.html", student_body):
+        done.append("student body defaults on base.html")
+
+    for rel in STUDENT_SURFACES:
+        if edit(rel, mark_student_surface):
+            done.append(f"student skin scope on {rel}")
+
     for rel, pairs in THEME_RENAMES.items():
         if edit(rel, lambda s, p=pairs: theme_block(s, p)):
             done.append(f"institution theme names in {rel}")
-    if edit("base.html", student_theme_block):
-        done.append("institution theme names in base.html")
+    for rel in CORAL_SHELLS:
+        if edit(rel, coral_theme_block):
+            done.append(f"institution theme names in {rel}")
 
     # .lp-section.lp-band--deploy sits later in the sheet than either class
     # alone, so its background-position and padding win over both.

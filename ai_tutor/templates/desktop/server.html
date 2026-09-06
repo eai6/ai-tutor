@@ -9,7 +9,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
 {% endcomment %}
 {% load static i18n %}
 <!doctype html>
-<html lang="en">
+<html data-surface="student" lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,17 +17,15 @@ tutor — the wording must never imply it is broken until someone fills this in.
 <link rel="stylesheet" href="{% static 'vendor/css/google-fonts.css' %}">
 <link rel="stylesheet" href="{% static 'vendor/css/space-grotesk.css' %}">
 <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
-<link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-<link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
 <style>
   {% comment %}
   Same treatment as downloads/self_hosting.html: the page keeps its own
   variable names, they now resolve to the design tokens, and the dark
   override is gone because nothing else in the product has one.
   {% endcomment %}
-  :root { --bg:var(--canvas); --fg:var(--text); --muted:var(--text-muted);
-          --line:var(--border); --card:var(--surface); --accent:var(--coral-ink);
-          --ok:var(--success); --bad:var(--danger); }
+  :root { --bg:var(--color-canvas); --fg:var(--color-text); --muted:var(--color-text-muted);
+          --line:var(--color-border); --card:var(--color-surface); --accent:var(--color-coral-ink);
+          --ok:var(--color-success); --bad:var(--color-danger); }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg); font: 15px/1.55 var(--font-body); padding:40px 20px; }
   .wrap { max-width:600px; margin:0 auto; }
@@ -43,7 +41,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
   .hint { color:var(--muted); font-size:12.5px; margin:0 0 16px; }
   button { font:inherit; font-weight:600; border-radius:8px; padding:10px 16px;
            border:1px solid var(--line); background:transparent; color:var(--fg); cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:var(--text-on-accent); }
+  button.primary { background:var(--color-accent); border-color:var(--color-accent); color:var(--color-text-on-accent); }
   .msg { border-radius:8px; padding:12px 14px; margin:0 0 16px; font-size:14px; }
   .msg.bad { background:rgba(209,73,63,.1); border:1px solid var(--bad); color:var(--bad); }
   .msg.ok { background:rgba(47,158,95,.1); border:1px solid var(--ok); color:var(--ok); }
@@ -71,7 +69,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
     Pinned in the environment by whoever imaged this machine; a form here
     would offer a choice the application cannot honour.
     {% endcomment %}
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
       <h2>{% trans "Set by your administrator" %}</h2>
       <p class="current" style="margin:0">
         {% blocktrans trimmed with server=state.server_url %}
@@ -83,7 +81,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
   {% else %}
     <form method="post" action="{% url 'desktop:server_save' %}">
       {% csrf_token %}
-      <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+      <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <h2>{% trans "Server address" %}</h2>
         <p>{% trans "The web address teachers use to sign in. Your administrator has it." %}</p>
 
@@ -101,7 +99,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
     {% if state.server_url %}
       <form method="post" action="{% url 'desktop:server_signin' %}">
         {% csrf_token %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
           <h2>
             {% if state.signed_in %}{% trans "Signed in" %}{% else %}{% trans "Sign in" %}{% endif %}
           </h2>
@@ -136,7 +134,7 @@ tutor — the wording must never imply it is broken until someone fills this in.
 
       <form method="post" action="{% url 'desktop:server_clear' %}">
         {% csrf_token %}
-        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+        <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
           <h2>{% trans "Work offline only" %}</h2>
           <p>
             {% blocktrans trimmed %}

@@ -8,31 +8,31 @@
 <style>
     .summary-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.2rem; }
     .summary-card {
-        background:var(--surface); border:1px solid var(--border); border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px;
         padding:0.85rem 1.1rem; flex:1; min-width:160px;
     }
-    .summary-card .label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
-    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--text); line-height:1.1; margin-top:0.15rem; }
+    .summary-card .label { font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--color-text); line-height:1.1; margin-top:0.15rem; }
 
-    .matrix { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow-x: auto; }
+    .matrix { background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px; overflow-x: auto; }
     .matrix table { width:100%; border-collapse:collapse; min-width: 660px; }
     .matrix th, .matrix td { padding:0.5rem 0.75rem; text-align:left; font-size:0.85rem; vertical-align:middle; }
-    .matrix thead th { background:var(--surface-sunken); color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border); }
-    .matrix tbody tr { border-bottom:1px solid var(--surface-sunken); }
-    .matrix .obj { color:var(--text); font-weight:500; max-width:380px; }
-    .pct { font-weight:600; color:var(--text); font-variant-numeric: tabular-nums; }
-    .pct-faint { color:var(--text-faint); font-size:0.8rem; }
-    .delta-pos { color:var(--success); font-weight:600; }
-    .delta-neg { color:var(--danger); font-weight:600; }
-    .delta-zero { color:var(--text-muted); }
+    .matrix thead th { background:var(--color-surface-sunken); color:var(--color-text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--color-border); }
+    .matrix tbody tr { border-bottom:1px solid var(--color-surface-sunken); }
+    .matrix .obj { color:var(--color-text); font-weight:500; max-width:380px; }
+    .pct { font-weight:600; color:var(--color-text); font-variant-numeric: tabular-nums; }
+    .pct-faint { color:var(--color-text-faint); font-size:0.8rem; }
+    .delta-pos { color:var(--color-success); font-weight:600; }
+    .delta-neg { color:var(--color-danger); font-weight:600; }
+    .delta-zero { color:var(--color-text-muted); }
     .pill {
         display:inline-block; padding:0.1rem 0.5rem; border-radius:999px;
         font-size:0.7rem; font-weight:600;
     }
-    .pill.mastered { background:#dcfce7; color:var(--success); }
-    .pill.weak { background:var(--danger-surface); color:var(--danger); }
-    .pill.med { background:var(--warning-surface); color:var(--warning); }
-    .pill.none { background:var(--surface-sunken); color:var(--text-muted); }
+    .pill.mastered { background:#dcfce7; color:var(--color-success); }
+    .pill.weak { background:var(--color-danger-surface); color:var(--color-danger); }
+    .pill.med { background:var(--color-warning-surface); color:var(--color-warning); }
+    .pill.none { background:var(--color-surface-sunken); color:var(--color-text-muted); }
 </style>
 
 <div style="margin-bottom:1rem;">
@@ -73,10 +73,10 @@
             <tr>
                 <td class="obj">{{ r.tag }}</td>
                 <td>
-                    {% if r.latest_pct is None %}<span class="pill none">{% trans "not assessed" %}</span>
-                    {% elif r.latest_pct >= 70 %}<span class="pill mastered">{% trans "mastered" %}</span>
-                    {% elif r.latest_pct >= 40 %}<span class="pill med">{% trans "developing" %}</span>
-                    {% else %}<span class="pill weak">{% trans "weak" %}</span>{% endif %}
+                    {% if r.latest_pct is None %}<span class="pill none inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "not assessed" %}</span>
+                    {% elif r.latest_pct >= 70 %}<span class="pill mastered inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "mastered" %}</span>
+                    {% elif r.latest_pct >= 40 %}<span class="pill med inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "developing" %}</span>
+                    {% else %}<span class="pill weak inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{% trans "weak" %}</span>{% endif %}
                 </td>
                 <td>{% if r.latest_pct is not None %}<span class="pct">{{ r.latest_pct|floatformat:0 }}%</span>{% else %}<span class="pct-faint">—</span>{% endif %}</td>
                 <td><span class="pct-faint">{{ r.attempts }}</span></td>

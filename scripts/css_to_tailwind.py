@@ -77,7 +77,12 @@ LEADINGS = _same_name("--leading-")
 TRACKINGS = _same_name("--tracking-")
 FONTS = _same_name("--font-")
 WEIGHTS = {"--weight-normal": "normal", "--weight-medium": "medium", "--weight-bold": "bold"}
-RAW_WEIGHTS = {"400": "normal", "600": "medium", "700": "bold", "500": "[500]", "800": "[800]"}
+RAW_WEIGHTS = {"400": "normal", "600": "medium", "700": "bold", "500": "[500]",
+               "800": "[800]", "300": "[300]", "900": "black",
+               "bold": "bold", "normal": "normal", "bolder": "[bolder]",
+               "lighter": "[lighter]"}
+# The student sheets say --weight-regular where the token is --weight-normal.
+WEIGHTS["--weight-regular"] = "normal"
 
 # The old sheet's legacy aliases, so a --gray-500 in an un-migrated page
 # converts to the warm ramp it already points at rather than refusing.
@@ -241,6 +246,11 @@ def _arb(value):
 def _colour(value, role="text"):
     """A colour value -> a utility suffix. Raises if it is not a colour."""
     value = value.strip()
+    # var(--x, fallback): the variable is the value; the fallback only matters
+    # where the variable is undefined, which is not the case after migration.
+    fallback = re.fullmatch(r"var\(\s*(--[\w-]+)\s*,.*\)", value, re.S)
+    if fallback:
+        value = f"var({fallback.group(1)})"
     m = re.fullmatch(r"var\((--[\w-]+)\)", value)
     if m:
         if m.group(1) in COLOURS:
@@ -425,7 +435,10 @@ def _convert(prop, value):
     if prop in KEYWORDS:
         if value in KEYWORDS[prop]:
             return [KEYWORDS[prop][value]]
-        raise Unconvertible(f"{prop}: {value}")
+        # A keyword this table does not list is still a valid declaration —
+        # vertical-align: -0.125em, say. An arbitrary property carries it
+        # exactly, which beats refusing and dropping the whole rule.
+        return [_arb(f"{prop}:{value}")]
 
     if prop in SPACING_PROPS:
         parts = _split_values(value)
@@ -458,10 +471,13 @@ def _convert(prop, value):
                 "border-bottom-color", "border-left-color"):
         side = {"top": "t", "right": "r", "bottom": "b", "left": "l"}[prop.split("-")[1]]
         return [f"border-{side}-{_colour(value, "border")}"]
-    if prop == "fill":
-        return [f"fill-{_colour(value, "bg")}"]
-    if prop == "stroke":
-        return [f"stroke-{_colour(value, "text")}"]
+    if prop in ("fill", "stroke"):
+        # `none` is a paint value, not a colour. .icon sets fill: none and
+        # stroke: currentColor; refusing the first dropped the whole rule and
+        # every sprite icon fell back to the SVG default of 150x150.
+        if value == "none":
+            return [f"{prop}-none"]
+        return [f"{prop}-{_colour(value, 'bg' if prop == 'fill' else 'text')}"]
     if prop == "accent-color":
         return [f"accent-{_colour(value, "bg")}"]
 
@@ -474,6 +490,11 @@ def _convert(prop, value):
         if value in RAW_WEIGHTS:
             return [f"font-{RAW_WEIGHTS[value]}"]
         raise Unconvertible(f"{prop}: {value}")
+    if prop == "font-style":
+        return {"italic": "italic", "normal": "not-italic",
+                "oblique": "[font-style:oblique]"}.get(value) and [
+            {"italic": "italic", "normal": "not-italic",
+             "oblique": "[font-style:oblique]"}[value]] or [_arb(f"font-style:{value}")]
     if prop == "font-family":
         return [f"font-{_sized(value, FONTS)}"]
     if prop == "line-height":

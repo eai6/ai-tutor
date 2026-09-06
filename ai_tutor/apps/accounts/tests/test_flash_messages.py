@@ -116,7 +116,9 @@ class TestRendering:
         client.post(reverse('accounts:student_login'),
                     {'username': 'pupil2', 'password': PASSWORD})
         body = client.get(reverse('tutoring:catalog'), follow=True).content.decode()
-        assert 'class="messages"' in body
+        # The region is found by its name, which now travels alongside the
+        # utilities that style it — flash.js still looks it up as .messages.
+        assert 'class="messages' in body
         assert 'Welcome back, Ana!' in body
 
     def test_a_message_is_consumed_where_it_renders(self, school):

@@ -26,7 +26,7 @@
         gap: 1rem;
         margin-top: 0.5rem;
         font-size: 0.875rem;
-        color: var(--gray-500);
+        color: var(--color-warm-500);
     }
     .lesson-meta-item {
         display: flex;
@@ -38,7 +38,7 @@
         display: flex;
         gap: 1.5rem;
         padding: 1rem;
-        background: var(--gray-50);
+        background: var(--color-warm-50);
         border-radius: 8px;
         margin-bottom: 1.5rem;
     }
@@ -49,16 +49,16 @@
     .stat-value {
         font-size: 1.5rem;
         font-weight: 700;
-        color: var(--primary);
+        color: var(--color-primary);
     }
     .stat-label {
         font-size: 0.75rem;
-        color: var(--gray-500);
+        color: var(--color-warm-500);
         text-transform: uppercase;
     }
     
     .step-card {
-        border: 1px solid var(--gray-200);
+        border: 1px solid var(--color-warm-200);
         border-radius: 8px;
         margin-bottom: 1rem;
         overflow: hidden;
@@ -68,11 +68,11 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.75rem 1rem;
-        background: var(--gray-50);
+        background: var(--color-warm-50);
         cursor: pointer;
     }
     .step-header:hover {
-        background: var(--gray-100);
+        background: var(--color-warm-100);
     }
     .step-number {
         display: inline-flex;
@@ -80,7 +80,7 @@
         justify-content: center;
         width: 24px;
         height: 24px;
-        background: var(--primary);
+        background: var(--color-primary);
         color: white;
         border-radius: 50%;
         font-size: 0.75rem;
@@ -94,10 +94,10 @@
         text-transform: uppercase;
         font-weight: 600;
     }
-    .step-phase.engage { background: var(--warning-surface); color: var(--warning); }
-    .step-phase.explore { background: var(--info-surface); color: var(--info); }
-    .step-phase.explain { background: var(--success-surface); color: var(--success); }
-    .step-phase.practice { background: var(--accent-surface); color: var(--accent); }
+    .step-phase.engage { background: var(--color-warning-surface); color: var(--color-warning); }
+    .step-phase.explore { background: var(--color-info-surface); color: var(--color-info); }
+    .step-phase.explain { background: var(--color-success-surface); color: var(--color-success); }
+    .step-phase.practice { background: var(--color-accent-surface); color: var(--color-accent); }
     .step-phase.evaluate { background: #fce7f3; color: #9d174d; }
     
     .step-body {
@@ -108,7 +108,7 @@
         display: block;
     }
     .step-card.expanded .step-header {
-        border-bottom: 1px solid var(--gray-200);
+        border-bottom: 1px solid var(--color-warm-200);
     }
     
     .step-content-section {
@@ -116,12 +116,12 @@
     }
     .step-content-section h4 {
         font-size: 0.8rem;
-        color: var(--gray-500);
+        color: var(--color-warm-500);
         text-transform: uppercase;
         margin-bottom: 0.5rem;
     }
     .step-script {
-        background: var(--gray-50);
+        background: var(--color-warm-50);
         padding: 1rem;
         border-radius: 6px;
         font-size: 0.9rem;
@@ -135,12 +135,12 @@
     }
     .media-item {
         padding: 0.5rem;
-        background: var(--warning-surface);
+        background: var(--color-warning-surface);
         border-radius: 4px;
         font-size: 0.8rem;
     }
     .media-item.has-url {
-        background: var(--success-surface);
+        background: var(--color-success-surface);
     }
     
     .vocab-list {
@@ -149,7 +149,7 @@
         gap: 0.5rem;
     }
     .vocab-item {
-        background: var(--info-surface);
+        background: var(--color-info-surface);
         padding: 0.25rem 0.5rem;
         border-radius: 4px;
         font-size: 0.8rem;
@@ -222,12 +222,12 @@
 </div>
 
 <!-- Lesson Header -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
     <div class="card-body p-5">
         <div class="lesson-header">
             <div>
                 <h2 style="margin: 0;">{{ lesson.title }}</h2>
-                <div class="lesson-meta">
+                <div class="lesson-meta max-[600px]:[&_.time]:hidden flex items-center gap-4 shrink-0 [&_.time]:text-[0.75rem] [&_.time]:text-text-faint [&_.time]:font-medium [&_.review-hint]:text-primary [&_.review-hint]:font-medium [&_.review-hint]:text-[0.75rem]">
                     <span class="lesson-meta-item">📚 {{ unit.title }}</span>
                     <span class="lesson-meta-item">⏱️ {{ lesson.estimated_minutes|default:20 }} min</span>
                     {% if lesson.is_published %}
@@ -246,7 +246,7 @@
                     {% if lesson.content_quality in 'tier_3,tier_4' and not lesson.teacher_approved %}
                     <form method="post" action="{% url 'dashboard:lesson_approve' lesson.id %}" style="display: inline;">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--warning-solid); color: var(--surface); border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
+                        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background: var(--warning-solid); color: var(--surface); border: none; border-radius: 6px; padding: 6px 14px; font-weight: 600; cursor: pointer;">
                             {% trans "Approve Content" %}
                         </button>
                     </form>
@@ -254,13 +254,13 @@
                 <form method="post" action="{% url 'dashboard:lesson_publish' lesson.id %}" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="publish">
-                    <button type="submit" class="btn btn-success btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-success-solid rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent">{% trans "Publish" %}</button>
+                    <button type="submit" class="btn btn-success btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-success-solid rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-success-solid text-text-on-accent hover:bg-success hover:border-success hover:text-text-on-accent">{% trans "Publish" %}</button>
                 </form>
                 {% else %}
                 <form method="post" action="{% url 'dashboard:lesson_publish' lesson.id %}" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="unpublish">
-                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Unpublish" %}</button>
+                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Unpublish" %}</button>
                 </form>
                 {% endif %}
                 {% if is_generating and can_regenerate_courses %}
@@ -283,17 +283,17 @@
                         <input type="checkbox" name="regen_exit_tickets" value="1" checked style="accent-color:var(--accent);">
                         Exit ticket
                     </label>
-                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent"
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]"
                             onclick="this.disabled=true; this.innerHTML='Regenerating…'; this.form.submit();">
                         🔄 Regenerate
                     </button>
                 </form>
                 {% endif %}
                 {% endif %}
-                <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
+                <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
                     Session Report
                 </a>
-                <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--accent-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
+                <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="background:var(--accent-solid);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">
                     Live Monitor
                 </a>
             </div>
@@ -324,7 +324,7 @@
                     <span style="font-size:0.85rem;color:var(--text-muted);">(2–10 students)</span>
                 </label>
                 <div>
-                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save group settings" %}</button>
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save group settings" %}</button>
                 </div>
             </form>
         </details>
@@ -493,7 +493,7 @@
 </div>
 
 <!-- Prerequisites -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="display: flex; justify-content: space-between; align-items: center;">
         <h3 class="font-display text-md font-medium tracking-tight m-0" style="margin: 0;">Prerequisites ({{ prerequisites|length }})</h3>
     </div>
@@ -519,7 +519,7 @@
                 <option value="{{ al.id }}">{{ al.unit.title }} &rsaquo; {{ al.title }}</option>
                 {% endfor %}
             </select>
-            <button type="button" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="addPrereq()">Add</button>
+            <button type="button" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" onclick="addPrereq()">Add</button>
         </div>
         {% endif %}
     </div>
@@ -530,7 +530,7 @@
 {% with step_corrs=audit.step_corrections|default_if_none:'' et_corrs=audit.exit_ticket_corrections|default_if_none:'' answer_key_mismatches=audit.answer_key_mismatches|default_if_none:'' layer4_rejections=audit.layer4_rejections|default_if_none:'' %}
 {% if step_corrs or et_corrs or answer_key_mismatches or layer4_rejections %}
 <!-- Layers 1 + 2 — content arithmetic verification audit -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="border-left:4px solid var(--accent-solid);">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="border-left:4px solid var(--accent-solid);">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0" style="margin:0;">🧮 Arithmetic Verification</h3>
         <span style="color:var(--text-muted);font-size:0.75rem;">at content generation time · {{ audit.generated_at|default:"(no timestamp)" }}</span>
@@ -627,10 +627,10 @@
 {% endwith %}
 
 <!-- Lesson Steps -->
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-top: 1.25rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.25rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0">Lesson Steps ({{ steps.count }})</h3>
-        <button class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="toggleAllSteps()">{% trans "Expand All" %}</button>
+        <button class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="toggleAllSteps()">{% trans "Expand All" %}</button>
     </div>
     <div class="card-body p-5" style="padding: 1rem;">
         {% if steps %}
@@ -731,7 +731,7 @@
                         <form method="post" action="{% url 'dashboard:lesson_step_mark_reviewed' step.id %}"
                               style="margin-top: 0.5rem; display:inline;">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                            <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                                     style="border-color:#93c5fd; color:var(--info); background:var(--info-surface);"
                                     onclick="return confirm('Mark this step as reviewed? The flag will clear and the step will be tagged as human-approved.');">
                                 ✓ Mark as Reviewed
@@ -892,7 +892,7 @@
                     
                     {% if user.is_superuser %}
                     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-100);">
-                        <a href="{% url 'dashboard:step_edit' step.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Edit Step" %}</a>
+                        <a href="{% url 'dashboard:step_edit' step.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Edit Step" %}</a>
                     </div>
                     {% endif %}
                 </div>
@@ -904,7 +904,7 @@
                 {% if user.is_superuser %}
                 <form method="post" action="{% url 'dashboard:lesson_generate_content' lesson.id %}" style="margin-top: 1rem;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">⚡ Generate Content</button>
+                    <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">⚡ Generate Content</button>
                 </form>
                 {% endif %}
             </div>
@@ -914,7 +914,7 @@
 
 <!-- Exit Ticket -->
 {% if exit_questions %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-top: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="display: flex; justify-content: space-between; align-items: center;">
         <h3 class="font-display text-md font-medium tracking-tight m-0" style="margin: 0;">📝 Exit Ticket Question Bank ({{ exit_questions|length }} questions)</h3>
         <span style="font-size: 0.8rem; color: var(--gray-500);">10 randomly selected per tutoring session</span>
@@ -979,7 +979,7 @@
                 <form method="post" action="{% url 'dashboard:exit_ticket_question_mark_reviewed' question.id %}"
                       style="margin-bottom: 0.75rem; display:inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                             style="border-color:#93c5fd; color:var(--info); background:var(--info-surface);"
                             onclick="return confirm('Mark this exit-ticket question as reviewed? The flag will clear and it will be tagged as human-approved.');">
                         ✓ Mark as Reviewed
@@ -1063,7 +1063,7 @@
                     {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
-                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                            style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
                     {% endif %}
@@ -1074,7 +1074,7 @@
                     {% if user.is_superuser %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
-                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                            style="font-size:0.75rem;text-decoration:none;">✎ Edit figure</a>
                     </div>
                     {% endif %}
@@ -1084,14 +1084,14 @@
                     </div>
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
-                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                            style="font-size:0.75rem;text-decoration:none;">✎ Add chart figure</a>
                     </div>
                     {% endif %}
                     {% if user.is_superuser and question.question_type == 'data_interpretation' and not question.answer_data.figure_svg and not question.answer_data.figure_url and not question.answer_data.data_description %}
                     <div style="margin-bottom:0.5rem;">
                         <a href="{% url 'dashboard:exit_ticket_figure_edit' question.id %}"
-                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
+                           class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                            style="font-size:0.75rem;text-decoration:none;">+ Add chart figure</a>
                     </div>
                     {% endif %}
@@ -1132,19 +1132,19 @@
 
                 {% if user.is_superuser %}
                 <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
-                    <button type="button" onclick="editQuestion(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Edit</button>
+                    <button type="button" onclick="editQuestion(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Edit</button>
                     {% if question.question_type == 'mcq' %}
-                    <button type="button" class="exitq-regen-toggle btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                    <button type="button" class="exitq-regen-toggle btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                             data-question-id="{{ question.id }}"
                             style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
                     {% elif question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
                     {% comment %}Non-MCQ regenerate: opens a panel with auto-review / prompt mode. Persists in place (no candidate-review UI since schema is heterogeneous per type).{% endcomment %}
-                    <button type="button" class="exitq-inplace-toggle btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                    <button type="button" class="exitq-inplace-toggle btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                             data-question-id="{{ question.id }}"
                             data-question-type="{{ question.question_type }}"
                             style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">🔁 Regenerate</button>
                     {% endif %}
-                    <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">{% trans "Delete" %}</button>
+                    <button type="button" onclick="deleteQuestion(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size: 0.75rem; padding: 0.25rem 0.75rem; color: var(--danger);">{% trans "Delete" %}</button>
                 </div>
 
                 {% if question.question_type == 'fill_in_blank' or question.question_type == 'short_answer' or question.question_type == 'matching' %}
@@ -1169,12 +1169,12 @@
                                      border:1px solid var(--gray-300); border-radius:0.25rem;
                                      margin-bottom:0.5rem; font-family:inherit;"></textarea>
                     <div style="display:flex; gap:0.5rem;">
-                        <button type="button" class="exitq-ip-apply btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                        <button type="button" class="exitq-ip-apply btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;
                                        background:var(--primary,var(--accent)); color:white; border:none;
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
-                        <button type="button" class="exitq-ip-cancel btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                        <button type="button" class="exitq-ip-cancel btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                         <span class="exitq-ip-status" data-question-id="{{ question.id }}"
@@ -1204,12 +1204,12 @@
                                      border:1px solid var(--gray-300); border-radius:0.25rem;
                                      margin-bottom:0.5rem; font-family:inherit;"></textarea>
                     <div style="display:flex; gap:0.5rem;">
-                        <button type="button" class="exitq-regen-apply btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                        <button type="button" class="exitq-regen-apply btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;
                                        background:var(--primary,var(--accent)); color:white; border:none;
                                        border-radius:0.25rem; cursor:pointer;">Apply</button>
-                        <button type="button" class="exitq-regen-cancel btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                        <button type="button" class="exitq-regen-cancel btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                 data-question-id="{{ question.id }}"
                                 style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                         <span class="exitq-regen-status" data-question-id="{{ question.id }}"
@@ -1248,12 +1248,12 @@
                         <div class="exitq-regen-meta" data-question-id="{{ question.id }}"
                              style="font-size:0.75rem; color:var(--gray-500); margin-top:0.375rem;"></div>
                         <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-                            <button type="button" class="exitq-regen-save btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                            <button type="button" class="exitq-regen-save btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                     data-question-id="{{ question.id }}"
                                     style="font-size:0.75rem; padding:0.25rem 0.75rem;
                                            background:var(--success); color:white; border:none;
                                            border-radius:0.25rem; cursor:pointer;">{% trans "Save to Question" %}</button>
-                            <button type="button" class="exitq-regen-discard btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
+                            <button type="button" class="exitq-regen-discard btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55"
                                     data-question-id="{{ question.id }}"
                                     style="font-size:0.75rem; padding:0.25rem 0.75rem;">{% trans "Discard" %}</button>
                         </div>
@@ -1356,8 +1356,8 @@
                     <textarea class="eq-explanation" rows="2" style="width: 100%; padding: 0.375rem; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.875rem;">{{ question.explanation }}</textarea>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" onclick="saveQuestion(this)" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Save</button>
-                    <button type="button" onclick="cancelEdit(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">{% trans "Cancel" %}</button>
+                    <button type="button" onclick="saveQuestion(this)" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">Save</button>
+                    <button type="button" onclick="cancelEdit(this)" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-transparent rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">{% trans "Cancel" %}</button>
                 </div>
             </div>
         </div>
@@ -1365,7 +1365,7 @@
     </div>
 </div>
 {% else %}
-<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-top: 1.5rem;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top: 1.5rem;">
     <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
         <h3 class="font-display text-md font-medium tracking-tight m-0">📝 Exit Ticket</h3>
     </div>

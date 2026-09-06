@@ -8,15 +8,15 @@
 <style>
     .rv-wrap { max-width: 760px; margin: 1rem auto 4rem; padding: 0 1rem; }
     .rv-hero {
-        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-solid) 100%);
-        color: var(--surface);
+        background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-solid) 100%);
+        color: var(--color-surface);
         border-radius: 16px;
         padding: 1.6rem 1.8rem;
         margin-bottom: 1.25rem;
         box-shadow: 0 12px 32px rgba(91,33,182,0.25);
     }
     .rv-hero.failed {
-        background: linear-gradient(135deg, #b45309 0%, var(--warning-solid) 100%);
+        background: linear-gradient(135deg, #b45309 0%, var(--color-warning-solid) 100%);
         box-shadow: 0 12px 32px rgba(180,83,9,0.25);
     }
     .rv-score { font-size: 2.6rem; font-weight: 800; line-height: 1; }
@@ -24,26 +24,26 @@
     .rv-status { display: inline-block; background: rgba(255,255,255,0.2); padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; margin-top: 0.4rem; }
 
     .rv-q {
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
         border-radius: 12px;
         padding: 1rem 1.2rem;
         margin-bottom: 0.75rem;
     }
-    .rv-q.correct { border-left: 4px solid var(--success-solid); }
-    .rv-q.wrong { border-left: 4px solid var(--danger-solid); }
-    .rv-stem { color: var(--text); font-size: 0.95rem; line-height: 1.55; margin: 0 0 0.5rem; }
-    .rv-stem .num { display: inline-block; background: var(--surface-sunken); color: var(--accent); padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
-    .rv-row { font-size: 0.86rem; color: var(--text-secondary); margin: 0.3rem 0; }
-    .rv-row strong { color: var(--text); }
+    .rv-q.correct { border-left: 4px solid var(--color-success-solid); }
+    .rv-q.wrong { border-left: 4px solid var(--color-danger-solid); }
+    .rv-stem { color: var(--color-text); font-size: 0.95rem; line-height: 1.55; margin: 0 0 0.5rem; }
+    .rv-stem .num { display: inline-block; background: var(--color-surface-sunken); color: var(--color-accent); padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
+    .rv-row { font-size: 0.86rem; color: var(--color-text-secondary); margin: 0.3rem 0; }
+    .rv-row strong { color: var(--color-text); }
     .rv-row.you { color: #6b21a8; }
-    .rv-row.correct { color: var(--success); }
-    .rv-row.expl { color: var(--text-muted); font-style: italic; margin-top: 0.5rem; }
+    .rv-row.correct { color: var(--color-success); }
+    .rv-row.expl { color: var(--color-text-muted); font-style: italic; margin-top: 0.5rem; }
     .rv-fig { margin: 0.5rem 0; max-width: 100%; }
     .rv-fig svg { max-width: 100%; height: auto; }
     .rv-objective {
-        background: var(--surface-sunken);
-        border: 1px solid var(--border);
+        background: var(--color-surface-sunken);
+        border: 1px solid var(--color-border);
         border-radius: 8px;
         padding: 0.6rem 0.85rem;
         margin-bottom: 0.4rem;
@@ -51,7 +51,7 @@
         justify-content: space-between;
         font-size: 0.86rem;
     }
-    .rv-objective.weak { background: var(--danger-surface); border-color: #fca5a5; }
+    .rv-objective.weak { background: var(--color-danger-surface); border-color: #fca5a5; }
 </style>
 
 <div class="rv-wrap">
@@ -104,7 +104,7 @@
     {% for q in questions %}
     {% with row=per_q_by_id|default_if_none:'' %}
     <div class="rv-q {% if q.id in per_q_by_id and per_q_by_id|get_item:q.id|get_item:'is_correct' %}correct{% else %}wrong{% endif %}">
-        <p class="rv-stem"><span class="num">{{ forloop.counter }}</span>{{ q.question_text }}</p>
+        <p class="rv-stem"><span class="num font-display [font-variant-numeric:tabular-nums] [font-feature-settings:'tnum'_1]">{{ forloop.counter }}</span>{{ q.question_text }}</p>
         {% if q.answer_data.figure_svg %}<div class="rv-fig">{{ q.answer_data.figure_svg|sanitized }}</div>{% endif %}
 
         <div class="rv-row you"><strong>Your answer:</strong>

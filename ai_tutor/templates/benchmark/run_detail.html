@@ -97,33 +97,33 @@
 
 <div class="meta-row">
     <span><strong>When</strong> {{ run.created_at|date:"M j, Y H:i" }}</span>
-    <span><strong>Variant</strong> <span class="pill pill-variant">{{ run.get_system_variant_display }}</span></span>
+    <span><strong>Variant</strong> <span class="pill pill-variant inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ run.get_system_variant_display }}</span></span>
     <span><strong>Annotator</strong>
         {% if run.annotator_role == 'human' %}
-            <span class="pill pill-role-human">human</span>
+            <span class="pill pill-role-human inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">human</span>
         {% else %}
-            <span class="pill pill-role-llm">{{ run.annotator_role }}</span>
+            <span class="pill pill-role-llm inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ run.annotator_role }}</span>
         {% endif %}
     </span>
     {% if run.notes %}<span style="flex-basis:100%;color:#6b7280;"><strong>Notes</strong> {{ run.notes }}</span>{% endif %}
 </div>
 
 <div class="summary-grid">
-    <div class="card {% if overall.pass_rate >= 0.7 %}card-success{% elif overall.pass_rate < 0.4 %}card-warn{% endif %} bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card {% if overall.pass_rate >= 0.7 %}card-success{% elif overall.pass_rate < 0.4 %}card-warn{% endif %} bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="label">Pass rate</div>
         <div class="value">{{ overall.pass_rate|floatformat:3 }}</div>
         <div class="sub">{{ overall.passed }}/{{ overall.total }} items passed</div>
     </div>
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="label">Passed</div>
         <div class="value">{{ overall.passed }}</div>
     </div>
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="label">Failed</div>
         <div class="value">{{ overall.failed }}</div>
     </div>
     {% if agreement %}
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="label">Agreement (vs cross-check)</div>
         <div class="value">{{ agreement.agreement_rate|floatformat:3 }}</div>
         <div class="sub">{{ agreement.agree }}/{{ agreement.overlap_items }} items match</div>
@@ -131,7 +131,7 @@
     {% endif %}
 </div>
 
-<div class="section">
+<div class="section flex items-baseline justify-between gap-3 flex-wrap mb-3">
     <h3>Slices</h3>
     <div class="slice-grid">
         {% for slice in slices %}
@@ -161,7 +161,7 @@
 </div>
 
 {% if failure_categories %}
-<div class="section">
+<div class="section flex items-baseline justify-between gap-3 flex-wrap mb-3">
     <h3>Failure categories</h3>
     <p style="color:#6b7280;font-size:0.78rem;margin:0 0 0.5rem 0;">
         {{ category_tag_total }} tag{{ category_tag_total|pluralize }}
@@ -178,7 +178,7 @@
 {% endif %}
 
 {% if agreement and agreement.disagreements %}
-<div class="section">
+<div class="section flex items-baseline justify-between gap-3 flex-wrap mb-3">
     <h3>Disagreements ({{ agreement.disagree }} of {{ agreement.overlap_items }})</h3>
     <table class="disagree-table">
         <thead>

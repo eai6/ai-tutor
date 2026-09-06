@@ -5,7 +5,7 @@
 
 {% block content %}
 <div style="max-width: 600px;">
-    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-sm)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-body p-5" style="text-align: center; padding: 3rem;">
             <div style="font-size: 4rem; margin-bottom: 1rem;">✅</div>
             <h2 style="margin-bottom: 0.5rem;">Invitation Created!</h2>
@@ -24,13 +24,13 @@
                 <div style="display: flex; gap: 0.5rem;">
                     <input type="text" id="invite-url" value="{{ invite_url }}" readonly
                            style="flex: 1; padding: 0.75rem; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace; font-size: 0.8125rem;">
-                    <button onclick="copyLink()" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="white-space: nowrap;">
+                    <button onclick="copyLink()" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="white-space: nowrap;">
                         Copy Link
                     </button>
                 </div>
             </div>
 
-            <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
+            <a href="{% url 'accounts:invite_staff' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">
                 Create Another Invitation
             </a>
         </div>

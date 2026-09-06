@@ -7,15 +7,15 @@
 <style>
     .settings-page { max-width: 640px; margin: 0 auto; padding: 0; }
     .settings-page h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.25rem; }
-    .settings-page .lead { color: var(--text-muted); margin-bottom: 1.5rem; }
+    .settings-page .lead { color: var(--color-text-muted); margin-bottom: 1.5rem; }
     .settings-page .back-link {
-        color: var(--text-muted);
+        color: var(--color-text-muted);
         font-size: 0.85rem;
         text-decoration: none;
         margin-bottom: 1rem;
         display: inline-block;
     }
-    .settings-page .back-link:hover { color: var(--accent); }
+    .settings-page .back-link:hover { color: var(--color-accent); }
 
     .panel {
         background: var(--bg-card);
@@ -30,7 +30,7 @@
         margin-bottom: 0.25rem;
     }
     .panel .panel-sub {
-        color: var(--text-muted);
+        color: var(--color-text-muted);
         font-size: 0.875rem;
         margin-bottom: 1rem;
     }
@@ -40,7 +40,7 @@
         display: block;
         font-size: 0.78rem;
         font-weight: 700;
-        color: var(--text-muted);
+        color: var(--color-text-muted);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         margin-bottom: 0.35rem;
@@ -53,16 +53,16 @@
         padding: 0.75rem 0.875rem;
         font-size: 1rem;
         font-family: inherit;
-        border: 1px solid var(--border);
+        border: 1px solid var(--color-border);
         border-radius: var(--radius-sm);
-        background: var(--surface);
+        background: var(--color-surface);
         color: var(--text-dark);
         min-height: 44px;
     }
     .field input:focus, .field select:focus {
-        outline: 2px solid var(--primary);
+        outline: 2px solid var(--color-primary);
         outline-offset: -1px;
-        border-color: var(--primary);
+        border-color: var(--color-primary);
     }
     .field-row { display: flex; gap: 0.75rem; }
     .field-row > .field { flex: 1; }
@@ -77,7 +77,7 @@
     }
     .helptext {
         font-size: 0.8rem;
-        color: var(--text-muted);
+        color: var(--color-text-muted);
         margin-top: 0.25rem;
     }
 
@@ -90,7 +90,7 @@
         font-size: 0.9rem;
     }
     .read-only-row:last-child { border-bottom: none; }
-    .read-only-row .ro-label { color: var(--text-muted); }
+    .read-only-row .ro-label { color: var(--color-text-muted); }
     .read-only-row .ro-value { font-weight: 600; }
 
     .messages-area {
@@ -103,16 +103,16 @@
         margin-bottom: 0.5rem;
     }
     .alert-success { background: rgba(0, 184, 148, 0.12); color: #0a7857; }
-    .alert-error { background: rgba(255, 118, 117, 0.12); color: var(--danger); }
+    .alert-error { background: rgba(255, 118, 117, 0.12); color: var(--color-danger); }
 
     .danger-zone {
         border: 1px solid rgba(220, 38, 38, 0.25);
         background: rgba(255, 118, 117, 0.06);
     }
-    .danger-zone h2 { color: var(--danger); }
+    .danger-zone h2 { color: var(--color-danger); }
     .btn-danger {
         background: transparent;
-        color: var(--danger);
+        color: var(--color-danger);
         border: 1px solid rgba(220, 38, 38, 0.4);
     }
     .btn-danger:hover { background: rgba(220, 38, 38, 0.08); }
@@ -134,7 +134,7 @@
     {% if messages %}
     <div class="messages-area">
         {% for message in messages %}
-        <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        <div class="alert alert-{{ message.tags|default:'info' }} motion-reduce:[&.is-leaving]:transition-none flex items-start gap-3 py-3 px-4 border border-border rounded-md bg-surface-sunken text-text-secondary text-base [&_.icon]:text-[1.125rem] [&_.icon]:mt-[1px] [&.is-leaving]:overflow-hidden [&.is-leaving]:opacity-0 [&.is-leaving]:max-h-0 [&.is-leaving]:mt-0 [&.is-leaving]:py-0 [&.is-leaving]:[border-block-width:0] [&.is-leaving]:[transition:opacity_var(--dur-fast)_var(--ease-out),_max-height_var(--dur-base)_var(--ease-out),_margin-top_var(--dur-base)_var(--ease-out),_padding_var(--dur-base)_var(--ease-out)]">{{ message }}</div>
         {% endfor %}
     </div>
     {% endif %}
@@ -204,7 +204,7 @@
                 </select>
                 <p class="helptext">{% trans "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless." %}</p>
             </div>
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save profile" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save profile" %}</button>
         </form>
     </section>
 
@@ -265,7 +265,7 @@
                 {% endif %}
             </p>
             {% endif %}
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save tutor choice" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save tutor choice" %}</button>
         </form>
     </section>
     {% endif %}
@@ -302,7 +302,7 @@
                 <ul class="errorlist">{% for e in password_form.new_password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Change password" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Change password" %}</button>
         </form>
     </section>
 
@@ -317,7 +317,7 @@
             <p class="panel-sub">
                 {% trans "Where this computer sends finished work. Optional — it teaches without one." %}
             </p>
-            <a href="{% url 'desktop:server' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+            <a href="{% url 'desktop:server' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                 {% trans "Change server address" %}
             </a>
         </section>
@@ -327,14 +327,14 @@
     <section class="panel">
         <h2>{% trans "Session" %}</h2>
         <p class="panel-sub">{% trans "Sign out on this device." %}</p>
-        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Logout" %}</a>
+        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Logout" %}</a>
     </section>
 
     {# ── Delete account (kept clearly separate) ───────────────── #}
     <section class="panel danger-zone">
         <h2>{% trans "Delete account" %}</h2>
         <p class="panel-sub">{% trans "Permanently remove your account and all data we hold for you. This cannot be undone." %}</p>
-        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-danger-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-text-on-accent hover:bg-danger hover:border-danger hover:text-text-on-accent">{% trans "Delete my account" %}</a>
+        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-danger-solid text-[#fff] hover:bg-danger hover:border-danger hover:text-[#fff]">{% trans "Delete my account" %}</a>
     </section>
 </div>
 {% endblock %}

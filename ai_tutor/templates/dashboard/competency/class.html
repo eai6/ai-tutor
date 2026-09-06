@@ -8,40 +8,40 @@
 <style>
     .summary-row { display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:1rem; }
     .summary-card {
-        background:var(--surface); border:1px solid var(--border); border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px;
         padding:0.85rem 1.1rem; flex:1; min-width:180px;
     }
-    .summary-card .label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; }
-    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--text); line-height:1.1; margin-top:0.15rem; }
+    .summary-card .label { font-size:0.75rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.04em; }
+    .summary-card .value { font-size:1.4rem; font-weight:700; color:var(--color-text); line-height:1.1; margin-top:0.15rem; }
 
     .matrix {
-        background:var(--surface); border:1px solid var(--border); border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-border); border-radius:10px;
         overflow-x: auto;
     }
     .matrix table { width:100%; border-collapse:collapse; min-width: 720px; }
     .matrix th, .matrix td { padding:0.5rem 0.75rem; text-align:left; font-size:0.85rem; vertical-align:top; }
-    .matrix thead th { background:var(--surface-sunken); color:var(--text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border); position:sticky; top:0; }
-    .matrix tbody tr { border-bottom:1px solid var(--surface-sunken); }
-    .matrix tbody tr:hover { background:var(--surface-sunken); }
-    .matrix .obj { color:var(--text); font-weight:500; max-width:380px; }
+    .matrix thead th { background:var(--color-surface-sunken); color:var(--color-text-muted); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--color-border); position:sticky; top:0; }
+    .matrix tbody tr { border-bottom:1px solid var(--color-surface-sunken); }
+    .matrix tbody tr:hover { background:var(--color-surface-sunken); }
+    .matrix .obj { color:var(--color-text); font-weight:500; max-width:380px; }
 
-    .bar { width:100%; height:8px; background:var(--surface-sunken); border-radius:4px; overflow:hidden; margin-top:0.2rem; }
+    .bar { width:100%; height:8px; background:var(--color-surface-sunken); border-radius:4px; overflow:hidden; margin-top:0.2rem; }
     .bar-fill { height:100%; transition: width 0.3s ease; }
     .bar-fill.baseline { background:#fbbf24; }
-    .bar-fill.latest { background:var(--accent-solid); }
-    .bar-fill.final { background:var(--success-solid); }
+    .bar-fill.latest { background:var(--color-accent-solid); }
+    .bar-fill.final { background:var(--color-success-solid); }
 
-    .pct { font-weight:600; color:var(--text); font-variant-numeric: tabular-nums; }
-    .pct-faint { color:var(--text-faint); font-size:0.8rem; }
-    .delta-pos { color:var(--success); font-weight:600; }
-    .delta-neg { color:var(--danger); font-weight:600; }
-    .delta-zero { color:var(--text-muted); }
+    .pct { font-weight:600; color:var(--color-text); font-variant-numeric: tabular-nums; }
+    .pct-faint { color:var(--color-text-faint); font-size:0.8rem; }
+    .delta-pos { color:var(--color-success); font-weight:600; }
+    .delta-neg { color:var(--color-danger); font-weight:600; }
+    .delta-zero { color:var(--color-text-muted); }
 
-    .legend { display:flex; gap:1rem; font-size:0.78rem; color:var(--text-muted); margin:0.5rem 0 1rem; flex-wrap:wrap; }
+    .legend { display:flex; gap:1rem; font-size:0.78rem; color:var(--color-text-muted); margin:0.5rem 0 1rem; flex-wrap:wrap; }
     .legend-swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:0.3rem; vertical-align:middle; }
 
-    .empty-state { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
-    .empty-state h3 { color:var(--text-secondary); margin:0.5rem 0; }
+    .empty-state { text-align:center; padding:3rem 1rem; color:var(--color-text-muted); }
+    .empty-state h3 { color:var(--color-text-secondary); margin:0.5rem 0; }
 </style>
 
 <div style="margin-bottom:1rem;">

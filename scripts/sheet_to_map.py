@@ -123,6 +123,9 @@ def _selector_to_variant(sel):
 def parse(path):
     css = pathlib.Path(path).read_text()
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    # @keyframes steps are `from`, `to` and percentages, not selectors. The
+    # frames themselves live in app.css; here they are only noise.
+    css = re.sub(r"@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\}\s*)*\}", "", css)
     # Custom properties the sheet declares for itself. They disappear with the
     # sheet, so they must be resolved to their values rather than referenced.
     # The sheet's own custom properties, plus the two token sheets it was

@@ -29,7 +29,7 @@ Extracted alongside the header for the same reason — see _marketing_header.htm
                 <input type="hidden" name="next" value="{{ request.path }}">
                 <label class="inline-flex items-center text-text-muted" for="lang-switch-select">
                     {% icon "globe" size="sm" %}
-                    <span class="sr-only">{% trans "Language" %}</span>
+                    <span class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% trans "Language" %}</span>
                 </label>
                 <select name="language" id="lang-switch-select"
                         class="lang-switch__select max-[640px]:pr-6 [appearance:none] pt-1 pr-8 pb-1 pl-2 border-0 rounded-full bg-transparent [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236E6157'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*3)_center] [background-size:0.85rem] font-body text-xs font-bold leading-[1.8] text-text cursor-pointer hover:bg-surface-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)]"

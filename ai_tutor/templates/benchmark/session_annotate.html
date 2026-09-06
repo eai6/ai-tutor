@@ -86,14 +86,14 @@
         <div class="an-card">
             <h3>Session</h3>
             <div class="meta-row">
-                <span>{% if item.subject %}<span class="pill pill-subj">{{ item.subject }}</span>{% endif %}</span>
+                <span>{% if item.subject %}<span class="pill pill-subj inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ item.subject }}</span>{% endif %}</span>
                 <span>Engine <strong>{{ item.engine|default:"—" }}</strong></span>
                 <span>Outcome <strong>{{ item.outcome|default:"—" }}</strong></span>
                 <span>Turns <strong>{{ item.turn_count }}</strong></span>
             </div>
             {% if annotator_role != 'human' %}
             <p style="margin-top:0.5rem;">
-                <span class="pill pill-judge">Annotating as {{ annotator_role }}
+                <span class="pill pill-judge inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">Annotating as {{ annotator_role }}
                 {% if annotator_model %}({{ annotator_model }}){% endif %}</span>
             </p>
             {% endif %}
@@ -147,8 +147,8 @@
                 <h3>Notes</h3>
                 <textarea name="notes" placeholder="What decided the borderline calls?">{{ annotation.notes|default:"" }}</textarea>
                 <div class="actions">
-                    <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">Save</button>
-                    <button type="submit" name="save_and_next" value="1" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
+                    <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-coral-fill text-[#fff] hover:bg-primary-dark hover:border-primary-dark hover:text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">Save</button>
+                    <button type="submit" name="save_and_next" value="1" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                         Save &amp; next
                     </button>
                 </div>

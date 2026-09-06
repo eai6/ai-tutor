@@ -36,9 +36,6 @@
     file has to be scrolled to find one rule. See css/dashboard/README.md.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
-    <link rel="stylesheet" href="{% static 'css/shared/tokens.css' %}">
-    <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
-    <link rel="stylesheet" href="{% static 'css/shared/flash.css' %}">
     {% comment %}
     Compatibility shim for the ~20 pages still written against the class names
     the old base.html <style> block defined (.card-header, .form-control,
@@ -46,7 +43,6 @@
     unmigrated page renders correctly and in the new palette. Delete it, and
     this link, once the last page is migrated — see css/dashboard/README.md.
     {% endcomment %}
-    <link rel="stylesheet" href="{% static 'css/shared/password-field.css' %}">
 
     {% comment %}
     Institution theming. These three land in the primitive layer of
@@ -75,12 +71,12 @@
 {% include "_includes/icon_sprite.html" %}
 
 {# First tab stop on every page: jump the whole rail. #}
-<a class="skip-link print:hidden" href="#main-content">{% trans "Skip to main content" %}</a>
+<a class="skip-link print:hidden absolute left-4 top-[calc(-1_*_calc(var(--spacing)*12))] z-1000 py-2 px-4 bg-surface text-text-link border border-primary rounded-sm font-medium text-sm shadow-[var(--shadow-md)] transition duration-[var(--dur-fast)] ease-[var(--ease-out)] focus:top-4" href="#main-content">{% trans "Skip to main content" %}</a>
 
 <div class="flex min-h-screen">
 
     {# ================================================================ rail #}
-    <aside class="app-rail max-[900px]:w-70 max-[900px]:[transform:translateX(-100%)] max-[900px]:transition-transform max-[900px]:duration-[var(--dur-base)] max-[900px]:ease-[var(--ease-spring)] max-[900px]:shadow-[var(--shadow-lg)] max-[900px]:[&.is-open]:[transform:translateX(0)] w-[var(--rail-width)] flex-none fixed inset-0 z-200 flex flex-col bg-surface border-r border-r-border overflow-y-auto [overscroll-behavior:contain]" id="app-rail" aria-label="{% trans 'Dashboard sections' %}">
+    <aside class="app-rail max-[900px]:w-70 max-[900px]:[transform:translateX(-100%)] max-[900px]:transition-transform max-[900px]:duration-[var(--dur-base)] max-[900px]:ease-[var(--ease-spring)] max-[900px]:shadow-[var(--shadow-lg)] max-[900px]:[&.is-open]:[transform:translateX(0)] w-[var(--rail-width)] flex-none fixed inset-0 z-200 flex flex-col bg-surface border-r border-r-border overflow-y-auto [overscroll-behavior:contain] print:hidden" id="app-rail" aria-label="{% trans 'Dashboard sections' %}">
         <div class="pt-5 px-5 pb-4 border-b border-b-border">
             {# Same as the student shell: landing redirects by role. #}
             <a href="{% url 'accounts:landing' %}" class="flex items-center gap-3 no-underline text-text rounded-sm">
@@ -116,7 +112,7 @@
                     {% icon "flag" %}{% trans "Flagged chats" %}
                     {% if unreviewed_flag_count %}
                     <span class="ml-auto min-w-[1.4rem] py-0 px-[0.4rem] rounded-full font-display text-2xs font-bold leading-[1.5rem] text-center bg-danger-surface text-danger border border-danger-border">{{ unreviewed_flag_count }}</span>
-                    <span class="sr-only">{% blocktrans count n=unreviewed_flag_count %}{{ n }} unreviewed{% plural %}{{ n }} unreviewed{% endblocktrans %}</span>
+                    <span class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% blocktrans count n=unreviewed_flag_count %}{{ n }} unreviewed{% plural %}{{ n }} unreviewed{% endblocktrans %}</span>
                     {% endif %}
                 </a>
             </div>
@@ -211,8 +207,8 @@
     <div class="rail-scrim fixed inset-0 z-199 bg-[rgba(27,_24,_21,_0.45)] opacity-0 [visibility:hidden] [transition:opacity_var(--dur-base)_var(--ease-out),_visibility_var(--dur-base)] [&.is-open]:opacity-100 [&.is-open]:[visibility:visible]" id="rail-scrim" aria-hidden="true"></div>
 
     {# ================================================================ main #}
-    <div class="app-main max-[900px]:ml-0 flex-1 min-w-0 ml-[var(--rail-width)] flex flex-col">
-        <header class="app-topbar max-[900px]:py-3 max-[900px]:px-4 max-[900px]:gap-2 sticky top-0 z-100 min-h-[var(--topbar-height)] flex items-center gap-3 py-3 px-6 bg-[color-mix(in_srgb,_var(--color-surface)_88%,_transparent)] border-b border-b-border [backdrop-filter:saturate(1.6)_blur(10px)] [-webkit-backdrop-filter:saturate(1.6)_blur(10px)] bg-surface">
+    <div class="max-[900px]:ml-0 flex-1 min-w-0 ml-[var(--rail-width)] flex flex-col print:ml-0">
+        <header class="max-[900px]:py-3 max-[900px]:px-4 max-[900px]:gap-2 sticky top-0 z-100 min-h-[var(--topbar-height)] flex items-center gap-3 py-3 px-6 bg-[color-mix(in_srgb,_var(--color-surface)_88%,_transparent)] border-b border-b-border [backdrop-filter:saturate(1.6)_blur(10px)] [-webkit-backdrop-filter:saturate(1.6)_blur(10px)] bg-surface print:hidden">
             <button type="button" class="rail-toggle max-[900px]:inline-flex hidden w-[38px] h-[38px] flex-none items-center justify-center bg-transparent border border-border rounded-sm text-text-secondary cursor-pointer transition duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-surface-hover" id="rail-toggle"
                     aria-label="{% trans 'Open navigation' %}"
                     aria-controls="app-rail" aria-expanded="false">
@@ -239,7 +235,7 @@
                 <form method="post" action="{% url 'dashboard:switch_school' %}" class="row flex items-center gap-2 flex-wrap">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.path }}">
-                    <label for="school-switch" class="sr-only">{% trans "Showing data for school" %}</label>
+                    <label for="school-switch" class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% trans "Showing data for school" %}</label>
                     <select name="school_id" id="school-switch" class="select w-full min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [appearance:none] pr-8 [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%237C7469'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*2)_center] [background-size:1rem] cursor-pointer pt-1 pb-1" onchange="this.form.submit()">
                         {% if user.is_staff %}
                         <option value="all" {% if is_aggregated %}selected{% endif %}>{% trans "All schools" %}</option>
@@ -248,7 +244,7 @@
                         <option value="{{ school.id }}" {% if institution.id == school.id %}selected{% endif %}>{{ school.name }}</option>
                         {% endfor %}
                     </select>
-                    <noscript><button type="submit" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Switch" %}</button></noscript>
+                    <noscript><button type="submit" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none disabled:opacity-55 [&[aria-disabled='true']]:opacity-55 bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Switch" %}</button></noscript>
                 </form>
                 {% endif %}
 
@@ -268,7 +264,7 @@
             Messages are announced: a teacher who submits a form and gets a
             success banner should hear it, not have to go looking.
             {% endcomment %}
-            <div class="messages" role="status" aria-live="polite">
+            <div class="messages mb-5 [&>*_+_*]:mt-2" role="status" aria-live="polite">
                 {% for message in messages %}
                 {% comment %}
                 level_tag, not tags: `tags` concatenates extra_tags with the
@@ -276,7 +272,7 @@
                 class="alert--sticky success" — the tone skin silently gone.
                 Extra tags go on separately.
                 {% endcomment %}
-                <div class="alert alert--{{ message.level_tag|default:'info' }} {{ message.extra_tags }}">
+                <div class="alert alert--{{ message.level_tag|default:'info' }} {{ message.extra_tags }} motion-reduce:[&.is-leaving]:transition-none flex items-start gap-3 py-3 px-4 border border-border rounded-md bg-surface-sunken text-text-secondary text-base [&_.icon]:text-[1.125rem] [&_.icon]:mt-[1px] [&.is-leaving]:overflow-hidden [&.is-leaving]:opacity-0 [&.is-leaving]:max-h-0 [&.is-leaving]:mt-0 [&.is-leaving]:py-0 [&.is-leaving]:[border-block-width:0] [&.is-leaving]:[transition:opacity_var(--dur-fast)_var(--ease-out),_max-height_var(--dur-base)_var(--ease-out),_margin-top_var(--dur-base)_var(--ease-out),_padding_var(--dur-base)_var(--ease-out)]">
                     {% if message.level_tag == 'success' %}{% icon "check-circle" %}
                     {% elif message.level_tag == 'error' %}{% icon "alert" %}
                     {% elif message.level_tag == 'warning' %}{% icon "alert" %}

@@ -158,8 +158,8 @@
 <div class="ann-card" style="margin-bottom:1rem;">
     <div class="meta-row">
         <span><strong>Item</strong> <code>{{ item.item_id }}</code></span>
-        <span><strong>Subject</strong> <span class="pill pill-subj">{{ item.subject }}</span></span>
-        {% if item.stratum %}<span><strong>Stratum</strong> <span class="pill pill-stratum">{{ item.stratum }}</span></span>{% endif %}
+        <span><strong>Subject</strong> <span class="pill pill-subj inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ item.subject }}</span></span>
+        {% if item.stratum %}<span><strong>Stratum</strong> <span class="pill pill-stratum inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ item.stratum }}</span></span>{% endif %}
         <span><strong>Lesson</strong> {{ snapshot_item.lesson_title|default:"—" }}</span>
         {% if snapshot_item.current_step_type %}<span><strong>Step type</strong> <code>{{ snapshot_item.current_step_type }}</code></span>{% endif %}
         {% if snapshot_item.lesson_objective %}<span style="flex-basis:100%;"><strong>Objective</strong> {{ snapshot_item.lesson_objective }}</span>{% endif %}
@@ -337,7 +337,7 @@
                 {% if suggested_labels %}
                 <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.6rem;">
                     Pipeline suggested:
-                    {% for s in suggested_labels %}<span class="pill pill-suggested">{{ s }}</span> {% endfor %}
+                    {% for s in suggested_labels %}<span class="pill pill-suggested inline-flex items-center gap-1 py-[2px] px-3 border border-border rounded-full bg-surface-sunken text-text-secondary text-xs font-bold leading-[1.7] whitespace-nowrap">{{ s }}</span> {% endfor %}
                 </div>
                 {% endif %}
 
@@ -385,7 +385,7 @@
             <div class="ann-card">
                 <h3>Verdict & rationale</h3>
 
-                <div class="form-row">
+                <div class="form-row max-[480px]:grid-cols-[1fr] grid grid-cols-2 gap-4">
                     <label class="field-label">Student claim correct?</label>
                     <div class="tri-state">
                         <label><input type="radio" name="student_claim_correct" value="" {% if prefill_claim is None %}checked{% endif %}> Not applicable</label>
@@ -394,7 +394,7 @@
                     </div>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row max-[480px]:grid-cols-[1fr] grid grid-cols-2 gap-4">
                     <label class="field-label">Failure categories
                         <span style="color:#9ca3af;font-weight:400;font-size:0.78rem;">
                             (multi-select — leave all unchecked for a pass)
@@ -412,14 +412,14 @@
                     </div>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row max-[480px]:grid-cols-[1fr] grid grid-cols-2 gap-4">
                     <label class="field-label">
                         <input type="checkbox" name="safety_concern" {% if prefill_safety %}checked{% endif %}>
                         Safety concern
                     </label>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row max-[480px]:grid-cols-[1fr] grid grid-cols-2 gap-4">
                     <label class="field-label">Rationale</label>
                     <textarea name="rationale" placeholder="Why these expected labels? What did the response miss / do wrong?">{{ prefill_rationale }}</textarea>
                 </div>

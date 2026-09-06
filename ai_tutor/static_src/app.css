@@ -27,18 +27,12 @@
    theming would have silently stopped working the day this landed.
    ========================================================================== */
 
-/* Theme and utilities only — NOT preflight, until phase 4.
+/* Theme, preflight and utilities.
    -------------------------------------------------------------------------
-   Preflight is Tailwind's reset, and it is correct for a page built out of
-   utilities. It is not correct for a page still styled by the sheets this
-   migration has yet to delete: turning it on across the whole product moved
-   roughly forty un-migrated pages, mostly by unsetting list markers and image
-   display that shared/base.css never re-asserts because it never had to.
-
-   Those pages keep their reset from shared/base.css, which already does the
-   universal margin/padding/box-sizing part of preflight's job. Phase 4 swaps
-   the two over in one step, with the whole product converted and the gate
-   able to say what that swap cost.
+   Preflight was held back through phases 1-3, because a page still styled by
+   an un-migrated stylesheet does not want Tailwind's reset — turning it on
+   early moved roughly forty of them. With every sheet gone it is now the only
+   reset there is, and shared/base.css hands over to it here.
 
    The utilities are imported UNLAYERED, and that is not a stylistic choice.
    Unlayered CSS beats layered CSS outright, whatever the specificity, so with
@@ -48,8 +42,9 @@
    converted page lost its spacing. Unlayered, .px-6 (0,1,0) beats * (0,0,0)
    normally. Phase 4 can put them back in a layer once no unlayered stylesheet
    is left to fight. */
-@layer theme;
+@layer theme, base;
 @import "tailwindcss/theme.css" layer(theme) source(none);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" source(none);
 
 @source "../templates/**/*.html";
@@ -470,4 +465,97 @@
    the same mechanism as the student skin above, and for the same reason. */
 .docs {
   --lp-max: 78rem;
+}
+
+
+/* ==========================================================================
+   Base — what a bare element looks like
+   ==========================================================================
+   The element defaults that css/shared/base.css used to hold, in the layer
+   Tailwind reserves for exactly this and where preflight itself sits.
+
+   WHY THIS IS NOT THE STYLESHEET WE JUST DELETED. Every rule here selects a
+   bare element that carries no class and can carry none: a heading inside
+   generated playbook prose, a <strong> inside a translated sentence, the
+   focus ring on anything focusable. Expressing them as utilities would mean
+   putting a class on 1,686 elements, ~870 of them <strong> inside msgids —
+   which is how you churn a translation catalogue and get nothing for it.
+   What is NOT here is any component: no .card, no .btn, no .badge. Those are
+   utilities on the markup, which is the whole point of the migration.
+   ========================================================================== */
+
+@layer base {
+  /* Preflight zeroes margin but not padding, and does not carry [hidden]
+     with enough weight: a class that sets display beats the UA's type-less
+     rule, and .empty[hidden] stayed visible. */
+  *, *::before, *::after { padding: 0; }
+  [hidden] { display: none !important; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    color: var(--color-text);
+    background: var(--color-canvas);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings take the display face and negative tracking; SIZE is left to the
+     markup, so an h2 can be a small section label without a specificity war. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--color-text);
+  }
+
+  a {
+    color: var(--color-text-link);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+  a:hover { color: var(--color-primary-dark); }
+
+  strong, b { font-weight: var(--font-weight-bold); }
+  small { font-size: var(--text-xs); }
+
+  /* One ring for the whole product. :focus-visible so a mouse click on a card
+     does not paint a ring, but every keyboard path does. */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+    border-radius: var(--radius-sm);
+  }
+
+  /* A form control already draws a border, so the gap ring on top of it reads
+     as two concentric lines. One border, thickened and coloured, plus a soft
+     halo — and !important because eight auth pages set their own
+     input:focus border-color at higher specificity. */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  .form-control:focus-visible {
+    box-shadow: var(--shadow-halo);
+    border-color: var(--color-primary-fill) !important;
+  }
+
+  /* Windows High Contrast Mode paints box-shadow as nothing — fall back to a
+     real outline so the ring survives. */
+  @media (forced-colors: active) {
+    :focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+  }
+
+  /* Everything decorative stops. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
