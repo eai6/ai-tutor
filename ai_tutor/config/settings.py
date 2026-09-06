@@ -344,6 +344,11 @@ LANGUAGES = [
     # francophone deployment has claimed it yet. Give it a country the day one
     # does — that is a label change plus a data migration, not a new locale.
     ('fr', '🇫🇷 Français'),
+    # Kiswahili, added for the Tanzania pilot. Language-level for the same
+    # reason French is: the interface and the tutor speak it, but no Tanzanian
+    # deployment has claimed the locale yet. Give it a country the day one
+    # does — a label change plus a data migration, not a new locale.
+    ('sw', '🇹🇿 Kiswahili'),
 ]
 
 # Language-only labels for the public language switcher.
@@ -360,6 +365,7 @@ LANGUAGE_SHORT_LABELS = {
     'en-us': 'English',
     'pt-mz': 'Português',
     'fr': 'Français',
+    'sw': 'Kiswahili',
 }
 LOCALE_PATHS = [PACKAGE_DIR / 'locale']
 TIME_ZONE = 'UTC'

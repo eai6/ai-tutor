@@ -1,0 +1,225 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: ai-tutor-js\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-03 18:07+0000\n"
+"Language: sw\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: templates/_includes/feedback_button.html:343
+msgid "Proposed action:"
+msgstr "Kitendo kilichopendekezwa:"
+#: templates/_includes/feedback_button.html:352
+msgid "Confirm"
+msgstr "Thibitisha"
+#: templates/_includes/feedback_button.html:356
+msgid "Cancel"
+msgstr "Ghairi"
+#: templates/_includes/feedback_button.html:375
+msgid "Take me there →"
+msgstr "Nipeleke huko →"
+#: templates/_includes/feedback_button.html:385
+msgid "Send this to support →"
+msgstr "Tuma hii kwa msaada →"
+#: templates/_includes/feedback_button.html:408
+msgid "Could not start chat."
+msgstr "Haikuweza kuanzisha mazungumzo."
+#: templates/_includes/feedback_button.html:424
+msgid "Assistant failed."
+msgstr "Msaidizi ameshindwa."
+#: templates/_includes/feedback_button.html:453
+msgid "Could not run that action."
+msgstr "Haikuweza kutekeleza kitendo hicho."
+#: templates/_includes/feedback_button.html:463
+msgid "Cancelled."
+msgstr "Imeghairiwa."
+#: templates/_includes/feedback_button.html:466
+msgid "Done."
+msgstr "Imekamilika."
+#: templates/_includes/feedback_button.html:569
+msgid "Please describe what happened."
+msgstr "Tafadhali eleza kilichotokea."
+#: templates/_includes/feedback_button.html:575
+msgid "Pick a window…"
+msgstr "Chagua dirisha…"
+#: templates/_includes/feedback_button.html:575
+#: templates/_includes/feedback_button.html:598
+msgid "Sending…"
+msgstr "Inatuma…"
+#: templates/_includes/feedback_button.html:617
+msgid "Submission failed. Please try again."
+msgstr "Uwasilishaji umeshindwa. Tafadhali jaribu tena."
+#: templates/_includes/feedback_button.html:625
+msgid "Network error. Try again in a moment."
+msgstr "Hitilafu ya mtandao. Jaribu tena baada ya muda."
+#: templates/_includes/feedback_button.html:629
+msgid "Send"
+msgstr "Tuma"
+#: templates/tutoring/_partials/exit_modal.html:713
+msgid "Correct!"
+msgstr "Sahihi!"
+#: templates/tutoring/_partials/exit_modal.html:716
+msgid "Hint:"
+msgstr "Kidokezo:"
+#: templates/tutoring/_partials/exit_modal.html:717
+msgid "Not quite — review this topic during remediation."
+msgstr "Bado kidogo — pitia mada hii wakati wa marekebisho."
+#: templates/tutoring/catalog.html:963
+msgid "Lesson Locked"
+msgstr "Somo Limefungwa"
+#: templates/tutoring/catalog.html:964
+msgid "Complete these lessons first:"
+msgstr "Kamilisha masomo haya kwanza:"
+#: templates/tutoring/catalog.html:966
+msgid "Got it"
+msgstr "Nimeelewa"
+#: templates/tutoring/catalog.html:1015
+#, javascript-format
+#| msgid "%s day streak"
+msgid "%s day streak"
+msgid_plural "%s day streak"
+msgstr[0] "%s jour d'affilée"
+msgstr[1] "%s jours d'affilée"
+
+#: templates/tutoring/catalog.html:1030
+msgid "Trophies (%(earned)s/%(total)s)"
+msgstr "Nishani (%(earned)s/%(total)s)"
+#: templates/tutoring/catalog.html:1039
+msgid "Lessons:"
+msgstr "Masomo:"
+#: templates/tutoring/catalog.html:1040
+msgid "Hours:"
+msgstr "Saa:"
+#: templates/tutoring/catalog.html:1043
+msgid "Accuracy:"
+msgstr "Usahihi:"
+#: templates/tutoring/catalog.html:1129
+msgid "Loading..."
+msgstr "Inapakia..."
+#: templates/tutoring/catalog.html:1134
+msgid "No data yet. Complete lessons to appear!"
+msgstr "Hakuna data bado. Kamilisha masomo ili uonekane!"
+#: templates/tutoring/catalog.html:1137
+msgid " (You)"
+msgstr " (Wewe)"
+#: templates/tutoring/catalog.html:1148
+msgid "Failed to load leaderboard."
+msgstr "Imeshindwa kupakia ubao wa viongozi."
+#: templates/tutoring/catalog.html:1167
+msgid "Achievement Unlocked!"
+msgstr "Mafanikio Yamefunguliwa!"
+#: templates/tutoring/chat_tutor.html:1386
+msgid "Areas to revisit:"
+msgstr "Maeneo ya kurudia:"
+#: templates/tutoring/chat_tutor.html:1388
+#, javascript-format
+msgid "%s attempt"
+msgid_plural "%s attempts"
+msgstr[0] "%s tentative"
+msgstr[1] "%s tentatives"
+
+#: templates/tutoring/chat_tutor.html:1390
+msgid "Your best:"
+msgstr "Bora yako:"
+#: templates/tutoring/chat_tutor.html:1392
+msgid "%(score)s% — passing threshold %(threshold)s%"
+msgstr "%(score)s% — kiwango cha ufaulu %(threshold)s%"
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Great work! You passed!"
+msgstr "Kazi nzuri! Umefaulu!"
+#: templates/tutoring/chat_tutor.html:1393
+msgid "Keep going — review the explanations above, then continue."
+msgstr "Endelea — pitia maelezo yaliyo juu, kisha uendelee."
+#: templates/tutoring/chat_tutor.html:1400
+msgid "Scroll up to review your answers and explanations."
+msgstr "Sogeza juu kukagua majibu na maelezo yako."
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue"
+msgstr "Endelea"
+#: templates/tutoring/chat_tutor.html:1402
+msgid "Continue to Review"
+msgstr "Endelea kwenye Ukaguzi"
+#: templates/tutoring/chat_tutor.html:1471
+msgid "Engage"
+msgstr "Shirikisha"
+#: templates/tutoring/chat_tutor.html:1472
+msgid "Explore"
+msgstr "Chunguza"
+#: templates/tutoring/chat_tutor.html:1473
+msgid "Explain"
+msgstr "Eleza"
+#: templates/tutoring/chat_tutor.html:1474
+msgid "Practice"
+msgstr "Mazoezi"
+#: templates/tutoring/chat_tutor.html:1475
+msgid "Evaluate"
+msgstr "Tathmini"
+#: templates/tutoring/chat_tutor.html:1476
+msgid "Exit Quiz"
+msgstr "Jaribio la Kutoka"
+#: templates/tutoring/chat_tutor.html:1477
+msgid "Review"
+msgstr "Kagua"
+#: templates/tutoring/chat_tutor.html:1478
+msgid "Completed"
+msgstr "Imekamilika"
+#: templates/tutoring/chat_tutor.html:1606
+msgid "Show how you got there — formulas, steps, reasoning…"
+msgstr "Onyesha ulivyofika hapo — fomula, hatua, hoja…"
+#: templates/tutoring/chat_tutor.html:1654
+msgid "Your answer…"
+msgstr "Jibu lako…"
+#: templates/tutoring/chat_tutor.html:1657
+msgid "Submit answer"
+msgstr "Wasilisha jibu"
+#: templates/tutoring/chat_tutor.html:1698
+msgid "Pick an option first."
+msgstr "Chagua chaguo kwanza."
+#: templates/tutoring/chat_tutor.html:1709
+msgid "Fill in at least one blank."
+msgstr "Jaza angalau nafasi moja."
+#: templates/tutoring/chat_tutor.html:1717
+msgid "Type a final answer first."
+msgstr "Andika jibu la mwisho kwanza."
+#: templates/tutoring/chat_tutor.html:1812
+msgid "Welcome back — your previous question is still waiting in the panel on the right."
+msgstr "Karibu tena — swali lako la awali bado linasubiri kwenye kidirisha cha kulia."
+#: templates/tutoring/chat_tutor.html:1904
+msgid "earlier messages"
+msgstr "ujumbe wa awali"
+#: templates/tutoring/chat_tutor.html:1959
+msgid "Ask your teacher to add you to a group to share this lesson."
+msgstr "Muombe mwalimu wako akuongeze kwenye kikundi ili kushiriki somo hili."
+#: templates/tutoring/chat_tutor.html:2024
+#, javascript-format
+msgid "Could not add %s: %s"
+msgstr "Haikuweza kuongeza %s: %s"
+#: templates/tutoring/chat_tutor.html:2024
+msgid "student"
+msgstr "mwanafunzi"
+#: templates/tutoring/chat_tutor.html:2024
+msgid "unknown"
+msgstr "haijulikani"
+#: templates/tutoring/chat_tutor.html:2030
+msgid "Network error adding student."
+msgstr "Hitilafu ya mtandao wakati wa kuongeza mwanafunzi."
+#: templates/tutoring/chat_tutor.html:2035
+msgid "Remove this student from the group session?"
+msgstr "Ondoa mwanafunzi huyu kwenye kipindi cha kikundi?"
+#: templates/tutoring/chat_tutor.html:2188
+msgid "Interactive Content"
+msgstr "Maudhui Shirikishi"
+#: templates/tutoring/chat_tutor.html:2374
+msgid "Type your answer…"
+msgstr "Andika jibu lako…"
+#: templates/tutoring/chat_tutor.html:2416
+msgid "Check answer"
+msgstr "Kagua jibu"
+#: templates/tutoring/chat_tutor.html:2483
+msgid "Will send when online"
+msgstr "Itatuma ukiwa mtandaoni"
+#: templates/tutoring/chat_tutor.html:2700
+msgid "Could not restart the lesson. Please try again."
+msgstr "Haikuweza kuanzisha somo upya. Tafadhali jaribu tena."
