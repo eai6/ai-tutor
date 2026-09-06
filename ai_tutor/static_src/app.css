@@ -27,7 +27,30 @@
    theming would have silently stopped working the day this landed.
    ========================================================================== */
 
-@import "tailwindcss" source(none);
+/* Theme and utilities only — NOT preflight, until phase 4.
+   -------------------------------------------------------------------------
+   Preflight is Tailwind's reset, and it is correct for a page built out of
+   utilities. It is not correct for a page still styled by the sheets this
+   migration has yet to delete: turning it on across the whole product moved
+   roughly forty un-migrated pages, mostly by unsetting list markers and image
+   display that shared/base.css never re-asserts because it never had to.
+
+   Those pages keep their reset from shared/base.css, which already does the
+   universal margin/padding/box-sizing part of preflight's job. Phase 4 swaps
+   the two over in one step, with the whole product converted and the gate
+   able to say what that swap cost.
+
+   The utilities are imported UNLAYERED, and that is not a stylistic choice.
+   Unlayered CSS beats layered CSS outright, whatever the specificity, so with
+   the utilities inside @layer utilities the `* { margin: 0; padding: 0 }` in
+   the un-migrated shared/base.css won against every p-* and m-* on the page.
+   Colour and border survived only because nothing competed for them; every
+   converted page lost its spacing. Unlayered, .px-6 (0,1,0) beats * (0,0,0)
+   normally. Phase 4 can put them back in a layer once no unlayered stylesheet
+   is left to fight. */
+@layer theme;
+@import "tailwindcss/theme.css" layer(theme) source(none);
+@import "tailwindcss/utilities.css" source(none);
 
 @source "../templates/**/*.html";
 @source "../static/js/**/*.js";
@@ -291,6 +314,12 @@
   --topbar-height:      60px;
   --content-max:        1440px;
 
+  /* The marketing shell's content width. It is a variable rather than a fixed
+     utility because the documentation site is wider than the landing page and
+     both are rendered through the same header partial — resolving it to one
+     number put the docs header at the landing page's width. */
+  --lp-max: 68rem;
+
   --skeleton-base:  var(--color-warm-100);
   --skeleton-sheen: rgba(255, 255, 255, 0.65);
 }
@@ -401,4 +430,11 @@
   /* The ring picks up the fill, which has enough contrast on cream. */
   --shadow-focus: 0 0 0 2px var(--color-canvas), 0 0 0 4px var(--color-coral-fill);
   --shadow-halo:  0 0 0 3px var(--color-coral-tint);
+}
+
+/* The documentation site runs wider than the landing page. Same header
+   partial, same utility, one variable with a second value under the scope —
+   the same mechanism as the student skin above, and for the same reason. */
+.docs {
+  --lp-max: 78rem;
 }

@@ -10,15 +10,15 @@ current section.
 Returning users are the majority of traffic on a school platform, so signing
 in stays reachable without scrolling past the explainer.
 {% endcomment %}
-<header class="lp-header">
-    <div class="lp-wrap lp-header__inner">
-        <a href="{% url 'accounts:landing' %}" class="lp-brand">
+<header class="sticky top-0 z-50 bg-[color-mix(in_srgb,_var(--color-canvas)_88%,_transparent)] [backdrop-filter:saturate(1.5)_blur(10px)] [-webkit-backdrop-filter:saturate(1.5)_blur(10px)] border-b border-b-transparent transition duration-[var(--dur-base)] ease-[var(--ease-out)] bg-canvas print:hidden">
+    <div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6 max-sm:flex-wrap max-sm:gap-y-2 flex items-center gap-4 py-4">
+        <a href="{% url 'accounts:landing' %}" class="flex items-center gap-3 no-underline text-text">
             {% if theme_logo_url %}
-            <img src="{{ theme_logo_url }}" alt="" class="lp-brand__mark">
+            <img src="{{ theme_logo_url }}" alt="" class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">
             {% else %}
-            <span class="lp-brand__mark">{% icon "courses" size="md" %}</span>
+            <span class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">{% icon "courses" size="md" %}</span>
             {% endif %}
-            <span class="lp-brand__name">{{ theme_institution_name|default:"AI Tutor" }}</span>
+            <span class="max-[640px]:whitespace-nowrap font-display text-md font-bold tracking-tight">{{ theme_institution_name|default:"AI Tutor" }}</span>
         </a>
 
         {% comment %}
@@ -26,14 +26,14 @@ in stays reachable without scrolling past the explainer.
         than a label — "Home" is the word someone looks for, and with a second
         destination in the bar the first one has to be named to be a choice.
         {% endcomment %}
-        <nav class="lp-header__nav" aria-label="{% trans 'Main' %}">
-            <a href="{% url 'accounts:landing' %}" class="lp-header__link"
+        <nav class="max-sm:[order:3] max-sm:basis-full max-sm:ml-0 max-sm:pt-1 max-sm:border-t max-sm:border-t-border flex items-center gap-4 ml-6" aria-label="{% trans 'Main' %}">
+            <a href="{% url 'accounts:landing' %}" class="lp-header__link max-sm:pt-1 font-body text-base font-medium text-text-secondary no-underline py-2 px-0 border-b-[2px] border-b-transparent [transition:color_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out)] hover:text-text [&[aria-current="page"]]:text-primary-ink [&[aria-current="page"]]:border-b-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:rounded-xs"
                {% if nav_current == 'home' %}aria-current="page"{% endif %}>{% trans "Home" %}</a>
-            <a href="{% url 'docs:index' %}" class="lp-header__link"
+            <a href="{% url 'docs:index' %}" class="lp-header__link max-sm:pt-1 font-body text-base font-medium text-text-secondary no-underline py-2 px-0 border-b-[2px] border-b-transparent [transition:color_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out)] hover:text-text [&[aria-current="page"]]:text-primary-ink [&[aria-current="page"]]:border-b-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:rounded-xs"
                {% if nav_current == 'docs' %}aria-current="page"{% endif %}>{% trans "Country Adoption" %}</a>
         </nav>
 
-        <div class="lp-header__actions">
+        <div class="lp-header__actions max-[640px]:[&_.btn--secondary]:hidden max-[640px]:[&_.btn]:px-4 max-[640px]:[&_.btn]:whitespace-nowrap ml-auto flex items-center gap-2">
             <a href="{% url 'accounts:staff_login' %}" class="btn btn--secondary btn--sm">{% trans "Teacher/Admin sign in" %}</a>
             <a href="{% url 'accounts:student_login' %}" class="btn btn--primary btn--sm">{% trans "Student sign in" %}</a>
         </div>

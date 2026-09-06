@@ -8,27 +8,27 @@ can match on text that is not visible in the tile. The footer link carries it
 too: two appendices appear in no card list, and without this a search for what
 they contain would come back empty.
 {% endcomment %}
-<article class="docs-card">
-    <div class="docs-card__body">
-        <h3 class="docs-card__title">{{ card.title }}</h3>
-        <p class="docs-card__lede">{{ card.lede }}</p>
-        <ul class="docs-card__list">
+<article class="docs-card motion-reduce:transition-none flex flex-col bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden [transition:box-shadow_var(--dur-base)_var(--ease-out),_border-color_var(--dur-base)_var(--ease-out)] hover:shadow-[var(--shadow-md)] hover:border-border-strong [&[hidden]]:hidden">
+    <div class="flex-1 py-3 px-5">
+        <h3 class="m-0 font-display text-md font-bold tracking-tight text-text">{{ card.title }}</h3>
+        <p class="mt-1 mx-0 mb-3 text-sm leading-snug text-text-muted">{{ card.lede }}</p>
+        <ul class="list-none m-0 p-0 grid">
             {% for s in card.sections %}
-            <li class="docs-card__item" data-slug="{{ s.slug }}" data-terms="{{ s.search_terms }}">
+            <li class="docs-card__item [&_a]:grid [&_a]:grid-cols-[2rem_minmax(0,_1fr)] [&_a]:items-baseline [&_a]:gap-2 [&_a]:py-[3px] [&_a]:px-2 [&_a]:mx-[calc(calc(var(--spacing)*2)_*_-1)] [&_a]:rounded-sm [&_a]:no-underline [&_a]:text-text-link [&_a]:transition [&_a]:duration-[var(--dur-fast)] [&_a]:ease-[var(--ease-out)] [&_a:hover]:bg-accent-surface [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&[hidden]]:hidden" data-slug="{{ s.slug }}" data-terms="{{ s.search_terms }}">
                 <a href="{% url 'docs:section' s.slug %}">
-                    <span class="docs-num">{{ s.label }}</span>
-                    <span class="docs-card__link-text">{{ s.title }}</span>
+                    <span class="font-mono text-xs font-bold tracking-wide text-primary-ink bg-accent-surface rounded-xs py-[2px] px-2 text-center whitespace-nowrap">{{ s.label }}</span>
+                    <span class="leading-snug">{{ s.title }}</span>
                 </a>
             </li>
             {% endfor %}
         </ul>
     </div>
     {% if card.more_url_name %}
-    <p class="docs-card__more">
+    <p class="docs-card__more motion-reduce:[&_.icon]:transition-none m-0 py-2 px-5 border-t border-t-border bg-surface-sunken [&_a]:inline-flex [&_a]:items-center [&_a]:gap-2 [&_a]:text-base [&_a]:font-medium [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs [&_.icon]:transition-transform [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] [&_a:hover_.icon]:[transform:translateX(2px)] [&[hidden]]:hidden">
         <a href="{% url card.more_url_name %}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
     </p>
     {% else %}
-    <p class="docs-card__more" data-slug="{{ card.more_section.slug }}"
+    <p class="docs-card__more motion-reduce:[&_.icon]:transition-none m-0 py-2 px-5 border-t border-t-border bg-surface-sunken [&_a]:inline-flex [&_a]:items-center [&_a]:gap-2 [&_a]:text-base [&_a]:font-medium [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs [&_.icon]:transition-transform [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] [&_a:hover_.icon]:[transform:translateX(2px)] [&[hidden]]:hidden" data-slug="{{ card.more_section.slug }}"
        data-terms="{{ card.more_section.search_terms }}">
         <a href="{% url 'docs:section' card.more_section.slug %}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
     </p>

@@ -71,7 +71,7 @@
 <body>
 {% include "_includes/icon_sprite.html" %}
 
-<a class="skip-link" href="#main">{% trans "Skip to content" %}</a>
+<a class="skip-link print:hidden" href="#main">{% trans "Skip to content" %}</a>
 
 {% comment %}
 Email-verify banner removed 2026-05-29 (Seychelles government review).
@@ -84,12 +84,12 @@ restore by un-commenting the include below.
 {% include '_includes/_baseline_recommend_banner.html' %}
 
 {# id and class are read by static/js/network-helpers.js — keep both. #}
-<div class="offline-banner" id="offline-banner" role="status" hidden>
+<div class="offline-banner print:hidden" id="offline-banner" role="status" hidden>
     {% icon "wifi-off" %}
     <span>{% trans "You're offline — messages will send when you reconnect." %}</span>
 </div>
 
-<header class="app-header">
+<header class="app-header print:hidden">
     <div class="app-header__inner">
         {% comment %}
         The wordmark goes to the front door, not straight to the catalog.

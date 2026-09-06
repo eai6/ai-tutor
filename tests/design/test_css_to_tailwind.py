@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
+from scripts import css_to_tailwind  # noqa: E402
 from scripts.css_to_tailwind import Unconvertible, decls_to_utilities  # noqa: E402
 
 
@@ -36,6 +37,15 @@ class TestSpacing:
 
     def test_zero_is_zero_not_an_arbitrary_value(self):
         assert decls_to_utilities("padding: 0") == "p-0"
+
+    def test_auto_is_a_keyword_not_a_length(self):
+        """mx-[auto] is not a utility Tailwind generates.
+
+        Emitting it lost the centring on every page container at once, and the
+        symptom — content flush against the left edge — looked like a missing
+        max-width rather than a missing margin.
+        """
+        assert decls_to_utilities("margin: 0 auto") == "my-0 mx-auto"
 
 
 class TestColour:
@@ -70,6 +80,38 @@ class TestTypography:
 
     def test_raw_font_weight(self):
         assert decls_to_utilities("font-weight: 700") == "font-bold"
+
+
+class TestUrls:
+    def test_a_relative_url_is_rebased_onto_the_built_stylesheet(self):
+        """url() resolves against the stylesheet, and the stylesheet moved.
+
+        css/marketing/landing.css reached the hero photograph as ../../img/…;
+        served from css/app.build.css that same path is one directory too far
+        up and 404s silently, leaving a section with no background at all.
+        """
+        css_to_tailwind.URL_BASE = "css/marketing"
+        got = decls_to_utilities("background-image: url('../../img/marketing/x.webp')")
+        assert got == "[background-image:url('../img/marketing/x.webp')]"
+
+    def test_absolute_and_data_urls_are_left_alone(self):
+        css_to_tailwind.URL_BASE = "css/shared"
+        assert "data:image/svg+xml" in decls_to_utilities(
+            'background-image: url("data:image/svg+xml,%3Csvg%3E")')
+        assert "/static/x.png" in decls_to_utilities("background-image: url(/static/x.png)")
+
+
+class TestUnderscores:
+    def test_a_literal_underscore_is_escaped(self):
+        """Tailwind reads _ as a space inside an arbitrary value.
+
+        Unescaped, [&_.lp-hero__lede] compiles to `.lp-hero lede` — a
+        descendant selector for an element type that does not exist. The rule
+        matches nothing, silently, and this codebase names everything in BEM.
+        """
+        css_to_tailwind.URL_BASE = "css"
+        got = decls_to_utilities("background-image: url('x_y.png')")
+        assert got == r"[background-image:url('x\_y.png')]"
 
 
 class TestSkinnableTokens:

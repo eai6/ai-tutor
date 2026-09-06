@@ -18,8 +18,6 @@
     <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
     <link rel="stylesheet" href="{% static 'css/student/components.css' %}">
-    <link rel="stylesheet" href="{% static 'css/marketing/landing.css' %}">
-    <link rel="stylesheet" href="{% static 'css/marketing/docs.css' %}">
 
     {% if theme_primary %}
     <style nonce="{{ request.csp_nonce }}">
@@ -31,9 +29,9 @@
     </style>
     {% endif %}
 </head>
-<body class="lp docs">
+<body class="docs bg-canvas text-text">
 {% include "_includes/icon_sprite.html" %}
-<a class="skip-link" href="#docs-content">{% trans "Skip to the documentation" %}</a>
+<a class="skip-link print:hidden" href="#docs-content">{% trans "Skip to the documentation" %}</a>
 
 {% include "_includes/_marketing_header.html" with nav_current="docs" %}
 

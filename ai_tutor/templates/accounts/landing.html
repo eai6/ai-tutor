@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
     <link rel="stylesheet" href="{% static 'css/student/brand.css' %}">
     <link rel="stylesheet" href="{% static 'css/student/components.css' %}">
-    <link rel="stylesheet" href="{% static 'css/marketing/landing.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.build.css' %}">
 
     {% if theme_primary %}
     <style nonce="{{ request.csp_nonce }}">
@@ -29,9 +29,9 @@
     </style>
     {% endif %}
 </head>
-<body class="lp">
+<body class="bg-canvas text-text">
 {% include "_includes/icon_sprite.html" %}
-<a class="skip-link" href="#start">{% trans "Skip to sign in" %}</a>
+<a class="skip-link print:hidden" href="#start">{% trans "Skip to sign in" %}</a>
 
 {% include "_includes/_marketing_header.html" with nav_current="home" %}
 
@@ -42,23 +42,23 @@
     bleed to both edges. Picture and scrim live on the band; the hero grid is
     untouched and simply sits on top of it.
     {% endcomment %}
-    <div class="lp-band lp-band--hero">
-        <section class="lp-wrap lp-hero">
+    <div class="lp-band max-[61.99rem]:before:bg-[color-mix(in_srgb,_var(--color-warm-900)_70%,_transparent)] contrast-more:before:bg-[color-mix(in_srgb,_var(--color-warm-900)_96%,_transparent)] relative bg-warm-900 [background-repeat:no-repeat] [background-position:28%_22%] [background-size:cover] text-[#fff] before:content-[''] before:absolute before:inset-0 before:[background:linear-gradient(_100deg,_color-mix(in_srgb,_var(--color-warm-900)_66%,_transparent)_0%,_color-mix(in_srgb,_var(--color-warm-900)_60%,_transparent)_45%,_color-mix(in_srgb,_var(--color-warm-900)_32%,_transparent)_100%)] [&>*]:relative [&>*]:z-1 [&_.lp-hero]:py-20 [&_.lp-hero_h1]:text-[#fff] [&_.lp-section\_\_head_h2]:text-[#fff] [&_.lp-hero\_\_lede]:text-[rgba(255,_255,_255,_0.84)] [&_.lp-section\_\_head_p]:text-[rgba(255,_255,_255,_0.84)] [&_.lp-hero\_\_note]:text-[rgba(255,_255,_255,_0.78)] [&_.lp-eyebrow]:bg-[rgba(255,_255,_255,_0.1)] [&_.lp-eyebrow]:border-[rgba(255,_255,_255,_0.28)] [&_.lp-eyebrow]:text-[#fff] [&_.btn--secondary]:bg-transparent [&_.btn--secondary]:border-[rgba(255,_255,_255,_0.5)] [&_.btn--secondary]:text-[#fff] [&_.btn--secondary:hover]:bg-[rgba(255,_255,_255,_0.14)] [&_.btn--secondary:hover]:text-[#fff] [&_.arc]:shadow-[0_24px_48px_color-mix(in_srgb,_var(--color-warm-900)_45%,_transparent),_0_4px_12px_color-mix(in_srgb,_var(--color-warm-900)_30%,_transparent)] [&_.lp-deploy\_\_card]:shadow-[0_24px_48px_color-mix(in_srgb,_var(--color-warm-900)_45%,_transparent),_0_4px_12px_color-mix(in_srgb,_var(--color-warm-900)_30%,_transparent)] [&_.lp-deploy\_\_card--dark]:bg-[color-mix(in_srgb,_var(--color-warm-900)_58%,_transparent)] [&_.lp-deploy\_\_card--dark]:border-[rgba(255,_255,_255,_0.2)] [&_.lp-deploy\_\_card--dark]:[backdrop-filter:blur(10px)_saturate(1.3)] [&_.lp-deploy\_\_card--dark]:[-webkit-backdrop-filter:blur(10px)_saturate(1.3)] [&_.lp-deploy\_\_card--dark]:bg-[color-mix(in_srgb,_var(--color-warm-900)_88%,_transparent)] md:[background-image:url('../img/marketing/hero-classroom.webp')] [background-image:url('../img/marketing/hero-classroom-sm.webp')]">
+        <section class="lp-hero max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6 xl:grid-cols-[minmax(0,_1.05fr)_minmax(0,_1fr)] max-[640px]:py-8 max-[640px]:gap-8 grid grid-cols-[minmax(0,_1fr)] gap-10 py-12 items-center [&_h1]:mt-5 [&_h1]:font-display [&_h1]:text-[clamp(2.1rem,_5vw,_3.4rem)] [&_h1]:font-bold [&_h1]:leading-[1.04] [&_h1]:tracking-[-0.03em]">
             <div>
-                <p class="lp-eyebrow">{% icon "courses" size="sm" %}{% trans "Secondary school" %}</p>
+                <p class="lp-eyebrow inline-flex items-center gap-2 py-1 px-3 border border-coral-edge rounded-full bg-coral-tint text-coral-ink font-mono text-2xs tracking-wide uppercase">{% icon "courses" size="sm" %}{% trans "Secondary school" %}</p>
 
                 <h1>{% trans "AI Powered Tutor" %}</h1>
 
-                <p class="lp-hero__lede">
+                <p class="lp-hero__lede mt-5 text-lg leading-[1.5] text-text-secondary max-w-[40ch]">
                     {% blocktrans %}Students learn by talking through a lesson, not by watching one. The tutor asks, listens, and only moves on when the answer shows understanding — then tells the teacher what it saw.{% endblocktrans %}
                 </p>
 
-                <div class="lp-hero__cta" id="start">
+                <div class="flex gap-3 flex-wrap mt-8" id="start">
                     <a href="{% url 'accounts:student_login' %}" class="btn btn--primary">{% trans "Student" %}</a>
                     <a href="{% url 'accounts:staff_login' %}" class="btn btn--secondary">{% trans "Teacher/Admin" %}</a>
                 </div>
 
-                <p class="lp-hero__note">
+                <p class="lp-hero__note mt-4 text-sm text-text-muted">
                     {% trans "New here? You can create an account on either sign-in page." %}
                 </p>
             </div>
@@ -68,42 +68,42 @@
             engine actually runs, and it is the clearest one-glance answer to
             "what is this?" that the product has.
             {% endcomment %}
-            <div class="arc">
-                <p class="arc__label">{% trans "How one lesson goes" %}</p>
-                <ol class="arc__list">
-                    <li class="arc__step">
-                        <span class="arc__dot" aria-hidden="true">1</span>
+            <div class="arc relative p-6 bg-surface text-text border border-border rounded-xl shadow-[var(--shadow-md)]">
+                <p class="font-mono text-2xs tracking-wide uppercase text-text-muted mb-4">{% trans "How one lesson goes" %}</p>
+                <ol class="arc__list list-none relative before:content-[''] before:absolute before:left-[15px] before:top-[18px] before:bottom-[18px] before:w-[2px] before:[background:linear-gradient(var(--color-coral-edge),_var(--color-teal-edge))]">
+                    <li class="arc__step relative grid grid-cols-[32px_minmax(0,_1fr)] gap-4 py-3 [&:last-child_.arc__dot]:border-teal-edge [&:last-child_.arc__dot]:text-teal-ink">
+                        <span class="arc__dot relative z-1 w-8 h-8 grid place-items-center rounded-full bg-surface border-[2px] border-coral-edge text-coral-ink font-display text-xs font-bold" aria-hidden="true">1</span>
                         <span>
-                            <span class="arc__name">{% trans "Engage" %}</span>
-                            <span class="arc__what">{% trans "Opens with a question about something the student already knows." %}</span>
+                            <span class="block font-display text-base font-bold tracking-tight">{% trans "Engage" %}</span>
+                            <span class="block text-sm text-text-muted leading-snug mt-[1px]">{% trans "Opens with a question about something the student already knows." %}</span>
                         </span>
                     </li>
-                    <li class="arc__step">
-                        <span class="arc__dot" aria-hidden="true">2</span>
+                    <li class="arc__step relative grid grid-cols-[32px_minmax(0,_1fr)] gap-4 py-3 [&:last-child_.arc__dot]:border-teal-edge [&:last-child_.arc__dot]:text-teal-ink">
+                        <span class="arc__dot relative z-1 w-8 h-8 grid place-items-center rounded-full bg-surface border-[2px] border-coral-edge text-coral-ink font-display text-xs font-bold" aria-hidden="true">2</span>
                         <span>
-                            <span class="arc__name">{% trans "Explore" %}</span>
-                            <span class="arc__what">{% trans "The student works the idea out loud; the tutor asks rather than tells." %}</span>
+                            <span class="block font-display text-base font-bold tracking-tight">{% trans "Explore" %}</span>
+                            <span class="block text-sm text-text-muted leading-snug mt-[1px]">{% trans "The student works the idea out loud; the tutor asks rather than tells." %}</span>
                         </span>
                     </li>
-                    <li class="arc__step">
-                        <span class="arc__dot" aria-hidden="true">3</span>
+                    <li class="arc__step relative grid grid-cols-[32px_minmax(0,_1fr)] gap-4 py-3 [&:last-child_.arc__dot]:border-teal-edge [&:last-child_.arc__dot]:text-teal-ink">
+                        <span class="arc__dot relative z-1 w-8 h-8 grid place-items-center rounded-full bg-surface border-[2px] border-coral-edge text-coral-ink font-display text-xs font-bold" aria-hidden="true">3</span>
                         <span>
-                            <span class="arc__name">{% trans "Explain" %}</span>
-                            <span class="arc__what">{% trans "The idea gets named and tied to the curriculum's own wording." %}</span>
+                            <span class="block font-display text-base font-bold tracking-tight">{% trans "Explain" %}</span>
+                            <span class="block text-sm text-text-muted leading-snug mt-[1px]">{% trans "The idea gets named and tied to the curriculum's own wording." %}</span>
                         </span>
                     </li>
-                    <li class="arc__step">
-                        <span class="arc__dot" aria-hidden="true">4</span>
+                    <li class="arc__step relative grid grid-cols-[32px_minmax(0,_1fr)] gap-4 py-3 [&:last-child_.arc__dot]:border-teal-edge [&:last-child_.arc__dot]:text-teal-ink">
+                        <span class="arc__dot relative z-1 w-8 h-8 grid place-items-center rounded-full bg-surface border-[2px] border-coral-edge text-coral-ink font-display text-xs font-bold" aria-hidden="true">4</span>
                         <span>
-                            <span class="arc__name">{% trans "Elaborate" %}</span>
-                            <span class="arc__what">{% trans "A harder case, to see whether it holds outside the first example." %}</span>
+                            <span class="block font-display text-base font-bold tracking-tight">{% trans "Elaborate" %}</span>
+                            <span class="block text-sm text-text-muted leading-snug mt-[1px]">{% trans "A harder case, to see whether it holds outside the first example." %}</span>
                         </span>
                     </li>
-                    <li class="arc__step">
-                        <span class="arc__dot" aria-hidden="true">5</span>
+                    <li class="arc__step relative grid grid-cols-[32px_minmax(0,_1fr)] gap-4 py-3 [&:last-child_.arc__dot]:border-teal-edge [&:last-child_.arc__dot]:text-teal-ink">
+                        <span class="arc__dot relative z-1 w-8 h-8 grid place-items-center rounded-full bg-surface border-[2px] border-coral-edge text-coral-ink font-display text-xs font-bold" aria-hidden="true">5</span>
                         <span>
-                            <span class="arc__name">{% trans "Exit ticket" %}</span>
-                            <span class="arc__what">{% trans "A short check. The score is what the teacher sees the next morning." %}</span>
+                            <span class="block font-display text-base font-bold tracking-tight">{% trans "Exit ticket" %}</span>
+                            <span class="block text-sm text-text-muted leading-snug mt-[1px]">{% trans "A short check. The score is what the teacher sees the next morning." %}</span>
                         </span>
                     </li>
                 </ol>
@@ -112,46 +112,46 @@
     </div>
 
     {# ────────────────────────────────── what it does ────────────────────── #}
-    <section class="lp-section lp-section--tint">
-        <div class="lp-wrap">
-            <div class="lp-section__head">
+    <section class="lp-section lp-section--tint max-[640px]:py-10 py-12 bg-surface [border-block:1px_solid_var(--color-border)] [&_.lp-feature]:bg-canvas">
+        <div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6">
+            <div class="lp-section__head max-w-[46rem] mb-8 [&_h2]:font-display [&_h2]:text-[clamp(1.6rem,_3.2vw,_2.2rem)] [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:leading-[1.12] [&_p]:mt-3 [&_p]:text-md [&_p]:text-text-secondary [&_p]:leading-normal">
                 <h2>{% trans "It teaches the syllabus the school already uses" %}</h2>
                 <p>{% blocktrans %}A teacher uploads the curriculum — schemes of work, past papers, worksheets. The platform turns it into lessons and keeps every answer grounded in that material, so a student is not being taught a different course from the one they sit an exam in.{% endblocktrans %}</p>
             </div>
 
-            <div class="lp-grid">
-                <article class="lp-feature">
-                    <span class="lp-feature__icon">{% icon "chat" %}</span>
+            <div class="grid grid-cols-[repeat(auto-fit,_minmax(min(100%,_17rem),_1fr))] gap-5">
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.3rem] mb-4">{% icon "chat" %}</span>
                     <h3>{% trans "Talks, doesn't lecture" %}</h3>
                     <p>{% trans "Every step is a question. A student who answers correctly moves on; a student who doesn't gets a smaller step, not the answer." %}</p>
                 </article>
 
-                <article class="lp-feature">
-                    <span class="lp-feature__icon lp-feature__icon--teal">{% icon "target" %}</span>
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-teal-tint text-teal-ink text-[1.3rem] mb-4">{% icon "target" %}</span>
                     <h3>{% trans "Measures what stuck" %}</h3>
                     <p>{% trans "Each lesson ends with an exit ticket. Scores are per objective, so a teacher sees which idea a class missed, not just who scored low." %}</p>
                 </article>
 
-                <article class="lp-feature">
-                    <span class="lp-feature__icon lp-feature__icon--sunny">{% icon "shield" %}</span>
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-sunny text-sunny-ink text-[1.3rem] mb-4">{% icon "shield" %}</span>
                     <h3>{% trans "Watched, not unattended" %}</h3>
                     <p>{% trans "Conversations are checked for harmful, inappropriate and manipulative content. Anything flagged goes to a named teacher to review." %}</p>
                 </article>
 
-                <article class="lp-feature">
-                    <span class="lp-feature__icon">{% icon "students" %}</span>
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.3rem] mb-4">{% icon "students" %}</span>
                     <h3>{% trans "One device, two students" %}</h3>
                     <p>{% trans "Where devices are shared, a teacher can pair students into groups and the tutor runs the lesson for the pair." %}</p>
                 </article>
 
-                <article class="lp-feature">
-                    <span class="lp-feature__icon lp-feature__icon--teal">{% icon "evaluation" %}</span>
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-teal-tint text-teal-ink text-[1.3rem] mb-4">{% icon "evaluation" %}</span>
                     <h3>{% trans "Reports for the teacher" %}</h3>
                     <p>{% trans "A dashboard shows who has been active, how the class scored, and which students went backwards on a retry." %}</p>
                 </article>
 
-                <article class="lp-feature">
-                    <span class="lp-feature__icon lp-feature__icon--sunny">{% icon "globe" %}</span>
+                <article class="lp-feature p-5 bg-canvas border border-border rounded-lg [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_p]:text-sm [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="w-[42px] h-[42px] grid place-items-center rounded-md bg-sunny text-sunny-ink text-[1.3rem] mb-4">{% icon "globe" %}</span>
                     <h3>{% trans "In the classroom's language" %}</h3>
                     <p>{% trans "The interface and the lessons follow the language the course is taught in, set per school." %}</p>
                 </article>
@@ -165,54 +165,54 @@
     used to be a footer link, which put a ministry's whole evaluation path
     below the fold and in six-point type.
     {% endcomment %}
-    <section class="lp-section lp-band lp-band--deploy">
-        <div class="lp-wrap">
-            <div class="lp-section__head">
+    <section class="lp-section lp-band lp-band--deploy max-[640px]:py-10 py-12 max-[61.99rem]:before:bg-[color-mix(in_srgb,_var(--color-warm-900)_70%,_transparent)] contrast-more:before:bg-[color-mix(in_srgb,_var(--color-warm-900)_96%,_transparent)] relative bg-warm-900 [background-repeat:no-repeat] [background-position:center_top] [background-size:cover] text-[#fff] before:content-[''] before:absolute before:inset-0 before:[background:linear-gradient(_100deg,_color-mix(in_srgb,_var(--color-warm-900)_66%,_transparent)_0%,_color-mix(in_srgb,_var(--color-warm-900)_60%,_transparent)_45%,_color-mix(in_srgb,_var(--color-warm-900)_32%,_transparent)_100%)] [&>*]:relative [&>*]:z-1 [&_.lp-hero]:py-20 max-xl:py-12 [&_.lp-hero_h1]:text-[#fff] [&_.lp-section\_\_head_h2]:text-[#fff] [&_.lp-hero\_\_lede]:text-[rgba(255,_255,_255,_0.84)] [&_.lp-section\_\_head_p]:text-[rgba(255,_255,_255,_0.84)] [&_.lp-hero\_\_note]:text-[rgba(255,_255,_255,_0.78)] [&_.lp-eyebrow]:bg-[rgba(255,_255,_255,_0.1)] [&_.lp-eyebrow]:border-[rgba(255,_255,_255,_0.28)] [&_.lp-eyebrow]:text-[#fff] [&_.btn--secondary]:bg-transparent [&_.btn--secondary]:border-[rgba(255,_255,_255,_0.5)] [&_.btn--secondary]:text-[#fff] [&_.btn--secondary:hover]:bg-[rgba(255,_255,_255,_0.14)] [&_.btn--secondary:hover]:text-[#fff] [&_.arc]:shadow-[0_24px_48px_color-mix(in_srgb,_var(--color-warm-900)_45%,_transparent),_0_4px_12px_color-mix(in_srgb,_var(--color-warm-900)_30%,_transparent)] [&_.lp-deploy\_\_card]:shadow-[0_24px_48px_color-mix(in_srgb,_var(--color-warm-900)_45%,_transparent),_0_4px_12px_color-mix(in_srgb,_var(--color-warm-900)_30%,_transparent)] [&_.lp-deploy\_\_card--dark]:bg-[color-mix(in_srgb,_var(--color-warm-900)_58%,_transparent)] [&_.lp-deploy\_\_card--dark]:border-[rgba(255,_255,_255,_0.2)] [&_.lp-deploy\_\_card--dark]:[backdrop-filter:blur(10px)_saturate(1.3)] [&_.lp-deploy\_\_card--dark]:[-webkit-backdrop-filter:blur(10px)_saturate(1.3)] [&_.lp-deploy\_\_card--dark]:bg-[color-mix(in_srgb,_var(--color-warm-900)_88%,_transparent)] md:[background-image:url('../img/marketing/offline-classroom.webp')] max-[61.99rem]:before:bg-[color-mix(in_srgb,_var(--color-warm-900)_66%,_transparent)] [background-image:url('../img/marketing/offline-classroom-sm.webp')] before:[background:linear-gradient(_100deg,_color-mix(in_srgb,_var(--color-warm-900)_62%,_transparent)_0%,_color-mix(in_srgb,_var(--color-warm-900)_46%,_transparent)_45%,_color-mix(in_srgb,_var(--color-warm-900)_18%,_transparent)_100%)]">
+        <div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6">
+            <div class="lp-section__head max-w-[46rem] mb-8 [&_h2]:font-display [&_h2]:text-[clamp(1.6rem,_3.2vw,_2.2rem)] [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:leading-[1.12] [&_p]:mt-3 [&_p]:text-md [&_p]:text-text-secondary [&_p]:leading-normal">
                 <h2>{% trans "Run it on your own hardware" %}</h2>
                 <p>{% trans "Neither option needs a connection to us. Pick the one that matches who is running it — a teacher in one classroom, or a ministry across a district." %}</p>
             </div>
 
-            <div class="lp-deploy">
-                <article class="lp-deploy__card lp-deploy__card--dark">
-                    <span class="lp-deploy__icon" aria-hidden="true">{% icon "wifi-off" %}</span>
+            <div class="grid grid-cols-[repeat(auto-fit,_minmax(min(100%,_22rem),_1fr))] gap-5 items-stretch">
+                <article class="lp-deploy__card lp-deploy__card--dark flex flex-col gap-3 p-6 bg-text text-[#fff] border border-text rounded-xl shadow-[var(--shadow-sm)] [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_p]:text-base [&_p]:text-text-muted [&_p]:leading-normal [&_.btn]:mt-auto [&_.btn]:self-start [&_.lp-deploy\_\_icon]:bg-[rgba(255,_255,_255,_0.12)] [&_.lp-deploy\_\_icon]:text-[#fff] [&_h3]:text-[#fff] [&_p]:text-[rgba(255,_255,_255,_0.78)]">
+                    <span class="lp-deploy__icon w-[46px] h-[46px] flex-none grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.4rem]" aria-hidden="true">{% icon "wifi-off" %}</span>
                     <h3>{% trans "No internet? It still teaches." %}</h3>
                     <p>{% blocktrans %}The desktop build runs the whole platform — tutor, curriculum and marking — on one machine in the classroom, serving students over its own WiFi. Nothing leaves the room, and nothing needs a connection.{% endblocktrans %}</p>
-                    <a href="{% url 'downloads:page' %}" class="btn btn--on-dark">{% trans "Get the offline app" %}</a>
+                    <a href="{% url 'downloads:page' %}" class="btn btn--on-dark bg-[#fff] border-[#fff] text-text hover:bg-surface-sunken hover:border-surface-sunken hover:text-text hover:[transform:translateY(-1px)]">{% trans "Get the offline app" %}</a>
                 </article>
 
-                <article class="lp-deploy__card">
-                    <span class="lp-deploy__icon lp-deploy__icon--teal" aria-hidden="true">{% icon "settings" %}</span>
+                <article class="lp-deploy__card flex flex-col gap-3 p-6 bg-surface text-text border border-border rounded-xl shadow-[var(--shadow-sm)] [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_p]:text-base [&_p]:text-text-muted [&_p]:leading-normal [&_.btn]:mt-auto [&_.btn]:self-start">
+                    <span class="lp-deploy__icon w-[46px] h-[46px] flex-none grid place-items-center rounded-md bg-teal-tint text-teal-ink text-[1.4rem]" aria-hidden="true">{% icon "settings" %}</span>
                     <h3>{% trans "Host it on your own servers" %}</h3>
                     <p>{% blocktrans %}For a school group or a ministry that needs the data to stay on infrastructure it controls. The whole platform is deployable from source, with your own models and your own storage.{% endblocktrans %}</p>
-                    <a href="{% url 'self_hosting' %}" class="btn btn--teal">{% trans "Run it yourself" %}</a>
+                    <a href="{% url 'self_hosting' %}" class="btn btn--teal bg-teal-ink border-teal-ink text-[#fff] hover:bg-teal-solid hover:border-teal-solid hover:text-[#fff] hover:[transform:translateY(-1px)]">{% trans "Run it yourself" %}</a>
                 </article>
             </div>
         </div>
     </section>
 
     {# ────────────────────────────────── sign-in fork ────────────────────── #}
-    <section class="lp-section lp-section--tint">
-        <div class="lp-wrap">
-            <div class="lp-section__head">
+    <section class="lp-section lp-section--tint max-[640px]:py-10 py-12 bg-surface [border-block:1px_solid_var(--color-border)] [&_.lp-feature]:bg-canvas">
+        <div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6">
+            <div class="lp-section__head max-w-[46rem] mb-8 [&_h2]:font-display [&_h2]:text-[clamp(1.6rem,_3.2vw,_2.2rem)] [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:leading-[1.12] [&_p]:mt-3 [&_p]:text-md [&_p]:text-text-secondary [&_p]:leading-normal">
                 <h2>{% trans "Get started" %}</h2>
             </div>
 
-            <div class="lp-roles">
-                <article class="lp-role">
-                    <span class="lp-role__icon" aria-hidden="true">{% icon "user" %}</span>
+            <div class="grid grid-cols-[repeat(auto-fit,_minmax(min(100%,_20rem),_1fr))] gap-5">
+                <article class="lp-role flex flex-col gap-3 p-6 bg-surface border border-border rounded-xl shadow-[var(--shadow-sm)] [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_p]:text-base [&_p]:text-text-muted [&_p]:leading-normal">
+                    <span class="lp-role__icon w-[46px] h-[46px] grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.4rem]" aria-hidden="true">{% icon "user" %}</span>
                     <h3>{% trans "Students" %}</h3>
                     <p>{% trans "Pick a subject and carry on where you left off. Your teacher gives you your school and grade." %}</p>
-                    <div class="lp-role__actions">
+                    <div class="flex gap-3 flex-wrap mt-auto pt-3">
                         <a href="{% url 'accounts:student_login' %}" class="btn btn--primary">{% trans "Sign in" %}</a>
                         <a href="{% url 'accounts:student_register' %}" class="btn btn--secondary">{% trans "Create account" %}</a>
                     </div>
                 </article>
 
-                <article class="lp-role lp-role--teacher">
-                    <span class="lp-role__icon" aria-hidden="true">{% icon "classes" %}</span>
+                <article class="lp-role lp-role--teacher flex flex-col gap-3 p-6 bg-surface border border-border rounded-xl shadow-[var(--shadow-sm)] [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_p]:text-base [&_p]:text-text-muted [&_p]:leading-normal [&_.lp-role\_\_icon]:bg-teal-tint [&_.lp-role\_\_icon]:text-teal-ink">
+                    <span class="lp-role__icon w-[46px] h-[46px] grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.4rem]" aria-hidden="true">{% icon "classes" %}</span>
                     <h3>{% trans "Teachers & Admins" %}</h3>
                     <p>{% trans "Upload your curriculum, watch how the class is doing, and review anything the safety check flagged." %}</p>
-                    <div class="lp-role__actions">
+                    <div class="flex gap-3 flex-wrap mt-auto pt-3">
                         <a href="{% url 'accounts:staff_login' %}" class="btn btn--primary">{% trans "Sign in" %}</a>
                         <a href="{% url 'accounts:staff_self_register' %}" class="btn btn--secondary">{% trans "Create account" %}</a>
                     </div>

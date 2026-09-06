@@ -18,26 +18,26 @@ stacked blocks, and the cards are sized to their lists.
 {% endcomment %}
 
 {% block content %}
-<div class="lp-wrap docs-page docs-page--index">
+<div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6 print:p-0 py-4">
 
-    <div class="docs-masthead">
-        <div class="docs-masthead__titles">
+    <div class="docs-masthead flex items-start justify-between gap-8 flex-wrap [&_h1]:font-display [&_h1]:text-[clamp(1.75rem,_1.3rem_+_1.5vw,_2.5rem)] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:leading-tight [&_h1]:m-0 [&_h1]:text-text">
+        <div class="flex-[1_1_26rem] min-w-0">
             <h1>{% trans "Country Adoption" %}</h1>
-            <p class="docs-masthead__lede">
+            <p class="mt-2 mx-0 mb-0 max-w-[46rem] text-base leading-normal text-text-secondary">
                 {% blocktrans %}Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, what it costs, and how to get a first cohort teaching.{% endblocktrans %}
             </p>
         </div>
 
         {# Filters what is already on the page. No results screen, no round #}
         {# trip: 23 sections is small enough that the answer is always here. #}
-        <form class="docs-search" role="search" id="docs-search"
+        <form class="max-[48rem]:flex-[1_1_100%] print:hidden flex-[0_1_22rem]" role="search" id="docs-search"
               data-index="{% url 'docs:search_index' %}">
-            <label class="docs-search__label" for="docs-search-input">{% trans "Search the playbook" %}</label>
-            <div class="docs-search__field">
+            <label class="block font-mono text-2xs tracking-wide uppercase text-text-muted mb-2" for="docs-search-input">{% trans "Search the playbook" %}</label>
+            <div class="docs-search__field flex items-stretch bg-surface border border-border-field rounded-sm overflow-hidden focus-within:border-primary focus-within:shadow-[var(--shadow-halo)] [&_input]:flex-1 [&_input]:min-w-0 [&_input]:border-0 [&_input]:bg-transparent [&_input]:py-2 [&_input]:px-4 [&_input]:font-body [&_input]:text-base [&_input]:text-text [&_input:focus]:outline-none">
                 <input type="search" id="docs-search-input" name="q" autocomplete="off"
                        placeholder="{% trans 'Search the playbook' %}"
                        aria-describedby="docs-search-status">
-                <button type="submit" class="docs-search__go" aria-label="{% trans 'Search' %}">
+                <button type="submit" class="docs-search__go grid place-items-center w-11 border-0 border-l border-l-border bg-surface-sunken text-text-secondary cursor-pointer transition duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--color-primary)]" aria-label="{% trans 'Search' %}">
                     {% icon "search" size="sm" %}
                 </button>
             </div>
@@ -46,46 +46,46 @@ stacked blocks, and the cards are sized to their lists.
 
     {# Where you are on the left, what you can do about it on the right. Two #}
     {# lines of chrome on one line: the row they gave up is a row of cards.  #}
-    <div class="docs-utility">
-        <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
+    <div class="docs-utility max-[48rem]:justify-start flex flex-wrap items-baseline justify-between gap-2 mt-4 pb-2 border-b border-b-border [&_.docs-crumbs]:mt-0 [&_.docs-crumbs]:pb-0 [&_.docs-crumbs]:border-b-0 [&_.docs-crumbs\_\_date]:ml-3">
+        <nav class="docs-crumbs flex items-baseline flex-wrap gap-2 mt-4 pb-4 border-b border-b-border text-base [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline" aria-label="{% trans 'Breadcrumb' %}">
             <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
-            <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
-            <span class="docs-crumbs__here">{% trans "Country adoption playbook" %}</span>
-            <span class="docs-crumbs__date">{{ version_date|date:"j F Y" }}</span>
+            <span class="text-text-faint" aria-hidden="true">&#9656;</span>
+            <span class="text-text font-medium">{% trans "Country adoption playbook" %}</span>
+            <span class="docs-crumbs__date max-[48rem]:ml-0 max-[48rem]:basis-full ml-auto font-mono text-xs text-text-muted">{{ version_date|date:"j F Y" }}</span>
         </nav>
 
-        <div class="docs-meta">
-            <span class="docs-meta__chip">{% icon "courses" size="sm" %}{% blocktrans %}Playbook v{{ version }}{% endblocktrans %}</span>
-            <span class="docs-meta__current" aria-current="page">{% icon "list" size="sm" %}{% trans "Overview" %}</span>
+        <div class="docs-meta max-[48rem]:justify-start max-[48rem]:gap-4 print:hidden flex flex-wrap justify-end items-center gap-4 text-base [&_a]:inline-flex [&_a]:items-center [&_a]:gap-2 [&_a]:no-underline [&_a]:text-text-link [&_a:hover]:underline [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs">
+            <span class="inline-flex items-center gap-2 no-underline text-primary-ink font-mono text-xs tracking-wide bg-accent-surface border border-accent-border rounded-full py-[1px] px-2">{% icon "courses" size="sm" %}{% blocktrans %}Playbook v{{ version }}{% endblocktrans %}</span>
+            <span class="inline-flex items-center gap-2 no-underline text-text font-medium" aria-current="page">{% icon "list" size="sm" %}{% trans "Overview" %}</span>
             <a href="{% url 'self_hosting' %}">{% icon "download" size="sm" %}{% trans "Run it yourself" %}</a>
             <a href="{% url 'dashboard:help_index' %}">{% icon "help" size="sm" %}{% trans "Help & FAQ" %}</a>
-            <button type="button" class="docs-meta__btn" id="docs-print">{% trans "Print" %}</button>
+            <button type="button" class="docs-meta__btn inline-flex items-center gap-2 no-underline text-text-link border-0 bg-none p-0 [font:inherit] cursor-pointer hover:underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:rounded-xs" id="docs-print">{% trans "Print" %}</button>
         </div>
     </div>
 
-    <p class="docs-search__status" id="docs-search-status" role="status" hidden></p>
+    <p class="mt-4 mx-0 mb-0 text-base text-text-secondary" id="docs-search-status" role="status" hidden></p>
 
     {# ─────────────────────────────────────── the two parts ──────────────── #}
-    <section class="docs-part" data-part="one">
-        <div class="docs-part__head">
-            <p class="docs-part__label">{% trans "Part I" %}</p>
-            <h2 class="docs-part__title">{{ part_one_label }}</h2>
-            <p class="docs-part__blurb">{{ part_one_blurb }}</p>
+    <section class="docs-part mt-5 [&[hidden]]:hidden" data-part="one">
+        <div class="max-[48rem]:grid-cols-[minmax(0,_1fr)] grid grid-cols-[auto_auto_minmax(0,_1fr)] items-baseline gap-x-3 gap-y-1 pb-2 border-b-[2px] border-b-text">
+            <p class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-row:1] m-0 font-mono text-xs tracking-wide uppercase text-primary-ink">{% trans "Part I" %}</p>
+            <h2 class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-row:1] m-0 font-display text-md font-bold tracking-tight text-text">{{ part_one_label }}</h2>
+            <p class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-column:3] [grid-row:1] m-0 text-base text-text-muted">{{ part_one_blurb }}</p>
         </div>
-        <div class="docs-grid">
+        <div class="grid grid-cols-[repeat(auto-fit,_minmax(17rem,_1fr))] gap-4 mt-3">
             {% for card in cards %}{% if card.part == part_one %}
                 {% include "docs/_card.html" %}
             {% endif %}{% endfor %}
         </div>
     </section>
 
-    <section class="docs-part" data-part="two">
-        <div class="docs-part__head">
-            <p class="docs-part__label">{% trans "Part II" %}</p>
-            <h2 class="docs-part__title">{{ part_two_label }}</h2>
-            <p class="docs-part__blurb">{{ part_two_blurb }}</p>
+    <section class="docs-part mt-5 [&[hidden]]:hidden" data-part="two">
+        <div class="max-[48rem]:grid-cols-[minmax(0,_1fr)] grid grid-cols-[auto_auto_minmax(0,_1fr)] items-baseline gap-x-3 gap-y-1 pb-2 border-b-[2px] border-b-text">
+            <p class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-row:1] m-0 font-mono text-xs tracking-wide uppercase text-primary-ink">{% trans "Part II" %}</p>
+            <h2 class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-row:1] m-0 font-display text-md font-bold tracking-tight text-text">{{ part_two_label }}</h2>
+            <p class="max-[48rem]:[grid-row:auto] max-[48rem]:[grid-column:1] [grid-column:3] [grid-row:1] m-0 text-base text-text-muted">{{ part_two_blurb }}</p>
         </div>
-        <div class="docs-grid">
+        <div class="grid grid-cols-[repeat(auto-fit,_minmax(17rem,_1fr))] gap-4 mt-3">
             {% for card in cards %}{% if card.part == part_two %}
                 {% include "docs/_card.html" %}
             {% endif %}{% endfor %}
@@ -93,10 +93,10 @@ stacked blocks, and the cards are sized to their lists.
     </section>
 
     {# ───────────────────────────────────────── utility bar ──────────────── #}
-    <div class="docs-tools">
-        <details class="docs-tools__item">
+    <div class="docs-tools motion-reduce:[&_summary::after]:transition-none mt-12 border border-border rounded-md bg-surface-sunken overflow-hidden [&_summary]:flex [&_summary]:items-center [&_summary]:gap-2 [&_summary]:py-4 [&_summary]:px-6 [&_summary]:cursor-pointer [&_summary]:font-display [&_summary]:text-base [&_summary]:font-medium [&_summary]:text-text [&_summary]:list-none [&_summary::-webkit-details-marker]:hidden [&_summary::after]:content-[''] [&_summary::after]:ml-auto [&_summary::after]:w-2 [&_summary::after]:h-2 [&_summary::after]:border-r-[2px] [&_summary::after]:border-r-text-muted [&_summary::after]:border-b-[2px] [&_summary::after]:border-b-text-muted [&_summary::after]:[transform:rotate(45deg)_translate(-2px,_-2px)] [&_summary::after]:transition-transform [&_summary::after]:duration-[var(--dur-fast)] [&_summary::after]:ease-[var(--ease-out)] [&_summary:hover]:bg-surface-hover [&_summary:focus-visible]:outline-none [&_summary:focus-visible]:shadow-[inset_0_0_0_2px_var(--color-primary)]">
+        <details class="docs-tools__item print:[break-inside:avoid] [&_+_.docs-tools\_\_item]:border-t [&_+_.docs-tools\_\_item]:border-t-border [&[open] summary::after]:[transform:rotate(-135deg)]">
             <summary>{% icon "info" size="sm" %}{% trans "About this document" %}</summary>
-            <dl class="docs-about">
+            <dl class="docs-about m-0 pt-0 px-6 pb-6 grid grid-cols-[minmax(6rem,_max-content)_minmax(0,_1fr)] gap-2 text-base [&_dt]:font-mono [&_dt]:text-2xs [&_dt]:tracking-wide [&_dt]:uppercase [&_dt]:text-text-muted [&_dt]:pt-[0.15rem] [&_dd]:m-0 [&_dd]:text-text-secondary">
                 <dt>{% trans "Version" %}</dt><dd>{{ version }} — {{ version_date|date:"j F Y" }}</dd>
                 <dt>{% trans "Status" %}</dt><dd>{{ status }}</dd>
                 <dt>{% trans "Evidence base" %}</dt><dd>{{ evidence_base }}</dd>

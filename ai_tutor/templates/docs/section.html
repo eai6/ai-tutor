@@ -14,21 +14,21 @@ checklists and the glossary — get no rail and the full measure instead.
 {% block page_description %}{{ section.summary }}{% endblock %}
 
 {% block content %}
-<div class="lp-wrap docs-page">
+<div class="max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6 print:p-0 py-10">
 
-    <nav class="docs-crumbs" aria-label="{% trans 'Breadcrumb' %}">
+    <nav class="docs-crumbs flex items-baseline flex-wrap gap-2 mt-4 pb-4 border-b border-b-border text-base [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline" aria-label="{% trans 'Breadcrumb' %}">
         <a href="{% url 'docs:index' %}">{% trans "Country Adoption" %}</a>
-        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
+        <span class="text-text-faint" aria-hidden="true">&#9656;</span>
         <span>{{ section.part_label }}</span>
-        <span class="docs-crumbs__sep" aria-hidden="true">&#9656;</span>
-        <span class="docs-crumbs__here">{{ section.label }}. {{ section.title }}</span>
+        <span class="text-text-faint" aria-hidden="true">&#9656;</span>
+        <span class="text-text font-medium">{{ section.label }}. {{ section.title }}</span>
     </nav>
 
     <article class="docs-article{% if section.headings %} docs-article--railed{% endif %}">
 
         {% if section.headings %}
-        <nav class="docs-rail" aria-label="{% trans 'On this page' %}">
-            <p class="docs-rail__label">{% trans "On this page" %}</p>
+        <nav class="docs-rail xl:sticky xl:top-[calc(var(--topbar-height)_+_calc(var(--spacing)*6))] print:hidden self-start [&_ul]:list-none [&_ul]:m-0 [&_ul]:pt-0 [&_ul]:pr-0 [&_ul]:pb-0 [&_ul]:pl-4 [&_ul]:border-l-[2px] [&_ul]:border-l-border [&_ul]:grid [&_ul]:gap-2 [&_a]:text-base [&_a]:leading-snug [&_a]:text-text-secondary [&_a]:no-underline [&_a:hover]:text-primary-ink [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs" aria-label="{% trans 'On this page' %}">
+            <p class="mt-0 mx-0 mb-3 font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "On this page" %}</p>
             <ul>
                 {% for anchor, title in section.headings %}
                 <li><a href="#{{ anchor }}">{{ title }}</a></li>
@@ -37,11 +37,11 @@ checklists and the glossary — get no rail and the full measure instead.
         </nav>
         {% endif %}
 
-        <div class="docs-main">
-            <header class="docs-head">
-                <p class="docs-eyebrow">{% if part_numeral %}{{ part_numeral }} &middot; {% endif %}{{ section.part_label }}</p>
-                <h1><span class="docs-num docs-num--lg">{{ section.label }}</span>{{ section.title }}</h1>
-                <p class="docs-head__lede">{{ section.summary }}</p>
+        <div class="min-w-0">
+            <header class="docs-head pb-6 border-b border-b-border [&_h1]:flex [&_h1]:items-baseline [&_h1]:gap-3 [&_h1]:m-0 [&_h1]:font-display [&_h1]:text-[clamp(1.7rem,_1.3rem_+_1.5vw,_2.4rem)] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:leading-tight [&_h1]:text-text">
+                <p class="mt-0 mx-0 mb-3 font-mono text-2xs tracking-wide uppercase text-text-muted">{% if part_numeral %}{{ part_numeral }} &middot; {% endif %}{{ section.part_label }}</p>
+                <h1><span class="font-mono text-sm font-bold tracking-wide text-primary-ink bg-accent-surface rounded-xs py-1 px-3 text-center whitespace-nowrap flex-none">{{ section.label }}</span>{{ section.title }}</h1>
+                <p class="mt-4 mx-0 mb-0 max-w-[44rem] text-md leading-normal text-text-secondary">{{ section.summary }}</p>
             </header>
 
             {% comment %}
@@ -51,33 +51,33 @@ checklists and the glossary — get no rail and the full measure instead.
             have to work out for itself that the page went back to English.
             {% endcomment %}
             {% if not body_translated and not is_english %}
-            <p class="docs-untranslated" role="status">
+            <p class="mb-5 py-3 px-4 bg-warning-surface border border-warning-border rounded-md text-warning text-sm leading-normal" role="status">
                 {% trans "This section has not been translated yet, and is shown in English." %}
             </p>
             {% endif %}
 
-            <div class="docs-body">
+            <div class="docs-body print:[&_h2]:[break-after:avoid] print:[&_h3]:[break-after:avoid] text-md leading-normal text-text [&>p]:max-w-[44rem] [&>.doc-list]:max-w-[44rem] [&>p]:my-5 [&>p]:mx-0 [&_h2]:mt-10 [&_h2]:mx-0 [&_h2]:mb-3 [&_h2]:font-display [&_h2]:text-lg [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:leading-snug [&_h2]:text-text [&_h2]:[scroll-margin-top:calc(var(--topbar-height)_+_calc(var(--spacing)*4))] [&_h3]:mt-8 [&_h3]:mx-0 [&_h3]:mb-3 [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:text-text [&_h3]:[scroll-margin-top:calc(var(--topbar-height)_+_calc(var(--spacing)*4))] [&_.doc-list]:my-5 [&_.doc-list]:mx-0 [&_.doc-list]:pl-6 [&_.doc-list_li]:mb-3 [&_.doc-list_li::marker]:text-primary [&_strong]:font-bold">
                 {% include body_template %}
             </div>
         </div>
     </article>
 
-    <nav class="docs-pager" aria-label="{% trans 'Section navigation' %}">
+    <nav class="max-[48rem]:grid-cols-[minmax(0,_1fr)] print:hidden grid grid-cols-[1fr_1fr] gap-4 mt-12 pt-6 border-t border-t-border" aria-label="{% trans 'Section navigation' %}">
         {% if previous %}
-        <a class="docs-pager__link docs-pager__link--prev" href="{% url 'docs:section' previous.slug %}">
+        <a class="docs-pager__link docs-pager__link--prev motion-reduce:transition-none flex items-center gap-3 p-4 border border-border rounded-md bg-surface no-underline text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-border-strong hover:shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] [&_.icon]:flex-none [&_.icon]:text-primary-ink" href="{% url 'docs:section' previous.slug %}">
             {% icon "arrow-left" size="sm" %}
             <span>
-                <span class="docs-pager__dir">{% trans "Previous" %}</span>
-                <span class="docs-pager__title">{{ previous.label }}. {{ previous.title }}</span>
+                <span class="block font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Previous" %}</span>
+                <span class="block text-base font-medium leading-snug">{{ previous.label }}. {{ previous.title }}</span>
             </span>
         </a>
         {% else %}<span></span>{% endif %}
 
         {% if following %}
-        <a class="docs-pager__link docs-pager__link--next" href="{% url 'docs:section' following.slug %}">
+        <a class="docs-pager__link motion-reduce:transition-none flex items-center gap-3 p-4 border border-border rounded-md bg-surface no-underline text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-border-strong hover:shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] [&_.icon]:flex-none [&_.icon]:text-primary-ink max-[48rem]:[grid-column:1] [grid-column:2] justify-end text-right" href="{% url 'docs:section' following.slug %}">
             <span>
-                <span class="docs-pager__dir">{% trans "Next" %}</span>
-                <span class="docs-pager__title">{{ following.label }}. {{ following.title }}</span>
+                <span class="block font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Next" %}</span>
+                <span class="block text-base font-medium leading-snug">{{ following.label }}. {{ following.title }}</span>
             </span>
             {% icon "arrow-right" size="sm" %}
         </a>

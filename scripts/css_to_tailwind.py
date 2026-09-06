@@ -128,6 +128,12 @@ SPACING_STEP = 0.25  # rem, from --spacing
 # the moment phase 4 deletes tokens.css.
 SPACE_TOKENS = {f"--space-{n}": str(n) for n in (1, 2, 3, 4, 5, 6, 8, 10, 12)}
 
+# Where the stylesheet being converted lived, as a path under static/. A
+# url() inside it was written relative to THAT directory; once the declaration
+# moves into a class it is served from static/css/app.build.css instead, so
+# every relative URL has to be rebased or it silently 404s.
+URL_BASE: str = "css"
+
 # Page-local custom properties, filled in by the caller from the sheet being
 # converted. A sheet that declares --docs-measure and then reads it back would
 # otherwise convert to a var() with nothing behind it once the sheet is gone.
@@ -182,6 +188,19 @@ def _length(value):
     return None
 
 
+def _rebase_urls(value):
+    import posixpath
+
+    def sub(m):
+        quote, url = m.group(1), m.group(2)
+        if url.startswith(("data:", "http:", "https:", "/", "#")):
+            return m.group(0)
+        resolved = posixpath.normpath(posixpath.join(URL_BASE, url))
+        return f"url({quote}{posixpath.relpath(resolved, 'css')}{quote})"
+
+    return re.sub(r"""url\((['"]?)([^)'"]+)\1\)""", sub, value)
+
+
 def _rename_vars(value):
     """Rewrite an old variable name to the one the theme actually declares.
 
@@ -203,7 +222,20 @@ def _rename_vars(value):
 
 
 def _arb(value):
-    return "[" + _rename_vars(value.strip()).replace(" ", "_") + "]"
+    # ALL whitespace collapses, not just spaces. A multi-line box-shadow left
+    # its newlines in place, and the caller splits utilities on whitespace, so
+    # one shadow arrived as two broken class names.
+    #
+    # Double quotes become single ones. A class attribute is delimited by ",
+    # so [&[aria-current="page"]]: ends the attribute early and the browser
+    # reads the rest of the class list as stray attributes — the utility does
+    # not merely fail, it corrupts the element.
+    # Underscores are escaped BEFORE spaces are collapsed to underscores:
+    # Tailwind reads _ as a space, so a literal one in a filename or a BEM
+    # name has to say so.
+    out = _rebase_urls(_rename_vars(value.strip())).replace("_", "\\_")
+    out = re.sub(r"\s+", "_", out)
+    return "[" + out.replace('"', "'") + "]"
 
 
 def _colour(value, role="text"):
@@ -225,8 +257,16 @@ def _colour(value, role="text"):
     raise Unconvertible(f"not a colour: {value!r}")
 
 
+# Keywords a spacing property accepts that are not lengths. mx-[auto] is not a
+# utility Tailwind will generate, so `margin: 0 auto` silently lost its
+# centring and every page sat flush against the left edge.
+SPACING_KEYWORDS = {"auto", "inherit", "initial", "revert", "unset"}
+
+
 def _spacing(value):
-    """A length -> a scale step or an exact arbitrary value."""
+    """A length -> a scale step, a keyword, or an exact arbitrary value."""
+    if value.strip() in SPACING_KEYWORDS:
+        return value.strip()
     m = re.fullmatch(r"var\((--[\w-]+)\)", value.strip())
     if m and m.group(1) in SPACE_TOKENS:
         return SPACE_TOKENS[m.group(1)]
@@ -302,7 +342,9 @@ KEYWORDS = {
 ARBITRARY_PROPERTIES = {
     "transform", "transform-origin", "background-image", "background-position",
     "background-size", "background-repeat", "background-clip", "backdrop-filter",
-    "font-variant-numeric", "font-feature-settings", "grid-row", "grid-column",
+    "font-variant-numeric", "font-feature-settings", "-webkit-backdrop-filter",
+    "border-block", "border-inline", "border-block-width", "outline-offset", "font",
+    "stroke-width", "stroke-linecap", "stroke-linejoin", "clip", "grid-row", "grid-column",
     "grid-template-rows", "grid-auto-flow", "grid-auto-rows", "appearance",
     "break-inside", "break-after", "page-break-inside", "filter", "mix-blend-mode",
     "text-underline-offset", "text-decoration-thickness", "text-decoration-color",
@@ -395,13 +437,22 @@ def _convert(prop, value):
     if prop == "color":
         return [f"text-{_colour(value, "text")}"]
     if prop in ("background-color", "background"):
+        if value == "none":
+            return ["bg-none"] if prop == "background" else ["bg-transparent"]
         if prop == "background" and (
             "gradient" in value or "url(" in value or len(_split_values(value)) > 1
         ):
-            raise Unconvertible(f"{prop}: {value} (not a plain colour)")
+            # A gradient or a layered background travels verbatim. Tailwind's
+            # own gradient utilities cannot reproduce an arbitrary colour-mix
+            # stop list, and approximating one would move a pixel.
+            return [_arb(f"background:{value}")]
         return [f"bg-{_colour(value, "bg")}"]
     if prop == "border-color":
         return [f"border-{_colour(value, "border")}"]
+    if prop in ("border-top-color", "border-right-color",
+                "border-bottom-color", "border-left-color"):
+        side = {"top": "t", "right": "r", "bottom": "b", "left": "l"}[prop.split("-")[1]]
+        return [f"border-{side}-{_colour(value, "border")}"]
     if prop == "fill":
         return [f"fill-{_colour(value, "bg")}"]
     if prop == "stroke":
@@ -477,7 +528,11 @@ def _convert(prop, value):
             out = [f"border-{side}" if w == "1px" else f"border-{side}-{_length(w) or _arb(w)}"]
             if style != "solid":
                 out.append(f"border-{style}")
-            out.append(f"border-{_colour(col, 'border')}")
+            # border-l-<colour>, not border-<colour>: the longhand colours one
+            # edge. .doc-note sets a border all round and then a heavier left
+            # edge in a different hue, and flattening the second would have
+            # repainted all four.
+            out.append(f"border-{side}-{_colour(col, 'border')}")
             return out
         raise Unconvertible(f"{prop}: {value}")
     if prop == "border-width":
@@ -498,6 +553,11 @@ def _convert(prop, value):
         return [f"grid-cols-{_arb(value)}"]
 
     if prop == "transition":
+        if "," in value:
+            # Several properties in one declaration. Splitting on whitespace
+            # would strand a comma inside a duration and produce a utility
+            # that silently does nothing.
+            return [_arb(f"transition:{value}")]
         parts = _split_values(value)
         if value == "none":
             return ["transition-none"]
