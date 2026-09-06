@@ -58,7 +58,7 @@
 **Interfaces:**
 - Produces: `Country(name, slug, default_locale, is_hidden)` with `Country.get_platform()` returning the hidden default; `CountryMembership(user, country, is_active)`; `Institution.country`; `Course.country`; `Membership.Role.SCHOOL_ADMIN == 'school_admin'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 import pytest
@@ -87,12 +87,12 @@ def test_school_admin_is_a_role():
     assert Membership.Role.SCHOOL_ADMIN == 'school_admin'
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor/apps/accounts/tests/test_country_model.py -q`
 Expected: FAIL, `ImportError: cannot import name 'Country'`.
 
-- [ ] **Step 3: Add the models**
+- [x] **Step 3: Add the models**
 
 ```python
 class Country(models.Model):
@@ -177,7 +177,7 @@ On `Membership.Role`, between STAFF and STUDENT:
         SCHOOL_ADMIN = 'school_admin', 'School Admin'
 ```
 
-- [ ] **Step 4: Add the same FK to `Course`**
+- [x] **Step 4: Add the same FK to `Course`**
 
 In `ai_tutor/apps/curriculum/models.py`, on `Course`:
 
@@ -195,7 +195,7 @@ In `ai_tutor/apps/curriculum/models.py`, on `Course`:
 
 Import `default_country` at the top of the module rather than naming it as a string.
 
-- [ ] **Step 5: Reject a course whose country disagrees with its school**
+- [x] **Step 5: Reject a course whose country disagrees with its school**
 
 ```python
     def clean(self):
@@ -207,21 +207,21 @@ Import `default_country` at the top of the module rather than naming it as a str
                 })
 ```
 
-- [ ] **Step 6: Make the migrations**
+- [x] **Step 6: Make the migrations**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python manage.py makemigrations accounts curriculum`
 Rename them to `0029_add_country.py` and `0035_add_course_country.py`.
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Expected: PASS.
 
-- [ ] **Step 8: Run the wider suite to prove the default protects existing tests**
+- [x] **Step 8: Run the wider suite to prove the default protects existing tests**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor/apps/accounts ai_tutor/apps/dashboard -q`
 Expected: no new failures. If any test fails on a missing country, the default is not wired.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ---
 
@@ -235,7 +235,7 @@ Expected: no new failures. If any test fails on a missing country, the default i
 - Consumes: `Country`, `Institution.country`, `Course.country` from Task 1.
 - Produces: a `seychelles` country holding every real school and every previously platform-wide course.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 import pytest
@@ -259,9 +259,9 @@ def test_every_real_school_has_a_visible_country():
         assert inst.country is not None
 ```
 
-- [ ] **Step 2: Run to verify it fails.** Expected: FAIL — no Seychelles country exists.
+- [x] **Step 2: Run to verify it fails.** Expected: FAIL — no Seychelles country exists.
 
-- [ ] **Step 3: Write the data migration**
+- [x] **Step 3: Write the data migration**
 
 ```python
 SYNTHETIC = ('global', 'eval-harness')
@@ -302,14 +302,14 @@ def backwards(apps, schema_editor):
     apps.get_model('curriculum', 'Course').objects.update(country=None)
 ```
 
-- [ ] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 4: Run the tests.** Expected: PASS.
 
-- [ ] **Step 5: Prove it reverses**
+- [x] **Step 5: Prove it reverses**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python manage.py migrate accounts 0029 && DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python manage.py migrate accounts`
 Expected: both directions succeed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ---
 
@@ -322,7 +322,7 @@ Expected: both directions succeed.
 **Interfaces:**
 - Produces: `visible_to(queryset, institution)` — returns rows whose `institution` is that school, plus rows with no institution whose `country` matches the school's. With `institution=None` it returns the queryset unchanged, because the caller is already in an aggregated context.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 import pytest
@@ -369,9 +369,9 @@ def test_none_means_aggregated_and_filters_nothing(two_countries):
     assert visible_to(Course.objects.all(), None).count() == 1
 ```
 
-- [ ] **Step 2: Run to verify it fails.** Expected: FAIL, `ModuleNotFoundError: ai_tutor.apps.accounts.tenancy`.
+- [x] **Step 2: Run to verify it fails.** Expected: FAIL, `ModuleNotFoundError: ai_tutor.apps.accounts.tenancy`.
 
-- [ ] **Step 3: Write it**
+- [x] **Step 3: Write it**
 
 ```python
 """What one school may see.
@@ -410,9 +410,9 @@ def visible_to(queryset, institution, field='institution'):
     return queryset.filter(Q(**{field: institution}) | Q(**shared))
 ```
 
-- [ ] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 4: Run the tests.** Expected: PASS.
 
-- [ ] **Step 5: Write the guard test**
+- [x] **Step 5: Write the guard test**
 
 ```python
 import pathlib
@@ -439,9 +439,9 @@ def test_nothing_outside_tenancy_writes_the_rule_by_hand():
         f"{len(offenders)} file(s) still spell the tenancy rule out by hand")
 ```
 
-- [ ] **Step 6: Run it.** Expected: FAIL, listing 15 files. That is the worklist for Task 4.
+- [x] **Step 6: Run it.** Expected: FAIL, listing 15 files. That is the worklist for Task 4.
 
-- [ ] **Step 7: Commit** — the guard fails; note the count in the commit body.
+- [x] **Step 7: Commit** — the guard fails; note the count in the commit body.
 
 ---
 
@@ -454,12 +454,12 @@ def test_nothing_outside_tenancy_writes_the_rule_by_hand():
 **Interfaces:**
 - Consumes: `visible_to(queryset, institution, field='institution')` from Task 3.
 
-- [ ] **Step 1: List the work**
+- [x] **Step 1: List the work**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor/apps/accounts/tests/test_tenancy.py -q`
 The failure names every file.
 
-- [ ] **Step 2: Convert one file, starting with `curriculum/knowledge_base.py`**
+- [x] **Step 2: Convert one file, starting with `curriculum/knowledge_base.py`**
 
 The shape to look for, and what it becomes:
 
@@ -484,21 +484,21 @@ Note the `country` lookup in `visible_to` is not prefixed — a related
 `country` needs its own path, so for those sites write the filter inline and
 add the file to `ALLOWED` with a comment saying why.
 
-- [ ] **Step 3: Run that app's tests after each file**
+- [x] **Step 3: Run that app's tests after each file**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor/apps/<app> -q`
 Expected: PASS before moving to the next file.
 
-- [ ] **Step 4: Repeat for all 15 files.**
+- [x] **Step 4: Repeat for all 15 files.**
 
-- [ ] **Step 5: Run the guard.** Expected: PASS.
+- [x] **Step 5: Run the guard.** Expected: PASS.
 
-- [ ] **Step 6: Run the whole suite.**
+- [x] **Step 6: Run the whole suite.**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor -q`
 Expected: no new failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ---
 
@@ -513,7 +513,7 @@ Expected: no new failures.
 - Produces: `get_staff_context(request)` returning `{membership, institution, role, role_label, all_schools, is_aggregated, unreviewed_flag_count, can_edit_content, can_upload_curriculum, can_regenerate_courses, can_add_schools, can_manage_people, country}` or `None`.
 - `role` is one of `'superadmin' | 'country' | 'school_admin' | 'staff'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 import pytest
@@ -592,9 +592,9 @@ def test_a_hidden_country_never_appears_in_a_school_list(rf, world):
     assert all(s.country.is_hidden is False for s in ctx['all_schools'])
 ```
 
-- [ ] **Step 2: Run to verify it fails.** Expected: FAIL, `ModuleNotFoundError`.
+- [x] **Step 2: Run to verify it fails.** Expected: FAIL, `ModuleNotFoundError`.
 
-- [ ] **Step 3: Write `scope.py`**
+- [x] **Step 3: Write `scope.py`**
 
 Move the existing body of `get_staff_context` (`views.py:38-130`) verbatim into
 two functions, `_superadmin_context` and `_staff_context`, keeping every
@@ -669,7 +669,7 @@ def get_staff_context(request):
 Add `'can_add_schools': True, 'can_manage_people': True` to the superadmin
 dict and `False, False` to the staff dict, plus `'country'` to both.
 
-- [ ] **Step 4: Re-export from views.py so no caller changes**
+- [x] **Step 4: Re-export from views.py so no caller changes**
 
 Replace the deleted body at `views.py:38` with:
 
@@ -677,11 +677,11 @@ Replace the deleted body at `views.py:38` with:
 from ai_tutor.apps.accounts.scope import get_staff_context  # noqa: F401
 ```
 
-- [ ] **Step 5: Run the tests.** Expected: PASS.
+- [x] **Step 5: Run the tests.** Expected: PASS.
 
-- [ ] **Step 6: Run the dashboard suite.** Expected: no new failures.
+- [x] **Step 6: Run the dashboard suite.** Expected: no new failures.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ---
 
@@ -695,7 +695,7 @@ from ai_tutor.apps.accounts.scope import get_staff_context  # noqa: F401
 **Interfaces:**
 - Consumes: `staff_ctx['can_manage_people']`, `staff_ctx['can_add_schools']`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 @pytest.mark.django_db
@@ -727,9 +727,9 @@ def test_a_teacher_still_cannot_reach_the_staff_page(client, world):
     assert client.get('/dashboard/staff/').status_code in (302, 403)
 ```
 
-- [ ] **Step 2: Run to verify it fails.** Expected: the school admin is redirected.
+- [x] **Step 2: Run to verify it fails.** Expected: the school admin is redirected.
 
-- [ ] **Step 3: Swap the role checks for flag checks**
+- [x] **Step 3: Swap the role checks for flag checks**
 
 In the staff-list, invite, delete-staff and settings views, replace
 
@@ -746,15 +746,15 @@ if not request.staff_ctx['can_manage_people']:
 Leave every `is_superuser` gate on a curriculum, lesson or regeneration view
 exactly as it is.
 
-- [ ] **Step 4: Widen the Manage Schools gate**
+- [x] **Step 4: Widen the Manage Schools gate**
 
 `settings.html:423` — the comment says "superadmin only". Change the
 surrounding condition to `{% if staff_ctx.can_add_schools %}` and update the
 comment to say what it now means.
 
-- [ ] **Step 5: Run the tests.** Expected: PASS.
+- [x] **Step 5: Run the tests.** Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ---
 
@@ -769,7 +769,7 @@ comment to say what it now means.
 **Interfaces:**
 - Produces: `dashboard:country_schools` (GET) and `dashboard:country_school_create` (POST).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 @pytest.mark.django_db
@@ -802,9 +802,9 @@ def test_a_teacher_cannot_reach_the_page(client, world):
     assert client.get('/dashboard/schools/').status_code in (302, 403)
 ```
 
-- [ ] **Step 2: Run to verify it fails.** Expected: 404, no such route.
+- [x] **Step 2: Run to verify it fails.** Expected: 404, no such route.
 
-- [ ] **Step 3: Write the views**
+- [x] **Step 3: Write the views**
 
 ```python
 @staff_required
@@ -845,21 +845,21 @@ def country_school_create(request):
     return redirect('dashboard:country_schools')
 ```
 
-- [ ] **Step 4: Add the routes**
+- [x] **Step 4: Add the routes**
 
 ```python
     path('schools/', views_country.country_schools, name='country_schools'),
     path('schools/create/', views_country.country_school_create, name='country_school_create'),
 ```
 
-- [ ] **Step 5: Write the template**
+- [x] **Step 5: Write the template**
 
 A page in the existing dashboard shell: a heading, a table of schools with
 their student counts, and an add form. Utilities only — no new stylesheet,
 no `<style>` block, no literal colour. Follow `dashboard/students/list.html`
 for the table shape.
 
-- [ ] **Step 6: Add the nav item**
+- [x] **Step 6: Add the nav item**
 
 In `base.html`, beside Students and Classes:
 
@@ -871,15 +871,15 @@ In `base.html`, beside Students and Classes:
 {% endif %}
 ```
 
-- [ ] **Step 7: Run the tests.** Expected: PASS.
+- [x] **Step 7: Run the tests.** Expected: PASS.
 
-- [ ] **Step 8: Screenshot the page and look at it**
+- [x] **Step 8: Screenshot the page and look at it**
 
 Per CLAUDE.md, a UI change is not verified until it has been seen. Use
 `scripts/shoot.py` or drive Chromium directly, and check the table renders,
 the form submits, and the flash message appears.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ---
 
@@ -891,7 +891,7 @@ the form submits, and the flash message appears.
 **Interfaces:**
 - Consumes: everything above.
 
-- [ ] **Step 1: Write the tests — one per surface, not one for all**
+- [x] **Step 1: Write the tests — one per surface, not one for all**
 
 ```python
 """A Tanzania account must not see Seychelles.
@@ -925,13 +925,13 @@ Each builds two countries with a school and data in each, logs in as the
 Tanzania country account, and asserts the Seychelles record is absent from
 both the rendered page and the underlying queryset.
 
-- [ ] **Step 2: Run them.** Expected: PASS — if any fails, it is a real leak, not a test bug.
+- [x] **Step 2: Run them.** Expected: PASS — if any fails, it is a real leak, not a test bug.
 
-- [ ] **Step 3: Run the whole suite.**
+- [x] **Step 3: Run the whole suite.**
 
 Run: `DJANGO_SETTINGS_MODULE=ai_tutor.config.settings venv/bin/python -m pytest ai_tutor -q`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ---
 
@@ -956,3 +956,35 @@ match between Task 1 and Task 7. The `can_*` flag names in Task 5's dicts,
 Task 5's `CAPABILITIES` table, Task 6's checks and Task 7's guard are the same
 four strings. `role` values `'superadmin' | 'country' | 'school_admin' |
 'staff'` match between Task 5's dispatch and its parametrised test.
+
+---
+
+## What the plan got wrong
+
+Recorded because the gaps were all of one kind: the plan trusted that
+widening a gate was the whole job.
+
+**Task 6 was a one-line gate swap in the plan.** It is the largest change in
+the series. The staff page reaches every user on the platform and can create
+platform super admins, so handing it to `can_manage_people` without scoping
+every id it resolves would have been a privilege escalation, not a feature.
+The plan also named the gates as `is_superuser`; they were `is_staff`.
+
+**Task 8 was meant to be a test file.** Every one of its tests failed. The
+plan assumed Tasks 3–7 had already closed the country boundary, but they
+closed it only where a school was selected. `institution=None` meant "every
+school on the platform" in 96 places, and a country account arrives at all of
+them with no school selected. Task 8 became the fix as well as the proof.
+
+**`can_edit_school_settings` was missing.** The spec grants a school admin
+"School settings"; the plan's flag list had nothing for it, and folding it
+into `can_manage_people` would have tied a school's name to its teachers'
+accounts.
+
+**The safety badge and the nav were not in any task.** The badge counted
+flags from every country; the school admin's Staff page had no nav item at
+all, so it was reachable only by typing the URL.
+
+**One conversion was a false positive.** Task 4's shape-match hit
+`Q(step=current_step) | Q(step__isnull=True)` in `simple_tutor/state.py`,
+which is step scoping and not tenancy. 29 tests caught it.
