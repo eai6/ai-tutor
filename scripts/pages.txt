@@ -1,0 +1,85 @@
+# Pages the screenshot gate photographs. One line: <role> <path>.
+#
+# Roles map to fixture users in db.sqlite3 — teacher_daniel, student_daniel,
+# superadmin_daniel — and were chosen by probing each URL with Django's test
+# client rather than guessed; the role listed is the least-privileged one that
+# returns 200.
+#
+# Not listed, and why:
+#   /login/ /register/            redirect for every role; aliases only
+#   /dashboard/switch-school/     POST only
+#   /dashboard/groups/create/     POST only
+#   safety/privacy_{policy,dashboard}.html
+#                                 apps/safety/urls.py is not mounted in the
+#                                 URLconf, so these render from no URL. They
+#                                 are migrated without a screenshot gate.
+#   templates/email/*             HTML email, deliberately never migrated
+
+# ---- marketing and documentation (phase 1) ----
+anon     /
+anon     /terms/
+anon     /docs/
+anon     /docs/executive-summary/
+anon     /docs/what-is-adopted/
+anon     /docs/five-layers/
+anon     /download/
+anon     /self-hosting/
+anon     /desktop/setup/
+anon     /desktop/server/
+
+# ---- auth (phase 3, student surface) ----
+anon     /student/login/
+anon     /student/register/
+anon     /staff/login/
+anon     /staff/register/
+anon     /password-reset/
+anon     /password-reset/done/
+anon     /password-reset/complete/
+student  /terms/accept/
+student  /password/change-required/
+
+# ---- student and tutoring (phase 3) ----
+student  /tutor/
+student  /tutor/lesson/1/
+student  /tutor/chat/lesson/1/
+student  /tutor/summative/1/
+student  /settings/
+student  /delete-account/
+
+# ---- teacher dashboard (phase 2) ----
+teacher  /dashboard/
+teacher  /dashboard/students/
+teacher  /dashboard/students/999006/
+teacher  /dashboard/classes/
+teacher  /dashboard/classes/S1/
+teacher  /dashboard/curriculum/
+teacher  /dashboard/curriculum/course/1/
+teacher  /dashboard/curriculum/lesson/1/
+teacher  /dashboard/curriculum/step/14111/edit/
+teacher  /dashboard/curriculum/course/1/competencies/
+teacher  /dashboard/curriculum/course/1/competencies/student/999006/
+teacher  /dashboard/curriculum/course/1/summative/
+teacher  /dashboard/curriculum/course/1/unit/create/
+teacher  /dashboard/curriculum/unit/1/lesson/create/
+teacher  /dashboard/curriculum/process/1/
+teacher  /dashboard/flagged/
+teacher  /dashboard/settings/
+teacher  /dashboard/groups/
+teacher  /dashboard/reports/
+teacher  /dashboard/help/
+teacher  /dashboard/session/12328/chat-history/
+teacher  /dashboard/lesson/1/monitor/
+teacher  /dashboard/lesson/1/session-report/
+admin    /dashboard/curriculum/upload/
+admin    /dashboard/curriculum/content-progress/1/
+admin    /dashboard/curriculum/media-progress/1/
+admin    /dashboard/staff/
+admin    /dashboard/feedback/
+admin    /dashboard/content-edits/
+admin    /dashboard/content-edits/dashboard/
+
+# ---- benchmark, internal tooling but on the dashboard shell (phase 2) ----
+admin    /dashboard/benchmark/
+admin    /dashboard/benchmark/scores/
+admin    /dashboard/benchmark/sessions/
+admin    /dashboard/benchmark/sessions/scores/

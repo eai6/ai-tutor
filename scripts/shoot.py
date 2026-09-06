@@ -1,0 +1,291 @@
+#!/usr/bin/env python
+"""Screenshot every page, and compare two sets of screenshots.
+
+This is the gate for the Tailwind migration: the rewrite is meant to be
+invisible, so every page is photographed before and after and any difference
+is a defect.
+
+chrome-devtools-mcp is not installed on this machine, so this drives
+/usr/bin/chromium directly over raw CDP using the venv's websockets.
+
+    python scripts/shoot.py --out .screens/baseline
+    python scripts/shoot.py --compare .screens/baseline .screens/after
+
+Sessions are created through Django rather than by filling in the login form:
+django-axes locks the (ip, username) pair after five failures, and a harness
+that logs in a few hundred times would lock the fixture users out for an hour.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import os
+import pathlib
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+REPO = pathlib.Path(__file__).resolve().parent.parent
+CHROMIUM = "/usr/bin/chromium"
+VIEWPORTS = {"desktop": (1440, 900), "mobile": (390, 844)}
+SETTLE_MS = 450          # after load: webfonts, icon sprite, chart JS
+DEFAULT_BASE = "http://127.0.0.1:8000"
+
+
+# --------------------------------------------------------------------------
+# Django-side: session cookies without going through the login form
+# --------------------------------------------------------------------------
+
+def session_cookies(roles):
+    """Return {role: sessionid} for each role that names a real user."""
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ai_tutor.config.settings")
+    sys.path.insert(0, str(REPO))
+    import django
+
+    django.setup()
+    from django.contrib.auth import get_user_model
+    from django.contrib.sessions.backends.db import SessionStore
+
+    User = get_user_model()
+    out = {}
+    for role, username in roles.items():
+        if username is None:
+            continue
+        user = User.objects.filter(username=username).first()
+        if user is None:
+            print(f"  ! no user {username!r} — {role} pages will render logged out")
+            continue
+        store = SessionStore()
+        store["_auth_user_id"] = str(user.pk)
+        store["_auth_user_backend"] = "django.contrib.auth.backends.ModelBackend"
+        store["_auth_user_hash"] = user.get_session_auth_hash()
+        store.create()
+        out[role] = store.session_key
+    return out
+
+
+# --------------------------------------------------------------------------
+# CDP
+# --------------------------------------------------------------------------
+
+class Chrome:
+    def __init__(self, port=9222):
+        self.port = port
+        self.proc = None
+        self._id = 0
+
+    def __enter__(self):
+        from websockets.sync.client import connect
+
+        profile = REPO / ".screens" / ".chrome-profile"
+        shutil.rmtree(profile, ignore_errors=True)
+        profile.mkdir(parents=True, exist_ok=True)
+        self.proc = subprocess.Popen(
+            [
+                CHROMIUM,
+                "--headless=new",
+                f"--remote-debugging-port={self.port}",
+                f"--user-data-dir={profile}",
+                "--no-sandbox",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                "--force-device-scale-factor=1",
+                "--disable-lcd-text",          # subpixel AA is machine-dependent
+                "--font-render-hinting=none",  # so is hinting; both add noise
+                "--disable-extensions",
+                "about:blank",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        ws_url = self._wait_for_target()
+        self.ws = connect(ws_url, max_size=200 * 1024 * 1024, open_timeout=30)
+        self.send("Page.enable")
+        self.send("Network.enable")
+        self.send("Network.setCacheDisabled", cacheDisabled=True)
+        return self
+
+    def _wait_for_target(self):
+        import urllib.request
+
+        for _ in range(120):
+            try:
+                raw = urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.port}/json/list", timeout=1
+                ).read()
+                for t in json.loads(raw):
+                    if t.get("type") == "page" and t.get("webSocketDebuggerUrl"):
+                        return t["webSocketDebuggerUrl"]
+            except Exception:
+                pass
+            time.sleep(0.25)
+        raise RuntimeError("chromium did not expose a CDP target")
+
+    def send(self, method, **params):
+        self._id += 1
+        self.ws.send(json.dumps({"id": self._id, "method": method, "params": params}))
+        while True:
+            msg = json.loads(self.ws.recv())
+            if msg.get("id") == self._id:
+                if "error" in msg:
+                    raise RuntimeError(f"{method}: {msg['error']}")
+                return msg.get("result", {})
+
+    def __exit__(self, *exc):
+        try:
+            self.ws.close()
+        except Exception:
+            pass
+        if self.proc:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+
+
+# --------------------------------------------------------------------------
+# Shooting
+# --------------------------------------------------------------------------
+
+def slug(role, path):
+    s = re.sub(r"[^a-z0-9]+", "-", f"{role}{path}".lower()).strip("-")
+    return s or "root"
+
+
+def read_pages(path):
+    pages = []
+    for line in pathlib.Path(path).read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        role, url = line.split(None, 1)
+        pages.append((role, url.strip()))
+    return pages
+
+
+def shoot(out_dir, base_url, pages_file, only=None):
+    out = pathlib.Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    pages = read_pages(pages_file)
+    if only:
+        pages = [p for p in pages if only in p[1]]
+    cookies = session_cookies(
+        {"teacher": "teacher_daniel", "student": "student_daniel", "admin": "superadmin_daniel"}
+    )
+
+    host = base_url.split("//", 1)[1].split(":")[0]
+    failures = []
+    with Chrome() as chrome:
+        for role, path in pages:
+            chrome.send("Network.clearBrowserCookies")
+            if role in cookies:
+                chrome.send(
+                    "Network.setCookie",
+                    name="sessionid",
+                    value=cookies[role],
+                    domain=host,
+                    path="/",
+                )
+            for vp, (w, h) in VIEWPORTS.items():
+                chrome.send(
+                    "Emulation.setDeviceMetricsOverride",
+                    width=w, height=h, deviceScaleFactor=1,
+                    mobile=(vp == "mobile"),
+                )
+                try:
+                    chrome.send("Page.navigate", url=base_url + path)
+                    time.sleep(SETTLE_MS / 1000)
+                    # Freeze anything still animating so the frame is stable.
+                    chrome.send(
+                        "Runtime.evaluate",
+                        expression=(
+                            "document.getAnimations?.().forEach(a=>{a.pause();"
+                            "a.currentTime=0});document.fonts.ready"
+                        ),
+                        awaitPromise=True,
+                    )
+                    shot = chrome.send(
+                        "Page.captureScreenshot", format="png", captureBeyondViewport=True
+                    )
+                except Exception as exc:
+                    failures.append(f"{role} {path} [{vp}]: {exc}")
+                    continue
+                name = f"{slug(role, path)}__{vp}.png"
+                (out / name).write_bytes(base64.b64decode(shot["data"]))
+            print(f"  shot {role:8} {path}")
+
+    print(f"\n{len(list(out.glob('*.png')))} screenshots -> {out}")
+    for f in failures:
+        print(f"  FAILED {f}")
+    return 1 if failures else 0
+
+
+# --------------------------------------------------------------------------
+# Comparing
+# --------------------------------------------------------------------------
+
+def compare(before_dir, after_dir, tolerance=0):
+    import numpy as np
+    from PIL import Image
+
+    before, after = pathlib.Path(before_dir), pathlib.Path(after_dir)
+    names = sorted({p.name for p in before.glob("*.png")} | {p.name for p in after.glob("*.png")})
+    if not names:
+        print("no screenshots to compare")
+        return 1
+
+    differing, missing = [], []
+    for name in names:
+        b, a = before / name, after / name
+        if not b.exists() or not a.exists():
+            missing.append(name)
+            continue
+        ib, ia = Image.open(b).convert("RGB"), Image.open(a).convert("RGB")
+        if ib.size != ia.size:
+            differing.append((name, -1, f"{ib.size} -> {ia.size}"))
+            continue
+        diff = np.abs(np.asarray(ib, np.int16) - np.asarray(ia, np.int16)).max(axis=2)
+        n = int((diff > tolerance).sum())
+        if n:
+            differing.append((name, n, f"{100 * n / diff.size:.3f}% of pixels"))
+
+    print(f"compared {len(names) - len(missing)} pages")
+    for name in missing:
+        print(f"  MISSING  {name}")
+    for name, n, detail in differing:
+        print(f"  DIFFERS  {name:<58} {detail}")
+    if not differing and not missing:
+        print("  identical — no visual change")
+    return 1 if (differing or missing) else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out")
+    ap.add_argument("--compare", nargs=2, metavar=("BEFORE", "AFTER"))
+    ap.add_argument("--base", default=DEFAULT_BASE)
+    ap.add_argument("--pages", default=str(REPO / "scripts" / "pages.txt"))
+    ap.add_argument("--only", help="substring filter on the URL")
+    ap.add_argument("--tolerance", type=int, default=0)
+    args = ap.parse_args()
+
+    if args.compare:
+        return compare(*args.compare, tolerance=args.tolerance)
+    if args.out:
+        with socket.socket() as s:
+            host, port = args.base.split("//", 1)[1].split(":")
+            if s.connect_ex((host, int(port))) != 0:
+                sys.exit(f"no dev server on {args.base} — start runserver first")
+        return shoot(args.out, args.base, args.pages, args.only)
+    ap.print_help()
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

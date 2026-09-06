@@ -126,3 +126,6 @@ offline_eval/multi_turn_results/**/*.log
 
 # Node — only the CSS build needs it; package-lock.json IS committed
 node_modules/
+
+# Screenshot gate for the Tailwind migration — large, machine-specific
+.screens/
