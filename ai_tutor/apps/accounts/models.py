@@ -1,13 +1,101 @@
 """
-Accounts app - Institution and Membership models.
+Accounts app - Country, Institution and Membership models.
 
-Multi-tenancy pattern: Every record in the system is tied to an Institution.
-Users can belong to multiple institutions with different roles.
+Multi-tenancy pattern: every record is tied to an Institution, and every
+Institution to a Country. Users belong to institutions with a role, and a
+country account belongs to a country instead.
+
+Content with no institution is shared with every school IN THE SAME COUNTRY —
+not, as it once was, with every school on the platform. See
+`accounts/tenancy.py`, which holds the single definition of that rule.
 """
 
 from django.conf import settings as django_settings
 from django.db import models
 from django.contrib.auth.models import User
+
+
+class Country(models.Model):
+    """A country the platform has been adopted in.
+
+    `is_hidden` carries the institutions that are not schools — `global` and
+    `eval-harness`. Without it every school list would special-case two slugs,
+    which is the kind of rule that gets applied at some call sites and not
+    others.
+    """
+    PLATFORM_SLUG = 'platform'
+
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
+    default_locale = models.CharField(
+        max_length=10,
+        default='en-us',
+        choices=django_settings.LANGUAGES,
+        help_text="Default UI language for schools created in this country.",
+    )
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Hidden countries never appear in a school or country list.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'countries'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_platform(cls):
+        """The hidden country a record falls back to when none is given.
+
+        Deliberately NOT the live pilot's country. A school created without a
+        country is a bug, and it has to surface somewhere invisible rather
+        than inside a real ministry's list of schools.
+        """
+        country, _ = cls.objects.get_or_create(
+            slug=cls.PLATFORM_SLUG,
+            defaults={'name': 'Platform', 'is_hidden': True},
+        )
+        return country
+
+
+def default_country():
+    """Default for the two country FKs.
+
+    Module-level so a migration can serialise the reference to it. Callable so
+    the row is created on first use rather than at import time.
+    """
+    return Country.get_platform().pk
+
+
+class CountryMembership(models.Model):
+    """Links a user to a country they administer.
+
+    No role field, on purpose: a country account is one thing. A second
+    country role would be the third case, and the point at which generalising
+    is warranted rather than speculative.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='country_memberships',
+    )
+    country = models.ForeignKey(
+        Country,
+        on_delete=models.CASCADE,
+        related_name='memberships',
+    )
+    is_active = models.BooleanField(default=True)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'country']
+        ordering = ['country', 'user']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.country.name}"
 
 
 class Institution(models.Model):
@@ -21,6 +109,14 @@ class Institution(models.Model):
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, help_text="URL-friendly identifier")
+    # PROTECT, not CASCADE: deleting a country that still has schools should
+    # fail loudly, not take every student record with it.
+    country = models.ForeignKey(
+        'Country',
+        on_delete=models.PROTECT,
+        related_name='institutions',
+        default=default_country,
+    )
     timezone = models.CharField(max_length=50, default='UTC')
     is_active = models.BooleanField(default=True)
     # Default UI language for students/staff at this school. The
@@ -82,6 +178,9 @@ class Membership(models.Model):
     """
     class Role(models.TextChoices):
         STAFF = 'staff', 'Staff (Teacher/Admin)'
+        # Runs one school: its people and its settings, not its content.
+        # Curriculum upload and lesson editing stay with the super admin.
+        SCHOOL_ADMIN = 'school_admin', 'School Admin'
         STUDENT = 'student', 'Student'
 
     user = models.ForeignKey(

@@ -8,9 +8,10 @@ Hierarchy: Course > Unit > Lesson > LessonStep
 """
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
-from ai_tutor.apps.accounts.models import Institution
+from ai_tutor.apps.accounts.models import Institution, default_country
 
 
 class Course(models.Model):
@@ -23,7 +24,23 @@ class Course(models.Model):
         related_name='courses',
         null=True,
         blank=True,
-        help_text="Null = platform-wide course visible to all schools"
+        help_text=(
+            "Null = shared with every school in this course's COUNTRY. It "
+            "used to mean every school on the platform; countries narrowed "
+            "it. See accounts/tenancy.py."
+        )
+    )
+    # Redundant when `institution` is set — the country is reachable through
+    # the school — but a shared course has no school to reach it through, and
+    # a query that branches on whether the FK is null is exactly the rule
+    # that gets applied at some call sites and not others. `clean()` below
+    # stops the two disagreeing.
+    country = models.ForeignKey(
+        'accounts.Country',
+        on_delete=models.PROTECT,
+        related_name='courses',
+        default=default_country,
+        help_text="Which country's schools may see this course.",
     )
     curriculum_upload = models.ForeignKey(
         'dashboard.CurriculumUpload',
@@ -207,6 +224,21 @@ class Course(models.Model):
             return self.subject_type == self.SubjectType.MATH
         # Legacy fallback for unclassified courses.
         return any(kw in (self.title or '').lower() for kw in self.MATH_KEYWORDS)
+
+    def clean(self):
+        """A course's country must match its school's.
+
+        The country FK is denormalised so that a shared course (no school)
+        still has one. The cost of that is two fields that can disagree, and
+        a disagreement is invisible: the course simply stops appearing for
+        the school that owns it. So it is rejected at the boundary.
+        """
+        super().clean()
+        if self.institution_id and self.country_id:
+            if self.institution.country_id != self.country_id:
+                raise ValidationError({
+                    'country': "A course's country must match its school's.",
+                })
 
     def __str__(self):
         return self.title
