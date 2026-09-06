@@ -141,7 +141,7 @@
                     <span class="role">{{ turn.role }}</span>{{ turn.content }}
                 </div>
                 {% empty %}
-                <p class="muted">No transcript stored.</p>
+                <p class="muted text-text-muted">No transcript stored.</p>
                 {% endfor %}
             </div>
         </div>
@@ -156,7 +156,7 @@
                 <span>Outcome <strong>{{ item.outcome|default:"—" }}</strong></span>
                 <span>Status <strong>{{ item.get_status_display }}</strong></span>
             </div>
-            <p class="muted" style="margin-top:0.6rem;">
+            <p class="muted text-text-muted" style="margin-top:0.6rem;">
                 Key <code>{{ item.session_key }}</code> — a salted hash. The raw
                 session id is never exported.
             </p>
@@ -167,11 +167,11 @@
             {% if replacements %}
                 {% for r in replacements %}<span class="tag">{{ r }}</span>{% endfor %}
             {% else %}
-                <p class="muted">Nothing was replaced — no contact details or
+                <p class="muted text-text-muted">Nothing was replaced — no contact details or
                 known names appeared.</p>
             {% endif %}
             {% if report.llm_names_found %}
-            <p class="muted" style="margin-top:0.5rem;">
+            <p class="muted text-text-muted" style="margin-top:0.5rem;">
                 The LLM pass found <strong>{{ report.llm_names_found }}</strong>
                 name(s) beyond the database lookup. The names themselves are not
                 stored — recording them here would put the identifiers straight
@@ -190,7 +190,7 @@
         <div class="rv-card">
             <h3>Possible names — advisory</h3>
             {% if advisory_names %}
-            <p class="muted" style="margin-bottom:0.5rem;">
+            <p class="muted text-text-muted" style="margin-bottom:0.5rem;">
                 Capitalised mid-sentence words the LLM pass did <em>not</em>
                 call personal names. Mostly places and subject terms — a
                 geography session is full of them. Shown so you can spot the one
@@ -198,7 +198,7 @@
             </p>
             {% for n in advisory_names %}<span class="tag">{{ n }}</span>{% endfor %}
             {% else %}
-            <p class="muted">None flagged.</p>
+            <p class="muted text-text-muted">None flagged.</p>
             {% endif %}
         </div>
 
@@ -238,22 +238,22 @@
         <div class="rv-card">
             <h3>Decision</h3>
             <div class="decide">
-                <button type="submit" name="decision" value="approve" class="btn btn-approve-judge">
+                <button type="submit" name="decision" value="approve" class="btn btn-approve-judge inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">
                     Approve &amp; save
                 </button>
                 <textarea name="reject_reason" placeholder="Reason (required to reject) — e.g. 'classmate named in turn 7'"></textarea>
-                <button type="submit" name="decision" value="reject" class="btn btn-reject">
+                <button type="submit" name="decision" value="reject" class="btn btn-reject inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none">
                     Reject
                 </button>
             </div>
-            <p class="muted" style="margin-top:0.7rem;">
+            <p class="muted text-text-muted" style="margin-top:0.7rem;">
                 {{ pending_count }} session(s) awaiting review{% if nav %}
                 in this filter ({% for k, v in nav.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}.
                 Deciding moves you to the next one.
             </p>
         </div>
 
-        <p class="muted">
+        <p class="muted text-text-muted">
             <a href="{% url 'dashboard:benchmark:session_list' %}{% if nav.engine %}?engine={{ nav.engine }}{% endif %}">← Back to the list</a>
         </p>
     </div>

@@ -32,7 +32,7 @@ class Unconvertible(Exception):
 
 def _parse_theme(path=APP_CSS):
     text = path.read_text()
-    block = re.search(r"@theme\s*\{(.*?)\n\}", text, re.S)
+    block = re.search(r"@theme[^{]*\{(.*?)\n\}", text, re.S)
     if not block:
         raise RuntimeError(f"no @theme block in {path}")
     out = {}
@@ -249,6 +249,11 @@ def _colour(value, role="text"):
     if value.upper() in HEX_TO_TOKENS:
         return _pick(HEX_TO_TOKENS[value.upper()], role)
     if re.fullmatch(r"#[0-9A-Fa-f]{3,8}", value):
+        return _arb(value)
+    # System colours, used under forced-colors: to hand control to the OS.
+    if value in ("Highlight", "HighlightText", "Canvas", "CanvasText", "LinkText",
+                 "ButtonText", "ButtonFace", "GrayText", "ActiveText", "Field",
+                 "FieldText", "Mark", "MarkText", "SelectedItem", "SelectedItemText"):
         return _arb(value)
     if value in ("transparent", "currentColor", "inherit", "white", "black"):
         return {"currentColor": "current"}.get(value, value)
@@ -483,7 +488,15 @@ def _convert(prop, value):
         parts = _split_values(value)
         if len(parts) == 1:
             return [f"rounded-{_sized(value, RADII)}"]
-        raise Unconvertible(f"{prop}: {value} (per-corner radius)")
+        # Per-corner shorthand: top-left, top-right, bottom-right, bottom-left.
+        corners = ["tl", "tr", "br", "bl"]
+        if len(parts) == 2:
+            vals = [parts[0], parts[1], parts[0], parts[1]]
+        elif len(parts) == 3:
+            vals = [parts[0], parts[1], parts[2], parts[1]]
+        else:
+            vals = parts[:4]
+        return [f"rounded-{c}-{_sized(v, RADII)}" for c, v in zip(corners, vals)]
     if prop == "box-shadow":
         if value == "none":
             return ["shadow-none"]
@@ -527,7 +540,13 @@ def _convert(prop, value):
             w, style, col = parts
             out = [f"border-{side}" if w == "1px" else f"border-{side}-{_length(w) or _arb(w)}"]
             if style != "solid":
-                out.append(f"border-{style}")
+                # NOT border-dashed: that sets the border-style SHORTHAND, so
+                # all four sides become dashed. A side whose width was never
+                # set then computes to `medium` — 3px of dashed border on
+                # three sides that should have none. The chart gridlines grew
+                # from 1px to 4px tall that way.
+                full = {"t": "top", "r": "right", "b": "bottom", "l": "left"}[side]
+                out.append(_arb(f"border-{full}-style:{style}"))
             # border-l-<colour>, not border-<colour>: the longhand colours one
             # edge. .doc-note sets a border all round and then a heavier left
             # edge in a different hue, and flattening the second would have

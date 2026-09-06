@@ -162,16 +162,16 @@
 </a>
 
 <!-- Course Header -->
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-body">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom: 1.5rem;">
+    <div class="card-body p-5">
         <div id="course-header-display" style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem;">
             <div style="flex: 1; min-width: 200px;">
                 <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
                     <h2 style="font-size: 1.5rem; margin: 0;">{{ course.title }}</h2>
                     {% if course.is_published %}
-                        <span class="badge badge-success">{% trans "Published" %}</span>
+                        <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-success-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-success-surface text-success">{% trans "Published" %}</span>
                     {% else %}
-                        <span class="badge badge-warning">{% trans "Draft" %}</span>
+                        <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-warning-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-warning-surface text-warning">{% trans "Draft" %}</span>
                     {% endif %}
                     <span style="padding:3px 10px;border-radius:999px;font-size:0.6875rem;font-weight:700;background:{{ course_tier_bg }};color:{{ course_tier_color }};">{{ course_tier_label }}</span>
                 </div>
@@ -195,22 +195,22 @@
                 </form>
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <a href="{% url 'dashboard:summative_review' course.id %}" class="btn btn-sm" style="background:var(--accent);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📝 {% trans "Summative Exam" %}</a>
-                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm" style="background:#0891b2;color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 {% trans "Class Competency & Readiness" %}</a>
+                <a href="{% url 'dashboard:summative_review' course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--accent);color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📝 {% trans "Summative Exam" %}</a>
+                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:#0891b2;color:var(--surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 {% trans "Class Competency & Readiness" %}</a>
                 {% if can_edit_content %}
-                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">{% trans "Edit Course" %}</button>{% endif %}
+                <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">{% trans "Edit Course" %}</button>{% endif %}
                 {% if can_edit_content %}
                 <form method="post" action="{% url 'dashboard:course_publish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('{% trans "Publish all lessons in this course?" %}');">{% trans "Publish All" %}</button>
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="return confirm('{% trans "Publish all lessons in this course?" %}');">{% trans "Publish All" %}</button>
                 </form>
                 <form method="post" action="{% url 'dashboard:course_unpublish_all' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('{% trans "Unpublish all lessons in this course?" %}');">{% trans "Unpublish All" %}</button>
+                    <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="return confirm('{% trans "Unpublish all lessons in this course?" %}');">{% trans "Unpublish All" %}</button>
                 </form>
                 <form method="post" action="{% url 'dashboard:course_delete' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone." %}');">{% trans "Delete" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone." %}');">{% trans "Delete" %}</button>
                 </form>
                 {% endif %}
             </div>
@@ -221,13 +221,13 @@
             <form method="post" action="{% url 'dashboard:course_edit' course.id %}">
                 {% csrf_token %}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group">
-                        <label class="form-label">Title</label>
-                        <input type="text" name="title" class="form-control" value="{{ course.title }}" required>
+                    <div class="form-group mb-4">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">Title</label>
+                        <input type="text" name="title" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" value="{{ course.title }}" required>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">{% trans "Subject" %} <span style="color:var(--danger);">*</span></label>
-                        <select name="subject_code" class="form-control" required>
+                    <div class="form-group mb-4">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Subject" %} <span style="color:var(--danger);">*</span></label>
+                        <select name="subject_code" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" required>
                             <option value="" {% if not course.subject_code %}selected{% endif %}>— Select subject —</option>
                             {% for code, label in subject_code_choices %}
                             <option value="{{ code }}" {% if course.subject_code == code %}selected{% endif %}>{{ label }}</option>
@@ -235,8 +235,8 @@
                         </select>
                         <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Used to inherit platform-wide materials for this subject." %}</small>
                     </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">{% trans "Grade levels (multi-select)" %}</label>
+                    <div class="form-group mb-4" style="grid-column: 1 / -1;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Grade levels (multi-select)" %}</label>
                         <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
                             {% for code, label in secondary_year_choices %}
                             <label style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer;background:white;">
@@ -248,30 +248,30 @@
                         </div>
                         <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Tick all years this course covers. Used to match platform-wide courses for material inheritance." %}</small>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">{% trans "Grade label (display)" %}</label>
-                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="{% trans 'auto from grade levels' %}">
+                    <div class="form-group mb-4">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Grade label (display)" %}</label>
+                        <input type="text" name="grade_level" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" value="{{ course.grade_level }}" placeholder="{% trans 'auto from grade levels' %}">
                         <small style="color:var(--gray-500);font-size:0.7rem;">{% trans "Optional free-text label. Auto-derived from grade levels if blank." %}</small>
                     </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">{% trans "Description" %}</label>
-                        <textarea name="description" class="form-control" rows="2">{{ course.description }}</textarea>
+                    <div class="form-group mb-4" style="grid-column: 1 / -1;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Description" %}</label>
+                        <textarea name="description" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="2">{{ course.description }}</textarea>
                     </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
+                    <div class="form-group mb-4" style="grid-column: 1 / -1;">
                         <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;">
                             <input type="checkbox" name="tutoring_images_enabled" value="1"
                                    {% if course.tutoring_images_enabled %}checked{% endif %}>
-                            <span class="form-label" style="margin:0;">{% trans "Show images in tutoring sessions" %}</span>
+                            <span class="form-label block mb-1 text-xs font-bold text-text-secondary" style="margin:0;">{% trans "Show images in tutoring sessions" %}</span>
                         </label>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
                             When off, the AI tutor sees no images and cannot reference figures. Useful for text-only courses or when image generation isn't appropriate.
                         </div>
                     </div>
-                    <div class="form-group" style="grid-column: 1 / -1;">
+                    <div class="form-group mb-4" style="grid-column: 1 / -1;">
                         <label style="display:inline-flex;align-items:center;gap:0.5rem;cursor:pointer;">
                             <input type="checkbox" name="prerequisites_enabled" value="1"
                                    {% if course.prerequisites_enabled %}checked{% endif %}>
-                            <span class="form-label" style="margin:0;">{% trans "Enforce lesson prerequisites" %}</span>
+                            <span class="form-label block mb-1 text-xs font-bold text-text-secondary" style="margin:0;">{% trans "Enforce lesson prerequisites" %}</span>
                         </label>
                         <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.25rem;">
                             When off, every lesson is unlocked from the start — students can take them in any order. Use for review courses, exam-prep collections, and demo content.
@@ -279,8 +279,8 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Save Changes" %}</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">{% trans "Cancel" %}</button>
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save Changes" %}</button>
+                    <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="document.getElementById('course-edit-form').style.display='none'; document.getElementById('course-header-display').style.display='flex';">{% trans "Cancel" %}</button>
                 </div>
             </form>
         </div>
@@ -304,7 +304,7 @@
                     <option value="{{ school.id }}" {% if course.institution_id == school.id %}disabled{% endif %}>{{ school.name }}{% if course.institution_id == school.id %} — current{% endif %}</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.4rem 1rem; font-weight: 600;">{% trans "Move course" %}</button>
+                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.4rem 1rem; font-weight: 600;">{% trans "Move course" %}</button>
             </form>
         </details>
         {% endif %}
@@ -325,7 +325,7 @@
                 <input type="hidden" name="title" value="{{ course.title }}">
                 <input type="hidden" name="description" value="{{ course.description }}">
                 <input type="hidden" name="grade_level" value="{{ course.grade_level }}">
-                <button type="submit" class="btn btn-sm" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;" {% if not course.curriculum_upload_id %}disabled title="{% trans 'No source PDF linked to this course' %}"{% endif %}>
+                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-solid); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;" {% if not course.curriculum_upload_id %}disabled title="{% trans 'No source PDF linked to this course' %}"{% endif %}>
                     Re-parse &amp; Re-plan
                 </button>
             </form>
@@ -343,22 +343,22 @@
                 {% csrf_token %}
                 <div style="margin-bottom: 0.75rem;">
                     <input type="file" name="curriculum_file" accept=".pdf,.docx,.doc,.txt" required
-                           class="form-control" style="font-size: 0.8125rem;">
+                           class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" style="font-size: 0.8125rem;">
                 </div>
                 <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-bottom:0.75rem;">
                     <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
                         First page
                         <input type="number" name="first_page" min="1" step="1" placeholder="{% trans 'start' %}"
-                               class="form-control" style="width:5.5rem;">
+                               class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" style="width:5.5rem;">
                     </label>
                     <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--gray-600);">
                         Last page
                         <input type="number" name="last_page" min="1" step="1" placeholder="end"
-                               class="form-control" style="width:5.5rem;">
+                               class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" style="width:5.5rem;">
                     </label>
                     <span style="font-size:0.75rem;color:var(--gray-400);">optional — for multi-grade PDFs</span>
                 </div>
-                <button type="submit" class="btn btn-sm" style="background: var(--primary); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;">
+                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--primary); color: var(--surface); border: none; border-radius: 6px; padding: 0.5rem 1rem; font-weight: 600;">
                     Upload &amp; add to course
                 </button>
             </form>
@@ -370,25 +370,25 @@
 <!-- Stats Bar -->
 <div class="stats-bar">
     <div class="stat-item">
-        <div class="stat-value">{{ total_lessons }}</div>
-        <div class="stat-label">{% trans "Total Lessons" %}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ total_lessons }}</div>
+        <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Total Lessons" %}</div>
     </div>
     <div class="stat-item">
-        <div class="stat-value" style="color: var(--success);">{{ lessons_with_content }}</div>
-        <div class="stat-label">{% trans "With Content" %}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--success);">{{ lessons_with_content }}</div>
+        <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "With Content" %}</div>
     </div>
     <div class="stat-item">
-        <div class="stat-value" style="color: var(--info);">{{ total_media }}</div>
-        <div class="stat-label">{% trans "Media Assets" %}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--info);">{{ total_media }}</div>
+        <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Media Assets" %}</div>
     </div>
     <div class="stat-item">
-        <div class="stat-value" style="color: var(--warning);">{{ total_media_pending }}</div>
-        <div class="stat-label">{% trans "Media Pending" %}</div>
+        <div class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text" style="color: var(--warning);">{{ total_media_pending }}</div>
+        <div class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Media Pending" %}</div>
     </div>
     <div style="flex: 1;"></div>
     <div class="stat-item" style="min-width: 150px;">
         <div style="margin-bottom: 0.25rem; font-size: 0.75rem; color: var(--gray-500);">{% trans "Content Progress" %}</div>
-        <div class="progress-bar">
+        <div class="progress-bar h-[6px] bg-warm-200 rounded-full overflow-hidden">
             {% if total_lessons > 0 %}
                 {% widthratio lessons_with_content total_lessons 100 as progress %}
             {% else %}
@@ -420,24 +420,24 @@
 {% endif %}
 
 <!-- Teaching Materials -->
-<div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header collapsible-header collapsed" onclick="toggleCollapse(this)">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom: 1.5rem;">
+    <div class="card-header collapsible-header collapsed flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" onclick="toggleCollapse(this)">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
-            <h3 class="card-title" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
+            <h3 class="font-display text-md font-medium tracking-tight m-0" style="margin: 0;">Teaching Materials{% if materials %} ({{ materials|length }}){% endif %}</h3>
         </div>
         {% if can_edit_content %}
         <div style="display:flex;gap:0.5rem;" onclick="event.stopPropagation();">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="showUploadForm(this)">
+            <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="showUploadForm(this)">
                 + Upload Material
             </button>
         </div>
         {% endif %}
     </div>
     <div class="collapsible-body collapsed" style="max-height: 2000px;">
-        <div class="card-body" style="padding: 0;">
+        <div class="card-body p-5" style="padding: 0;">
             {% if materials %}
             <!-- Filter & Batch Actions Bar -->
             {% if can_edit_content %}
@@ -445,17 +445,17 @@
                 <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
                     <div style="display:flex;gap:0.25rem;align-items:center;">
                         <span style="font-size:0.75rem;color:var(--gray-500);">{% trans "Status:" %}</span>
-                        <button type="button" class="btn btn-sm mat-filter active" data-filter="all" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="pending" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Pending" %}</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="processing" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Processing" %}</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="completed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Completed" %}</button>
-                        <button type="button" class="btn btn-sm mat-filter" data-filter="failed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Failed" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter active inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="all" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
+                        <button type="button" class="btn btn-sm mat-filter inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="pending" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Pending" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="processing" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Processing" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="completed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Completed" %}</button>
+                        <button type="button" class="btn btn-sm mat-filter inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="failed" data-filter-type="status" onclick="filterMaterials(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{% trans "Failed" %}</button>
                     </div>
                     <div style="display:flex;gap:0.25rem;align-items:center;">
                         <span style="font-size:0.75rem;color:var(--gray-500);">Type:</span>
-                        <button type="button" class="btn btn-sm type-filter active" data-filter="all" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
+                        <button type="button" class="btn btn-sm type-filter active inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="all" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">All</button>
                         {% for code, name in material_types %}
-                        <button type="button" class="btn btn-sm type-filter" data-filter="{{ code }}" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{{ name }}</button>
+                        <button type="button" class="btn btn-sm type-filter inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-filter="{{ code }}" onclick="filterMaterialType(this)" style="font-size:0.7rem;padding:0.2rem 0.5rem;">{{ name }}</button>
                         {% endfor %}
                     </div>
                 </div>
@@ -465,10 +465,10 @@
                         {% csrf_token %}
                         <input type="hidden" name="material_ids" id="batch-material-ids" value="">
                         <input type="hidden" name="mode" id="batch-mode" value="rich">
-                        <button type="submit" class="btn btn-primary btn-sm" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='rich';this.innerHTML='Processing...';">
+                        <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='rich';this.innerHTML='Processing...';">
                             Process Rich
                         </button>
-                        <button type="submit" class="btn btn-secondary btn-sm" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='fast';this.innerHTML='Processing...';">
+                        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="font-size:0.75rem;" onclick="document.getElementById('batch-mode').value='fast';this.innerHTML='Processing...';">
                             Process Fast
                         </button>
                     </form>
@@ -476,7 +476,7 @@
             </div>
             {% endif %}
 
-            <table class="table" id="materials-table">
+            <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]" id="materials-table">
                 <thead>
                     <tr>
                         {% if can_edit_content %}<th style="width:32px;"><input type="checkbox" id="select-all-mat" onchange="toggleAllMaterials(this)" title="{% trans 'Select all' %}"></th>{% endif %}
@@ -497,12 +497,12 @@
                             <div style="font-size: 0.8125rem; color: var(--gray-500);">{{ m.description|truncatewords:8 }}</div>
                             {% endif %}
                         </td>
-                        <td><span class="badge badge-secondary" style="font-size:0.6875rem;">{{ m.get_material_type_display }}</span></td>
+                        <td><span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="font-size:0.6875rem;">{{ m.get_material_type_display }}</span></td>
                         <td>
                             {% if m.status == 'completed' %}
-                                <span class="badge badge-success">{% trans "Completed" %}</span>
+                                <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-success-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-success-surface text-success">{% trans "Completed" %}</span>
                             {% elif m.status == 'processing' %}
-                                <span class="badge badge-warning">{% trans "Processing" %}</span>
+                                <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-warning-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-warning-surface text-warning">{% trans "Processing" %}</span>
                                 {% if m.pages_total > 0 %}
                                 <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">
                                     {{ m.pages_processed }} / {{ m.pages_total }} pages
@@ -512,33 +512,33 @@
                                 </div>
                                 {% endif %}
                             {% elif m.status == 'pending_confirmation' %}
-                                <span class="badge" style="background:var(--warning-surface);color:var(--warning);">{% trans "Confirm to start" %}</span>
+                                <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--warning-surface);color:var(--warning);">{% trans "Confirm to start" %}</span>
                                 <div style="font-size:0.7rem;color:var(--gray-600);margin-top:0.2rem;">{{ m.pages_total }} pages</div>
                             {% elif m.status == 'failed' %}
-                                <span class="badge badge-danger" title="{{ m.error_message|truncatechars:200 }}">{% trans "Failed" %}</span>
+                                <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-danger-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-danger-surface text-danger" title="{{ m.error_message|truncatechars:200 }}">{% trans "Failed" %}</span>
                             {% else %}
-                                <span class="badge badge-secondary">{% trans "Pending" %}</span>
+                                <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{% trans "Pending" %}</span>
                             {% endif %}
                         </td>
                         <td>{{ m.chunks_created }}</td>
                         <td style="white-space: nowrap;">
-                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary" style="font-size:0.75rem;padding:0.25rem 0.5rem;">{% trans "Details" %}</a>
+                            <a href="{% url 'dashboard:material_process' upload_id=m.id %}" class="btn btn-sm btn-secondary inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="font-size:0.75rem;padding:0.25rem 0.5rem;">{% trans "Details" %}</a>
                             {% if can_edit_content and m.status != 'completed' %}
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
                                 <input type="hidden" name="mode" value="rich">
-                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--info-solid);color:var(--surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="{% trans 'Process with LLM vision' %}">Rich</button>
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--info-solid);color:var(--surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="{% trans 'Process with LLM vision' %}">Rich</button>
                             </form>
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
                                 <input type="hidden" name="mode" value="fast">
-                                <button type="submit" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.4rem;" onclick="this.innerHTML='...';" title="{% trans 'Process text only' %}">Fast</button>
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.7rem;padding:0.2rem 0.4rem;" onclick="this.innerHTML='...';" title="{% trans 'Process text only' %}">Fast</button>
                             </form>
                             <form method="post" action="{% url 'dashboard:material_delete' material_id=m.id %}" style="display:inline;" onsubmit="return confirm('Delete {{ m.title|escapejs }}?');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm" style="color: var(--danger); padding: 0.2rem 0.4rem; font-size:0.75rem;">✕</button>
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="color: var(--danger); padding: 0.2rem 0.4rem; font-size:0.75rem;">✕</button>
                             </form>
                             {% endif %}
                         </td>
@@ -557,24 +557,24 @@
                 <form method="post" action="{% url 'dashboard:course_upload_material' course.id %}" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">{% trans "Files (select multiple)" %}</label>
-                            <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control" multiple required>
+                        <div class="form-group mb-4" style="grid-column: 1 / -1;">
+                            <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Files (select multiple)" %}</label>
+                            <input type="file" name="material_files" accept=".pdf,.docx,.doc,.txt" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" multiple required>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Title</label>
-                            <input type="text" name="material_title" class="form-control" placeholder="{% trans 'e.g., S3 Geography Worksheets' %}" required>
+                        <div class="form-group mb-4">
+                            <label class="form-label block mb-1 text-xs font-bold text-text-secondary">Title</label>
+                            <input type="text" name="material_title" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" placeholder="{% trans 'e.g., S3 Geography Worksheets' %}" required>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Type</label>
-                            <select name="material_type" class="form-control">
+                        <div class="form-group mb-4">
+                            <label class="form-label block mb-1 text-xs font-bold text-text-secondary">Type</label>
+                            <select name="material_type" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]">
                                 {% for code, name in material_types %}
                                 <option value="{{ code }}">{{ name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label class="form-label">{% trans "Processing Mode" %}</label>
+                        <div class="form-group mb-4" style="grid-column: 1 / -1;">
+                            <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Processing Mode" %}</label>
                             <div style="display:flex;gap:1rem;">
                                 <label style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;border:2px solid var(--gray-200);border-radius:0.5rem;cursor:pointer;flex:1;">
                                     <input type="radio" name="processing_mode" value="rich" checked style="accent-color:var(--info-solid);">
@@ -594,8 +594,8 @@
                         </div>
                     </div>
                     <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                        <button type="submit" class="btn btn-primary btn-sm">{% trans "Upload & Process" %}</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('material-upload-form').style.display='none';">{% trans "Cancel" %}</button>
+                        <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Upload & Process" %}</button>
+                        <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="document.getElementById('material-upload-form').style.display='none';">{% trans "Cancel" %}</button>
                     </div>
                 </form>
             </div>
@@ -616,12 +616,12 @@
     {% if active_upload %}
     <form method="post" action="{% url 'dashboard:cancel_generation' active_upload.id %}" style="display: inline;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
+        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
             ⛔ Stop Generation
         </button>
     </form>
     {% else %}
-    <button class="btn btn-secondary" disabled>{% trans "Generating..." %}</button>
+    <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" disabled>{% trans "Generating..." %}</button>
     {% endif %}
 </div>
 {% elif lessons_without_content > 0 and can_edit_content %}
@@ -633,7 +633,7 @@
     </div>
     <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display:inline;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Generate content for all {{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }}? This runs in the background and will take a while.');">
+        <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" onclick="return confirm('Generate content for all {{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }}? This runs in the background and will take a while.');">
             ⚡ Generate All Content
         </button>
     </form>
@@ -677,7 +677,7 @@
             <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:var(--success-solid);">
             Allow students to change
         </label>
-        <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#34d399; color:var(--success);">
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:#34d399; color:var(--success);">
             Apply
         </button>
     </form>
@@ -720,7 +720,7 @@ can_regenerate_courses.
             <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
             Re-do already-done
         </label>
-        <button type="submit" class="btn btn-secondary btn-sm"
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                 style="border-color:#7dd3fc; color:#0369a1;"
                 title='{% trans "Generate any image whose URL is empty. With Re-do already-done checked: regenerate every image." %}'>
             🖼️ Generate images
@@ -752,7 +752,7 @@ can_regenerate_courses.
             <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
             Re-do already-done
         </label>
-        <button type="submit" class="btn btn-secondary btn-sm"
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                 style="border-color:#7dd3fc; color:#0369a1;"
                 title='{% trans "Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With Re-do already-done checked: re-judge everything (overwrite)." %}'>
             🔍 Run AI review
@@ -789,7 +789,7 @@ regeneration.
             Summative bank
         </label>
         {% endif %}
-        <button type="submit" class="btn btn-secondary btn-sm" style="border-color:#a78bfa; color:var(--accent);"
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:#a78bfa; color:var(--accent);"
                 onclick="return confirm('Regenerate the selected content?\n\nAll student data is preserved — mastery levels, competency transcript, AND exit-ticket attempt history.\nRuns 10 lessons in parallel in the background — this page auto-refreshes every 12s while content is generating.');">
             🔁 Regenerate
         </button>
@@ -803,7 +803,7 @@ staff user — NOT gated by can_edit_content (which governs lesson
 content editing). Teachers in the pilot need to assign weekly
 lessons even when curriculum editing is locked down.
 {% endcomment %}
-<details class="card" style="margin: 1rem 0 2rem; padding: 0; overflow: hidden;">
+<details class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin: 1rem 0 2rem; padding: 0; overflow: hidden;">
     <summary style="cursor:pointer; padding:1rem 1.25rem; font-weight:600; color:var(--text-secondary); font-size:0.95rem; background:var(--surface-sunken); list-style:none; display:flex; justify-content:space-between; align-items:center;">
         <span>📅 Weekly assignments <span style="font-size:0.78rem;color:var(--text-muted);font-weight:500;margin-left:0.5rem;">— students see these in their weekly panel + Monday email</span></span>
         <span style="font-size:0.78rem;color:var(--text-muted);">{{ weekly_assignments|length }} weeks visible</span>
@@ -824,7 +824,7 @@ lessons even when curriculum editing is locked down.
                     <div style="font-size:0.8rem; color:var(--text-faint); margin-top:0.2rem;">{% trans "No lessons assigned for this week." %}</div>
                     {% endif %}
                 </div>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('wa-form-{{ forloop.counter0 }}').style.display='block'; this.style.display='none';">
+                <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="document.getElementById('wa-form-{{ forloop.counter0 }}').style.display='block'; this.style.display='none';">
                     {% if w.assignment %}Edit{% else %}Assign{% endif %}
                 </button>
             </div>
@@ -844,9 +844,9 @@ lessons even when curriculum editing is locked down.
                 </div>
                 <textarea name="notes" rows="2" placeholder="{% trans 'Optional message to students for this week...' %}" style="width:100%; margin-top:0.5rem; padding:0.45rem; border:1px solid var(--border); border-radius:8px; font-size:0.86rem; font-family:inherit;">{% if w.assignment %}{{ w.assignment.notes }}{% endif %}</textarea>
                 <div style="display:flex; gap:0.4rem; margin-top:0.5rem; flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary btn-sm">{% trans "Save assignment" %}</button>
+                    <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save assignment" %}</button>
                     {% if w.assignment %}
-                    <button type="submit" name="action" value="delete" class="btn btn-sm" style="color:var(--danger); border:1px solid var(--danger-border);" onclick="return confirm('Clear this week\'s assignment?');">{% trans "Clear week" %}</button>
+                    <button type="submit" name="action" value="delete" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="color:var(--danger); border:1px solid var(--danger-border);" onclick="return confirm('Clear this week\'s assignment?');">{% trans "Clear week" %}</button>
                     {% endif %}
                 </div>
             </form>
@@ -866,15 +866,15 @@ lessons even when curriculum editing is locked down.
 </div>
 {% endif %}
 {% endifchanged %}
-<div class="card unit-card" data-unit-id="{{ unit.id }}" style="margin-bottom: 1rem;">
-    <div class="card-header collapsible-header" style="background: var(--gray-50);" onclick="toggleCollapse(this)">
+<div class="card unit-card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" data-unit-id="{{ unit.id }}" style="margin-bottom: 1rem;">
+    <div class="card-header collapsible-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="background: var(--gray-50);" onclick="toggleCollapse(this)">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
             {% if can_edit_content %}<span class="unit-handle" title="{% trans 'Drag to reorder units' %}" onclick="event.stopPropagation();" style="cursor: grab; color: var(--gray-400); font-size: 1.1rem; line-height: 1; padding: 0 0.15rem; user-select: none;">⠿</span>{% endif %}
             <svg class="chevron" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
             <div>
-                <h3 class="card-title" style="margin: 0;">
+                <h3 class="font-display text-md font-medium tracking-tight m-0" style="margin: 0;">
                     {{ forloop.counter }}. {{ unit.title }}
                     {% if unit.grade_level %}<span style="font-size:0.6875rem;font-weight:600;background:var(--accent-surface);color:var(--accent);padding:2px 6px;border-radius:999px;margin-left:0.5rem;vertical-align:middle;">{{ unit.grade_level }}</span>{% endif %}
                 </h3>
@@ -883,10 +883,10 @@ lessons even when curriculum editing is locked down.
                 </p>
             </div>
         </div>
-        {% if can_edit_content %}<a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();">+ Add Lesson</a>{% endif %}
+        {% if can_edit_content %}<a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="event.stopPropagation();">+ Add Lesson</a>{% endif %}
     </div>
     <div class="collapsible-body" style="max-height: 2000px;">
-        <div class="card-body" style="padding: 0;">
+        <div class="card-body p-5" style="padding: 0;">
             {% if unit.lessons.all %}
 
             <!-- Header Row -->
@@ -979,7 +979,7 @@ lessons even when curriculum editing is locked down.
                             {% if can_regenerate_courses %}
                             <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5; font-size: 0.75rem;" title="{% trans 'Stop generating this lesson' %}">
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5; font-size: 0.75rem;" title="{% trans 'Stop generating this lesson' %}">
                                     ⛔
                                 </button>
                             </form>
@@ -995,22 +995,22 @@ lessons even when curriculum editing is locked down.
                             <form method="post" action="{% url 'dashboard:lesson_regenerate' lesson.id %}" style="display: inline;"
                                   onsubmit="return confirm('Regenerate this lesson?\n\nReplaces lesson steps and exit ticket. Mastery levels and the permanent competency transcript are preserved.');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-primary btn-sm"
+                                <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent"
                                         title="{% if lstats.content_status == 'ready' %}Regenerate this lesson{% else %}Generate this lesson{% endif %}">
                                     ⚡
                                 </button>
                             </form>
                         {% endif %}
                     {% endwith %}
-                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Review" %}</a>
-                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
+                    <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Review" %}</a>
+                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--info-solid);color:var(--surface);border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
                 </div>
             </div>
             {% endfor %}
             </div><!-- /.lessons-sortable -->
 
             {% else %}
-            <div class="empty-state" style="padding: 2rem;">
+            <div class="empty-state flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted text-sm [&_svg]:w-8 [&_svg]:h-8 [&_svg]:text-text-faint [&_svg]:mb-1 [&_h3]:text-md [&_h3]:font-medium [&_h3]:text-text-secondary [&_p]:max-w-[46ch] [&_p]:leading-normal" style="padding: 2rem;">
                 <p style="margin: 0;">{% trans "No lessons in this unit yet" %}</p>
             </div>
             {% endif %}
@@ -1018,21 +1018,21 @@ lessons even when curriculum editing is locked down.
     </div>
 </div>
 {% empty %}
-<div class="card">
-    <div class="empty-state">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="empty-state flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted text-sm [&_svg]:w-8 [&_svg]:h-8 [&_svg]:text-text-faint [&_svg]:mb-1 [&_h3]:text-md [&_h3]:font-medium [&_h3]:text-text-secondary [&_p]:max-w-[46ch] [&_p]:leading-normal">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px;">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
         </svg>
         <h3>{% trans "No Units Yet" %}</h3>
         <p>{% trans "Upload a curriculum document to automatically create units and lessons." %}</p>
-        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary">{% trans "Upload Curriculum" %}</a>
+        <a href="{% url 'dashboard:curriculum_upload' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Upload Curriculum" %}</a>
     </div>
 </div>
 {% endfor %}
 </div><!-- /#units-sortable -->
 
 {% if units %}
-<a href="{% url 'dashboard:unit_create' course.id %}" class="btn btn-secondary" style="margin-top: 1rem;">
+<a href="{% url 'dashboard:unit_create' course.id %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="margin-top: 1rem;">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>

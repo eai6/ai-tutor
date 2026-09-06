@@ -27,7 +27,9 @@
             lastFocused = document.activeElement;
             rail.classList.add('is-open');
             scrim.classList.add('is-open');
-            document.body.classList.add('rail-open');
+            // The utility travels with the marker: the marker is what the
+              // handlers test for, the utility is what the browser acts on.
+            document.body.classList.add('rail-open', 'overflow-hidden');
             toggle.setAttribute('aria-expanded', 'true');
             // Move focus into the drawer, otherwise a keyboard user opens it
             // and their next Tab lands somewhere behind the scrim.
@@ -39,7 +41,7 @@
             if (!rail.classList.contains('is-open')) { return; }
             rail.classList.remove('is-open');
             scrim.classList.remove('is-open');
-            document.body.classList.remove('rail-open');
+            document.body.classList.remove('rail-open', 'overflow-hidden');
             toggle.setAttribute('aria-expanded', 'false');
             if (returnFocus) {
                 (lastFocused || toggle).focus();

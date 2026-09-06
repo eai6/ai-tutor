@@ -11,26 +11,26 @@
         </header>
 
         <!-- Data Summary -->
-        <section class="card">
+        <section class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
             <h2>📊 Your Data Summary</h2>
             <div class="data-stats">
                 <div class="stat">
-                    <span class="stat-value">{{ data_summary.sessions }}</span>
-                    <span class="stat-label">Learning Sessions</span>
+                    <span class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ data_summary.sessions }}</span>
+                    <span class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">Learning Sessions</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-value">{{ data_summary.messages }}</span>
-                    <span class="stat-label">Messages</span>
+                    <span class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ data_summary.messages }}</span>
+                    <span class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">Messages</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-value">{{ data_summary.account_created|date:"M d, Y" }}</span>
-                    <span class="stat-label">Account Created</span>
+                    <span class="stat-value font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ data_summary.account_created|date:"M d, Y" }}</span>
+                    <span class="stat-label font-mono text-2xs tracking-wide uppercase text-text-muted">Account Created</span>
                 </div>
             </div>
         </section>
 
         <!-- Consent Management -->
-        <section class="card">
+        <section class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
             <h2>✅ Consent Preferences</h2>
             <p class="card-description">Control how your data is used</p>
             
@@ -67,7 +67,7 @@
         </section>
 
         <!-- Data Actions -->
-        <section class="card">
+        <section class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
             <h2>📥 Your Data Rights</h2>
             
             <div class="data-actions">
@@ -76,7 +76,7 @@
                         <h3>Download Your Data</h3>
                         <p>Get a copy of all your data (GDPR data portability)</p>
                     </div>
-                    <a href="{% url 'safety:export_data' %}" class="btn btn-secondary">
+                    <a href="{% url 'safety:export_data' %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                         📥 Download
                     </a>
                 </div>
@@ -86,7 +86,7 @@
                         <h3>Delete Your Data</h3>
                         <p>Permanently delete all your learning data</p>
                     </div>
-                    <button class="btn btn-danger" onclick="confirmDelete()">
+                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-danger-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-text-on-accent hover:bg-danger hover:border-danger hover:text-text-on-accent" onclick="confirmDelete()">
                         🗑️ Delete Data
                     </button>
                 </div>
@@ -96,7 +96,7 @@
                         <h3>Delete Account</h3>
                         <p>Delete your account and all associated data</p>
                     </div>
-                    <button class="btn btn-danger" onclick="confirmDeleteAccount()">
+                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-danger-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-text-on-accent hover:bg-danger hover:border-danger hover:text-text-on-accent" onclick="confirmDeleteAccount()">
                         ⚠️ Delete Account
                     </button>
                 </div>
@@ -117,8 +117,8 @@
         <h2>⚠️ Confirm Deletion</h2>
         <p id="delete-message"></p>
         <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+            <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-danger-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-text-on-accent hover:bg-danger hover:border-danger hover:text-text-on-accent" id="confirm-delete-btn">Delete</button>
         </div>
     </div>
 </div>

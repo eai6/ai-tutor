@@ -226,7 +226,7 @@
         {{ latest_run.screened }} of {{ latest_run.candidates }}.
         Every session goes through the LLM redaction pass, so this takes a few
         minutes. The page refreshes itself.
-        <div class="progress"><span style="width:{{ latest_run.progress_pct }}%"></span></div>
+        <div class="progress h-[6px] bg-warm-200 rounded-full overflow-hidden"><span style="width:{{ latest_run.progress_pct }}%"></span></div>
     {% elif latest_run.status == 'completed' %}
         <strong>Last run:</strong> screened {{ latest_run.screened }} session(s),
         created {{ latest_run.created_items }} new item(s) for review.
@@ -355,7 +355,7 @@
         </tbody>
     </table>
     {% else %}
-    <div class="empty">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         <p>No sessions match.</p>
         <p style="font-size:0.85rem;">
             Use <strong>Sample sessions</strong> above, or clear the filters if

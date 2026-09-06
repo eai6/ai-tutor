@@ -99,15 +99,15 @@
   <p class="sub">Runs offline. No internet needed once installed.</p>
 
   <div class="cards">
-    <div class="card">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
       <h2>macOS</h2>
       <p>Apple Silicon (M1 and newer)</p>
-      <a class="btn" href="{% url 'downloads:installer' 'macos' %}">Download .dmg</a>
+      <a class="btn inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="{% url 'downloads:installer' 'macos' %}">Download .dmg</a>
     </div>
-    <div class="card">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
       <h2>Windows</h2>
       <p>64-bit Windows 10 or 11</p>
-      <a class="btn" href="{% url 'downloads:installer' 'windows' %}">Download .zip</a>
+      <a class="btn inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="{% url 'downloads:installer' 'windows' %}">Download .zip</a>
     </div>
   </div>
 
@@ -151,7 +151,7 @@
     {% endblocktrans %}
   </p>
   <p style="margin:0 0 2rem">
-    <a class="btn" href="{% url 'self_hosting' %}">{% trans "Self-hosting instructions" %}</a>
+    <a class="btn inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="{% url 'self_hosting' %}">{% trans "Self-hosting instructions" %}</a>
   </p>
 
   <footer>

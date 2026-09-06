@@ -273,9 +273,9 @@
             </td>
             <td data-label="{% trans 'Status' %}">
                 <span>
-                    <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
-                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="{% blocktrans with mins=s.idle_minutes %}No activity for {{ mins }} min{% endblocktrans %}">{% blocktrans with mins=s.idle_minutes %}Idle {{ mins }}m{% endblocktrans %}</span>{% endif %}
-                    {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">{% trans "Remediation" %}</span>{% endif %}
+                    <span class="badge badge-{{ s.status }} inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{{ s.status }}</span>
+                    {% if s.is_idle %}<span class="badge badge-idle inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="margin-left:4px;" title="{% blocktrans with mins=s.idle_minutes %}No activity for {{ mins }} min{% endblocktrans %}">{% blocktrans with mins=s.idle_minutes %}Idle {{ mins }}m{% endblocktrans %}</span>{% endif %}
+                    {% if s.is_remediation %}<span class="badge badge-remediation inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="margin-left:4px;">{% trans "Remediation" %}</span>{% endif %}
                 </span>
             </td>
             <td data-label="{% trans 'Phase' %}">{{ s.display_phase|default:"--" }}</td>

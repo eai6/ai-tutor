@@ -134,10 +134,58 @@ def attention_item(item):
     return {'item': item}
 
 
+# Literal utility strings, one per (component, tone). They are literal on
+# purpose: Tailwind's scanner only sees class names that appear verbatim in a
+# scanned file, so an f-string that built "badge--success" at request time
+# would be invisible to it. The failure mode is quiet — the class works in
+# development, because an earlier build scanned it from the stylesheet that
+# has since been deleted, and ships with no styles at all.
+#
+# Empty means "the base class already covers it": neutral IS the base.
+TONE_UTILITIES = {
+    'badge': {
+        'neutral': '',
+        'success': 'bg-success-surface text-success border-success-border',
+        'warning': 'bg-warning-surface text-warning border-warning-border',
+        'danger':  'bg-danger-surface text-danger border-danger-border',
+        'info':    'bg-info-surface text-info border-info-border',
+        'accent':  'bg-accent-surface text-accent border-accent-border',
+    },
+    'tile__figure': {
+        'neutral': '',
+        'success': 'text-success',
+        'warning': 'text-warning',
+        'danger':  'text-danger',
+        'info':    'text-info',
+        'accent':  'text-accent',
+    },
+    'tile__note': {
+        'neutral': '',
+        'success': 'text-success font-medium',
+        'warning': 'text-warning font-medium',
+        'danger':  'text-danger font-medium',
+        'info':    'text-info font-medium',
+        'accent':  'text-accent font-medium',
+    },
+    'progress__fill': {
+        'neutral': '',
+        'success': 'bg-success-solid',
+        'warning': 'bg-warning-solid',
+        'danger':  'bg-danger-solid',
+        'info':    'bg-info-solid',
+        'accent':  '',
+    },
+}
+
+
 @register.simple_tag
 def tone_class(prefix, tone):
-    """Build a validated modifier class: {% tone_class "badge" row.tone %}."""
-    return mark_safe(f'{prefix}--{_tone(tone)}')
+    """The utilities for one component in one tone.
+
+    {% tone_class "badge" row.tone %} — a complete literal string looked up
+    here, never a modifier name assembled from parts.
+    """
+    return mark_safe(TONE_UTILITIES.get(prefix, {}).get(_tone(tone), ''))
 
 
 @register.filter

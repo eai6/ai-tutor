@@ -1,12 +1,12 @@
 {% load i18n dashboard_ui %}
-<div class="tile">
-    <span class="tile__label">{{ label }}</span>
-    <span class="tile__figure {% if tone != 'neutral' %}{% tone_class 'tile__figure' tone %}{% endif %}">{{ value }}</span>
-    {% if note %}<span class="tile__note {% if note_tone %}{% tone_class 'tile__note' note_tone %}{% endif %}">{{ note }}</span>{% endif %}
+<div class="tile flex flex-col gap-1 p-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)]">
+    <span class="font-mono text-2xs tracking-wide uppercase text-text-muted">{{ label }}</span>
+    <span class="{% if tone != 'neutral' %}{% tone_class 'tile__figure' tone %}{% endif %} font-display text-2xl font-medium leading-[1.05] tracking-tight [font-variant-numeric:tabular-nums] text-text">{{ value }}</span>
+    {% if note %}<span class="{% if note_tone %}{% tone_class 'tile__note' note_tone %}{% endif %} text-xs text-text-muted leading-snug">{{ note }}</span>{% endif %}
     {% if hint %}
-    <details class="footnote">
+    <details class="footnote text-xs text-text-muted [&>summary]:inline-flex [&>summary]:items-center [&>summary]:gap-1 [&>summary]:cursor-pointer [&>summary]:list-none [&>summary]:text-text-muted [&>summary]:rounded-xs [&>summary]:py-[2px] [&>summary]:px-0 [&>summary::-webkit-details-marker]:hidden [&>summary:hover]:text-text-secondary [&>summary_.icon]:transition-transform [&>summary_.icon]:duration-[var(--dur-fast)] [&>summary_.icon]:ease-[var(--ease-out)] [&[open] > summary .icon]:[transform:rotate(90deg)]">
         <summary>{% icon "chevron-right" size="sm" %}{% trans "How this is counted" %}</summary>
-        <div class="footnote__body">{{ hint }}</div>
+        <div class="mt-2 p-3 bg-surface-sunken rounded-sm border-l-[2px] border-l-border-strong leading-normal max-w-[72ch]">{{ hint }}</div>
     </details>
     {% endif %}
 </div>

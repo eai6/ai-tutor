@@ -9,9 +9,9 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
         <h1 style="margin: 0;">{% trans "Content Edit Events" %} <span style="font-weight: normal; color: var(--gray-500); font-size: 1rem;">({{ total }})</span></h1>
         <div style="display: flex; gap: 0.5rem;">
-            <a class="btn btn-sm" href="{% url 'dashboard:content_edit_dashboard' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" style="background: var(--primary, var(--accent)); color: white; border: none;">📊 {% trans "Dashboard" %}</a>
-            <a class="btn btn-sm" href="export.csv{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ CSV</a>
-            <a class="btn btn-sm" href="export.jsonl{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ JSONL</a>
+            <a class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="{% url 'dashboard:content_edit_dashboard' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" style="background: var(--primary, var(--accent)); color: white; border: none;">📊 {% trans "Dashboard" %}</a>
+            <a class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="export.csv{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ CSV</a>
+            <a class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="export.jsonl{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">⬇ JSONL</a>
         </div>
     </div>
 
@@ -47,7 +47,7 @@
         <label style="font-size: 0.8125rem;">{% trans "Lesson ID:" %}
             <input type="number" name="lesson_id" value="{{ filters.lesson_id }}" style="width: 5rem; padding: 0.25rem;">
         </label>
-        <button type="submit" class="btn btn-sm" style="background: var(--primary, var(--accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
+        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--primary, var(--accent)); color: white; border: none; padding: 0.25rem 0.75rem; border-radius: 0.25rem;">{% trans "Apply" %}</button>
         {% if filters.content_type or filters.source or filters.tag or filters.lesson_id %}
         <a href="{% url 'dashboard:content_edit_events_list' %}" style="font-size: 0.8125rem;">{% trans "clear" %}</a>
         {% endif %}
@@ -89,7 +89,7 @@
                     {% endfor %}
                 </td>
                 <td style="padding: 0.5rem; color: var(--gray-600);">{% if evt.edited_by %}{{ evt.edited_by.username }}{% else %}—{% endif %}</td>
-                <td style="padding: 0.5rem;"><a href="{% url 'dashboard:content_edit_event_detail' event_id=evt.id %}" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.125rem 0.5rem;">{% trans "Open" %}</a></td>
+                <td style="padding: 0.5rem;"><a href="{% url 'dashboard:content_edit_event_detail' event_id=evt.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size: 0.75rem; padding: 0.125rem 0.5rem;">{% trans "Open" %}</a></td>
             </tr>
             {% empty %}
             <tr><td colspan="7" style="padding: 2rem; text-align: center; color: var(--gray-500);">{% trans "No content edit events match these filters." %}</td></tr>

@@ -4,7 +4,7 @@
 {% block title %}{% trans "Students" %}{% endblock %}
 {% block page_title %}{% trans "Students" %}{% endblock %}
 {% block topbar_eyebrow %}
-<span class="topbar-eyebrow">{% blocktrans count n=total_count %}{{ n }} on roll{% plural %}{{ n }} on roll{% endblocktrans %}</span>
+<span class="max-[560px]:hidden font-mono text-2xs tracking-wide uppercase text-text-muted">{% blocktrans count n=total_count %}{{ n }} on roll{% plural %}{{ n }} on roll{% endblocktrans %}</span>
 {% endblock %}
 
 {% comment %}
@@ -13,20 +13,20 @@ teacher does on this page, and it now sits at a fixed position that does not
 move as the table grows.
 {% endcomment %}
 {% block topbar_actions %}
-<div class="search">
+<div class="search relative flex items-center [&_.icon]:absolute [&_.icon]:left-3 [&_.icon]:text-text-muted [&_.icon]:pointer-events-none [&_.icon]:text-[1rem] [&_.input]:pl-[calc(calc(var(--spacing)*3)_+_1rem_+_calc(var(--spacing)*2))]">
     {% icon "search" %}
     <label for="student-search" class="sr-only">{% trans "Search students by name" %}</label>
-    <input type="search" id="student-search" class="input input--sm" autocomplete="off"
+    <input type="search" id="student-search" class="input w-full min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&[aria-invalid='true']]:border-danger-solid pt-1 pb-1" autocomplete="off"
            placeholder="{% trans 'Search students…' %}">
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card__body card__body--flush">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="card__body p-0">
         {% if students %}
-        <div class="table-wrap">
-            <table class="table">
+        <div class="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+            <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]">
                 <thead>
                     <tr>
                         <th scope="col">{% trans "Student" %}</th>
@@ -41,21 +41,21 @@ move as the table grows.
                     {% for s in students %}
                     <tr class="student-row" data-search="{{ s.user.first_name }} {{ s.user.last_name }} {{ s.user.email }}">
                         <td>
-                            <div class="cell-primary">
-                                <span class="avatar avatar--sm" aria-hidden="true">{{ s.user.first_name|slice:":1"|upper }}{{ s.user.last_name|slice:":1"|upper }}</span>
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="avatar w-[30px] h-[30px] flex-none rounded-full grid place-items-center bg-primary-light text-primary-ink border border-primary-tint font-display text-xs font-bold tracking-[0]" aria-hidden="true">{{ s.user.first_name|slice:":1"|upper }}{{ s.user.last_name|slice:":1"|upper }}</span>
                                 <span>
-                                    <span class="cell-primary__name">{{ s.user.first_name }} {{ s.user.last_name }}</span>
-                                    <span class="cell-primary__meta truncate">{{ s.user.email }}</span>
+                                    <span class="block font-bold text-text leading-[1.3]">{{ s.user.first_name }} {{ s.user.last_name }}</span>
+                                    <span class="truncate block text-xs text-text-muted leading-[1.3] overflow-hidden truncate whitespace-nowrap">{{ s.user.email }}</span>
                                 </span>
                             </div>
                         </td>
                         <td>
                             {% if s.profile %}{% badge s.profile.grade_level tone="info" %}
-                            {% else %}<span class="muted">—</span>{% endif %}
+                            {% else %}<span class="muted text-text-muted">—</span>{% endif %}
                         </td>
                         <td class="text-sm">
                             {% if s.profile %}{{ s.profile.get_school_display_name }}
-                            {% else %}<span class="muted">—</span>{% endif %}
+                            {% else %}<span class="muted text-text-muted">—</span>{% endif %}
                         </td>
                         <td>
                             {% comment %}
@@ -72,10 +72,10 @@ move as the table grows.
                         </td>
                         <td class="text-sm">
                             {% if s.last_active %}{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}
-                            {% else %}<span class="muted">{% trans "Never" %}</span>{% endif %}
+                            {% else %}<span class="muted text-text-muted">{% trans "Never" %}</span>{% endif %}
                         </td>
-                        <td class="row-actions">
-                            <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn--secondary btn--sm">
+                        <td class="row-actions text-right whitespace-nowrap [&_.btn]:text-text-muted [&_.btn]:border-border [&_.btn:focus-visible]:text-text [&_.btn:focus-visible]:border-border-strong [&_.btn:focus-visible]:bg-surface [tr:hover_&_.btn]:text-text [tr:hover_&_.btn]:border-border-strong [tr:hover_&_.btn]:bg-surface">
+                            <a href="{% url 'dashboard:student_detail' s.user.id %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                                 {% trans "Open" %}<span class="sr-only"> {{ s.user.first_name }} {{ s.user.last_name }}</span>
                             </a>
                         </td>
@@ -86,22 +86,22 @@ move as the table grows.
         </div>
 
         {# Announced when the client-side filter empties the table. #}
-        <p class="empty" id="no-matches" hidden role="status">
+        <p class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1" id="no-matches" hidden role="status">
             {% trans "No students match that search." %}
         </p>
 
         {% if students.has_other_pages %}
-        <nav class="pagination" aria-label="{% trans 'Student list pages' %}">
+        <nav class="flex items-center justify-center gap-3 py-3 px-5 border-t border-t-border" aria-label="{% trans 'Student list pages' %}">
             {% if students.has_previous %}
-            <a href="?page={{ students.previous_page_number }}" class="btn btn--secondary btn--sm">
+            <a href="?page={{ students.previous_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                 {% icon "arrow-left" size="sm" %}{% trans "Previous" %}
             </a>
             {% endif %}
-            <span class="pagination__status">
+            <span class="text-xs text-text-muted [font-variant-numeric:tabular-nums]">
                 {% blocktrans with current=students.number total=students.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
             </span>
             {% if students.has_next %}
-            <a href="?page={{ students.next_page_number }}" class="btn btn--secondary btn--sm">
+            <a href="?page={{ students.next_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                 {% trans "Next" %}{% icon "arrow-right" size="sm" %}
             </a>
             {% endif %}

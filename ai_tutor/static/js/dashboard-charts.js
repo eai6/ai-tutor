@@ -1,3 +1,18 @@
+// Literal utility strings, not names assembled at runtime.
+//
+// Tailwind's scanner reads source text; a class this file builds by
+// concatenation is invisible to it and ships with no styles. The BEM names are
+// kept alongside the utilities because other rules select through them —
+// .chart__col's hover rule reaches .chart__bar by name.
+const CHART = {
+    gridline: 'border-t [border-top-style:dashed] border-t-border h-0',
+    gridlineBase: 'border-t border-t-border-strong',
+    col: 'flex-1 min-w-0 flex flex-col justify-end items-stretch [&:hover_.chart__bar]:bg-primary-dark',
+    bar: 'motion-reduce:transition-none w-full rounded-tl-xs rounded-tr-xs bg-accent-solid [transition:height_var(--dur-slow)_var(--ease-out),_background_var(--dur-fast)_var(--ease-out)]',
+    xLabel: 'flex-1 min-w-0 text-center whitespace-nowrap',
+    xLabelShown: 'overflow-visible',
+};
+
 /* Overview charts.
  *
  * One div-based chart: sessions over time. No charting library — production
@@ -62,7 +77,8 @@
         if (!el) { return; }
         for (var i = 0; i < count; i++) {
             var line = document.createElement('div');
-            line.className = 'chart__gridline' + (i === count - 1 ? ' chart__gridline--base' : '');
+            line.className = 'chart__gridline ' + CHART.gridline
+                + (i === count - 1 ? ' chart__gridline--base ' + CHART.gridlineBase : '');
             el.appendChild(line);
         }
     }
@@ -71,10 +87,10 @@
      *  colour included, comes from charts.css. */
     function addBar(barsEl, heightPct, hasValue, title) {
         var col = document.createElement('div');
-        col.className = 'chart__col';
+        col.className = 'chart__col ' + CHART.col;
 
         var bar = document.createElement('div');
-        bar.className = 'chart__bar';
+        bar.className = 'chart__bar ' + CHART.bar;
         bar.style.height = heightPct + '%';
         bar.style.minHeight = hasValue ? '2px' : '0';
         bar.title = title;
@@ -85,7 +101,8 @@
 
     function addXLabel(xEl, text, shown) {
         var cell = document.createElement('div');
-        cell.className = 'chart__x-label' + (shown ? ' chart__x-label--shown' : '');
+        cell.className = 'chart__x-label ' + CHART.xLabel
+            + (shown ? ' chart__x-label--shown ' + CHART.xLabelShown : '');
         cell.textContent = shown ? text : '';
         if (text) { cell.title = text; }
         xEl.appendChild(cell);

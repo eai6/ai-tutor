@@ -56,7 +56,15 @@
 @source "../static/js/**/*.js";
 @source "../apps/**/*.py";
 
-@theme {
+/* `static` because this theme is read by more than Tailwind's own utilities.
+   ---------------------------------------------------------------------------
+   By default v4 emits only the variables some generated utility references,
+   and drops the rest. That is right for a theme nobody else reads, and wrong
+   here: an arbitrary value like shadow-[var(--shadow-xs)] mentions --shadow-xs
+   in a string Tailwind does not resolve, so the variable was tree-shaken and
+   every card on the dashboard rendered with box-shadow: none. The same held
+   for --dur-*, --ease-*, --rail-width and the scoped skin below. */
+@theme static {
   /* ------------------------------------------------------------------------
      PRIMITIVE — warm neutral ramp
      ------------------------------------------------------------------------
@@ -237,6 +245,31 @@
   --text-xl:   1.625rem;   /* 26px — page title                */
   --text-2xl:  2.125rem;   /* 34px — metric figures            */
   --text-3xl:  2.75rem;    /* 44px — the gain bridge figures   */
+
+  /* A size sets a size and nothing else.
+     ---------------------------------------------------------------------
+     Tailwind pairs every --text-* with a --text-*--line-height and applies
+     both from one utility. This design does not work that way: the sheets it
+     replaces set font-size alone and let line-height come from the body's
+     --leading-normal, or from an explicit rule. Leaving the pairing at
+     Tailwind's defaults silently re-set line-height on every sized element —
+     14px text went from 21.7px leading to 21px, and the drift accumulated
+     down the page.
+
+     `initial` REMOVES the key rather than setting a value, so the size
+     utilities emit font-size and nothing else. `inherit` was the first
+     attempt and was subtly wrong: it forced inheritance onto form controls,
+     whose UA default is line-height: normal, making every input 2px taller
+     than the sheet it replaced. */
+  --text-2xs--line-height:  initial;
+  --text-xs--line-height:   initial;
+  --text-sm--line-height:   initial;
+  --text-base--line-height: initial;
+  --text-md--line-height:   initial;
+  --text-lg--line-height:   initial;
+  --text-xl--line-height:   initial;
+  --text-2xl--line-height:  initial;
+  --text-3xl--line-height:  initial;
 
   --leading-tight:  1.15;
   --leading-snug:   1.35;

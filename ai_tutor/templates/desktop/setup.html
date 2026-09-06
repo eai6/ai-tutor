@@ -69,14 +69,14 @@ in place.
     unless you set a school server in step 3.</p>
 
   <!-- ── model ─────────────────────────────────────────────────────── -->
-  <div class="card" id="model-card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="model-card">
     <h2>1. Tutor model</h2>
     <p>The model is about 2.5&nbsp;GB, so it is not included in the installer.
        Add it from a setup drive, or download it if this computer is online.</p>
 
-    <div class="state" id="model-state"><span class="dot"></span><span id="model-label">Checking…</span></div>
+    <div class="state" id="model-state"><span class="dot w-[7px] h-[7px] flex-none rounded-full bg-current"></span><span id="model-label">Checking…</span></div>
 
-    <div class="row" id="model-actions">
+    <div class="row flex items-center gap-3 flex-wrap" id="model-actions">
       <button class="primary" id="pick-model">Choose model file…</button>
       <button id="download-model">Download (needs internet)</button>
     </div>
@@ -97,18 +97,18 @@ in place.
   lesson content still answers — it just answers ungrounded, and nothing on
   screen would say so.
   {% endcomment %}
-  <div class="card" id="assets-card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="assets-card">
     <h2>2. Model files</h2>
     <p>The tutor's content search and read-aloud voice. Kept out of the app
       download so updates stay small.</p>
     {% for asset in assets %}
       <div class="state">
-        <span class="dot" style="background:{% if asset.installed %}var(--ok){% else %}{% if asset.required %}var(--bad){% else %}var(--muted){% endif %}{% endif %}"></span>
+        <span class="dot w-[7px] h-[7px] flex-none rounded-full bg-current" style="background:{% if asset.installed %}var(--ok){% else %}{% if asset.required %}var(--bad){% else %}var(--muted){% endif %}{% endif %}"></span>
         <span>{{ asset.label }}{% if not asset.required %} <span style="color:var(--muted)">— optional</span>{% endif %}:
           {% if asset.installed %}Installed{% else %}Not installed yet{% endif %}</span>
       </div>
     {% endfor %}
-    <div class="row" style="margin-top:12px">
+    <div class="row flex items-center gap-3 flex-wrap" style="margin-top:12px">
       <button class="primary" id="pick-assets">Choose model files folder…</button>
     </div>
     <div class="err" id="assets-error" hidden></div>
@@ -117,11 +117,11 @@ in place.
   </div>
 
   <!-- ── lessons ───────────────────────────────────────────────────── -->
-  <div class="card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
     <h2>2. Lessons</h2>
     <p>Course content, exercises and pictures for your school.</p>
-    <div class="state" id="pack-state"><span class="dot"></span><span id="pack-label">Checking…</span></div>
-    <div class="row"><button class="primary" id="pick-pack">Choose lesson pack…</button></div>
+    <div class="state" id="pack-state"><span class="dot w-[7px] h-[7px] flex-none rounded-full bg-current"></span><span id="pack-label">Checking…</span></div>
+    <div class="row flex items-center gap-3 flex-wrap"><button class="primary" id="pick-pack">Choose lesson pack…</button></div>
     <div class="detail" id="pack-detail" style="margin-top:12px"></div>
     <div class="err" id="pack-error" hidden></div>
     <div class="hint">Choose the setup drive folder, or the
@@ -133,15 +133,15 @@ in place.
   required-looking third step would imply this computer is not ready until
   someone finds a server address.
   {% endcomment %}
-  <div class="card">
+  <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
     <h2>3. School server <span style="font-weight:400;color:var(--muted)">— optional</span></h2>
     <p>Send finished work to your school's server. Leave this out to work
        entirely offline.</p>
-    <div class="row"><a class="launch" style="display:inline-block"
+    <div class="row flex items-center gap-3 flex-wrap"><a class="launch" style="display:inline-block"
        href="{% url 'desktop:server' %}">Set server address</a></div>
   </div>
 
-  <div class="card done" id="finish" hidden>
+  <div class="card done bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" id="finish" hidden>
     <h2 style="margin-bottom:10px">Ready to teach</h2>
     <a class="launch" href="/student/login/">Start</a>
   </div>

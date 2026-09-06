@@ -4,18 +4,18 @@
 {% block title %}{% trans "Classes" %}{% endblock %}
 {% block page_title %}{% trans "Classes" %}{% endblock %}
 {% block topbar_eyebrow %}
-<span class="topbar-eyebrow">{% blocktrans count n=classes|length %}{{ n }} class{% plural %}{{ n }} classes{% endblocktrans %}</span>
+<span class="max-[560px]:hidden font-mono text-2xs tracking-wide uppercase text-text-muted">{% blocktrans count n=classes|length %}{{ n }} class{% plural %}{{ n }} classes{% endblocktrans %}</span>
 {% endblock %}
 
 {% block content %}
-<div class="stack">
+<div class="stack [&>*_+_*]:mt-5">
 
     {% comment %}
     One line of orientation, not a paragraph. The old copy explained where
     promotion lives, which belongs on the class page next to the control —
     not here, where it is read once and then re-read on every visit.
     {% endcomment %}
-    <p class="muted text-sm">
+    <p class="muted text-text-muted text-sm">
         {% blocktrans with students=total_students %}{{ students }} students by grade. Open a class for its courses, mastery averages and roster.{% endblocktrans %}
     </p>
 
@@ -57,7 +57,7 @@
         {% endfor %}
     </ul>
     {% else %}
-    <div class="card">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
         {% empty_state title=_("No classes yet") body=_("Classes are grouped from student grade levels. They appear once students join and complete their profiles.") icon_name="classes" %}
     </div>
     {% endif %}

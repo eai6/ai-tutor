@@ -4,18 +4,18 @@
 {% block title %}{% trans "Flagged chats" %}{% endblock %}
 {% block page_title %}{% trans "Flagged chats" %}{% endblock %}
 {% block topbar_eyebrow %}
-<span class="topbar-eyebrow">{% trans "Safety review" %}</span>
+<span class="max-[560px]:hidden font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "Safety review" %}</span>
 {% endblock %}
 
 {% block content %}
-<div class="stack">
+<div class="stack [&>*_+_*]:mt-5">
 
     {% comment %}
     The queue's own state, in two figures. "Unreviewed" is the actionable
     one, so it leads and takes the danger tone only when it is non-zero —
     a red 0 trains teachers to ignore red.
     {% endcomment %}
-    <section class="metric-row metric-row--fit" aria-label="{% trans 'Review queue' %}">
+    <section class="grid grid-cols-[repeat(auto-fit,_minmax(190px,_280px))] gap-3" aria-label="{% trans 'Review queue' %}">
         {% if unreviewed_count %}
         {% stat_tile label=_("Waiting for review") value=unreviewed_count tone="danger" note=_("Each one is a conversation the safety judge stopped on.") %}
         {% else %}
@@ -24,31 +24,31 @@
         {% stat_tile label=_("Flagged all time") value=total_flagged note=_("Includes chats already reviewed and closed.") %}
     </section>
 
-    <div class="card">
-        <header class="card__header">
-            <h2 class="card__title">{% trans "Review queue" %}</h2>
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+        <header class="flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
+            <h2 class="font-display text-md font-medium tracking-tight flex items-center gap-2">{% trans "Review queue" %}</h2>
             {% comment %}
             Status filter as a segmented control rather than three loose
             buttons: it is one choice with three options, and the previous
             styling made "All" look like a separate action.
             {% endcomment %}
-            <div class="card__actions">
+            <div class="flex items-center gap-2 flex-wrap">
                 <span class="eyebrow" id="status-filter-label">{% trans "Show" %}</span>
-                <div class="segmented" role="group" aria-labelledby="status-filter-label">
-                    <a href="?status=unreviewed" class="segmented__option"
+                <div class="inline-flex flex-wrap p-[2px] gap-[2px] bg-surface-sunken border border-border rounded-sm" role="group" aria-labelledby="status-filter-label">
+                    <a href="?status=unreviewed" class="segmented__option py-1 px-3 rounded-xs text-xs font-medium text-text-secondary no-underline whitespace-nowrap leading-[1.7] [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] hover:bg-surface-hover hover:text-text [&[aria-pressed='true']]:bg-surface [&[aria-pressed='true']]:text-text [&[aria-pressed='true']]:font-bold [&[aria-pressed='true']]:shadow-[var(--shadow-xs)] [&[aria-current='true']]:bg-surface [&[aria-current='true']]:text-text [&[aria-current='true']]:font-bold [&[aria-current='true']]:shadow-[var(--shadow-xs)]"
                        {% if status_filter == 'unreviewed' %}aria-current="true"{% endif %}>{% trans "Unreviewed" %}</a>
-                    <a href="?status=reviewed" class="segmented__option"
+                    <a href="?status=reviewed" class="segmented__option py-1 px-3 rounded-xs text-xs font-medium text-text-secondary no-underline whitespace-nowrap leading-[1.7] [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] hover:bg-surface-hover hover:text-text [&[aria-pressed='true']]:bg-surface [&[aria-pressed='true']]:text-text [&[aria-pressed='true']]:font-bold [&[aria-pressed='true']]:shadow-[var(--shadow-xs)] [&[aria-current='true']]:bg-surface [&[aria-current='true']]:text-text [&[aria-current='true']]:font-bold [&[aria-current='true']]:shadow-[var(--shadow-xs)]"
                        {% if status_filter == 'reviewed' %}aria-current="true"{% endif %}>{% trans "Reviewed" %}</a>
-                    <a href="?status=all" class="segmented__option"
+                    <a href="?status=all" class="segmented__option py-1 px-3 rounded-xs text-xs font-medium text-text-secondary no-underline whitespace-nowrap leading-[1.7] [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] hover:bg-surface-hover hover:text-text [&[aria-pressed='true']]:bg-surface [&[aria-pressed='true']]:text-text [&[aria-pressed='true']]:font-bold [&[aria-pressed='true']]:shadow-[var(--shadow-xs)] [&[aria-current='true']]:bg-surface [&[aria-current='true']]:text-text [&[aria-current='true']]:font-bold [&[aria-current='true']]:shadow-[var(--shadow-xs)]"
                        {% if status_filter == 'all' %}aria-current="true"{% endif %}>{% trans "All" %}</a>
                 </div>
             </div>
         </header>
 
-        <div class="card__body card__body--flush">
+        <div class="card__body p-0">
             {% if sessions %}
-            <div class="table-wrap">
-                <table class="table">
+            <div class="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]">
                     <thead>
                         <tr>
                             <th scope="col">{% trans "Student" %}</th>
@@ -63,8 +63,8 @@
                         {% for s in sessions %}
                         <tr>
                             <td>
-                                <span class="cell-primary__name">{{ s.student.first_name }} {{ s.student.last_name }}</span>
-                                <span class="cell-primary__meta">{{ s.student.username }}</span>
+                                <span class="block font-bold text-text leading-[1.3]">{{ s.student.first_name }} {{ s.student.last_name }}</span>
+                                <span class="block text-xs text-text-muted leading-[1.3] overflow-hidden truncate">{{ s.student.username }}</span>
                             </td>
                             <td class="text-sm">{{ s.lesson.title }}</td>
                             <td class="flag-reason">
@@ -74,9 +74,9 @@
                                 {# spends the alarm colour on something that isn't one. #}
                                 <span class="flag-reason__text">{{ s.flag_reason|truncatewords:22 }}</span>
                             </td>
-                            <td class="text-sm nowrap">
+                            <td class="text-sm whitespace-nowrap">
                                 {% if s.flagged_at %}{% blocktrans with ts=s.flagged_at|timesince %}{{ ts }} ago{% endblocktrans %}
-                                {% else %}<span class="muted">—</span>{% endif %}
+                                {% else %}<span class="muted text-text-muted">—</span>{% endif %}
                             </td>
                             <td>
                                 {% if s.flag_reviewed %}
@@ -85,8 +85,8 @@
                                 {% badge _("Unreviewed") tone="danger" icon_name="alert" %}
                                 {% endif %}
                             </td>
-                            <td class="row-actions">
-                                <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn--secondary btn--sm">
+                            <td class="row-actions text-right whitespace-nowrap [&_.btn]:text-text-muted [&_.btn]:border-border [&_.btn:focus-visible]:text-text [&_.btn:focus-visible]:border-border-strong [&_.btn:focus-visible]:bg-surface [tr:hover_&_.btn]:text-text [tr:hover_&_.btn]:border-border-strong [tr:hover_&_.btn]:bg-surface">
+                                <a href="{% url 'dashboard:flagged_session_detail' s.id %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                                     {% trans "Review" %}<span class="sr-only"> {{ s.student.first_name }} {{ s.student.last_name }}</span>
                                 </a>
                             </td>
@@ -97,17 +97,17 @@
             </div>
 
             {% if sessions.has_other_pages %}
-            <nav class="pagination" aria-label="{% trans 'Flagged chat pages' %}">
+            <nav class="flex items-center justify-center gap-3 py-3 px-5 border-t border-t-border" aria-label="{% trans 'Flagged chat pages' %}">
                 {% if sessions.has_previous %}
-                <a href="?status={{ status_filter }}&amp;page={{ sessions.previous_page_number }}" class="btn btn--secondary btn--sm">
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.previous_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     {% icon "arrow-left" size="sm" %}{% trans "Previous" %}
                 </a>
                 {% endif %}
-                <span class="pagination__status">
+                <span class="text-xs text-text-muted [font-variant-numeric:tabular-nums]">
                     {% blocktrans with current=sessions.number total=sessions.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}
                 </span>
                 {% if sessions.has_next %}
-                <a href="?status={{ status_filter }}&amp;page={{ sessions.next_page_number }}" class="btn btn--secondary btn--sm">
+                <a href="?status={{ status_filter }}&amp;page={{ sessions.next_page_number }}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                     {% trans "Next" %}{% icon "arrow-right" size="sm" %}
                 </a>
                 {% endif %}

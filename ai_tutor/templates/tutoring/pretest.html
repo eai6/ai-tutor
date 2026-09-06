@@ -121,7 +121,7 @@
                 <div style="font-size:2rem;font-weight:800;color:${passed ? 'var(--success-solid)' : 'var(--danger-solid)'};margin-bottom:0.25rem;">${score} / ${total}</div>
                 <div style="font-size:0.95rem;color:var(--text-muted);">${passed ? 'Great work! You passed.' : 'Some gaps — the tutor will focus there.'}</div>
                 <div style="font-size:0.9rem;color:#52525b;margin:0.75rem 0 1.25rem;">${message}</div>
-                <a href="${redirectUrl}" class="btn btn-primary" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:var(--text);color:var(--surface);text-decoration:none;font-weight:600;">
+                <a href="${redirectUrl}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:var(--text);color:var(--surface);text-decoration:none;font-weight:600;">
                     ${passed ? '✓ Continue' : '→ Start the lesson'}
                 </a>
             `;

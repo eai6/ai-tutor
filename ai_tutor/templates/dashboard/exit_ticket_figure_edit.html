@@ -44,8 +44,8 @@
     {{ question.question_text }}
 </div>
 
-{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
-{% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+{% if error %}<div class="alert alert-error bg-danger-surface border-danger-border text-danger">{{ error }}</div>{% endif %}
+{% if success %}<div class="alert alert-success bg-success-surface border-success-border text-success">{{ success }}</div>{% endif %}
 
 <div class="figure-edit-grid">
 
@@ -78,9 +78,9 @@
                     <option value="openai">OpenAI gpt-image-2</option>
                     <option value="gemini">Gemini</option>
                 </select>
-                <button type="submit" class="btn btn-primary">{% trans "Generate & save" %}</button>
+                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Generate & save" %}</button>
                 {% if figure_url or figure_svg %}
-                <button type="submit" name="action" value="remove" class="btn btn-danger"
+                <button type="submit" name="action" value="remove" class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-danger-solid rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-text-on-accent hover:bg-danger hover:border-danger hover:text-text-on-accent"
                         onclick="return confirm('{% trans "Remove this figure from the question?" %}');">{% trans "Remove figure" %}</button>
                 {% endif %}
             </div>

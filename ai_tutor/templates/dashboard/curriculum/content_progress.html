@@ -91,7 +91,7 @@
                 </span>
                 <form method="post" action="{% url 'dashboard:cancel_generation' upload.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating content? Lessons already completed will be kept." %}');">
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--danger-surface); color: var(--danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Stop generating content? Lessons already completed will be kept." %}');">
                         ⛔ {% trans "Stop Generation" %}
                     </button>
                 </form>
@@ -123,11 +123,11 @@
         {% if upload.status == 'completed' %}
         <div style="margin-top: 1.5rem; text-align: center;">
             {% if course %}
-            <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-primary">
+            <a href="{% url 'dashboard:course_detail' course.id %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
                 ← {% trans "Back to Course" %}
             </a>
             {% else %}
-            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-primary">
+            <a href="{% url 'dashboard:curriculum_list' %}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
                 ← {% trans "Back to Curriculum" %}
             </a>
             {% endif %}

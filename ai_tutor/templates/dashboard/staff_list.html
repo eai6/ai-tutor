@@ -7,17 +7,17 @@
 {% block content %}
 <div class="page-header" style="margin-bottom:1rem;">
     <h1>{% trans "Staff Management" %}</h1>
-    <p class="muted">{% trans "Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place." %}</p>
+    <p class="muted text-text-muted">{% trans "Create and manage admins and teachers, approve pending sign-ups, and send invites — all in one place." %}</p>
 </div>
 
 {# ── Find / debug any account (incl. students who can't log in as staff) ── #}
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">{% trans "Find / debug a user" %}</h3></div>
-    <div class="card-body">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom:1.5rem;">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Find / debug a user" %}</h3></div>
+    <div class="card-body p-5">
         <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.6rem;">{% trans "Look up any account by email or username — including students — to see why a login isn't working and fix it." %}</p>
         <form method="get" style="display:flex;gap:0.5rem;max-width:480px;">
-            <input type="text" class="form-control" name="find" value="{{ find_query }}" placeholder="{% trans 'email or username' %}" style="flex:1;">
-            <button type="submit" class="btn btn-primary btn-sm">{% trans "Search" %}</button>
+            <input type="text" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="find" value="{{ find_query }}" placeholder="{% trans 'email or username' %}" style="flex:1;">
+            <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Search" %}</button>
         </form>
 
         {% if find_query %}
@@ -30,14 +30,14 @@
                     <div style="font-size:0.85rem;color:var(--gray-500);">{{ f.user.email }}</div>
                 </div>
                 <div style="text-align:right;font-size:0.78rem;color:var(--gray-500);">
-                    {% if f.is_admin %}<span class="badge" style="background:var(--accent-surface);color:var(--accent);">{% trans "Super Admin" %}</span>{% endif %}
-                    {% if f.is_active %}<span class="badge badge-success">{% trans "Active" %}</span>{% else %}<span class="badge">{% trans "Inactive" %}</span>{% endif %}
+                    {% if f.is_admin %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--accent-surface);color:var(--accent);">{% trans "Super Admin" %}</span>{% endif %}
+                    {% if f.is_active %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-success-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-success-surface text-success">{% trans "Active" %}</span>{% else %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{% trans "Inactive" %}</span>{% endif %}
                     <div style="margin-top:0.25rem;">{% trans "Last login:" %} {{ f.user.last_login|date:"M d, Y H:i"|default:"never" }}</div>
                 </div>
             </div>
             <div style="margin-top:0.5rem;font-size:0.82rem;">
                 <strong>{% trans "Memberships:" %}</strong>
-                {% for m in f.memberships %}<span class="badge" style="margin-right:0.25rem;">{{ m.role }} @ {{ m.institution }}{% if not m.is_active %} {% trans "(inactive)" %}{% endif %}</span>{% empty %}<span style="color:var(--gray-500);">{% trans "none" %}</span>{% endfor %}
+                {% for m in f.memberships %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="margin-right:0.25rem;">{{ m.role }} @ {{ m.institution }}{% if not m.is_active %} {% trans "(inactive)" %}{% endif %}</span>{% empty %}<span style="color:var(--gray-500);">{% trans "none" %}</span>{% endfor %}
             </div>
             <div style="margin-top:0.5rem;padding:0.5rem 0.7rem;border-radius:6px;background:#fff8e6;border:1px solid #f0c36d;font-size:0.82rem;">⚠️ {{ f.diagnosis }}</div>
             {% if not f.is_self %}
@@ -47,19 +47,19 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="grant_staff">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <select name="school_id" class="form-control" style="font-size:0.78rem;padding:3px 6px;width:auto;">
+                    <select name="school_id" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" style="font-size:0.78rem;padding:3px 6px;width:auto;">
                         <option value="">{% trans "Grant staff at…" %}</option>
                         {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
                     </select>
-                    <button type="submit" class="btn btn-sm" style="background:var(--success-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Grant staff" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--success-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Grant staff" %}</button>
                 </form>
                 <form method="post" style="display:inline;" onsubmit="return confirm('{% if f.is_admin %}{% trans 'Remove Super Admin from' %}{% else %}{% trans 'Make Super Admin:' %}{% endif %} {{ f.user.get_full_name|default:f.user.email|escapejs }}?');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="toggle_admin">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:var(--accent-surface);color:var(--accent);border:1px solid var(--accent-border);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}{% trans "Remove admin" %}{% else %}{% trans "Make Super Admin" %}{% endif %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--accent-surface);color:var(--accent);border:1px solid var(--accent-border);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}{% trans "Remove admin" %}{% else %}{% trans "Make Super Admin" %}{% endif %}</button>
                 </form>
-                <button type="button" class="btn btn-sm staff-reset-btn"
+                <button type="button" class="btn btn-sm staff-reset-btn inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
                         data-user-id="{{ f.user.id }}" data-username="{{ f.user.username }}" data-email="{{ f.user.email }}"
                         style="background:var(--accent);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
                 {% if not f.is_admin %}
@@ -67,13 +67,13 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="toggle_user">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
                 </form>
                 <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=f.user.get_full_name|default:f.user.email|escapejs %}Permanently delete {{ name }}? This cancels the signup and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="delete_user">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
-                    <button type="submit" class="btn btn-sm" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Delete" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Delete" %}</button>
                 </form>
                 {% endif %}
             </div>
@@ -88,9 +88,9 @@
 
 {# ── Pending approvals (self-registered, awaiting admin OK) ── #}
 {% if pending_approvals %}
-<div class="card" style="margin-bottom:1.5rem;border:1px solid var(--warning-border);">
-    <div class="card-header" style="background:var(--warning-surface);"><h3 class="card-title">{% trans "Pending approval" %} ({{ pending_approvals|length }})</h3></div>
-    <div class="card-body" style="padding:0;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom:1.5rem;border:1px solid var(--warning-border);">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border" style="background:var(--warning-surface);"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Pending approval" %} ({{ pending_approvals|length }})</h3></div>
+    <div class="card-body p-5" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <tbody>
                 {% for row in pending_approvals %}
@@ -103,13 +103,13 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--success-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Approve" %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--success-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Approve" %}</button>
                         </form>
                         <form method="post" style="display:inline;" onsubmit="return confirm('{% trans 'Reject and delete this pending account?' %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Reject" %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Reject" %}</button>
                         </form>
                     </td>
                 </tr>
@@ -121,9 +121,9 @@
 {% endif %}
 
 {# ── Admins & active staff ── #}
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">{% trans "Admins & staff" %}</h3></div>
-    <div class="card-body" style="padding:0;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom:1.5rem;">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Admins & staff" %}</h3></div>
+    <div class="card-body p-5" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
@@ -140,32 +140,32 @@
                 <tr style="border-top:1px solid var(--gray-100);">
                     <td style="padding:0.75rem 1rem;font-weight:600;">{{ row.user.get_full_name|default:row.user.username }}{% if row.is_self %}<span style="font-size:0.7rem;color:var(--gray-500);margin-left:0.4rem;">{% trans "(you)" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ row.user.email }}</td>
-                    <td style="padding:0.75rem 1rem;">{% if row.is_admin %}<span class="badge" style="background:var(--accent-surface);color:var(--accent);">{% trans "Super Admin" %}</span>{% else %}<span class="badge">{% trans "Staff" %}</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{% if row.is_admin %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--accent-surface);color:var(--accent);">{% trans "Super Admin" %}</span>{% else %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{% trans "Staff" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;">{{ row.institutions }}</td>
-                    <td style="padding:0.75rem 1rem;">{% if row.is_active %}<span class="badge badge-success">{% trans "Active" %}</span>{% else %}<span class="badge">{% trans "Inactive" %}</span>{% endif %}</td>
+                    <td style="padding:0.75rem 1rem;">{% if row.is_active %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-success-border rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-success-surface text-success">{% trans "Active" %}</span>{% else %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{% trans "Inactive" %}</span>{% endif %}</td>
                     <td style="padding:0.75rem 1rem;text-align:right;white-space:nowrap;">
                         {% if not row.is_self %}
-                        <button type="button" class="btn btn-sm staff-reset-btn"
+                        <button type="button" class="btn btn-sm staff-reset-btn inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
                                 data-user-id="{{ row.user.id }}" data-username="{{ row.user.username }}" data-email="{{ row.user.email }}"
                                 style="background:var(--accent);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
                         <form method="post" style="display:inline;" onsubmit="return confirm('{% if row.is_admin %}{% trans 'Demote from Super Admin:' %}{% else %}{% trans 'Promote to Super Admin:' %}{% endif %} {{ row.user.get_full_name|default:row.user.email|escapejs }}?');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_admin">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}{% trans "Demote" %}{% else %}{% trans "Promote" %}{% endif %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}{% trans "Demote" %}{% else %}{% trans "Promote" %}{% endif %}</button>
                         </form>
                         {% if not row.is_admin %}
                         <form method="post" style="display:inline;">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
                         </form>
                         <form method="post" style="display:inline;" onsubmit="return confirm('{% blocktrans with name=row.user.get_full_name|default:row.user.email|escapejs %}Permanently delete {{ name }}? This cascades through their data and cannot be undone.{% endblocktrans %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="delete_user">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Delete" %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Delete" %}</button>
                         </form>
                         {% endif %}
                         {% endif %}
@@ -181,9 +181,9 @@
 
 {# ── Pending invites (not yet accepted) ── #}
 {% if pending_invites %}
-<div class="card" style="margin-bottom:1.5rem;">
-    <div class="card-header"><h3 class="card-title">{% trans "Pending invites" %} ({{ pending_invites|length }})</h3></div>
-    <div class="card-body" style="padding:0;">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="margin-bottom:1.5rem;">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Pending invites" %} ({{ pending_invites|length }})</h3></div>
+    <div class="card-body p-5" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;">
             <thead style="background:var(--gray-50);">
                 <tr style="text-align:left;font-size:0.75rem;color:var(--gray-500);text-transform:uppercase;">
@@ -200,13 +200,13 @@
                     <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.invited_by.get_full_name|default:inv.invited_by.username|default:"—" }}</td>
                     <td style="padding:0.6rem 1rem;font-size:0.85rem;color:var(--gray-500);">{{ inv.created_at|date:"M d, Y" }}</td>
                     <td style="padding:0.6rem 1rem;text-align:right;white-space:nowrap;">
-                        <button type="button" class="btn btn-sm copy-invite-btn" data-path="{% url 'accounts:staff_register' inv.token %}"
+                        <button type="button" class="btn btn-sm copy-invite-btn inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" data-path="{% url 'accounts:staff_register' inv.token %}"
                                 style="background:var(--surface-sunken);color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Copy link" %}</button>
                         <form method="post" style="display:inline;" onsubmit="return confirm('{% trans 'Revoke this invitation?' %}');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="revoke_invite">
                             <input type="hidden" name="invite_id" value="{{ inv.id }}">
-                            <button type="submit" class="btn btn-sm" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Revoke" %}</button>
+                            <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--danger-solid);color:var(--surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% trans "Revoke" %}</button>
                         </form>
                     </td>
                 </tr>
@@ -219,56 +219,56 @@
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;">
     {# ── Invite teacher / staff ── #}
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">{% trans "Invite teacher / staff" %}</h3></div>
-        <div class="card-body">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+        <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Invite teacher / staff" %}</h3></div>
+        <div class="card-body p-5">
             <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">{% trans "Sends an email invite (or generates a link). They register themselves and are active immediately." %}</p>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="invite_staff">
-                <div class="form-group">
-                    <label class="form-label">{% trans "School" %}</label>
-                    <select class="form-control" name="invite_school_id" required>
+                <div class="form-group mb-4">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "School" %}</label>
+                    <select class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="invite_school_id" required>
                         <option value="">{% trans "Select a school…" %}</option>
                         {% for s in active_schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom:0.75rem;">
-                    <label class="form-label">{% trans "Email" %} <span style="font-weight:normal;color:var(--gray-500);">{% trans "(optional — blank = link-only)" %}</span></label>
-                    <input type="email" class="form-control" name="invite_email" placeholder="{% trans 'teacher@school.edu' %}">
+                <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Email" %} <span style="font-weight:normal;color:var(--gray-500);">{% trans "(optional — blank = link-only)" %}</span></label>
+                    <input type="email" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="invite_email" placeholder="{% trans 'teacher@school.edu' %}">
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">{% trans "Send invite" %}</button>
+                <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Send invite" %}</button>
             </form>
         </div>
     </div>
 
     {# ── Create Super Admin ── #}
-    <div class="card">
-        <div class="card-header"><h3 class="card-title">{% trans "Create Super Admin" %}</h3></div>
-        <div class="card-body">
+    <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+        <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Create Super Admin" %}</h3></div>
+        <div class="card-body p-5">
             <p style="color:var(--gray-500);font-size:0.8125rem;margin-bottom:0.75rem;">{% trans "Platform-wide admin. If the email already exists you'll be offered a password reset instead." %}</p>
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="create_admin">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
-                    <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">{% trans "First Name" %}</label>
-                        <input type="text" class="form-control" name="admin_first_name" placeholder="{% trans 'First name' %}">
+                    <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "First Name" %}</label>
+                        <input type="text" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="admin_first_name" placeholder="{% trans 'First name' %}">
                     </div>
-                    <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">{% trans "Last Name" %}</label>
-                        <input type="text" class="form-control" name="admin_last_name" placeholder="{% trans 'Last name' %}">
+                    <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Last Name" %}</label>
+                        <input type="text" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="admin_last_name" placeholder="{% trans 'Last name' %}">
                     </div>
-                    <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">{% trans "Email" %}</label>
-                        <input type="email" class="form-control" name="admin_email" placeholder="{% trans 'admin@school.edu' %}" required>
+                    <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Email" %}</label>
+                        <input type="email" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="admin_email" placeholder="{% trans 'admin@school.edu' %}" required>
                     </div>
-                    <div class="form-group" style="margin-bottom:0.75rem;">
-                        <label class="form-label">{% trans "Password" %}</label>
-                        <input type="password" class="form-control" name="admin_password" placeholder="{% trans 'Strong password' %}" required>
+                    <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                        <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Password" %}</label>
+                        <input type="password" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" name="admin_password" placeholder="{% trans 'Strong password' %}" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">{% trans "Create Admin" %}</button>
+                <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Create Admin" %}</button>
             </form>
         </div>
     </div>

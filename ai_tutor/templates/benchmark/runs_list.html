@@ -133,7 +133,7 @@
 </div>
 {% else %}
 <div class="runs-table">
-    <div class="empty">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         <h3 style="color:#374151;margin-bottom:0.5rem;">No runs yet.</h3>
         {% if human_annotation_count %}
         <p>{{ human_annotation_count }} annotation{{ human_annotation_count|pluralize }} ready — hit

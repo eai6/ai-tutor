@@ -8,7 +8,7 @@
 
 {% block auth_body %}
 <div class="auth-container auth-container--wide">
-    <div class="auth-card card animate-in">
+    <div class="auth-card card animate-in bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
         <div class="auth-header">
             <div class="auth-icon">{% icon "courses" %}</div>
             <h1>{% trans "Join AI Tutor" %}</h1>
@@ -16,7 +16,7 @@
         </div>
 
         {% if errors %}
-        <div class="alert alert-error">
+        <div class="alert alert-error bg-danger-surface border-danger-border text-danger">
             <ul class="alert__list">
             {% for error in errors %}
                 <li>{{ error }}</li>
@@ -28,7 +28,7 @@
         <form method="post" class="auth-form auth-form--two-up">
             {% csrf_token %}
 
-            <div class="form-group form-group--full">
+            <div class="form-group form-group--full mb-4">
                 <label for="first_name">{% trans "Your Name" %} *</label>
                 <input
                     type="text"
@@ -42,7 +42,7 @@
                 >
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="school">{% trans "School" %} *</label>
                 <select id="school" name="school" required>
                     <option value="">{% trans "Select your school" %}</option>
@@ -52,7 +52,7 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="grade_level">{% trans "Grade" %} *</label>
                 <select id="grade_level" name="grade_level" required>
                     <option value="">{% trans "Select grade" %}</option>
@@ -62,7 +62,7 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="username">{% trans "Username" %} *</label>
                 <input
                     type="text"
@@ -75,7 +75,7 @@
                 >
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="email">{% trans "Email" %} *</label>
                 <input
                     type="email"
@@ -88,7 +88,7 @@
                 >
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="password">{% trans "Password" %} *</label>
                 <input
                     type="password"
@@ -101,7 +101,7 @@
                     data-pw-similar-to="#first_name,#username,#email">
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="password_confirm">{% trans "Confirm" %} *</label>
                 <input
                     type="password"
@@ -113,7 +113,7 @@
                     data-pw-confirms="#password">
             </div>
 
-            <button type="submit" class="btn btn-primary btn-full form-group--full">
+            <button type="submit" class="btn btn-primary btn-full form-group--full inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">
                 {% trans "Create Account" %} →
             </button>
         </form>

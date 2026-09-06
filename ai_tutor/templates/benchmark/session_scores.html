@@ -149,7 +149,7 @@
             {% for row in dimension_rows %}
             <tr>
                 <td>{{ row.label }}</td>
-                <td class="muted">{{ row.desideratum }}</td>
+                <td class="muted text-text-muted">{{ row.desideratum }}</td>
                 <td class="num">{{ row.pass }}</td>
                 <td class="num">{{ row.fail }}</td>
                 <td class="num">{{ row.not_applicable }}</td>
@@ -195,7 +195,7 @@
             </tr>
             {% endfor %}
             {% empty %}
-            <tr><td colspan="4" class="muted">No annotations yet.</td></tr>
+            <tr><td colspan="4" class="muted text-text-muted">No annotations yet.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -232,7 +232,7 @@
                     {% if row.kappa is None %}<span class="none">—</span>
                     {% else %}{{ row.kappa|floatformat:2 }}{% endif %}
                 </td>
-                <td class="muted">{{ row.undefined_reason }}</td>
+                <td class="muted text-text-muted">{{ row.undefined_reason }}</td>
             </tr>
             {% endfor %}
             <tr style="border-top:2px solid #e5e7eb;">
@@ -246,7 +246,7 @@
                     {% if metrics.agreement.session_verdict.kappa is None %}<span class="none">—</span>
                     {% else %}{{ metrics.agreement.session_verdict.kappa|floatformat:2 }}{% endif %}
                 </td>
-                <td class="muted">{{ metrics.agreement.session_verdict.undefined_reason }}</td>
+                <td class="muted text-text-muted">{{ metrics.agreement.session_verdict.undefined_reason }}</td>
             </tr>
         </tbody>
     </table>
@@ -264,14 +264,14 @@
         linked. It is stable within one release, which it has to be for
         annotations to join to sessions.
     </p>
-    <a class="btn" href="{% url 'dashboard:benchmark:session_export_jsonl' %}">Download JSONL</a>
-    <a class="btn btn-secondary"
+    <a class="btn inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" href="{% url 'dashboard:benchmark:session_export_jsonl' %}">Download JSONL</a>
+    <a class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
        href="{% url 'dashboard:benchmark:session_export_jsonl' %}?complete=yes">Complete only</a>
-    <a class="btn btn-secondary"
+    <a class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
        href="{% url 'dashboard:benchmark:session_export_jsonl' %}?annotator_role=human">Human only</a>
 </div>
 
-<p class="muted">
+<p class="muted text-text-muted">
     <a href="{% url 'dashboard:benchmark:session_list' %}">← All sessions</a>
 </p>
 <div id="block-content-tail"></div>

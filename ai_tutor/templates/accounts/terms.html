@@ -38,10 +38,10 @@
         <article class="legal__body print:p-0 print:border-0 print:rounded-[0] print:text-[11pt] print:text-[#000] print:[&_h2]:[break-after:avoid] print:[&_p]:[break-inside:avoid] print:[&_li]:[break-inside:avoid] print:[&_a::after]:content-['_('_attr(href)_')'] print:[&_a::after]:text-[0.85em] max-[640px]:p-5 max-[640px]:text-base p-8 bg-surface border border-border rounded-lg text-md leading-[1.7] text-text-secondary [&>*_+_*]:mt-4 [&_h2]:font-display [&_h2]:tracking-tight [&_h2]:text-text [&_h2]:[scroll-margin-top:calc(calc(var(--spacing)*8)_+_60px)] [&_h3]:font-display [&_h3]:tracking-tight [&_h3]:text-text [&_h3]:[scroll-margin-top:calc(calc(var(--spacing)*8)_+_60px)] [&_h2]:text-xl [&_h2]:mt-10 [&_h2]:pt-5 [&_h2]:border-t [&_h2]:border-t-border [&_h3]:text-lg [&_h3]:mt-6 [&>h2:first-child]:mt-0 [&>h2:first-child]:pt-0 [&>h2:first-child]:border-t-0 [&>h3:first-child]:mt-0 [&>h3:first-child]:pt-0 [&>h3:first-child]:border-t-0 [&_p]:max-w-[68ch] [&_ul]:pl-6 [&_ul]:max-w-[68ch] [&_ol]:pl-6 [&_ol]:max-w-[68ch] [&_li_+_li]:mt-2 [&_strong]:text-text [&_strong]:font-bold [&_a]:text-coral-ink [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-t-border [&_hr]:my-6 [&_code]:py-[0.1em] [&_code]:px-[0.35em] [&_code]:bg-surface-sunken [&_code]:rounded-xs [&_code]:font-mono [&_code]:text-[0.9em] [&_blockquote]:pl-4 [&_blockquote]:border-l-[3px] [&_blockquote]:border-l-coral-edge [&_blockquote]:text-text-muted [&_table]:w-full [&_table]:[border-collapse:collapse] [&_table]:text-sm [&_th]:py-2 [&_th]:px-3 [&_th]:border [&_th]:border-border [&_th]:text-left [&_td]:py-2 [&_td]:px-3 [&_td]:border [&_td]:border-border [&_td]:text-left [&_th]:bg-surface-sunken" id="legal-body">{{ terms.body|render_markdown }}</article>
 
         <div class="print:hidden flex gap-3 flex-wrap items-center mt-6">
-            <button type="button" class="btn btn--secondary btn--sm" id="legal-print">
+            <button type="button" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" id="legal-print">
                 {% icon "download" size="sm" %}{% trans "Print or save as PDF" %}
             </button>
-            <a href="{% url 'tutoring:catalog' %}" class="btn btn--ghost btn--sm">
+            <a href="{% url 'tutoring:catalog' %}" class="btn btn--ghost btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-transparent text-text-secondary hover:bg-surface-hover hover:text-text">
                 {% icon "back" size="sm" %}{% trans "Back to my subjects" %}
             </a>
             <p class="text-sm text-text-muted">
@@ -57,14 +57,14 @@
 Not an error page — an unpublished terms document is an administrative gap,
 and the person reading this cannot fix it. Say who can.
 {% endcomment %}
-<div class="card">
-    <div class="empty">
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden">
+    <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
         {% icon "list" %}
-        <p class="empty__title">{% trans "No terms are published yet" %}</p>
-        <p class="empty__body">
+        <p class="empty__title text-md font-medium text-text-secondary">{% trans "No terms are published yet" %}</p>
+        <p class="empty__body text-sm max-w-[46ch] leading-normal">
             {% trans "Your school has not published a terms-of-use document for this platform. A platform administrator can add one from the dashboard settings." %}
         </p>
-        <a href="{% url 'tutoring:catalog' %}" class="btn btn--secondary btn--sm">
+        <a href="{% url 'tutoring:catalog' %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
             {% trans "Back to my subjects" %}
         </a>
     </div>

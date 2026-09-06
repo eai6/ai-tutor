@@ -35,11 +35,11 @@
     ← {% blocktrans with title=lesson.title %}Back to {{ title }}{% endblocktrans %}
 </a>
 
-<div class="card" style="max-width: 800px;">
-    <div class="card-header">
-        <h3 class="card-title">{% blocktrans with n=step.order_index|add:1 %}Edit Step {{ n }}{% endblocktrans %}</h3>
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" style="max-width: 800px;">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
+        <h3 class="font-display text-md font-medium tracking-tight m-0">{% blocktrans with n=step.order_index|add:1 %}Edit Step {{ n }}{% endblocktrans %}</h3>
     </div>
-    <div class="card-body">
+    <div class="card-body p-5">
         <div class="step-meta">
             <div class="step-meta-item">
                 <span class="step-meta-label">{% trans "Lesson" %}</span>
@@ -58,7 +58,7 @@
         <form method="post">
             {% csrf_token %}
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label>{% trans "Phase (5E Model)" %}</label>
                 <div class="phase-select">
                     {% for phase_val, phase_label in phases %}
@@ -70,9 +70,9 @@
                 </div>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="step_type">{% trans "Step Type" %}</label>
-                <select name="step_type" id="step_type" class="form-control">
+                <select name="step_type" id="step_type" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]">
                     <option value="teach" {% if step.step_type == 'teach' %}selected{% endif %}>{% trans "Teach - Direct instruction" %}</option>
                     <option value="worked_example" {% if step.step_type == 'worked_example' %}selected{% endif %}>{% trans "Worked Example" %}</option>
                     <option value="practice" {% if step.step_type == 'practice' %}selected{% endif %}>{% trans "Practice - Student attempts" %}</option>
@@ -80,25 +80,25 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="teacher_script">{% trans "Tutor Script" %}</label>
-                <textarea name="teacher_script" id="teacher_script" class="form-control" rows="6">{{ step.teacher_script }}</textarea>
+                <textarea name="teacher_script" id="teacher_script" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="6">{{ step.teacher_script }}</textarea>
                 <small>{% trans "What the AI tutor says to explain concepts." %}</small>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="question">{% trans "Question (optional)" %}</label>
-                <textarea name="question" id="question" class="form-control" rows="3">{{ step.question }}</textarea>
+                <textarea name="question" id="question" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="3">{{ step.question }}</textarea>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="expected_answer">{% trans "Expected Answer" %}</label>
-                <input type="text" name="expected_answer" id="expected_answer" class="form-control" value="{{ step.expected_answer|default:'' }}">
+                <input type="text" name="expected_answer" id="expected_answer" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" value="{{ step.expected_answer|default:'' }}">
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="answer_type">{% trans "Answer Type" %}</label>
-                <select name="answer_type" id="answer_type" class="form-control">
+                <select name="answer_type" id="answer_type" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]">
                     <option value="none" {% if step.answer_type == 'none' %}selected{% endif %}>{% trans "None" %}</option>
                     <option value="free_text" {% if step.answer_type == 'free_text' %}selected{% endif %}>{% trans "Free Text" %}</option>
                     <option value="multiple_choice" {% if step.answer_type == 'multiple_choice' %}selected{% endif %}>{% trans "Multiple Choice" %}</option>
@@ -106,19 +106,19 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="choices">{% trans "Choices (one per line)" %}</label>
-                <textarea name="choices" id="choices" class="form-control" rows="4">{% if step.choices %}{% for choice in step.choices %}{{ choice }}{% if not forloop.last %}
+                <textarea name="choices" id="choices" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="4">{% if step.choices %}{% for choice in step.choices %}{{ choice }}{% if not forloop.last %}
 {% endif %}{% endfor %}{% endif %}</textarea>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label for="hints">{% trans "Hints (one per line)" %}</label>
-                <textarea name="hints" id="hints" class="form-control" rows="3">{% if step.hints %}{% for hint in step.hints %}{{ hint }}{% if not forloop.last %}
+                <textarea name="hints" id="hints" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="3">{% if step.hints %}{% for hint in step.hints %}{{ hint }}{% if not forloop.last %}
 {% endif %}{% endfor %}{% endif %}</textarea>
             </div>
 
-            <div class="form-group">
+            <div class="form-group mb-4">
                 <label>{% trans "Media" %}</label>
                 <div class="media-editor">
                     {% if step.media and step.media.images %}
@@ -142,22 +142,22 @@
                             {% endif %}
                             <div style="margin-top: 0.5rem;">
                                 <label style="font-size: 0.8rem; font-weight: 500; color: var(--gray-600);">{% trans "Image Prompt" %}</label>
-                                <textarea name="image_description_{{ forloop.counter0 }}" class="form-control" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
+                                <textarea name="image_description_{{ forloop.counter0 }}" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" rows="2" style="font-size: 0.85rem; min-height: 60px;">{{ img.description }}</textarea>
                             </div>
                             <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <select id="model-choice-{{ forloop.counter0 }}" class="form-control" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="{% trans 'Image model for regeneration' %}">
+                                <select id="model-choice-{{ forloop.counter0 }}" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical]" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="{% trans 'Image model for regeneration' %}">
                                     <option value="">{% trans "Default (config)" %}</option>
                                     <option value="openai">OpenAI gpt-image-2</option>
                                     <option value="gemini">Gemini</option>
                                 </select>
-                                <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm">
+                                <button type="submit" form="regenerate-form-{{ forloop.counter0 }}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">
                                     {% trans "Regenerate" %}
                                 </button>
-                                <label class="btn btn-secondary btn-sm" style="margin: 0; cursor: pointer;">
+                                <label class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="margin: 0; cursor: pointer;">
                                     {% trans "Replace" %}
                                     <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'replace_image', {{ forloop.counter0 }})">
                                 </label>
-                                <button type="button" class="btn btn-sm" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteImage({{ forloop.counter0 }})">
+                                <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="color: var(--danger); border-color: var(--danger);" onclick="confirmDeleteImage({{ forloop.counter0 }})">
                                     {% trans "Delete" %}
                                 </button>
                                 {% if img.model %}
@@ -171,7 +171,7 @@
                     {% endif %}
 
                     <div style="margin-top: 0.75rem; padding-top: 0.75rem; {% if step.media and step.media.images %}border-top: 1px solid var(--gray-200);{% endif %}">
-                        <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                        <label class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent" style="cursor: pointer; margin: 0;">
                             + {% trans "Add Image" %}
                             <input type="file" accept="image/*" style="display: none;" onchange="submitImageAction(this, 'upload_image')">
                         </label>
@@ -181,8 +181,8 @@
             </div>
 
             <div style="display: flex; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--gray-200);">
-                <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
-                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+                <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Save Changes" %}</button>
+                <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-border-strong rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Cancel" %}</a>
             </div>
         </form>
     </div>

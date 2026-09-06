@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+"""The handful of rules no class map could express, applied to the markup.
+
+Each one is here because a CSS selector reached across elements in a way a
+variant on a single class cannot reproduce, or because a stylesheet the
+migration deletes was the only thing linking a page to its styles.
+"""
+
+import pathlib
+import re
+
+TEMPLATES = pathlib.Path("ai_tutor/templates")
+LINK = "    <link rel=\"stylesheet\" href=\"{% static 'css/app.build.css' %}\">\n"
+
+# tr:hover .row-actions .btn — the ancestor is a <tr>, not a class, so the
+# condition has to be written out in full on .row-actions itself.
+ROW_ACTIONS = ("[tr:hover_&_.btn]:text-text [tr:hover_&_.btn]:border-border-strong "
+               "[tr:hover_&_.btn]:bg-surface")
+
+
+def edit(rel, fn):
+    p = TEMPLATES / rel
+    s = p.read_text()
+    new = fn(s)
+    if new != s:
+        p.write_text(new)
+        return True
+    return False
+
+
+def add_class(src, marker, extra):
+    def fix(m):
+        cls = m.group(1)
+        if marker not in cls.split() or extra.split()[0] in cls:
+            return m.group(0)
+        return f'class="{cls} {extra}"'
+    return re.sub(r'class="([^"]*)"', fix, src)
+
+
+# The per-institution theme block sets the token names the stylesheets read.
+# The theme renamed them, so the block has to follow: a school's brand colour
+# written to --primary reaches nothing once the utilities read
+# --color-primary. This is the one thing the "v4 not v3" decision existed to
+# protect, so it is not allowed to rot.
+THEME_RENAMES = {
+    "dashboard/base.html": [
+        ("--primary:", "--color-primary:"),
+        ("--primary-fill:", "--color-primary-fill:"),
+        ("--primary-dark:", "--color-primary-dark:"),
+        ("--primary-light:", "--color-primary-light:"),
+        ("--primary-ink:", "--color-primary-ink:"),
+    ],
+}
+
+
+def theme_block(src, pairs):
+    for old, new in pairs:
+        src = src.replace(f"            {old}", f"            {new}")
+    return src
+
+
+def student_theme_block(src):
+    """The student shell keeps BOTH spellings until phase 4.
+
+    css/student/ still reads --coral*; the utilities read --color-coral*.
+    Writing one and not the other would break whichever half is not yet
+    converted.
+    """
+    old = "            --coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};\n"
+    if old not in src or "--color-coral:" in src:
+        return src
+    add = ("            --color-coral: {{ theme_primary }};\n"
+           "            --color-coral-fill: {{ theme_primary_dark|default:theme_primary }};\n"
+           "            --color-coral-ink: {{ theme_primary_dark|default:theme_primary }};\n"
+           "            --color-coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};\n")
+    return src.replace(old, old + add)
+
+
+def main():
+    done = []
+
+    for rel, pairs in THEME_RENAMES.items():
+        if edit(rel, lambda s, p=pairs: theme_block(s, p)):
+            done.append(f"institution theme names in {rel}")
+    if edit("base.html", student_theme_block):
+        done.append("institution theme names in base.html")
+
+    # .lp-section.lp-band--deploy sits later in the sheet than either class
+    # alone, so its background-position and padding win over both.
+    def deploy(src):
+        def fix(m):
+            cls = m.group(1)
+            if "lp-band--deploy" not in cls:
+                return m.group(0)
+            cls = cls.replace("[background-position:center]", "[background-position:center_top]")
+            cls = re.sub(r"(?<![\w-])py-20(?![\w-])", "py-20 max-xl:py-12", cls)
+            return f'class="{cls}"'
+        return re.sub(r'class="([^"]*)"', fix, src)
+    if edit("accounts/landing.html", deploy):
+        done.append("lp-band--deploy")
+
+    for rel in sorted(p.relative_to(TEMPLATES).as_posix() for p in TEMPLATES.rglob("*.html")):
+        if edit(rel, lambda s: add_class(s, "row-actions", ROW_ACTIONS)):
+            done.append(f"row-actions in {rel}")
+
+    # Standalone marketing documents never had the stylesheet link: they do not
+    # extend a base, so Task 3 never reached them.
+    for rel in ["accounts/landing.html", "downloads/index.html", "downloads/self_hosting.html"]:
+        def link(s):
+            if "app.build.css" in s:
+                return s
+            links = list(re.finditer(r'^[ \t]*<link rel="stylesheet"[^>]*>\n', s, re.M))
+            at = links[-1].end() if links else re.search(
+                r'^[ \t]*<title>.*?</title>\n', s, re.M | re.S).end()
+            return s[:at] + LINK + s[at:]
+        if edit(rel, link):
+            done.append(f"stylesheet link in {rel}")
+
+    # Any <link> whose stylesheet no longer exists. Removing them by name per
+    # phase missed dashboard/home.html, which carries its own page sheet in a
+    # block rather than in the shell — and a stale link is not cosmetic: the
+    # manifest storage raises on it and every page 500s.
+    static = pathlib.Path("ai_tutor/static")
+    dead = re.compile(r"^[ \t]*<link[^>]*\{% static '(css/[^']+)' %\}[^>]*>\n", re.M)
+
+    def drop_dead(src):
+        return dead.sub(lambda m: "" if not (static / m.group(1)).exists() else m.group(0), src)
+
+    for rel in sorted(p.relative_to(TEMPLATES).as_posix() for p in TEMPLATES.rglob("*.html")):
+        if edit(rel, drop_dead):
+            done.append(f"stale stylesheet link in {rel}")
+
+    for d in done:
+        print(f"  fixup: {d}")
+
+
+if __name__ == "__main__":
+    main()

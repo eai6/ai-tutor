@@ -84,12 +84,28 @@ def make_family(families):
     return family
 
 
+# A Django tag inside a class attribute. The tag itself is opaque, but the
+# literal class names around it are not, and skipping the whole attribute
+# because one is present left every component template unconverted — the stat
+# tiles kept their class names and lost their styles when the sheet went.
+TAG = re.compile(r"\{%.*?%\}|\{\{.*?\}\}", re.S)
+
+
 def rewrite_attr(value, mapping, unmapped, conflicts, where, family, hooks):
-    """Rewrite one class="..." value. Django tags inside are left alone."""
-    if "{%" in value:
-        return value, False
+    """Rewrite one class="..." value, leaving any Django tag in place."""
+    # Park the tags, rewrite what is left, then put them back where they were.
+    parked = []
+
+    def park(m):
+        parked.append(m.group(0))
+        return f"\x00{len(parked) - 1}\x00"
+
+    value = TAG.sub(park, value)
     literal, best, changed = [], {}, False
     for token in value.split():
+        if token.startswith("\x00"):
+            literal.append(token)
+            continue
         if "{{" in token:
             literal.append(token)
             continue
@@ -110,7 +126,9 @@ def rewrite_attr(value, mapping, unmapped, conflicts, where, family, hooks):
                 loser, winner = (prev, (order, util)) if order > prev[0] else ((order, util), prev)
                 best[fam] = winner
                 conflicts.setdefault(f"{winner[1]} over {loser[1]}", []).append(where)
-    return " ".join(literal + [u for _, u in best.values()]), changed
+    out = " ".join(literal + [u for _, u in best.values()])
+    out = re.sub(r"\x00(\d+)\x00", lambda m: parked[int(m.group(1))], out)
+    return out, changed
 
 
 def classes_defined_elsewhere(converting):
@@ -123,12 +141,19 @@ def classes_defined_elsewhere(converting):
     holding those rules on.
     """
     converting = {pathlib.Path(c).resolve() for c in converting}
-    root = pathlib.Path(__file__).resolve().parent.parent / "ai_tutor" / "static" / "css"
+    repo = pathlib.Path(__file__).resolve().parent.parent / "ai_tutor"
     names = set()
-    for css in root.rglob("*.css"):
+    for css in (repo / "static" / "css").rglob("*.css"):
         if css.resolve() in converting or css.name == "app.build.css":
             continue
         names.update(re.findall(r"\.([A-Za-z][\w-]*)", css.read_text()))
+    # Templates carry their own <style> blocks, and a class styled there is
+    # just as real as one in a stylesheet. Scanning only .css files stripped
+    # names that a page's own block was still selecting on — the benchmark
+    # pages lost their input, select and code styling that way.
+    for tpl in (repo / "templates").rglob("*.html"):
+        for block in re.findall(r"<style[^>]*>(.*?)</style>", tpl.read_text(errors="ignore"), re.S):
+            names.update(re.findall(r"\.([A-Za-z][\w-]*)", block))
     return names
 
 

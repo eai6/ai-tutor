@@ -4,15 +4,14 @@
 {% block title %}{% trans "Overview" %}{% endblock %}
 {% block page_title %}{% trans "Overview" %}{% endblock %}
 {% block topbar_eyebrow %}
-<span class="topbar-eyebrow">{{ activity_label }}</span>
+<span class="max-[560px]:hidden font-mono text-2xs tracking-wide uppercase text-text-muted">{{ activity_label }}</span>
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/dashboard/pages/home.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="stack">
+<div class="stack [&>*_+_*]:mt-5">
 
     {% comment %} ─────────────────────────────────────────────────────────
     1. TRIAGE — what needs the teacher, before any analytics.
@@ -24,22 +23,22 @@
     the view already had, so this costs no extra query.
     ───────────────────────────────────────────────────────────── {% endcomment %}
     <section aria-labelledby="attention-heading">
-        <div class="section-head">
-            <h2 class="section-head__title" id="attention-heading">{% trans "Needs you" %}</h2>
+        <div class="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+            <h2 class="text-lg font-medium tracking-tight" id="attention-heading">{% trans "Needs you" %}</h2>
             {# Deliberately NOT labelled with the period: safety flags are every #}
             {# unreviewed flag, not just this window's, and saying "July 2026" #}
             {# over the row claimed otherwise. #}
-            <p class="section-head__note">{% trans "Most urgent first" %}</p>
+            <p class="text-xs text-text-muted">{% trans "Most urgent first" %}</p>
         </div>
 
         {% if attention_items %}
-        <div class="attention">
+        <div class="grid grid-cols-[repeat(auto-fit,_minmax(260px,_1fr))] gap-3">
             {% for item in attention_items %}{% attention_item item %}{% endfor %}
         </div>
         {% else %}
         {# Same footprint as a populated rail, so clearing the last flag #}
         {# doesn't make the rest of the page jump up the screen. #}
-        <p class="attention-clear">
+        <p class="flex items-center gap-3 p-4 bg-success-surface border border-success-border rounded-md text-success font-medium text-base">
             {% icon "check-circle" size="md" %}
             {% trans "Nothing needs review. No safety flags, no students going backwards." %}
         </p>
@@ -51,16 +50,16 @@
     than inside the chart card, where it read as a chart control. Presets
     are one click; the custom range is disclosed only when wanted.
     ───────────────────────────────────────────────────────────── {% endcomment %}
-    <section class="period" aria-labelledby="period-heading">
-        <div class="period__current">
+    <section class="flex items-center gap-4 flex-wrap py-3 px-4 bg-surface border border-border rounded-md shadow-[var(--shadow-xs)]" aria-labelledby="period-heading">
+        <div class="flex flex-col gap-[1px] min-w-0">
             <span class="eyebrow" id="period-heading">{% trans "Showing" %}</span>
-            <span class="period__value">{{ activity_label }}</span>
+            <span class="font-display text-md font-medium tracking-tight whitespace-nowrap">{{ activity_label }}</span>
         </div>
 
-        <div class="period__controls">
-            <div class="segmented" role="group" aria-labelledby="period-heading">
+        <div class="flex items-center gap-2 flex-wrap ml-auto">
+            <div class="inline-flex flex-wrap p-[2px] gap-[2px] bg-surface-sunken border border-border rounded-sm" role="group" aria-labelledby="period-heading">
                 {% for key, label, days in activity_presets %}
-                <a href="?preset={{ key }}" class="segmented__option"
+                <a href="?preset={{ key }}" class="segmented__option py-1 px-3 rounded-xs text-xs font-medium text-text-secondary no-underline whitespace-nowrap leading-[1.7] [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] hover:bg-surface-hover hover:text-text [&[aria-pressed='true']]:bg-surface [&[aria-pressed='true']]:text-text [&[aria-pressed='true']]:font-bold [&[aria-pressed='true']]:shadow-[var(--shadow-xs)] [&[aria-current='true']]:bg-surface [&[aria-current='true']]:text-text [&[aria-current='true']]:font-bold [&[aria-current='true']]:shadow-[var(--shadow-xs)]"
                    {% if activity_preset == key %}aria-current="true"{% endif %}>{{ label }}</a>
                 {% endfor %}
             </div>
@@ -72,23 +71,23 @@
             hint that the range was baked into the download.
             {% endcomment %}
             <a href="{% url 'dashboard:aggregate_export_csv' %}?start={{ activity_start }}&amp;end={{ activity_end }}"
-               class="btn btn--secondary btn--sm"
+               class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
                title="{% blocktrans with label=activity_label %}Download the rows behind every figure on this page, for {{ label }}{% endblocktrans %}">
                 {% icon "download" size="sm" %}{% trans "Export this period" %}
             </a>
 
-            <details class="period__custom">
+            <details class="period__custom [&>summary]:inline-flex [&>summary]:items-center [&>summary]:gap-1 [&>summary]:py-1 [&>summary]:px-3 [&>summary]:border [&>summary]:border-border-strong [&>summary]:rounded-sm [&>summary]:bg-surface [&>summary]:text-text-secondary [&>summary]:text-xs [&>summary]:font-medium [&>summary]:cursor-pointer [&>summary]:list-none [&>summary]:leading-[1.7] [&>summary::-webkit-details-marker]:hidden [&>summary:hover]:bg-surface-hover [&>summary:hover]:text-text">
                 <summary>{% icon "calendar" size="sm" %}{% trans "Custom range" %}</summary>
-                <form method="get" class="period__custom-form">
-                    <div class="field">
-                        <label class="field__label" for="range-start">{% trans "From" %}</label>
-                        <input type="date" id="range-start" name="start" value="{{ activity_start }}" class="input input--sm">
+                <form method="get" class="flex items-end gap-2 flex-wrap w-full mt-3 pt-3 border-t [border-top-style:dashed] border-t-border">
+                    <div class="field flex flex-col gap-1">
+                        <label class="text-xs font-bold text-text-secondary" for="range-start">{% trans "From" %}</label>
+                        <input type="date" id="range-start" name="start" value="{{ activity_start }}" class="input w-full min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&[aria-invalid='true']]:border-danger-solid pt-1 pb-1">
                     </div>
-                    <div class="field">
-                        <label class="field__label" for="range-end">{% trans "To" %}</label>
-                        <input type="date" id="range-end" name="end" value="{{ activity_end }}" class="input input--sm">
+                    <div class="field flex flex-col gap-1">
+                        <label class="text-xs font-bold text-text-secondary" for="range-end">{% trans "To" %}</label>
+                        <input type="date" id="range-end" name="end" value="{{ activity_end }}" class="input w-full min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&[aria-invalid='true']]:border-danger-solid pt-1 pb-1">
                     </div>
-                    <button type="submit" class="btn btn--primary btn--sm">{% trans "Apply range" %}</button>
+                    <button type="submit" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent active:shadow-[inset_0_1px_3px_rgba(27,_24,_21,_0.25)]">{% trans "Apply range" %}</button>
                 </form>
             </details>
         </div>
@@ -99,7 +98,7 @@
     this counted" notes moved out of title="" attributes, which keyboard
     users never see and touch users cannot reach at all, into disclosures.
     ───────────────────────────────────────────────────────────── {% endcomment %}
-    <section class="metric-row" aria-label="{% trans 'Headline figures' %}">
+    <section class="grid grid-cols-[repeat(auto-fit,_minmax(190px,_1fr))] gap-3" aria-label="{% trans 'Headline figures' %}">
         {% blocktrans asvar students_note with count=active_students %}{{ count }} active this period{% endblocktrans %}
         {% stat_tile label=_("Students on roll") value=total_students note=students_note %}
 
@@ -124,18 +123,18 @@
     4. TREND — last, because it is the figure a teacher browses rather than
     acts on.
     ───────────────────────────────────────────────────────────── {% endcomment %}
-    <section class="card" aria-labelledby="activity-heading">
-        <header class="card__header">
-            <h2 class="card__title" id="activity-heading">{% trans "Sessions over time" %}</h2>
-            <p class="card__meta">{{ activity_label }}</p>
+    <section class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden" aria-labelledby="activity-heading">
+        <header class="flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
+            <h2 class="font-display text-md font-medium tracking-tight flex items-center gap-2" id="activity-heading">{% trans "Sessions over time" %}</h2>
+            <p class="text-xs text-text-muted flex items-center gap-2 flex-wrap">{{ activity_label }}</p>
         </header>
-        <div class="card__body">
-            <div class="chart chart--sessions" id="activity-chart">
-                <div class="chart__y" id="activity-y" aria-hidden="true"></div>
-                <div class="chart__plot">
-                    <div class="chart__grid" id="activity-grid" aria-hidden="true"></div>
-                    <div class="chart__bars" id="activity-bars"></div>
-                    <div class="chart__x" id="activity-x" aria-hidden="true"></div>
+        <div class="card__body p-5">
+            <div class="flex gap-2 h-55" id="activity-chart">
+                <div class="flex flex-col justify-between items-end pr-1 min-w-[2.2rem] font-display text-2xs [font-variant-numeric:tabular-nums] text-text-muted select-none pb-[var(--chart-axis-h,_30px)]" id="activity-y" aria-hidden="true"></div>
+                <div class="relative flex-1 min-w-0 flex flex-col">
+                    <div class="absolute inset-0 flex flex-col justify-between pointer-events-none" id="activity-grid" aria-hidden="true"></div>
+                    <div class="relative z-1 flex-1 flex items-stretch gap-[3px]" id="activity-bars"></div>
+                    <div class="flex gap-[3px] h-[var(--chart-axis-h,_30px)] pt-1 font-display text-2xs [font-variant-numeric:tabular-nums] text-text-muted" id="activity-x" aria-hidden="true"></div>
                 </div>
             </div>
         </div>

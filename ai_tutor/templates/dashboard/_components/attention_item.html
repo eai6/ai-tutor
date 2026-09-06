@@ -4,12 +4,12 @@ One triage row. The whole row is the link — a teacher scanning this should
 never have to aim at a small "view" button. Severity is carried three ways
 (left edge, icon, wording) so it survives greyscale and colour-blindness.
 {% endcomment %}
-<a href="{{ item.url }}" class="attention-item attention-item--{{ item.tone }}">
-    <span class="attention-item__icon">{% icon item.icon %}</span>
-    <span class="attention-item__body">
-        <span class="attention-item__figure">{{ item.figure }}</span>
-        <span class="attention-item__label">{{ item.label }}</span>
-        <span class="attention-item__detail">{{ item.detail }}</span>
+<a href="{{ item.url }}" class="attention-item attention-item--{{ item.tone }} relative flex items-start gap-3 p-4 pl-[calc(calc(var(--spacing)*4)_+_3px)] bg-surface border border-border border-l-[3px] border-l-border-strong rounded-md shadow-[var(--shadow-xs)] no-underline text-inherit [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out)] hover:shadow-[var(--shadow-md)] hover:[transform:translateY(-1px)] hover:text-inherit [&:hover_.attention-item__go]:text-text-secondary [&:hover_.attention-item__go]:[transform:translateX(2px)]">
+    <span class="attention-item__icon grid place-items-center w-8 h-8 flex-none rounded-sm text-[1.125rem]">{% icon item.icon %}</span>
+    <span class="min-w-0 flex flex-col gap-[1px]">
+        <span class="attention-item__figure block font-display text-lg font-bold leading-[1.1] tracking-tight [font-variant-numeric:tabular-nums]">{{ item.figure }}</span>
+        <span class="block text-base font-medium leading-snug">{{ item.label }}</span>
+        <span class="block text-xs text-text-muted leading-snug mt-[2px]">{{ item.detail }}</span>
     </span>
-    <span class="attention-item__go">{% icon "arrow-right" %}</span>
+    <span class="attention-item__go ml-auto self-center text-text-faint text-[1rem] [transition:transform_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)]">{% icon "arrow-right" %}</span>
 </a>

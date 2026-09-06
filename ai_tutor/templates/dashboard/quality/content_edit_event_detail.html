@@ -65,7 +65,7 @@
         <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">{% trans "Notes (optional)" %}</h3>
         <textarea name="teacher_notes" rows="3" style="width: 100%; padding: 0.5rem; border: 1px solid var(--gray-300); border-radius: 0.375rem; font-family: inherit; font-size: 0.875rem; margin-bottom: 1rem;">{{ event.teacher_notes }}</textarea>
 
-        <button type="submit" class="btn" style="background: var(--primary, var(--accent)); color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">{% trans "Save tags + notes" %}</button>
+        <button type="submit" class="btn inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-transparent rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--primary, var(--accent)); color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">{% trans "Save tags + notes" %}</button>
     </form>
 </div>
 {% endblock %}

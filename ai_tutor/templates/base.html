@@ -62,6 +62,10 @@
             --coral-fill: {{ theme_primary_dark|default:theme_primary }};
             --coral-ink: {{ theme_primary_dark|default:theme_primary }};
             --coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};
+            --color-coral: {{ theme_primary }};
+            --color-coral-fill: {{ theme_primary_dark|default:theme_primary }};
+            --color-coral-ink: {{ theme_primary_dark|default:theme_primary }};
+            --color-coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};
         }
     </style>
     {% endif %}
@@ -141,7 +145,7 @@ restore by un-commenting the include below.
             </div>
         </details>
         {% else %}
-        <a href="{% url 'accounts:login' %}" class="btn btn--primary btn--sm" style="margin-left:auto">{% trans "Sign in" %}</a>
+        <a href="{% url 'accounts:login' %}" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent active:shadow-[inset_0_1px_3px_rgba(27,_24,_21,_0.25)]" style="margin-left:auto">{% trans "Sign in" %}</a>
         {% endif %}
     </div>
 </header>

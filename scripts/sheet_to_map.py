@@ -75,6 +75,15 @@ def _media_variant(query):
 def _selector_to_variant(sel):
     """(base class, variant prefix) or (None, reason) if a person is needed."""
     sel = sel.strip()
+    if sel in (":root", "html", "body", "*"):
+        # Custom-property carriers and the document reset. resolve_local has
+        # already followed anything they declare.
+        return None, ""
+    # `select.form-control` — a tag narrowing a class. The class is the base;
+    # the tag becomes a condition on the element itself.
+    tag = re.match(r"^([a-z][a-z0-9]*)\.([\w-]+)$", sel)
+    if tag:
+        return tag.group(2), f"[&:is({tag.group(1)})]:"
     m = re.match(r"^\.([\w-]+)(.*)$", sel)
     if not m:
         return None, f"not a single class selector: {sel}"
@@ -102,6 +111,11 @@ def _selector_to_variant(sel):
         if rest.startswith(":"):
             # A pseudo-class not in the table, e.g. :not(...)
             return base, f"[&{rest.replace(' ', '_')}]:"
+        if rest.startswith("."):
+            # .stat-change.positive — a modifier on the same element. The
+            # variant asks for the second class alongside the first, which is
+            # exactly what the cascade was doing.
+            return base, f"[&{rest}]:"
         return None, f"two classes on one element needs a person: {sel}"
     return base, f"[&_{_sel(rest)}]:".replace('"', "'")
 
@@ -150,7 +164,8 @@ def parse(path):
                     hooks.update(names)
                 base, variant = _selector_to_variant(sel)
                 if base is None:
-                    problems.append(variant)
+                    if variant:
+                        problems.append(variant)
                     continue
                 # A custom-property declaration defines a value for other
                 # rules to read; resolve_local has already followed it, so it
