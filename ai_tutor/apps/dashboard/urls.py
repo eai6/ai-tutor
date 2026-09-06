@@ -3,7 +3,7 @@ Dashboard URL Configuration
 """
 
 from django.urls import include, path
-from . import views
+from . import views, views_country
 
 app_name = 'dashboard'
 
@@ -11,6 +11,11 @@ urlpatterns = [
     # Home
     path('', views.dashboard_home, name='home'),
     
+    # Schools — the country account's own surface. Everything else it does,
+    # it does through the existing views with an institution selected.
+    path('schools/', views_country.country_schools, name='country_schools'),
+    path('schools/create/', views_country.country_school_create, name='country_school_create'),
+
     # Students
     path('students/', views.student_list, name='student_list'),
     path('students/<int:student_id>/', views.student_detail, name='student_detail'),

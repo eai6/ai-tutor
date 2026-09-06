@@ -208,7 +208,8 @@ def shoot(out_dir, base_url, pages_file, only=None):
     (out / "manual.txt").write_text(
         "".join(f"{slug(r, u)}\n" for r, u, m in pages if m))
     cookies = session_cookies(
-        {"teacher": "teacher_daniel", "student": "student_daniel", "admin": "superadmin_daniel"}
+        {"teacher": "teacher_daniel", "student": "student_daniel",
+         "admin": "superadmin_daniel", "country": "country_daniel"}
     )
 
     host = base_url.split("//", 1)[1].split(":")[0]

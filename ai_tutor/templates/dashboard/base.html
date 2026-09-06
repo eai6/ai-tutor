@@ -90,7 +90,7 @@
                 {% endif %}
                 <span class="font-display text-md font-medium tracking-tight leading-[1.2] overflow-hidden truncate whitespace-nowrap">
                     {{ theme_institution_name|default:"AI Tutor" }}
-                    <span class="block font-mono text-2xs tracking-wide uppercase text-text-muted mt-[2px]">{% trans "Teacher/Admin" %}</span>
+                    <span class="block font-mono text-2xs tracking-wide uppercase text-text-muted mt-[2px]">{{ role_label|default:_("Teacher/Admin") }}</span>
                 </span>
             </a>
         </div>
@@ -119,6 +119,12 @@
 
             <div class="py-0 px-2 mb-4">
                 <p class="py-2 px-3 font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "People" %}</p>
+                {% if can_add_schools %}
+                <a href="{% url 'dashboard:country_schools' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
+                   {% if 'country_school' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "globe" %}{% trans "Schools" %}
+                </a>
+                {% endif %}
                 <a href="{% url 'dashboard:student_list' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
                    {% if 'student' in request.resolver_match.url_name and 'group' not in request.resolver_match.url_name %}aria-current="page"{% endif %}>
                     {% icon "students" %}{% trans "Students" %}

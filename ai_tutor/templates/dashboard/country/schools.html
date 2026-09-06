@@ -1,0 +1,80 @@
+{% extends "dashboard/base.html" %}
+{% load i18n dashboard_ui %}
+
+{% block title %}{% trans "Schools" %}{% endblock %}
+{% block page_title %}{% trans "Schools" %}{% endblock %}
+{% block topbar_eyebrow %}
+<span class="max-[560px]:hidden font-mono text-2xs tracking-wide uppercase text-text-muted">
+    {% if country %}{{ country.name }} · {% endif %}{% blocktrans count n=schools|length %}{{ n }} school{% plural %}{{ n }} schools{% endblocktrans %}
+</span>
+{% endblock %}
+
+{% block content %}
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-bottom:1.5rem;">
+    <div class="card__body p-0">
+        {% if schools %}
+        <div class="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+            <table class="table w-full [border-collapse:collapse] text-sm [&_th]:sticky [&_th]:top-0 [&_th]:z-1 [&_th]:py-2 [&_th]:px-4 [&_th]:text-left [&_th]:bg-surface-sunken [&_th]:border-b [&_th]:border-b-border [&_th]:font-mono [&_th]:text-2xs [&_th]:font-normal [&_th]:tracking-wide [&_th]:uppercase [&_th]:text-text-muted [&_th]:whitespace-nowrap [&_td]:py-3 [&_td]:px-4 [&_td]:border-b [&_td]:border-b-border [&_td]:align-middle [&_tbody_tr]:transition [&_tbody_tr]:duration-[var(--dur-fast)] [&_tbody_tr]:ease-[var(--ease-out)] [&_tbody_tr:hover]:bg-surface-sunken [&_tbody_tr:last-child_td]:border-b-0 [&_.num]:text-right [&_.num]:font-display [&_.num]:[font-variant-numeric:tabular-nums] [&_td.is-numeric]:text-right [&_td.is-numeric]:font-display [&_td.is-numeric]:[font-variant-numeric:tabular-nums] [&_th.is-numeric]:text-right [&_th.is-numeric]:font-display [&_th.is-numeric]:[font-variant-numeric:tabular-nums]">
+                <thead>
+                    <tr>
+                        <th scope="col">{% trans "School" %}</th>
+                        <th scope="col">{% trans "Short name" %}</th>
+                        <th scope="col" class="is-numeric">{% trans "Students" %}</th>
+                        <th scope="col" class="is-numeric">{% trans "Staff" %}</th>
+                        <th scope="col">{% trans "Status" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in schools %}
+                    <tr>
+                        <td class="font-bold text-text">{{ s.name }}</td>
+                        <td class="font-mono text-xs text-text-muted">{{ s.slug }}</td>
+                        <td class="is-numeric">{{ s.student_count }}</td>
+                        <td class="is-numeric">{{ s.staff_count }}</td>
+                        <td>
+                            {% if s.is_active %}{% badge _("Active") tone="success" %}
+                            {% else %}{% badge _("Inactive") tone="neutral" %}{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        {% empty_state title=_("No schools yet") body=_("Add the first school below. Students and staff belong to a school, so this comes first.") icon_name="globe" %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border">
+        <h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Add a school" %}</h3>
+    </div>
+    <div class="card-body p-5">
+        {% if country %}
+        <p class="text-sm text-text-muted" style="margin-bottom:1rem;">
+            {% blocktrans with name=country.name %}New schools join {{ name }}. Its default language becomes theirs.{% endblocktrans %}
+        </p>
+        {% endif %}
+        <form method="post" action="{% url 'dashboard:country_school_create' %}">
+            {% csrf_token %}
+            <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(14rem,1fr))]" style="margin-bottom:1rem;">
+                <div class="form-group">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary" for="school-name">{% trans "Name" %}</label>
+                    <input type="text" id="school-name" name="name" required
+                           class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)]"
+                           placeholder="{% trans 'Anse Royale Secondary' %}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary" for="school-slug">{% trans "Short name" %}</label>
+                    <input type="text" id="school-slug" name="slug"
+                           class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)]"
+                           placeholder="{% trans 'anse-royale' %}">
+                    <small class="block mt-1 text-xs text-text-muted">{% trans "Used in links. Left blank, it is made from the name." %}</small>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-[38px] py-2 px-4 border border-primary-fill rounded-sm font-body text-sm font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Add school" %}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
