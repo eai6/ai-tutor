@@ -209,7 +209,8 @@ def shoot(out_dir, base_url, pages_file, only=None):
         "".join(f"{slug(r, u)}\n" for r, u, m in pages if m))
     cookies = session_cookies(
         {"teacher": "teacher_daniel", "student": "student_daniel",
-         "admin": "superadmin_daniel", "country": "country_daniel"}
+         "admin": "superadmin_daniel", "country": "country_daniel",
+         "school_admin": "schooladmin_daniel"}
     )
 
     host = base_url.split("//", 1)[1].split(":")[0]

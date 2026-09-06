@@ -131,3 +131,94 @@ def test_nothing_outside_tenancy_writes_the_rule_by_hand():
         f"{len(offenders)} file(s) still spell the tenancy rule out by hand:\n  "
         + "\n  ".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# The second guard: the aggregated view
+# ---------------------------------------------------------------------------
+
+def test_no_aggregated_query_forgets_the_country():
+    """`institution=None` no longer means the platform.
+
+    `filter_by_institution` and `get_scoped_object_or_404` fall back to the
+    whole platform when both institution and country are None, because that
+    IS the super admin's view. A country account reaches the same views with
+    no school selected, so a call that omits `country=` shows it every other
+    country's data — and reads as correct, because it is what the code said
+    for years.
+    """
+    import ast
+
+    path = REPO / 'ai_tutor' / 'apps' / 'dashboard' / 'views.py'
+    tree = ast.parse(path.read_text())
+    helpers = {'filter_by_institution', 'get_scoped_object_or_404'}
+
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name in helpers:
+            continue
+        for call in ast.walk(node):
+            if (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                    and call.func.id in helpers
+                    and not any(k.arg == 'country' for k in call.keywords)):
+                offenders.append(f'{call.func.id} at views.py:{call.lineno}')
+
+    assert offenders == [], (
+        f"{len(offenders)} scoped quer(ies) do not pass a country:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_the_dashboard_does_not_hand_write_the_scope_branch():
+    """The same rule again, in the shape the dashboard used to write it.
+
+        if institution is not None:
+            course = get_object_or_404(Course, visible_q(institution), id=n)
+        else:
+            course = get_object_or_404(Course, id=n)
+
+    26 sites had that `else`, and every one of them showed a country account
+    the whole platform's curriculum. `scope_q` is the one expression that
+    covers all three scopes, so `visible_q` should not appear in the
+    dashboard's views at all.
+    """
+    path = REPO / 'ai_tutor' / 'apps' / 'dashboard' / 'views.py'
+    text = path.read_text()
+    lines = text.split('\n')
+    offenders = [
+        f'views.py:{i + 1}' for i, line in enumerate(lines)
+        if 'visible_q(' in line and not line.lstrip().startswith('#')
+    ]
+    assert offenders == [], (
+        "the dashboard reaches for visible_q instead of scope_q at:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_every_institution_branch_considers_the_country():
+    """A third shape of the same mistake, and the one left to write.
+
+    `if institution is not None:` is not wrong by itself — it is how a view
+    asks "is one school selected". It becomes a leak when the other side of
+    the branch, written or implied, means "the whole platform". So every one
+    of them has to mention the country within sight, either by handling it or
+    by resolving through `scope_q`.
+    """
+    path = REPO / 'ai_tutor' / 'apps' / 'dashboard' / 'views.py'
+    lines = path.read_text().split('\n')
+
+    offenders = []
+    for i, line in enumerate(lines):
+        if line.strip() != 'if institution is not None:':
+            continue
+        # Twelve lines: enough for a three-way branch that assigns an id and
+        # then applies it, which is the longest of these in the file.
+        window = ' '.join(lines[i:i + 12])
+        if 'country' in window or 'scope_q' in window:
+            continue
+        offenders.append(f'views.py:{i + 1}')
+
+    assert offenders == [], (
+        f"{len(offenders)} institution branch(es) ignore the country:\n  "
+        + "\n  ".join(offenders)
+    )

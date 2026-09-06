@@ -114,3 +114,81 @@ def visible_to(queryset, institution, field='institution', country_field=None):
     country of its own.
     """
     return queryset.filter(visible_q(institution, field, country_field))
+
+
+def in_country_q(country, field='institution', model=None):
+    """Everything one country may see, across every school in it.
+
+    The aggregated view's counterpart to `visible_q`. `visible_q` answers
+    "what may this one school see"; this answers "what may this whole country
+    see", which is the question a ministry's dashboard asks when no school is
+    selected.
+
+    Before countries, that question had no answer and no need of one: an
+    unselected school meant the platform super admin looking at everything, so
+    `dashboard/views.py::filter_by_institution` simply returned the queryset
+    unfiltered. A country account reaches the same views with the same
+    unselected school and a very different entitlement.
+
+    The shared half — rows with no institution — is included only when the
+    model carries a country of its own. A Course does. A TutorSession does
+    not, and does not need to: it always has a school.
+    """
+    if country is None:
+        return Q()
+    country_id = getattr(country, 'pk', country)
+    q = Q(**{f'{field}__country': country_id})
+
+    shared_field = (
+        field.rsplit('__', 1)[0] + '__country' if '__' in field else 'country')
+    if model is not None and _has_path(model, shared_field):
+        q |= Q(**{f'{field}__isnull': True, shared_field: country_id})
+    return q
+
+
+def _has_path(model, path):
+    """Whether *path* ('country', 'course__country') resolves on *model*."""
+    for part in path.split('__'):
+        try:
+            field = model._meta.get_field(part)
+        except Exception:
+            return False
+        model = field.related_model
+        if model is None:
+            return True
+    return True
+
+
+def scope_q(institution, country, field='institution', model=None, shared=True):
+    """What a dashboard view's scope may see — all three cases in one Q.
+
+    The dashboard wrote this branch out by hand at 26 sites::
+
+        if institution is not None:
+            course = get_object_or_404(Course, visible_q(institution), id=n)
+        else:
+            course = get_object_or_404(Course, id=n)
+
+    and the `else` is the bug. It reads as "the super admin sees everything",
+    which was true when the only account with no school selected WAS the super
+    admin. A country account has no school selected either, and that branch
+    handed it every other country's curriculum.
+
+    One school selected -> `visible_q`. No school but a country -> that
+    country. Neither -> everything, which is still the super admin.
+
+    *shared* is whether rows with no institution count. They do for content a
+    school reads: a national curriculum exists to be visible. They do not for
+    rows a school owns — a student group, a roster, an invitation — where
+    `institution=None` is not "shared with everyone" but "belongs to nobody".
+    Those sites were strict before countries existed, and widening them is a
+    different change from the one this makes, so they pass `shared=False` and
+    get the country without the shared half.
+    """
+    if institution is not None:
+        return visible_q(institution, field) if shared else Q(**{field: institution})
+    if country is None:
+        return Q()
+    if not shared:
+        return Q(**{f'{field}__country': getattr(country, 'pk', country)})
+    return in_country_q(country, field, model=model)

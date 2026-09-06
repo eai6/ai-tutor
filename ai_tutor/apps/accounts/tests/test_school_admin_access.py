@@ -187,6 +187,35 @@ def test_the_people_list_stops_at_the_school_boundary(client, world):
     assert 'theirs' not in body
 
 
+@pytest.mark.django_db
+def test_the_staff_page_is_in_the_nav(client, world):
+    """A page reachable only by typing its URL is not delivered."""
+    _, _, a, _, _ = world
+    client.force_login(_admin_of(a, 'sa12'))
+
+    body = client.get('/dashboard/').content.decode()
+    assert '/dashboard/staff/' in body
+
+
+@pytest.mark.django_db
+def test_a_teacher_does_not_see_the_staff_link(client, world):
+    _, _, a, _, _ = world
+    client.force_login(_teacher_at(a, 't4'))
+
+    body = client.get('/dashboard/').content.decode()
+    assert '/dashboard/staff/' not in body
+
+
+@pytest.mark.django_db
+def test_a_school_admin_does_not_see_the_schools_link(client, world):
+    """It cannot add schools, so the nav must not offer to."""
+    _, _, a, _, _ = world
+    client.force_login(_admin_of(a, 'sa13'))
+
+    body = client.get('/dashboard/').content.decode()
+    assert '/dashboard/schools/' not in body
+
+
 # ---------------------------------------------------------------------------
 # A country account is a super admin bounded by one country
 # ---------------------------------------------------------------------------

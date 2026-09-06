@@ -90,3 +90,4 @@ admin    /dashboard/benchmark/scores/
 admin    /dashboard/benchmark/sessions/
 admin    /dashboard/benchmark/sessions/scores/
 country  /dashboard/schools/
+school_admin  /dashboard/staff/

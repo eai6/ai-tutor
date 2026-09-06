@@ -157,18 +157,23 @@
                 </a>
             </div>
 
-            {% if user.is_staff %}
+            {% if can_manage_people %}
             <details class="nav-group--collapsible py-0 px-2 mb-4 [&>summary]:flex [&>summary]:items-center [&>summary]:gap-2 [&>summary]:py-2 [&>summary]:px-3 [&>summary]:cursor-pointer [&>summary]:list-none [&>summary]:rounded-sm [&>summary]:font-mono [&>summary]:text-2xs [&>summary]:tracking-wide [&>summary]:uppercase [&>summary]:text-text-muted [&>summary::-webkit-details-marker]:hidden [&>summary:hover]:text-text [&>summary_.icon]:ml-auto [&>summary_.icon]:transition-transform [&>summary_.icon]:duration-[var(--dur-fast)] [&>summary_.icon]:ease-[var(--ease-out)] [&[open]_>_summary_.icon]:[transform:rotate(90deg)]" id="nav-admin" open>
                 <summary>{% trans "Administration" %}{% icon "chevron-right" size="sm" %}</summary>
                 <a href="{% url 'dashboard:staff_list' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
                    {% if 'staff' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
                     {% icon "staff" %}{% trans "Staff" %}
                 </a>
+                {% if user.is_staff %}
                 <a href="{% url 'dashboard:feedback_list' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
                    {% if 'feedback' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
                     {% icon "feedback" %}{% trans "Feedback & bugs" %}
                 </a>
+                {% endif %}
             </details>
+            {% endif %}
+
+            {% if user.is_staff %}
 
             <details class="nav-group--collapsible py-0 px-2 mb-4 [&>summary]:flex [&>summary]:items-center [&>summary]:gap-2 [&>summary]:py-2 [&>summary]:px-3 [&>summary]:cursor-pointer [&>summary]:list-none [&>summary]:rounded-sm [&>summary]:font-mono [&>summary]:text-2xs [&>summary]:tracking-wide [&>summary]:uppercase [&>summary]:text-text-muted [&>summary::-webkit-details-marker]:hidden [&>summary:hover]:text-text [&>summary_.icon]:ml-auto [&>summary_.icon]:transition-transform [&>summary_.icon]:duration-[var(--dur-fast)] [&>summary_.icon]:ease-[var(--ease-out)] [&[open]_>_summary_.icon]:[transform:rotate(90deg)]" id="nav-dev">
                 <summary>{% trans "Evaluation" %}{% icon "chevron-right" size="sm" %}</summary>

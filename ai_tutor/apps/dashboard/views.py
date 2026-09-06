@@ -19,7 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Avg, Q, F, Max
-from ai_tutor.apps.accounts.tenancy import shared_in, visible_q
+from ai_tutor.apps.accounts.tenancy import in_country_q, scope_q, shared_in
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.utils.translation import gettext as _, gettext_lazy as _lazy
@@ -88,23 +88,46 @@ def _inherited_materials_summary(course):
     }
 
 
-def filter_by_institution(queryset, institution, field='institution'):
-    """Filter queryset by institution. If institution is None (aggregated), return all."""
+def filter_by_institution(queryset, institution, field='institution', country=None):
+    """Filter a queryset to what this view's scope may see.
+
+    Three scopes, and the second one is why `country` exists:
+
+    - a school selected      that school's rows
+    - a country, none        every school in that country, plus the country's
+      selected               shared rows
+    - neither                everything — the platform super admin's aggregate
+
+    `institution=None` used to mean only the third. A country account reaches
+    these same views with no school selected, and returning the queryset
+    unfiltered would show it every other country's data.
+
+    `country` is therefore NOT optional in practice: a call that omits it
+    silently falls back to the platform-wide branch. A guard test fails the
+    build on one, the same way the tenancy rule's guard does.
+    """
     if institution is not None:
         return queryset.filter(**{field: institution})
+    if country is not None:
+        return queryset.filter(in_country_q(country, field, model=queryset.model))
     return queryset
 
 
-def get_scoped_object_or_404(model, institution, **kwargs):
+def get_scoped_object_or_404(model, institution, country=None, **kwargs):
     """get_object_or_404 with optional institution scoping.
 
     When *institution* is not None the lookup includes an ``institution``
     filter (or ``course__institution`` for Unit, ``unit__course__institution``
-    for Lesson, etc. – callers pass kwargs directly).  When *institution* is
-    None (aggregated mode) the institution filter is omitted.
+    for Lesson, etc. – callers pass kwargs directly).  When it is None the
+    lookup falls back to *country*, and only to the whole platform when that
+    is None too — see `filter_by_institution`, which this mirrors. Without
+    the country branch a ministry could open any school's course by id.
     """
     if institution is not None:
         kwargs['institution'] = institution
+        return get_object_or_404(model, **kwargs)
+    if country is not None:
+        return get_object_or_404(model, in_country_q(country, model=model), **kwargs)
     return get_object_or_404(model, **kwargs)
 
 
@@ -180,7 +203,7 @@ def _parse_chart_date(raw):
         return None
 
 
-def _activity_chart(request, institution, today):
+def _activity_chart(request, institution, today, country=None):
     """Session counts per bucket for the overview chart.
 
     Reads `?start=`/`?end=` (YYYY-MM-DD), falling back to the last
@@ -230,6 +253,7 @@ def _activity_chart(request, institution, today):
                 started_at__date__gte=start, started_at__date__lte=end
             ),
             institution,
+            country=country,
         )
         .annotate(day=TruncDate('started_at'))
         .values('day')
@@ -398,7 +422,7 @@ def _format_signature(answers):
     return frozenset(formats) or None
 
 
-def _progression_stats(institution, win_start, win_end, weekly):
+def _progression_stats(institution, win_start, win_end, weekly, country=None):
     """Learning progression over the window, three ways.
 
     Keyed on the ATTEMPT date, not the session start, because these answer
@@ -425,6 +449,7 @@ def _progression_stats(institution, win_start, win_end, weekly):
         ),
         institution,
         field='session__institution',
+        country=country,
     )
     rows = list(qs.values_list(
         'student_id', 'exit_ticket__lesson_id', 'purpose', 'score',
@@ -589,6 +614,7 @@ def _progression_stats(institution, win_start, win_end, weekly):
 def dashboard_home(request):
     """Main dashboard with overview metrics."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     today = timezone.now().date()
 
@@ -597,13 +623,14 @@ def dashboard_home(request):
     # all-time for competency — three windows side by side under labels that
     # did not say so. With a picker on the page that reads as a contradiction:
     # set it to July and a neighbouring tile still reports a rolling 30 days.
-    chart = _activity_chart(request, institution, today)
+    chart = _activity_chart(request, institution, today, country=country)
     win_start, win_end = chart['start'], chart['end']
 
     # Get all students in institution (or all if aggregated)
     student_memberships = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
-        institution
+        institution,
+        country=country,
     ).select_related('user')
 
     student_ids = list(student_memberships.values_list('user_id', flat=True))
@@ -617,10 +644,11 @@ def dashboard_home(request):
 
     # Students who ran a session inside the window.
     active_students = filter_by_institution(
-        _in_window.filter(student_id__in=student_ids), institution
+        _in_window.filter(student_id__in=student_ids), institution,
+        country=country,
     ).values('student').distinct().count()
 
-    _scoped_sessions = filter_by_institution(_in_window, institution)
+    _scoped_sessions = filter_by_institution(_in_window, institution, country=country)
     total_sessions = _scoped_sessions.count()
 
     # Reach-rate + score distribution for the sessions started in this window.
@@ -629,6 +657,7 @@ def dashboard_home(request):
     # Learning progression: pre/post gain, cohort trend, per-student movement.
     prog = _progression_stats(
         institution, win_start, win_end, weekly=(chart['bucket'] == 'week'),
+        country=country,
     )
 
     # Passes now come from _exit_ticket_stats, which counts them over the SAME
@@ -641,7 +670,8 @@ def dashboard_home(request):
 
     # Progress stats
     progress_stats = filter_by_institution(
-        StudentLessonProgress.objects.all(), institution
+        StudentLessonProgress.objects.all(), institution,
+        country=country,
     ).aggregate(
         total=Count('id'),
         mastered=Count('id', filter=Q(mastery_level='mastered')),
@@ -650,7 +680,8 @@ def dashboard_home(request):
 
     # Total available published lessons (true denominator for mastery %)
     total_available_lessons = filter_by_institution(
-        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
+        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution',
+        country=country,
     ).count()
 
     # avg_competency (C4): average best_score across all populated progress rows,
@@ -659,6 +690,7 @@ def dashboard_home(request):
     avg_competency_data = filter_by_institution(
         StudentLessonProgress.objects.exclude(best_score__isnull=True),
         institution,
+        country=country,
     ).aggregate(avg=Avg('best_score'))
     avg_competency = round((avg_competency_data['avg'] or 0.0) * 100)
 
@@ -709,15 +741,14 @@ def student_groups_list(request):
     from ai_tutor.apps.accounts.models import StudentGroup
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = StudentGroup.objects.all()
-    if institution is not None:
-        qs = qs.filter(institution=institution)
+    qs = qs.filter(scope_q(institution, country, shared=False))
     qs = qs.prefetch_related('students').order_by('-is_active', 'name')
 
     # Roster of students for the create-form
     roster_q = Membership.objects.filter(role='student', is_active=True)
-    if institution is not None:
-        roster_q = roster_q.filter(institution=institution)
+    roster_q = roster_q.filter(scope_q(institution, country, shared=False))
     roster = list(roster_q.select_related('user').order_by('user__last_name', 'user__first_name'))
 
     # Map student id → active group (for "already in" hints)
@@ -746,6 +777,7 @@ def student_group_create(request):
     from ai_tutor.apps.accounts.models import StudentGroup
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     if institution is None:
         messages.error(request, "Pick a specific school before creating groups.")
         return redirect('dashboard:student_groups')
@@ -787,9 +819,9 @@ def student_group_update(request, group_id):
     from ai_tutor.apps.accounts.models import StudentGroup
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = StudentGroup.objects.all()
-    if institution is not None:
-        qs = qs.filter(institution=institution)
+    qs = qs.filter(scope_q(institution, country, shared=False))
     group = get_object_or_404(qs, id=group_id)
 
     new_name = (request.POST.get('name') or '').strip()
@@ -824,9 +856,9 @@ def student_group_archive(request, group_id):
     from ai_tutor.apps.accounts.models import StudentGroup
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = StudentGroup.objects.all()
-    if institution is not None:
-        qs = qs.filter(institution=institution)
+    qs = qs.filter(scope_q(institution, country, shared=False))
     group = get_object_or_404(qs, id=group_id)
 
     group.is_active = not group.is_active
@@ -841,6 +873,7 @@ def student_group_archive(request, group_id):
 def institution_session_mode(request):
     """Toggle the institution's session_mode (shared_device | individual)."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     if institution is None:
         messages.error(request, "Pick a specific school first.")
         return redirect('dashboard:student_groups')
@@ -865,16 +898,19 @@ def institution_session_mode(request):
 def student_list(request):
     """List all students with progress summary."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     
     # Get students with their progress
     students = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
-        institution
+        institution,
+        country=country,
     ).select_related('user').order_by('user__last_name', 'user__first_name')
 
     # Total available published lessons (denominator for all students)
     total_available = filter_by_institution(
-        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
+        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution',
+        country=country,
     ).count()
 
     # Enrich with progress data
@@ -885,13 +921,15 @@ def student_list(request):
         # Get progress stats
         mastered_count = filter_by_institution(
             StudentLessonProgress.objects.filter(student=user, mastery_level='mastered'),
-            institution
+            institution,
+            country=country,
         ).count()
 
         # Get recent session
         last_session = filter_by_institution(
             TutorSession.objects.filter(student=user),
-            institution
+            institution,
+            country=country,
         ).order_by('-started_at').first()
 
         # Get profile
@@ -924,13 +962,15 @@ def student_list(request):
 def student_detail(request, student_id):
     """Detailed view of a student's progress."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     
     student = get_object_or_404(User, id=student_id)
 
     # Verify student belongs to this institution (or any if aggregated)
     membership = filter_by_institution(
         Membership.objects.filter(user=student, role='student'),
-        institution
+        institution,
+        country=country,
     ).first()
 
     if not membership:
@@ -940,7 +980,8 @@ def student_detail(request, student_id):
     # Get all progress
     progress_list = filter_by_institution(
         StudentLessonProgress.objects.filter(student=student),
-        institution
+        institution,
+        country=country,
     ).select_related('lesson', 'lesson__unit', 'lesson__unit__course').order_by(
         'lesson__unit__course__title',
         'lesson__unit__order_index',
@@ -956,6 +997,7 @@ def student_detail(request, student_id):
         filter_by_institution(
             TutorSession.objects.filter(sessions_q).distinct(),
             institution,
+            country=country,
         )
         .select_related('lesson')
         .prefetch_related('participants__student')
@@ -971,6 +1013,7 @@ def student_detail(request, student_id):
     all_sessions_qs = filter_by_institution(
         TutorSession.objects.filter(sessions_q).distinct(),
         institution,
+        country=country,
     )
     stats = {
         'total_sessions': all_sessions_qs.count(),
@@ -985,7 +1028,8 @@ def student_detail(request, student_id):
     # student is even when later lessons aren't published yet.
     course_lesson_counts = {}
     courses_qs = filter_by_institution(
-        Course.objects.all(), institution
+        Course.objects.all(), institution,
+        country=country,
     ).prefetch_related('units__lessons')
     for course in courses_qs:
         count = 0
@@ -1119,14 +1163,12 @@ def student_detail(request, student_id):
 def curriculum_list(request):
     """List all courses grouped by grade level."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     # Include platform-wide courses (institution=None) alongside school courses
-    if institution is not None:
-        courses_qs = Course.objects.filter(
-            visible_q(institution)
-        )
-    else:
-        courses_qs = Course.objects.all()
+    courses_qs = Course.objects.filter(
+        scope_q(institution, country, model=Course),
+    )
 
     courses = courses_qs.prefetch_related('units__lessons').order_by('grade_level', 'title')
 
@@ -1153,13 +1195,10 @@ def curriculum_list(request):
             'read_only': is_platform_wide and not is_superadmin,
         })
 
-    if institution is not None:
-        unlinked_materials = TeachingMaterialUpload.objects.filter(
-            visible_q(institution),
-            course__isnull=True,
-        )
-    else:
-        unlinked_materials = TeachingMaterialUpload.objects.filter(course__isnull=True)
+    unlinked_materials = TeachingMaterialUpload.objects.filter(
+        scope_q(institution, country, model=TeachingMaterialUpload),
+        course__isnull=True,
+    )
 
     context = {
         **request.staff_ctx,
@@ -1174,15 +1213,15 @@ def curriculum_list(request):
 def course_detail(request, course_id):
     """View and manage a course's units and lessons."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     is_superadmin = request.user.is_staff
 
-    if institution is not None:
-        # Staff can see their school's courses AND platform-wide courses
-        course = get_object_or_404(
-            Course, visible_q(institution), id=course_id
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    # Staff can see their school's courses AND platform-wide courses
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     # Platform-wide courses are read-only for non-superadmins
     is_platform_wide = course.institution is None
@@ -1199,7 +1238,8 @@ def course_detail(request, course_id):
             # Progress stats
             progress = filter_by_institution(
                 StudentLessonProgress.objects.filter(lesson=lesson),
-                institution
+                institution,
+                country=country,
             ).aggregate(
                 total=Count('id'),
                 mastered=Count('id', filter=Q(mastery_level='mastered')),
@@ -1448,6 +1488,7 @@ def _parse_page_range(post):
 def curriculum_upload(request):
     """Upload curriculum document with optional teaching material attachment."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     is_superadmin = request.user.is_staff
 
     # Pilot-mode gate: teachers can review + edit courses but cannot
@@ -1648,18 +1689,16 @@ def curriculum_process(request, upload_id):
     import traceback as tb
     try:
         institution = request.staff_ctx['institution']
+        country = request.staff_ctx['country']
 
         from ai_tutor.apps.dashboard.models import CurriculumUpload
 
         # Allow platform-wide uploads (institution=None) for any staff
-        if institution is not None:
-            upload = get_object_or_404(
-                CurriculumUpload,
-                visible_q(institution),
-                id=upload_id,
-            )
-        else:
-            upload = get_object_or_404(CurriculumUpload, id=upload_id)
+        upload = get_object_or_404(
+            CurriculumUpload,
+            scope_q(institution, country, model=CurriculumUpload),
+            id=upload_id,
+        )
     except Exception as e:
         logger.error(f"curriculum_process CRASHED for upload {upload_id}: {e}\n{tb.format_exc()}")
         print(f"[ERROR] curriculum_process({upload_id}): {e}\n{tb.format_exc()}", flush=True)
@@ -1692,18 +1731,16 @@ def curriculum_process(request, upload_id):
 def curriculum_generate(request, upload_id):
     """API endpoint to start curriculum generation."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     from ai_tutor.apps.dashboard.models import CurriculumUpload
     from ai_tutor.apps.dashboard.tasks import process_curriculum_upload
 
-    if institution is not None:
-        upload = get_object_or_404(
-            CurriculumUpload,
-            visible_q(institution),
-            id=upload_id,
-        )
-    else:
-        upload = get_object_or_404(CurriculumUpload, id=upload_id)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, model=CurriculumUpload),
+        id=upload_id,
+    )
 
     if upload.status not in ('pending', 'failed', 'processing'):
         return JsonResponse({'error': 'Already processing'}, status=400)
@@ -1746,15 +1783,18 @@ def curriculum_approve(request, upload_id):
     2º Ciclo covering 10ª/11ª/12ª) produce N Courses.
     """
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     from ai_tutor.apps.dashboard.models import CurriculumUpload
     from ai_tutor.apps.curriculum.models import Lesson
     from ai_tutor.apps.curriculum.curriculum_parser import complete_curriculum_upload as v2_complete
 
     lookup = {'id': upload_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     if upload.status != 'review':
         return JsonResponse({'error': 'Not in review state'}, status=400)
@@ -1897,15 +1937,13 @@ def curriculum_process_api(request, upload_id):
     )
     
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        upload = get_object_or_404(
-            CurriculumUpload,
-            visible_q(institution),
-            id=upload_id,
-        )
-    else:
-        upload = get_object_or_404(CurriculumUpload, id=upload_id)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, model=CurriculumUpload),
+        id=upload_id,
+    )
 
     try:
         data = json.loads(request.body)
@@ -2098,11 +2136,13 @@ def class_list(request):
     list + promote action live on the dedicated class detail page; this
     page is just for picking which class to drill into."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     counts = {}
     memberships = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
         institution,
+        country=country,
     ).select_related('user__student_profile')
     for m in memberships:
         profile = getattr(m.user, 'student_profile', None)
@@ -2150,11 +2190,13 @@ def class_detail(request, grade):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     # Roster — institution-scoped students whose grade_level matches.
     student_qs = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
         institution,
+        country=country,
     ).select_related('user', 'user__student_profile')
     students = []
     for m in student_qs:
@@ -2171,12 +2213,9 @@ def class_detail(request, grade):
     # be visible to every school. Competency stats below are still
     # filtered to the teacher's institution roster, so the numbers
     # show how THEIR students are doing on the global course.
-    if institution is not None:
-        courses_qs = Course.objects.filter(
-            visible_q(institution)
-        )
-    else:
-        courses_qs = Course.objects.all()
+    courses_qs = Course.objects.filter(
+        scope_q(institution, country, model=Course),
+    )
     course_stats = []
     for course in courses_qs.order_by('title'):
         course_grades = {
@@ -2395,6 +2434,7 @@ def promote_students(request):
 def reports_overview(request):
     """Generate reports on student progress."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     
     # Get date range from request
     days = int(request.GET.get('days', 30))
@@ -2403,7 +2443,8 @@ def reports_overview(request):
     # Sessions by day
     sessions_by_day = filter_by_institution(
         TutorSession.objects.filter(started_at__date__gte=start_date),
-        institution
+        institution,
+        country=country,
     ).annotate(
         date=TruncDate('started_at')
     ).values('date').annotate(
@@ -2415,7 +2456,8 @@ def reports_overview(request):
     # Top performing students
     top_students = filter_by_institution(
         StudentLessonProgress.objects.filter(mastery_level='mastered'),
-        institution
+        institution,
+        country=country,
     ).values('student__first_name', 'student__last_name', 'student__id').annotate(
         mastered_count=Count('id')
     ).order_by('-mastered_count')[:10]
@@ -2423,7 +2465,8 @@ def reports_overview(request):
     # Lessons completion rate
     lessons = filter_by_institution(
         Lesson.objects.filter(is_published=True),
-        institution, field='unit__course__institution'
+        institution, field='unit__course__institution',
+        country=country,
     ).annotate(
         attempts=Count('sessions'),
         completions=Count('sessions', filter=Q(sessions__mastery_achieved=True))
@@ -2436,12 +2479,14 @@ def reports_overview(request):
     course_qs = filter_by_institution(
         Course.objects.filter(is_published=True),
         institution,
+        country=country,
     ).order_by('title')
     for course in course_qs:
         eo_count = Skill.objects.filter(course=course, is_enabling_objective=True).count()
         session_count = filter_by_institution(
             TutorSession.objects.filter(lesson__unit__course=course),
             institution,
+            country=country,
         ).count()
         courses_with_eo.append({
             'course': course,
@@ -2455,7 +2500,8 @@ def reports_overview(request):
             is_published=True,
             sessions__started_at__date__gte=start_date,
         ),
-        institution, field='unit__course__institution'
+        institution, field='unit__course__institution',
+        country=country,
     ).annotate(
         recent_sessions=Count('sessions', filter=Q(sessions__started_at__date__gte=start_date)),
         recent_completions=Count('sessions', filter=Q(sessions__started_at__date__gte=start_date, sessions__status='completed')),
@@ -2483,11 +2529,14 @@ def class_readiness_report(request, course_id):
     from django.db.models import Avg, Count, Q
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     lookup = {'id': course_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    course = get_object_or_404(Course, **lookup)
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     # Get all EO skills for this course
     eo_skills = Skill.objects.filter(
@@ -2614,14 +2663,12 @@ def lesson_session_report(request, lesson_id):
     config = PlatformConfig.load()
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    country = request.staff_ctx['country']
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
 
     course = lesson.unit.course
     mastery_threshold = config.threshold_me_min / 100.0  # Default 0.8
@@ -3041,7 +3088,8 @@ def process_pending_materials(request, course_id):
     from ai_tutor.apps.dashboard.job_dispatch import dispatch_material_job
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     # Determine processing mode
     mode = request.POST.get('mode', 'rich')
@@ -3142,14 +3190,12 @@ def material_process(request, upload_id):
     from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        upload = get_object_or_404(
-            TeachingMaterialUpload,
-            visible_q(institution),
-            id=upload_id,
-        )
-    else:
-        upload = get_object_or_404(TeachingMaterialUpload, id=upload_id)
+    country = request.staff_ctx['country']
+    upload = get_object_or_404(
+        TeachingMaterialUpload,
+        scope_q(institution, country, model=TeachingMaterialUpload),
+        id=upload_id,
+    )
 
     # Handle edit POST
     if request.method == 'POST' and request.POST.get('action') == 'update':
@@ -3217,7 +3263,8 @@ def course_upload_material(request, course_id):
     from ai_tutor.apps.dashboard.job_dispatch import dispatch_material_job
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     uploaded_files = request.FILES.getlist('material_files') or [request.FILES.get('material_file')]
     uploaded_files = [f for f in uploaded_files if f]
@@ -3330,14 +3377,12 @@ def material_confirm_processing(request, upload_id):
     )
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        upload = get_object_or_404(
-            TeachingMaterialUpload,
-            visible_q(institution),
-            id=upload_id,
-        )
-    else:
-        upload = get_object_or_404(TeachingMaterialUpload, id=upload_id)
+    country = request.staff_ctx['country']
+    upload = get_object_or_404(
+        TeachingMaterialUpload,
+        scope_q(institution, country, model=TeachingMaterialUpload),
+        id=upload_id,
+    )
 
     if upload.status not in ('pending_confirmation', 'failed', 'pending'):
         messages.error(
@@ -3411,14 +3456,12 @@ def material_delete(request, material_id):
     from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        material = get_object_or_404(
-            TeachingMaterialUpload,
-            visible_q(institution),
-            id=material_id,
-        )
-    else:
-        material = get_object_or_404(TeachingMaterialUpload, id=material_id)
+    country = request.staff_ctx['country']
+    material = get_object_or_404(
+        TeachingMaterialUpload,
+        scope_q(institution, country, model=TeachingMaterialUpload),
+        id=material_id,
+    )
 
     course = material.course
     title = material.title
@@ -3454,6 +3497,7 @@ def settings_page(request):
     """
     from django.conf import settings as django_settings
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     membership = request.staff_ctx['membership']
     is_superadmin = request.user.is_staff
     can_edit_school = request.staff_ctx['can_edit_school_settings']
@@ -3916,15 +3960,13 @@ def lesson_detail(request, lesson_id):
     from ai_tutor.apps.tutoring.models import ExitTicket, TutorSession
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
 
     # Auto-fix legacy 40-min lessons
     if lesson.estimated_minutes == 40:
@@ -4065,10 +4107,13 @@ def exit_question_edit(request, question_id):
     import json
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lookup = {'id': question_id}
-    if institution is not None:
-        lookup['exit_ticket__lesson__unit__course__institution'] = institution
-    question = get_object_or_404(ExitTicketQuestion, **lookup)
+    question = get_object_or_404(
+        ExitTicketQuestion,
+        scope_q(institution, country, 'exit_ticket__lesson__unit__course__institution', shared=False),
+        **lookup,
+    )
 
     data = json.loads(request.body) if request.body else {}
 
@@ -4153,10 +4198,13 @@ def lesson_prerequisite_edit(request, lesson_id):
     from ai_tutor.apps.tutoring.skills_models import LessonPrerequisite
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lookup = {'id': lesson_id}
-    if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        **lookup,
+    )
 
     data = json.loads(request.body) if request.body else {}
     action = data.get('action')
@@ -4199,10 +4247,13 @@ def course_set_default_duration(request, course_id):
     from ai_tutor.apps.curriculum.models import Course, Lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lookup = {'id': course_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    course = get_object_or_404(Course, **lookup)
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     raw = (request.POST.get('lesson_duration') or '').strip()
     try:
@@ -4288,10 +4339,13 @@ def course_regenerate_all(request, course_id):
         return redirect('dashboard:course_detail', course_id=course_id)
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lookup = {'id': course_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    course = get_object_or_404(Course, **lookup)
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     # Optional duration knob — lets the teacher recalibrate every
     # lesson's `estimated_minutes` BEFORE regen, without going through
@@ -4395,11 +4449,14 @@ def lesson_regenerate(request, lesson_id):
     from ai_tutor.apps.accounts.models import Institution
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     lookup = {'id': lesson_id}
-    if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        **lookup,
+    )
 
     # Guard: skip if a generation is already in flight. Rapid clicks
     # used to wipe in-progress state and spawn pre-empting tasks.
@@ -4494,11 +4551,14 @@ def lesson_generate_content(request, lesson_id):
     from ai_tutor.apps.dashboard.background_tasks import run_async, generate_complete_lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     lookup = {'id': lesson_id}
-    if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        **lookup,
+    )
 
     from ai_tutor.apps.tutoring.models import ExitTicket
 
@@ -4552,15 +4612,13 @@ def lesson_publish(request, lesson_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
     
     # Gate: tier_3/tier_4 content requires teacher approval before publishing
     if not lesson.is_published and lesson.content_quality in ('tier_3', 'tier_4'):
@@ -4595,15 +4653,13 @@ def lesson_approve(request, lesson_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
 
     lesson.teacher_approved = True
     lesson.teacher_approved_at = timezone.now()
@@ -4625,14 +4681,12 @@ def lesson_group_settings(request, lesson_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    country = request.staff_ctx['country']
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
 
     lesson.allow_group_mode = request.POST.get('allow_group_mode') == 'on'
     try:
@@ -4663,6 +4717,7 @@ def delete_student(request, student_id):
     from ai_tutor.apps.accounts.models import Membership
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     target = get_object_or_404(User, id=student_id)
 
     # Cannot delete yourself via this endpoint (use self-delete).
@@ -4677,6 +4732,11 @@ def delete_student(request, student_id):
     )
     if institution is not None:
         teacher_inst_ids.append(institution.id)
+    elif country is not None:
+        # A country account holds no staff membership anywhere, so without
+        # this it fails closed on every student in its own country.
+        teacher_inst_ids.extend(
+            Institution.objects.filter(country=country).values_list('id', flat=True))
     student_in_scope = Membership.objects.filter(
         user=target,
         role='student',
@@ -4738,6 +4798,7 @@ def staff_list(request):
         return redirect('dashboard:home')
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     is_platform_admin = request.user.is_staff
     managed_ids = manageable_school_ids(request.staff_ctx)   # None = every school
 
@@ -5001,8 +5062,7 @@ def staff_list(request):
 
     invites_qs = _managed(StaffInvitation.objects.filter(is_used=False)).select_related(
         'institution', 'invited_by')
-    if institution is not None:
-        invites_qs = invites_qs.filter(institution=institution)
+    invites_qs = invites_qs.filter(scope_q(institution, country, shared=False))
     pending_invites = list(invites_qs.order_by('-created_at'))
 
     # Find / debug ANY account (incl. students) by email or username, so an admin
@@ -5292,14 +5352,12 @@ def course_subject_type(request, course_id):
     from ai_tutor.apps.curriculum.models import Course
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     new_value = request.POST.get('subject_type', '').strip()
     valid = {choice[0] for choice in Course.SubjectType.choices}
@@ -5329,6 +5387,7 @@ def exit_question_regenerate(request, question_id):
     from django.http import JsonResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     question = get_object_or_404(
         ExitTicketQuestion.objects.select_related(
             'exit_ticket__lesson__unit__course',
@@ -5539,6 +5598,7 @@ def exit_question_save_regen(request, question_id):
     from django.http import JsonResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     question = get_object_or_404(
         ExitTicketQuestion.objects.select_related(
             'exit_ticket__lesson__unit__course',
@@ -5859,6 +5919,7 @@ def exit_question_inplace_regen(request, question_id):
     from django.http import JsonResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     question = get_object_or_404(
         ExitTicketQuestion.objects.select_related(
             'exit_ticket__lesson__unit__course',
@@ -6396,6 +6457,7 @@ def lesson_step_regenerate(request, step_id):
     from django.http import JsonResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     step = get_object_or_404(
         LessonStep.objects.select_related('lesson__unit__course'),
         id=step_id,
@@ -6549,6 +6611,7 @@ def lesson_step_save_regen(request, step_id):
     from django.http import JsonResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     step = get_object_or_404(
         LessonStep.objects.select_related('lesson__unit__course'),
         id=step_id,
@@ -6625,19 +6688,17 @@ def step_edit(request, step_id):
     from ai_tutor.apps.curriculum.models import LessonStep
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     # Include platform-wide courses (institution=None) so teachers
     # whose membership is school-scoped can still edit lessons in
     # courses that aren't owned by any single school. Without this,
     # the lookup 404'd on every platform-wide course.
-    if institution is not None:
-        step = get_object_or_404(
-            LessonStep,
-            visible_q(institution, 'lesson__unit__course__institution'),
-            id=step_id,
-        )
-    else:
-        step = get_object_or_404(LessonStep, id=step_id)
+    step = get_object_or_404(
+        LessonStep,
+        scope_q(institution, country, 'lesson__unit__course__institution', model=LessonStep),
+        id=step_id,
+    )
     
     lesson = step.lesson
     total_steps = lesson.steps.count()
@@ -6913,7 +6974,8 @@ def course_generate_all(request, course_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
     
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     # Guard: skip if any lesson is already generating
     from ai_tutor.apps.curriculum.models import Lesson
@@ -6959,7 +7021,8 @@ def course_generate_media(request, course_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     # Check if force regenerate was requested
     force_regenerate = request.POST.get('force', '') == '1'
@@ -7020,7 +7083,8 @@ def course_review_unreviewed(request, course_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     # Parse the optional model picker. Empty string = use the default
     # chain; "provider:model_name" = forced override.
@@ -7079,6 +7143,7 @@ def lesson_step_mark_reviewed(request, step_id):
     from django.utils import timezone
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     step = get_object_or_404(
         LessonStep.objects.select_related('lesson__unit__course'),
         id=step_id,
@@ -7114,6 +7179,7 @@ def exit_ticket_question_mark_reviewed(request, question_id):
     from django.utils import timezone
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     q = get_object_or_404(
         ExitTicketQuestion.objects.select_related(
             'exit_ticket__lesson__unit__course',
@@ -7150,11 +7216,14 @@ def media_progress(request, upload_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
     
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     
     lookup = {'id': upload_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     context = {
         **request.staff_ctx,
@@ -7171,11 +7240,14 @@ def content_progress(request, upload_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     lookup = {'id': upload_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
     
     context = {
         **request.staff_ctx,
@@ -7193,10 +7265,13 @@ def cancel_generation(request, upload_id):
     from ai_tutor.apps.dashboard.models import CurriculumUpload
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lookup = {'id': upload_id}
-    if institution is not None:
-        lookup['institution'] = institution
-    upload = get_object_or_404(CurriculumUpload, **lookup)
+    upload = get_object_or_404(
+        CurriculumUpload,
+        scope_q(institution, country, shared=False),
+        **lookup,
+    )
 
     upload.is_cancelled = True
     upload.status = 'completed'
@@ -7219,11 +7294,14 @@ def cancel_generation(request, upload_id):
 def cancel_lesson_generation(request, lesson_id):
     """Cancel generation for a single lesson."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     lookup = {'id': lesson_id}
-    if institution is not None:
-        lookup['unit__course__institution'] = institution
-    lesson = get_object_or_404(Lesson, **lookup)
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        **lookup,
+    )
 
     if lesson.content_status == 'generating':
         # Set the explicit 'cancelled' sentinel — that's the ONE state
@@ -7247,7 +7325,8 @@ def course_publish_all(request, course_id):
     from ai_tutor.apps.curriculum.models import Lesson
     
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     # Publish all lessons that have content
     lessons = Lesson.objects.filter(unit__course=course)
@@ -7274,7 +7353,8 @@ def course_unpublish_all(request, course_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     unpublished = Lesson.objects.filter(
         unit__course=course, is_published=True
@@ -7293,7 +7373,8 @@ def unit_create(request, course_id):
     from ai_tutor.apps.curriculum.models import Unit
     
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -7327,10 +7408,12 @@ def lesson_create(request, unit_id):
     from ai_tutor.apps.curriculum.models import Unit, Lesson
     
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
-    else:
-        unit = get_object_or_404(Unit, id=unit_id)
+    country = request.staff_ctx['country']
+    unit = get_object_or_404(
+        Unit,
+        scope_q(institution, country, 'course__institution', shared=False),
+        id=unit_id,
+    )
     
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -7374,10 +7457,12 @@ def lesson_edit_objectives(request, lesson_id):
     """
     from ai_tutor.apps.curriculum.models import Lesson
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        lesson = get_object_or_404(Lesson, id=lesson_id, unit__course__institution=institution)
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    country = request.staff_ctx['country']
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        id=lesson_id,
+    )
 
     raw = request.POST.getlist('enabling_objectives')   # multiple inputs same name
     seen = set()
@@ -7425,10 +7510,12 @@ def lesson_move_objective(request, lesson_id):
     """
     from ai_tutor.apps.curriculum.models import Lesson
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        source = get_object_or_404(Lesson, id=lesson_id, unit__course__institution=institution)
-    else:
-        source = get_object_or_404(Lesson, id=lesson_id)
+    country = request.staff_ctx['country']
+    source = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', shared=False),
+        id=lesson_id,
+    )
 
     eo_text = (request.POST.get('eo_text') or '').strip()
     target_id = (request.POST.get('target_lesson_id') or '').strip()
@@ -7487,11 +7574,13 @@ def lesson_move_objective(request, lesson_id):
 def course_edit(request, course_id):
     """Edit course title, description, subject, grade levels."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        course = get_object_or_404(Course, id=course_id, institution=institution)
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        id=course_id,
+    )
 
     title = request.POST.get('title', '').strip()
     description = request.POST.get('description', '').strip()
@@ -7703,10 +7792,12 @@ def course_reupload(request, course_id):
     from ai_tutor.apps.dashboard.background_tasks import run_async
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(Course, id=course_id, institution=institution)
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        id=course_id,
+    )
 
     uploaded_file = request.FILES.get('curriculum_file')
     if not uploaded_file:
@@ -7832,7 +7923,8 @@ def _apply_order(queryset, ordered_ids):
 def course_reorder_units(request, course_id):
     """Persist a drag-reordered unit sequence for a course (AJAX, JSON body)."""
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
     try:
         order = json.loads(request.body or '{}').get('order', [])
     except json.JSONDecodeError:
@@ -7849,10 +7941,12 @@ def unit_reorder_lessons(request, unit_id):
     """Persist a drag-reordered lesson sequence for a unit (AJAX, JSON body)."""
     from ai_tutor.apps.curriculum.models import Unit
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
-    else:
-        unit = get_object_or_404(Unit, id=unit_id)
+    country = request.staff_ctx['country']
+    unit = get_object_or_404(
+        Unit,
+        scope_q(institution, country, 'course__institution', shared=False),
+        id=unit_id,
+    )
     try:
         order = json.loads(request.body or '{}').get('order', [])
     except json.JSONDecodeError:
@@ -7972,11 +8066,13 @@ def course_change_institution(request, course_id):
 def course_delete(request, course_id):
     """Delete a course and all its units/lessons/steps."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
-    if institution is not None:
-        course = get_object_or_404(Course, id=course_id, institution=institution)
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, shared=False),
+        id=course_id,
+    )
 
     title = course.title
 
@@ -8041,6 +8137,7 @@ def flagged_sessions(request):
     from ai_tutor.apps.tutoring.models import SessionTurn
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     status_filter = request.GET.get('status', 'unreviewed')
     # `flag_filter` query-param kept for URL-compat but ignored: the
     # only flag family rendered is safety. Existing links with
@@ -8062,7 +8159,7 @@ def flagged_sessions(request):
     qs = TutorSession.objects.filter(
         is_flagged=True, id__in=safety_session_ids,
     )
-    qs = filter_by_institution(qs, institution)
+    qs = filter_by_institution(qs, institution, country=country)
     if status_filter == 'unreviewed':
         qs = qs.filter(flag_reviewed=False)
     elif status_filter == 'reviewed':
@@ -8078,6 +8175,7 @@ def flagged_sessions(request):
             is_flagged=True, id__in=safety_session_ids,
         ),
         institution,
+        country=country,
     )
     total_flagged = total_flagged_qs.count()
     unreviewed_count = total_flagged_qs.filter(flag_reviewed=False).count()
@@ -8107,9 +8205,10 @@ def flagged_sessions(request):
 def flagged_session_detail(request, session_id):
     """View transcript of a flagged session with highlighted flagged turns."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     qs = TutorSession.objects.filter(is_flagged=True)
-    qs = filter_by_institution(qs, institution)
+    qs = filter_by_institution(qs, institution, country=country)
     session = get_object_or_404(qs.select_related('student', 'lesson', 'reviewed_by'), id=session_id)
 
     from ai_tutor.apps.tutoring.models import SessionTurn
@@ -8127,9 +8226,10 @@ def flagged_session_detail(request, session_id):
 def resolve_flag(request, session_id):
     """Mark a flagged session as reviewed and optionally re-approve the student."""
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
 
     qs = TutorSession.objects.filter(is_flagged=True)
-    qs = filter_by_institution(qs, institution)
+    qs = filter_by_institution(qs, institution, country=country)
     session = get_object_or_404(qs, id=session_id)
 
     session.flag_reviewed = True
@@ -8193,7 +8293,8 @@ def reindex_materials(request, course_id):
     from ai_tutor.apps.dashboard.background_tasks import run_async
 
     institution = request.staff_ctx['institution']
-    course = get_scoped_object_or_404(Course, institution, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_scoped_object_or_404(Course, institution, id=course_id, country=country)
 
     completed = TeachingMaterialUpload.objects.filter(
         course=course, status='completed'
@@ -8253,14 +8354,12 @@ def lesson_live_monitor(request, lesson_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        lesson = get_object_or_404(
-            Lesson,
-            visible_q(institution, 'unit__course__institution'),
-            id=lesson_id,
-        )
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+    country = request.staff_ctx['country']
+    lesson = get_object_or_404(
+        Lesson,
+        scope_q(institution, country, 'unit__course__institution', model=Lesson),
+        id=lesson_id,
+    )
 
     # Exclude abandoned sessions from the live monitor — they're
     # noise (a student who started, bounced, then started fresh
@@ -8477,6 +8576,7 @@ def send_guidance(request, lesson_id):
     from ai_tutor.apps.curriculum.models import Lesson
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     lesson = get_object_or_404(Lesson, id=lesson_id)
 
     session_ids = request.POST.getlist('session_ids')
@@ -8535,8 +8635,9 @@ def session_chat_history(request, session_id):
     from ai_tutor.apps.tutoring.models import SessionTurn
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = TutorSession.objects.all()
-    qs = filter_by_institution(qs, institution)
+    qs = filter_by_institution(qs, institution, country=country)
     session = get_object_or_404(qs.select_related('student', 'lesson'), id=session_id)
 
     turns = SessionTurn.objects.filter(session=session).order_by('created_at')
@@ -8589,8 +8690,9 @@ def session_exit_review(request, session_id):
     from ai_tutor.apps.tutoring.models import ExitTicketAttempt, ExitTicketQuestion
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = TutorSession.objects.all()
-    qs = filter_by_institution(qs, institution)
+    qs = filter_by_institution(qs, institution, country=country)
     session = get_object_or_404(qs.select_related('student', 'lesson'), id=session_id)
 
     attempts = list(
@@ -8765,11 +8867,11 @@ def session_exit_review_override(request, attempt_id):
     from ai_tutor.apps.tutoring.models import ExitTicketAttempt
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     qs = ExitTicketAttempt.objects.select_related('session__lesson__unit__course')
-    if institution is not None:
-        qs = qs.filter(
-            visible_q(institution, 'session__lesson__unit__course__institution')
-        )
+    qs = qs.filter(scope_q(
+        institution, country, 'session__lesson__unit__course__institution',
+        model=qs.model))
     attempt = get_object_or_404(qs, id=attempt_id)
 
     try:
@@ -8955,13 +9057,13 @@ def _question_for_staff(request, question_id):
     from ai_tutor.apps.tutoring.models import ExitTicketQuestion
 
     institution = request.staff_ctx.get('institution')
+    country = request.staff_ctx.get('country')
     qs = ExitTicketQuestion.objects.select_related(
         'exit_ticket__lesson__unit__course__institution'
     )
-    if institution is not None:
-        qs = qs.filter(
-            visible_q(institution, 'exit_ticket__lesson__unit__course__institution')
-        )
+    qs = qs.filter(scope_q(
+        institution, country, 'exit_ticket__lesson__unit__course__institution',
+        model=qs.model))
     return qs.filter(id=question_id).first()
 
 
@@ -9128,14 +9230,12 @@ def summative_generate(request, course_id):
     from ai_tutor.apps.tutoring.summative_generator import generate_summative_for_course
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     def _run(cid):
         import django.db
@@ -9166,14 +9266,12 @@ def summative_review(request, course_id):
     from ai_tutor.apps.accounts.models import Membership
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     summative = ExitTicket.objects.filter(
         course=course,
@@ -9315,14 +9413,12 @@ def summative_publish(request, course_id):
     from ai_tutor.apps.tutoring.models import ExitTicket
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     summative = get_object_or_404(
         ExitTicket,
@@ -9356,22 +9452,22 @@ def class_competency(request, course_id):
     )
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     # Roster resolution priority:
     #   1. The school picker (request.staff_ctx['institution']) — if a
     #      super admin picks "Belonie Secondary", scope every metric to
     #      that school's roster, even on platform-wide courses.
     #   2. The course's own institution if it's school-scoped.
-    #   3. All active students (only when picker = "All Schools" AND
-    #      the course is platform-wide).
+    #   3. Every active student the viewer can see, when the picker says
+    #      "All Schools" AND the course is shared. For a country account
+    #      that is its country's students; only for a platform super admin
+    #      does it mean the platform's.
     if institution is not None:
         roster_institution_id = institution.id
     elif course.institution_id:
@@ -9379,18 +9475,12 @@ def class_competency(request, course_id):
     else:
         roster_institution_id = None
 
+    roster_q = Membership.objects.filter(role='student', is_active=True)
     if roster_institution_id is not None:
-        roster_ids = list(
-            Membership.objects.filter(
-                role='student', is_active=True,
-                institution_id=roster_institution_id,
-            ).values_list('user_id', flat=True)
-        )
-    else:
-        roster_ids = list(
-            Membership.objects.filter(role='student', is_active=True)
-            .values_list('user_id', flat=True)
-        )
+        roster_q = roster_q.filter(institution_id=roster_institution_id)
+    elif country is not None:
+        roster_q = roster_q.filter(institution__country=country)
+    roster_ids = list(roster_q.values_list('user_id', flat=True))
 
     # Grade scope — Mathematics S3 should only count S3 students, not
     # the entire school's roster. Course.grade_level can be a single
@@ -9514,14 +9604,12 @@ def student_competency(request, course_id, student_id):
     from django.contrib.auth.models import User as _User
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            visible_q(institution),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     student = get_object_or_404(_User, id=student_id)
     table = student_competency_table(course, student)
@@ -9561,12 +9649,12 @@ def weekly_assignment_save(request, course_id):
     from ai_tutor.apps.dashboard.models import WeeklyAssignment
 
     institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course, visible_q(institution), id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
+    country = request.staff_ctx['country']
+    course = get_object_or_404(
+        Course,
+        scope_q(institution, country, model=Course),
+        id=course_id,
+    )
 
     raw_date = (request.POST.get('week_start') or '').strip()
     try:
@@ -9629,7 +9717,7 @@ def weekly_assignment_save(request, course_id):
 AGGREGATE_MIN_GROUP = 5
 
 
-def _aggregate_rows(institution, win_start, win_end, group_by):
+def _aggregate_rows(institution, win_start, win_end, group_by, country=None):
     """Per-school or per-lesson metrics for the window. No student rows."""
     from ai_tutor.apps.accounts.models import Institution
     from ai_tutor.apps.curriculum.models import Lesson
@@ -9640,6 +9728,7 @@ def _aggregate_rows(institution, win_start, win_end, group_by):
             TutorSession.objects.filter(
                 started_at__date__gte=win_start, started_at__date__lte=win_end),
             institution,
+            country=country,
         )
         lesson_ids = list(scope.values_list('lesson_id', flat=True).distinct())
         lessons = {l.id: l for l in Lesson.objects.filter(id__in=lesson_ids)
@@ -9665,14 +9754,19 @@ def _aggregate_rows(institution, win_start, win_end, group_by):
                 'median_score_pct': et['median_pct'],
             })
     else:
-        institutions = ([institution] if institution is not None
-                        else list(Institution.objects.all()))
+        if institution is not None:
+            institutions = [institution]
+        elif country is not None:
+            institutions = list(Institution.objects.filter(country=country))
+        else:
+            institutions = list(Institution.objects.all())
         for inst in institutions:
             sessions = TutorSession.objects.filter(
                 institution=inst,
                 started_at__date__gte=win_start, started_at__date__lte=win_end)
             et = _exit_ticket_stats(sessions)
-            prog = _progression_stats(inst, win_start, win_end, weekly=False)
+            prog = _progression_stats(inst, win_start, win_end, weekly=False,
+                                      country=country)
             rows.append({
                 'group': 'school',
                 'school': inst.name,
@@ -9730,8 +9824,9 @@ def aggregate_export_csv(request):
     from django.http import HttpResponse
 
     institution = request.staff_ctx['institution']
+    country = request.staff_ctx['country']
     today = timezone.now().date()
-    chart = _activity_chart(request, institution, today)
+    chart = _activity_chart(request, institution, today, country=country)
     win_start, win_end = chart['start'], chart['end']
 
     salt = secrets.token_hex(16)
@@ -9744,6 +9839,7 @@ def aggregate_export_csv(request):
             TutorSession.objects.filter(
                 started_at__date__gte=win_start, started_at__date__lte=win_end),
             institution,
+            country=country,
         )
         .select_related('lesson', 'institution')
         .order_by('started_at')
@@ -9758,6 +9854,7 @@ def aggregate_export_csv(request):
                 completed_at__isnull=False,
             ),
             institution, field='session__institution',
+            country=country,
         )
         .select_related('exit_ticket__lesson', 'session__institution')
         .order_by('completed_at')
