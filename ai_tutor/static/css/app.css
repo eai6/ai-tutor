@@ -1,0 +1,276 @@
+/* ==========================================================================
+   The stylesheet
+   ==========================================================================
+   Everything the product renders comes from this file plus the utilities
+   Tailwind generates from it. There is no tailwind.config.js: v4 is
+   configured in CSS, and this @theme block is the whole configuration.
+
+   It is the direct descendant of the old css/shared/tokens.css, and it keeps
+   that file's one rule:
+
+       NO LITERAL COLOUR OUTSIDE THIS FILE.
+
+   Not in a template, not in JavaScript. `grep '#[0-9A-Fa-f]\{6\}'` over
+   static/ and templates/ should match here, the .select chevron data URI
+   (an SVG data URI cannot read a custom property) and templates/email/
+   verify_email.html (an HTML email, where inline style is all that renders).
+   tests/design/test_no_raw_css.py fails the build otherwise.
+
+   WHY v4 AND NOT v3. A v4 utility compiles to var(--color-*); a v3 utility
+   compiled to a literal hex. templates/base.html injects the institution's
+   brand colour into :root from the database, so under v3 every school's
+   theming would have silently stopped working the day this landed.
+   ========================================================================== */
+
+@import "tailwindcss" source(none);
+
+@source "../../templates/**/*.html";
+@source "../js/**/*.js";
+@source "../../apps/**/*.py";
+
+@theme {
+  /* ------------------------------------------------------------------------
+     PRIMITIVE — warm neutral ramp
+     ------------------------------------------------------------------------
+     Hue ~30deg at very low chroma, not a cool blue-grey. Orange on a cool
+     grey vibrates; on a warm grey it reads as ink on paper. That is the only
+     reason this ramp exists. Contrast on --color-surface noted where the
+     ramp carries text.
+     --------------------------------------------------------------------- */
+  --color-warm-25:  #FCFBF9;   /* app canvas                                */
+  --color-warm-50:  #F7F5F2;   /* table head, inset wells                   */
+  --color-warm-100: #EFECE7;   /* hover fills                               */
+  --color-warm-200: #E3DFD8;   /* hairline borders                          */
+  --color-warm-300: #CFC9C0;   /* dividers on tinted grounds      (1.6:1)   */
+  --color-warm-350: #948C81;   /* form-control boundaries         (3.3:1)   */
+  --color-warm-400: #A9A199;   /* NON-TEXT only: markers, hover   (2.6:1)   */
+  --color-warm-500: #6F6860;   /* muted body text                (5.5:1) AA */
+  --color-warm-600: #5E574E;   /* secondary text                 (7.2:1) AA */
+  --color-warm-700: #453F38;   /* strong secondary text          (10.4:1)   */
+  --color-warm-800: #2E2A25;   /* headings                                  */
+  --color-warm-900: #1B1815;   /* body ink                       (16.4:1)   */
+
+  /* ------------------------------------------------------------------------
+     Brand orange — THREE TOKENS, THREE JOBS.
+     Getting this wrong is the single most common mistake in this codebase.
+     --color-primary is overridden per-institution by base.html; the ramp
+     around it is fixed so derived surfaces stay predictable.
+     --------------------------------------------------------------------- */
+  --color-primary:       #E8590C;  /* bars, focus ring, active edge, tint source.
+                                      3.6:1 — clears the 3:1 non-text bar and
+                                      NOTHING more. Never put text on it or
+                                      in it, in either direction. */
+  --color-primary-fill:  #C4460A;  /* a filled control carrying white text.
+                                      White on this is 5.0:1. */
+  --color-primary-dark:  #A83B00;  /* hover/active on a filled control (6.4:1) */
+  --color-primary-light: #FFF3EC;  /* tinted surface                           */
+  --color-primary-tint:  #FDE3D3;  /* tinted surface, one step stronger        */
+  --color-primary-ink:   #A83B00;  /* orange TEXT and standalone icons (6.4:1) */
+
+  /* ------------------------------------------------------------------------
+     Status. Deliberately desaturated: a teacher scans this page dozens of
+     times a day and saturated red/green at that frequency is fatiguing.
+     Each role is a trio — ink (AA on white), surface, border — plus a solid
+     for bars and dots.
+     --------------------------------------------------------------------- */
+  --color-green-ink:     #0F7B5F;  /* (4.9:1) AA */
+  --color-green-surface: #E7F4EF;
+  --color-green-border:  #B8E0D0;
+  --color-green-solid:   #12996F;
+
+  --color-amber-ink:     #9A6207;  /* (4.9:1) AA */
+  --color-amber-surface: #FBF1DE;
+  --color-amber-border:  #EFD9AE;
+  --color-amber-solid:   #B0720F;  /* 4.0:1 on white, 3.0:1 on the progress
+                                      track — a severity edge and a bar fill
+                                      are both graphical objects required to
+                                      understand content (WCAG 1.4.11). */
+
+  --color-rose-ink:      #B3261E;  /* (6.1:1) AA */
+  --color-rose-surface:  #FBEAE8;
+  --color-rose-border:   #F2C4C0;
+  --color-rose-solid:    #D6382E;
+
+  --color-blue-ink:      #2D5B8E;  /* (6.0:1) AA — complement to the orange, */
+  --color-blue-surface:  #E8F0F8;  /*   reserved for measured/neutral data   */
+  --color-blue-border:   #C4D8EC;
+  --color-blue-solid:    #3E7CBF;
+
+  --color-violet-ink:    #6B3FA0;  /* median marker — must not read as status */
+  --color-violet-solid:  #7C4DBE;
+
+  /* ------------------------------------------------------------------------
+     SEMANTIC — what markup actually names. Components reference the ROLE,
+     never the hue, so "needs attention" can be re-hued in one place.
+     --------------------------------------------------------------------- */
+  --color-canvas:          var(--color-warm-25);
+  --color-surface:         #FFFFFF;
+  --color-surface-sunken:  var(--color-warm-50);
+  --color-surface-hover:   var(--color-warm-100);
+  --color-surface-inverse: var(--color-warm-900);
+
+  --color-text:           var(--color-warm-900);
+  --color-text-secondary: var(--color-warm-700);
+  --color-text-muted:     var(--color-warm-500);
+  /* NOT a text colour — 2.6:1. Decorative glyphs only: the chevron beside a
+     link that already has a label, an empty-state illustration, a marker
+     fill. Anything a person reads takes text-text-muted. */
+  --color-text-faint:     var(--color-warm-400);
+  --color-text-on-accent: #FFFFFF;
+  --color-text-link:      var(--color-primary-ink);
+
+  --color-border:        var(--color-warm-200);
+  --color-border-strong: var(--color-warm-300);
+  /* Form controls need a 3:1 boundary of their own (WCAG 1.4.11). The divider
+     grey is 1.6:1 — fine for a hairline between rows, not enough to say
+     "this is a box you can type in". */
+  --color-border-field:  var(--color-warm-350);
+
+  --color-success:         var(--color-green-ink);
+  --color-success-surface: var(--color-green-surface);
+  --color-success-border:  var(--color-green-border);
+  --color-success-solid:   var(--color-green-solid);
+
+  --color-warning:         var(--color-amber-ink);
+  --color-warning-surface: var(--color-amber-surface);
+  --color-warning-border:  var(--color-amber-border);
+  --color-warning-solid:   var(--color-amber-solid);
+
+  --color-danger:          var(--color-rose-ink);
+  --color-danger-surface:  var(--color-rose-surface);
+  --color-danger-border:   var(--color-rose-border);
+  --color-danger-solid:    var(--color-rose-solid);
+
+  --color-info:            var(--color-blue-ink);
+  --color-info-surface:    var(--color-blue-surface);
+  --color-info-border:     var(--color-blue-border);
+  --color-info-solid:      var(--color-blue-solid);
+
+  --color-accent:          var(--color-primary-ink);
+  --color-accent-surface:  var(--color-primary-light);
+  --color-accent-border:   var(--color-primary-tint);
+  --color-accent-solid:    var(--color-primary);
+  --color-accent-fill:     var(--color-primary-fill);
+
+  /* ------------------------------------------------------------------------
+     Typography — three roles, each doing one job.
+       display  Space Grotesk. Headings and every figure read as a number.
+       body     Nunito. Humanist, holds up at 13px.
+       mono     Space Mono. Eyebrow labels and timestamps ONLY — texture,
+                not for reading.
+     --------------------------------------------------------------------- */
+  --font-display: 'Space Grotesk', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body:    'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'Space Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  /* Dense-dashboard scale. Ratio ~1.22 in the reading sizes, opening to ~1.3
+     in the display sizes so figures separate from their labels. These
+     deliberately override Tailwind's defaults — text-base is 14px here. */
+  --text-2xs:  0.6875rem;  /* 11px — eyebrow, badge            */
+  --text-xs:   0.75rem;    /* 12px — table meta, captions      */
+  --text-sm:   0.8125rem;  /* 13px — dense table body, buttons */
+  --text-base: 0.875rem;   /* 14px — default UI text           */
+  --text-md:   1rem;       /* 16px — card titles, long prose   */
+  --text-lg:   1.25rem;    /* 20px — section headings          */
+  --text-xl:   1.625rem;   /* 26px — page title                */
+  --text-2xl:  2.125rem;   /* 34px — metric figures            */
+  --text-3xl:  2.75rem;    /* 44px — the gain bridge figures   */
+
+  --leading-tight:  1.15;
+  --leading-snug:   1.35;
+  --leading-normal: 1.55;
+
+  --tracking-tight: -0.018em;  /* display sizes only    */
+  --tracking-wide:   0.08em;   /* eyebrow / mono labels */
+
+  /* medium is 600, not Tailwind's 500 — the display face needs the weight. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 600;
+  --font-weight-bold:   700;
+
+  /* ------------------------------------------------------------------------
+     Space. A 4px base reproduces the old --space-1 … --space-12 scale
+     exactly as p-1 … p-12, because v4 computes p-<n> as
+     calc(var(--spacing) * n). The old sheet leaned on 1.5rem for nearly
+     every gap, which is why the page felt airy but low-information.
+     --------------------------------------------------------------------- */
+  --spacing: 0.25rem;
+
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-full: 9999px;
+
+  /* Warm-tinted shadows — a neutral black shadow over a warm ground reads as
+     grey dirt. */
+  --shadow-xs: 0 1px 2px rgba(27, 24, 21, 0.05);
+  --shadow-sm: 0 1px 3px rgba(27, 24, 21, 0.06), 0 1px 2px rgba(27, 24, 21, 0.04);
+  --shadow-md: 0 4px 12px rgba(27, 24, 21, 0.07), 0 1px 3px rgba(27, 24, 21, 0.05);
+  --shadow-lg: 0 12px 32px rgba(27, 24, 21, 0.10), 0 2px 8px rgba(27, 24, 21, 0.05);
+
+  /* Focus. One ring, everywhere, always visible.
+     The gap ring — 2px of surface, then 2px of colour — is for elements with
+     no border of their own: cards, links, tiles. Form controls already draw a
+     border, so a gap ring on top reads as two concentric lines; they take the
+     halo instead. */
+  --shadow-focus: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+  --shadow-halo:  0 0 0 3px var(--color-primary-light);
+  --inset-shadow-focus: inset 0 0 0 2px var(--color-primary);
+
+  /* Motion. Two curves and three durations; anything else is decoration. */
+  --ease-out:    cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast:    120ms;
+  --dur-base:    200ms;
+  --dur-slow:    360ms;
+
+  /* The four animations, copied from the sheets they replace along with the
+     exact shorthand each was used with. */
+  --animate-skeleton-sheen: skeleton-sheen 1.4s var(--ease-out) infinite;
+  --animate-slide-down:     slide-down var(--dur-base) var(--ease-out);
+  --animate-slide-up:       slideUp 0.3s ease;
+  --animate-fade-in-up:     fadeInUp var(--dur-slow) var(--ease-out) forwards;
+
+  /* ------------------------------------------------------------------------
+     Breakpoints — the ones the old sheets actually used, not Tailwind's.
+     900px and 600px appear once each and are written as arbitrary variants
+     (max-[900px]:) at their single call site rather than named here.
+     --------------------------------------------------------------------- */
+  --breakpoint-xs: 30rem;   /* 480px */
+  --breakpoint-sm: 40rem;   /* 640px */
+  --breakpoint-md: 56rem;   /* 896px */
+  --breakpoint-lg: 60rem;   /* 960px */
+  --breakpoint-xl: 62rem;   /* 992px */
+
+  /* Component-level knobs. Consumed as w-[var(--rail-width)] and friends. */
+  --rail-width:         260px;
+  --rail-width-compact: 212px;
+  --topbar-height:      60px;
+  --content-max:        1440px;
+
+  --skeleton-base:  var(--color-warm-100);
+  --skeleton-sheen: rgba(255, 255, 255, 0.65);
+}
+
+/* The keyframes themselves, verbatim from shared/base.css, student/shell.css,
+   student/catalog.css and student/legacy.css. @theme names an animation; it
+   cannot hold the frames. */
+@keyframes skeleton-sheen {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes slide-down {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

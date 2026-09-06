@@ -123,3 +123,6 @@ tests/*Security_Assessment*.docx
 # committed; the log is the console spew that produced it, up to 27 MB for a
 # single arm, and no .log under multi_turn_results has ever been tracked.
 offline_eval/multi_turn_results/**/*.log
+
+# Node — only the CSS build needs it; package-lock.json IS committed
+node_modules/
