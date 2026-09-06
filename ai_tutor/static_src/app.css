@@ -16,6 +16,11 @@
    verify_email.html (an HTML email, where inline style is all that renders).
    tests/design/test_no_raw_css.py fails the build otherwise.
 
+   This file lives OUTSIDE static/ on purpose. It is a build input, not a
+   served asset: collectstatic post-processes every stylesheet it collects and
+   tries to resolve @import "tailwindcss" as a relative URL, which fails the
+   whole command. Only the built app.build.css is served.
+
    WHY v4 AND NOT v3. A v4 utility compiles to var(--color-*); a v3 utility
    compiled to a literal hex. templates/base.html injects the institution's
    brand colour into :root from the database, so under v3 every school's
@@ -24,9 +29,9 @@
 
 @import "tailwindcss" source(none);
 
-@source "../../templates/**/*.html";
-@source "../js/**/*.js";
-@source "../../apps/**/*.py";
+@source "../templates/**/*.html";
+@source "../static/js/**/*.js";
+@source "../apps/**/*.py";
 
 @theme {
   /* ------------------------------------------------------------------------

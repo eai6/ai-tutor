@@ -14,6 +14,12 @@
 #                                 URLconf, so these render from no URL. They
 #                                 are migrated without a screenshot gate.
 #   templates/email/*             HTML email, deliberately never migrated
+#
+# A trailing "manual" marks a page whose content is not reproducible: it comes
+# from a live model, or from a poll that ticks while the shutter is open. Those
+# are still photographed, but they are reported for review by eye instead of
+# being asserted pixel-identical. Marking them is what keeps the zero-tolerance
+# bar honest for the other 51 pages.
 
 # ---- marketing and documentation (phase 1) ----
 anon     /
@@ -39,19 +45,19 @@ student  /terms/accept/
 student  /password/change-required/
 
 # ---- student and tutoring (phase 3) ----
-student  /tutor/
-student  /tutor/lesson/1/
-student  /tutor/chat/lesson/1/
-student  /tutor/summative/1/
+student  /tutor/                                              manual   # relative progress times
+student  /tutor/lesson/1/                                     manual   # live LLM turn
+student  /tutor/chat/lesson/1/                                manual   # live LLM turn
+student  /tutor/summative/1/                                  manual   # generated questions
 student  /settings/
 student  /delete-account/
 
 # ---- teacher dashboard (phase 2) ----
 teacher  /dashboard/
-teacher  /dashboard/students/
+teacher  /dashboard/students/                                 manual   # relative last-seen times
 teacher  /dashboard/students/999006/
 teacher  /dashboard/classes/
-teacher  /dashboard/classes/S1/
+teacher  /dashboard/classes/S1/                               manual   # relative last-seen times
 teacher  /dashboard/curriculum/
 teacher  /dashboard/curriculum/course/1/
 teacher  /dashboard/curriculum/lesson/1/
@@ -66,13 +72,13 @@ teacher  /dashboard/flagged/
 teacher  /dashboard/settings/
 teacher  /dashboard/groups/
 teacher  /dashboard/reports/
-teacher  /dashboard/help/
+teacher  /dashboard/help/                                     manual   # relative timestamps
 teacher  /dashboard/session/12328/chat-history/
-teacher  /dashboard/lesson/1/monitor/
+teacher  /dashboard/lesson/1/monitor/                         manual   # polls for active sessions
 teacher  /dashboard/lesson/1/session-report/
 admin    /dashboard/curriculum/upload/
-admin    /dashboard/curriculum/content-progress/1/
-admin    /dashboard/curriculum/media-progress/1/
+admin    /dashboard/curriculum/content-progress/1/            manual   # polls generation progress
+admin    /dashboard/curriculum/media-progress/1/              manual   # polls generation progress
 admin    /dashboard/staff/
 admin    /dashboard/feedback/
 admin    /dashboard/content-edits/

@@ -2,7 +2,7 @@
   "name": "ai-tutor-css",
   "private": true,
   "scripts": {
-    "css": "tailwindcss -i ai_tutor/static/css/app.css -o ai_tutor/static/css/app.build.css --minify"
+    "css": "tailwindcss -i ai_tutor/static_src/app.css -o ai_tutor/static/css/app.build.css --minify"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3"
