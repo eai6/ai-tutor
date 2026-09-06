@@ -204,6 +204,12 @@ class TestSectionLanguage:
 
 @pytest.mark.django_db
 class TestHeaderLink:
+    """`lp-header__link` is a hook, not the whole class attribute.
+
+    The Tailwind migration appended utilities after it, so these match the
+    hook followed by a space or the closing quote rather than requiring it
+    to stand alone.
+    """
 
     def test_landing_page_links_to_the_playbook(self, client):
         body = client.get(reverse('accounts:landing')).content.decode()
@@ -212,7 +218,7 @@ class TestHeaderLink:
 
     def test_playbook_marks_itself_current(self, client):
         body = client.get(reverse('docs:index')).content.decode()
-        link = re.search(r'<a href="/docs/" class="lp-header__link"[^>]*>', body)
+        link = re.search(r'<a href="/docs/" class="lp-header__link[ "][^>]*>', body)
         assert link and 'aria-current="page"' in link.group(0)
 
     def test_both_public_pages_carry_the_home_link(self, client):
@@ -222,14 +228,14 @@ class TestHeaderLink:
         for url in (landing, reverse('docs:index')):
             body = client.get(url).content.decode()
             assert re.search(
-                r'<a href="%s" class="lp-header__link"[^>]*>\s*Home' % re.escape(landing),
+                r'<a href="%s" class="lp-header__link[ "][^>]*>\s*Home' % re.escape(landing),
                 body), url
 
     def test_home_marks_itself_current_on_the_landing_page(self, client):
         landing = reverse('accounts:landing')
         body = client.get(landing).content.decode()
         link = re.search(
-            r'<a href="%s" class="lp-header__link"[^>]*>' % re.escape(landing), body)
+            r'<a href="%s" class="lp-header__link[ "][^>]*>' % re.escape(landing), body)
         assert link and 'aria-current="page"' in link.group(0)
 
 
@@ -272,7 +278,7 @@ class TestGeneratedProse:
             )
 
     def test_shell_blocks_keep_their_line_breaks(self, prose):
-        block = re.search(r'<pre class="doc-code"><code>(.*?)</code></pre>',
+        block = re.search(r'<pre class="doc-code[^"]*"><code>(.*?)</code></pre>',
                           prose['hosting'], re.S)
         assert block and '\n' in block.group(1)
         assert 'ai-tutordocker' not in prose['hosting']
