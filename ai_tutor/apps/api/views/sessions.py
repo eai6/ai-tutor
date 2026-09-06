@@ -3,6 +3,7 @@ engine logic in apps/tutoring/views.py so we don't duplicate the
 ConversationalTutor wiring.
 """
 
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -65,8 +66,7 @@ def start_session(request):
     lesson_qs = Lesson.objects.filter(is_published=True)
     if not user.is_staff:
         lesson_qs = lesson_qs.filter(
-            Q(unit__course__institution_id__in=institution_ids)
-            | Q(unit__course__institution__isnull=True),
+            visible_q(institution_ids, 'unit__course__institution'),
         )
     lesson = get_object_or_404(lesson_qs, id=lesson_id)
 
@@ -197,8 +197,7 @@ def lesson_competency(request, lesson_id):
     lesson_qs = Lesson.objects.all()
     if not request.user.is_staff:
         lesson_qs = lesson_qs.filter(
-            Q(unit__course__institution_id__in=institution_ids)
-            | Q(unit__course__institution__isnull=True),
+            visible_q(institution_ids, 'unit__course__institution'),
         )
     lesson = get_object_or_404(lesson_qs, id=lesson_id)
     return Response(competency_snapshot(request.user, lesson))

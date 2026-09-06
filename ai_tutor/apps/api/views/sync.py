@@ -20,6 +20,7 @@ only turns, etc.) so the client can sync incrementally.
 from datetime import datetime
 
 from django.db.models import Q
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -213,8 +214,7 @@ def upload_session(request):
     lesson_qs = Lesson.objects.all()
     if not request.user.is_staff:
         lesson_qs = lesson_qs.filter(
-            Q(unit__course__institution_id__in=institution_ids)
-            | Q(unit__course__institution__isnull=True),
+            visible_q(institution_ids, 'unit__course__institution'),
         )
     lesson = lesson_qs.filter(id=lesson_id).select_related('unit__course').first()
     if lesson is None:

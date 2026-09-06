@@ -38,6 +38,7 @@ from pathlib import Path
 
 from django.core import serializers
 from django.db import transaction
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.utils import timezone
 
 # Shared format primitives. Imported rather than duplicated so the two pack
@@ -263,7 +264,7 @@ def _normalise_scope(instance) -> None:
     Platform-wide is the honest target: seeded curriculum belongs to no single
     school and should be visible to all of them. That is what
     ``institution=None`` means for a Course (CLAUDE.md's scoping rule reads
-    ``Q(institution=inst) | Q(institution__isnull=True)``), and what the
+    ``visible_q(inst)``), and what the
     normalised ``0`` bucket means for a knowledge-base chunk, which stores a
     loose integer rather than a foreign key.
     """

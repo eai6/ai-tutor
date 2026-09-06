@@ -41,6 +41,7 @@ from pathlib import Path
 
 from django.core import serializers
 from django.db import transaction
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -93,16 +94,16 @@ def _latest_migration() -> str:
 def _institution_querysets(institution_id: int):
     """Every row a device needs, scoped to one institution.
 
-    Platform-wide content (``institution__isnull=True``) is included
+    Content shared across the school's country (no institution) is included
     deliberately: CLAUDE.md's scoping rule is
-    ``Q(institution=inst) | Q(institution__isnull=True)``, and a device that
+    ``visible_q(inst)``, and a device that
     dropped the global tier would silently lose shared curriculum.
     """
     from django.db.models import Q
     from ai_tutor.apps.curriculum.models import Course, Unit, Lesson, LessonStep, CurriculumChunk
     from ai_tutor.apps.tutoring.models import ExitTicket, ExitTicketQuestion
 
-    scope = Q(institution_id=institution_id) | Q(institution__isnull=True)
+    scope = visible_q(institution_id)
     courses = Course.objects.filter(scope)
     units = Unit.objects.filter(course__in=courses)
     lessons = Lesson.objects.filter(unit__in=units)

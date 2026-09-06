@@ -5,6 +5,7 @@ Branding is platform-wide (stored in PlatformConfig), so all users see the
 same theme regardless of which school they belong to.
 """
 
+from ai_tutor.apps.accounts.tenancy import visible_q
 from ai_tutor.apps.accounts.models import PlatformConfig
 
 
@@ -124,7 +125,7 @@ def baseline_recommendations(request):
             assessment_type=ExitTicket.AssessmentType.SUMMATIVE,
             is_published=True,
         ).filter(
-            Q(course__institution__in=institutions) | Q(course__institution__isnull=True),
+            visible_q(list(institutions), 'course__institution'),
         ).select_related('course')
 
         recommended = []

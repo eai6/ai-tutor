@@ -267,6 +267,11 @@ def _find_matching_course(upload):
     if upload.institution_id:
         q &= Q(institution_id=upload.institution_id)
     else:
+        # A shared upload has no institution and therefore no country of its
+        # own, so there is nothing to scope the match by. It matches shared
+        # courses only, which is the narrowest rule available here. Creating
+        # a shared upload is a super-admin action, not a country-account one,
+        # so this is not a route a country account can reach.
         q &= Q(institution__isnull=True)
 
     return Course.objects.filter(q).first()

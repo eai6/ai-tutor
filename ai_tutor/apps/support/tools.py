@@ -23,6 +23,7 @@ Tool spec shape (Anthropic tool-use compatible):
   }
 """
 
+from ai_tutor.apps.accounts.tenancy import visible_q
 import logging
 from typing import Dict, List, Optional
 
@@ -90,7 +91,7 @@ def _fuzzy_course_lookup(query: str, user: User):
             inst_ids = list(Membership.objects.filter(
                 user=user, role__in=['teacher', 'admin'], is_active=True,
             ).values_list('institution_id', flat=True))
-            qs = qs.filter(Q(institution_id__in=inst_ids) | Q(institution__isnull=True))
+            qs = qs.filter(visible_q(inst_ids))
         except Exception:
             pass
     return list(qs.order_by('title')[:5])

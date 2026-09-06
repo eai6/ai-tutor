@@ -38,6 +38,7 @@ USAGE:
     )
 """
 
+from ai_tutor.apps.accounts.tenancy import shared_in
 import os
 import re
 import json
@@ -1500,9 +1501,12 @@ class CurriculumKnowledgeBase:
         from ai_tutor.apps.curriculum.models import Course as CourseModel
         from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
 
-        # Platform-wide courses (institution=None) with same subject_code.
+        # Courses shared across this course's COUNTRY with the same
+        # subject_code. They used to be shared across the whole platform;
+        # inheriting a neighbouring country's materials into a lesson is
+        # exactly the leak countries were introduced to close.
         global_courses = CourseModel.objects.filter(
-            institution__isnull=True,
+            shared_in(getattr(course, 'country_id', None)),
             subject_code=subject_code,
         ).only('id', 'grade_levels')
 

@@ -21,6 +21,7 @@ See memory/mobile_rn_plan.md and memory/offline_mobile_architecture.md.
 """
 
 from django.db.models import Q
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -215,8 +216,7 @@ def offline_pack(request, lesson_id):
     lesson_qs = Lesson.objects.filter(is_published=True)
     if not user.is_staff:
         lesson_qs = lesson_qs.filter(
-            Q(unit__course__institution_id__in=institution_ids)
-            | Q(unit__course__institution__isnull=True),
+            visible_q(institution_ids, 'unit__course__institution'),
         )
     lesson = get_object_or_404(
         lesson_qs.select_related('unit', 'unit__course'),

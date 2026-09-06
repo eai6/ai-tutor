@@ -19,13 +19,20 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Avg, Q, F, Max
+from ai_tutor.apps.accounts.tenancy import shared_in, visible_q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.utils.translation import gettext as _, gettext_lazy as _lazy
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 
-from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
+from ai_tutor.apps.accounts.models import (
+    Country, Institution, Membership, StudentProfile, PlatformConfig)
+# Both live in accounts/scope.py now — four roles' worth of dispatch does not
+# belong in a view module. Imported here so the ~130 references below, and the
+# handful of `from ...views import get_staff_context` elsewhere, keep working.
+from ai_tutor.apps.accounts.scope import (  # noqa: F401
+    get_staff_context, _safety_flag_count, manageable_school_ids, may_manage)
 from ai_tutor.apps.curriculum.models import Course, Unit, Lesson
 from ai_tutor.apps.dashboard.attention import build_attention_items
 from ai_tutor.apps.tutoring.models import TutorSession, StudentLessonProgress
@@ -178,8 +185,9 @@ def _inherited_materials_summary(course):
     from ai_tutor.apps.curriculum.models import Course as CourseModel
     from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
 
+    # Shared within this course's country, not the whole platform.
     platform_courses = list(CourseModel.objects.filter(
-        institution__isnull=True,
+        shared_in(course.country_id),
         subject_code=course.subject_code,
     ).only('id', 'title', 'grade_levels'))
 
@@ -1237,7 +1245,7 @@ def curriculum_list(request):
     # Include platform-wide courses (institution=None) alongside school courses
     if institution is not None:
         courses_qs = Course.objects.filter(
-            Q(institution=institution) | Q(institution__isnull=True)
+            visible_q(institution)
         )
     else:
         courses_qs = Course.objects.all()
@@ -1269,7 +1277,7 @@ def curriculum_list(request):
 
     if institution is not None:
         unlinked_materials = TeachingMaterialUpload.objects.filter(
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             course__isnull=True,
         )
     else:
@@ -1293,7 +1301,7 @@ def course_detail(request, course_id):
     if institution is not None:
         # Staff can see their school's courses AND platform-wide courses
         course = get_object_or_404(
-            Course, Q(institution=institution) | Q(institution__isnull=True), id=course_id
+            Course, visible_q(institution), id=course_id
         )
     else:
         course = get_object_or_404(Course, id=course_id)
@@ -1769,7 +1777,7 @@ def curriculum_process(request, upload_id):
         if institution is not None:
             upload = get_object_or_404(
                 CurriculumUpload,
-                Q(institution=institution) | Q(institution__isnull=True),
+                visible_q(institution),
                 id=upload_id,
             )
         else:
@@ -1813,7 +1821,7 @@ def curriculum_generate(request, upload_id):
     if institution is not None:
         upload = get_object_or_404(
             CurriculumUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=upload_id,
         )
     else:
@@ -2015,7 +2023,7 @@ def curriculum_process_api(request, upload_id):
     if institution is not None:
         upload = get_object_or_404(
             CurriculumUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=upload_id,
         )
     else:
@@ -2287,7 +2295,7 @@ def class_detail(request, grade):
     # show how THEIR students are doing on the global course.
     if institution is not None:
         courses_qs = Course.objects.filter(
-            Q(institution=institution) | Q(institution__isnull=True)
+            visible_q(institution)
         )
     else:
         courses_qs = Course.objects.all()
@@ -2731,7 +2739,7 @@ def lesson_session_report(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -3259,7 +3267,7 @@ def material_process(request, upload_id):
     if institution is not None:
         upload = get_object_or_404(
             TeachingMaterialUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=upload_id,
         )
     else:
@@ -3447,7 +3455,7 @@ def material_confirm_processing(request, upload_id):
     if institution is not None:
         upload = get_object_or_404(
             TeachingMaterialUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=upload_id,
         )
     else:
@@ -3528,7 +3536,7 @@ def material_delete(request, material_id):
     if institution is not None:
         material = get_object_or_404(
             TeachingMaterialUpload,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=material_id,
         )
     else:
@@ -3835,6 +3843,9 @@ def settings_page(request):
 
         elif action == 'prompts' and is_superadmin:
             from ai_tutor.apps.llm.models import PromptPack
+            # PromptPack is platform configuration, not curriculum: a platform-wide
+            # pack is deliberately so, and scoping it by country would leave a
+            # country with no prompts at all.
             prompt_pack = PromptPack.objects.filter(
                 institution__isnull=True, is_active=True
             ).first()
@@ -3862,6 +3873,7 @@ def settings_page(request):
     platform_config = None
     if is_superadmin:
         from ai_tutor.apps.llm.models import PromptPack
+        # PromptPack is platform configuration, not curriculum.
         prompt_pack = PromptPack.objects.filter(
             institution__isnull=True, is_active=True
         ).first()
@@ -4005,7 +4017,7 @@ def lesson_detail(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -4641,7 +4653,7 @@ def lesson_publish(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -4684,7 +4696,7 @@ def lesson_approve(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -4713,7 +4725,7 @@ def lesson_group_settings(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -5332,7 +5344,7 @@ def course_subject_type(request, course_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -6670,8 +6682,7 @@ def step_edit(request, step_id):
     if institution is not None:
         step = get_object_or_404(
             LessonStep,
-            Q(lesson__unit__course__institution=institution)
-            | Q(lesson__unit__course__institution__isnull=True),
+            visible_q(institution, 'lesson__unit__course__institution'),
             id=step_id,
         )
     else:
@@ -8294,7 +8305,7 @@ def lesson_live_monitor(request, lesson_id):
     if institution is not None:
         lesson = get_object_or_404(
             Lesson,
-            Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True),
+            visible_q(institution, 'unit__course__institution'),
             id=lesson_id,
         )
     else:
@@ -8806,8 +8817,7 @@ def session_exit_review_override(request, attempt_id):
     qs = ExitTicketAttempt.objects.select_related('session__lesson__unit__course')
     if institution is not None:
         qs = qs.filter(
-            Q(session__lesson__unit__course__institution=institution)
-            | Q(session__lesson__unit__course__institution__isnull=True)
+            visible_q(institution, 'session__lesson__unit__course__institution')
         )
     attempt = get_object_or_404(qs, id=attempt_id)
 
@@ -8999,8 +9009,7 @@ def _question_for_staff(request, question_id):
     )
     if institution is not None:
         qs = qs.filter(
-            Q(exit_ticket__lesson__unit__course__institution=institution)
-            | Q(exit_ticket__lesson__unit__course__institution__isnull=True)
+            visible_q(institution, 'exit_ticket__lesson__unit__course__institution')
         )
     return qs.filter(id=question_id).first()
 
@@ -9171,7 +9180,7 @@ def summative_generate(request, course_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -9209,7 +9218,7 @@ def summative_review(request, course_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -9358,7 +9367,7 @@ def summative_publish(request, course_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -9399,7 +9408,7 @@ def class_competency(request, course_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -9557,7 +9566,7 @@ def student_competency(request, course_id, student_id):
     if institution is not None:
         course = get_object_or_404(
             Course,
-            Q(institution=institution) | Q(institution__isnull=True),
+            visible_q(institution),
             id=course_id,
         )
     else:
@@ -9603,7 +9612,7 @@ def weekly_assignment_save(request, course_id):
     institution = request.staff_ctx['institution']
     if institution is not None:
         course = get_object_or_404(
-            Course, Q(institution=institution) | Q(institution__isnull=True), id=course_id,
+            Course, visible_q(institution), id=course_id,
         )
     else:
         course = get_object_or_404(Course, id=course_id)

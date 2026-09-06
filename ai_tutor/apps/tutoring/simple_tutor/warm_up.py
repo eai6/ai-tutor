@@ -28,6 +28,7 @@ import re
 from typing import TYPE_CHECKING
 
 from django.db.models import Q
+from ai_tutor.apps.accounts.tenancy import visible_q
 
 if TYPE_CHECKING:
     from ai_tutor.apps.tutoring.models import ExitTicketQuestion, TutorSession
@@ -68,8 +69,7 @@ def _institution_scope(institution_id):
     Same shape as tutoring/views.py::get_student_progress.
     """
     return (
-        Q(lesson__unit__course__institution_id=institution_id)
-        | Q(lesson__unit__course__institution__isnull=True)
+        visible_q(institution_id, 'lesson__unit__course__institution')
     )
 
 

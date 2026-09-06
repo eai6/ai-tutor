@@ -3,6 +3,7 @@ Dashboard Models - For tracking curriculum uploads and processing.
 """
 
 from django.db import models
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.contrib.auth.models import User
 from ai_tutor.apps.accounts.models import Institution
 
@@ -463,7 +464,7 @@ class WeeklyAssignment(models.Model):
         profile = StudentProfile.objects.filter(user=student).first()
         grade = profile.grade_level if profile else ''
 
-        course_filter = Q(course__institution=institution) | Q(course__institution__isnull=True)
+        course_filter = visible_q(institution, 'course__institution')
         if grade:
             course_filter &= Q(course__grade_level=grade) | Q(course__grade_level='')
         return cls.objects.filter(

@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages as django_messages
 from django.db.models import Count, Q
+from ai_tutor.apps.accounts.tenancy import visible_q
 from django.utils import timezone
 
 from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, TutorPersonality
@@ -140,7 +141,7 @@ def get_student_progress(user, institution):
     progress = StudentLessonProgress.objects.filter(student=user)
     if institution:
         progress = progress.filter(
-            Q(lesson__unit__course__institution=institution) | Q(lesson__unit__course__institution__isnull=True)
+            visible_q(institution, 'lesson__unit__course__institution')
         )
     # If institution is None (super admin "All Schools"), return all progress
     progress = progress.select_related('lesson')
@@ -158,7 +159,7 @@ def lesson_list(request):
     lessons = Lesson.objects.filter(
         is_published=True
     ).filter(
-        Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+        visible_q(institution, 'unit__course__institution')
     ).select_related('unit', 'unit__course')
 
     data = [{
@@ -241,7 +242,7 @@ def lesson_catalog(request):
     # Get courses — staff with no specific school sees all, otherwise scoped
     if viewing_institution:
         courses = Course.objects.filter(
-            Q(institution=viewing_institution) | Q(institution__isnull=True),
+            visible_q(viewing_institution),
             is_published=True
         )
     else:
@@ -641,7 +642,7 @@ def chat_tutor_interface(request, lesson_id):
     if institution:
         lesson = get_object_or_404(
             Lesson.objects.filter(
-                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+                visible_q(institution, 'unit__course__institution')
             ),
             id=lesson_id,
             is_published=True
@@ -758,7 +759,7 @@ def chat_start_session(request, lesson_id):
     if institution:
         lesson = get_object_or_404(
             Lesson.objects.filter(
-                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+                visible_q(institution, 'unit__course__institution')
             ),
             id=lesson_id,
             is_published=True
@@ -1022,8 +1023,7 @@ def chat_restart_session(request, lesson_id):
     if institution:
         lesson = get_object_or_404(
             Lesson.objects.filter(
-                Q(unit__course__institution=institution)
-                | Q(unit__course__institution__isnull=True)
+                visible_q(institution, 'unit__course__institution')
             ),
             id=lesson_id,
             is_published=True,
@@ -1991,8 +1991,7 @@ def lesson_competency(request, lesson_id):
     allowed_institutions = [m.institution_id for m in memberships]
     lesson = get_object_or_404(
         Lesson.objects.filter(
-            Q(unit__course__institution_id__in=allowed_institutions)
-            | Q(unit__course__institution__isnull=True),
+            visible_q(allowed_institutions, 'unit__course__institution'),
         ),
         id=lesson_id,
     )
@@ -2575,7 +2574,7 @@ def lesson_pretest(request, lesson_id):
     if institution and not request.user.is_staff:
         lesson = get_object_or_404(
             Lesson.objects.filter(
-                Q(unit__course__institution=institution) | Q(unit__course__institution__isnull=True)
+                visible_q(institution, 'unit__course__institution')
             ), **lookup,
         )
     else:
