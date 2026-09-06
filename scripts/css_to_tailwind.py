@@ -57,23 +57,25 @@ def _resolve(value, depth=0):
     return value.strip()
 
 
-def _suffixes(prefix):
-    """{old-var-name: utility-suffix} for one theme namespace."""
-    return {
-        f"--{k[len(prefix):]}": k[len(prefix):]
-        for k in THEME
-        if k.startswith(prefix)
-    }
+def _same_name(prefix):
+    """{old-var-name: suffix} where the old and new names are identical.
+
+    --radius-md was --radius-md before the migration too, so the key keeps its
+    full name. Only the colour namespace gained a prefix.
+    """
+    return {k: k[len(prefix):] for k in THEME if k.startswith(prefix)}
 
 
-COLOURS = _suffixes("--color-")                       # --surface      -> surface
-FONT_SIZES = {f"--{k[2:]}": k[len("--text-"):]        # --text-sm      -> sm
-              for k in THEME if k.startswith("--text-")}
-RADII = _suffixes("--radius-")
-SHADOWS = _suffixes("--shadow-")
-LEADINGS = _suffixes("--leading-")
-TRACKINGS = _suffixes("--tracking-")
-FONTS = _suffixes("--font-")
+# Colours are the exception: the old --surface became --color-surface, so the
+# key has to be rebuilt from the suffix.
+COLOURS = {f"--{k[len('--color-'):]}": k[len("--color-"):]
+           for k in THEME if k.startswith("--color-")}
+FONT_SIZES = _same_name("--text-")
+RADII = _same_name("--radius-")
+SHADOWS = _same_name("--shadow-")
+LEADINGS = _same_name("--leading-")
+TRACKINGS = _same_name("--tracking-")
+FONTS = _same_name("--font-")
 WEIGHTS = {"--weight-normal": "normal", "--weight-medium": "medium", "--weight-bold": "bold"}
 RAW_WEIGHTS = {"400": "normal", "600": "medium", "700": "bold", "500": "[500]", "800": "[800]"}
 
@@ -85,6 +87,8 @@ COLOURS["--white"] = "surface"
 
 # Old focus tokens were named for the ring; the theme names them for the shadow.
 SHADOWS.update({"--focus-ring": "focus", "--focus-halo": "halo"})
+SHADOW_RENAMES = {"--focus-ring": "--shadow-focus", "--focus-halo": "--shadow-halo",
+                  "--focus-ring-inset": "--inset-shadow-focus"}
 
 # hex -> every token holding it, so a literal colour converts to the token that
 # already carries that value. Several hexes have more than one name on purpose:
@@ -119,6 +123,48 @@ def _pick(candidates, role):
 
 SPACING_STEP = 0.25  # rem, from --spacing
 
+# The old sheet's spacing tokens. --spacing is the same 0.25rem base, so
+# --space-4 IS p-4. Leaving these as var() would compile fine today and break
+# the moment phase 4 deletes tokens.css.
+SPACE_TOKENS = {f"--space-{n}": str(n) for n in (1, 2, 3, 4, 5, 6, 8, 10, 12)}
+
+# Page-local custom properties, filled in by the caller from the sheet being
+# converted. A sheet that declares --docs-measure and then reads it back would
+# otherwise convert to a var() with nothing behind it once the sheet is gone.
+LOCAL_VARS: dict[str, str] = {}
+
+
+def known_token(name):
+    """True if the old variable name has a utility of its own.
+
+    These must never be resolved to a literal. --canvas resolves to #FCFBF9 on
+    the dashboard and #FFF9F5 for students; baking either one in would turn a
+    re-skinnable token into a fixed colour and break the surface it was not
+    baked for.
+    """
+    return (name in THEME or name in COLOURS or name in SPACE_TOKENS
+            or name in RADII or name in SHADOWS or name in FONT_SIZES
+            or name in LEADINGS or name in TRACKINGS or name in FONTS
+            or name in WEIGHTS)
+
+
+def resolve_local(value):
+    """Substitute custom properties that have no utility and no future.
+
+    An alias like --card-bg: var(--surface) disappears with the stylesheet
+    that declared it, so it has to be followed through to something that
+    survives — here, back to --surface, which is a token.
+    """
+    def sub(m):
+        name = m.group(1)
+        if name in LOCAL_VARS and not known_token(name):
+            return LOCAL_VARS[name]
+        return m.group(0)
+    prev = None
+    while prev != value:
+        prev, value = value, re.sub(r"var\((--[\w-]+)\)", sub, value)
+    return value
+
 
 def _length(value):
     """A spacing-scale step if the value lands on it exactly, else None."""
@@ -136,8 +182,28 @@ def _length(value):
     return None
 
 
+def _rename_vars(value):
+    """Rewrite an old variable name to the one the theme actually declares.
+
+    An arbitrary value carries its text through verbatim, so a var(--surface)
+    inside a gradient would still say --surface after the theme renamed it to
+    --color-surface — compiling fine today and resolving to nothing the day
+    tokens.css is deleted.
+    """
+    def sub(m):
+        name = m.group(1)
+        if name in COLOURS:
+            return f"var(--color-{COLOURS[name]})"
+        if name in SPACE_TOKENS:
+            return f"calc(var(--spacing)*{SPACE_TOKENS[name]})"
+        if name in SHADOW_RENAMES:
+            return f"var({SHADOW_RENAMES[name]})"
+        return m.group(0)
+    return re.sub(r"var\((--[\w-]+)\)", sub, value)
+
+
 def _arb(value):
-    return "[" + value.strip().replace(" ", "_") + "]"
+    return "[" + _rename_vars(value.strip()).replace(" ", "_") + "]"
 
 
 def _colour(value, role="text"):
@@ -161,6 +227,9 @@ def _colour(value, role="text"):
 
 def _spacing(value):
     """A length -> a scale step or an exact arbitrary value."""
+    m = re.fullmatch(r"var\((--[\w-]+)\)", value.strip())
+    if m and m.group(1) in SPACE_TOKENS:
+        return SPACE_TOKENS[m.group(1)]
     step = _length(value)
     return step if step is not None else _arb(value)
 
@@ -367,7 +436,16 @@ def _convert(prop, value):
     if prop == "box-shadow":
         if value == "none":
             return ["shadow-none"]
-        return [f"shadow-{_sized(value, SHADOWS)}"]
+        m = re.fullmatch(r"var\((--[\w-]+)\)", value.strip())
+        if m and m.group(1) in SHADOWS:
+            ref = SHADOW_RENAMES.get(m.group(1), m.group(1))
+            # shadow-sm would BAKE the literal at build time, and the student
+            # skin re-declares --shadow-* under its scope with warmer, softer
+            # values. Keeping the reference is what lets the scope reach it.
+            # Colour and radius utilities need no such care: they already
+            # compile to var().
+            return [f"shadow-[var({ref})]"]
+        return [f"shadow-{_arb(value)}"]
     if prop == "opacity":
         try:
             return [f"opacity-{round(float(value) * 100)}"]
@@ -477,6 +555,7 @@ def decls_to_utilities(css: str) -> str:
             raise Unconvertible(f"not a declaration: {decl!r}")
         prop, _, value = decl.partition(":")
         value = re.sub(r"\s*!important\s*$", "", value.strip())
+        value = resolve_local(value)
         out.extend(_convert(prop, value))
     return " ".join(out)
 

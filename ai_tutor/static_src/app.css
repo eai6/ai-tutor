@@ -158,6 +158,40 @@
   --color-accent-fill:     var(--color-primary-fill);
 
   /* ------------------------------------------------------------------------
+     The student app's own hues — coral, teal, sunny.
+     ------------------------------------------------------------------------
+     Only the student surface uses these, but they are declared globally
+     because Tailwind generates a utility from a theme entry: a hue declared
+     only inside the scoped block below would produce no bg-coral at all.
+
+     Every hue carries four versions, and the reason is accessibility. The
+     palette this replaces used #FF6B35 under white text (2.8:1), #4ECDC4 teal
+     (1.9:1) and #FFE66D yellow (1.25:1) as if they were inks.
+       --x         identity. Large decorative areas only. Never under text.
+       --x-solid   >=3:1 on the ground. Bars, dots, icon fills, borders.
+       --x-fill    >=4.5:1 with white on top. Filled buttons.
+       --x-ink     >=4.5:1 on the ground. Text and standalone icons.
+     --------------------------------------------------------------------- */
+  --color-coral:       #FF6B35;   /* identity, decoration only     (2.8:1) */
+  --color-coral-solid: #E85416;   /* bars, dots, icon fills        (3.7:1) */
+  --color-coral-fill:  #CE440B;   /* button fill, white text on it (4.7:1) */
+  --color-coral-ink:   #BC3D07;   /* text and standalone icons     (5.5:1) */
+  --color-coral-tint:  #FFF1EA;
+  --color-coral-edge:  #FFD9C7;
+
+  --color-teal:        #4ECDC4;
+  --color-teal-solid:  #1E9B94;   /* (3.4:1) */
+  --color-teal-ink:    #0E7670;   /* (5.5:1) */
+  --color-teal-tint:   #E6F7F5;
+  --color-teal-edge:   #B9E6E2;
+
+  /* Sunny is a ground, never an ink: 1.25:1 on white cannot carry text at any
+     size, so it is only ever something dark sits on. */
+  --color-sunny:       #FFE66D;
+  --color-sunny-deep:  #EDC72E;
+  --color-sunny-ink:   #6B4E02;   /* text on a sunny ground */
+
+  /* ------------------------------------------------------------------------
      Typography — three roles, each doing one job.
        display  Space Grotesk. Headings and every figure read as a number.
        body     Nunito. Humanist, holds up at 13px.
@@ -205,6 +239,9 @@
   --radius-sm:   6px;
   --radius-md:   10px;
   --radius-lg:   14px;
+  /* No dashboard component uses xl; it exists because the student skin is one
+     step rounder throughout and needs a step above lg. */
+  --radius-xl:   20px;
   --radius-full: 9999px;
 
   /* Warm-tinted shadows — a neutral black shadow over a warm ground reads as
@@ -278,4 +315,90 @@
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   The student skin
+   ==========================================================================
+   The student app and the teacher dashboard are one system in two skins. They
+   share the type scale, the spacing, the status roles and every utility NAME;
+   they differ in what a handful of those names resolve to. A fifteen-year-old
+   opening this at the end of a school day is not doing ops work, so the
+   student side gets a cream ground instead of near-white, coral instead of
+   burnt orange, and radii one step larger throughout.
+
+   WHY THIS BLOCK EXISTS, given that the rest of the migration removed every
+   hand-written rule. A utility is a single value: bg-canvas cannot be two
+   colours at once. The alternative was forking the names — bg-student-canvas
+   — but the partials shared by both surfaces (_includes/feedback_button,
+   the flash messages, the password field, the icon sprite) are rendered by
+   both shells and can only carry one set of class names, so forking would
+   have made them identical on both surfaces and broken the promise that
+   nothing moves by a pixel.
+
+   This is theme data, not component styling: every declaration is a variable
+   the theme already defines, given a second value under a scope. Adding a
+   RULE here — anything with a property that is not a custom property — would
+   be reintroducing the stylesheet this migration deleted.
+
+   Applied by data-surface="student" on the shells that used to load
+   css/student/brand.css: base.html, docs/base.html and the two desktop pages.
+   ========================================================================== */
+
+[data-surface="student"] {
+  /* Brand roles re-point at coral. --coral-fill, not --coral: sixteen rules in
+     the auth templates used the primary for a focus border, and the decoration
+     hue is 2.8:1 — below the 3:1 a UI-component boundary needs. */
+  --color-primary:        var(--color-coral-fill);
+  --color-primary-fill:   var(--color-coral-fill);
+  --color-primary-dark:   var(--color-coral-ink);
+  --color-primary-ink:    var(--color-coral-ink);
+  --color-primary-light:  var(--color-coral-tint);
+  --color-primary-tint:   var(--color-coral-edge);
+
+  --color-accent:         var(--color-coral-ink);
+  --color-accent-solid:   var(--color-coral-solid);
+  --color-accent-surface: var(--color-coral-tint);
+  --color-accent-border:  var(--color-coral-edge);
+  --color-accent-fill:    var(--color-coral-fill);
+
+  /* Success reads as "mastered" here, so it takes the teal rather than the
+     dashboard's green — green and teal side by side would be two words for
+     one idea. */
+  --color-success:         var(--color-teal-ink);
+  --color-success-solid:   var(--color-teal-solid);
+  --color-success-surface: var(--color-teal-tint);
+  --color-success-border:  var(--color-teal-edge);
+
+  /* A cream ground rather than the dashboard's near-white. */
+  --color-canvas:         #FFF9F5;
+  --color-surface:        #FFFFFF;
+  --color-surface-sunken: #FFF4EC;
+  --color-surface-hover:  #FFEDE2;
+
+  --color-border:         #F2E3D8;
+  --color-border-strong:  #E4CFC0;
+
+  /* Warmer ink than the dashboard's, to sit on the cream. */
+  --color-text:           #2A2622;
+  --color-text-secondary: #4E453D;
+  --color-text-muted:     #6E6157;   /* (5.3:1 on canvas) */
+  --color-text-faint:     #A29386;   /* non-text only */
+
+  /* One step rounder everywhere. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+
+  /* Warm-tinted shadows, a touch softer than the dashboard's. */
+  --shadow-xs: 0 1px 2px rgba(74, 45, 30, 0.05);
+  --shadow-sm: 0 2px 8px rgba(74, 45, 30, 0.07);
+  --shadow-md: 0 6px 18px rgba(74, 45, 30, 0.09);
+  --shadow-lg: 0 16px 40px rgba(74, 45, 30, 0.13);
+
+  /* The ring picks up the fill, which has enough contrast on cream. */
+  --shadow-focus: 0 0 0 2px var(--color-canvas), 0 0 0 4px var(--color-coral-fill);
+  --shadow-halo:  0 0 0 3px var(--color-coral-tint);
 }

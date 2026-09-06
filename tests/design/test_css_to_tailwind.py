@@ -72,6 +72,22 @@ class TestTypography:
         assert decls_to_utilities("font-weight: 700") == "font-bold"
 
 
+class TestSkinnableTokens:
+    def test_shadows_keep_their_variable_so_a_scope_can_re_skin_them(self):
+        """shadow-sm bakes its literal; shadow-[var(--shadow-sm)] does not.
+
+        The student skin re-declares --shadow-* under [data-surface="student"]
+        with warmer, softer values. A baked utility would ignore that and put
+        the dashboard's shadow on every student card.
+        """
+        assert decls_to_utilities("box-shadow: var(--shadow-sm)") == "shadow-[var(--shadow-sm)]"
+
+    def test_colour_and_radius_need_no_such_care(self):
+        """These already compile to var(), so the scope reaches them."""
+        assert decls_to_utilities("border-radius: var(--radius-lg)") == "rounded-lg"
+        assert decls_to_utilities("background: var(--canvas)") == "bg-canvas"
+
+
 class TestLayout:
     def test_display_and_flex(self):
         got = decls_to_utilities("display: flex; align-items: center; gap: 0.5rem")
