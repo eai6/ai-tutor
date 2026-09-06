@@ -3445,16 +3445,25 @@ def material_delete(request, material_id):
 
 @teacher_required
 def settings_page(request):
-    """Institution settings — general for all staff, theme + prompts for superadmins."""
+    """Institution settings — general for all staff, theme + prompts for superadmins.
+
+    `is_superadmin` still gates everything platform-shaped: the theme, the
+    model config, the prompt pack, the tutor personalities. The two sections
+    that are about a school rather than the platform read a capability flag
+    instead, so a country or a school admin reaches the one that is theirs.
+    """
     from django.conf import settings as django_settings
     institution = request.staff_ctx['institution']
     membership = request.staff_ctx['membership']
     is_superadmin = request.user.is_staff
+    can_edit_school = request.staff_ctx['can_edit_school_settings']
+    can_add_schools = request.staff_ctx['can_add_schools']
+    managed_ids = manageable_school_ids(request.staff_ctx)   # None = every school
 
     if request.method == 'POST':
         action = request.POST.get('action', 'general')
 
-        if action == 'general' and institution is not None and is_superadmin:
+        if action == 'general' and institution is not None and can_edit_school:
             institution.name = request.POST.get('name', institution.name)
             institution.timezone = request.POST.get('timezone', institution.timezone)
             institution.save()
@@ -3554,7 +3563,7 @@ def settings_page(request):
             platform_config.save()
             messages.success(request, "Theme updated.")
 
-        elif action == 'add_school' and is_superadmin:
+        elif action == 'add_school' and can_add_schools:
             school_name = request.POST.get('school_name', '').strip()
             school_slug = request.POST.get('school_slug', '').strip()
             school_tz = request.POST.get('school_timezone', 'UTC')
@@ -3562,10 +3571,17 @@ def settings_page(request):
                 if Institution.objects.filter(slug=school_slug).exists():
                     messages.error(request, f"A school with slug '{school_slug}' already exists.")
                 else:
+                    # The creator's country, never a form field. A country
+                    # account may only add schools to its own country, so a
+                    # posted country id would be a cross-tenant hole. A
+                    # platform admin has no country, and falls back to the
+                    # hidden one the FK defaults to.
+                    country = request.staff_ctx.get('country') or Country.get_platform()
                     Institution.objects.create(
                         name=school_name,
                         slug=school_slug,
                         timezone=school_tz,
+                        country=country,
                         is_active=True,
                     )
                     messages.success(request, f"School '{school_name}' created.")
@@ -3575,10 +3591,13 @@ def settings_page(request):
         # Staff/admin management (create_admin, toggle_admin, toggle_user,
         # delete_user) moved to the centralized Staff page (dashboard:staff_list).
 
-        elif action == 'toggle_school' and is_superadmin:
+        elif action == 'toggle_school' and can_add_schools:
             school_id = request.POST.get('school_id')
             if school_id:
-                school = Institution.objects.filter(id=school_id).first()
+                schools = Institution.objects.filter(id=school_id)
+                if managed_ids is not None:
+                    schools = schools.filter(id__in=managed_ids)
+                school = schools.first()
                 if school:
                     school.is_active = not school.is_active
                     school.save()
@@ -3837,7 +3856,13 @@ def settings_page(request):
         personalities = TutorPersonality.objects.all()
 
     all_timezones = sorted(zoneinfo.available_timezones())
-    all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG).order_by('name') if is_superadmin else []
+    if can_add_schools:
+        all_schools = Institution.objects.exclude(slug=Institution.GLOBAL_SLUG)
+        if managed_ids is not None:
+            all_schools = all_schools.filter(id__in=managed_ids)
+        all_schools = all_schools.order_by('name')
+    else:
+        all_schools = []
     # Staff/user management moved to the centralized Staff page
     # (dashboard:staff_list) — no all_users / reset_target here anymore.
 
@@ -4686,34 +4711,58 @@ def delete_student(request, student_id):
 
 @staff_required
 def staff_list(request):
-    """Centralized staff management hub (superadmin only).
+    """Centralized staff management hub.
 
     One place for all staff/admin/teacher management: list admins + active
     staff, approve pending self-registrations, view/revoke outstanding email
     invites, create super admins, invite staff, and reset passwords.
 
-    Security: gated to platform superadmins (`request.user.is_staff`). Every
-    mutating action is audit-logged via SafetyAuditLog, refuses to act on the
-    requester's own privileged status, and admin passwords are run through
-    Django's password validators. POST follows redirect-after-post.
+    Security: reached by any account with `can_manage_people` — a platform
+    super admin, a country, or a school admin. Everything on the page that
+    names a school, a user or an invitation arrives as an id in the request,
+    so every one of them is resolved against `managed_ids` rather than
+    against the whole platform; without that a school admin could act on any
+    account on it. Creating and toggling platform super admins stays
+    `is_staff`-only — it is the one action that would hand out more access
+    than the actor has. Every mutating action is audit-logged via
+    SafetyAuditLog, refuses to act on the requester's own privileged status,
+    and admin passwords are run through Django's password validators. POST
+    follows redirect-after-post.
     """
     from django.contrib.auth.models import User
     from ai_tutor.apps.accounts.models import Membership, StaffInvitation, Institution
     from ai_tutor.apps.safety import SafetyAuditLog
 
-    # Hard gate — staff management is sensitive; superadmins only.
-    if not request.user.is_staff:
+    if not request.staff_ctx['can_manage_people']:
         messages.error(request, "Admin access required.")
         return redirect('dashboard:home')
 
     institution = request.staff_ctx['institution']
+    is_platform_admin = request.user.is_staff
+    managed_ids = manageable_school_ids(request.staff_ctx)   # None = every school
+
+    def _managed(qs, field='institution_id'):
+        return qs if managed_ids is None else qs.filter(**{f'{field}__in': managed_ids})
 
     if request.method == 'POST':
         action = request.POST.get('action', '')
 
         def _target():
+            """The user this POST names, or None when out of reach.
+
+            Returning None for an unreachable target rather than raising lets
+            every branch below keep its existing "Cannot modify this user"
+            path.
+            """
             uid = request.POST.get('user_id')
-            return User.objects.filter(id=uid).first() if uid else None
+            target = User.objects.filter(id=uid).first() if uid else None
+            return target if may_manage(request.staff_ctx, target) else None
+
+        if action in ('create_admin', 'toggle_admin') and not is_platform_admin:
+            # Making a platform super admin is the one action that grants more
+            # access than the actor holds.
+            messages.error(request, "Only a platform super admin can do that.")
+            return redirect('dashboard:staff_list')
 
         if action == 'create_admin':
             email = request.POST.get('admin_email', '').strip()
@@ -4816,7 +4865,8 @@ def staff_list(request):
             # so this converts any existing membership there to active staff.
             target = _target()
             school_id = request.POST.get('school_id')
-            inst = Institution.objects.filter(id=school_id, is_active=True).first() if school_id else None
+            inst = _managed(Institution.objects.filter(
+                id=school_id, is_active=True), 'id').first() if school_id else None
             if not target:
                 messages.error(request, "User not found.")
             elif not inst:
@@ -4846,7 +4896,8 @@ def staff_list(request):
         if action == 'invite_staff':
             email = request.POST.get('invite_email', '').strip()
             school_id = request.POST.get('invite_school_id', '')
-            inst = Institution.objects.filter(id=school_id, is_active=True).first() if school_id else None
+            inst = _managed(Institution.objects.filter(
+                id=school_id, is_active=True), 'id').first() if school_id else None
             if not inst:
                 messages.error(request, "Please select a valid school.")
             elif email and '@' not in email:
@@ -4898,7 +4949,8 @@ def staff_list(request):
 
         if action == 'revoke_invite':
             inv_id = request.POST.get('invite_id')
-            inv = StaffInvitation.objects.filter(id=inv_id, is_used=False).first() if inv_id else None
+            inv = _managed(StaffInvitation.objects.filter(
+                id=inv_id, is_used=False)).first() if inv_id else None
             if inv:
                 inv.delete()
                 messages.success(request, "Invitation revoked.")
@@ -4911,12 +4963,18 @@ def staff_list(request):
 
     # ---- GET: build the management view ----
     # Everyone who is a platform admin OR has a staff membership, deduped
-    # (a user can be both an admin and hold a staff membership).
-    candidates = (
-        User.objects.filter(Q(is_staff=True) | Q(memberships__role='staff'))
-        .distinct()
-        .prefetch_related('memberships__institution')
-    )
+    # (a user can be both an admin and hold a staff membership). Platform
+    # admins are listed only to a platform admin: to anyone else they are
+    # neither actionable (`may_manage` refuses) nor theirs to see.
+    if managed_ids is None:
+        candidates = User.objects.filter(Q(is_staff=True) | Q(memberships__role='staff'))
+    else:
+        candidates = User.objects.filter(
+            is_staff=False,
+            memberships__role='staff',
+            memberships__institution_id__in=managed_ids,
+        )
+    candidates = candidates.distinct().prefetch_related('memberships__institution')
     people, pending_approvals = [], []
     for u in candidates:
         staff_ms = [m for m in u.memberships.all() if m.role == 'staff']
@@ -4941,7 +4999,7 @@ def staff_list(request):
         (pending_approvals if is_pending else people).append(row)
     people.sort(key=lambda r: (not r['is_admin'], (r['user'].last_name or '').lower(), r['user'].username))
 
-    invites_qs = StaffInvitation.objects.filter(is_used=False).select_related(
+    invites_qs = _managed(StaffInvitation.objects.filter(is_used=False)).select_related(
         'institution', 'invited_by')
     if institution is not None:
         invites_qs = invites_qs.filter(institution=institution)
@@ -4956,6 +5014,11 @@ def staff_list(request):
             User.objects.filter(Q(email__icontains=find_query) | Q(username__icontains=find_query))
             .distinct().prefetch_related('memberships__institution').order_by('username')[:10]
         )
+        # The box searches every account by design — it exists to diagnose
+        # "this person cannot log in". For anyone but a platform admin that
+        # would be an enumeration of the whole platform's users, so the
+        # results are cut to the ones they could act on anyway.
+        matches = [u for u in matches if may_manage(request.staff_ctx, u)]
         for u in matches:
             ms = list(u.memberships.all())
             has_staff_access = u.is_staff or any(m.role == 'staff' and m.is_active for m in ms)
@@ -4984,7 +5047,8 @@ def staff_list(request):
                 'diagnosis': diagnosis,
             })
 
-    active_schools = Institution.objects.filter(is_active=True).order_by('name')
+    active_schools = _managed(
+        Institution.objects.filter(is_active=True), 'id').order_by('name')
 
     context = {
         **request.staff_ctx,
@@ -5003,19 +5067,24 @@ def staff_list(request):
 def delete_staff(request, user_id):
     """Admin-initiated staff (teacher) deletion.
 
-    Restricted to platform admins (request.user.is_staff). Refuses to
-    delete the requester themselves.
+    Restricted to accounts with `can_manage_people`, and within those, to the
+    users they can reach: a school admin deletes their own school's teachers,
+    never another school's and never a platform admin. Refuses to delete the
+    requester themselves.
     """
     from django.contrib.auth.models import User
     from ai_tutor.apps.safety import SafetyAuditLog
 
-    if not request.user.is_staff:
+    if not request.staff_ctx['can_manage_people']:
         messages.error(request, "Admin access required.")
         return redirect('dashboard:home')
 
     target = get_object_or_404(User, id=user_id)
     if target.id == request.user.id:
         messages.error(request, "Use the account-deletion page to delete your own account.")
+        return redirect('dashboard:staff_list')
+    if not may_manage(request.staff_ctx, target):
+        messages.error(request, "Cannot modify this user.")
         return redirect('dashboard:staff_list')
 
     username = target.username
@@ -5082,11 +5151,13 @@ def staff_reset_password_show(request, user_id):
     from django.http import JsonResponse
     from ai_tutor.apps.safety import SafetyAuditLog
 
-    if not request.user.is_staff:
+    if not request.staff_ctx['can_manage_people']:
         return JsonResponse({"error": "Admin access required"}, status=403)
     target = get_object_or_404(User, id=user_id)
     if target.id == request.user.id:
         return JsonResponse({"error": "Use the account-settings page to change your own password."}, status=400)
+    if not may_manage(request.staff_ctx, target):
+        return JsonResponse({"error": "Cannot modify this user"}, status=403)
 
     new_password = _generate_temp_password()
     target.set_password(new_password)
@@ -5133,11 +5204,13 @@ def staff_reset_password_email(request, user_id):
     from django.http import JsonResponse
     from ai_tutor.apps.safety import SafetyAuditLog
 
-    if not request.user.is_staff:
+    if not request.staff_ctx['can_manage_people']:
         return JsonResponse({"error": "Admin access required"}, status=403)
     target = get_object_or_404(User, id=user_id)
     if target.id == request.user.id:
         return JsonResponse({"error": "Use the account-settings page to change your own password."}, status=400)
+    if not may_manage(request.staff_ctx, target):
+        return JsonResponse({"error": "Cannot modify this user"}, status=403)
     if not target.email:
         return JsonResponse({"error": "User has no email address on file"}, status=400)
 

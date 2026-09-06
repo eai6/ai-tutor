@@ -53,12 +53,14 @@
                     </select>
                     <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-success-solid);color:var(--color-surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Grant staff" %}</button>
                 </form>
+                {% if role == "superadmin" %}
                 <form method="post" style="display:inline;" onsubmit="return confirm('{% if f.is_admin %}{% trans 'Remove Super Admin from' %}{% else %}{% trans 'Make Super Admin:' %}{% endif %} {{ f.user.get_full_name|default:f.user.email|escapejs }}?');">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="toggle_admin">
                     <input type="hidden" name="user_id" value="{{ f.user.id }}">
                     <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-accent-surface);color:var(--color-accent);border:1px solid var(--color-accent-border);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% if f.is_admin %}{% trans "Remove admin" %}{% else %}{% trans "Make Super Admin" %}{% endif %}</button>
                 </form>
+                {% endif %}
                 <button type="button" class="btn btn-sm staff-reset-btn inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
                         data-user-id="{{ f.user.id }}" data-username="{{ f.user.username }}" data-email="{{ f.user.email }}"
                         style="background:var(--color-accent);color:var(--color-surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
@@ -148,12 +150,14 @@
                         <button type="button" class="btn btn-sm staff-reset-btn inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none"
                                 data-user-id="{{ row.user.id }}" data-username="{{ row.user.username }}" data-email="{{ row.user.email }}"
                                 style="background:var(--color-accent);color:var(--color-surface);border:none;border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;">{% trans "Reset password" %}</button>
+                        {% if role == "superadmin" %}
                         <form method="post" style="display:inline;" onsubmit="return confirm('{% if row.is_admin %}{% trans 'Demote from Super Admin:' %}{% else %}{% trans 'Promote to Super Admin:' %}{% endif %} {{ row.user.get_full_name|default:row.user.email|escapejs }}?');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="toggle_admin">
                             <input type="hidden" name="user_id" value="{{ row.user.id }}">
                             <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-surface-sunken);color:var(--color-text-secondary);border:1px solid var(--color-border-strong);border-radius:4px;padding:4px 10px;font-size:0.78rem;cursor:pointer;margin-left:0.3rem;">{% if row.is_admin %}{% trans "Demote" %}{% else %}{% trans "Promote" %}{% endif %}</button>
                         </form>
+                        {% endif %}
                         {% if not row.is_admin %}
                         <form method="post" style="display:inline;">
                             {% csrf_token %}
@@ -242,6 +246,7 @@
         </div>
     </div>
 
+    {% if role == "superadmin" %}
     {# ── Create Super Admin ── #}
     <div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
         <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Create Super Admin" %}</h3></div>
@@ -272,6 +277,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Reset-password modal: choose flavour, then show result. Closed by default. -->
