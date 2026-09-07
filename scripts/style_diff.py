@@ -37,6 +37,11 @@ PROPS = [
     "justifyContent", "gap", "flexGrow", "flexShrink", "flexBasis", "opacity",
     "overflowX", "overflowY", "whiteSpace", "zIndex", "gridTemplateColumns",
     "maxWidth", "minWidth", "maxHeight", "minHeight", "textDecorationLine",
+    # Two elements can share font-family, size and letter-spacing and still
+    # measure differently: tabular figures are a different advance width from
+    # proportional ones. Without these a dropped `tabular-nums` shows up only
+    # as an unexplained 0.2px per digit.
+    "fontVariantNumeric", "fontFeatureSettings", "fontStyle", "wordSpacing",
 ]
 
 WALK = """
@@ -91,6 +96,25 @@ def normalise(prop, value):
         kept = [l for l in layers if "rgba(0, 0, 0, 0)" not in l and l != "none"]
         return ", ".join(kept) if kept else "none"
     return value
+
+
+def reaches_a_screen(prop, style):
+    """Whether a difference in *prop* can actually be seen.
+
+    A border colour on a zero-width border is the common case: the old sheets
+    left it at `currentColor` and Tailwind's preflight sets it to the border
+    token, so every element in the tree reports a difference that no one can
+    ever see. Filtering it here rather than in the eye keeps the report about
+    real defects.
+    """
+    if prop.startswith("border") and prop.endswith("Color"):
+        side = prop[len("border"):-len("Color")]
+        width = style.get(f"border{side}Width")
+        try:
+            return float(str(width).replace("px", "")) > 0
+        except (TypeError, ValueError):
+            return True
+    return True
 
 
 def snapshot(chrome, url, settle=2.5):

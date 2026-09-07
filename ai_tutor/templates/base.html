@@ -75,12 +75,12 @@ restore by un-commenting the include below.
 {% include '_includes/_baseline_recommend_banner.html' %}
 
 {# id and class are read by static/js/network-helpers.js — keep both. #}
-<div class="offline-banner fixed inset-0 z-1000 flex items-center justify-center gap-2 py-2 px-4 bg-text text-[#fff] text-sm font-bold shadow-[var(--shadow-md)] animate-[slide-down_var(--dur-base)_var(--ease-out)] [&_.icon]:text-[1rem]" id="offline-banner" role="status" hidden>
+<div class="offline-banner fixed top-0 right-0 left-0 bottom-auto z-1000 flex items-center justify-center gap-2 py-2 px-4 bg-text text-[#fff] text-sm font-bold shadow-[var(--shadow-md)] animate-[slide-down_var(--dur-base)_var(--ease-out)] [&_.icon]:text-[1rem]" id="offline-banner" role="status" hidden>
     {% icon "wifi-off" %}
     <span>{% trans "You're offline — messages will send when you reconnect." %}</span>
 </div>
 
-<header class="app-header sticky top-0 z-100 bg-[color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] [backdrop-filter:saturate(1.5)_blur(10px)] [-webkit-backdrop-filter:saturate(1.5)_blur(10px)] border-b border-b-border bg-surface">
+<header class="app-header sticky top-0 z-100 bg-[color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] [backdrop-filter:saturate(1.5)_blur(10px)] [-webkit-backdrop-filter:saturate(1.5)_blur(10px)] border-b border-b-border ">
     <div class="max-[640px]:py-2 max-[640px]:px-4 max-w-[var(--student-max,_62rem)] my-0 mx-auto py-3 px-5 flex items-center gap-3">
         {% comment %}
         The wordmark goes to the front door, not straight to the catalog.

@@ -26,7 +26,17 @@ register = template.Library()
 # dashboard has exactly these five roles; anything else is a bug in the caller.
 TONES = ('neutral', 'success', 'warning', 'danger', 'info', 'accent')
 
-ICON_SIZES = ('sm', 'md', 'lg', 'xl')
+# An icon is 1em square, so its size IS its font-size. These were
+# `.icon--sm` and friends in shared/base.css; the utility carries the same
+# rem values, because the sheet is gone and the class name with it — for a
+# while the markup still said `icon--sm` and nothing sized it, which read as
+# every icon quietly inheriting the text beside it.
+ICON_SIZES = {
+    'sm': 'text-[0.875rem]',
+    'md': 'text-[1.125rem]',
+    'lg': 'text-[1.5rem]',
+    'xl': 'text-[2.5rem]',
+}
 
 
 def _tone(value):
@@ -46,10 +56,9 @@ def icon(name, size='', css_class='', label=''):
     Decorative by default: an icon that sits next to its own label is noise
     to a screen reader, so it is aria-hidden unless *label* is given.
     """
-    size = size if size in ICON_SIZES else ''
     return {
         'name': name,
-        'size_class': f'icon--{size}' if size else '',
+        'size_class': ICON_SIZES.get(size, ''),
         'css_class': css_class,
         'label': label,
     }

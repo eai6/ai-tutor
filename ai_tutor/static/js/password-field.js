@@ -33,6 +33,13 @@ const PW = {
     meterWord: "text-xs font-bold min-w-18 text-right text-text-muted",
     match: "flex items-center gap-2 mt-2 text-sm font-medium [&[hidden]]:hidden",
     srOnly: "absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0",
+    // Room for the toggle, on the input itself. This was
+    // `.pw-field > input { padding-right: 2.75rem !important }` — 2.75rem is
+    // the button's 2.25rem plus its inset. It has to be applied here rather
+    // than in the template because the wrapper and the button are built at
+    // runtime, and `!important` is gone with the sheet, so it is applied last
+    // and wins on source order against the page's own field padding.
+    fieldInput: "!pr-11",
     ruleMet: "text-success [&_.pw-rule-mark]:bg-success-surface [&_.pw-rule-mark]:border-success-border [&_.pw-rule-mark]:text-success [&_.pw-rule-tick]:block [&_.pw-rule-dot]:hidden",
     meterFillWeak: "w-[33%] bg-danger-solid",
     meterFillFair: "w-[66%] bg-warning-solid",
@@ -166,6 +173,7 @@ const PW = {
         wrap.className = 'pw-field ' + PW.field;
         input.parentNode.insertBefore(wrap, input);
         wrap.appendChild(input);
+        input.className = (input.className + ' ' + PW.fieldInput).trim();
 
         var btn = document.createElement('button');
         btn.type = 'button';
