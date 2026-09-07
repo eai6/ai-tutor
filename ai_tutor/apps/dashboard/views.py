@@ -4790,7 +4790,8 @@ def staff_list(request):
     follows redirect-after-post.
     """
     from django.contrib.auth.models import User
-    from ai_tutor.apps.accounts.models import Membership, StaffInvitation, Institution
+    from ai_tutor.apps.accounts.models import (
+        CountryMembership, Institution, Membership, StaffInvitation)
     from ai_tutor.apps.safety import SafetyAuditLog
 
     if not request.staff_ctx['can_manage_people']:
@@ -4892,6 +4893,7 @@ def staff_list(request):
                 target.is_active = not target.is_active
                 target.save(update_fields=['is_active'])
                 Membership.objects.filter(user=target).update(is_active=target.is_active)
+                CountryMembership.objects.filter(user=target).update(is_active=target.is_active)
                 SafetyAuditLog.log(
                     'permission_change', user=request.user,
                     details={'mode': 'toggle_active', 'target_user_id': target.id,
@@ -5028,33 +5030,46 @@ def staff_list(request):
     # admins are listed only to a platform admin: to anyone else they are
     # neither actionable (`may_manage` refuses) nor theirs to see.
     if managed_ids is None:
-        candidates = User.objects.filter(Q(is_staff=True) | Q(memberships__role='staff'))
+        # Country accounts hold a CountryMembership and no Membership at all,
+        # so a query that only knows about memberships leaves a pending
+        # ministry invisible on the one page that could approve it.
+        candidates = User.objects.filter(
+            Q(is_staff=True)
+            | Q(memberships__role='staff')
+            | Q(country_memberships__isnull=False))
     else:
         candidates = User.objects.filter(
             is_staff=False,
             memberships__role='staff',
             memberships__institution_id__in=managed_ids,
         )
-    candidates = candidates.distinct().prefetch_related('memberships__institution')
+    candidates = candidates.distinct().prefetch_related(
+        'memberships__institution', 'country_memberships__country')
     people, pending_approvals = [], []
     for u in candidates:
         staff_ms = [m for m in u.memberships.all() if m.role == 'staff']
+        country_ms = list(u.country_memberships.all())
         # Institution-scoped admins see only staff of the selected school
         # (platform admins themselves are always shown).
-        if institution is not None and not u.is_staff:
+        if institution is not None and not u.is_staff and not country_ms:
             if not any(m.institution_id == institution.id for m in staff_ms):
                 continue
         inst_names = sorted({m.institution.name for m in staff_ms if m.institution})
+        # A country account belongs to a country, not a school, so that is
+        # what the School column has to say about it.
+        scope = ", ".join(sorted({cm.country.name for cm in country_ms})) \
+            or ", ".join(inst_names) or ('All' if u.is_staff else '—')
         row = {
             'user': u,
-            'institutions': ", ".join(inst_names) or ('All' if u.is_staff else '—'),
+            'institutions': scope,
             'is_admin': u.is_staff,
             'is_active': u.is_active,
             'is_self': u.id == request.user.id,
         }
+        memberships = staff_ms + country_ms
         is_pending = (
-            not u.is_staff and staff_ms
-            and not any(m.is_active for m in staff_ms)
+            not u.is_staff and memberships
+            and not any(m.is_active for m in memberships)
             and u.last_login is None
         )
         (pending_approvals if is_pending else people).append(row)

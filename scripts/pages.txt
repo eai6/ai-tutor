@@ -38,6 +38,8 @@ anon     /student/login/
 anon     /student/register/
 anon     /staff/login/
 anon     /staff/register/
+anon     /country/login/
+anon     /country/register/
 anon     /password-reset/
 anon     /password-reset/done/
 anon     /password-reset/complete/

@@ -213,6 +213,16 @@
                         <a href="{% url 'accounts:staff_self_register' %}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text">{% trans "Create account" %}</a>
                     </div>
                 </article>
+
+                <article class="lp-role lp-role--country flex flex-col gap-3 p-6 bg-surface border border-border rounded-xl shadow-[var(--shadow-sm)] [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-bold [&_h3]:tracking-tight [&_p]:text-base [&_p]:text-text-muted [&_p]:leading-normal [&_.lp-role\_\_icon]:bg-teal-tint [&_.lp-role\_\_icon]:text-teal-ink">
+                    <span class="lp-role__icon w-[46px] h-[46px] grid place-items-center rounded-md bg-coral-tint text-coral-ink text-[1.4rem]" aria-hidden="true">{% icon "globe" %}</span>
+                    <h3>{% trans "Countries" %}</h3>
+                    <p>{% trans "Adopting the platform for a national system. See every school in your country, add new ones, and follow how the whole cohort is doing." %}</p>
+                    <div class="flex gap-3 flex-wrap mt-auto pt-3">
+                        <a href="{% url 'accounts:country_login' %}" class="btn btn--primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)] active:shadow-[var(--shadow-xs)]">{% trans "Sign in" %}</a>
+                        <a href="{% url 'accounts:country_self_register' %}" class="btn btn--secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text">{% trans "Request access" %}</a>
+                    </div>
+                </article>
             </div>
         </div>
     </section>

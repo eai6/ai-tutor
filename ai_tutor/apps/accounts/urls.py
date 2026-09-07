@@ -18,6 +18,10 @@ urlpatterns = [
 
     # Staff (Teacher/Admin) auth
     path('staff/login/', views.staff_login, name='staff_login'),
+
+    # Country accounts — a ministry or programme team.
+    path('country/login/', views.country_login, name='country_login'),
+    path('country/register/', views.country_self_register, name='country_self_register'),
     path('staff/register/', views.staff_self_register, name='staff_self_register'),
     path('staff/register/<str:token>/', views.staff_register, name='staff_register'),
 

@@ -17,7 +17,9 @@ from django.contrib import messages
 from django.http import Http404
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
-from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
+from ai_tutor.apps.accounts.models import (
+    Country, CountryMembership, Institution, Membership, PlatformConfig,
+    StudentProfile)
 
 
 def landing_page(request):
@@ -60,15 +62,9 @@ def _password_errors(password, *, username='', email='', first_name='', last_nam
 
 def redirect_by_role(user):
     """Redirect user to appropriate dashboard based on role."""
-    if user.is_staff:
-        return redirect('dashboard:home')
+    from ai_tutor.apps.accounts.scope import has_staff_access
 
-    membership = Membership.objects.filter(
-        user=user,
-        is_active=True
-    ).first()
-
-    if membership and membership.role == 'staff':
+    if has_staff_access(user):
         return redirect('dashboard:home')
 
     return redirect('tutoring:catalog')
@@ -265,12 +261,11 @@ def staff_login(request):
         user = authenticate(request, username=username, password=password)
         
         if user is not None:
-            # Check if user is superadmin (is_staff) or has staff Membership
-            has_access = user.is_staff or Membership.objects.filter(
-                user=user,
-                role='staff',
-                is_active=True
-            ).exists()
+            # Every role the dashboard dispatches over, from the one
+            # definition of it. Spelling it out here again is how country
+            # accounts and school admins ended up unable to sign in.
+            from ai_tutor.apps.accounts.scope import has_staff_access
+            has_access = has_staff_access(user)
 
             if has_access:
                 login(request, user)
@@ -287,8 +282,14 @@ def staff_login(request):
             # Check if this is a pending teacher (inactive, never logged in)
             try:
                 pending_user = User.objects.get(username=username)
-                if not pending_user.is_active and pending_user.last_login is None and \
-                   Membership.objects.filter(user=pending_user, role='staff').exists():
+                awaiting = (
+                    Membership.objects.filter(
+                        user=pending_user,
+                        role__in=(Membership.Role.STAFF, Membership.Role.SCHOOL_ADMIN),
+                    ).exists()
+                    or CountryMembership.objects.filter(user=pending_user).exists()
+                )
+                if not pending_user.is_active and pending_user.last_login is None and awaiting:
                     return render(request, 'accounts/staff_login.html', {
                         'error': "Your account is pending approval by an administrator.",
                         'username': username,
@@ -422,6 +423,155 @@ def staff_self_register(request):
         'school_choices': school_choices,
         'active_terms': active_terms,
     })
+
+
+# ============================================================================
+# Country accounts
+# ============================================================================
+
+def country_login(request):
+    """Sign-in for a ministry or programme team.
+
+    Its own page rather than a note on the staff one: a ministry officer
+    arriving from a procurement conversation should not have to work out that
+    they are "staff". The gate is the same `has_staff_access` the dashboard
+    uses, narrowed to an active CountryMembership — signing in here and
+    landing on a teacher's view of one school would be worse than a refusal.
+    """
+    from ai_tutor.apps.accounts.scope import has_staff_access
+
+    if request.user.is_authenticated:
+        return redirect_by_role(request.user)
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None and CountryMembership.objects.filter(
+                user=user, is_active=True).exists():
+            login(request, user)
+            messages.success(request, _("Welcome back, %(name)s!") % {
+                "name": user.first_name or user.username})
+            if _terms_acceptance_pending(user):
+                return redirect("/terms/accept/?next=/dashboard/")
+            return redirect('dashboard:home')
+
+        if user is not None and has_staff_access(user):
+            # A real account, just not a country one. Say so rather than
+            # "invalid password", which sends them to reset a password that
+            # was never the problem.
+            return render(request, 'accounts/country_login.html', {
+                'error': _("That account is not a country account. Use the teacher and admin sign-in."),
+                'username': username,
+            })
+
+        pending = User.objects.filter(username=username).first()
+        if pending is not None and not pending.is_active and \
+                CountryMembership.objects.filter(user=pending).exists():
+            return render(request, 'accounts/country_login.html', {
+                'error': _("Your country account is awaiting approval."),
+                'username': username,
+            })
+
+        return render(request, 'accounts/country_login.html', {
+            'error': _("Invalid username or password."),
+            'username': username,
+        })
+
+    return render(request, 'accounts/country_login.html')
+
+
+def country_self_register(request):
+    """Request a country account. Inactive until a platform admin approves it.
+
+    The country is chosen from the ones already on the platform rather than
+    typed. An unauthenticated form that creates Country rows would let anyone
+    add a country — and a country is the boundary every scoped query is drawn
+    against, so an invented one is a tenancy hole rather than a stray record.
+    A ministry whose country is not listed yet is told to get in touch.
+    """
+    from ai_tutor.apps.accounts.models import PlatformTerms
+
+    if request.user.is_authenticated:
+        return redirect_by_role(request.user)
+
+    countries = list(Country.objects.filter(is_hidden=False).order_by('name'))
+    active_terms = PlatformTerms.active(locale=get_language())
+
+    def _form(**extra):
+        return render(request, 'accounts/country_self_register.html', dict(
+            {'countries': countries, 'active_terms': active_terms}, **extra))
+
+    if request.method != 'POST':
+        return _form()
+
+    first_name = request.POST.get('first_name', '').strip()
+    last_name = request.POST.get('last_name', '').strip()
+    username = request.POST.get('username', '').strip()
+    email = request.POST.get('email', '').strip()
+    country_id = request.POST.get('country', '')
+    organisation = request.POST.get('organisation', '').strip()
+    password = request.POST.get('password', '')
+    password_confirm = request.POST.get('password_confirm', '')
+    accepted_terms = request.POST.get('accept_terms') == 'on'
+
+    errors = []
+    if not first_name:
+        errors.append(_("Please enter your first name."))
+    if not username or len(username) < 3:
+        errors.append(_("Username must be at least 3 characters."))
+    elif User.objects.filter(username=username).exists():
+        errors.append(_("Username already taken."))
+    if not email:
+        errors.append(_("Email is required for a country account."))
+
+    country = next((c for c in countries if str(c.pk) == str(country_id)), None)
+    if country is None:
+        errors.append(_("Please choose the country you represent."))
+    if not organisation:
+        errors.append(_("Please name the ministry or programme you work for."))
+
+    errors.extend(_password_errors(
+        password, username=username, email=email,
+        first_name=first_name, last_name=last_name))
+    if password != password_confirm:
+        errors.append(_("Passwords don't match."))
+    if active_terms and not accepted_terms:
+        errors.append(_("Please read and agree to the platform terms."))
+
+    if errors:
+        return _form(errors=errors, first_name=first_name, last_name=last_name,
+                     username=username, email=email, country=country_id,
+                     organisation=organisation)
+
+    user = User.objects.create_user(
+        username=username, email=email, password=password,
+        first_name=first_name, last_name=last_name, is_active=False,
+    )
+    # Inactive on both records. The account is only a country account once a
+    # platform admin says so, and `has_staff_access` reads is_active.
+    CountryMembership.objects.create(user=user, country=country, is_active=False)
+
+    if active_terms:
+        from django.utils import timezone as _tz
+        StudentProfile.objects.update_or_create(user=user, defaults={
+            'terms_accepted_version': active_terms.version,
+            'terms_accepted_at': _tz.now(),
+        })
+
+    from ai_tutor.apps.safety import SafetyAuditLog
+    SafetyAuditLog.log(
+        'account_created', user=user,
+        details={'mode': 'country_self_register', 'country': country.slug,
+                 'organisation': organisation[:200]},
+        severity='warning', request=request,
+    )
+
+    from ai_tutor.apps.accounts.email_verification import send_verification_email
+    send_verification_email(request, user)
+
+    return render(request, 'accounts/country_pending.html', {'country': country})
 
 
 def staff_register(request, token=None):

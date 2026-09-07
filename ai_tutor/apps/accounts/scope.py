@@ -246,6 +246,27 @@ def _safety_flag_count(institution, country=None) -> int:
     return qs.count()
 
 
+def has_staff_access(user):
+    """Whether *user* may reach the dashboard at all.
+
+    The same four roles `get_staff_context` dispatches over, asked without a
+    request. The login gate used to spell out its own, narrower version —
+    `is_staff` or a Membership with role STAFF — which meant the two roles
+    added for country adoption could be created but never signed in with. A
+    door and a room disagreeing about who may enter is the kind of bug that
+    only shows up as "it just says invalid password".
+    """
+    if user.is_staff:
+        return True
+    if CountryMembership.objects.filter(user=user, is_active=True).exists():
+        return True
+    return Membership.objects.filter(
+        user=user,
+        role__in=(Membership.Role.STAFF, Membership.Role.SCHOOL_ADMIN),
+        is_active=True,
+    ).exists()
+
+
 # ---------------------------------------------------------------------------
 # Reach: which schools and which people an account may act on
 # ---------------------------------------------------------------------------
