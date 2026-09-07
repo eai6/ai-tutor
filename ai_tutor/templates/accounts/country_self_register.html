@@ -84,12 +84,11 @@
                 <label for="country">{% trans "Country" %}</label>
                 <select id="country" name="country" required>
                     <option value="">{% trans "Select your country" %}</option>
-                    {% for c in countries %}
-                    <option value="{{ c.pk }}" {% if country == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                    {% for code, label in countries %}
+                    <option value="{{ code }}" {% if country == code %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <small class="block mt-1 text-xs text-text-muted">{% trans "Country not listed? Get in touch and the platform team will add it." %}</small>
-            </div>
+                            </div>
 
             <div class="form-group form-group--full flex flex-col gap-2 [&_label]:text-sm [&_label]:font-bold [&_label]:text-text-secondary [&>input]:w-full [&>input]:min-h-12 [&>input]:py-3 [&>input]:px-4 [&>input]:bg-surface [&>input]:border [&>input]:border-border-strong [&>input]:rounded-sm [&>input]:font-body [&>input]:text-md [&>input]:text-text [&>input]:[transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] [&>select]:w-full [&>select]:min-h-12 [&>select]:py-3 [&>select]:px-4 [&>select]:bg-surface [&>select]:border [&>select]:border-border-strong [&>select]:rounded-sm [&>select]:font-body [&>select]:text-md [&>select]:text-text [&>select]:[transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] [&>input:focus-visible]:outline-none [&>input:focus-visible]:border-coral-fill [&>input:focus-visible]:shadow-[0_0_0_3px_var(--color-coral-tint)] [&>select]:[appearance:none] [&>select]:pr-8 [&>select]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236E6157'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&>select]:[background-repeat:no-repeat] [&>select]:[background-position:right_calc(var(--spacing)*3)_center] [&>select]:[background-size:1rem] [&>select]:cursor-pointer [&_.auth-terms]:flex [&_.auth-terms]:gap-3 [&_.auth-terms]:items-start [&_.auth-terms]:py-3 [&_.auth-terms]:px-4 [&_.auth-terms]:bg-surface-sunken [&_.auth-terms]:border [&_.auth-terms]:border-border [&_.auth-terms]:rounded-md [&_.auth-terms]:text-base [&_.auth-terms]:font-normal [&_.auth-terms]:leading-normal [&_.auth-terms]:text-text [&_.auth-terms]:cursor-pointer [&_.auth-terms\_\_box]:flex-none [&_.auth-terms\_\_box]:w-[1.05rem] [&_.auth-terms\_\_box]:h-[1.05rem] [&_.auth-terms\_\_box]:mt-[0.15rem] [&_.auth-terms\_\_box]:accent-coral-fill [&_.auth-terms_a]:text-coral-ink [&_.auth-terms_a]:font-bold [&_.auth-terms\_\_summary]:block [&_.auth-terms\_\_summary]:mt-1 [&_.auth-terms\_\_summary]:text-sm [&_.auth-terms\_\_summary]:text-text-muted mb-4 [&_label]:block [&_label]:mb-1">
                 <label for="organisation">{% trans "Ministry or programme" %}</label>

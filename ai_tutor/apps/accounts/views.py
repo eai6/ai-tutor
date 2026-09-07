@@ -485,23 +485,30 @@ def country_login(request):
 def country_self_register(request):
     """Request a country account. Inactive until a platform admin approves it.
 
-    The country is chosen from the ones already on the platform rather than
-    typed. An unauthenticated form that creates Country rows would let anyone
-    add a country — and a country is the boundary every scoped query is drawn
-    against, so an invented one is a tenancy hole rather than a stray record.
-    A ministry whose country is not listed yet is told to get in touch.
+    Every country is offered, not only the ones already on the platform: a
+    ministry arrives *before* its country is on it, which is the whole point
+    of the form. The `Country` row is created from the chosen ISO code if it
+    does not exist — matched on the code rather than the name, so a country
+    cannot end up with two rows and its schools split between them.
+
+    Creating a row from an unauthenticated form is a smaller thing than it
+    looks: it carries a name and a code, nothing is scoped to it until a
+    school is added, and the account that asked for it stays inactive until a
+    platform admin approves it.
     """
+    from django.utils.text import slugify
+
+    from ai_tutor.apps.accounts.countries import BY_CODE, choices
     from ai_tutor.apps.accounts.models import PlatformTerms
 
     if request.user.is_authenticated:
         return redirect_by_role(request.user)
 
-    countries = list(Country.objects.filter(is_hidden=False).order_by('name'))
     active_terms = PlatformTerms.active(locale=get_language())
 
     def _form(**extra):
         return render(request, 'accounts/country_self_register.html', dict(
-            {'countries': countries, 'active_terms': active_terms}, **extra))
+            {'countries': choices(), 'active_terms': active_terms}, **extra))
 
     if request.method != 'POST':
         return _form()
@@ -510,7 +517,7 @@ def country_self_register(request):
     last_name = request.POST.get('last_name', '').strip()
     username = request.POST.get('username', '').strip()
     email = request.POST.get('email', '').strip()
-    country_id = request.POST.get('country', '')
+    country_code = request.POST.get('country', '').strip().upper()
     organisation = request.POST.get('organisation', '').strip()
     password = request.POST.get('password', '')
     password_confirm = request.POST.get('password_confirm', '')
@@ -526,8 +533,7 @@ def country_self_register(request):
     if not email:
         errors.append(_("Email is required for a country account."))
 
-    country = next((c for c in countries if str(c.pk) == str(country_id)), None)
-    if country is None:
+    if country_code not in BY_CODE:
         errors.append(_("Please choose the country you represent."))
     if not organisation:
         errors.append(_("Please name the ministry or programme you work for."))
@@ -542,8 +548,16 @@ def country_self_register(request):
 
     if errors:
         return _form(errors=errors, first_name=first_name, last_name=last_name,
-                     username=username, email=email, country=country_id,
+                     username=username, email=email, country=country_code,
                      organisation=organisation)
+
+    # get_or_create on the code, so a second ministry from the same country
+    # joins the row the first one made rather than starting a rival one.
+    country, _created = Country.objects.get_or_create(
+        iso_code=country_code,
+        defaults={'name': BY_CODE[country_code],
+                  'slug': slugify(BY_CODE[country_code])[:50]},
+    )
 
     user = User.objects.create_user(
         username=username, email=email, password=password,
@@ -563,7 +577,7 @@ def country_self_register(request):
     from ai_tutor.apps.safety import SafetyAuditLog
     SafetyAuditLog.log(
         'account_created', user=user,
-        details={'mode': 'country_self_register', 'country': country.slug,
+        details={'mode': 'country_self_register', 'country': country_code,
                  'organisation': organisation[:200]},
         severity='warning', request=request,
     )

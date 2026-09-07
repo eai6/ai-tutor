@@ -33,6 +33,11 @@ class Country(models.Model):
         choices=django_settings.LANGUAGES,
         help_text="Default UI language for schools created in this country.",
     )
+    iso_code = models.CharField(
+        max_length=2, null=True, blank=True, unique=True,
+        help_text="ISO 3166-1 alpha-2. The account-request form matches on "
+                  "this, and the flag emoji is derived from it.",
+    )
     is_hidden = models.BooleanField(
         default=False,
         help_text="Hidden countries never appear in a school or country list.",
@@ -45,6 +50,14 @@ class Country(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def flag(self):
+        """The emoji for `iso_code`, or '' — a country added before the code
+        field existed has none, and a missing flag is better than a wrong one.
+        """
+        from ai_tutor.apps.accounts.countries import flag
+        return flag(self.iso_code)
 
     @classmethod
     def get_platform(cls):
@@ -66,8 +79,20 @@ def default_country():
 
     Module-level so a migration can serialise the reference to it. Callable so
     the row is created on first use rather than at import time.
+
+    Reads the pk on its own rather than fetching the row, because this is also
+    the default the migration that adds those FKs evaluates — and at that
+    point the table has only the columns that migration created, while this
+    class knows about every column added since. `values_list` names one of
+    them; loading the object names all of them and fails on the first field
+    added after the fact. 0029 seeds the row before it needs this, so the
+    fallback below does not run during a migration.
     """
-    return Country.get_platform().pk
+    pk = (Country.objects
+          .filter(slug=Country.PLATFORM_SLUG)
+          .values_list('pk', flat=True)
+          .first())
+    return pk if pk is not None else Country.get_platform().pk
 
 
 class CountryMembership(models.Model):

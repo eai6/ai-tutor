@@ -22,8 +22,14 @@ PW = 'Correct-Horse-Battery-92'
 
 @pytest.fixture
 def countries(db):
-    return (Country.objects.create(name='Seychelles', slug='sc'),
-            Country.objects.create(name='Tanzania', slug='tz'))
+    """get_or_create, because the migrations already put Seychelles in the
+    test database and `iso_code` is unique — a second row for it is exactly
+    the split this field exists to prevent."""
+    sc, _ = Country.objects.get_or_create(
+        iso_code='SC', defaults={'name': 'Seychelles', 'slug': 'seychelles'})
+    tz, _ = Country.objects.get_or_create(
+        iso_code='TZ', defaults={'name': 'Tanzania', 'slug': 'tanzania'})
+    return sc, tz
 
 
 @pytest.fixture(autouse=True)
@@ -36,9 +42,12 @@ def _no_lockout(db):
 
 
 def _request(client, country, **over):
+    """*country* is a Country or a bare ISO code, so a test can ask for one
+    the platform has no row for yet."""
+    code = getattr(country, 'iso_code', country)
     payload = {
         'first_name': 'Amina', 'last_name': 'Juma', 'username': 'ministry',
-        'email': 'amina@moe.example', 'country': country.pk,
+        'email': 'amina@moe.example', 'country': code,
         'organisation': 'Ministry of Education',
         'password': PW, 'password_confirm': PW, 'accept_terms': 'on',
     }
@@ -95,19 +104,64 @@ def test_a_student_still_has_no_staff_access(client, countries):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.django_db
-def test_the_form_offers_the_countries_on_the_platform(client, countries):
+def test_the_form_offers_every_country_not_only_the_ones_on_the_platform(client, countries):
+    """A ministry arrives before its country is on the platform. Offering only
+    the existing rows would mean the form worked for nobody new."""
     resp = client.get(reverse('accounts:country_self_register'))
     assert resp.status_code == 200
-    assert {c.name for c in resp.context['countries']} == {'Seychelles', 'Tanzania'}
+    offered = dict(resp.context['countries'])
+    assert len(offered) > 150
+    assert 'TZ' in offered and 'SC' in offered
+    assert 'MZ' in offered, 'a country with no row yet must still be offerable'
+
+
+@pytest.mark.django_db
+def test_every_country_is_offered_with_its_flag(client, countries):
+    resp = client.get(reverse('accounts:country_self_register'))
+    offered = dict(resp.context['countries'])
+    assert offered['TZ'] == '\U0001F1F9\U0001F1FF Tanzania'
+    assert all(label[0] == '\U0001F1E6' or ord(label[0]) >= 0x1F1E6
+               for label in offered.values()), 'every option leads with a flag'
 
 
 @pytest.mark.django_db
 def test_the_hidden_platform_country_is_never_offered(client, countries):
     """`Country.get_platform()` is the fallback a row lands on when it has no
-    country. Offering it would let someone request an account against it."""
-    Country.get_platform()
+    country, and it is not a country. It has no ISO code, so it cannot appear
+    in a list built from ISO codes — this asserts that stays true."""
+    platform = Country.get_platform()
     resp = client.get(reverse('accounts:country_self_register'))
-    assert all(c.is_hidden is False for c in resp.context['countries'])
+    assert platform.iso_code in (None, '')
+    assert platform.name not in dict(resp.context['countries']).values()
+
+
+@pytest.mark.django_db
+def test_choosing_a_country_with_no_row_yet_creates_one(client, countries):
+    _request(client, 'MZ')
+
+    created = Country.objects.get(iso_code='MZ')
+    assert created.name == 'Mozambique'
+    assert CountryMembership.objects.get(
+        user__username='ministry').country == created
+
+
+@pytest.mark.django_db
+def test_a_second_ministry_joins_the_row_the_first_one_made(client, countries):
+    """Two rows for one country would split its schools between them, each
+    invisible to the other."""
+    _request(client, 'MZ')
+    _request(client, 'MZ', username='ministry2')
+
+    assert Country.objects.filter(iso_code='MZ').count() == 1
+
+
+@pytest.mark.django_db
+def test_an_existing_country_is_matched_not_duplicated(client, countries):
+    _, tz = countries
+    _request(client, tz)
+
+    assert Country.objects.filter(iso_code='TZ').count() == 1
+    assert CountryMembership.objects.get(user__username='ministry').country == tz
 
 
 @pytest.mark.django_db
@@ -125,16 +179,17 @@ def test_a_request_creates_an_inactive_account_against_its_country(client, count
 @pytest.mark.django_db
 def test_a_request_cannot_invent_a_country(client, countries):
     """The country is the boundary every scoped query is drawn against, so a
-    posted id that is not one of the offered countries is refused rather than
-    resolved to something."""
+    posted code that is not a real one is refused rather than resolved to
+    something — and no Country row is created for it."""
     client.post(reverse('accounts:country_self_register'), {
         'first_name': 'Amina', 'last_name': 'Juma', 'username': 'ministry',
-        'email': 'amina@moe.example', 'country': 99999,
+        'email': 'amina@moe.example', 'country': 'ZZ',
         'organisation': 'Ministry of Education',
         'password': PW, 'password_confirm': PW, 'accept_terms': 'on',
     })
 
     assert not User.objects.filter(username='ministry').exists()
+    assert not Country.objects.filter(iso_code='ZZ').exists()
 
 
 @pytest.mark.django_db

@@ -6,6 +6,27 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def seed_platform_country(apps, schema_editor):
+    """The row `default_country` returns, created through the historical model.
+
+    The two country FKs below default to it, and a field's default is
+    evaluated while its column is added. Seeding it here — with this
+    migration's own idea of what a Country has — is what keeps that evaluation
+    from reaching for the live class, whose field list grows over time while
+    this table's does not. Without it, adding any column to Country breaks
+    this migration on a database that has never run it.
+    """
+    apps.get_model('accounts', 'Country').objects.get_or_create(
+        slug='platform',
+        defaults={'name': 'Platform', 'is_hidden': True,
+                  'default_locale': 'en-us'},
+    )
+
+
+def unseed_platform_country(apps, schema_editor):
+    apps.get_model('accounts', 'Country').objects.filter(slug='platform').delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -29,6 +50,7 @@ class Migration(migrations.Migration):
                 'ordering': ['name'],
             },
         ),
+        migrations.RunPython(seed_platform_country, unseed_platform_country),
         migrations.AlterField(
             model_name='membership',
             name='role',

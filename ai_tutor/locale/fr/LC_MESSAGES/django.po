@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-07 04:35+0000\n"
+"POT-Creation-Date: 2026-09-07 06:05+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -54,16 +54,12 @@ msgstr "Super administrateur"
 
 #: ai_tutor/apps/accounts/scope.py:128
 #: ai_tutor/templates/accounts/country_self_register.html:84
-#| msgid "Country Adoption"
 msgid "Country"
 msgstr "Pays"
 
-
 #: ai_tutor/apps/accounts/scope.py:152
-#| msgid "School Name"
 msgid "School Admin"
 msgstr "Administrateur d'établissement"
-
 
 #: ai_tutor/apps/accounts/scope.py:203
 msgid "Teacher"
@@ -90,66 +86,59 @@ msgid "Your country account is awaiting approval."
 msgstr "Votre compte pays est en attente d'approbation."
 
 #: ai_tutor/apps/accounts/views.py:478
-#| msgid "Enter your username and password."
 msgid "Invalid username or password."
 msgstr "Nom d'utilisateur ou mot de passe invalide."
 
-
-#: ai_tutor/apps/accounts/views.py:521
-#| msgid "Your first name"
+#: ai_tutor/apps/accounts/views.py:528
 msgid "Please enter your first name."
 msgstr "Veuillez saisir votre prénom."
 
-
-#: ai_tutor/apps/accounts/views.py:523
-#| msgid "Choose a password of at least 4 characters."
+#: ai_tutor/apps/accounts/views.py:530
 msgid "Username must be at least 3 characters."
 msgstr "Le nom d'utilisateur doit comporter au moins 3 caractères."
 
-
-#: ai_tutor/apps/accounts/views.py:525
+#: ai_tutor/apps/accounts/views.py:532
 msgid "Username already taken."
 msgstr "Ce nom d'utilisateur est déjà pris."
 
-#: ai_tutor/apps/accounts/views.py:527
+#: ai_tutor/apps/accounts/views.py:534
 msgid "Email is required for a country account."
 msgstr "Une adresse e-mail est requise pour un compte pays."
 
-#: ai_tutor/apps/accounts/views.py:531
+#: ai_tutor/apps/accounts/views.py:537
 msgid "Please choose the country you represent."
 msgstr "Veuillez choisir le pays que vous représentez."
 
-#: ai_tutor/apps/accounts/views.py:533
-msgid "Please name the ministry or programme you work for."
-msgstr "Veuillez nommer le ministère ou le programme pour lequel vous travaillez."
-
 #: ai_tutor/apps/accounts/views.py:539
-#| msgid "Password changed."
+msgid "Please name the ministry or programme you work for."
+msgstr ""
+"Veuillez nommer le ministère ou le programme pour lequel vous travaillez."
+
+#: ai_tutor/apps/accounts/views.py:545
 msgid "Passwords don't match."
 msgstr "Les mots de passe ne correspondent pas."
 
-
-#: ai_tutor/apps/accounts/views.py:541
+#: ai_tutor/apps/accounts/views.py:547
 msgid "Please read and agree to the platform terms."
 msgstr "Veuillez lire et accepter les conditions de la plateforme."
 
-#: ai_tutor/apps/accounts/views.py:886
+#: ai_tutor/apps/accounts/views.py:900
 msgid "Profile updated."
 msgstr "Profil mis à jour."
 
-#: ai_tutor/apps/accounts/views.py:894
+#: ai_tutor/apps/accounts/views.py:908
 msgid "Password changed."
 msgstr "Mot de passe modifié."
 
-#: ai_tutor/apps/accounts/views.py:904
+#: ai_tutor/apps/accounts/views.py:918
 msgid "That tutor option is not available."
 msgstr "Cette option de tuteur n'est pas disponible."
 
-#: ai_tutor/apps/accounts/views.py:925
+#: ai_tutor/apps/accounts/views.py:939
 msgid "That offline tutor is not installed."
 msgstr "Ce tuteur hors ligne n'est pas installé."
 
-#: ai_tutor/apps/accounts/views.py:931
+#: ai_tutor/apps/accounts/views.py:945
 msgid "Tutor preference saved."
 msgstr "Préférence de tuteur enregistrée."
 
@@ -243,7 +232,6 @@ msgstr "Ce nom court est déjà pris."
 #| msgid "by %(name)s"
 msgid "%(name)s added."
 msgstr "%(name)s ajoutée."
-
 
 #: ai_tutor/apps/desktop/server_config.py:59
 msgid "Enter the address of your school server."
@@ -807,7 +795,7 @@ msgid "Help & FAQ"
 msgstr "Aide et FAQ"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:10
-#: ai_tutor/templates/_includes/_marketing_header.html:34
+#: ai_tutor/templates/_includes/_marketing_header.html:35
 #: ai_tutor/templates/docs/base.html:7 ai_tutor/templates/docs/index.html:25
 #: ai_tutor/templates/docs/section.html:20
 msgid "Country Adoption"
@@ -844,11 +832,11 @@ msgstr "Principal"
 msgid "Home"
 msgstr "Accueil"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:38
+#: ai_tutor/templates/_includes/_marketing_header.html:40
 msgid "Teacher/Admin sign in"
 msgstr "Connexion enseignant/administrateur"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:39
+#: ai_tutor/templates/_includes/_marketing_header.html:41
 msgid "Student sign in"
 msgstr "Connexion élève"
 
@@ -1069,10 +1057,8 @@ msgstr "S1, S2, S3, S4 ou S5"
 
 #: ai_tutor/templates/accounts/country_login.html:5
 #: ai_tutor/templates/accounts/country_login.html:14
-#| msgid "Student Sign In"
 msgid "Country Sign In"
 msgstr "Connexion pays"
-
 
 #: ai_tutor/templates/accounts/country_login.html:15
 msgid "For ministries and programme teams"
@@ -1100,7 +1086,7 @@ msgid "Enter your username"
 msgstr "Saisissez votre nom d'utilisateur"
 
 #: ai_tutor/templates/accounts/country_login.html:42
-#: ai_tutor/templates/accounts/country_self_register.html:102
+#: ai_tutor/templates/accounts/country_self_register.html:101
 #: ai_tutor/templates/accounts/login.html:42
 #: ai_tutor/templates/accounts/register.html:92
 #: ai_tutor/templates/accounts/settings.html:277
@@ -1138,27 +1124,21 @@ msgid "Forgot your password?"
 msgstr "Mot de passe oublié ?"
 
 #: ai_tutor/templates/accounts/country_login.html:60
-#| msgid "Operating the platform"
 msgid "New to the platform?"
 msgstr "Nouveau sur la plateforme ?"
 
-
 #: ai_tutor/templates/accounts/country_login.html:60
-#| msgid "Deleting your account"
 msgid "Request a country account"
 msgstr "Demander un compte pays"
 
-
 #: ai_tutor/templates/accounts/country_login.html:61
-#| msgid "Your account will need admin approval before you can sign in."
 msgid ""
 "A country account is approved by the platform team before it can sign in."
 msgstr ""
 
-
 #: ai_tutor/templates/accounts/country_login.html:62
 #: ai_tutor/templates/accounts/country_pending.html:22
-#: ai_tutor/templates/accounts/country_self_register.html:146
+#: ai_tutor/templates/accounts/country_self_register.html:145
 #: ai_tutor/templates/accounts/staff_login.html:62
 #: ai_tutor/templates/accounts/staff_self_register.html:138
 #: ai_tutor/templates/accounts/student_login.html:61
@@ -1189,10 +1169,8 @@ msgstr ""
 
 #: ai_tutor/templates/accounts/country_self_register.html:5
 #: ai_tutor/templates/accounts/country_self_register.html:14
-#| msgid "Deleting your account"
 msgid "Request a Country Account"
 msgstr "Demander un compte pays"
-
 
 #: ai_tutor/templates/accounts/country_self_register.html:15
 msgid "For a ministry or programme team adopting the platform"
@@ -1253,26 +1231,18 @@ msgid "Email"
 msgstr "E-mail"
 
 #: ai_tutor/templates/accounts/country_self_register.html:86
-#| msgid "Select your school"
 msgid "Select your country"
 msgstr "Choisissez votre pays"
 
-
-#: ai_tutor/templates/accounts/country_self_register.html:91
-msgid "Country not listed? Get in touch and the platform team will add it."
-msgstr "Pays absent de la liste ? Contactez-nous et l'équipe de la plateforme l'ajoutera."
-
-#: ai_tutor/templates/accounts/country_self_register.html:95
+#: ai_tutor/templates/accounts/country_self_register.html:94
 msgid "Ministry or programme"
 msgstr "Ministère ou programme"
 
-#: ai_tutor/templates/accounts/country_self_register.html:98
-#| msgid "Administration"
+#: ai_tutor/templates/accounts/country_self_register.html:97
 msgid "Ministry of Education"
 msgstr "Ministère de l'Éducation"
 
-
-#: ai_tutor/templates/accounts/country_self_register.html:107
+#: ai_tutor/templates/accounts/country_self_register.html:106
 #: ai_tutor/templates/accounts/register.html:97
 #: ai_tutor/templates/accounts/staff_register.html:109
 #: ai_tutor/templates/accounts/staff_self_register.html:99
@@ -1280,33 +1250,33 @@ msgstr "Ministère de l'Éducation"
 msgid "Create a password"
 msgstr "Créez un mot de passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:115
+#: ai_tutor/templates/accounts/country_self_register.html:114
 #: ai_tutor/templates/accounts/staff_register.html:117
 #: ai_tutor/templates/accounts/staff_self_register.html:107
 #: ai_tutor/templates/accounts/student_register.html:129
 msgid "Confirm Password"
 msgstr "Confirmez le mot de passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:120
+#: ai_tutor/templates/accounts/country_self_register.html:119
 #: ai_tutor/templates/accounts/staff_register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:112
 #: ai_tutor/templates/accounts/student_register.html:134
 msgid "Re-enter your password"
 msgstr "Saisissez à nouveau votre mot de passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:131
+#: ai_tutor/templates/accounts/country_self_register.html:130
 #: ai_tutor/templates/accounts/staff_self_register.html:123
 #: ai_tutor/templates/accounts/student_register.html:145
 msgid "I agree to the"
 msgstr "J'accepte les"
 
-#: ai_tutor/templates/accounts/country_self_register.html:132
+#: ai_tutor/templates/accounts/country_self_register.html:131
 #: ai_tutor/templates/accounts/staff_self_register.html:124
 #: ai_tutor/templates/accounts/student_register.html:146
 msgid "AI Tutor terms"
 msgstr "conditions d'AI Tutor"
 
-#: ai_tutor/templates/accounts/country_self_register.html:140
+#: ai_tutor/templates/accounts/country_self_register.html:139
 #: ai_tutor/templates/accounts/register.html:5
 #: ai_tutor/templates/accounts/register.html:117
 #: ai_tutor/templates/accounts/staff_login.html:60
@@ -1315,14 +1285,14 @@ msgstr "conditions d'AI Tutor"
 msgid "Create Account"
 msgstr "Créer un compte"
 
-#: ai_tutor/templates/accounts/country_self_register.html:145
+#: ai_tutor/templates/accounts/country_self_register.html:144
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
 msgid "Already have an account?"
 msgstr "Vous avez déjà un compte ?"
 
-#: ai_tutor/templates/accounts/country_self_register.html:145
+#: ai_tutor/templates/accounts/country_self_register.html:144
 #: ai_tutor/templates/accounts/landing.html:205
 #: ai_tutor/templates/accounts/landing.html:215
 #: ai_tutor/templates/accounts/landing.html:225
@@ -2101,10 +2071,8 @@ msgstr "Personnes"
 #: ai_tutor/templates/dashboard/base.html:131
 #: ai_tutor/templates/dashboard/country/schools.html:4
 #: ai_tutor/templates/dashboard/country/schools.html:5
-#| msgid "School"
 msgid "Schools"
 msgstr "Écoles"
-
 
 #: ai_tutor/templates/dashboard/base.html:140
 #: ai_tutor/templates/dashboard/classes/list.html:4
@@ -2673,10 +2641,8 @@ msgstr[1] "%(n)s wazi"
 
 #: ai_tutor/templates/dashboard/country/schools.html:21
 #: ai_tutor/templates/dashboard/country/schools.html:69
-#| msgid "First name"
 msgid "Short name"
 msgstr "Nom court"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:35
 #: ai_tutor/templates/dashboard/lesson_monitor.html:230
@@ -2696,10 +2662,8 @@ msgid "Inactive"
 msgstr "Inactive"
 
 #: ai_tutor/templates/dashboard/country/schools.html:44
-#| msgid "No schools yet."
 msgid "No schools yet"
 msgstr "Aucune école pour l'instant"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:44
 msgid ""
@@ -2708,15 +2672,15 @@ msgid ""
 msgstr ""
 
 #: ai_tutor/templates/dashboard/country/schools.html:51
-#| msgid "Add School"
 msgid "Add a school"
 msgstr "Ajouter une école"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:56
 #, python-format
 msgid "New schools join %(name)s. Its default language becomes theirs."
-msgstr "Les nouvelles écoles rejoignent %(name)s. Sa langue par défaut devient la leur."
+msgstr ""
+"Les nouvelles écoles rejoignent %(name)s. Sa langue par défaut devient la "
+"leur."
 
 #: ai_tutor/templates/dashboard/country/schools.html:63
 #: ai_tutor/templates/dashboard/settings.html:446
@@ -2728,10 +2692,8 @@ msgid "Name"
 msgstr "Nom"
 
 #: ai_tutor/templates/dashboard/country/schools.html:66
-#| msgid "e.g. Mont Fleuri Secondary"
 msgid "Anse Royale Secondary"
 msgstr ""
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:72
 msgid "anse-royale"
@@ -2742,10 +2704,8 @@ msgid "Used in links. Left blank, it is made from the name."
 msgstr "Utilisé dans les liens. Laissé vide, il est dérivé du nom."
 
 #: ai_tutor/templates/dashboard/country/schools.html:76
-#| msgid "Add School"
 msgid "Add school"
 msgstr "Ajouter l'école"
-
 
 #: ai_tutor/templates/dashboard/curriculum/content_progress.html:4
 msgid "Content Generation Progress"
@@ -8088,3 +8048,8 @@ msgstr "Revoir la leçon"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Continuer à apprendre"
+
+#~ msgid "Country not listed? Get in touch and the platform team will add it."
+#~ msgstr ""
+#~ "Pays absent de la liste ? Contactez-nous et l'équipe de la plateforme "
+#~ "l'ajoutera."

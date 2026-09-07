@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-07 04:35+0000\n"
+"POT-Creation-Date: 2026-09-07 06:05+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -54,16 +54,12 @@ msgstr "Msimamizi Mkuu"
 
 #: ai_tutor/apps/accounts/scope.py:128
 #: ai_tutor/templates/accounts/country_self_register.html:84
-#| msgid "Country Adoption"
 msgid "Country"
 msgstr "Nchi"
 
-
 #: ai_tutor/apps/accounts/scope.py:152
-#| msgid "School Name"
 msgid "School Admin"
 msgstr "Msimamizi wa Shule"
-
 
 #: ai_tutor/apps/accounts/scope.py:203
 msgid "Teacher"
@@ -90,66 +86,58 @@ msgid "Your country account is awaiting approval."
 msgstr "Akaunti yako ya nchi inasubiri idhini."
 
 #: ai_tutor/apps/accounts/views.py:478
-#| msgid "Enter your username and password."
 msgid "Invalid username or password."
 msgstr "Jina la mtumiaji au nenosiri si sahihi."
 
-
-#: ai_tutor/apps/accounts/views.py:521
-#| msgid "Your first name"
+#: ai_tutor/apps/accounts/views.py:528
 msgid "Please enter your first name."
 msgstr "Tafadhali weka jina lako la kwanza."
 
-
-#: ai_tutor/apps/accounts/views.py:523
-#| msgid "Choose a password of at least 4 characters."
+#: ai_tutor/apps/accounts/views.py:530
 msgid "Username must be at least 3 characters."
 msgstr "Jina la mtumiaji lazima liwe na angalau herufi 3."
 
-
-#: ai_tutor/apps/accounts/views.py:525
+#: ai_tutor/apps/accounts/views.py:532
 msgid "Username already taken."
 msgstr "Jina la mtumiaji tayari limechukuliwa."
 
-#: ai_tutor/apps/accounts/views.py:527
+#: ai_tutor/apps/accounts/views.py:534
 msgid "Email is required for a country account."
 msgstr "Barua pepe inahitajika kwa akaunti ya nchi."
 
-#: ai_tutor/apps/accounts/views.py:531
+#: ai_tutor/apps/accounts/views.py:537
 msgid "Please choose the country you represent."
 msgstr "Tafadhali chagua nchi unayoiwakilisha."
 
-#: ai_tutor/apps/accounts/views.py:533
+#: ai_tutor/apps/accounts/views.py:539
 msgid "Please name the ministry or programme you work for."
 msgstr "Tafadhali taja wizara au programu unayofanyia kazi."
 
-#: ai_tutor/apps/accounts/views.py:539
-#| msgid "Password changed."
+#: ai_tutor/apps/accounts/views.py:545
 msgid "Passwords don't match."
 msgstr "Manenosiri hayalingani."
 
-
-#: ai_tutor/apps/accounts/views.py:541
+#: ai_tutor/apps/accounts/views.py:547
 msgid "Please read and agree to the platform terms."
 msgstr "Tafadhali soma na ukubali masharti ya jukwaa."
 
-#: ai_tutor/apps/accounts/views.py:886
+#: ai_tutor/apps/accounts/views.py:900
 msgid "Profile updated."
 msgstr "Wasifu umesasishwa."
 
-#: ai_tutor/apps/accounts/views.py:894
+#: ai_tutor/apps/accounts/views.py:908
 msgid "Password changed."
 msgstr "Nenosiri limebadilishwa."
 
-#: ai_tutor/apps/accounts/views.py:904
+#: ai_tutor/apps/accounts/views.py:918
 msgid "That tutor option is not available."
 msgstr "Chaguo hilo la mkufunzi halipatikani."
 
-#: ai_tutor/apps/accounts/views.py:925
+#: ai_tutor/apps/accounts/views.py:939
 msgid "That offline tutor is not installed."
 msgstr "Mkufunzi huyo wa bila mtandao hajasakinishwa."
 
-#: ai_tutor/apps/accounts/views.py:931
+#: ai_tutor/apps/accounts/views.py:945
 msgid "Tutor preference saved."
 msgstr "Upendeleo wa mkufunzi umehifadhiwa."
 
@@ -241,7 +229,6 @@ msgstr "Jina hilo fupi tayari limechukuliwa."
 #| msgid "by %(name)s"
 msgid "%(name)s added."
 msgstr "%(name)s imeongezwa."
-
 
 #: ai_tutor/apps/desktop/server_config.py:59
 msgid "Enter the address of your school server."
@@ -790,7 +777,7 @@ msgid "Help & FAQ"
 msgstr "Msaada na Maswali"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:10
-#: ai_tutor/templates/_includes/_marketing_header.html:34
+#: ai_tutor/templates/_includes/_marketing_header.html:35
 #: ai_tutor/templates/docs/base.html:7 ai_tutor/templates/docs/index.html:25
 #: ai_tutor/templates/docs/section.html:20
 msgid "Country Adoption"
@@ -827,11 +814,11 @@ msgstr "Kuu"
 msgid "Home"
 msgstr "Mwanzo"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:38
+#: ai_tutor/templates/_includes/_marketing_header.html:40
 msgid "Teacher/Admin sign in"
 msgstr "Kuingia kwa mwalimu au msimamizi"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:39
+#: ai_tutor/templates/_includes/_marketing_header.html:41
 msgid "Student sign in"
 msgstr "Kuingia kwa mwanafunzi"
 
@@ -1046,10 +1033,8 @@ msgstr "S1, S2, S3, S4, au S5"
 
 #: ai_tutor/templates/accounts/country_login.html:5
 #: ai_tutor/templates/accounts/country_login.html:14
-#| msgid "Student Sign In"
 msgid "Country Sign In"
 msgstr "Kuingia kwa Nchi"
-
 
 #: ai_tutor/templates/accounts/country_login.html:15
 msgid "For ministries and programme teams"
@@ -1077,7 +1062,7 @@ msgid "Enter your username"
 msgstr "Weka jina lako la mtumiaji"
 
 #: ai_tutor/templates/accounts/country_login.html:42
-#: ai_tutor/templates/accounts/country_self_register.html:102
+#: ai_tutor/templates/accounts/country_self_register.html:101
 #: ai_tutor/templates/accounts/login.html:42
 #: ai_tutor/templates/accounts/register.html:92
 #: ai_tutor/templates/accounts/settings.html:277
@@ -1115,27 +1100,21 @@ msgid "Forgot your password?"
 msgstr "Umesahau nenosiri lako?"
 
 #: ai_tutor/templates/accounts/country_login.html:60
-#| msgid "Operating the platform"
 msgid "New to the platform?"
 msgstr "Ni mgeni kwenye jukwaa?"
 
-
 #: ai_tutor/templates/accounts/country_login.html:60
-#| msgid "Deleting your account"
 msgid "Request a country account"
 msgstr "Omba akaunti ya nchi"
 
-
 #: ai_tutor/templates/accounts/country_login.html:61
-#| msgid "Your account will need admin approval before you can sign in."
 msgid ""
 "A country account is approved by the platform team before it can sign in."
 msgstr ""
 
-
 #: ai_tutor/templates/accounts/country_login.html:62
 #: ai_tutor/templates/accounts/country_pending.html:22
-#: ai_tutor/templates/accounts/country_self_register.html:146
+#: ai_tutor/templates/accounts/country_self_register.html:145
 #: ai_tutor/templates/accounts/staff_login.html:62
 #: ai_tutor/templates/accounts/staff_self_register.html:138
 #: ai_tutor/templates/accounts/student_login.html:61
@@ -1166,10 +1145,8 @@ msgstr ""
 
 #: ai_tutor/templates/accounts/country_self_register.html:5
 #: ai_tutor/templates/accounts/country_self_register.html:14
-#| msgid "Deleting your account"
 msgid "Request a Country Account"
 msgstr "Omba Akaunti ya Nchi"
-
 
 #: ai_tutor/templates/accounts/country_self_register.html:15
 msgid "For a ministry or programme team adopting the platform"
@@ -1230,26 +1207,18 @@ msgid "Email"
 msgstr "Barua pepe"
 
 #: ai_tutor/templates/accounts/country_self_register.html:86
-#| msgid "Select your school"
 msgid "Select your country"
 msgstr "Chagua nchi yako"
 
-
-#: ai_tutor/templates/accounts/country_self_register.html:91
-msgid "Country not listed? Get in touch and the platform team will add it."
-msgstr "Nchi yako haipo? Wasiliana nasi na timu ya jukwaa itaiongeza."
-
-#: ai_tutor/templates/accounts/country_self_register.html:95
+#: ai_tutor/templates/accounts/country_self_register.html:94
 msgid "Ministry or programme"
 msgstr "Wizara au programu"
 
-#: ai_tutor/templates/accounts/country_self_register.html:98
-#| msgid "Administration"
+#: ai_tutor/templates/accounts/country_self_register.html:97
 msgid "Ministry of Education"
 msgstr "Wizara ya Elimu"
 
-
-#: ai_tutor/templates/accounts/country_self_register.html:107
+#: ai_tutor/templates/accounts/country_self_register.html:106
 #: ai_tutor/templates/accounts/register.html:97
 #: ai_tutor/templates/accounts/staff_register.html:109
 #: ai_tutor/templates/accounts/staff_self_register.html:99
@@ -1257,33 +1226,33 @@ msgstr "Wizara ya Elimu"
 msgid "Create a password"
 msgstr "Tengeneza nenosiri"
 
-#: ai_tutor/templates/accounts/country_self_register.html:115
+#: ai_tutor/templates/accounts/country_self_register.html:114
 #: ai_tutor/templates/accounts/staff_register.html:117
 #: ai_tutor/templates/accounts/staff_self_register.html:107
 #: ai_tutor/templates/accounts/student_register.html:129
 msgid "Confirm Password"
 msgstr "Thibitisha Nenosiri"
 
-#: ai_tutor/templates/accounts/country_self_register.html:120
+#: ai_tutor/templates/accounts/country_self_register.html:119
 #: ai_tutor/templates/accounts/staff_register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:112
 #: ai_tutor/templates/accounts/student_register.html:134
 msgid "Re-enter your password"
 msgstr "Weka tena nenosiri lako"
 
-#: ai_tutor/templates/accounts/country_self_register.html:131
+#: ai_tutor/templates/accounts/country_self_register.html:130
 #: ai_tutor/templates/accounts/staff_self_register.html:123
 #: ai_tutor/templates/accounts/student_register.html:145
 msgid "I agree to the"
 msgstr "Nakubaliana na"
 
-#: ai_tutor/templates/accounts/country_self_register.html:132
+#: ai_tutor/templates/accounts/country_self_register.html:131
 #: ai_tutor/templates/accounts/staff_self_register.html:124
 #: ai_tutor/templates/accounts/student_register.html:146
 msgid "AI Tutor terms"
 msgstr "Masharti ya AI Tutor"
 
-#: ai_tutor/templates/accounts/country_self_register.html:140
+#: ai_tutor/templates/accounts/country_self_register.html:139
 #: ai_tutor/templates/accounts/register.html:5
 #: ai_tutor/templates/accounts/register.html:117
 #: ai_tutor/templates/accounts/staff_login.html:60
@@ -1292,14 +1261,14 @@ msgstr "Masharti ya AI Tutor"
 msgid "Create Account"
 msgstr "Fungua Akaunti"
 
-#: ai_tutor/templates/accounts/country_self_register.html:145
+#: ai_tutor/templates/accounts/country_self_register.html:144
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
 msgid "Already have an account?"
 msgstr "Tayari una akaunti?"
 
-#: ai_tutor/templates/accounts/country_self_register.html:145
+#: ai_tutor/templates/accounts/country_self_register.html:144
 #: ai_tutor/templates/accounts/landing.html:205
 #: ai_tutor/templates/accounts/landing.html:215
 #: ai_tutor/templates/accounts/landing.html:225
@@ -2061,10 +2030,8 @@ msgstr "Watu"
 #: ai_tutor/templates/dashboard/base.html:131
 #: ai_tutor/templates/dashboard/country/schools.html:4
 #: ai_tutor/templates/dashboard/country/schools.html:5
-#| msgid "School"
 msgid "Schools"
 msgstr "Shule"
-
 
 #: ai_tutor/templates/dashboard/base.html:140
 #: ai_tutor/templates/dashboard/classes/list.html:4
@@ -2632,10 +2599,8 @@ msgstr[1] "%(n)s wazi"
 
 #: ai_tutor/templates/dashboard/country/schools.html:21
 #: ai_tutor/templates/dashboard/country/schools.html:69
-#| msgid "First name"
 msgid "Short name"
 msgstr "Jina fupi"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:35
 #: ai_tutor/templates/dashboard/lesson_monitor.html:230
@@ -2655,10 +2620,8 @@ msgid "Inactive"
 msgstr "Haitumiki"
 
 #: ai_tutor/templates/dashboard/country/schools.html:44
-#| msgid "No schools yet."
 msgid "No schools yet"
 msgstr "Bado hakuna shule"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:44
 msgid ""
@@ -2667,10 +2630,8 @@ msgid ""
 msgstr ""
 
 #: ai_tutor/templates/dashboard/country/schools.html:51
-#| msgid "Add School"
 msgid "Add a school"
 msgstr "Ongeza shule"
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:56
 #, python-format
@@ -2687,10 +2648,8 @@ msgid "Name"
 msgstr "Jina"
 
 #: ai_tutor/templates/dashboard/country/schools.html:66
-#| msgid "e.g. Mont Fleuri Secondary"
 msgid "Anse Royale Secondary"
 msgstr ""
-
 
 #: ai_tutor/templates/dashboard/country/schools.html:72
 msgid "anse-royale"
@@ -2701,10 +2660,8 @@ msgid "Used in links. Left blank, it is made from the name."
 msgstr "Hutumika katika viungo. Ikiachwa wazi, hutengenezwa kutoka jina."
 
 #: ai_tutor/templates/dashboard/country/schools.html:76
-#| msgid "Add School"
 msgid "Add school"
 msgstr "Ongeza shule"
-
 
 #: ai_tutor/templates/dashboard/curriculum/content_progress.html:4
 msgid "Content Generation Progress"
@@ -7976,3 +7933,6 @@ msgstr "Kagua Somo"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Endelea Kujifunza"
+
+#~ msgid "Country not listed? Get in touch and the platform team will add it."
+#~ msgstr "Nchi yako haipo? Wasiliana nasi na timu ya jukwaa itaiongeza."
