@@ -53,6 +53,17 @@ class Section:
         return PART_LABELS.get(self.part, self.part)
 
     @property
+    def ends_part_one(self) -> bool:
+        """Whether this is the last section before Part II begins.
+
+        The reader has finished the argument and not yet started the manual,
+        which is the point at which asking to be onboarded is a next step
+        rather than an interruption.
+        """
+        of_part = [s for s in SECTIONS if s.part == self.part]
+        return self.part == PART_ONE and bool(of_part) and of_part[-1] is self
+
+    @property
     def headings(self) -> list[tuple[str, str]]:
         """The contents rail, in the language the prose is being read in.
 
@@ -178,6 +189,9 @@ class Card:
     more_slug: str = ''
     more_label: str = ''
     more_url_name: str = ''
+    # A literal href, for a footer that leaves the site altogether. The other
+    # two resolve through the URLconf and cannot express a mailto.
+    more_url: str = ''
     sections: list[Section] = field(default_factory=list, init=False)
 
     def __post_init__(self):
@@ -211,6 +225,8 @@ CARDS: list[Card] = [
         lede=_('The part that cannot be bought or deployed, and how you know it teaches well.'),
         part=PART_ONE,
         slugs=['evidence', 'teacher-training'],
+        more_url='mailto:onboarding@seselai.sc',
+        more_label=_('Contact us for onboarding'),
     ),
     Card(
         title=_('Stand it up'),

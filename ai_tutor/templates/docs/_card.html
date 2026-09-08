@@ -23,7 +23,11 @@ they contain would come back empty.
             {% endfor %}
         </ul>
     </div>
-    {% if card.more_url_name %}
+    {% if card.more_url %}
+    <p class="docs-card__more motion-reduce:[&_.icon]:transition-none m-0 py-2 px-5 border-t border-t-border bg-surface-sunken [&_a]:inline-flex [&_a]:items-center [&_a]:gap-2 [&_a]:text-base [&_a]:font-medium [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs [&_.icon]:transition-transform [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] [&_a:hover_.icon]:[transform:translateX(2px)] [&[hidden]]:hidden">
+        <a href="{{ card.more_url }}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
+    </p>
+    {% elif card.more_url_name %}
     <p class="docs-card__more motion-reduce:[&_.icon]:transition-none m-0 py-2 px-5 border-t border-t-border bg-surface-sunken [&_a]:inline-flex [&_a]:items-center [&_a]:gap-2 [&_a]:text-base [&_a]:font-medium [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs [&_.icon]:transition-transform [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] [&_a:hover_.icon]:[transform:translateX(2px)] [&[hidden]]:hidden">
         <a href="{% url card.more_url_name %}">{{ card.more_label }}{% icon "arrow-right" size="sm" %}</a>
     </p>

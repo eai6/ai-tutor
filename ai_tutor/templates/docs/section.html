@@ -30,13 +30,15 @@ checklists and the glossary — get no rail and the full measure instead.
     `docs-article--railed` carried these columns until the Tailwind migration
     deleted the sheet that defined it — the class survived as markup with no
     rule behind it, which is why the rail had been stacking above the text.
-    Below the xl breakpoint there is no room for two columns and it stacks
-    again, deliberately.
+    The rail turns sticky at the same breakpoint the columns appear at, and
+    that is the whole of the bug this had: sticky from xl and columns from
+    nowhere left it pinned above the prose, which then scrolled underneath it.
+    Below md it stacks and is static, which is right for a phone.
     {% endcomment %}
-    <article class="docs-article{% if section.headings %} docs-article--railed grid gap-10 items-start xl:grid-cols-[minmax(0,_14rem)_minmax(0,_1fr)]{% endif %}">
+    <article class="docs-article{% if section.headings %} docs-article--railed grid gap-8 xl:gap-10 items-start md:grid-cols-[minmax(0,_14rem)_minmax(0,_1fr)]{% endif %}">
 
         {% if section.headings %}
-        <nav class="docs-rail xl:sticky xl:top-[calc(var(--topbar-height)_+_calc(var(--spacing)*6))] print:hidden self-start [&_ul]:list-none [&_ul]:m-0 [&_ul]:pt-0 [&_ul]:pr-0 [&_ul]:pb-0 [&_ul]:pl-4 [&_ul]:border-l-[2px] [&_ul]:border-l-border [&_ul]:grid [&_ul]:gap-2 [&_a]:text-base [&_a]:leading-snug [&_a]:text-text-secondary [&_a]:no-underline [&_a:hover]:text-primary-ink [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs" aria-label="{% trans 'On this page' %}">
+        <nav class="docs-rail md:sticky md:top-[calc(var(--topbar-height)_+_calc(var(--spacing)*6))] print:hidden self-start [&_ul]:list-none [&_ul]:m-0 [&_ul]:pt-0 [&_ul]:pr-0 [&_ul]:pb-0 [&_ul]:pl-4 [&_ul]:border-l-[2px] [&_ul]:border-l-border [&_ul]:grid [&_ul]:gap-2 [&_a]:text-base [&_a]:leading-snug [&_a]:text-text-secondary [&_a]:no-underline [&_a:hover]:text-primary-ink [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs" aria-label="{% trans 'On this page' %}">
             <p class="mt-0 mx-0 mb-3 font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "On this page" %}</p>
             <ul>
                 {% for anchor, title in section.headings %}
@@ -68,6 +70,22 @@ checklists and the glossary — get no rail and the full measure instead.
             <div class="docs-body print:[&_h2]:[break-after:avoid] print:[&_h3]:[break-after:avoid] text-md leading-normal text-text [&>p]:max-w-[44rem] [&>.doc-list]:max-w-[44rem] [&>p]:my-5 [&>p]:mx-0 [&_h2]:mt-10 [&_h2]:mx-0 [&_h2]:mb-3 [&_h2]:font-display [&_h2]:text-lg [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:leading-snug [&_h2]:text-text [&_h2]:[scroll-margin-top:calc(var(--topbar-height)_+_calc(var(--spacing)*4))] [&_h3]:mt-8 [&_h3]:mx-0 [&_h3]:mb-3 [&_h3]:font-display [&_h3]:text-md [&_h3]:font-bold [&_h3]:text-text [&_h3]:[scroll-margin-top:calc(var(--topbar-height)_+_calc(var(--spacing)*4))] [&_.doc-list]:my-5 [&_.doc-list]:mx-0 [&_.doc-list]:pl-6 [&_.doc-list_li]:mb-3 [&_.doc-list_li::marker]:text-primary [&_strong]:font-bold">
                 {% include body_template %}
             </div>
+
+            {% comment %}
+            The end of Part I: the argument is finished and the manual has not
+            started. That is where asking to be onboarded is a next step rather
+            than an interruption, so it is the one section page that carries it.
+            A country account is opened by the platform team after a
+            conversation — there is no form to send anyone to.
+            {% endcomment %}
+            {% if section.ends_part_one %}
+            <aside class="docs-onboard print:hidden mt-10 pt-6 border-t border-t-border flex flex-col items-start gap-2">
+                <p class="m-0 font-display text-md font-bold tracking-tight text-text">{% trans "Ready to talk about adopting it?" %}</p>
+                <p class="m-0 text-base leading-normal text-text-secondary max-w-[44rem]">{% trans "A country account is opened by the platform team, not by a form. Tell us who you are and what you are considering, and we will take it from there." %}</p>
+                <a class="mt-2 inline-flex items-center justify-center gap-2 min-h-10 py-2 px-5 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out)] bg-coral-fill !text-[var(--color-text-on-accent)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:[transform:translateY(-1px)]" href="mailto:onboarding@seselai.sc">{% trans "Contact us for onboarding" %}</a>
+                <p class="m-0 text-sm text-text-muted"><a class="text-text-link font-bold" href="mailto:onboarding@seselai.sc">onboarding@seselai.sc</a></p>
+            </aside>
+            {% endif %}
         </div>
     </article>
 
