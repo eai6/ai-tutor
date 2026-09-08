@@ -51,7 +51,7 @@
 
             {% if upload.status == 'pending_confirmation' %}
             {% if cost_verdict_label == 'red' %}
-                {% with bgcolor='var(--color-danger-surface)' textcolor='var(--color-danger)' bordercolor='#F87171' %}
+                {% with bgcolor='var(--color-danger-surface)' textcolor='var(--color-danger)' bordercolor='var(--color-danger-border)' %}
                 <div style="background:{{ bgcolor }};border:1px solid {{ bordercolor }};border-radius:8px;padding:1.25rem;margin-top:1rem;color:{{ textcolor }};">
                     <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem;">{% trans "⛔ Cost over hard-block threshold" %}</div>
                     <div style="font-size:0.9rem;margin-bottom:0.75rem;">
@@ -80,9 +80,9 @@
                 {% endwith %}
             {% else %}
                 {% if cost_verdict_label == 'yellow' %}
-                    {% with bgcolor='var(--color-warning-surface)' textcolor='var(--color-warning)' bordercolor='#FBBF24' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                    {% with bgcolor='var(--color-warning-surface)' textcolor='var(--color-warning)' bordercolor='var(--color-warning-border)' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
                 {% else %}
-                    {% with bgcolor='var(--color-success-surface)' textcolor='var(--color-success)' bordercolor='#34D399' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
+                    {% with bgcolor='var(--color-success-surface)' textcolor='var(--color-success)' bordercolor='var(--color-success-border)' %}{% include 'dashboard/materials/_confirm_card.html' %}{% endwith %}
                 {% endif %}
             {% endif %}
             {% endif %}
@@ -103,7 +103,7 @@
             {% if error_detail %}
             <div style="background: var(--color-danger-surface); border-radius: 8px; padding: 1rem; margin-top: 1rem; color: var(--color-danger);">
                 <strong>{% trans "Failed:" %}</strong> {{ error_detail.reason }}<br>
-                <span style="font-size:0.875rem;color:#7F1D1D;">{{ error_detail.detail|default:error_detail.message }}</span>
+                <span style="font-size:0.875rem;color:var(--color-rose-ink);">{{ error_detail.detail|default:error_detail.message }}</span>
             </div>
             {% else %}
             <div style="background: var(--color-danger-surface); border-radius: 8px; padding: 1rem; margin-top: 1rem; color: var(--color-danger);">

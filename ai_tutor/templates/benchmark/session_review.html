@@ -9,15 +9,15 @@
                gap:1.25rem; align-items:start; }
     @media (max-width: 1100px) { .rv-grid { grid-template-columns: 1fr; } }
 
-    .rv-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+    .rv-card { background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
                padding:1rem 1.1rem; margin-bottom:1rem; }
     .rv-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
-                  color:#6b7280; margin:0 0 0.6rem; font-weight:600; }
+                  color:var(--color-warm-500); margin:0 0 0.6rem; font-weight:600; }
 
     .banner { border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:1rem;
               font-size:0.86rem; line-height:1.55; }
-    .banner-instruct { background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; }
-    .banner-danger { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+    .banner-instruct { background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); color:var(--color-primary-ink); }
+    .banner-danger { background:var(--color-rose-surface); border:1px solid var(--color-rose-border); color:var(--color-rose-ink); }
 
     /* The transcript sticks while the eight dimensions scroll past it. You
        re-read turns against each question, so a transcript that scrolls away
@@ -25,66 +25,66 @@
     .rv-left { position:sticky; top:1rem; }
     @media (max-width: 1100px) { .rv-left { position:static; } }
     .transcript { max-height:calc(100vh - 14rem); min-height:18rem;
-                  overflow-y:auto; border:1px solid #f3f4f6;
-                  border-radius:8px; padding:0.6rem; background:#fafafa; }
+                  overflow-y:auto; border:1px solid var(--color-surface-sunken);
+                  border-radius:8px; padding:0.6rem; background:var(--color-canvas); }
     .turn { font-size:0.85rem; padding:0.5rem 0.6rem; border-radius:6px;
             margin-bottom:0.35rem; white-space:pre-wrap; line-height:1.5; }
     .turn .role { font-size:0.68rem; font-weight:700; text-transform:uppercase;
-                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:#6b7280; }
-    .turn-tutor { background:#fff; border:1px solid #e5e7eb; }
-    .turn-student { background:#f5f3ff; border:1px solid #ddd6fe; }
+                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:var(--color-warm-500); }
+    .turn-tutor { background:var(--color-surface); border:1px solid var(--color-surface-hover); }
+    .turn-student { background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); }
 
-    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:var(--color-warm-700); }
     .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
-    .meta-row strong { color:#111; font-weight:600; }
+    .meta-row strong { color:var(--color-text); font-weight:600; }
 
     .tag { display:inline-block; padding:0.12rem 0.5rem; border-radius:6px;
            font-size:0.74rem; margin:0.12rem 0.15rem 0.12rem 0;
-           background:#f3f4f6; color:#374151; font-family:ui-monospace, monospace; }
-    .tag-alert { background:#fef2f2; color:#991b1b; }
+           background:var(--color-surface-sunken); color:var(--color-warm-700); font-family:ui-monospace, monospace; }
+    .tag-alert { background:var(--color-rose-surface); color:var(--color-rose-ink); }
 
     .decide { display:flex; flex-direction:column; gap:0.6rem; }
     .rv-card textarea { width:100%; padding:0.5rem 0.6rem;
-                        border:1px solid #d1d5db; border-radius:6px;
+                        border:1px solid var(--color-warm-300); border-radius:6px;
                         font-size:0.85rem; font-family:inherit;
                         min-height:70px; resize:vertical; box-sizing:border-box; }
     .btn { padding:0.6rem 1rem; border:none; border-radius:8px; font-size:0.9rem;
            font-weight:600; cursor:pointer; font-family:inherit; width:100%; }
-    .btn-approve { background:#059669; color:#fff; }
-    .btn-reject { background:#fff; color:#991b1b; border:1px solid #fecaca; }
-    .muted { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+    .btn-approve { background:var(--color-green-ink); color:var(--color-surface); }
+    .btn-reject { background:var(--color-surface); color:var(--color-rose-ink); border:1px solid var(--color-rose-border); }
+    .muted { font-size:0.78rem; color:var(--color-warm-500); line-height:1.5; }
 
-    .dim { border:1px solid #e5e7eb; border-radius:8px; padding:0.7rem 0.8rem;
+    .dim { border:1px solid var(--color-surface-hover); border-radius:8px; padding:0.7rem 0.8rem;
            margin-bottom:0.6rem; }
-    .dim .name { font-size:0.9rem; font-weight:600; color:#111; margin-bottom:0.12rem; }
-    .dim .definition { font-size:0.79rem; color:#374151; line-height:1.5;
+    .dim .name { font-size:0.9rem; font-weight:600; color:var(--color-text); margin-bottom:0.12rem; }
+    .dim .definition { font-size:0.79rem; color:var(--color-warm-700); line-height:1.5;
                        margin-bottom:0.28rem; }
-    .dim .guidance { font-size:0.77rem; color:#6b7280; line-height:1.5;
-                     margin-bottom:0.5rem; border-left:2px solid #ddd6fe;
+    .dim .guidance { font-size:0.77rem; color:var(--color-warm-500); line-height:1.5;
+                     margin-bottom:0.5rem; border-left:2px solid var(--color-coral-edge);
                      padding-left:0.5rem; }
     .dim .opts { display:flex; flex-direction:column; gap:0.28rem; }
     .dim label { display:flex; gap:0.45rem; align-items:flex-start;
-                 font-size:0.84rem; color:#374151; cursor:pointer; }
+                 font-size:0.84rem; color:var(--color-warm-700); cursor:pointer; }
     .dim label input { margin-top:0.2rem; }
-    .desired { font-size:0.65rem; font-weight:700; color:#065f46;
-               background:#ecfdf5; border-radius:999px; padding:0.02rem 0.4rem;
+    .desired { font-size:0.65rem; font-weight:700; color:var(--color-teal-ink);
+               background:var(--color-teal-tint); border-radius:999px; padding:0.02rem 0.4rem;
                letter-spacing:0.03em; }
-    .rule { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px;
+    .rule { background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); border-radius:8px;
             padding:0.6rem 0.8rem; margin-bottom:0.8rem; font-size:0.8rem;
-            color:#4c1d95; line-height:1.5; }
-    .btn-approve-judge { background:#5b21b6; color:#fff; }
+            color:var(--color-coral-ink); line-height:1.5; }
+    .btn-approve-judge { background:var(--color-primary-fill); color:var(--color-surface); }
 
     /* Skip without deciding. Deliberately links, not submit buttons — inside
        the one big form a button would post the annotation, and pressing
        "Next" must never record a judgement by accident. */
     .pager-bar { display:flex; gap:0.5rem; align-items:center;
                  justify-content:space-between; margin-bottom:1rem;
-                 font-size:0.85rem; color:#6b7280; }
+                 font-size:0.85rem; color:var(--color-warm-500); }
     .pager-bar a, .pager-bar span.disabled {
-        padding:0.4rem 0.85rem; border:1px solid #e5e7eb; border-radius:8px;
-        background:#fff; text-decoration:none; color:#5b21b6; font-weight:600;
+        padding:0.4rem 0.85rem; border:1px solid var(--color-surface-hover); border-radius:8px;
+        background:var(--color-surface); text-decoration:none; color:var(--color-primary-ink); font-weight:600;
     }
-    .pager-bar span.disabled { color:#d1d5db; background:#fafafa; }
+    .pager-bar span.disabled { color:var(--color-warm-300); background:var(--color-canvas); }
     .pager-bar .where { font-variant-numeric:tabular-nums; }
 
     /* Clear the dashboard's fixed feedback button, which otherwise sits on

@@ -106,7 +106,7 @@
         font-weight: 500;
     }
     .content-badge.steps { background: var(--color-info-surface); color: var(--color-info); }
-    .content-badge.media { background: #fce7f3; color: #9d174d; }
+    .content-badge.media { background: var(--color-rose-surface); color: var(--color-rose-ink); }
     .content-badge.exit { background: var(--color-success-surface); color: var(--color-success); }
     .content-badge.none { background: var(--color-surface-sunken); color: var(--color-text-muted); }
     
@@ -196,7 +196,7 @@
             </div>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <a href="{% url 'dashboard:summative_review' course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-accent);color:var(--color-surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📝 {% trans "Summative Exam" %}</a>
-                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:#0891b2;color:var(--color-surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 {% trans "Class Competency & Readiness" %}</a>
+                <a href="{% url 'dashboard:class_competency' course.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-blue-ink);color:var(--color-surface);border:none;border-radius:6px;padding:6px 14px;font-weight:600;text-decoration:none;">📊 {% trans "Class Competency & Readiness" %}</a>
                 {% if can_edit_content %}
                 <button type="button" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" onclick="document.getElementById('course-header-display').style.display='none'; document.getElementById('course-edit-form').style.display='block';">{% trans "Edit Course" %}</button>{% endif %}
                 {% if can_edit_content %}
@@ -210,7 +210,7 @@
                 </form>
                 <form method="post" action="{% url 'dashboard:course_delete' course.id %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid #fca5a5;" onclick="return confirm('{% trans "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone." %}');">{% trans "Delete" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid var(--color-rose-border);" onclick="return confirm('{% trans "Are you sure you want to delete this course and ALL its units, lessons, and content? This cannot be undone." %}');">{% trans "Delete" %}</button>
                 </form>
                 {% endif %}
             </div>
@@ -291,7 +291,7 @@
                 🚚 Move course to a different institution
                 <span style="font-size:0.7rem;background:var(--color-danger-surface);color:var(--color-danger);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">super-admin only</span>
             </summary>
-            <p style="font-size: 0.8125rem; color: #7f1d1d; margin: 0.75rem 0;">
+            <p style="font-size: 0.8125rem; color: var(--color-rose-ink); margin: 0.75rem 0;">
                 Re-assigns the course (and any linked teaching materials) to another institution. <strong>{% trans "Only allowed when no lesson has generated content" %}</strong> — moving a content-bearing course would orphan its ChromaDB chunks and student session data.
                 <br><span style="color:var(--color-warm-500);font-size:0.75rem;">{% trans "Current owner:" %} <strong>{% if course.institution %}{{ course.institution.name }}{% else %}All Schools (platform-wide){% endif %}</strong></span>
             </p>
@@ -313,7 +313,7 @@
         <details style="margin-top: 1.25rem; padding: 1rem; background: var(--color-surface-sunken); border: 1px solid var(--color-warm-200); border-radius: 8px;">
             <summary style="cursor: pointer; font-weight: 600; color: var(--color-warm-700); font-size: 0.875rem;">
                 🔄 Re-parse &amp; Re-plan Lessons
-                {% if course.curriculum_upload_id %}<span style="font-size:0.7rem;background:#dcfce7;color:var(--color-success);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">source PDF available</span>{% else %}<span style="font-size:0.7rem;background:var(--color-danger-surface);color:var(--color-danger);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">no source PDF linked</span>{% endif %}
+                {% if course.curriculum_upload_id %}<span style="font-size:0.7rem;background:var(--color-teal-tint);color:var(--color-success);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">source PDF available</span>{% else %}<span style="font-size:0.7rem;background:var(--color-danger-surface);color:var(--color-danger);padding:0.1rem 0.5rem;border-radius:999px;margin-left:0.5rem;">no source PDF linked</span>{% endif %}
             </summary>
             <p style="font-size: 0.8125rem; color: var(--color-warm-500); margin: 0.75rem 0;">
                 Re-analyze the original curriculum document to refresh the unit/lesson skeleton. This is non-destructive — existing lessons with the same titles are upserted, student mastery + competency transcripts survive. Lesson duration is no longer set here; use the green "Default lesson duration" form on the course page.
@@ -528,7 +528,7 @@
                                 {% csrf_token %}
                                 <input type="hidden" name="material_ids" value="{{ m.id }}">
                                 <input type="hidden" name="mode" value="rich">
-                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--color-info-solid);color:var(--color-surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="{% trans 'Process with LLM vision' %}">Rich</button>
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.7rem;padding:0.2rem 0.4rem;background:var(--color-info);color:var(--color-surface);border:none;border-radius:4px;" onclick="this.innerHTML='...';" title="{% trans 'Process with LLM vision' %}">Rich</button>
                             </form>
                             <form method="post" action="{% url 'dashboard:process_pending_materials' course.id %}" style="display:inline;">
                                 {% csrf_token %}
@@ -607,7 +607,7 @@
 <div id="course-live-region" data-is-generating="{% if is_generating %}1{% else %}0{% endif %}">
 <!-- Content Generation Status -->
 {% if is_generating %}
-<div class="bulk-actions" style="background: var(--color-info-surface); border: 1px solid #93c5fd;">
+<div class="bulk-actions" style="background: var(--color-info-surface); border: 1px solid var(--color-brand-soft);">
     <span class="spinner-icon" style="font-size: 1.25rem;">⏳</span>
     <div style="flex: 1;">
         <strong style="color: var(--color-info);">{% trans "Content generation in progress..." %}</strong>
@@ -616,7 +616,7 @@
     {% if active_upload %}
     <form method="post" action="{% url 'dashboard:cancel_generation' active_upload.id %}" style="display: inline;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid #fca5a5;" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
+        <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid var(--color-rose-border);" onclick="return confirm('Stop generating content? Lessons already completed will be kept.');">
             ⛔ Stop Generation
         </button>
     </form>
@@ -629,7 +629,7 @@
     <span style="font-size: 1.25rem;">⚠️</span>
     <div style="flex: 1;">
         <strong style="color: var(--color-warning);">{{ lessons_without_content }} lesson{{ lessons_without_content|pluralize }} need{{ lessons_without_content|pluralize:"s," }} content</strong>
-        <div style="font-size: 0.8rem; color: #A16207;">{% trans "Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons." %}</div>
+        <div style="font-size: 0.8rem; color: var(--color-amber-ink);">{% trans "Generate everything in parallel (2 workers, ~2 min/lesson) or use ⚡ on individual lessons." %}</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_generate_all' course.id %}" style="display:inline;">
         {% csrf_token %}
@@ -641,7 +641,7 @@
 {% endif %}
 
 {% if can_edit_content %}
-<div class="bulk-actions" style="background: var(--color-success-surface); border: 1px solid #6ee7b7; margin-top: 0.75rem; flex-wrap: wrap;">
+<div class="bulk-actions" style="background: var(--color-success-surface); border: 1px solid var(--color-green-border); margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">⏱️</span>
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: var(--color-success);">{% trans "Default lesson duration" %}</strong>
@@ -665,7 +665,7 @@
         whose lessons predate the cap surfaces the placeholder
         instead of trying to auto-select a now-removed option.
         {% endcomment %}
-        <select name="lesson_duration" {% if not current_lesson_duration %}required{% endif %} style="font-size:0.78rem; padding:0.25rem 0.4rem; border:1px solid #6ee7b7; border-radius:6px; color:var(--color-success); background:var(--color-surface);">
+        <select name="lesson_duration" {% if not current_lesson_duration %}required{% endif %} style="font-size:0.78rem; padding:0.25rem 0.4rem; border:1px solid var(--color-green-border); border-radius:6px; color:var(--color-success); background:var(--color-surface);">
             {% if not current_lesson_duration %}
             <option value="" disabled selected>— pick a duration —</option>
             {% endif %}
@@ -677,7 +677,7 @@
             <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:var(--color-success-solid);">
             Allow students to change
         </label>
-        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:#34d399; color:var(--color-success);">
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:var(--color-teal); color:var(--color-success);">
             Apply
         </button>
     </form>
@@ -685,22 +685,22 @@
 {% endif %}
 
 {% comment %}
-Bulk-pending-images + bulk-AI-review (task #215). Gated on
+Bulk-pending-images + bulk-AI-review (task 215). Gated on
 can_edit_content (same as Generate All Content) so teachers can
 sweep up after a partial generation without needing
 can_regenerate_courses.
 {% endcomment %}
 {% if can_edit_content %}
-<div class="bulk-actions" style="background: #f0f9ff; border: 1px solid #bae6fd; margin-top: 0.75rem; flex-wrap: wrap;">
+<div class="bulk-actions" style="background: var(--color-accent-surface); border: 1px solid var(--color-accent-border); margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🧹</span>
     <div style="flex: 1; min-width: 240px;">
-        <strong style="color: #0369a1;">{% trans "Catch up on pending work" %}</strong>
-        <div style="font-size: 0.8rem; color: #0c4a6e;">{% trans "Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task #216)." %}</div>
+        <strong style="color: var(--color-primary);">{% trans "Catch up on pending work" %}</strong>
+        <div style="font-size: 0.8rem; color: var(--color-primary-ink);">{% trans "Sweep the course for two common gaps: images that never rendered, and lesson / exit-ticket content that hasn't been audited by the AI judges yet. Both run in the background and are idempotent — already-done items are skipped. You can pick a specific provider/model per run (task 216)." %}</div>
     </div>
     {% comment %}
     Images form: provider dropdown + force checkbox + button. The
     selected provider is passed to ImageGenerationService via the
-    model_override kwarg; the force checkbox (task #217) tells the
+    model_override kwarg; the force checkbox (task 217) tells the
     backend to regenerate EVERY image, not just pending ones —
     overwriting URLs. Useful to re-render a course with a different
     provider after the original pass.
@@ -710,18 +710,18 @@ can_regenerate_courses.
           onsubmit="var pv=this.image_provider.value?(' using ' + this.image_provider.options[this.image_provider.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-generate ALL images in {{ course.title }}'+pv+'? This will OVERWRITE every existing image URL — much higher cost. Continue?') : ('Generate every pending image in {{ course.title }}'+pv+'? Runs in the background — already-generated images are skipped.'); return confirm(msg);">
         {% csrf_token %}
         <select name="image_provider" title="{% trans 'Force a specific image provider for this run' %}"
-                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:var(--color-surface);">
+                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--color-blue-border); border-radius:6px; color:var(--color-primary); background:var(--color-surface);">
             <option value="">{% trans "Default" %}</option>
             <option value="openai">OpenAI gpt-image-2</option>
             <option value="gemini">Gemini Flash Image</option>
         </select>
-        <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+        <label style="font-size:0.72rem; color:var(--color-primary-ink); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
                title="{% trans 'When checked: re-generate every image, overwriting existing URLs. Otherwise: only fill in images whose URL is empty.' %}">
-            <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
+            <input type="checkbox" name="force" value="1" style="accent-color:var(--color-primary);">
             Re-do already-done
         </label>
         <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
-                style="border-color:#7dd3fc; color:#0369a1;"
+                style="border-color:var(--color-blue-border); color:var(--color-primary);"
                 title='{% trans "Generate any image whose URL is empty. With Re-do already-done checked: regenerate every image." %}'>
             🖼️ Generate images
         </button>
@@ -730,7 +730,7 @@ can_regenerate_courses.
     Review form: judge model dropdown (provider:model_name pair) +
     force checkbox. Selected pair is resolved via
     ModelConfig.resolve_runtime — never written to DB. Force checkbox
-    (task #217) lets a teacher re-judge already-audited content with
+    (task 217) lets a teacher re-judge already-audited content with
     a stronger model.
     {% endcomment %}
     <form method="post" action="{% url 'dashboard:course_review_unreviewed' course.id %}"
@@ -738,7 +738,7 @@ can_regenerate_courses.
           onsubmit="var jm=this.judge_model.value?(' using ' + this.judge_model.options[this.judge_model.selectedIndex].text):''; var msg = this.force.checked ? ('FORCE re-judge ALL steps + exit-Qs in {{ course.title }}'+jm+'? This will OVERWRITE every existing judge verdict — much higher cost than the unreviewed-only sweep. Continue?') : ('Run AI review on every unreviewed step + exit-ticket question in {{ course.title }}'+jm+'? Already-reviewed content is skipped.'); return confirm(msg);">
         {% csrf_token %}
         <select name="judge_model" title="{% trans 'Force a specific judge model for this run (default = use configured chain)' %}"
-                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid #7dd3fc; border-radius:6px; color:#0369a1; background:var(--color-surface);">
+                style="font-size:0.75rem; padding:0.25rem 0.4rem; border:1px solid var(--color-blue-border); border-radius:6px; color:var(--color-primary); background:var(--color-surface);">
             <option value="">{% trans "Default (configured chain)" %}</option>
             <option value="anthropic:claude-opus-4-7">Claude Opus 4.7</option>
             <option value="anthropic:claude-sonnet-4-6">Claude Sonnet 4.6</option>
@@ -747,13 +747,13 @@ can_regenerate_courses.
             <option value="google:gemini-3-pro-preview">Gemini 3 Pro</option>
             <option value="google:gemini-3-flash-preview">Gemini 3 Flash</option>
         </select>
-        <label style="font-size:0.72rem; color:#0c4a6e; display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
+        <label style="font-size:0.72rem; color:var(--color-primary-ink); display:inline-flex; align-items:center; gap:0.25rem; cursor:pointer;"
                title="{% trans 'When checked: re-judge every step + exit-Q, overwriting existing verdicts. Otherwise: only judge content whose judge_outputs is empty.' %}">
-            <input type="checkbox" name="force" value="1" style="accent-color:#0369a1;">
+            <input type="checkbox" name="force" value="1" style="accent-color:var(--color-primary);">
             Re-do already-done
         </label>
         <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text"
-                style="border-color:#7dd3fc; color:#0369a1;"
+                style="border-color:var(--color-blue-border); color:var(--color-primary);"
                 title='{% trans "Run content judges (factual, pedagogy, safety, exit-question). Pending: only unreviewed. With Re-do already-done checked: re-judge everything (overwrite)." %}'>
             🔍 Run AI review
         </button>
@@ -767,11 +767,11 @@ so the pilot can let teachers edit lessons but block destructive
 regeneration.
 {% endcomment %}
 {% if can_regenerate_courses %}
-<div class="bulk-actions" style="background: #f5f3ff; border: 1px solid #ddd6fe; margin-top: 0.75rem; flex-wrap: wrap;">
+<div class="bulk-actions" style="background: var(--color-accent-surface); border: 1px solid var(--color-coral-edge); margin-top: 0.75rem; flex-wrap: wrap;">
     <span style="font-size: 1.25rem;">🔁</span>
     <div style="flex: 1; min-width: 240px;">
         <strong style="color: var(--color-accent);">{% trans "Regenerate content" %}</strong>
-        <div style="font-size: 0.8rem; color: #6d28d9;">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. All student data — mastery levels, permanent competency transcript, AND exit-ticket attempt history — is preserved across the regen.</div>
+        <div style="font-size: 0.8rem; color: var(--color-coral-solid);">Pick what to refresh. Lesson steps regenerate the teaching script + worked examples. Exit tickets replace the question bank{% if course.is_math %} and rebuild the summative{% endif %}. All student data — mastery levels, permanent competency transcript, AND exit-ticket attempt history — is preserved across the regen.</div>
     </div>
     <form method="post" action="{% url 'dashboard:course_regenerate_all' course.id %}" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
         {% csrf_token %}
@@ -789,7 +789,7 @@ regeneration.
             Summative bank
         </label>
         {% endif %}
-        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:#a78bfa; color:var(--color-accent);"
+        <button type="submit" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text" style="border-color:var(--color-brand-mid); color:var(--color-accent);"
                 onclick="return confirm('Regenerate the selected content?\n\nAll student data is preserved — mastery levels, competency transcript, AND exit-ticket attempt history.\nRuns 10 lessons in parallel in the background — this page auto-refreshes every 12s while content is generating.');">
             🔁 Regenerate
         </button>
@@ -810,7 +810,7 @@ lessons even when curriculum editing is locked down.
     </summary>
     <div style="padding: 0.5rem 1.25rem 1.25rem;">
         {% for w in weekly_assignments %}
-        <div style="border:1px solid var(--color-border); border-radius:10px; padding:0.85rem 1rem; margin-top:0.75rem; {% if w.is_current %}background:#fef9c3;border-color:#fde047;{% endif %}">
+        <div style="border:1px solid var(--color-border); border-radius:10px; padding:0.85rem 1rem; margin-top:0.75rem; {% if w.is_current %}background:var(--color-amber-surface);border-color:var(--color-amber-border);{% endif %}">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
                 <div>
                     <strong style="color:var(--color-text);">Week of {{ w.week_start|date:"M j" }} – {{ w.week_end|date:"M j, Y" }}</strong>
@@ -979,7 +979,7 @@ lessons even when curriculum editing is locked down.
                             {% if can_regenerate_courses %}
                             <form method="post" action="{% url 'dashboard:cancel_lesson_generation' lesson.id %}" style="display: inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid #fca5a5; font-size: 0.75rem;" title="{% trans 'Stop generating this lesson' %}">
+                                <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background: var(--color-danger-surface); color: var(--color-danger); border: 1px solid var(--color-rose-border); font-size: 0.75rem;" title="{% trans 'Stop generating this lesson' %}">
                                     ⛔
                                 </button>
                             </form>
@@ -1003,7 +1003,7 @@ lessons even when curriculum editing is locked down.
                         {% endif %}
                     {% endwith %}
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-border-strong rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:border-warm-400 hover:text-text">{% trans "Review" %}</a>
-                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info-solid);color:var(--color-surface);border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
+                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info);color:var(--color-surface);border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
                 </div>
             </div>
             {% endfor %}

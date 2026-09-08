@@ -32,7 +32,7 @@ def _lighten_hex(hex_color, factor=0.85):
 def _build_theme_dict():
     """Build theme context dict from PlatformConfig singleton."""
     config = PlatformConfig.load()
-    primary = config.primary_color or '#E8590C'
+    primary = config.primary_color or '#003BA4'
     return {
         'theme_primary': primary,
         'theme_secondary': config.secondary_color or '#4ECDC4',
@@ -40,7 +40,7 @@ def _build_theme_dict():
         'theme_primary_dark': _darken_hex(primary),
         'theme_primary_light': _lighten_hex(primary),
         'theme_logo_url': config.logo.url if config.logo else '',
-        'theme_institution_name': config.platform_name or 'AI Tutor',
+        'theme_institution_name': config.platform_name or 'Sesel AI',
     }
 
 

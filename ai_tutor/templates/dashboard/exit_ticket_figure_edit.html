@@ -9,32 +9,32 @@
 <style>
     .figure-edit-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.5rem; align-items:start; }
     @media (max-width: 900px) { .figure-edit-grid { grid-template-columns:1fr; } }
-    .panel { background:var(--color-surface); border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; }
-    .panel h3 { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#475569; margin:0 0 0.5rem; }
-    .question-text { background:#f8fafc; padding:0.75rem 1rem; border-radius:8px; font-size:0.95rem; margin-bottom:1rem; }
-    .preview-frame { background:var(--color-surface); border:1px dashed #cbd5e1; border-radius:8px; padding:0.5rem; text-align:center; min-height:240px; display:flex; align-items:center; justify-content:center; }
+    .panel { background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:12px; padding:1rem 1.25rem; }
+    .panel h3 { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-warm-600); margin:0 0 0.5rem; }
+    .question-text { background:var(--color-canvas); padding:0.75rem 1rem; border-radius:8px; font-size:0.95rem; margin-bottom:1rem; }
+    .preview-frame { background:var(--color-surface); border:1px dashed var(--color-warm-300); border-radius:8px; padding:0.5rem; text-align:center; min-height:240px; display:flex; align-items:center; justify-content:center; }
     .preview-frame svg { max-width:100%; height:auto; }
     .preview-frame img { max-width:100%; border-radius:6px; }
-    .preview-empty { padding:3rem 1rem; color:#94a3b8; font-style:italic; }
-    textarea.prompt-area { width:100%; min-height:140px; padding:0.75rem; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; font-family:inherit; resize:vertical; }
-    select.model-pick { padding:0.45rem 0.6rem; border:1px solid #cbd5e1; border-radius:8px; font-size:0.85rem; }
+    .preview-empty { padding:3rem 1rem; color:var(--color-warm-400); font-style:italic; }
+    textarea.prompt-area { width:100%; min-height:140px; padding:0.75rem; border:1px solid var(--color-warm-300); border-radius:8px; font-size:0.92rem; font-family:inherit; resize:vertical; }
+    select.model-pick { padding:0.45rem 0.6rem; border:1px solid var(--color-warm-300); border-radius:8px; font-size:0.85rem; }
     .actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; align-items:center; }
     .btn { font-family:inherit; font-size:0.875rem; font-weight:600; padding:0.55rem 1rem; border-radius:8px; cursor:pointer; border:1px solid transparent; text-decoration:none; display:inline-flex; align-items:center; gap:0.4rem; }
-    .btn-primary { background:#4f46e5; color:var(--color-surface); border-color:#4f46e5; }
+    .btn-primary { background:var(--color-primary); color:var(--color-surface); border-color:var(--color-primary); }
     .btn-primary:hover { background:var(--color-info); }
     .btn-danger { background:var(--color-surface); color:var(--color-danger); border-color:var(--color-danger-border); }
     .btn-danger:hover { background:var(--color-danger-surface); }
     .alert { padding:0.6rem 0.85rem; border-radius:8px; font-size:0.875rem; margin-bottom:0.75rem; }
     .alert-error { background:var(--color-danger-surface); color:var(--color-danger); border:1px solid var(--color-danger-border); }
-    .alert-success { background:#f0fdf4; color:var(--color-success); border:1px solid #bbf7d0; }
-    .meta { font-size:0.78rem; color:#64748b; margin-top:0.5rem; }
+    .alert-success { background:var(--color-teal-tint); color:var(--color-success); border:1px solid var(--color-green-surface); }
+    .meta { font-size:0.78rem; color:var(--color-warm-500); margin-top:0.5rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
     <a href="{% url 'dashboard:lesson_detail' question.exit_ticket.lesson.id %}"
-       style="font-size: 0.85rem; color: #64748b; text-decoration: none;">
+       style="font-size: 0.85rem; color: var(--color-warm-500); text-decoration: none;">
         ← {% trans "Back to lesson" %}
     </a>
 </div>
@@ -72,7 +72,7 @@
             <textarea name="figure_prompt" class="prompt-area" spellcheck="true"
                       placeholder="{% trans 'Describe the image you want generated. Be specific: labels, colours, shapes, what should NOT be in the image.' %}">{{ figure_prompt }}</textarea>
             <div class="actions">
-                <label style="font-size:0.78rem; color:#475569;">{% trans "Model:" %}</label>
+                <label style="font-size:0.78rem; color:var(--color-warm-600);">{% trans "Model:" %}</label>
                 <select name="model_choice" class="model-pick" title="{% trans 'Image model' %}">
                     <option value="">{% trans "Default (config)" %}</option>
                     <option value="openai">OpenAI gpt-image-2</option>

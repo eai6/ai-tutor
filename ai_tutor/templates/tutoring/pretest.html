@@ -65,7 +65,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #a1a1aa;
+        color: var(--color-warm-400);
         font-size: 0.9rem;
     }
 </style>
@@ -120,8 +120,8 @@
             summaryDiv.innerHTML = `
                 <div style="font-size:2rem;font-weight:800;color:${passed ? 'var(--color-success-solid)' : 'var(--color-danger-solid)'};margin-bottom:0.25rem;">${score} / ${total}</div>
                 <div style="font-size:0.95rem;color:var(--color-text-muted);">${passed ? 'Great work! You passed.' : 'Some gaps — the tutor will focus there.'}</div>
-                <div style="font-size:0.9rem;color:#52525b;margin:0.75rem 0 1.25rem;">${message}</div>
-                <a href="${redirectUrl}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:var(--color-text);color:var(--color-surface);text-decoration:none;font-weight:600;">
+                <div style="font-size:0.9rem;color:var(--color-warm-600);margin:0.75rem 0 1.25rem;">${message}</div>
+                <a href="${redirectUrl}" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="display:inline-block;font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;background:var(--color-text);color:var(--color-surface);text-decoration:none;font-weight:600;">
                     ${passed ? '✓ Continue' : '→ Start the lesson'}
                 </a>
             `;

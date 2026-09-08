@@ -22,7 +22,7 @@ stacked blocks, and the cards are sized to their lists.
 
     <div class="docs-masthead flex items-start justify-between gap-8 flex-wrap [&_h1]:font-display [&_h1]:text-[clamp(1.75rem,_1.3rem_+_1.5vw,_2.5rem)] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:leading-tight [&_h1]:m-0 [&_h1]:text-text">
         <div class="flex-[1_1_26rem] min-w-0">
-            <h1>{% trans "Country Adoption" %}</h1>
+            <h1>{% trans "Enterprise Adaptation" %}</h1>
             <p class="mt-2 mx-0 mb-0 max-w-[46rem] text-base leading-normal text-text-secondary">
                 {% blocktrans %}Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, what it costs, and how to get a first cohort teaching.{% endblocktrans %}
             </p>
@@ -48,7 +48,7 @@ stacked blocks, and the cards are sized to their lists.
     {# lines of chrome on one line: the row they gave up is a row of cards.  #}
     <div class="docs-utility max-[48rem]:justify-start flex flex-wrap items-baseline justify-between gap-2 mt-4 pb-2 border-b border-b-border [&_.docs-crumbs]:mt-0 [&_.docs-crumbs]:pb-0 [&_.docs-crumbs]:border-b-0 [&_.docs-crumbs\_\_date]:ml-3">
         <nav class="docs-crumbs flex items-baseline flex-wrap gap-2 mt-4 pb-4 border-b border-b-border text-base [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline" aria-label="{% trans 'Breadcrumb' %}">
-            <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"AI Tutor" }}</a>
+            <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"Sesel AI" }}</a>
             <span class="text-text-faint" aria-hidden="true">&#9656;</span>
             <span class="text-text font-medium">{% trans "Country adoption playbook" %}</span>
             <span class="docs-crumbs__date max-[48rem]:ml-0 max-[48rem]:basis-full ml-auto font-mono text-xs text-text-muted">{{ version_date|date:"j F Y" }}</span>

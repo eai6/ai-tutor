@@ -75,7 +75,7 @@
     font-weight: 600;
     text-decoration: none;
 }
-.btn-proceed { background: var(--color-success-solid); color: var(--color-surface); }
+.btn-proceed { background: var(--color-success); color: var(--color-surface); }
 .btn-revisit { background: var(--color-danger-solid); color: var(--color-surface); }
 
 /* Objectives Table */
@@ -292,7 +292,7 @@
     </div>
     <div class="summary-card">
         <div class="number {% if assessed_count == 0 %}gray{% elif students_below_count == 0 %}green{% elif students_below_count <= 3 %}yellow{% else %}red{% endif %}">{% if assessed_count %}{{ avg_pct }}%{% else %}—{% endif %}</div>
-        <div class="label">{% trans "Avg Competency" %}{% if unassessed_count %}<span style="font-weight:400;color:#a1a1aa;display:block;font-size:0.625rem;text-transform:none;letter-spacing:0;">{% trans "(assessed only)" %}</span>{% endif %}</div>
+        <div class="label">{% trans "Avg Competency" %}{% if unassessed_count %}<span style="font-weight:400;color:var(--color-warm-400);display:block;font-size:0.625rem;text-transform:none;letter-spacing:0;">{% trans "(assessed only)" %}</span>{% endif %}</div>
     </div>
     <div class="summary-card">
         <div class="number {% if students_below_count == 0 %}green{% else %}red{% endif %}">{{ students_below_count }}</div>
@@ -396,18 +396,18 @@ competency.
                 <td class="cell-title">
                     <span class="student-name">{{ s.student.get_full_name|default:s.student.username }}</span>
                     {% if s.exit_passed != None %}
-                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">
+                        <div style="font-size:0.6875rem;color:var(--color-warm-400);margin-top:2px;">
                             {% blocktrans with score=s.exit_score time=s.exit_time %}Exit ticket: {{ score }} · {{ time }}{% endblocktrans %}
                         </div>
                     {% else %}
-                        <div style="font-size:0.6875rem;color:#a1a1aa;margin-top:2px;">{% trans "Not taken" %}</div>
+                        <div style="font-size:0.6875rem;color:var(--color-warm-400);margin-top:2px;">{% trans "Not taken" %}</div>
                     {% endif %}
                 </td>
                 <td data-label="{% trans 'Competency' %}">
                     {% if s.has_exit_attempt %}
                         <span class="student-score {% if s.pct >= 80 %}pass{% elif s.pct >= 50 %}partial{% else %}fail{% endif %}">{{ s.pct }}%</span>
                     {% else %}
-                        <span style="color:#a1a1aa;font-size:0.8125rem;">—</span>
+                        <span style="color:var(--color-warm-400);font-size:0.8125rem;">—</span>
                     {% endif %}
                 </td>
             </tr>
@@ -450,7 +450,7 @@ competency.
                     </span>
                 </td>
                 <td style="padding:0.75rem 1rem;text-align:right;">
-                    <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info-solid);color:var(--color-surface);border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">{% trans "View chat" %}</a>
+                    <a href="{% url 'dashboard:session_chat_history' gs.session.id %}" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-info);color:var(--color-surface);border:none;border-radius:4px;padding:4px 10px;text-decoration:none;font-size:0.78rem;">{% trans "View chat" %}</a>
                 </td>
             </tr>
             {% endfor %}

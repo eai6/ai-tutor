@@ -6,12 +6,12 @@
 {% block content %}
 <style>
     .bench-summary {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.9rem;
-        color:#374151;
+        color:var(--color-warm-700);
     }
     .bench-table {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         overflow:hidden;
     }
     .bench-table table { width:100%; border-collapse:collapse; }
@@ -20,97 +20,97 @@
         vertical-align:top;
     }
     .bench-table thead th {
-        background:#f9fafb; color:#6b7280; font-weight:600;
+        background:var(--color-canvas); color:var(--color-warm-500); font-weight:600;
         font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;
-        border-bottom:1px solid #e5e7eb;
+        border-bottom:1px solid var(--color-surface-hover);
     }
-    .bench-table tbody tr { border-bottom:1px solid #f3f4f6; }
-    .bench-table tbody tr:hover { background:#fafafa; }
-    .bench-table td a { color:#5b21b6; text-decoration:none; font-weight:500; }
+    .bench-table tbody tr { border-bottom:1px solid var(--color-surface-sunken); }
+    .bench-table tbody tr:hover { background:var(--color-canvas); }
+    .bench-table td a { color:var(--color-primary-ink); text-decoration:none; font-weight:500; }
     .bench-table td a:hover { text-decoration:underline; }
 
     .pill {
         display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
         font-size:0.7rem; font-weight:600; letter-spacing:0.02em;
     }
-    .pill-pass { background:#ecfdf5; color:#065f46; }
-    .pill-fail { background:#fef2f2; color:#991b1b; }
-    .pill-none { background:#f3f4f6; color:#6b7280; }
-    .pill-subj { background:#eff6ff; color:#1e40af; }
-    .pill-stratum { background:#fef3c7; color:#92400e; }
+    .pill-pass { background:var(--color-teal-tint); color:var(--color-teal-ink); }
+    .pill-fail { background:var(--color-rose-surface); color:var(--color-rose-ink); }
+    .pill-none { background:var(--color-surface-sunken); color:var(--color-warm-500); }
+    .pill-subj { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .pill-stratum { background:var(--color-amber-surface); color:var(--color-sunny-ink); }
 
-    .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
+    .empty { padding:3rem 1rem; text-align:center; color:var(--color-warm-500); }
 
     /* Sample-on-demand form */
     .sample-card {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.85rem 1.1rem; margin-bottom:1rem;
         display:flex; gap:1rem; align-items:center; flex-wrap:wrap;
     }
     .sample-card .left { flex:1; min-width:240px; }
-    .sample-card .label-row { font-size:0.78rem; color:#6b7280; }
-    .sample-card .count { font-size:1.3rem; font-weight:700; color:#111; line-height:1.1; }
+    .sample-card .label-row { font-size:0.78rem; color:var(--color-warm-500); }
+    .sample-card .count { font-size:1.3rem; font-weight:700; color:var(--color-text); line-height:1.1; }
     .sample-card form { display:flex; gap:0.5rem; align-items:center; }
     .sample-card input[type=number] {
-        width:80px; padding:0.4rem 0.55rem; border:1px solid #d1d5db;
+        width:80px; padding:0.4rem 0.55rem; border:1px solid var(--color-warm-300);
         border-radius:6px; font-size:0.9rem; font-family:inherit;
     }
     .sample-card .legacy-toggle {
         display:flex; gap:0.3rem; align-items:center;
-        font-size:0.78rem; color:#6b7280;
+        font-size:0.78rem; color:var(--color-warm-500);
     }
     .sample-btn {
-        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        background:var(--color-primary-fill); color:var(--color-surface); border:none; border-radius:6px;
         padding:0.45rem 0.95rem; font-size:0.88rem; font-weight:600;
         cursor:pointer;
     }
-    .sample-btn:hover { background:#4c1d95; }
-    .sample-btn:disabled { background:#c4b5fd; cursor:not-allowed; }
+    .sample-btn:hover { background:var(--color-primary-dark); }
+    .sample-btn:disabled { background:var(--color-brand-soft); cursor:not-allowed; }
 
     /* Filter + bulk action bar */
     .filter-bar {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.7rem 0.9rem; margin-bottom:1rem;
         display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap;
         font-size:0.85rem;
     }
-    .filter-bar label { font-size:0.75rem; color:#6b7280; font-weight:600; }
+    .filter-bar label { font-size:0.75rem; color:var(--color-warm-500); font-weight:600; }
     .filter-bar select {
-        padding:0.35rem 0.5rem; border:1px solid #d1d5db; border-radius:6px;
-        font-size:0.85rem; background:#fff;
+        padding:0.35rem 0.5rem; border:1px solid var(--color-warm-300); border-radius:6px;
+        font-size:0.85rem; background:var(--color-surface);
     }
     .filter-bar .filter-actions { display:flex; gap:0.4rem; align-items:center; }
     .filter-apply {
-        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        background:var(--color-primary-fill); color:var(--color-surface); border:none; border-radius:6px;
         padding:0.35rem 0.8rem; font-size:0.82rem; font-weight:500;
         cursor:pointer;
     }
-    .filter-apply:hover { background:#4c1d95; }
+    .filter-apply:hover { background:var(--color-primary-dark); }
     .filter-clear {
-        background:transparent; color:#6b7280; border:none;
+        background:transparent; color:var(--color-warm-500); border:none;
         text-decoration:underline; font-size:0.78rem; cursor:pointer;
         padding:0.35rem 0.4rem;
     }
-    .filter-clear:hover { color:#111; }
+    .filter-clear:hover { color:var(--color-text); }
 
     .bulk-bar {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.55rem 0.85rem; margin-bottom:0.6rem;
         display:flex; gap:0.6rem; align-items:center; font-size:0.85rem;
     }
-    .bulk-bar .selected-count { color:#374151; font-weight:500; }
+    .bulk-bar .selected-count { color:var(--color-warm-700); font-weight:500; }
     .danger-btn {
-        background:#dc2626; color:#fff; border:none; border-radius:6px;
+        background:var(--color-rose-solid); color:var(--color-surface); border:none; border-radius:6px;
         padding:0.35rem 0.8rem; font-size:0.82rem; font-weight:500;
         cursor:pointer;
     }
-    .danger-btn:hover { background:#991b1b; }
-    .danger-btn:disabled { background:#fca5a5; cursor:not-allowed; }
+    .danger-btn:hover { background:var(--color-rose-ink); }
+    .danger-btn:disabled { background:var(--color-rose-border); cursor:not-allowed; }
     .delete-link {
-        color:#b91c1c; font-size:0.78rem; text-decoration:none;
+        color:var(--color-rose-ink); font-size:0.78rem; text-decoration:none;
         font-weight:500;
     }
-    .delete-link:hover { color:#7f1d1d; text-decoration:underline; }
+    .delete-link:hover { color:var(--color-rose-ink); text-decoration:underline; }
     .check-col { width:28px; }
     .check-col input[type=checkbox] { cursor:pointer; }
 </style>
@@ -129,7 +129,7 @@
           style="display:flex;flex-direction:column;gap:0.5rem;">
         {% csrf_token %}
         <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;">
-            <label for="sample-count" style="font-size:0.85rem;color:#374151;">Sample</label>
+            <label for="sample-count" style="font-size:0.85rem;color:var(--color-warm-700);">Sample</label>
             <input type="number" id="sample-count" name="count" value="10" min="1" max="50">
             <button type="submit" class="sample-btn">more →</button>
             <label class="legacy-toggle" title="Include pre-Phase-2.2.5 traces that lack judge_history_turns.">
@@ -141,8 +141,8 @@
         </div>
         {# Narrowing filters — applied to the candidate pool BEFORE       #}
         {# stratified sampling. Leaving them blank = no filter.           #}
-        <div style="display:flex;flex-wrap:wrap;gap:0.4rem 0.6rem;align-items:center;font-size:0.78rem;color:#6b7280;">
-            <span style="font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#9ca3af;">
+        <div style="display:flex;flex-wrap:wrap;gap:0.4rem 0.6rem;align-items:center;font-size:0.78rem;color:var(--color-warm-500);">
+            <span style="font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--color-warm-400);">
                 narrow to:
             </span>
             <label>subject
@@ -167,7 +167,7 @@
 
 {# Filter bar — GET form so filters land in the URL and can be bookmarked / shared. #}
 <form method="get" class="filter-bar" id="filter-form">
-    <span style="color:#6b7280;font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.04em;">Filter</span>
+    <span style="color:var(--color-warm-500);font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.04em;">Filter</span>
 
     <label for="f-subject">Subject</label>
     <select name="subject" id="f-subject">
@@ -202,14 +202,14 @@
         {# query string the filter form is showing.                    #}
         <a href="{% url 'dashboard:benchmark:export_annotations' %}?subject={{ filters.subject }}&stratum={{ filters.stratum }}&status={{ filters.status }}"
            class="filter-apply"
-           style="background:#fff;color:#5b21b6;border:1px solid #ddd6fe;text-decoration:none;"
+           style="background:var(--color-surface);color:var(--color-primary-ink);border:1px solid var(--color-coral-edge);text-decoration:none;"
            title="Download a CSV of annotations matching the filters above. One row per annotation. Filename includes filter context + timestamp.">
             ⬇ CSV
         </a>
         {# JSONL export — BEA 2023 + 2025 compatible, for ML eval pipelines #}
         <a href="{% url 'dashboard:benchmark:export_jsonl' %}?subject={{ filters.subject }}&stratum={{ filters.stratum }}&status={{ filters.status }}"
            class="filter-apply"
-           style="background:#fff;color:#5b21b6;border:1px solid #ddd6fe;text-decoration:none;"
+           style="background:var(--color-surface);color:var(--color-primary-ink);border:1px solid var(--color-coral-edge);text-decoration:none;"
            title="Download JSONL (BEA 2023/2025 compatible) — full conversation, lesson context, step script + answer key, BEA 4-dim mapping. For ML eval pipelines.">
             ⬇ JSONL (BEA)
         </a>
@@ -334,7 +334,7 @@ the table.
 {% else %}
 <div class="bench-table">
     <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
-        <h3 style="color:#374151;margin-bottom:0.5rem;">
+        <h3 style="color:var(--color-warm-700);margin-bottom:0.5rem;">
             {% if filters.subject or filters.stratum or filters.status %}
                 No items match the current filter.
             {% else %}

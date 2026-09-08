@@ -86,7 +86,7 @@
                         <h3>Delete Your Data</h3>
                         <p>Permanently delete all your learning data</p>
                     </div>
-                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[#fff] hover:bg-danger hover:border-danger hover:text-[#fff]" onclick="confirmDelete()">
+                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[var(--color-surface)] hover:bg-danger hover:border-danger hover:text-[var(--color-surface)]" onclick="confirmDelete()">
                         🗑️ Delete Data
                     </button>
                 </div>
@@ -96,7 +96,7 @@
                         <h3>Delete Account</h3>
                         <p>Delete your account and all associated data</p>
                     </div>
-                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[#fff] hover:bg-danger hover:border-danger hover:text-[#fff]" onclick="confirmDeleteAccount()">
+                    <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[var(--color-surface)] hover:bg-danger hover:border-danger hover:text-[var(--color-surface)]" onclick="confirmDeleteAccount()">
                         ⚠️ Delete Account
                     </button>
                 </div>
@@ -118,7 +118,7 @@
         <p id="delete-message"></p>
         <div class="modal-actions">
             <button class="btn btn-secondary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-border-strong rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[#fff] hover:bg-danger hover:border-danger hover:text-[#fff]" id="confirm-delete-btn">Delete</button>
+            <button class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[var(--color-surface)] hover:bg-danger hover:border-danger hover:text-[var(--color-surface)]" id="confirm-delete-btn">Delete</button>
         </div>
     </div>
 </div>
@@ -142,7 +142,7 @@
 }
 
 .page-header p {
-    color: #666;
+    color: var(--color-warm-500);
     margin: 0;
 }
 
@@ -160,7 +160,7 @@
 }
 
 .card-description {
-    color: #666;
+    color: var(--color-warm-500);
     margin-bottom: 1.5rem;
 }
 
@@ -175,7 +175,7 @@
 .stat {
     text-align: center;
     padding: 1rem;
-    background: #F8F7F5;
+    background: var(--color-surface-sunken);
     border-radius: 8px;
 }
 
@@ -183,12 +183,12 @@
     display: block;
     font-size: 1.5rem;
     font-weight: 700;
-    color: #FF6B35;
+    color: var(--color-brand-mid);
 }
 
 .stat-label {
     font-size: 0.75rem;
-    color: #666;
+    color: var(--color-warm-500);
 }
 
 /* Consent Items */
@@ -203,7 +203,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
-    background: #F8F7F5;
+    background: var(--color-surface-sunken);
     border-radius: 8px;
 }
 
@@ -214,7 +214,7 @@
 
 .consent-info p {
     font-size: 0.8125rem;
-    color: #666;
+    color: var(--color-warm-500);
     margin: 0;
 }
 
@@ -242,7 +242,7 @@
     position: absolute;
     cursor: pointer;
     inset: 0;
-    background-color: #E5E5E5;
+    background-color: var(--color-warm-200);
     border-radius: 28px;
     transition: 0.3s;
 }
@@ -279,7 +279,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
-    background: #F8F7F5;
+    background: var(--color-surface-sunken);
     border-radius: 8px;
 }
 
@@ -294,7 +294,7 @@
 
 .action-item p {
     font-size: 0.8125rem;
-    color: #666;
+    color: var(--color-warm-500);
     margin: 0;
 }
 
@@ -313,8 +313,8 @@
 }
 
 .btn-secondary {
-    background: #E5E5E5;
-    color: #333;
+    background: var(--color-warm-200);
+    color: var(--color-warm-800);
 }
 
 .btn-danger {
@@ -335,13 +335,13 @@
 }
 
 .legal-links a {
-    color: #666;
+    color: var(--color-warm-500);
     text-decoration: none;
     font-size: 0.875rem;
 }
 
 .legal-links a:hover {
-    color: #FF6B35;
+    color: var(--color-brand-mid);
 }
 
 /* Modal */
@@ -372,7 +372,7 @@
 }
 
 .modal-content p {
-    color: #666;
+    color: var(--color-warm-500);
     margin-bottom: 1.5rem;
 }
 

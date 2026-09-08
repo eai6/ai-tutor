@@ -482,8 +482,20 @@ def country_login(request):
     return render(request, 'accounts/country_login.html')
 
 
+def _country_is_claimed(iso_code) -> bool:
+    """Whether some account already holds the country with this ISO code.
+
+    Inactive memberships count. An account left over from before sign-up
+    became instant is still that ministry's claim, and letting a second
+    person register around it would hand them the country the first one is
+    waiting to be let into.
+    """
+    return CountryMembership.objects.filter(
+        country__iso_code=iso_code).exists()
+
+
 def country_self_register(request):
-    """Request a country account. Inactive until a platform admin approves it.
+    """Create a country account. Active immediately — there is no approval queue.
 
     Every country is offered, not only the ones already on the platform: a
     ministry arrives *before* its country is on it, which is the whole point
@@ -491,13 +503,23 @@ def country_self_register(request):
     does not exist — matched on the code rather than the name, so a country
     cannot end up with two rows and its schools split between them.
 
-    Creating a row from an unauthenticated form is a smaller thing than it
-    looks: it carries a name and a code, nothing is scoped to it until a
-    school is added, and the account that asked for it stays inactive until a
-    platform admin approves it.
-    """
-    from django.utils.text import slugify
+    The account used to land inactive and wait for a platform admin; the
+    sign-up now ends in the dashboard instead of a "we'll be in touch" page.
+    Accounts created before that change are still inactive, which is why
+    `country_login` keeps its awaiting-approval answer.
 
+    ONE ACCOUNT PER COUNTRY. An active CountryMembership reaches every school
+    in its country (see accounts/scope.py), so a form anyone can post is a
+    form anyone could use to reach a country already running. The approval
+    queue used to stand there; what stands there now is that a country can be
+    claimed exactly once. The team that holds it adds the rest of the ministry
+    from the staff page — that is the only other way in, which is why
+    `can_manage_country_team` exists.
+
+    The claim is checked against CountryMembership rather than against the
+    `Country` row: the row is created by whoever signs up first, and an
+    unclaimed row (backfilled, or seeded) is not a claim.
+    """
     from ai_tutor.apps.accounts.countries import BY_CODE, choices
     from ai_tutor.apps.accounts.models import PlatformTerms
 
@@ -535,6 +557,12 @@ def country_self_register(request):
 
     if country_code not in BY_CODE:
         errors.append(_("Please choose the country you represent."))
+    elif _country_is_claimed(country_code):
+        errors.append(_(
+            "%(country)s already has an account on the platform. Ask whoever "
+            "holds it to add you from their staff page — a country is "
+            "registered once."
+        ) % {"country": BY_CODE[country_code]})
     if not organisation:
         errors.append(_("Please name the ministry or programme you work for."))
 
@@ -551,21 +579,18 @@ def country_self_register(request):
                      username=username, email=email, country=country_code,
                      organisation=organisation)
 
-    # get_or_create on the code, so a second ministry from the same country
-    # joins the row the first one made rather than starting a rival one.
-    country, _created = Country.objects.get_or_create(
-        iso_code=country_code,
-        defaults={'name': BY_CODE[country_code],
-                  'slug': slugify(BY_CODE[country_code])[:50]},
-    )
+    # Matched on the code, so this door and the platform admin's land on the
+    # same row rather than starting rival ones. See Country.get_or_create_by_iso.
+    country = Country.get_or_create_by_iso(country_code)
 
     user = User.objects.create_user(
         username=username, email=email, password=password,
-        first_name=first_name, last_name=last_name, is_active=False,
+        first_name=first_name, last_name=last_name, is_active=True,
     )
-    # Inactive on both records. The account is only a country account once a
-    # platform admin says so, and `has_staff_access` reads is_active.
-    CountryMembership.objects.create(user=user, country=country, is_active=False)
+    # Active on both records. `has_staff_access` reads the membership's
+    # is_active as well as the user's, so one without the other is an account
+    # that looks signed up and still cannot sign in.
+    CountryMembership.objects.create(user=user, country=country, is_active=True)
 
     if active_terms:
         from django.utils import timezone as _tz
@@ -582,10 +607,17 @@ def country_self_register(request):
         severity='warning', request=request,
     )
 
+    # Verification is a banner, not a gate — the account works while the link
+    # sits unread in an inbox.
     from ai_tutor.apps.accounts.email_verification import send_verification_email
     send_verification_email(request, user)
 
-    return render(request, 'accounts/country_pending.html', {'country': country})
+    login_created_user(request, user)
+    messages.success(request, _("Welcome, %(name)s! Your %(country)s account is ready.") % {
+        "name": user.first_name or user.username, "country": country.name})
+    if _terms_acceptance_pending(user):
+        return redirect("/terms/accept/?next=/dashboard/")
+    return redirect('dashboard:home')
 
 
 def staff_register(request, token=None):

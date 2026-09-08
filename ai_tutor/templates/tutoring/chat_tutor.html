@@ -14,7 +14,7 @@
             </a>
             {% if is_staff_user %}
             <a href="{% url 'dashboard:home' %}"
-               style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.3rem 0.7rem; background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe; border-radius:999px; text-decoration:none; font-weight:600; font-size:0.78rem; margin-right:0.4rem;"
+               style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.3rem 0.7rem; background:var(--color-accent-surface); color:var(--color-primary-ink); border:1px solid var(--color-coral-edge); border-radius:999px; text-decoration:none; font-weight:600; font-size:0.78rem; margin-right:0.4rem;"
                title="{% trans 'Return to teacher dashboard' %}">
                 ← {% trans "Dashboard" %}
             </a>
@@ -91,16 +91,16 @@
             <!-- Pre-session duration picker. JS auto-defaults after 6s.
                  Hidden when Course.allow_student_duration_override is False. -->
             <div id="duration-picker"
-                 style="margin: 1rem; padding: 1rem 1.2rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px; box-shadow: 0 4px 12px rgba(91,33,182,0.08);">
-                <div style="font-weight: 600; color: #5b21b6; margin-bottom: 0.4rem;">⏱️ {% trans "How long do you have today?" %}</div>
-                <div style="font-size: 0.85rem; color: #6d28d9; margin-bottom: 0.7rem;">
+                 style="margin: 1rem; padding: 1rem 1.2rem; background: var(--color-accent-surface); border: 1px solid var(--color-coral-edge); border-radius: 12px; box-shadow: 0 4px 12px rgba(91,33,182,0.08);">
+                <div style="font-weight: 600; color: var(--color-primary-ink); margin-bottom: 0.4rem;">⏱️ {% trans "How long do you have today?" %}</div>
+                <div style="font-size: 0.85rem; color: var(--color-coral-solid); margin-bottom: 0.7rem;">
                     {% trans "The tutor adapts the lesson depth to fit your time. You can answer the same number of questions either way — fewer steps just means less reinforcement." %}
                 </div>
                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                    <button type="button" data-duration="15" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}15 min{% endblocktrans %}</button>
-                    <button type="button" data-duration="20" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}20 min{% endblocktrans %}</button>
-                    <button type="button" data-duration="25" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: #fff; border: 1px solid #c4b5fd; border-radius: 999px; font-weight: 600; color: #5b21b6; cursor: pointer; font-size: 0.88rem;">{% blocktrans %}25 min{% endblocktrans %}</button>
-                    <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: #6d28d9; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">{% trans "Use the lesson default" %}</button>
+                    <button type="button" data-duration="15" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: var(--color-surface); border: 1px solid var(--color-brand-soft); border-radius: 999px; font-weight: 600; color: var(--color-primary-ink); cursor: pointer; font-size: 0.88rem;">{% blocktrans %}15 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="20" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: var(--color-surface); border: 1px solid var(--color-brand-soft); border-radius: 999px; font-weight: 600; color: var(--color-primary-ink); cursor: pointer; font-size: 0.88rem;">{% blocktrans %}20 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="25" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: var(--color-surface); border: 1px solid var(--color-brand-soft); border-radius: 999px; font-weight: 600; color: var(--color-primary-ink); cursor: pointer; font-size: 0.88rem;">{% blocktrans %}25 min{% endblocktrans %}</button>
+                    <button type="button" data-duration="" class="duration-pick-btn" style="padding: 0.45rem 0.95rem; background: transparent; border: 1px solid transparent; color: var(--color-coral-solid); cursor: pointer; font-size: 0.85rem; text-decoration: underline;">{% trans "Use the lesson default" %}</button>
                 </div>
             </div>
             {% endif %}
@@ -122,21 +122,21 @@
             <footer class="chat-input-area" id="input-area">
                 {% if is_math_lesson %}
                 <div id="chat-math-toolbar" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.3rem;padding:0.5rem 0.75rem 0.75rem;">
-                    <button type="button" onclick="insertChatSymbol('°')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">°</button>
-                    <button type="button" onclick="insertChatSymbol('π')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">π</button>
-                    <button type="button" onclick="insertChatSymbol('√')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">√</button>
-                    <button type="button" onclick="insertChatSymbol('²')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">²</button>
-                    <button type="button" onclick="insertChatSymbol('³')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">³</button>
-                    <button type="button" onclick="insertChatSymbol('±')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">±</button>
-                    <button type="button" onclick="insertChatSymbol('≤')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≤</button>
-                    <button type="button" onclick="insertChatSymbol('≥')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≥</button>
-                    <button type="button" onclick="insertChatSymbol('≠')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">≠</button>
-                    <button type="button" onclick="insertChatSymbol('×')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">×</button>
-                    <button type="button" onclick="insertChatSymbol('÷')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">÷</button>
-                    <button type="button" onclick="insertChatSymbol('½')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">½</button>
-                    <button type="button" onclick="insertChatSymbol('¼')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¼</button>
-                    <button type="button" onclick="insertChatSymbol('¾')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">¾</button>
-                    <button type="button" onclick="insertChatSymbol('θ')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;">θ</button>
+                    <button type="button" onclick="insertChatSymbol('°')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">°</button>
+                    <button type="button" onclick="insertChatSymbol('π')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">π</button>
+                    <button type="button" onclick="insertChatSymbol('√')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">√</button>
+                    <button type="button" onclick="insertChatSymbol('²')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">²</button>
+                    <button type="button" onclick="insertChatSymbol('³')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">³</button>
+                    <button type="button" onclick="insertChatSymbol('±')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">±</button>
+                    <button type="button" onclick="insertChatSymbol('≤')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">≤</button>
+                    <button type="button" onclick="insertChatSymbol('≥')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">≥</button>
+                    <button type="button" onclick="insertChatSymbol('≠')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">≠</button>
+                    <button type="button" onclick="insertChatSymbol('×')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">×</button>
+                    <button type="button" onclick="insertChatSymbol('÷')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">÷</button>
+                    <button type="button" onclick="insertChatSymbol('½')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">½</button>
+                    <button type="button" onclick="insertChatSymbol('¼')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">¼</button>
+                    <button type="button" onclick="insertChatSymbol('¾')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">¾</button>
+                    <button type="button" onclick="insertChatSymbol('θ')" class="chat-math-btn" style="font-size:0.9rem;padding:0.15rem 0.45rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;">θ</button>
                 </div>
                 {% endif %}
                 {% comment %}
@@ -236,13 +236,13 @@
             <p id="completion-message"></p>
             <!-- Gamification XP display -->
             <div id="completion-xp" style="display:none; margin:1rem 0;">
-                <div id="xp-earned-text" style="font-size:1.5rem; font-weight:800; color:#7C3AED; animation: xpPulse 0.6s ease;"></div>
-                <div id="level-up-banner" style="display:none; margin-top:0.5rem; padding:0.4rem 0.8rem; background:linear-gradient(135deg,#7C3AED,#A855F7); color:#fff; border-radius:999px; font-weight:700; font-size:0.85rem; display:inline-block;"></div>
+                <div id="xp-earned-text" style="font-size:1.5rem; font-weight:800; color:var(--color-primary); animation: xpPulse 0.6s ease;"></div>
+                <div id="level-up-banner" style="display:none; margin-top:0.5rem; padding:0.4rem 0.8rem; background:linear-gradient(135deg,var(--color-primary),var(--color-brand-mid)); color:var(--color-surface); border-radius:999px; font-weight:700; font-size:0.85rem; display:inline-block;"></div>
                 <div id="completion-badges" style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:0.75rem;"></div>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center; margin-top: 1rem;">
                 <button class="cta-btn" onclick="startReview()" style="border: none; cursor: pointer;">{% trans "Review Lesson" %}</button>
-                <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: #fff; color: #18181b; border: 2px solid #e4e4e7;">{% trans "Continue Learning" %}</a>
+                <a href="{% url 'tutoring:catalog' %}" class="cta-btn" style="background: var(--color-surface); color: var(--color-text); border: 2px solid var(--color-border);">{% trans "Continue Learning" %}</a>
             </div>
         </div>
     </div>
@@ -259,7 +259,7 @@
     margin: 0 !important;
 }
 body {
-    background: #f4f4f5;
+    background: var(--color-surface-sunken);
     overflow: hidden;
 }
 
@@ -269,14 +269,14 @@ body {
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    background: #f4f4f5;
+    background: var(--color-surface-sunken);
 }
 
 /* ── Top Bar ── */
 .chat-header {
     flex-shrink: 0;
-    background: #fff;
-    border-bottom: 1px solid #e4e4e7;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
     padding: 0.75rem 1rem;
     z-index: 10;
 }
@@ -296,12 +296,12 @@ body {
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    color: #71717a;
+    color: var(--color-warm-500);
     text-decoration: none;
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.back-link:hover { background: #f4f4f5; color: #18181b; }
+.back-link:hover { background: var(--color-surface-sunken); color: var(--color-text); }
 
 .header-center {
     display: flex;
@@ -327,7 +327,7 @@ body {
 .lesson-name {
     font-size: 0.9375rem;
     font-weight: 600;
-    color: #18181b;
+    color: var(--color-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -339,8 +339,8 @@ body {
     font-weight: 600;
     letter-spacing: 0.02em;
     padding: 0.2rem 0.625rem;
-    background: #18181b;
-    color: #fff;
+    background: var(--color-warm-900);
+    color: var(--color-surface);
     border-radius: 999px;
     text-transform: capitalize;
 }
@@ -349,8 +349,8 @@ body {
     font-size: 0.6875rem;
     font-weight: 600;
     padding: 0.2rem 0.5rem;
-    background: #e4e4e7;
-    color: #52525b;
+    background: var(--color-warm-200);
+    color: var(--color-warm-600);
     border-radius: 999px;
 }
 .step-progress:empty { display: none; }
@@ -413,27 +413,27 @@ body {
     flex-shrink: 0;
     margin-top: 2px;
 }
-.message.tutor .avatar { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-.message.student .avatar { background: #e0e7ff; }
+.message.tutor .avatar { background: var(--color-surface); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.message.student .avatar { background: var(--color-primary-tint); }
 
 /* Bubbles */
 .bubble {
     padding: 0.875rem 1.125rem;
     line-height: 1.7;
     font-size: 0.9375rem;
-    color: #18181b;
+    color: var(--color-text);
     min-width: 0;
 }
 
 .message.tutor .bubble {
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 1rem 1rem 1rem 0.25rem;
     box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
 .message.student .bubble {
-    background: #18181b;
-    color: #fafafa;
+    background: var(--color-warm-900);
+    color: var(--color-canvas);
     border-radius: 1rem 1rem 0.25rem 1rem;
 }
 
@@ -447,8 +447,8 @@ body {
     width: 26px;
     height: 26px;
     border: none;
-    background: #f4f4f5;
-    color: #71717a;
+    background: var(--color-surface-sunken);
+    color: var(--color-warm-500);
     border-radius: 50%;
     cursor: pointer;
     align-items: center;
@@ -457,7 +457,7 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     opacity: 0.6;
 }
-.replay-btn:hover { background: #18181b; color: #fff; opacity: 1; }
+.replay-btn:hover { background: var(--color-warm-900); color: var(--color-surface); opacity: 1; }
 
 .bubble p { margin-bottom: 0.625rem; }
 .bubble p:last-child { margin-bottom: 0; }
@@ -465,15 +465,15 @@ body {
 .bubble ul, .bubble ol { margin: 0.5rem 0 0.5rem 1.25rem; }
 .bubble li { margin-bottom: 0.25rem; }
 .bubble code {
-    background: #f4f4f5;
+    background: var(--color-surface-sunken);
     padding: 0.125rem 0.375rem;
     border-radius: 4px;
     font-size: 0.875rem;
 }
 .message.student .bubble code { background: rgba(255,255,255,0.15); }
 .bubble pre {
-    background: #18181b;
-    color: #e4e4e7;
+    background: var(--color-warm-900);
+    color: var(--color-warm-200);
     padding: 0.75rem 1rem;
     border-radius: 8px;
     overflow-x: auto;
@@ -503,7 +503,7 @@ body {
 }
 .message-media .caption {
     font-size: 0.8125rem;
-    color: #71717a;
+    color: var(--color-warm-500);
     margin-top: 0.375rem;
     font-style: italic;
 }
@@ -515,14 +515,14 @@ body {
 .probe-widget {
     margin-top: 0.5rem;
     padding: 0.75rem;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    background: var(--color-canvas);
+    border: 1px solid var(--color-surface-hover);
     border-radius: 12px;
     font-size: 0.9rem;
 }
 .probe-widget .probe-stem {
     font-weight: 500;
-    color: #111;
+    color: var(--color-text);
     margin-bottom: 0.5rem;
     font-size: 0.92rem;
 }
@@ -537,42 +537,42 @@ body {
     align-items: center;
     gap: 0.5rem;
     padding: 0.55rem 0.75rem;
-    background: #fff;
-    border: 1.5px solid #e5e7eb;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-surface-hover);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.12s ease;
     font-size: 0.92rem;
-    color: #111;
+    color: var(--color-text);
 }
 .probe-option:hover {
-    border-color: #a78bfa;
-    background: #f5f3ff;
+    border-color: var(--color-brand-mid);
+    background: var(--color-accent-surface);
 }
 .probe-option.selected {
-    border-color: #7c3aed;
-    background: #f5f3ff;
+    border-color: var(--color-primary);
+    background: var(--color-accent-surface);
 }
 .probe-option .opt-letter {
     font-weight: 700;
-    color: #7c3aed;
+    color: var(--color-primary);
     width: 1.5em;
     flex-shrink: 0;
 }
 .probe-option.correct {
-    border-color: #16a34a;
-    background: #dcfce7;
-    color: #14532d;
+    border-color: var(--color-teal-solid);
+    background: var(--color-teal-tint);
+    color: var(--color-teal-ink);
 }
 .probe-option.wrong {
-    border-color: #ef4444;
-    background: #fee2e2;
-    color: #7f1d1d;
+    border-color: var(--color-rose-solid);
+    background: var(--color-rose-surface);
+    color: var(--color-rose-ink);
 }
 .probe-fill-input {
     width: 100%;
     padding: 0.55rem 0.75rem;
-    border: 1.5px solid #e5e7eb;
+    border: 1.5px solid var(--color-surface-hover);
     border-radius: 10px;
     font-size: 0.95rem;
     font-family: inherit;
@@ -580,10 +580,10 @@ body {
 }
 .probe-fill-input:focus {
     outline: none;
-    border-color: #7c3aed;
+    border-color: var(--color-primary);
 }
-.probe-fill-input.correct { border-color: #16a34a; background: #dcfce7; color: #14532d; }
-.probe-fill-input.wrong { border-color: #ef4444; background: #fee2e2; color: #7f1d1d; }
+.probe-fill-input.correct { border-color: var(--color-teal-solid); background: var(--color-teal-tint); color: var(--color-teal-ink); }
+.probe-fill-input.wrong { border-color: var(--color-rose-solid); background: var(--color-rose-surface); color: var(--color-rose-ink); }
 .probe-actions {
     display: flex;
     gap: 0.4rem;
@@ -591,8 +591,8 @@ body {
 }
 .probe-submit {
     padding: 0.5rem 1rem;
-    background: #7c3aed;
-    color: #fff;
+    background: var(--color-primary);
+    color: var(--color-surface);
     border: none;
     border-radius: 10px;
     font-size: 0.9rem;
@@ -600,8 +600,8 @@ body {
     cursor: pointer;
     transition: background 0.12s ease;
 }
-.probe-submit:hover { background: #6d28d9; }
-.probe-submit:disabled { background: #d1d5db; cursor: not-allowed; }
+.probe-submit:hover { background: var(--color-coral-solid); }
+.probe-submit:disabled { background: var(--color-warm-300); cursor: not-allowed; }
 .probe-feedback {
     margin-top: 0.55rem;
     padding: 0.5rem 0.75rem;
@@ -610,14 +610,14 @@ body {
     line-height: 1.4;
 }
 .probe-feedback.correct {
-    background: #dcfce7;
-    color: #14532d;
-    border: 1px solid #86efac;
+    background: var(--color-teal-tint);
+    color: var(--color-teal-ink);
+    border: 1px solid var(--color-green-border);
 }
 .probe-feedback.wrong {
-    background: #fef3c7;
-    color: #78350f;
-    border: 1px solid #fcd34d;
+    background: var(--color-amber-surface);
+    color: var(--color-sunny-ink);
+    border: 1px solid var(--color-amber-border);
 }
 .probe-feedback .feedback-icon {
     font-size: 1.15rem;
@@ -646,11 +646,11 @@ body {
     display: inline-block;
     border-radius: 8px;
     overflow: hidden;
-    border: 2px solid #e4e4e7;
+    border: 2px solid var(--color-border);
     transition: border-color 0.15s;
     max-width: 120px;
 }
-.media-panel-trigger:hover { border-color: #a1a1aa; }
+.media-panel-trigger:hover { border-color: var(--color-warm-400); }
 .media-panel-trigger img {
     display: block;
     max-width: 120px;
@@ -662,8 +662,8 @@ body {
 .artifact-panel {
     width: 420px;
     max-width: 40vw;
-    border-left: 1px solid #e4e4e7;
-    background: #fff;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-surface);
     display: none;
     flex-direction: column;
     flex-shrink: 0;
@@ -679,7 +679,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e4e4e7;
+    border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
     gap: 0.5rem;
 }
@@ -692,7 +692,7 @@ body {
 .artifact-title {
     font-size: 0.875rem;
     font-weight: 600;
-    color: #18181b;
+    color: var(--color-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -709,14 +709,14 @@ body {
     border: none;
     background: transparent;
     border-radius: 6px;
-    color: #71717a;
+    color: var(--color-warm-500);
     cursor: pointer;
     transition: background 0.15s;
     flex-shrink: 0;
 }
 .artifact-zoom-btn:hover,
 .artifact-expand-btn:hover,
-.artifact-close:hover { background: #f4f4f5; color: #18181b; }
+.artifact-close:hover { background: var(--color-surface-sunken); color: var(--color-text); }
 .artifact-body {
     flex: 1;
     display: flex;
@@ -764,7 +764,7 @@ body {
     border: none;
     background: rgba(255,255,255,0.15);
     border-radius: 8px;
-    color: #fff;
+    color: var(--color-surface);
     cursor: pointer;
     transition: background 0.15s;
 }
@@ -791,27 +791,27 @@ body {
 }
 .lightbox-caption {
     text-align: center;
-    color: #a1a1aa;
+    color: var(--color-warm-400);
     font-size: 0.875rem;
     padding: 0.5rem 1rem 1rem;
     font-style: italic;
 }
 .artifact-body .artifact-caption {
     font-size: 0.8125rem;
-    color: #71717a;
+    color: var(--color-warm-500);
     margin-top: 0.5rem;
     text-align: center;
     font-style: italic;
 }
 .artifact-placeholder {
-    color: #a1a1aa;
+    color: var(--color-warm-400);
     font-size: 0.875rem;
 }
 .artifact-thumbnails {
     display: flex;
     gap: 0.5rem;
     padding: 0.625rem 1rem;
-    border-top: 1px solid #e4e4e7;
+    border-top: 1px solid var(--color-border);
     overflow-x: auto;
     flex-shrink: 0;
 }
@@ -825,8 +825,8 @@ body {
     transition: border-color 0.15s;
     flex-shrink: 0;
 }
-.artifact-thumb:hover { border-color: #a1a1aa; }
-.artifact-thumb.active { border-color: #18181b; }
+.artifact-thumb:hover { border-color: var(--color-warm-400); }
+.artifact-thumb.active { border-color: var(--color-warm-900); }
 
 /* ── History Separator ── */
 .history-separator {
@@ -836,7 +836,7 @@ body {
     max-width: 768px;
     width: 100%;
     margin: 0.5rem auto;
-    color: #a1a1aa;
+    color: var(--color-warm-400);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -846,7 +846,7 @@ body {
     content: '';
     flex: 1;
     height: 1px;
-    background: #e4e4e7;
+    background: var(--color-warm-200);
 }
 
 /* ── Typing Indicator ── */
@@ -865,7 +865,7 @@ body {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #f4f4f5;
+    background: var(--color-surface-sunken);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -873,7 +873,7 @@ body {
     flex-shrink: 0;
 }
 .typing-bubble {
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 1rem;
     padding: 0.75rem 1rem;
     box-shadow: 0 1px 2px rgba(0,0,0,0.06);
@@ -886,7 +886,7 @@ body {
 .typing-dots span {
     width: 8px;
     height: 8px;
-    background: #71717a;
+    background: var(--color-warm-500);
     border-radius: 50%;
     animation: bounce 1.4s infinite ease-in-out;
 }
@@ -918,8 +918,8 @@ body {
     gap: 0.55rem;
     width: 100%;
     padding: 0.7rem 1rem;
-    background: #fff;
-    border: 1.5px solid #e4e4e7;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-border);
     border-radius: 0.9rem;
     cursor: pointer;
     font-size: 0.9375rem;
@@ -928,26 +928,26 @@ body {
     text-align: left;
     transition: border-color .12s, background .12s;
 }
-.answer-choice-btn:hover:not(:disabled) { border-color: #f97316; background: #fff7ed; }
+.answer-choice-btn:hover:not(:disabled) { border-color: var(--color-brand-mid); background: var(--color-accent-surface); }
 .answer-choice-btn:focus-visible {
     outline: none;
-    border-color: #a1a1aa;
+    border-color: var(--color-warm-400);
     box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
 }
 .answer-choice-btn:disabled { opacity: .5; cursor: default; }
 .answer-choice-btn .letter {
     font-weight: 700;
-    color: #ea580c;
+    color: var(--color-brand-mid);
     flex: 0 0 auto;
 }
 .answer-choice-btn .opt-text {
-    color: #374151;
+    color: var(--color-warm-700);
     overflow-wrap: anywhere;
 }
 .chat-input-area {
     flex-shrink: 0;
     padding: 0.75rem 1rem 1rem;
-    background: #f4f4f5;
+    background: var(--color-surface-sunken);
 }
 
 .input-wrapper {
@@ -956,14 +956,14 @@ body {
     display: flex;
     align-items: flex-end;
     gap: 0.5rem;
-    background: #fff;
-    border: 1px solid #e4e4e7;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     border-radius: 1.25rem;
     padding: 0.5rem 0.5rem 0.5rem 1rem;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 .input-wrapper:focus-within {
-    border-color: #a1a1aa;
+    border-color: var(--color-warm-400);
     box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
 }
 
@@ -978,9 +978,9 @@ body {
     max-height: 120px;
     padding: 0.375rem 0;
     background: transparent;
-    color: #18181b;
+    color: var(--color-text);
 }
-#user-input::placeholder { color: #a1a1aa; }
+#user-input::placeholder { color: var(--color-warm-400); }
 
 #send-btn {
     display: flex;
@@ -988,16 +988,16 @@ body {
     justify-content: center;
     width: 36px;
     height: 36px;
-    background: #18181b;
-    color: #fff;
+    background: var(--color-warm-900);
+    color: var(--color-surface);
     border: none;
     border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s;
     flex-shrink: 0;
 }
-#send-btn:hover { background: #27272a; }
-#send-btn:disabled { background: #d4d4d8; cursor: not-allowed; }
+#send-btn:hover { background: var(--color-warm-800); }
+#send-btn:disabled { background: var(--color-warm-300); cursor: not-allowed; }
 
 /* ── Modals ── */
 .modal {
@@ -1013,7 +1013,7 @@ body {
 }
 
 .modal-content {
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 1rem;
     max-width: 800px;
     width: 95%;
@@ -1025,33 +1025,33 @@ body {
 }
 
 .modal-content h2 { margin-bottom: 0.375rem; font-size: 1.25rem; }
-.modal-subtitle { color: #71717a; margin-bottom: 1.5rem; font-size: 0.9375rem; }
+.modal-subtitle { color: var(--color-warm-500); margin-bottom: 1.5rem; font-size: 0.9375rem; }
 
 /* Exit-ticket modal CSS now lives in templates/tutoring/_partials/exit_modal.html */
 
 /* ── Rich HTML Artifact Rendering ── */
 .artifact-inline {
     margin: 0.75rem 0 0.25rem;
-    border: 1px solid #e4e4e7;
+    border: 1px solid var(--color-border);
     border-radius: 0.5rem;
     overflow: hidden;
-    background: #fff;
+    background: var(--color-surface);
 }
 .artifact-inline iframe { display: block; }
 .data-description-rich {
     margin-bottom: 0.75rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--color-surface-hover);
     border-radius: 0.5rem;
     overflow: hidden;
-    background: #f8fafc;
+    background: var(--color-canvas);
 }
 .data-description-rich iframe { display: block; width: 100%; border: none; }
 
 .submit-btn {
     width: 100%;
     padding: 0.875rem;
-    background: #18181b;
-    color: #fff;
+    background: var(--color-warm-900);
+    color: var(--color-surface);
     border: none;
     border-radius: 0.75rem;
     font-size: 1rem;
@@ -1060,27 +1060,27 @@ body {
     margin-top: 1rem;
     transition: background 0.15s;
 }
-.submit-btn:hover { background: #27272a; }
-.submit-btn:disabled { background: #d4d4d8; cursor: not-allowed; }
+.submit-btn:hover { background: var(--color-warm-800); }
+.submit-btn:disabled { background: var(--color-warm-300); cursor: not-allowed; }
 
 /* Completion */
 .completion { text-align: center; }
 .completion-icon { font-size: 3.5rem; margin-bottom: 0.75rem; }
 @keyframes xpPulse { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
-.badge-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.6rem; background: #EDE9FE; border: 1px solid #C4B5FD; border-radius: 999px; font-size: 0.78rem; font-weight: 600; color: #6D28D9; }
+.badge-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.6rem; background: var(--color-accent-surface); border: 1px solid var(--color-brand-soft); border-radius: 999px; font-size: 0.78rem; font-weight: 600; color: var(--color-coral-solid); }
 
 .cta-btn {
     display: inline-block;
     padding: 0.875rem 2rem;
-    background: #18181b;
-    color: #fff;
+    background: var(--color-warm-900);
+    color: var(--color-surface);
     text-decoration: none;
     border-radius: 0.75rem;
     font-weight: 600;
     margin-top: 1rem;
     transition: background 0.15s;
 }
-.cta-btn:hover { background: #27272a; }
+.cta-btn:hover { background: var(--color-warm-800); }
 
 /* ── Difficulty Signal Buttons ── */
 /* Difficulty signal buttons live in the header (.header-difficulty) */
@@ -1093,19 +1093,19 @@ body {
     display: inline-flex;
     align-items: center;
     padding: 0.3rem 0.65rem;
-    border: 1.5px solid #e4e4e7;
+    border: 1.5px solid var(--color-border);
     border-radius: 999px;
-    background: #fff;
-    color: #71717a;
+    background: var(--color-surface);
+    color: var(--color-warm-500);
     font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
 }
-.difficulty-btn:hover { border-color: #a1a1aa; color: #18181b; }
-.difficulty-btn.active.too-easy { border-color: #7C3AED; background: #EDE9FE; color: #7C3AED; }
-.difficulty-btn.active.too-hard { border-color: #F59E0B; background: #FEF3C7; color: #D97706; }
+.difficulty-btn:hover { border-color: var(--color-warm-400); color: var(--color-text); }
+.difficulty-btn.active.too-easy { border-color: var(--color-primary); background: var(--color-accent-surface); color: var(--color-primary); }
+.difficulty-btn.active.too-hard { border-color: var(--color-sunny-deep); background: var(--color-amber-surface); color: var(--color-amber-solid); }
 /* Mobile overflow menu — kebab + popover. Hidden on desktop; takes
    over for the difficulty + audio buttons on narrow screens. */
 .header-kebab {
@@ -1114,26 +1114,26 @@ body {
        has no top-level button. */
     display: inline-flex;
     background: transparent;
-    border: 1px solid #e4e4e7;
+    border: 1px solid var(--color-border);
     border-radius: 8px;
     width: 36px;
     height: 36px;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #18181b;
+    color: var(--color-text);
     flex-shrink: 0;
     padding: 0;
 }
-.header-kebab:active { background: #f4f4f5; }
+.header-kebab:active { background: var(--color-surface-sunken); }
 .header-menu {
     position: absolute;
     top: 100%;
     right: 0.5rem;
     margin-top: 0.25rem;
     min-width: 180px;
-    background: #fff;
-    border: 1px solid #e4e4e7;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     padding: 0.25rem;
@@ -1151,14 +1151,14 @@ body {
     border: none;
     padding: 0.6rem 0.75rem;
     font-size: 0.9rem;
-    color: #18181b;
+    color: var(--color-text);
     text-align: left;
     border-radius: 8px;
     cursor: pointer;
     font-family: inherit;
     width: 100%;
 }
-.header-menu button:hover, .header-menu button:active { background: #f4f4f5; }
+.header-menu button:hover, .header-menu button:active { background: var(--color-surface-sunken); }
 .header-menu .hm-emoji { font-size: 1rem; }
 .chat-header { position: relative; }
 
@@ -1185,7 +1185,7 @@ body {
 
 /* ── In-Conversation Gamification ── */
 .message.tutor .bubble.correct-glow {
-    box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 2px var(--color-teal-solid), 0 0 12px rgba(16, 185, 129, 0.2);
     transition: box-shadow 0.3s ease;
 }
 
@@ -1201,10 +1201,10 @@ body {
     margin: 0.3rem auto 0.5rem;
     font-size: 0.875rem;
     font-weight: 700;
-    color: #047857;
-    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: var(--color-teal-ink);
+    background: linear-gradient(135deg, var(--color-green-surface), var(--color-teal-edge));
     border-radius: 999px;
-    border: 1px solid #6ee7b7;
+    border: 1px solid var(--color-green-border);
     animation: celebrationPop 0.4s ease, starShimmer 1.2s ease-out;
     transition: opacity 0.5s ease, transform 0.5s ease;
     align-self: center;
@@ -1235,8 +1235,8 @@ body {
     margin: 0.25rem auto;
     font-size: 0.875rem;
     font-weight: 700;
-    color: #D97706;
-    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    color: var(--color-amber-solid);
+    background: linear-gradient(135deg, var(--color-amber-surface), var(--color-sunny));
     border-radius: 999px;
     animation: celebrationPop 0.4s ease;
     transition: opacity 0.5s;
@@ -1257,10 +1257,10 @@ body {
     margin: 0.5rem auto;
     font-size: 0.8125rem;
     font-weight: 700;
-    color: #7C3AED;
-    background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+    color: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-accent-surface), var(--color-coral-edge));
     border-radius: 0.75rem;
-    border: 1px solid #C4B5FD;
+    border: 1px solid var(--color-brand-soft);
     animation: celebrationPop 0.4s ease;
 }
 .difficulty-feedback {
@@ -1273,8 +1273,8 @@ body {
     margin: 0.25rem auto;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: #7C3AED;
-    background: #EDE9FE;
+    color: var(--color-primary);
+    background: var(--color-accent-surface);
     border-radius: 999px;
     animation: celebrationPop 0.25s ease;
     transition: opacity 0.5s;
@@ -1291,15 +1291,15 @@ body {
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: #71717a;
+    color: var(--color-warm-500);
     cursor: pointer;
     transition: all 0.15s;
     flex-shrink: 0;
     margin-left: auto;
 }
-.audio-toggle:hover { background: #f4f4f5; color: #18181b; }
-.audio-toggle.active { background: #18181b; color: #fff; }
-.audio-toggle.active:hover { background: #27272a; }
+.audio-toggle:hover { background: var(--color-surface-sunken); color: var(--color-text); }
+.audio-toggle.active { background: var(--color-warm-900); color: var(--color-surface); }
+.audio-toggle.active:hover { background: var(--color-warm-800); }
 
 /* Help / report-issue button — same size + treatment as .audio-toggle.
    Lives next to it in the header. Hidden on mobile because the kebab
@@ -1313,12 +1313,12 @@ body {
     border-radius: 8px;
     border: none;
     background: transparent;
-    color: #71717a;
+    color: var(--color-warm-500);
     cursor: pointer;
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.help-toggle:hover { background: #f4f4f5; color: #18181b; }
+.help-toggle:hover { background: var(--color-surface-sunken); color: var(--color-text); }
 
 /* Hide the floating .fb-btn while we're on the chat page — its
    bottom-right position overlaps the chat input on phones. The
@@ -1332,17 +1332,17 @@ body {
     width: 36px;
     height: 36px;
     background: transparent;
-    color: #71717a;
+    color: var(--color-warm-500);
     border: none;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.mic-btn:hover { background: #f4f4f5; color: #18181b; }
+.mic-btn:hover { background: var(--color-surface-sunken); color: var(--color-text); }
 .mic-btn.recording {
-    background: #ef4444;
-    color: #fff;
+    background: var(--color-rose-solid);
+    color: var(--color-surface);
     animation: pulse-red 1.5s infinite;
 }
 @keyframes pulse-red {
@@ -1355,16 +1355,16 @@ body {
    mic so the affordance is unmistakable, plus a subtle pulse so it
    reads as "tap me to finish". Hover keeps a stronger red. */
 #send-btn.recording-active {
-    background: #ef4444;
-    color: #fff;
+    background: var(--color-rose-solid);
+    color: var(--color-surface);
     animation: pulse-red 1.5s infinite;
 }
 #send-btn.recording-active:hover {
-    background: #dc2626;
+    background: var(--color-rose-solid);
 }
 
 .bubble.speaking {
-    outline: 2px solid #6366f1;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 .tts-word {
@@ -1373,12 +1373,12 @@ body {
     padding: 0 1px;
 }
 .tts-word.active {
-    background-color: #6366f1;
-    color: #fff;
+    background-color: var(--color-primary);
+    color: var(--color-surface);
 }
 .tts-word.spoken {
-    background-color: #e0e7ff;
-    color: #3730a3;
+    background-color: var(--color-primary-tint);
+    color: var(--color-primary-ink);
 }
 
 /* ── Mobile ── */
@@ -1449,24 +1449,24 @@ window.EXIT_MODAL_CONFIG = {
         const weakConcepts = competency ? competency.weak_concepts : [];
 
         const summaryDiv = document.createElement('div');
-        summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid #e4e4e7;';
+        summaryDiv.style.cssText = 'text-align:center;padding:1.5rem;margin-top:1rem;border-top:2px solid var(--color-border);';
         const weakHtml = (weakConcepts && weakConcepts.length)
-            ? `<div style="font-size:0.85rem;color:#71717a;margin-top:0.75rem;">${gettext('Areas to revisit:')} <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
+            ? `<div style="font-size:0.85rem;color:var(--color-warm-500);margin-top:0.75rem;">${gettext('Areas to revisit:')} <strong>${weakConcepts.slice(0, 3).map(c => c).join(', ')}</strong></div>`
             : '';
         const attemptLabel = interpolate(ngettext('%s attempt', '%s attempts', attempts), [attempts]);
         const bestHtml = (bestPct !== null)
-            ? `<div style="font-size:0.8125rem;color:#71717a;margin-top:0.25rem;">${gettext('Your best:')} <strong>${bestPct}%</strong> · ${attemptLabel}</div>`
+            ? `<div style="font-size:0.8125rem;color:var(--color-warm-500);margin-top:0.25rem;">${gettext('Your best:')} <strong>${bestPct}%</strong> · ${attemptLabel}</div>`
             : '';
         const thresholdLine = interpolate(gettext('%(score)s% — passing threshold %(threshold)s%'), {score: scorePct, threshold: thresholdPct}, true);
         const statusMsg = passed ? gettext('Great work! You passed!') : gettext('Keep going — review the explanations above, then continue.');
         summaryDiv.innerHTML = `
-            <div style="font-size:2rem;font-weight:800;color:${passed ? '#10b981' : '#ef4444'};margin-bottom:0.25rem;">${score} / ${total}</div>
-            <div style="font-size:0.95rem;color:#71717a;">${thresholdLine}</div>
+            <div style="font-size:2rem;font-weight:800;color:${passed ? 'var(--color-success-solid)' : 'var(--color-danger-solid)'};margin-bottom:0.25rem;">${score} / ${total}</div>
+            <div style="font-size:0.95rem;color:var(--color-warm-500);">${thresholdLine}</div>
             ${bestHtml}
-            <div style="font-size:1rem;color:#71717a;margin-top:1rem;margin-bottom:0.5rem;">${statusMsg}</div>
+            <div style="font-size:1rem;color:var(--color-warm-500);margin-top:1rem;margin-bottom:0.5rem;">${statusMsg}</div>
             ${weakHtml}
-            <div style="font-size:0.8125rem;color:#a1a1aa;margin-top:1rem;margin-bottom:1.5rem;">${gettext('Scroll up to review your answers and explanations.')}</div>
-            <button onclick="continueAfterExit()" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
+            <div style="font-size:0.8125rem;color:var(--color-warm-400);margin-top:1rem;margin-bottom:1.5rem;">${gettext('Scroll up to review your answers and explanations.')}</div>
+            <button onclick="continueAfterExit()" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]" style="font-size:1rem;padding:0.75rem 2rem;border-radius:0.5rem;">
                 ${passed ? '✓ ' + gettext('Continue') : '→ ' + gettext('Continue to Review')}
             </button>
         `;
@@ -1620,7 +1620,14 @@ function renderArtifactIframe(html) {
     // CSP_STRICT_SCRIPTS is turned on — the iframe still renders, so the
     // breakage looks like a layout bug rather than a policy one.
     const resizeScript = '<script nonce="{{ request.csp_nonce }}">new ResizeObserver(()=>{parent.postMessage({type:"resize",height:document.body.scrollHeight},"*")}).observe(document.body)<\/script>';
-    const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:#18181b}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{padding:8px 12px;border:1px solid #e4e4e7;text-align:left}th{background:#f4f4f5;font-weight:600}tr:nth-child(even){background:#fafafa}svg{max-width:100%}</style></head><body>${clean}${resizeScript}</body></html>`;
+    // A srcdoc iframe is its own document and inherits none of this one's
+    // custom properties, so the tokens have to be copied across explicitly.
+    // Read from :root rather than written as literals — that is the whole
+    // point of the token file, and it means the panel follows a re-theme.
+    const t = getComputedStyle(document.documentElement);
+    const vars = ['text', 'border', 'surface-sunken', 'canvas']
+        .map(n => `--color-${n}:${t.getPropertyValue('--color-' + n).trim()}`).join(';');
+    const wrappedHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{${vars}}body{margin:0;padding:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;color:var(--color-text)}table{width:100%;border-collapse:collapse;margin:8px 0}th,td{padding:8px 12px;border:1px solid var(--color-border);text-align:left}th{background:var(--color-surface-sunken);font-weight:600}tr:nth-child(even){background:var(--color-canvas)}svg{max-width:100%}</style></head><body>${clean}${resizeScript}</body></html>`;
     const escaped = wrappedHtml.replace(/"/g, '&quot;');
     return `<div class="artifact-inline"><iframe sandbox="allow-scripts" srcdoc="${escaped}" style="width:100%;min-height:200px;border:none;border-radius:0.5rem;"></iframe></div>`;
 }
@@ -1678,7 +1685,7 @@ function renderPendingQuestionInArtifact(pq) {
         && /_{2,}/.test(pq.answer_data.text_template)
     );
     if (!_fibInlineWillRender) {
-        body += '<div class="bank-q-stem" style="font-size:1rem;line-height:1.5;color:#18181b;font-weight:500;">' + escapeHtml(pq.stem || '') + '</div>';
+        body += '<div class="bank-q-stem" style="font-size:1rem;line-height:1.5;color:var(--color-text);font-weight:500;">' + escapeHtml(pq.stem || '') + '</div>';
     }
 
     if (pq.question_type === 'mcq' && pq.options) {
@@ -1686,7 +1693,7 @@ function renderPendingQuestionInArtifact(pq) {
         for (const letter of ['A', 'B', 'C', 'D']) {
             const text = pq.options[letter];
             if (!text) continue;
-            body += '<label class="bank-q-option" style="display:flex;align-items:flex-start;gap:0.625rem;padding:0.625rem 0.75rem;background:#fff;border:1.5px solid #e4e4e7;border-radius:0.5rem;cursor:pointer;transition:all 0.15s;">';
+            body += '<label class="bank-q-option" style="display:flex;align-items:flex-start;gap:0.625rem;padding:0.625rem 0.75rem;background:var(--color-surface);border:1.5px solid var(--color-border);border-radius:0.5rem;cursor:pointer;transition:all 0.15s;">';
             body += '<input type="radio" name="bank-q-' + pq.question_id + '" value="' + letter + '" style="margin-top:0.25rem;flex-shrink:0;">';
             body += '<span style="flex:1;line-height:1.4;"><strong style="margin-right:0.375rem;">' + letter + '.</strong>' + escapeHtml(text) + '</span>';
             body += '</label>';
@@ -1700,13 +1707,13 @@ function renderPendingQuestionInArtifact(pq) {
         // box). Lets students think out loud without the grader
         // getting confused by their reasoning text.
         body += '<div style="display:flex;flex-direction:column;gap:0.625rem;">';
-        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:#52525b;">';
+        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:var(--color-warm-600);">';
         body += '<span style="font-weight:500;">Final answer</span>';
-        body += '<input type="text" class="bank-q-text" placeholder="e.g. 905" style="padding:0.625rem 0.75rem;border:1.5px solid #a855f7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;background:#fafafa;">';
+        body += '<input type="text" class="bank-q-text" placeholder="e.g. 905" style="padding:0.625rem 0.75rem;border:1.5px solid var(--color-brand-mid);border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;background:var(--color-canvas);">';
         body += '</label>';
-        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:#52525b;">';
-        body += '<span style="font-weight:500;">Show your working <span style="color:#a1a1aa;font-weight:400;">(optional)</span></span>';
-        body += '<textarea class="bank-q-working" rows="3" placeholder="' + gettext('Show how you got there — formulas, steps, reasoning…') + '" style="padding:0.5rem 0.625rem;border:1px solid #e4e4e7;border-radius:0.5rem;font-size:0.875rem;font-family:inherit;resize:vertical;background:#fff;"></textarea>';
+        body += '<label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.8125rem;color:var(--color-warm-600);">';
+        body += '<span style="font-weight:500;">Show your working <span style="color:var(--color-warm-400);font-weight:400;">(optional)</span></span>';
+        body += '<textarea class="bank-q-working" rows="3" placeholder="' + gettext('Show how you got there — formulas, steps, reasoning…') + '" style="padding:0.5rem 0.625rem;border:1px solid var(--color-border);border-radius:0.5rem;font-size:0.875rem;font-family:inherit;resize:vertical;background:var(--color-surface);"></textarea>';
         body += '</label>';
         body += '</div>';
     } else if (pq.question_type === 'fill_in_blank') {
@@ -1728,24 +1735,24 @@ function renderPendingQuestionInArtifact(pq) {
                 const idx = i++;
                 return '<input type="text" class="bank-q-blank" data-blank-index="' + idx + '" '
                     + 'placeholder="?" style="display:inline-block;width:8rem;margin:0 0.25rem;'
-                    + 'padding:0.25rem 0.5rem;border:1.5px solid #a855f7;border-bottom:2px solid #7c3aed;'
-                    + 'border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;background:#fafafa;">';
+                    + 'padding:0.25rem 0.5rem;border:1.5px solid var(--color-brand-mid);border-bottom:2px solid var(--color-primary);'
+                    + 'border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;background:var(--color-canvas);">';
             });
-            body += '<div style="line-height:2;font-size:0.9375rem;color:#3f3f46;background:#fafafa;'
-                + 'padding:0.75rem;border-radius:0.5rem;border:1px solid #e4e4e7;">' + rendered + '</div>';
+            body += '<div style="line-height:2;font-size:0.9375rem;color:var(--color-warm-700);background:var(--color-canvas);'
+                + 'padding:0.75rem;border-radius:0.5rem;border:1px solid var(--color-border);">' + rendered + '</div>';
             // If we created fewer inputs than expected (template had
             // fewer ___ than blanks list), pad with explicit inputs.
             for (let j = i; j < nBlanks; j++) {
                 body += '<input type="text" class="bank-q-blank" data-blank-index="' + j + '" '
                     + 'placeholder="Blank ' + (j+1) + '" style="padding:0.5rem;'
-                    + 'border:1.5px solid #e4e4e7;border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;">';
+                    + 'border:1.5px solid var(--color-border);border-radius:0.25rem;font-size:0.9375rem;font-family:inherit;">';
             }
         } else {
             // No template — just render N inputs.
             for (let j = 0; j < nBlanks; j++) {
                 body += '<input type="text" class="bank-q-blank" data-blank-index="' + j + '" '
                     + 'placeholder="Blank ' + (j+1) + '" style="padding:0.5rem;'
-                    + 'border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
+                    + 'border:1.5px solid var(--color-border);border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;">';
             }
         }
         body += '</div>';
@@ -1754,11 +1761,11 @@ function renderPendingQuestionInArtifact(pq) {
         // ships in R6; for now render a textarea so students can at
         // least answer in free text and the legacy text grader picks
         // it up.
-        body += '<textarea class="bank-q-text" placeholder="' + gettext('Your answer…') + '" rows="3" style="padding:0.625rem 0.75rem;border:1.5px solid #e4e4e7;border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;resize:vertical;"></textarea>';
+        body += '<textarea class="bank-q-text" placeholder="' + gettext('Your answer…') + '" rows="3" style="padding:0.625rem 0.75rem;border:1.5px solid var(--color-border);border-radius:0.5rem;font-size:0.9375rem;font-family:inherit;resize:vertical;"></textarea>';
     }
 
-    body += '<button class="bank-q-submit" type="button" style="align-self:flex-start;padding:0.5rem 1.25rem;background:#7c3aed;color:#fff;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;font-size:0.9375rem;">' + gettext('Submit answer') + '</button>';
-    body += '<div class="bank-q-status" style="font-size:0.8125rem;color:#71717a;min-height:1.2em;"></div>';
+    body += '<button class="bank-q-submit" type="button" style="align-self:flex-start;padding:0.5rem 1.25rem;background:var(--color-primary);color:var(--color-surface);border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;font-size:0.9375rem;">' + gettext('Submit answer') + '</button>';
+    body += '<div class="bank-q-status" style="font-size:0.8125rem;color:var(--color-warm-500);min-height:1.2em;"></div>';
     body += '</div>';
 
     artifactBody.innerHTML = body;
@@ -1777,13 +1784,13 @@ function bindBankQuestionHandlers(pq) {
     card.querySelectorAll('input[type=radio]').forEach(r => {
         r.addEventListener('change', () => {
             card.querySelectorAll('.bank-q-option').forEach(l => {
-                l.style.background = '#fff';
-                l.style.borderColor = '#e4e4e7';
+                l.style.background = 'var(--color-surface)';
+                l.style.borderColor = 'var(--color-border)';
             });
             const label = r.closest('.bank-q-option');
             if (label) {
-                label.style.background = '#f3e8ff';
-                label.style.borderColor = '#a855f7';
+                label.style.background = 'var(--color-accent-surface)';
+                label.style.borderColor = 'var(--color-brand-mid)';
             }
         });
     });
@@ -1858,10 +1865,10 @@ function bindBankQuestionHandlers(pq) {
             const verdict = data.verdict || {};
             const isCorrect = verdict.is_correct;
             if (isCorrect === true) {
-                statusEl.style.color = '#047857';
+                statusEl.style.color = 'var(--color-teal-ink)';
                 statusEl.textContent = '✓ Correct! Tutor is responding…';
             } else if (isCorrect === false) {
-                statusEl.style.color = '#b45309';
+                statusEl.style.color = 'var(--color-amber-ink)';
                 statusEl.textContent = '✗ Not quite — tutor will help…';
             } else {
                 statusEl.textContent = '✓ Submitted — see chat for tutor reply.';
@@ -1906,9 +1913,9 @@ function showResumePendingBanner() {
     const div = document.createElement('div');
     div.className = 'resume-pending-banner';
     div.style.cssText = 'margin:0.5rem auto;padding:0.625rem 1rem;'
-        + 'background:linear-gradient(90deg,#f3e8ff,#ede9fe);'
-        + 'border:1px solid #c4b5fd;border-radius:0.5rem;'
-        + 'font-size:0.8125rem;color:#5b21b6;text-align:center;'
+        + 'background:linear-gradient(90deg,var(--color-accent-surface),var(--color-accent-surface));'
+        + 'border:1px solid var(--color-brand-soft);border-radius:0.5rem;'
+        + 'font-size:0.8125rem;color:var(--color-primary-ink);text-align:center;'
         + 'max-width:36rem;display:flex;align-items:center;'
         + 'justify-content:center;gap:0.5rem;'
         + 'transition:opacity 0.5s;';
@@ -2077,14 +2084,14 @@ function showGroupmatePicker(mates, groupName) {
     modal.id = 'groupmate-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9000;';
     modal.innerHTML = `
-        <div style="background:#fff;border-radius:14px;padding:1.25rem 1.5rem;max-width:420px;width:90%;box-shadow:0 12px 36px rgba(0,0,0,0.18);">
-            <h3 style="margin:0 0 0.5rem;font-size:1.05rem;color:#111;">Add a groupmate</h3>
-            <p style="margin:0 0 1rem;font-size:0.85rem;color:#555;">
+        <div style="background:var(--color-surface);border-radius:14px;padding:1.25rem 1.5rem;max-width:420px;width:90%;box-shadow:0 12px 36px rgba(0,0,0,0.18);">
+            <h3 style="margin:0 0 0.5rem;font-size:1.05rem;color:var(--color-text);">Add a groupmate</h3>
+            <p style="margin:0 0 1rem;font-size:0.85rem;color:var(--color-warm-600);">
                 ${groupName ? `Tap a name from your group <strong>${groupName}</strong> to add them to this session.` : 'Tap a name to add them to this session.'}
             </p>
             <div id="mate-list" style="display:flex;flex-direction:column;gap:0.4rem;max-height:50vh;overflow-y:auto;"></div>
             <div style="text-align:right;margin-top:1rem;">
-                <button id="mate-cancel" style="border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:8px;padding:0.45rem 0.9rem;cursor:pointer;font-weight:500;">Close</button>
+                <button id="mate-cancel" style="border:1px solid var(--color-warm-300);background:var(--color-surface);color:var(--color-warm-700);border-radius:8px;padding:0.45rem 0.9rem;cursor:pointer;font-weight:500;">Close</button>
             </div>
         </div>
     `;
@@ -2093,9 +2100,9 @@ function showGroupmatePicker(mates, groupName) {
     mates.forEach(m => {
         const row = document.createElement('button');
         row.textContent = m.display_name || m.username;
-        row.style.cssText = 'width:100%;text-align:left;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:0.6rem 0.85rem;cursor:pointer;font-size:0.95rem;color:#111;';
-        row.onmouseover = () => { row.style.background = '#f3f4f6'; };
-        row.onmouseout = () => { row.style.background = '#f9fafb'; };
+        row.style.cssText = 'width:100%;text-align:left;background:var(--color-canvas);border:1px solid var(--color-surface-hover);border-radius:10px;padding:0.6rem 0.85rem;cursor:pointer;font-size:0.95rem;color:var(--color-text);';
+        row.onmouseover = () => { row.style.background = 'var(--color-surface-sunken)'; };
+        row.onmouseout = () => { row.style.background = 'var(--color-canvas)'; };
         row.onclick = () => {
             modal.remove();
             addParticipantById(m.user_id, m.display_name || m.username);
@@ -2496,7 +2503,7 @@ function renderProbeWidget(probe) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.textContent = sym;
-                btn.style.cssText = 'font-size:0.9rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:#5b21b6;font-weight:600;';
+                btn.style.cssText = 'font-size:0.9rem;padding:0.18rem 0.5rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-primary-ink);font-weight:600;';
                 btn.addEventListener('click', () => {
                     if (locked) return;
                     const start = input.selectionStart || 0;
@@ -2651,7 +2658,7 @@ function applyTutorResponse(data) {
     if (data.pending_question) {
         renderPendingQuestionInArtifact(data.pending_question);
     }
-    // 2026-05-17 (task #182): follow_up_message — second tutor bubble
+    // 2026-05-17 (task 182): follow_up_message — second tutor bubble
     // emitted on the same response when the engine split a move-on
     // turn into ack (bubble A) + new question pose (bubble B).
     // Render bubble B after a short delay so the chat feels like two

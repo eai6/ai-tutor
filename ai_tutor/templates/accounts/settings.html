@@ -86,7 +86,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.6rem 0;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--color-surface-hover);
         font-size: 0.9rem;
     }
     .read-only-row:last-child { border-bottom: none; }
@@ -102,7 +102,7 @@
         font-size: 0.9rem;
         margin-bottom: 0.5rem;
     }
-    .alert-success { background: rgba(0, 184, 148, 0.12); color: #0a7857; }
+    .alert-success { background: rgba(0, 184, 148, 0.12); color: var(--color-teal-ink); }
     .alert-error { background: rgba(255, 118, 117, 0.12); color: var(--color-danger); }
 
     .danger-zone {
@@ -204,7 +204,7 @@
                 </select>
                 <p class="helptext">{% trans "Sets the language the platform UI displays in. Blank means follow your school's default. Course chat sessions always render in the course's language regardless." %}</p>
             </div>
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save profile" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save profile" %}</button>
         </form>
     </section>
 
@@ -265,7 +265,7 @@
                 {% endif %}
             </p>
             {% endif %}
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save tutor choice" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Save tutor choice" %}</button>
         </form>
     </section>
     {% endif %}
@@ -302,7 +302,7 @@
                 <ul class="errorlist">{% for e in password_form.new_password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>
                 {% endif %}
             </div>
-            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Change password" %}</button>
+            <button type="submit" class="btn btn-primary inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-coral-fill rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)]">{% trans "Change password" %}</button>
         </form>
     </section>
 
@@ -334,7 +334,7 @@
     <section class="panel danger-zone">
         <h2>{% trans "Delete account" %}</h2>
         <p class="panel-sub">{% trans "Permanently remove your account and all data we hold for you. This cannot be undone." %}</p>
-        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[#fff] hover:bg-danger hover:border-danger hover:text-[#fff]">{% trans "Delete my account" %}</a>
+        <a href="{% url 'accounts:delete_account' %}" class="btn btn-danger inline-flex items-center justify-center gap-2 min-h-12 py-3 px-6 border border-danger-solid rounded-full font-body text-md font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-danger-solid text-[var(--color-surface)] hover:bg-danger hover:border-danger hover:text-[var(--color-surface)]">{% trans "Delete my account" %}</a>
     </section>
 </div>
 {% endblock %}

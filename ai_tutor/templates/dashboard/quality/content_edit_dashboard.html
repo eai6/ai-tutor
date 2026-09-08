@@ -109,7 +109,7 @@
                     <span style="color: var(--color-warm-500);">{{ count }}</span>
                 </div>
                 <div style="height: 8px; background: var(--color-warm-100); border-radius: 4px; overflow: hidden;">
-                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, var(--color-accent), #ec4899);"></div>
+                    <div style="height: 100%; width: {% widthratio count max_tag 100 %}%; background: linear-gradient(90deg, var(--color-accent), var(--color-rose-solid));"></div>
                 </div>
             </div>
             {% empty %}
@@ -157,7 +157,7 @@
                     <td style="padding: 0.5rem; font-family: monospace;">{{ jname }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: var(--color-warm-600);">{{ m.support }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: var(--color-success);">{{ m.tp }}</td>
-                    <td style="padding: 0.5rem; text-align: right; color: #b45309;">{{ m.fp }}</td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--color-amber-ink);">{{ m.fp }}</td>
                     <td style="padding: 0.5rem; text-align: right; color: var(--color-danger);">{{ m.fn }}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.precision is not None %}{{ m.precision|floatformat:2 }}{% else %}—{% endif %}</td>
                     <td style="padding: 0.5rem; text-align: right;">{% if m.recall is not None %}{{ m.recall|floatformat:2 }}{% else %}—{% endif %}</td>

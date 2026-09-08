@@ -100,6 +100,12 @@ def _superadmin_context(request, selected):
         'can_add_schools': True,
         'can_manage_people': True,
         'can_edit_school_settings': True,
+        # For any country, not one: a platform admin has no country of its
+        # own, so the staff page asks it which. Self-registration claims a
+        # country once, which would otherwise leave the people who run the
+        # platform unable to open one — or to get back into a country whose
+        # only account holder has gone.
+        'can_manage_country_team': True,
     }
 
 
@@ -135,6 +141,11 @@ def _country_context(request, membership, selected):
         'can_add_schools': True,
         'can_manage_people': True,
         'can_edit_school_settings': True,
+        # A country account is the only one whose team is not a school's. It
+        # is also now the only way into a country: self-registration is one
+        # account per country, so whoever holds it adds the rest of the
+        # ministry here or nobody else gets in.
+        'can_manage_country_team': True,
     }
 
 
@@ -159,6 +170,7 @@ def _school_admin_context(request, membership):
         'can_add_schools': False,
         'can_manage_people': True,
         'can_edit_school_settings': True,
+        'can_manage_country_team': False,
     }
 
 
@@ -210,6 +222,7 @@ def _staff_context(request, selected):
         'can_add_schools': False,
         'can_manage_people': False,
         'can_edit_school_settings': False,
+        'can_manage_country_team': False,
     }
 
 
@@ -308,6 +321,13 @@ def may_manage(staff_ctx, target):
     either. That is deliberate: it means the staff page's find-by-email box
     cannot be used to enumerate the platform's users, and it is why adding
     someone genuinely new goes through an invitation instead.
+
+    A country account's own team is the exception, and it is checked before
+    the school list because it does not appear in one: a ministry colleague
+    holds a CountryMembership and no Membership at all. Without this branch a
+    country account could create a colleague it could never afterwards
+    deactivate — and, for a country with no schools yet, `ids` is empty and
+    nobody is reachable at all.
     """
     if target is None:
         return False
@@ -316,6 +336,10 @@ def may_manage(staff_ctx, target):
         return True
     if target.is_staff or target.is_superuser:
         return False
+    if staff_ctx.get('can_manage_country_team') and staff_ctx.get('country'):
+        if CountryMembership.objects.filter(
+                user=target, country=staff_ctx['country']).exists():
+            return True
     if not ids:
         return False
     return Membership.objects.filter(

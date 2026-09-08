@@ -60,6 +60,34 @@ class Country(models.Model):
         return flag(self.iso_code)
 
     @classmethod
+    def get_or_create_by_iso(cls, iso_code):
+        """The row for this ISO 3166-1 alpha-2 code, made if it is not there.
+
+        A country arrives on the platform through one of two doors — a
+        ministry signing itself up, or a platform admin opening it for them —
+        and both have to land on the same row. Matching on the code rather
+        than the name is what keeps that true: the rows made by hand carry
+        whatever slug someone typed ('seychelles' here, 'tz' there), and a row
+        the lookup fails to match is a row it creates a second time, with a
+        country's schools split between the two and each invisible to the
+        other. That is the whole reason `iso_code` exists, so the lookup lives
+        here rather than at each door.
+
+        Raises KeyError on a code that is not a country, which both callers
+        already refuse before reaching this.
+        """
+        from django.utils.text import slugify
+
+        from ai_tutor.apps.accounts.countries import BY_CODE
+
+        name = BY_CODE[iso_code]
+        country, _created = cls.objects.get_or_create(
+            iso_code=iso_code,
+            defaults={'name': name, 'slug': slugify(name)[:50]},
+        )
+        return country
+
+    @classmethod
     def get_platform(cls):
         """The hidden country a record falls back to when none is given.
 
@@ -517,11 +545,11 @@ class PlatformConfig(models.Model):
     Singleton model for platform-wide configuration (branding, grades, etc.).
     Superadmins can edit these via the Settings page.
     """
-    platform_name = models.CharField(max_length=255, default='AI Tutor')
+    platform_name = models.CharField(max_length=255, default='Sesel AI')
 
     # Branding (platform-wide)
     logo = models.ImageField(upload_to='platform_logos/', blank=True, null=True)
-    primary_color = models.CharField(max_length=7, default='#E8590C')
+    primary_color = models.CharField(max_length=7, default='#003BA4')
     secondary_color = models.CharField(max_length=7, default='#4ECDC4')
     accent_color = models.CharField(max_length=7, default='#FFE66D')
 

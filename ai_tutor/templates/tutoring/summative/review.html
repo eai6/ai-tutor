@@ -16,7 +16,7 @@
         box-shadow: 0 12px 32px rgba(91,33,182,0.25);
     }
     .rv-hero.failed {
-        background: linear-gradient(135deg, #b45309 0%, var(--color-warning-solid) 100%);
+        background: linear-gradient(135deg, var(--color-amber-ink) 0%, var(--color-warning-solid) 100%);
         box-shadow: 0 12px 32px rgba(180,83,9,0.25);
     }
     .rv-score { font-size: 2.6rem; font-weight: 800; line-height: 1; }
@@ -36,7 +36,7 @@
     .rv-stem .num { display: inline-block; background: var(--color-surface-sunken); color: var(--color-accent); padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem; }
     .rv-row { font-size: 0.86rem; color: var(--color-text-secondary); margin: 0.3rem 0; }
     .rv-row strong { color: var(--color-text); }
-    .rv-row.you { color: #6b21a8; }
+    .rv-row.you { color: var(--color-primary-ink); }
     .rv-row.correct { color: var(--color-success); }
     .rv-row.expl { color: var(--color-text-muted); font-style: italic; margin-top: 0.5rem; }
     .rv-fig { margin: 0.5rem 0; max-width: 100%; }
@@ -51,7 +51,7 @@
         justify-content: space-between;
         font-size: 0.86rem;
     }
-    .rv-objective.weak { background: var(--color-danger-surface); border-color: #fca5a5; }
+    .rv-objective.weak { background: var(--color-danger-surface); border-color: var(--color-rose-border); }
 </style>
 
 <div class="rv-wrap">
@@ -154,7 +154,7 @@
            onclick="return confirm('Take the summative again? Your previous attempts stay in the record — this is for tracking growth over time.');">
             🔁 Retake summative
         </a>
-        <a href="{% url 'tutoring:catalog' %}" style="background:var(--color-surface);color:var(--color-accent);border:1.5px solid #ddd6fe;padding:0.65rem 1.4rem;border-radius:999px;font-weight:600;text-decoration:none;font-size:0.92rem;">← Back to lessons</a>
+        <a href="{% url 'tutoring:catalog' %}" style="background:var(--color-surface);color:var(--color-accent);border:1.5px solid var(--color-coral-edge);padding:0.65rem 1.4rem;border-radius:999px;font-weight:600;text-decoration:none;font-size:0.92rem;">← Back to lessons</a>
     </div>
 </div>
 {% endblock %}

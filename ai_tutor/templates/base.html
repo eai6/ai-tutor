@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="{{ theme_primary|default:'#FF6B35' }}">
+    <meta name="theme-color" content="{{ theme_primary }}">
     {% comment %}
     The only place JavaScript may obtain the CSRF token. The cookie is
     HttpOnly (assessment finding F-05), so script cannot read it back —
@@ -52,7 +52,7 @@
             --color-coral: {{ theme_primary }};
             --color-coral-fill: {{ theme_primary_dark|default:theme_primary }};
             --color-coral-ink: {{ theme_primary_dark|default:theme_primary }};
-            --color-coral-tint: {{ theme_primary_light|default:'#FFF1EA' }};
+            --color-coral-tint: {{ theme_primary_light }};
         }
     </style>
     {% endif %}
@@ -75,7 +75,7 @@ restore by un-commenting the include below.
 {% include '_includes/_baseline_recommend_banner.html' %}
 
 {# id and class are read by static/js/network-helpers.js — keep both. #}
-<div class="offline-banner fixed top-0 right-0 left-0 bottom-auto z-1000 flex items-center justify-center gap-2 py-2 px-4 bg-text text-[#fff] text-sm font-bold shadow-[var(--shadow-md)] animate-[slide-down_var(--dur-base)_var(--ease-out)] [&_.icon]:text-[1rem]" id="offline-banner" role="status" hidden>
+<div class="offline-banner fixed top-0 right-0 left-0 bottom-auto z-1000 flex items-center justify-center gap-2 py-2 px-4 bg-text text-[var(--color-surface)] text-sm font-bold shadow-[var(--shadow-md)] animate-[slide-down_var(--dur-base)_var(--ease-out)] [&_.icon]:text-[1rem]" id="offline-banner" role="status" hidden>
     {% icon "wifi-off" %}
     <span>{% trans "You're offline — messages will send when you reconnect." %}</span>
 </div>
@@ -91,12 +91,12 @@ restore by un-commenting the include below.
         {% endcomment %}
         <a href="{% url 'accounts:landing' %}" class="flex items-center gap-3 no-underline text-text rounded-sm min-w-0">
             {% if theme_logo_url %}
-            <img src="{{ theme_logo_url }}" alt="" class="max-[640px]:w-[34px] max-[640px]:h-[34px] w-[38px] h-[38px] flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">
+            <img src="{{ theme_logo_url }}" alt="" class="max-[640px]:w-[34px] max-[640px]:h-[34px] w-[38px] h-[38px] flex-none rounded-sm object-cover grid place-items-center bg-coral text-[var(--color-surface)]">
             {% else %}
-            <span class="max-[640px]:w-[34px] max-[640px]:h-[34px] w-[38px] h-[38px] flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">{% icon "courses" size="md" %}</span>
+            <span class="max-[640px]:w-[34px] max-[640px]:h-[34px] w-[38px] h-[38px] flex-none rounded-sm object-cover grid place-items-center bg-coral text-[var(--color-surface)]">{% icon "courses" size="md" %}</span>
             {% endif %}
             <span class="font-display text-md font-bold tracking-tight leading-[1.15] overflow-hidden truncate whitespace-nowrap">
-                {{ theme_institution_name|default:"AI Tutor" }}
+                {{ theme_institution_name|default:"Sesel AI" }}
                 <span class="max-[640px]:hidden block font-mono text-2xs tracking-wide uppercase text-text-muted mt-[1px]">{% trans "Learn" %}</span>
             </span>
         </a>
@@ -132,7 +132,7 @@ restore by un-commenting the include below.
             </div>
         </details>
         {% else %}
-        <a href="{% url 'accounts:login' %}" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)] active:shadow-[var(--shadow-xs)]" style="margin-left:auto">{% trans "Sign in" %}</a>
+        <a href="{% url 'accounts:login' %}" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)] active:shadow-[var(--shadow-xs)]" style="margin-left:auto">{% trans "Sign in" %}</a>
         {% endif %}
     </div>
 </header>

@@ -28,7 +28,7 @@
         </div>
         <div>
             <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--color-warm-700);">{% trans "After" %}</h3>
-            <pre style="background: var(--color-success-surface); border: 1px solid #bbf7d0; border-radius: 0.375rem; padding: 0.75rem; font-size: 0.8125rem; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow: auto;">{% for k,v in event.after_payload.items %}{{ k }}: {{ v }}
+            <pre style="background: var(--color-success-surface); border: 1px solid var(--color-green-surface); border-radius: 0.375rem; padding: 0.75rem; font-size: 0.8125rem; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow: auto;">{% for k,v in event.after_payload.items %}{{ k }}: {{ v }}
 {% endfor %}</pre>
         </div>
     </div>

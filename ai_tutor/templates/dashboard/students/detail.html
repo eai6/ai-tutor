@@ -53,7 +53,7 @@
                 {% endif %}
                 <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('{% blocktrans with name=student.username %}Permanently delete student account &quot;{{ name }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.{% endblocktrans %}');">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-danger-surface);color:var(--color-danger);border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
+                    <button type="submit" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="background:var(--color-danger-surface);color:var(--color-danger);border:1px solid var(--color-rose-border);border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
                 </form>
             </div>
         </div>
@@ -127,7 +127,7 @@
                                 {% endif %}
                             </div>
                             {% if lesson.weak_concepts %}
-                            <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
+                            <div style="margin-top:0.3rem;font-size:0.75rem;color:var(--color-amber-ink);">
                                 {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:var(--color-warning-surface);padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
                             </div>
                             {% endif %}

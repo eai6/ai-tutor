@@ -70,7 +70,7 @@ that refers to them keeps working):
     transition: opacity 0.15s;
 }
 .exit-modal-shell .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.exit-modal-shell .submit-btn:not(:disabled):hover { background: #27272a; }
+.exit-modal-shell .submit-btn:not(:disabled):hover { background: var(--color-warm-800); }
 
 /* ── Exit-ticket section + question styles ── */
 .exit-progress {
@@ -106,8 +106,8 @@ that refers to them keeps working):
     color: var(--color-surface);
     flex-shrink: 0;
 }
-.section-letter-A { background: var(--color-info-solid); }
-.section-letter-B { background: #ec4899; }
+.section-letter-A { background: var(--color-info); }
+.section-letter-B { background: var(--color-rose-solid); }
 .section-letter-C { background: var(--color-accent-solid); }
 .section-letter-D { background: var(--color-success-solid); }
 .section-name { font-size: 1rem; font-weight: 700; color: var(--color-text); }
@@ -134,7 +134,7 @@ that refers to them keeps working):
     transition: all 0.15s;
     font-size: 0.9375rem;
 }
-.option:hover { border-color: #a1a1aa; }
+.option:hover { border-color: var(--color-warm-400); }
 .option.selected { border-color: var(--color-text); background: var(--color-surface-sunken); }
 .option.correct { border-color: var(--color-success-solid); background: var(--color-success-surface); }
 .option.incorrect { border-color: var(--color-danger-solid); background: var(--color-danger-surface); }
@@ -156,7 +156,7 @@ that refers to them keeps working):
     display: inline-block;
     width: 120px;
     padding: 0.25rem 0.5rem;
-    border: 2px solid #a1a1aa;
+    border: 2px solid var(--color-warm-400);
     border-radius: 0.375rem;
     font-size: 0.9375rem;
     text-align: center;
@@ -178,7 +178,7 @@ that refers to them keeps working):
     background: var(--color-surface-sunken);
     border-radius: 0.375rem;
 }
-.matching-arrow { color: #a1a1aa; font-size: 1.25rem; }
+.matching-arrow { color: var(--color-warm-400); font-size: 1.25rem; }
 .matching-select {
     flex: 1;
     padding: 0.5rem;
@@ -188,8 +188,8 @@ that refers to them keeps working):
     background: var(--color-surface);
 }
 .matching-select:focus { border-color: var(--color-text); outline: none; }
-.matching-row.answered { background: #f8fafc; border-radius: 0.375rem; }
-.matching-row.answered .matching-left { background: #e0f2fe; }
+.matching-row.answered { background: var(--color-canvas); border-radius: 0.375rem; }
+.matching-row.answered .matching-left { background: var(--color-accent-surface); }
 
 .exit-textarea {
     width: 100%;
@@ -205,8 +205,8 @@ that refers to them keeps working):
 
 .data-description {
     padding: 0.75rem;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--color-canvas);
+    border: 1px solid var(--color-surface-hover);
     border-radius: 0.5rem;
     font-size: 0.875rem;
     margin-bottom: 0.75rem;
@@ -218,7 +218,7 @@ that refers to them keeps working):
     margin-top: 0.75rem;
     padding: 0.625rem 0.875rem;
     background: var(--color-success-surface);
-    border: 1px solid #6ee7b7;
+    border: 1px solid var(--color-green-border);
     border-radius: 0.5rem;
     color: var(--color-success);
     font-size: 0.875rem;
@@ -228,7 +228,7 @@ that refers to them keeps working):
     margin-top: 0.75rem;
     padding: 0.625rem 0.875rem;
     background: var(--color-danger-surface);
-    border: 1px solid #fca5a5;
+    border: 1px solid var(--color-rose-border);
     border-radius: 0.5rem;
     color: var(--color-danger);
     font-size: 0.875rem;
@@ -238,7 +238,7 @@ that refers to them keeps working):
 .exit-correct-answer {
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: #f0fdf4;
+    background: var(--color-teal-tint);
     border-left: 3px solid var(--color-success-solid);
     border-radius: 0 0.375rem 0.375rem 0;
     font-size: 0.8125rem;
@@ -464,12 +464,12 @@ function showExitTicket() {
                         dataDesc = `<div class="data-description">${escapeHtml(ad.data_description)}</div>`;
                     }
                 } else if (ad.figure_description) {
-                    dataDesc = `<div class="data-description" style="font-style:italic;color:#52525b;">${escapeHtml(ad.figure_description)}</div>`;
+                    dataDesc = `<div class="data-description" style="font-style:italic;color:var(--color-warm-600);">${escapeHtml(ad.figure_description)}</div>`;
                 }
                 const mathBar = `
                     <div class="math-toolbar" data-q="${origIdx}" style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.4rem;">
                         ${['°','π','√','²','³','±','≤','≥','≠','×','÷','½','¼','¾'].map(sym =>
-                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">${sym}</button>`
+                            `<button type="button" class="math-sym-btn" onclick="insertMathSymbol(${origIdx}, '${sym}')" style="font-size:0.95rem;padding:0.18rem 0.5rem;background:var(--color-accent-surface);border:1px solid var(--color-coral-edge);border-radius:6px;cursor:pointer;color:var(--color-accent);font-weight:600;">${sym}</button>`
                         ).join('')}
                     </div>`;
                 bodyHTML = `${dataDesc}${mathBar}

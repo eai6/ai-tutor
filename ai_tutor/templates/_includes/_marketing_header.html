@@ -14,30 +14,80 @@ in stays reachable without scrolling past the explainer.
     <div class="lp-wrap max-[640px]:px-4 w-full max-w-[var(--lp-max)] my-0 mx-auto px-6 max-sm:flex-wrap max-sm:gap-y-2 flex items-center gap-4 py-4">
         <a href="{% url 'accounts:landing' %}" class="flex items-center gap-3 no-underline text-text">
             {% if theme_logo_url %}
-            <img src="{{ theme_logo_url }}" alt="" class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">
+            <img src="{{ theme_logo_url }}" alt="" class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[var(--color-surface)]">
             {% else %}
-            <span class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[#fff]">{% icon "courses" size="md" %}</span>
+            <span class="w-10 h-10 flex-none rounded-sm object-cover grid place-items-center bg-coral text-[var(--color-surface)]">{% icon "courses" size="md" %}</span>
             {% endif %}
-            <span class="max-[640px]:whitespace-nowrap font-display text-md font-bold tracking-tight">{{ theme_institution_name|default:"AI Tutor" }}</span>
+            {% comment %}
+            Name over descriptor, the lockup the dashboard sidebar already
+            uses. "Sesel AI" is what the platform is called — the domain has
+            been seselai.sc all along — and "AI Tutor" is what it is, which
+            a first-time visitor needs and a returning one does not. The
+            descriptor goes at the 640px cut with the secondary buttons: on a
+            phone the name has to survive, the gloss does not.
+            {% endcomment %}
+            <span class="flex flex-col justify-center leading-[1.15]">
+                <span class="whitespace-nowrap font-display text-md font-bold tracking-tight">{{ theme_institution_name|default:"Sesel AI" }}</span>
+                <span class="max-[640px]:hidden whitespace-nowrap font-mono text-2xs tracking-wide uppercase text-text-muted">{% trans "AI Tutor" %}</span>
+            </span>
         </a>
+
+        <span class="sm:hidden max-sm:basis-full max-sm:[order:2] max-sm:border-t max-sm:border-t-border h-0" aria-hidden="true"></span>
 
         {% comment %}
         The wordmark already goes home, but a wordmark is a convention rather
         than a label — "Home" is the word someone looks for, and with a second
         destination in the bar the first one has to be named to be a choice.
         {% endcomment %}
-        <nav class="max-sm:[order:3] max-sm:basis-full max-sm:ml-0 max-sm:pt-1 max-sm:border-t max-sm:border-t-border flex items-center gap-4 ml-6" aria-label="{% trans 'Main' %}">
+        <nav class="max-sm:[order:3] max-sm:ml-0 flex items-center gap-4 ml-6" aria-label="{% trans 'Main' %}">
             <a href="{% url 'accounts:landing' %}" class="lp-header__link max-sm:pt-1 font-body text-base font-medium text-text-secondary no-underline py-2 px-0 border-b-[2px] border-b-transparent [transition:color_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out)] hover:text-text [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:border-b-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:rounded-xs"
                {% if nav_current == 'home' %}aria-current="page"{% endif %}>{% trans "Home" %}</a>
-            {% if nav_current != 'home' %}
             <a href="{% url 'docs:index' %}" class="lp-header__link max-sm:pt-1 font-body text-base font-medium text-text-secondary no-underline py-2 px-0 border-b-[2px] border-b-transparent [transition:color_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out)] hover:text-text [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:border-b-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:rounded-xs"
-               {% if nav_current == 'docs' %}aria-current="page"{% endif %}>{% trans "Country Adoption" %}</a>
-            {% endif %}
+               {% if nav_current == 'docs' %}aria-current="page"{% endif %}>{% trans "Enterprise Adaptation" %}</a>
         </nav>
 
-        <div class="lp-header__actions max-[640px]:[&_.btn--secondary]:hidden max-[640px]:[&_.btn]:px-4 max-[640px]:[&_.btn]:whitespace-nowrap ml-auto flex items-center gap-2">
+        <div class="lp-header__actions max-[640px]:[&_.btn--secondary]:hidden max-[640px]:[&_.btn]:px-4 max-[640px]:[&_.btn]:whitespace-nowrap ml-auto flex flex-wrap items-center justify-end gap-2">
             <a href="{% url 'accounts:staff_login' %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text">{% trans "Teacher/Admin sign in" %}</a>
-            <a href="{% url 'accounts:student_login' %}" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[#fff] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[#fff] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)] active:shadow-[var(--shadow-xs)]">{% trans "Student sign in" %}</a>
+            <a href="{% url 'accounts:student_login' %}" class="btn btn--primary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-coral-fill rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-coral-fill text-[var(--color-surface)] shadow-[var(--shadow-sm)] hover:bg-coral-ink hover:border-coral-ink hover:text-[var(--color-surface)] hover:[transform:translateY(-1px)] hover:shadow-[var(--shadow-md)] active:[transform:translateY(0)] active:shadow-[var(--shadow-xs)]">{% trans "Student sign in" %}</a>
+            <a href="{% url 'accounts:country_login' %}" class="btn btn--secondary btn--sm inline-flex items-center justify-center gap-2 min-h-10 py-2 px-4 border border-border-strong rounded-full font-body text-base font-bold leading-[1.2] no-underline cursor-pointer [transition:background_var(--dur-fast)_var(--ease-out),_transform_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-55 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-surface text-text-secondary hover:bg-surface-hover hover:text-text">{% trans "Enterprise sign in" %}</a>
         </div>
+
+        {% comment %}
+        The language picker sits with the sign-in doors rather than in the
+        footer: choosing what to read in is a decision someone makes on
+        arrival, and a footer control is one someone has to already be
+        looking for. It survives the 640px cut that hides the secondary
+        buttons — it is not a .btn — because reading the page at all
+        depends on it.
+
+        A select rather than a button per language: the row was fine at
+        two and stops being a row at four. Labels are language-only; the
+        country-forward names in settings.LANGUAGES are for a teacher
+        choosing a course locale, not a visitor choosing what to read.
+
+        The submit button is real, not a progressive-enhancement stub —
+        static/js/lang-switch.js hides it and submits on change. With no
+        script the picker still works, which the offline classroom build
+        depends on.
+        {% endcomment %}
+        {% get_current_language as CURRENT_LANG %}
+        <form action="{% url 'set_language' %}" method="post"
+              class="max-sm:[order:4] max-sm:ml-auto max-[640px]:pl-2 inline-flex items-center gap-2 pt-[2px] pr-[2px] pb-[2px] pl-3 bg-surface-sunken border border-border rounded-full" data-lang-switch>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <label class="inline-flex items-center text-text-muted" for="lang-switch-select">
+                {% icon "globe" size="sm" %}
+                <span class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% trans "Language" %}</span>
+            </label>
+            <select name="language" id="lang-switch-select"
+                    class="lang-switch__select max-[640px]:pr-6 [appearance:none] pt-1 pr-8 pb-1 pl-2 border-0 rounded-full bg-transparent [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236E6157'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*3)_center] [background-size:0.85rem] font-body text-xs font-bold leading-[1.8] text-text cursor-pointer hover:bg-surface-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)]"
+                    data-current="{{ CURRENT_LANG }}">
+                {% for code, label in LANGUAGES %}
+                <option value="{{ code }}"
+                        {% if code|lower == CURRENT_LANG|lower %}selected{% endif %}>{{ code|language_label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="lang-switch__go py-1 px-3 mr-[2px] border-0 rounded-full bg-surface shadow-[var(--shadow-xs)] font-body text-xs font-bold text-text cursor-pointer [&[hidden]]:hidden" data-lang-go>{% trans "Go" %}</button>
+        </form>
     </div>
 </header>

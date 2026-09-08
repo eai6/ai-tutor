@@ -87,7 +87,7 @@
     .step-number { width: 28px; height: 28px; border-radius: 50%; background: var(--color-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; }
     .step-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; padding: 0.375rem 0.75rem; border-radius: 20px; }
     .step-status.processing { background: var(--color-info-surface); color: var(--color-info); }
-    .step-status.review { background: var(--color-warning-surface); color: #B45309; }
+    .step-status.review { background: var(--color-warning-surface); color: var(--color-amber-ink); }
     .step-status.completed { background: var(--color-success-surface); color: var(--color-success); }
     .step-body { padding: 1.5rem; }
     
@@ -179,7 +179,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     
     /* Info Box */
-    .info-box { background: var(--color-info-surface); border: 1px solid #BFDBFE; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; }
+    .info-box { background: var(--color-info-surface); border: 1px solid var(--color-coral-edge); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.75rem; }
     .info-box-icon { font-size: 1.25rem; }
     .info-box-content { flex: 1; }
     .info-box-title { font-weight: 600; color: var(--color-info); margin-bottom: 0.25rem; }
@@ -406,7 +406,7 @@
                     </div>
                     <div class="lesson-review-list">
                         <!-- Unit-level terminal objectives (editable) -->
-                        <div style="padding:0.75rem 1rem;background:#f8fafc;border-bottom:1px solid var(--color-warm-200);">
+                        <div style="padding:0.75rem 1rem;background:var(--color-canvas);border-bottom:1px solid var(--color-warm-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                                 <div style="font-size:0.75rem;font-weight:700;color:var(--color-info-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Terminal Objectives (Assessment Targets)" %}</div>
                                 <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.6875rem;padding:2px 8px;background:var(--color-accent-surface);color:var(--color-info-solid);border:1px solid var(--color-accent-border);border-radius:4px;" onclick="addObjective(this, 'to')">+ {% trans "Add TO" %}</button>
@@ -426,7 +426,7 @@
 
                         <!-- Unit-level enabling objectives / teaching steps (editable) -->
                         {% if unit.enabling_objectives %}
-                        <div style="padding:0.75rem 1rem;background:#f0fdf4;border-bottom:1px solid var(--color-warm-200);">
+                        <div style="padding:0.75rem 1rem;background:var(--color-teal-tint);border-bottom:1px solid var(--color-warm-200);">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                                 <div style="font-size:0.75rem;font-weight:700;color:var(--color-success-solid);text-transform:uppercase;letter-spacing:0.05em;">{% trans "Enabling Objectives (Teaching Steps)" %}</div>
                                 <button type="button" class="btn btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-transparent rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none" style="font-size:0.6875rem;padding:2px 8px;background:var(--color-success-surface);color:var(--color-success-solid);border:1px solid var(--color-success-border);border-radius:4px;" onclick="addObjective(this, 'eo')">+ {% trans "Add EO" %}</button>
@@ -531,7 +531,7 @@
     
     {% elif upload.status == 'failed' %}
     <!-- Failed State -->
-    <div class="step-card" style="border: 2px solid #FCA5A5;">
+    <div class="step-card" style="border: 2px solid var(--color-rose-border);">
         <div class="step-header" style="background: var(--color-danger-surface);">
             <div class="step-title" style="color: var(--color-danger);">❌ Processing Failed</div>
         </div>

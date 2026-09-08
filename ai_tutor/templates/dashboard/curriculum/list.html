@@ -120,7 +120,7 @@
                 </tr>
                 <tr>
                     <td colspan="7" style="padding: 0.25rem 1rem 0.5rem; border-top: none;">
-                        <button onclick="var row=document.getElementById('materials-row-{{ c.course.id }}'); var isHidden=row.style.display==='none'; row.style.display=isHidden?'table-row':'none'; this.querySelector('.arrow').textContent=isHidden?'▾':'▸'; " style="background: none; border: none; cursor: pointer; font-size: 0.8125rem; color: var(--primary, #4f46e5); padding: 0;">
+                        <button onclick="var row=document.getElementById('materials-row-{{ c.course.id }}'); var isHidden=row.style.display==='none'; row.style.display=isHidden?'table-row':'none'; this.querySelector('.arrow').textContent=isHidden?'▾':'▸'; " style="background: none; border: none; cursor: pointer; font-size: 0.8125rem; color: var(--primary, var(--color-primary)); padding: 0;">
                             <span class="arrow">▸</span> {% blocktrans with count=c.material_count %}Materials ({{ count }}){% endblocktrans %}
                         </button>
                     </td>

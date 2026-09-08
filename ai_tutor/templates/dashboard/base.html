@@ -48,9 +48,9 @@
     Institution theming. These three land in the primitive layer of
     tokens.css and everything else derives from them, so a school's brand
     colour still flows through the whole page. --primary-ink is the
-    AA-contrast text version of the brand colour: #E8590C on white is 3.6:1,
-    which is fine for a bar or a fill but fails for text, and the old sheet
-    used it for both.
+    AA-contrast text version of the brand colour: the orange this wore until
+    the platform was named measured 3.6:1 on white, which is fine for a bar or
+    a fill and a failure for text, and the old sheet used it for both.
     {% endcomment %}
     {% if theme_primary %}
     <style nonce="{{ request.csp_nonce }}">
@@ -58,7 +58,7 @@
             --color-primary: {{ theme_primary }};
             --color-primary-fill: {{ theme_primary_dark|default:theme_primary }};
             --color-primary-dark: {{ theme_primary_dark|default:theme_primary }};
-            --color-primary-light: {{ theme_primary_light|default:'#FFF3EC' }};
+            --color-primary-light: {{ theme_primary_light }};
             --color-primary-ink: {{ theme_primary_ink|default:theme_primary_dark|default:theme_primary }};
         }
     </style>
@@ -89,7 +89,7 @@
                 </svg>
                 {% endif %}
                 <span class="font-display text-md font-medium tracking-tight leading-[1.2] overflow-hidden truncate whitespace-nowrap">
-                    {{ theme_institution_name|default:"AI Tutor" }}
+                    {{ theme_institution_name|default:"Sesel AI" }}
                     <span class="block font-mono text-2xs tracking-wide uppercase text-text-muted mt-[2px]">{{ role_label|default:_("Teacher/Admin") }}</span>
                 </span>
             </a>

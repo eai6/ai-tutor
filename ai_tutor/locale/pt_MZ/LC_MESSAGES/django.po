@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-07 06:05+0000\n"
+"POT-Creation-Date: 2026-09-08 10:54+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -43,16 +43,18 @@ msgstr "A sua palavra-passe deve conter %(wanted)s."
 msgid "Super Admin"
 msgstr "Super Administrador"
 
-#: ai_tutor/apps/accounts/scope.py:128
-#: ai_tutor/templates/accounts/country_self_register.html:84
+#: ai_tutor/apps/accounts/scope.py:134
+#: ai_tutor/templates/accounts/country_self_register.html:86
+#: ai_tutor/templates/dashboard/staff_list.html:145
+#: ai_tutor/templates/dashboard/staff_list.html:293
 msgid "Country"
 msgstr "País"
 
-#: ai_tutor/apps/accounts/scope.py:152
+#: ai_tutor/apps/accounts/scope.py:163
 msgid "School Admin"
 msgstr "Administrador da Escola"
 
-#: ai_tutor/apps/accounts/scope.py:203
+#: ai_tutor/apps/accounts/scope.py:215
 msgid "Teacher"
 msgstr "Professor"
 
@@ -71,6 +73,8 @@ msgstr "Olá, %(name)s! 🎉 Vamos começar a aprender!"
 msgid ""
 "That account is not a country account. Use the teacher and admin sign-in."
 msgstr ""
+"Essa conta não é uma conta de país. Use a entrada de professor e "
+"administrador."
 
 #: ai_tutor/apps/accounts/views.py:473
 msgid "Your country account is awaiting approval."
@@ -80,55 +84,70 @@ msgstr "A sua conta de país aguarda aprovação."
 msgid "Invalid username or password."
 msgstr "Nome de utilizador ou palavra-passe inválidos."
 
-#: ai_tutor/apps/accounts/views.py:528
+#: ai_tutor/apps/accounts/views.py:550
 msgid "Please enter your first name."
 msgstr "Introduza o seu nome próprio."
 
-#: ai_tutor/apps/accounts/views.py:530
+#: ai_tutor/apps/accounts/views.py:552
 msgid "Username must be at least 3 characters."
 msgstr "O nome de utilizador deve ter pelo menos 3 caracteres."
 
-#: ai_tutor/apps/accounts/views.py:532
+#: ai_tutor/apps/accounts/views.py:554
 msgid "Username already taken."
 msgstr "Nome de utilizador já existe."
 
-#: ai_tutor/apps/accounts/views.py:534
+#: ai_tutor/apps/accounts/views.py:556
 msgid "Email is required for a country account."
 msgstr "O e-mail é obrigatório para uma conta de país."
 
-#: ai_tutor/apps/accounts/views.py:537
+#: ai_tutor/apps/accounts/views.py:559
 msgid "Please choose the country you represent."
 msgstr "Escolha o país que representa."
 
-#: ai_tutor/apps/accounts/views.py:539
+#: ai_tutor/apps/accounts/views.py:562
+#, python-format
+msgid ""
+"%(country)s already has an account on the platform. Ask whoever holds it to "
+"add you from their staff page — a country is registered once."
+msgstr ""
+"%(country)s já tem uma conta na plataforma. Peça a quem a detém que o "
+"adicione a partir da página de pessoal — um país regista-se apenas uma "
+"vez."
+
+#: ai_tutor/apps/accounts/views.py:567
 msgid "Please name the ministry or programme you work for."
 msgstr "Indique o ministério ou programa para o qual trabalha."
 
-#: ai_tutor/apps/accounts/views.py:545
+#: ai_tutor/apps/accounts/views.py:573
 msgid "Passwords don't match."
 msgstr "As palavras-passe não coincidem."
 
-#: ai_tutor/apps/accounts/views.py:547
+#: ai_tutor/apps/accounts/views.py:575
 msgid "Please read and agree to the platform terms."
 msgstr "Leia e aceite os termos da plataforma."
 
-#: ai_tutor/apps/accounts/views.py:900
+#: ai_tutor/apps/accounts/views.py:616
+#, python-format
+msgid "Welcome, %(name)s! Your %(country)s account is ready."
+msgstr "Bem-vindo, %(name)s! A sua conta %(country)s está pronta."
+
+#: ai_tutor/apps/accounts/views.py:932
 msgid "Profile updated."
 msgstr "Perfil atualizado."
 
-#: ai_tutor/apps/accounts/views.py:908
+#: ai_tutor/apps/accounts/views.py:940
 msgid "Password changed."
 msgstr "Palavra-passe alterada."
 
-#: ai_tutor/apps/accounts/views.py:918
+#: ai_tutor/apps/accounts/views.py:950
 msgid "That tutor option is not available."
 msgstr "Essa opção de tutor não está disponível."
 
-#: ai_tutor/apps/accounts/views.py:939
+#: ai_tutor/apps/accounts/views.py:971
 msgid "That offline tutor is not installed."
 msgstr "Esse tutor offline não está instalado."
 
-#: ai_tutor/apps/accounts/views.py:945
+#: ai_tutor/apps/accounts/views.py:977
 msgid "Tutor preference saved."
 msgstr "Preferência de tutor guardada."
 
@@ -776,11 +795,11 @@ msgid "Help & FAQ"
 msgstr "Ajuda e FAQ"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:10
-#: ai_tutor/templates/_includes/_marketing_header.html:35
+#: ai_tutor/templates/_includes/_marketing_header.html:48
 #: ai_tutor/templates/docs/base.html:7 ai_tutor/templates/docs/index.html:25
 #: ai_tutor/templates/docs/section.html:20
-msgid "Country Adoption"
-msgstr "Adopção por País"
+msgid "Enterprise Adaptation"
+msgstr "Adaptação empresarial"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:11
 #: ai_tutor/templates/accounts/terms.html:4 ai_tutor/templates/base.html:132
@@ -788,12 +807,37 @@ msgid "Terms of use"
 msgstr "Termos de utilização"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:12
-#: ai_tutor/templates/accounts/landing.html:186
+#: ai_tutor/templates/accounts/landing.html:192
 #: ai_tutor/templates/docs/index.html:60
 msgid "Run it yourself"
 msgstr "Instale por si próprio"
 
-#: ai_tutor/templates/_includes/_marketing_footer.html:33
+#: ai_tutor/templates/_includes/_marketing_header.html:32
+#: ai_tutor/templates/safety/csrf_failure.html:7
+msgid "AI Tutor"
+msgstr "AI Tutor"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:44
+msgid "Main"
+msgstr "Principal"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:46
+msgid "Home"
+msgstr "Início"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:52
+msgid "Teacher/Admin sign in"
+msgstr "Entrada de professor/administrador"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:53
+msgid "Student sign in"
+msgstr "Entrada de aluno"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:54
+msgid "Enterprise sign in"
+msgstr "Entrada empresarial"
+
+#: ai_tutor/templates/_includes/_marketing_header.html:83
 #: ai_tutor/templates/accounts/settings.html:198
 #: ai_tutor/templates/dashboard/curriculum/course_detail.html:191
 #: ai_tutor/templates/dashboard/curriculum/upload.html:292
@@ -801,25 +845,9 @@ msgstr "Instale por si próprio"
 msgid "Language"
 msgstr "Idioma"
 
-#: ai_tutor/templates/_includes/_marketing_footer.html:43
+#: ai_tutor/templates/_includes/_marketing_header.html:93
 msgid "Go"
 msgstr "Ir"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:30
-msgid "Main"
-msgstr "Principal"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:32
-msgid "Home"
-msgstr "Início"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:40
-msgid "Teacher/Admin sign in"
-msgstr "Entrada de professor/administrador"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:41
-msgid "Student sign in"
-msgstr "Entrada de aluno"
 
 #: ai_tutor/templates/_includes/feedback_button.html:122
 msgid "Report a bug or send feedback"
@@ -1040,7 +1068,7 @@ msgid "For ministries and programme teams"
 msgstr "Para ministérios e equipas de programa"
 
 #: ai_tutor/templates/accounts/country_login.html:28
-#: ai_tutor/templates/accounts/country_self_register.html:58
+#: ai_tutor/templates/accounts/country_self_register.html:60
 #: ai_tutor/templates/accounts/login.html:28
 #: ai_tutor/templates/accounts/register.html:66
 #: ai_tutor/templates/accounts/settings.html:148
@@ -1061,7 +1089,7 @@ msgid "Enter your username"
 msgstr "Introduz o teu nome de utilizador"
 
 #: ai_tutor/templates/accounts/country_login.html:42
-#: ai_tutor/templates/accounts/country_self_register.html:101
+#: ai_tutor/templates/accounts/country_self_register.html:103
 #: ai_tutor/templates/accounts/login.html:42
 #: ai_tutor/templates/accounts/register.html:92
 #: ai_tutor/templates/accounts/settings.html:277
@@ -1071,6 +1099,7 @@ msgstr "Introduz o teu nome de utilizador"
 #: ai_tutor/templates/accounts/student_login.html:42
 #: ai_tutor/templates/accounts/student_register.html:116
 #: ai_tutor/templates/dashboard/staff_list.html:272
+#: ai_tutor/templates/dashboard/staff_list.html:314
 #: ai_tutor/templates/desktop/server.html:125
 msgid "Password"
 msgstr "Palavra-passe"
@@ -1103,17 +1132,11 @@ msgid "New to the platform?"
 msgstr "Novo na plataforma?"
 
 #: ai_tutor/templates/accounts/country_login.html:60
-msgid "Request a country account"
-msgstr "Solicitar uma conta de país"
+msgid "Create a country account"
+msgstr "Criar uma conta de país"
 
 #: ai_tutor/templates/accounts/country_login.html:61
-msgid ""
-"A country account is approved by the platform team before it can sign in."
-msgstr ""
-
-#: ai_tutor/templates/accounts/country_login.html:62
-#: ai_tutor/templates/accounts/country_pending.html:22
-#: ai_tutor/templates/accounts/country_self_register.html:145
+#: ai_tutor/templates/accounts/country_self_register.html:147
 #: ai_tutor/templates/accounts/staff_login.html:62
 #: ai_tutor/templates/accounts/staff_self_register.html:138
 #: ai_tutor/templates/accounts/student_login.html:61
@@ -1121,69 +1144,58 @@ msgstr ""
 msgid "Back to home"
 msgstr "Voltar ao início"
 
-#: ai_tutor/templates/accounts/country_pending.html:5
-msgid "Request Received"
-msgstr "Pedido recebido"
-
-#: ai_tutor/templates/accounts/country_pending.html:12
-msgid "Request received"
-msgstr "Pedido recebido"
-
-#: ai_tutor/templates/accounts/country_pending.html:16
-#, python-format
-msgid ""
-"Your request for a country account for %(name)s is <strong>with the platform "
-"team</strong>."
-msgstr ""
-
-#: ai_tutor/templates/accounts/country_pending.html:17
-msgid ""
-"You will be able to sign in once it is approved. We have sent a verification "
-"link to your email in the meantime."
-msgstr ""
-
 #: ai_tutor/templates/accounts/country_self_register.html:5
 #: ai_tutor/templates/accounts/country_self_register.html:14
-msgid "Request a Country Account"
-msgstr "Solicitar uma conta de país"
+msgid "Create a Country Account"
+msgstr "Criar uma Conta de País"
 
 #: ai_tutor/templates/accounts/country_self_register.html:15
 msgid "For a ministry or programme team adopting the platform"
 msgstr "Para um ministério ou equipa de programa que adopta a plataforma"
 
-#: ai_tutor/templates/accounts/country_self_register.html:32
+#: ai_tutor/templates/accounts/country_self_register.html:18
+msgid ""
+"A country is registered once. Whoever holds the account adds the rest of the "
+"team from the dashboard."
+msgstr ""
+"Um país regista-se apenas uma vez. Quem detém a conta adiciona o resto "
+"da equipa a partir do painel."
+
+#: ai_tutor/templates/accounts/country_self_register.html:34
 #: ai_tutor/templates/accounts/staff_register.html:65
 #: ai_tutor/templates/accounts/staff_self_register.html:32
 #: ai_tutor/templates/accounts/student_register.html:39
 #: ai_tutor/templates/dashboard/settings.html:197
 #: ai_tutor/templates/dashboard/staff_list.html:260
+#: ai_tutor/templates/dashboard/staff_list.html:302
 msgid "First Name"
 msgstr "Nome"
 
-#: ai_tutor/templates/accounts/country_self_register.html:38
+#: ai_tutor/templates/accounts/country_self_register.html:40
 #: ai_tutor/templates/accounts/staff_register.html:71
 #: ai_tutor/templates/accounts/staff_self_register.html:38
 #: ai_tutor/templates/accounts/student_register.html:45
 msgid "Your first name"
 msgstr "O teu nome"
 
-#: ai_tutor/templates/accounts/country_self_register.html:46
+#: ai_tutor/templates/accounts/country_self_register.html:48
 #: ai_tutor/templates/accounts/staff_register.html:79
 #: ai_tutor/templates/accounts/staff_self_register.html:46
 #: ai_tutor/templates/accounts/student_register.html:53
 #: ai_tutor/templates/dashboard/settings.html:201
 #: ai_tutor/templates/dashboard/staff_list.html:264
+#: ai_tutor/templates/dashboard/staff_list.html:306
 msgid "Last Name"
 msgstr "Apelido"
 
-#: ai_tutor/templates/accounts/country_self_register.html:52
+#: ai_tutor/templates/accounts/country_self_register.html:54
 #: ai_tutor/templates/accounts/staff_register.html:85
 #: ai_tutor/templates/accounts/staff_self_register.html:52
 #: ai_tutor/templates/accounts/student_register.html:59
 msgid "Your last name"
 msgstr "O teu apelido"
 
-#: ai_tutor/templates/accounts/country_self_register.html:64
+#: ai_tutor/templates/accounts/country_self_register.html:66
 #: ai_tutor/templates/accounts/register.html:72
 #: ai_tutor/templates/accounts/staff_register.html:97
 #: ai_tutor/templates/accounts/staff_self_register.html:64
@@ -1191,7 +1203,7 @@ msgstr "O teu apelido"
 msgid "Choose a username"
 msgstr "Escolhe um nome de utilizador"
 
-#: ai_tutor/templates/accounts/country_self_register.html:71
+#: ai_tutor/templates/accounts/country_self_register.html:73
 #: ai_tutor/templates/accounts/register.html:79
 #: ai_tutor/templates/accounts/settings.html:172
 #: ai_tutor/templates/accounts/staff_register.html:49
@@ -1202,22 +1214,23 @@ msgstr "Escolhe um nome de utilizador"
 #: ai_tutor/templates/dashboard/staff_list.html:194
 #: ai_tutor/templates/dashboard/staff_list.html:241
 #: ai_tutor/templates/dashboard/staff_list.html:268
+#: ai_tutor/templates/dashboard/staff_list.html:310
 msgid "Email"
 msgstr "Email"
 
-#: ai_tutor/templates/accounts/country_self_register.html:86
+#: ai_tutor/templates/accounts/country_self_register.html:88
 msgid "Select your country"
 msgstr "Seleccione o seu país"
 
-#: ai_tutor/templates/accounts/country_self_register.html:94
+#: ai_tutor/templates/accounts/country_self_register.html:96
 msgid "Ministry or programme"
 msgstr "Ministério ou programa"
 
-#: ai_tutor/templates/accounts/country_self_register.html:97
+#: ai_tutor/templates/accounts/country_self_register.html:99
 msgid "Ministry of Education"
 msgstr "Ministério da Educação"
 
-#: ai_tutor/templates/accounts/country_self_register.html:106
+#: ai_tutor/templates/accounts/country_self_register.html:108
 #: ai_tutor/templates/accounts/register.html:97
 #: ai_tutor/templates/accounts/staff_register.html:109
 #: ai_tutor/templates/accounts/staff_self_register.html:99
@@ -1225,33 +1238,33 @@ msgstr "Ministério da Educação"
 msgid "Create a password"
 msgstr "Crie uma palavra-passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:114
+#: ai_tutor/templates/accounts/country_self_register.html:116
 #: ai_tutor/templates/accounts/staff_register.html:117
 #: ai_tutor/templates/accounts/staff_self_register.html:107
 #: ai_tutor/templates/accounts/student_register.html:129
 msgid "Confirm Password"
 msgstr "Confirmar palavra-passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:119
+#: ai_tutor/templates/accounts/country_self_register.html:121
 #: ai_tutor/templates/accounts/staff_register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:112
 #: ai_tutor/templates/accounts/student_register.html:134
 msgid "Re-enter your password"
 msgstr "Insere novamente a tua palavra-passe"
 
-#: ai_tutor/templates/accounts/country_self_register.html:130
+#: ai_tutor/templates/accounts/country_self_register.html:132
 #: ai_tutor/templates/accounts/staff_self_register.html:123
 #: ai_tutor/templates/accounts/student_register.html:145
 msgid "I agree to the"
 msgstr "Concordo com os"
 
-#: ai_tutor/templates/accounts/country_self_register.html:131
+#: ai_tutor/templates/accounts/country_self_register.html:133
 #: ai_tutor/templates/accounts/staff_self_register.html:124
 #: ai_tutor/templates/accounts/student_register.html:146
 msgid "AI Tutor terms"
 msgstr "termos do AI Tutor"
 
-#: ai_tutor/templates/accounts/country_self_register.html:139
+#: ai_tutor/templates/accounts/country_self_register.html:141
 #: ai_tutor/templates/accounts/register.html:5
 #: ai_tutor/templates/accounts/register.html:117
 #: ai_tutor/templates/accounts/staff_login.html:60
@@ -1260,17 +1273,17 @@ msgstr "termos do AI Tutor"
 msgid "Create Account"
 msgstr "Criar conta"
 
-#: ai_tutor/templates/accounts/country_self_register.html:144
+#: ai_tutor/templates/accounts/country_self_register.html:146
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
 msgid "Already have an account?"
 msgstr "Já tens uma conta?"
 
-#: ai_tutor/templates/accounts/country_self_register.html:144
-#: ai_tutor/templates/accounts/landing.html:205
-#: ai_tutor/templates/accounts/landing.html:215
-#: ai_tutor/templates/accounts/landing.html:225
+#: ai_tutor/templates/accounts/country_self_register.html:146
+#: ai_tutor/templates/accounts/landing.html:211
+#: ai_tutor/templates/accounts/landing.html:221
+#: ai_tutor/templates/accounts/landing.html:231
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
@@ -1280,8 +1293,8 @@ msgid "Sign in"
 msgstr "Entrar"
 
 #: ai_tutor/templates/accounts/landing.html:7
-msgid "Curriculum tutoring for secondary school"
-msgstr "Tutoria do currículo para o ensino secundário"
+msgid "AI Tutor for secondary school"
+msgstr "AI Tutor para o ensino secundário"
 
 #: ai_tutor/templates/accounts/landing.html:8
 msgid ""
@@ -1292,19 +1305,19 @@ msgstr ""
 "Um tutor que percorre o currículo da sua escola lição a lição, verifica o "
 "que foi aprendido e comunica-o ao professor. Funciona sem ligação à Internet."
 
-#: ai_tutor/templates/accounts/landing.html:30
+#: ai_tutor/templates/accounts/landing.html:32
 msgid "Skip to sign in"
 msgstr "Ir para o início de sessão"
 
-#: ai_tutor/templates/accounts/landing.html:45
+#: ai_tutor/templates/accounts/landing.html:47
 msgid "Secondary school"
 msgstr "Ensino secundário"
 
-#: ai_tutor/templates/accounts/landing.html:47
+#: ai_tutor/templates/accounts/landing.html:52
 msgid "AI Powered Tutor"
 msgstr "Tutor com Inteligência Artificial"
 
-#: ai_tutor/templates/accounts/landing.html:50
+#: ai_tutor/templates/accounts/landing.html:55
 msgid ""
 "Students learn by talking through a lesson, not by watching one. The tutor "
 "asks, listens, and only moves on when the answer shows understanding — then "
@@ -1314,7 +1327,7 @@ msgstr ""
 "pergunta, ouve e só avança quando a resposta mostra compreensão — depois "
 "conta ao professor o que observou."
 
-#: ai_tutor/templates/accounts/landing.html:54
+#: ai_tutor/templates/accounts/landing.html:59
 #: ai_tutor/templates/dashboard/classes/detail.html:145
 #: ai_tutor/templates/dashboard/flagged_sessions.html:56
 #: ai_tutor/templates/dashboard/lesson_monitor.html:254
@@ -1325,70 +1338,75 @@ msgstr ""
 msgid "Student"
 msgstr "Aluno"
 
-#: ai_tutor/templates/accounts/landing.html:55
+#: ai_tutor/templates/accounts/landing.html:60
 #: ai_tutor/templates/dashboard/base.html:98
 msgid "Teacher/Admin"
 msgstr "Professor/Administrador"
 
-#: ai_tutor/templates/accounts/landing.html:59
-msgid "New here? You can create an account on either sign-in page."
-msgstr ""
-"É a primeira vez? Pode criar uma conta em qualquer das páginas de entrada."
+#: ai_tutor/templates/accounts/landing.html:61
+msgid "Enterprise"
+msgstr "Empresa"
 
-#: ai_tutor/templates/accounts/landing.html:70
+#: ai_tutor/templates/accounts/landing.html:65
+msgid "New here? You can create an account on any of these sign-in pages."
+msgstr ""
+"É a primeira vez? Pode criar uma conta em qualquer uma destas páginas de"
+" entrada."
+
+#: ai_tutor/templates/accounts/landing.html:76
 msgid "How one lesson goes"
 msgstr "Como decorre uma lição"
 
-#: ai_tutor/templates/accounts/landing.html:75
+#: ai_tutor/templates/accounts/landing.html:81
 #: ai_tutor/templates/tutoring/catalog.html:158
 msgid "Engage"
 msgstr "Engajar"
 
-#: ai_tutor/templates/accounts/landing.html:76
+#: ai_tutor/templates/accounts/landing.html:82
 msgid "Opens with a question about something the student already knows."
 msgstr "Começa com uma pergunta sobre algo que o aluno já sabe."
 
-#: ai_tutor/templates/accounts/landing.html:82
+#: ai_tutor/templates/accounts/landing.html:88
 #: ai_tutor/templates/tutoring/catalog.html:159
 msgid "Explore"
 msgstr "Explorar"
 
-#: ai_tutor/templates/accounts/landing.html:83
+#: ai_tutor/templates/accounts/landing.html:89
 msgid "The student works the idea out loud; the tutor asks rather than tells."
 msgstr ""
 "O aluno trabalha a ideia em voz alta; o tutor pergunta em vez de dizer."
 
-#: ai_tutor/templates/accounts/landing.html:89
+#: ai_tutor/templates/accounts/landing.html:95
 #: ai_tutor/templates/tutoring/catalog.html:160
 msgid "Explain"
 msgstr "Explicar"
 
-#: ai_tutor/templates/accounts/landing.html:90
+#: ai_tutor/templates/accounts/landing.html:96
 msgid "The idea gets named and tied to the curriculum's own wording."
 msgstr "A ideia é nomeada e ligada às próprias palavras do currículo."
 
-#: ai_tutor/templates/accounts/landing.html:96
+#: ai_tutor/templates/accounts/landing.html:102
 msgid "Elaborate"
 msgstr "Aprofundar"
 
-#: ai_tutor/templates/accounts/landing.html:97
+#: ai_tutor/templates/accounts/landing.html:103
 msgid "A harder case, to see whether it holds outside the first example."
 msgstr "Um caso mais difícil, para ver se se mantém fora do primeiro exemplo."
 
-#: ai_tutor/templates/accounts/landing.html:103
+#: ai_tutor/templates/accounts/landing.html:109
 msgid "Exit ticket"
 msgstr "Ficha de saída"
 
-#: ai_tutor/templates/accounts/landing.html:104
+#: ai_tutor/templates/accounts/landing.html:110
 msgid "A short check. The score is what the teacher sees the next morning."
 msgstr ""
 "Uma verificação curta. A nota é o que o professor vê na manhã seguinte."
 
-#: ai_tutor/templates/accounts/landing.html:116
+#: ai_tutor/templates/accounts/landing.html:122
 msgid "It teaches the syllabus the school already uses"
 msgstr "Ensina o programa que a escola já usa"
 
-#: ai_tutor/templates/accounts/landing.html:117
+#: ai_tutor/templates/accounts/landing.html:123
 msgid ""
 "A teacher uploads the curriculum — schemes of work, past papers, worksheets. "
 "The platform turns it into lessons and keeps every answer grounded in that "
@@ -1400,11 +1418,11 @@ msgstr ""
 "assentes nesse material, para que o aluno não aprenda um curso diferente "
 "daquele em que faz exame."
 
-#: ai_tutor/templates/accounts/landing.html:123
+#: ai_tutor/templates/accounts/landing.html:129
 msgid "Talks, doesn't lecture"
 msgstr "Conversa, não faz palestras"
 
-#: ai_tutor/templates/accounts/landing.html:124
+#: ai_tutor/templates/accounts/landing.html:130
 msgid ""
 "Every step is a question. A student who answers correctly moves on; a "
 "student who doesn't gets a smaller step, not the answer."
@@ -1412,11 +1430,11 @@ msgstr ""
 "Cada passo é uma pergunta. O aluno que responde correctamente avança; o que "
 "não responde recebe um passo mais pequeno, não a resposta."
 
-#: ai_tutor/templates/accounts/landing.html:129
+#: ai_tutor/templates/accounts/landing.html:135
 msgid "Measures what stuck"
 msgstr "Mede o que ficou"
 
-#: ai_tutor/templates/accounts/landing.html:130
+#: ai_tutor/templates/accounts/landing.html:136
 msgid ""
 "Each lesson ends with an exit ticket. Scores are per objective, so a teacher "
 "sees which idea a class missed, not just who scored low."
@@ -1425,11 +1443,11 @@ msgstr ""
 "que o professor veja que ideia a turma falhou, e não apenas quem teve nota "
 "baixa."
 
-#: ai_tutor/templates/accounts/landing.html:135
+#: ai_tutor/templates/accounts/landing.html:141
 msgid "Watched, not unattended"
 msgstr "Vigiado, não deixado ao acaso"
 
-#: ai_tutor/templates/accounts/landing.html:136
+#: ai_tutor/templates/accounts/landing.html:142
 msgid ""
 "Conversations are checked for harmful, inappropriate and manipulative "
 "content. Anything flagged goes to a named teacher to review."
@@ -1438,11 +1456,11 @@ msgstr ""
 "manipulador. Tudo o que for sinalizado segue para um professor designado "
 "rever."
 
-#: ai_tutor/templates/accounts/landing.html:141
+#: ai_tutor/templates/accounts/landing.html:147
 msgid "One device, two students"
 msgstr "Um dispositivo, dois alunos"
 
-#: ai_tutor/templates/accounts/landing.html:142
+#: ai_tutor/templates/accounts/landing.html:148
 msgid ""
 "Where devices are shared, a teacher can pair students into groups and the "
 "tutor runs the lesson for the pair."
@@ -1450,11 +1468,11 @@ msgstr ""
 "Onde os dispositivos são partilhados, o professor pode juntar alunos em "
 "grupos e o tutor dá a lição ao par."
 
-#: ai_tutor/templates/accounts/landing.html:147
+#: ai_tutor/templates/accounts/landing.html:153
 msgid "Reports for the teacher"
 msgstr "Relatórios para o professor"
 
-#: ai_tutor/templates/accounts/landing.html:148
+#: ai_tutor/templates/accounts/landing.html:154
 msgid ""
 "A dashboard shows who has been active, how the class scored, and which "
 "students went backwards on a retry."
@@ -1462,11 +1480,11 @@ msgstr ""
 "Um painel mostra quem esteve activo, como a turma se saiu e que alunos "
 "pioraram na repetição."
 
-#: ai_tutor/templates/accounts/landing.html:153
+#: ai_tutor/templates/accounts/landing.html:159
 msgid "In the classroom's language"
 msgstr "Na língua da sala de aula"
 
-#: ai_tutor/templates/accounts/landing.html:154
+#: ai_tutor/templates/accounts/landing.html:160
 msgid ""
 "The interface and the lessons follow the language the course is taught in, "
 "set per school."
@@ -1474,11 +1492,11 @@ msgstr ""
 "A interface e as lições seguem a língua em que o curso é leccionado, "
 "definida por escola."
 
-#: ai_tutor/templates/accounts/landing.html:170
+#: ai_tutor/templates/accounts/landing.html:176
 msgid "Run it on your own hardware"
 msgstr "Execute no seu próprio equipamento"
 
-#: ai_tutor/templates/accounts/landing.html:171
+#: ai_tutor/templates/accounts/landing.html:177
 msgid ""
 "Neither option needs a connection to us. Pick the one that matches who is "
 "running it — a teacher in one classroom, or a ministry across a district."
@@ -1487,11 +1505,11 @@ msgstr ""
 "quem a vai usar — um professor numa sala de aula ou um ministério em todo um "
 "distrito."
 
-#: ai_tutor/templates/accounts/landing.html:177
+#: ai_tutor/templates/accounts/landing.html:183
 msgid "No internet? It still teaches."
 msgstr "Sem Internet? Continua a ensinar."
 
-#: ai_tutor/templates/accounts/landing.html:178
+#: ai_tutor/templates/accounts/landing.html:184
 msgid ""
 "The desktop build runs the whole platform — tutor, curriculum and marking — "
 "on one machine in the classroom, serving students over its own WiFi. Nothing "
@@ -1501,15 +1519,15 @@ msgstr ""
 "correcção — numa única máquina na sala de aula, servindo os alunos pela sua "
 "própria rede WiFi. Nada sai da sala e nada precisa de ligação."
 
-#: ai_tutor/templates/accounts/landing.html:179
+#: ai_tutor/templates/accounts/landing.html:185
 msgid "Get the offline app"
 msgstr "Obter a aplicação offline"
 
-#: ai_tutor/templates/accounts/landing.html:184
+#: ai_tutor/templates/accounts/landing.html:190
 msgid "Host it on your own servers"
 msgstr "Alojar nos seus próprios servidores"
 
-#: ai_tutor/templates/accounts/landing.html:185
+#: ai_tutor/templates/accounts/landing.html:191
 msgid ""
 "For a school group or a ministry that needs the data to stay on "
 "infrastructure it controls. The whole platform is deployable from source, "
@@ -1519,11 +1537,11 @@ msgstr ""
 "infra-estrutura própria. Toda a plataforma pode ser instalada a partir do "
 "código, com os seus próprios modelos e o seu próprio armazenamento."
 
-#: ai_tutor/templates/accounts/landing.html:196
+#: ai_tutor/templates/accounts/landing.html:202
 msgid "Get started"
 msgstr "Começar"
 
-#: ai_tutor/templates/accounts/landing.html:202
+#: ai_tutor/templates/accounts/landing.html:208
 #: ai_tutor/templates/dashboard/base.html:136
 #: ai_tutor/templates/dashboard/classes/detail.html:67
 #: ai_tutor/templates/dashboard/classes/detail.html:106
@@ -1536,7 +1554,7 @@ msgstr "Começar"
 msgid "Students"
 msgstr "Alunos"
 
-#: ai_tutor/templates/accounts/landing.html:203
+#: ai_tutor/templates/accounts/landing.html:209
 msgid ""
 "Pick a subject and carry on where you left off. Your teacher gives you your "
 "school and grade."
@@ -1544,16 +1562,17 @@ msgstr ""
 "Escolha uma disciplina e continue de onde parou. O seu professor indica-lhe "
 "a escola e o ano."
 
-#: ai_tutor/templates/accounts/landing.html:206
-#: ai_tutor/templates/accounts/landing.html:216
+#: ai_tutor/templates/accounts/landing.html:212
+#: ai_tutor/templates/accounts/landing.html:222
+#: ai_tutor/templates/accounts/landing.html:232
 msgid "Create account"
 msgstr "Criar conta"
 
-#: ai_tutor/templates/accounts/landing.html:212
+#: ai_tutor/templates/accounts/landing.html:218
 msgid "Teachers & Admins"
 msgstr "Professores e administradores"
 
-#: ai_tutor/templates/accounts/landing.html:213
+#: ai_tutor/templates/accounts/landing.html:219
 msgid ""
 "Upload your curriculum, watch how the class is doing, and review anything "
 "the safety check flagged."
@@ -1561,19 +1580,19 @@ msgstr ""
 "Carregue o seu currículo, acompanhe o desempenho da turma e reveja tudo o "
 "que a verificação de segurança sinalizou."
 
-#: ai_tutor/templates/accounts/landing.html:222
-msgid "Countries"
-msgstr "Países"
+#: ai_tutor/templates/accounts/landing.html:228
+msgid "Enterprise Hosting"
+msgstr "Alojamento empresarial"
 
-#: ai_tutor/templates/accounts/landing.html:223
+#: ai_tutor/templates/accounts/landing.html:229
 msgid ""
-"Adopting the platform for a national system. See every school in your "
-"country, add new ones, and follow how the whole cohort is doing."
+"For a government ministry or organisation running the platform across a "
+"whole school system. See every school in it, add new ones, and follow how "
+"the whole cohort is doing."
 msgstr ""
-
-#: ai_tutor/templates/accounts/landing.html:226
-msgid "Request access"
-msgstr "Solicitar acesso"
+"Para um ministério do governo ou organização que gere a plataforma em "
+"todo um sistema escolar. Veja cada escola, adicione novas e acompanhe o "
+"desempenho de toda a coorte."
 
 #: ai_tutor/templates/accounts/login.html:14
 msgid "Welcome back!"
@@ -1669,11 +1688,13 @@ msgstr "Função"
 
 #: ai_tutor/templates/accounts/settings.html:163
 #: ai_tutor/templates/dashboard/staff_list.html:261
+#: ai_tutor/templates/dashboard/staff_list.html:303
 msgid "First name"
 msgstr "Nome"
 
 #: ai_tutor/templates/accounts/settings.html:167
 #: ai_tutor/templates/dashboard/staff_list.html:265
+#: ai_tutor/templates/dashboard/staff_list.html:307
 msgid "Last name"
 msgstr "Apelido"
 
@@ -3088,7 +3109,7 @@ msgid ""
 "Sweep the course for two common gaps: images that never rendered, and "
 "lesson / exit-ticket content that hasn't been audited by the AI judges yet. "
 "Both run in the background and are idempotent — already-done items are "
-"skipped. You can pick a specific provider/model per run (task #216)."
+"skipped. You can pick a specific provider/model per run (task 216)."
 msgstr ""
 "Percorre o curso à procura de duas falhas comuns: imagens que nunca foram "
 "geradas e conteúdo de lições ou fichas de saída ainda não auditado pelos "
@@ -6059,7 +6080,7 @@ msgstr "Tornar Super Administrador"
 
 #: ai_tutor/templates/dashboard/staff_list.html:66
 #: ai_tutor/templates/dashboard/staff_list.html:152
-#: ai_tutor/templates/dashboard/staff_list.html:287
+#: ai_tutor/templates/dashboard/staff_list.html:329
 msgid "Reset password"
 msgstr "Repor palavra-passe"
 
@@ -6198,6 +6219,7 @@ msgid "admin@school.edu"
 msgstr "admin@escola.edu"
 
 #: ai_tutor/templates/dashboard/staff_list.html:273
+#: ai_tutor/templates/dashboard/staff_list.html:315
 msgid "Strong password"
 msgstr "Palavra-passe forte"
 
@@ -6205,19 +6227,56 @@ msgstr "Palavra-passe forte"
 msgid "Create Admin"
 msgstr "Criar Admin"
 
-#: ai_tutor/templates/dashboard/staff_list.html:292
+#: ai_tutor/templates/dashboard/staff_list.html:285
+msgid "Add to the country team"
+msgstr "Adicionar à equipa do país"
+
+#: ai_tutor/templates/dashboard/staff_list.html:287
+#, python-format
+msgid ""
+"Another account for %(name)s, with the same reach as yours. A country "
+"registers once, so this is how the rest of the team gets in — they sign in "
+"with this email and password."
+msgstr ""
+"Outra conta para %(name)s, com o mesmo alcance que a sua. Um país "
+"regista-se apenas uma vez, por isso é assim que o resto da equipa entra "
+"— iniciam sessão com este e-mail e esta palavra-passe."
+
+#: ai_tutor/templates/dashboard/staff_list.html:287
+msgid ""
+"A country account reaches every school in its country. Open a country that "
+"has none yet, or add someone to one already running — they sign in with this "
+"email and password."
+msgstr ""
+"Uma conta de país alcança todas as escolas do seu país. Abra um país que"
+" ainda não tenha nenhuma, ou adicione alguém a um país já em "
+"funcionamento — iniciam sessão com este e-mail e esta palavra-passe."
+
+#: ai_tutor/templates/dashboard/staff_list.html:295
+msgid "Select a country…"
+msgstr "Seleciona um país…"
+
+#: ai_tutor/templates/dashboard/staff_list.html:311
+msgid "colleague@ministry.gov"
+msgstr ""
+
+#: ai_tutor/templates/dashboard/staff_list.html:318
+msgid "Add member"
+msgstr "Adicionar membro"
+
+#: ai_tutor/templates/dashboard/staff_list.html:334
 msgid "Pick how to deliver the new password:"
 msgstr "Escolhe como entregar a nova palavra-passe:"
 
-#: ai_tutor/templates/dashboard/staff_list.html:294
+#: ai_tutor/templates/dashboard/staff_list.html:336
 msgid "Email a reset link"
 msgstr "Enviar link de redefinição por e-mail"
 
-#: ai_tutor/templates/dashboard/staff_list.html:298
+#: ai_tutor/templates/dashboard/staff_list.html:340
 msgid "Show a temporary password"
 msgstr "Mostrar palavra-passe temporária"
 
-#: ai_tutor/templates/dashboard/staff_list.html:299
+#: ai_tutor/templates/dashboard/staff_list.html:341
 msgid ""
 "Copy it and share with the user. They will be forced to change it on next "
 "login."
@@ -6225,19 +6284,19 @@ msgstr ""
 "Copia-a e partilha com o utilizador. Será obrigado a alterá-la no próximo "
 "início de sessão."
 
-#: ai_tutor/templates/dashboard/staff_list.html:302
+#: ai_tutor/templates/dashboard/staff_list.html:344
 msgid "Working…"
 msgstr "A processar…"
 
-#: ai_tutor/templates/dashboard/staff_list.html:304
+#: ai_tutor/templates/dashboard/staff_list.html:346
 msgid "Temporary password for"
 msgstr "Palavra-passe temporária para"
 
-#: ai_tutor/templates/dashboard/staff_list.html:307
+#: ai_tutor/templates/dashboard/staff_list.html:349
 msgid "Copy"
 msgstr "Copiar"
 
-#: ai_tutor/templates/dashboard/staff_list.html:309
+#: ai_tutor/templates/dashboard/staff_list.html:351
 msgid ""
 "⚠️ Will not be shown again. The user will be required to change it on next "
 "login."
@@ -6245,15 +6304,15 @@ msgstr ""
 "⚠️ Não será mostrada novamente. O utilizador terá de a alterar no próximo "
 "início de sessão."
 
-#: ai_tutor/templates/dashboard/staff_list.html:312
+#: ai_tutor/templates/dashboard/staff_list.html:354
 msgid "✅ Reset link emailed to"
 msgstr "✅ Link de redefinição enviado por email para"
 
-#: ai_tutor/templates/dashboard/staff_list.html:312
+#: ai_tutor/templates/dashboard/staff_list.html:354
 msgid "The link expires shortly."
 msgstr "O link expira em breve."
 
-#: ai_tutor/templates/dashboard/staff_list.html:317
+#: ai_tutor/templates/dashboard/staff_list.html:359
 #: ai_tutor/templates/tutoring/catalog.html:105
 #: ai_tutor/templates/tutoring/catalog.html:114
 #: ai_tutor/templates/tutoring/chat_tutor.html:221
@@ -7662,10 +7721,6 @@ msgstr "Descarregar a aplicação para computador"
 msgid "Your session timed out"
 msgstr "A sua sessão expirou"
 
-#: ai_tutor/templates/safety/csrf_failure.html:7
-msgid "AI Tutor"
-msgstr "AI Tutor"
-
 #: ai_tutor/templates/safety/csrf_failure.html:106
 msgid ""
 "This page had been open long enough that the security check protecting it "
@@ -7984,6 +8039,21 @@ msgstr "Rever Lição"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Continuar a aprender"
+
+#~ msgid "Country Adoption"
+#~ msgstr "Adopção por País"
+
+#~ msgid "Request Received"
+#~ msgstr "Pedido recebido"
+
+#~ msgid "Request received"
+#~ msgstr "Pedido recebido"
+
+#~ msgid "Countries"
+#~ msgstr "Países"
+
+#~ msgid "Request access"
+#~ msgstr "Solicitar acesso"
 
 #~ msgid "Country not listed? Get in touch and the platform team will add it."
 #~ msgstr ""

@@ -5,60 +5,60 @@
 
 {% block content %}
 <style>
-    .sc-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+    .sc-card { background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
                padding:1rem 1.1rem; margin-bottom:1rem; }
     .sc-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
-                  color:#6b7280; margin:0 0 0.2rem; font-weight:600; }
-    .sc-card .lede { font-size:0.8rem; color:#6b7280; line-height:1.55;
+                  color:var(--color-warm-500); margin:0 0 0.2rem; font-weight:600; }
+    .sc-card .lede { font-size:0.8rem; color:var(--color-warm-500); line-height:1.55;
                      margin:0 0 0.8rem; }
 
     .headline { display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-start; }
     .headline .stat { display:flex; flex-direction:column; }
-    .headline .stat .n { font-size:1.8rem; font-weight:700; color:#111; line-height:1.1; }
-    .headline .stat .k { font-size:0.72rem; color:#6b7280; text-transform:uppercase;
+    .headline .stat .n { font-size:1.8rem; font-weight:700; color:var(--color-text); line-height:1.1; }
+    .headline .stat .k { font-size:0.72rem; color:var(--color-warm-500); text-transform:uppercase;
                          letter-spacing:0.04em; margin-top:0.15rem; }
 
     table { width:100%; border-collapse:collapse; }
     th, td { padding:0.5rem 0.7rem; text-align:left; font-size:0.85rem; }
-    thead th { background:#f9fafb; color:#6b7280; font-weight:600; font-size:0.7rem;
+    thead th { background:var(--color-canvas); color:var(--color-warm-500); font-weight:600; font-size:0.7rem;
                text-transform:uppercase; letter-spacing:0.04em;
-               border-bottom:1px solid #e5e7eb; }
-    tbody tr { border-bottom:1px solid #f3f4f6; }
+               border-bottom:1px solid var(--color-surface-hover); }
+    tbody tr { border-bottom:1px solid var(--color-surface-sunken); }
     td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
     .tablewrap { overflow-x:auto; }
     .tablewrap table { min-width:36rem; }
 
-    .bar { display:block; height:6px; border-radius:3px; background:#f3f4f6;
+    .bar { display:block; height:6px; border-radius:3px; background:var(--color-surface-sunken);
            margin-top:0.25rem; overflow:hidden; min-width:6rem; }
-    .bar span { display:block; height:100%; background:#5b21b6; }
+    .bar span { display:block; height:100%; background:var(--color-primary-fill); }
 
-    .muted { font-size:0.78rem; color:#6b7280; line-height:1.55; }
-    .none { color:#9ca3af; }
-    .warn { background:#fffbeb; border:1px solid #fde68a; border-radius:10px;
+    .muted { font-size:0.78rem; color:var(--color-warm-500); line-height:1.55; }
+    .none { color:var(--color-warm-400); }
+    .warn { background:var(--color-amber-surface); border:1px solid var(--color-sunny); border-radius:10px;
             padding:0.75rem 1.1rem; margin-bottom:1rem; font-size:0.84rem;
-            color:#78350f; line-height:1.55; }
+            color:var(--color-sunny-ink); line-height:1.55; }
     .btn { display:inline-block; padding:0.5rem 0.9rem; border-radius:8px;
-           background:#5b21b6; color:#fff; font-size:0.85rem; font-weight:600;
+           background:var(--color-primary-fill); color:var(--color-surface); font-size:0.85rem; font-weight:600;
            text-decoration:none; }
-    .btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; }
+    .btn-secondary { background:var(--color-surface); color:var(--color-warm-700); border:1px solid var(--color-warm-300); }
 
     #block-content-tail { height:5rem; }
 
     .scope {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.75rem 1.1rem; margin-bottom:1rem;
         display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;
     }
-    .scope label { font-size:0.7rem; color:#6b7280; display:block;
+    .scope label { font-size:0.7rem; color:var(--color-warm-500); display:block;
                    margin-bottom:0.2rem; text-transform:uppercase;
                    letter-spacing:0.04em; }
-    .scope select { padding:0.4rem 0.55rem; border:1px solid #d1d5db;
+    .scope select { padding:0.4rem 0.55rem; border:1px solid var(--color-warm-300);
                     border-radius:6px; font-size:0.85rem; font-family:inherit;
-                    background:#fff; }
+                    background:var(--color-surface); }
     .scope button { padding:0.45rem 0.9rem; border:none; border-radius:6px;
-                    background:#5b21b6; color:#fff; font-size:0.85rem;
+                    background:var(--color-primary-fill); color:var(--color-surface); font-size:0.85rem;
                     font-weight:600; cursor:pointer; font-family:inherit; }
-    .scope .summary { margin-left:auto; font-size:0.8rem; color:#6b7280;
+    .scope .summary { margin-left:auto; font-size:0.8rem; color:var(--color-warm-500);
                       text-align:right; line-height:1.5; }
 </style>
 
@@ -180,8 +180,8 @@
         </thead>
         <tbody>
             {% for label, group in slices %}
-            <tr><td colspan="4" style="background:#f9fafb; font-size:0.7rem;
-                text-transform:uppercase; letter-spacing:0.04em; color:#6b7280;
+            <tr><td colspan="4" style="background:var(--color-canvas); font-size:0.7rem;
+                text-transform:uppercase; letter-spacing:0.04em; color:var(--color-warm-500);
                 font-weight:600;">{{ label }}</td></tr>
             {% for key, stat in group.items %}
             <tr>
@@ -235,7 +235,7 @@
                 <td class="muted text-text-muted">{{ row.undefined_reason }}</td>
             </tr>
             {% endfor %}
-            <tr style="border-top:2px solid #e5e7eb;">
+            <tr style="border-top:2px solid var(--color-surface-hover);">
                 <td><strong>Session verdict</strong></td>
                 <td class="num font-display [font-variant-numeric:tabular-nums] [font-feature-settings:'tnum'_1]">{{ metrics.agreement.session_verdict.n }}</td>
                 <td class="num font-display [font-variant-numeric:tabular-nums] [font-feature-settings:'tnum'_1]">

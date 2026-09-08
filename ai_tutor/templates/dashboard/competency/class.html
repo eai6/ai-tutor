@@ -27,7 +27,7 @@
 
     .bar { width:100%; height:8px; background:var(--color-surface-sunken); border-radius:4px; overflow:hidden; margin-top:0.2rem; }
     .bar-fill { height:100%; transition: width 0.3s ease; }
-    .bar-fill.baseline { background:#fbbf24; }
+    .bar-fill.baseline { background:var(--color-sunny-deep); }
     .bar-fill.latest { background:var(--color-accent-solid); }
     .bar-fill.final { background:var(--color-success-solid); }
 
@@ -72,8 +72,8 @@
 
 {% if recommendation %}
 <div style="margin-bottom:1rem;padding:0.85rem 1.1rem;border-radius:10px;font-size:0.92rem;line-height:1.5;
-    {% if recommendation_type == 'success' %}background:var(--color-success-surface);border:1px solid #6ee7b7;color:var(--color-success);
-    {% elif recommendation_type == 'danger' %}background:var(--color-danger-surface);border:1px solid #fca5a5;color:var(--color-danger);
+    {% if recommendation_type == 'success' %}background:var(--color-success-surface);border:1px solid var(--color-green-border);color:var(--color-success);
+    {% elif recommendation_type == 'danger' %}background:var(--color-danger-surface);border:1px solid var(--color-rose-border);color:var(--color-danger);
     {% else %}background:var(--color-warning-surface);border:1px solid var(--color-warning-border);color:var(--color-warning);{% endif %}">
     <strong>{% if recommendation_type == 'success' %}✓{% elif recommendation_type == 'danger' %}!{% else %}⚠{% endif %}</strong>
     {{ recommendation }}

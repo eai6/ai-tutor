@@ -9,10 +9,10 @@
                gap:1.25rem; align-items:start; }
     @media (max-width: 1200px) { .an-grid { grid-template-columns: 1fr; } }
 
-    .an-card { background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+    .an-card { background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
                padding:1rem 1.1rem; margin-bottom:1rem; }
     .an-card h3 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
-                  color:#6b7280; margin:0 0 0.6rem; font-weight:600; }
+                  color:var(--color-warm-500); margin:0 0 0.6rem; font-weight:600; }
 
     /* The transcript sticks while the eight dimensions scroll past it.
        Judging a whole session means re-reading turns against each question;
@@ -20,54 +20,54 @@
     .an-left { position:sticky; top:1rem; }
     @media (max-width: 1200px) { .an-left { position:static; } }
     .transcript { max-height:calc(100vh - 16rem); min-height:18rem;
-                  overflow-y:auto; border:1px solid #f3f4f6;
-                  border-radius:8px; padding:0.6rem; background:#fafafa; }
+                  overflow-y:auto; border:1px solid var(--color-surface-sunken);
+                  border-radius:8px; padding:0.6rem; background:var(--color-canvas); }
     .turn { font-size:0.85rem; padding:0.5rem 0.6rem; border-radius:6px;
             margin-bottom:0.35rem; white-space:pre-wrap; line-height:1.5; }
     .turn .role { font-size:0.68rem; font-weight:700; text-transform:uppercase;
-                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:#6b7280; }
-    .turn-tutor { background:#fff; border:1px solid #e5e7eb; }
-    .turn-student { background:#f5f3ff; border:1px solid #ddd6fe; }
+                  letter-spacing:0.04em; display:block; margin-bottom:0.2rem; color:var(--color-warm-500); }
+    .turn-tutor { background:var(--color-surface); border:1px solid var(--color-surface-hover); }
+    .turn-student { background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); }
 
-    .dim { border:1px solid #e5e7eb; border-radius:8px; padding:0.75rem 0.85rem;
+    .dim { border:1px solid var(--color-surface-hover); border-radius:8px; padding:0.75rem 0.85rem;
            margin-bottom:0.7rem; }
-    .dim .name { font-size:0.92rem; font-weight:600; color:#111; margin-bottom:0.15rem; }
-    .dim .definition { font-size:0.8rem; color:#374151; line-height:1.5; margin-bottom:0.3rem; }
-    .dim .guidance { font-size:0.78rem; color:#6b7280; line-height:1.5;
-                     margin-bottom:0.55rem; border-left:2px solid #ddd6fe;
+    .dim .name { font-size:0.92rem; font-weight:600; color:var(--color-text); margin-bottom:0.15rem; }
+    .dim .definition { font-size:0.8rem; color:var(--color-warm-700); line-height:1.5; margin-bottom:0.3rem; }
+    .dim .guidance { font-size:0.78rem; color:var(--color-warm-500); line-height:1.5;
+                     margin-bottom:0.55rem; border-left:2px solid var(--color-coral-edge);
                      padding-left:0.55rem; }
     .dim .opts { display:flex; flex-direction:column; gap:0.3rem; }
     .dim label { display:flex; gap:0.45rem; align-items:flex-start;
-                 font-size:0.85rem; color:#374151; cursor:pointer; }
+                 font-size:0.85rem; color:var(--color-warm-700); cursor:pointer; }
     .dim label input { margin-top:0.2rem; }
-    .dim .desired { font-size:0.66rem; font-weight:700; color:#065f46;
-                    background:#ecfdf5; border-radius:999px; padding:0.02rem 0.4rem;
+    .dim .desired { font-size:0.66rem; font-weight:700; color:var(--color-teal-ink);
+                    background:var(--color-teal-tint); border-radius:999px; padding:0.02rem 0.4rem;
                     letter-spacing:0.03em; }
 
-    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
-    .meta-row strong { color:#111; font-weight:600; }
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:var(--color-warm-700); }
+    .meta-row strong { color:var(--color-text); font-weight:600; }
     .pill { display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
             font-size:0.7rem; font-weight:600; }
-    .pill-subj { background:#eff6ff; color:#1e40af; }
-    .pill-judge { background:#fef3c7; color:#92400e; }
+    .pill-subj { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .pill-judge { background:var(--color-amber-surface); color:var(--color-sunny-ink); }
 
-    textarea { width:100%; padding:0.5rem 0.6rem; border:1px solid #d1d5db;
+    textarea { width:100%; padding:0.5rem 0.6rem; border:1px solid var(--color-warm-300);
                border-radius:6px; font-size:0.85rem; font-family:inherit;
                min-height:80px; resize:vertical; }
     .actions { display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.8rem; }
     .btn { padding:0.6rem 1.1rem; border:none; border-radius:8px; font-size:0.9rem;
            font-weight:600; cursor:pointer; font-family:inherit; }
-    .btn-primary { background:#5b21b6; color:#fff; }
-    .btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; }
-    .muted { font-size:0.78rem; color:#6b7280; line-height:1.5; }
+    .btn-primary { background:var(--color-primary-fill); color:var(--color-surface); }
+    .btn-secondary { background:var(--color-surface); color:var(--color-warm-700); border:1px solid var(--color-warm-300); }
+    .muted { font-size:0.78rem; color:var(--color-warm-500); line-height:1.5; }
 
     /* Clear the dashboard's fixed feedback button, which otherwise sits on
        top of the last card — on the review page, on the Reject button. */
     #block-content-tail { height:5rem; }
 
-    .rule { background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px;
+    .rule { background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); border-radius:10px;
             padding:0.75rem 1.1rem; margin-bottom:1rem; font-size:0.84rem;
-            color:#4c1d95; line-height:1.55; }
+            color:var(--color-coral-ink); line-height:1.55; }
 </style>
 
 <div class="rule">

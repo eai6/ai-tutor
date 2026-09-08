@@ -5,35 +5,35 @@
 
 {% block content %}
 <style>
-    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.85rem; color:#374151; margin-bottom:1rem; }
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.85rem; color:var(--color-warm-700); margin-bottom:1rem; }
     .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
-    .meta-row strong { color:#111; font-weight:600; }
+    .meta-row strong { color:var(--color-text); font-weight:600; }
     .pill { display:inline-block; padding:0.1rem 0.55rem; border-radius:999px; font-size:0.7rem; font-weight:600; }
-    .pill-variant { background:#eff6ff; color:#1e40af; }
-    .pill-role-human { background:#ecfdf5; color:#065f46; }
-    .pill-role-llm { background:#ede9fe; color:#5b21b6; }
+    .pill-variant { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .pill-role-human { background:var(--color-teal-tint); color:var(--color-teal-ink); }
+    .pill-role-llm { background:var(--color-accent-surface); color:var(--color-primary-ink); }
 
     .summary-grid {
         display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap:0.85rem; margin-bottom:1.2rem;
     }
     .card {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.85rem 1.1rem;
     }
-    .card .label { font-size:0.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.04em; }
-    .card .value { font-size:1.6rem; font-weight:700; color:#111; line-height:1.1; margin-top:0.15rem; }
-    .card .sub { font-size:0.75rem; color:#6b7280; margin-top:0.2rem; }
-    .card-success .value { color:#065f46; }
-    .card-warn    .value { color:#92400e; }
+    .card .label { font-size:0.72rem; color:var(--color-warm-500); text-transform:uppercase; letter-spacing:0.04em; }
+    .card .value { font-size:1.6rem; font-weight:700; color:var(--color-text); line-height:1.1; margin-top:0.15rem; }
+    .card .sub { font-size:0.75rem; color:var(--color-warm-500); margin-top:0.2rem; }
+    .card-success .value { color:var(--color-teal-ink); }
+    .card-warn    .value { color:var(--color-sunny-ink); }
 
     .section {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:1rem 1.1rem; margin-bottom:1rem;
     }
     .section h3 {
         font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
-        color:#6b7280; margin:0 0 0.6rem; font-weight:600;
+        color:var(--color-warm-500); margin:0 0 0.6rem; font-weight:600;
     }
 
     .slice-grid {
@@ -42,27 +42,27 @@
     }
     .slice-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
     .slice-table th, .slice-table td { padding:0.4rem 0.55rem; text-align:left; }
-    .slice-table thead th { background:#f9fafb; color:#6b7280; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
-    .slice-table tbody tr { border-top:1px solid #f3f4f6; }
-    .slice-table .bucket { color:#111; font-weight:500; }
-    .rate { font-variant-numeric: tabular-nums; font-weight:600; color:#111; }
-    .bar { display:inline-block; width:60px; height:5px; background:#f3f4f6; border-radius:3px; vertical-align:middle; margin-left:0.4rem; overflow:hidden; }
-    .bar-fill { height:100%; background:#8b5cf6; }
+    .slice-table thead th { background:var(--color-canvas); color:var(--color-warm-500); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .slice-table tbody tr { border-top:1px solid var(--color-surface-sunken); }
+    .slice-table .bucket { color:var(--color-text); font-weight:500; }
+    .rate { font-variant-numeric: tabular-nums; font-weight:600; color:var(--color-text); }
+    .bar { display:inline-block; width:60px; height:5px; background:var(--color-surface-sunken); border-radius:3px; vertical-align:middle; margin-left:0.4rem; overflow:hidden; }
+    .bar-fill { height:100%; background:var(--color-brand-mid); }
 
     .cat-list { font-size:0.85rem; }
-    .cat-list div { padding:0.25rem 0; border-bottom:1px dashed #f3f4f6; display:flex; justify-content:space-between; }
-    .cat-list strong { color:#111; font-weight:600; }
-    .cat-count { font-variant-numeric: tabular-nums; color:#b91c1c; font-weight:600; }
+    .cat-list div { padding:0.25rem 0; border-bottom:1px dashed var(--color-surface-sunken); display:flex; justify-content:space-between; }
+    .cat-list strong { color:var(--color-text); font-weight:600; }
+    .cat-count { font-variant-numeric: tabular-nums; color:var(--color-rose-ink); font-weight:600; }
 
     .disagree-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
-    .disagree-table th, .disagree-table td { padding:0.4rem 0.55rem; text-align:left; vertical-align:top; border-bottom:1px solid #f3f4f6; }
-    .disagree-table thead th { background:#f9fafb; color:#6b7280; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
-    .disagree-table code { font-size:0.72rem; background:#f3f4f6; padding:0.1rem 0.35rem; border-radius:3px; }
-    .verdict-pass { color:#065f46; font-weight:600; }
-    .verdict-fail { color:#991b1b; font-weight:600; }
+    .disagree-table th, .disagree-table td { padding:0.4rem 0.55rem; text-align:left; vertical-align:top; border-bottom:1px solid var(--color-surface-sunken); }
+    .disagree-table thead th { background:var(--color-canvas); color:var(--color-warm-500); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .disagree-table code { font-size:0.72rem; background:var(--color-surface-sunken); padding:0.1rem 0.35rem; border-radius:3px; }
+    .verdict-pass { color:var(--color-teal-ink); font-weight:600; }
+    .verdict-fail { color:var(--color-rose-ink); font-weight:600; }
 
-    .back-link { color:#6b7280; font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
-    .back-link:hover { color:#5b21b6; }
+    .back-link { color:var(--color-warm-500); font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
+    .back-link:hover { color:var(--color-primary-ink); }
 </style>
 
 <a href="{% url 'dashboard:benchmark:runs_list' %}" class="back-link">← All runs</a>
@@ -71,24 +71,24 @@
 {% if available_subjects %}
 <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;
             margin:0 0 0.85rem 0;font-size:0.8rem;">
-    <span style="color:#6b7280;font-weight:600;text-transform:uppercase;
+    <span style="color:var(--color-warm-500);font-weight:600;text-transform:uppercase;
                  font-size:0.7rem;letter-spacing:0.04em;">Filter by subject:</span>
     <a href="{% url 'dashboard:benchmark:run_detail' run.id %}"
        style="padding:0.2rem 0.7rem;border-radius:999px;text-decoration:none;
-              border:1px solid {% if not subject_filter %}#5b21b6{% else %}#e5e7eb{% endif %};
-              color:{% if not subject_filter %}#5b21b6{% else %}#6b7280{% endif %};
+              border:1px solid {% if not subject_filter %}var(--color-primary-fill){% else %}var(--color-surface-hover){% endif %};
+              color:{% if not subject_filter %}var(--color-primary-ink){% else %}var(--color-warm-500){% endif %};
               font-weight:{% if not subject_filter %}600{% else %}500{% endif %};
-              background:{% if not subject_filter %}#f5f3ff{% else %}#fff{% endif %};">all</a>
+              background:{% if not subject_filter %}var(--color-accent-surface){% else %}var(--color-surface){% endif %};">all</a>
     {% for subj in available_subjects %}
     <a href="{% url 'dashboard:benchmark:run_detail' run.id %}?subject={{ subj }}"
        style="padding:0.2rem 0.7rem;border-radius:999px;text-decoration:none;
-              border:1px solid {% if subject_filter == subj %}#5b21b6{% else %}#e5e7eb{% endif %};
-              color:{% if subject_filter == subj %}#5b21b6{% else %}#6b7280{% endif %};
+              border:1px solid {% if subject_filter == subj %}var(--color-primary-fill){% else %}var(--color-surface-hover){% endif %};
+              color:{% if subject_filter == subj %}var(--color-primary-ink){% else %}var(--color-warm-500){% endif %};
               font-weight:{% if subject_filter == subj %}600{% else %}500{% endif %};
-              background:{% if subject_filter == subj %}#f5f3ff{% else %}#fff{% endif %};">{{ subj }}</a>
+              background:{% if subject_filter == subj %}var(--color-accent-surface){% else %}var(--color-surface){% endif %};">{{ subj }}</a>
     {% endfor %}
     {% if subject_filter %}
-    <span style="color:#9ca3af;font-size:0.75rem;margin-left:0.4rem;">
+    <span style="color:var(--color-warm-400);font-size:0.75rem;margin-left:0.4rem;">
         (recomputed live for `{{ subject_filter }}` only)
     </span>
     {% endif %}
@@ -105,7 +105,7 @@
             <span class="pill pill-role-llm">{{ run.annotator_role }}</span>
         {% endif %}
     </span>
-    {% if run.notes %}<span style="flex-basis:100%;color:#6b7280;"><strong>Notes</strong> {{ run.notes }}</span>{% endif %}
+    {% if run.notes %}<span style="flex-basis:100%;color:var(--color-warm-500);"><strong>Notes</strong> {{ run.notes }}</span>{% endif %}
 </div>
 
 <div class="summary-grid">
@@ -136,7 +136,7 @@
     <div class="slice-grid">
         {% for slice in slices %}
         <div>
-            <div style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:0.4rem;">{{ slice.name }}</div>
+            <div style="font-size:0.78rem;font-weight:600;color:var(--color-warm-700);margin-bottom:0.4rem;">{{ slice.name }}</div>
             <table class="slice-table">
                 <thead>
                     <tr><th>Bucket</th><th>Pass</th><th>Total</th><th>Rate</th></tr>
@@ -163,7 +163,7 @@
 {% if failure_categories %}
 <div class="section">
     <h3>Failure categories</h3>
-    <p style="color:#6b7280;font-size:0.78rem;margin:0 0 0.5rem 0;">
+    <p style="color:var(--color-warm-500);font-size:0.78rem;margin:0 0 0.5rem 0;">
         {{ category_tag_total }} tag{{ category_tag_total|pluralize }}
         across {{ failed_total }} failed item{{ failed_total|pluralize }}
         — items can carry multiple tags, so the counts may sum to more

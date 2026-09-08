@@ -55,19 +55,22 @@ class TestColour:
 
     def test_a_hex_that_matches_a_token_uses_the_token(self):
         """The one rule: no literal colour survives the migration."""
-        assert decls_to_utilities("color: #A83B00") == "text-primary-ink"
+        assert decls_to_utilities("color: #003BA4") == "text-primary-ink"
 
     def test_a_hex_that_matches_nothing_is_still_exact(self):
         assert decls_to_utilities("color: #123456") == "text-[#123456]"
 
     def test_an_ambiguous_hex_resolves_by_the_job_it_is_doing(self):
-        """#A83B00 is both --primary-dark and --primary-ink.
+        """The brand blue answers to seven names, --primary-ink among them.
 
-        css/dashboard/README.md is explicit that the ink is the orange that may
-        carry text and --primary (3.6:1) is the one that may not. Picking
+        css/dashboard/README.md is explicit that the ink is the brand colour
+        that may carry text and --primary is the one that may not. Picking
         whichever name happened to be declared first would erase that.
+
+        These hexes are read off the theme, so they move when it does — the
+        brand was #A83B00 here until it turned blue.
         """
-        assert decls_to_utilities("color: #A83B00") == "text-primary-ink"
+        assert decls_to_utilities("color: #003BA4") == "text-primary-ink"
         assert decls_to_utilities("border-color: #E3DFD8") == "border-border"
 
 

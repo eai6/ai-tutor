@@ -88,7 +88,7 @@ class TestPages:
         response = client.get(reverse('docs:index'))
         assert response.status_code == 200
         body = response.content.decode()
-        assert 'Country Adoption' in body
+        assert 'Enterprise Adaptation' in body
         # Every section is listed somewhere on the page, card or contents.
         for section in playbook.SECTIONS:
             assert reverse('docs:section', args=[section.slug]) in body
@@ -214,7 +214,7 @@ class TestHeaderLink:
     def test_landing_page_links_to_the_playbook(self, client):
         body = client.get(reverse('accounts:landing')).content.decode()
         assert reverse('docs:index') in body
-        assert 'Country Adoption' in body
+        assert 'Enterprise Adaptation' in body
 
     def test_playbook_marks_itself_current(self, client):
         body = client.get(reverse('docs:index')).content.decode()

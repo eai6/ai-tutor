@@ -16,29 +16,29 @@
     }
 
     .ann-card {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:1rem 1.1rem; margin-bottom:1rem;
     }
     .ann-card h3 {
         font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em;
-        color:#6b7280; margin:0 0 0.6rem; font-weight:600;
+        color:var(--color-warm-500); margin:0 0 0.6rem; font-weight:600;
     }
 
-    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:#374151; }
+    .meta-row { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.82rem; color:var(--color-warm-700); }
     .meta-row span { display:inline-flex; gap:0.3rem; align-items:baseline; }
-    .meta-row strong { color:#111; font-weight:600; }
+    .meta-row strong { color:var(--color-text); font-weight:600; }
     .pill {
         display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
         font-size:0.7rem; font-weight:600; letter-spacing:0.02em;
     }
-    .pill-subj { background:#eff6ff; color:#1e40af; }
-    .pill-stratum { background:#fef3c7; color:#92400e; }
-    .pill-suggested { background:#ede9fe; color:#5b21b6; }
+    .pill-subj { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .pill-stratum { background:var(--color-amber-surface); color:var(--color-sunny-ink); }
+    .pill-suggested { background:var(--color-accent-surface); color:var(--color-primary-ink); }
 
     /* History */
     .history-list {
-        max-height:280px; overflow-y:auto; border:1px solid #f3f4f6;
-        border-radius:8px; padding:0.5rem; background:#fafafa;
+        max-height:280px; overflow-y:auto; border:1px solid var(--color-surface-sunken);
+        border-radius:8px; padding:0.5rem; background:var(--color-canvas);
     }
     .history-row {
         font-size:0.83rem; padding:0.35rem 0.5rem; border-radius:6px;
@@ -47,36 +47,36 @@
     .history-row .role {
         font-size:0.7rem; font-weight:700; text-transform:uppercase;
         letter-spacing:0.04em; display:block; margin-bottom:0.15rem;
-        color:#6b7280;
+        color:var(--color-warm-500);
     }
-    .history-row.student .role { color:#1e40af; }
-    .history-row.tutor   .role { color:#5b21b6; }
-    .history-empty { color:#9ca3af; font-size:0.82rem; padding:0.5rem; }
+    .history-row.student .role { color:var(--color-primary-ink); }
+    .history-row.tutor   .role { color:var(--color-primary-ink); }
+    .history-empty { color:var(--color-warm-400); font-size:0.82rem; padding:0.5rem; }
 
     /* Trigger student turn */
     .student-turn {
-        background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px;
+        background:var(--color-accent-surface); border:1px solid var(--color-coral-edge); border-radius:8px;
         padding:0.7rem 0.9rem; font-size:0.92rem; line-height:1.5;
         white-space:pre-wrap;
     }
 
     /* Tutor response */
     .tutor-response {
-        background:#fdf4ff; border:1px solid #e9d5ff; border-radius:8px;
+        background:var(--color-accent-surface); border:1px solid var(--color-accent-border); border-radius:8px;
         padding:0.8rem 1rem; font-size:0.95rem; line-height:1.55;
-        white-space:pre-wrap; color:#111;
+        white-space:pre-wrap; color:var(--color-text);
     }
 
     /* Pipeline trace */
-    .trace-list { font-size:0.82rem; color:#374151; }
-    .trace-list div { padding:0.2rem 0; border-bottom:1px dashed #f3f4f6; }
-    .trace-list strong { color:#111; font-weight:600; display:inline-block; min-width:170px; }
+    .trace-list { font-size:0.82rem; color:var(--color-warm-700); }
+    .trace-list div { padding:0.2rem 0; border-bottom:1px dashed var(--color-surface-sunken); }
+    .trace-list strong { color:var(--color-text); font-weight:600; display:inline-block; min-width:170px; }
     .trace-list .judge-block {
-        background:#f9fafb; border-radius:6px; padding:0.4rem 0.6rem;
-        margin-top:0.3rem; border:1px solid #f3f4f6;
+        background:var(--color-canvas); border-radius:6px; padding:0.4rem 0.6rem;
+        margin-top:0.3rem; border:1px solid var(--color-surface-sunken);
     }
     .trace-list pre {
-        font-size:0.75rem; white-space:pre-wrap; color:#4b5563;
+        font-size:0.75rem; white-space:pre-wrap; color:var(--color-warm-600);
         margin:0.2rem 0 0;
     }
 
@@ -84,7 +84,7 @@
     .label-section { margin-bottom:0.9rem; }
     .label-section-title {
         font-size:0.72rem; font-weight:700; text-transform:uppercase;
-        letter-spacing:0.04em; color:#6b7280; margin-bottom:0.3rem;
+        letter-spacing:0.04em; color:var(--color-warm-500); margin-bottom:0.3rem;
     }
     .label-grid {
         display:grid; grid-template-columns: 1fr; gap:0.2rem;
@@ -94,16 +94,16 @@
         align-items:center; gap:0.4rem;
         font-size:0.82rem; padding:0.25rem 0.45rem; border-radius:6px;
     }
-    .label-row:hover { background:#fafafa; }
-    .label-row .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:0.78rem; color:#111; }
-    .label-row .suggested-tag { font-size:0.65rem; color:#5b21b6; font-weight:600; }
-    .label-row label { font-size:0.7rem; color:#6b7280; cursor:pointer; user-select:none; }
+    .label-row:hover { background:var(--color-canvas); }
+    .label-row .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:0.78rem; color:var(--color-text); }
+    .label-row .suggested-tag { font-size:0.65rem; color:var(--color-primary-ink); font-weight:600; }
+    .label-row label { font-size:0.7rem; color:var(--color-warm-500); cursor:pointer; user-select:none; }
     .label-row input[type=checkbox] { cursor:pointer; }
 
     .col-header {
         display:grid; grid-template-columns: 1fr auto auto;
         gap:0.4rem; padding:0.2rem 0.45rem;
-        font-size:0.65rem; color:#9ca3af; text-transform:uppercase;
+        font-size:0.65rem; color:var(--color-warm-400); text-transform:uppercase;
         letter-spacing:0.04em; font-weight:600;
     }
 
@@ -111,46 +111,46 @@
     .form-row { margin-bottom:0.9rem; }
     .form-row label.field-label {
         display:block; font-size:0.78rem; font-weight:600;
-        color:#374151; margin-bottom:0.25rem;
+        color:var(--color-warm-700); margin-bottom:0.25rem;
     }
     .form-row select, .form-row textarea, .form-row input[type=text] {
-        width:100%; padding:0.45rem 0.6rem; border:1px solid #d1d5db;
+        width:100%; padding:0.45rem 0.6rem; border:1px solid var(--color-warm-300);
         border-radius:6px; font-size:0.85rem; font-family:inherit;
-        color:#111; background:#fff;
+        color:var(--color-text); background:var(--color-surface);
     }
     .form-row textarea { min-height:90px; resize:vertical; }
 
     .tri-state { display:flex; gap:0.5rem; flex-wrap:wrap; }
     .tri-state label {
         display:inline-flex; gap:0.3rem; align-items:center;
-        padding:0.3rem 0.6rem; border:1px solid #e5e7eb;
+        padding:0.3rem 0.6rem; border:1px solid var(--color-surface-hover);
         border-radius:6px; font-size:0.8rem; cursor:pointer;
     }
     .tri-state input { cursor:pointer; }
 
     .save-bar {
-        position:sticky; bottom:1rem; background:#fff;
-        border:1px solid #e5e7eb; border-radius:10px;
+        position:sticky; bottom:1rem; background:var(--color-surface);
+        border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.7rem 0.9rem; box-shadow:0 6px 18px rgba(0,0,0,0.05);
         display:flex; justify-content:space-between; align-items:center;
-        font-size:0.82rem; color:#374151;
+        font-size:0.82rem; color:var(--color-warm-700);
     }
     .save-btn {
-        background:#5b21b6; color:#fff; border:none; border-radius:6px;
+        background:var(--color-primary-fill); color:var(--color-surface); border:none; border-radius:6px;
         padding:0.55rem 1.1rem; font-size:0.88rem; font-weight:600;
         cursor:pointer;
     }
-    .save-btn:hover { background:#4c1d95; }
+    .save-btn:hover { background:var(--color-primary-dark); }
 
-    .verdict-line { font-size:0.85rem; color:#374151; margin-top:0.4rem; }
-    .verdict-line .pass { color:#065f46; font-weight:600; }
-    .verdict-line .fail { color:#991b1b; font-weight:600; }
+    .verdict-line { font-size:0.85rem; color:var(--color-warm-700); margin-top:0.4rem; }
+    .verdict-line .pass { color:var(--color-teal-ink); font-weight:600; }
+    .verdict-line .fail { color:var(--color-rose-ink); font-weight:600; }
 
     .back-link {
-        color:#6b7280; font-size:0.85rem; text-decoration:none;
+        color:var(--color-warm-500); font-size:0.85rem; text-decoration:none;
         margin-bottom:1rem; display:inline-block;
     }
-    .back-link:hover { color:#5b21b6; }
+    .back-link:hover { color:var(--color-primary-ink); }
 </style>
 
 <a href="{% url 'dashboard:benchmark:list' %}" class="back-link">← All items</a>
@@ -170,7 +170,7 @@
                   style="display:inline;">
                 {% csrf_token %}
                 <button type="submit"
-                        style="background:transparent;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                        style="background:transparent;color:var(--color-rose-ink);border:1px solid var(--color-rose-border);border-radius:6px;padding:0.3rem 0.65rem;font-size:0.75rem;font-weight:600;cursor:pointer;">
                     Delete item
                 </button>
             </form>
@@ -206,19 +206,19 @@
                 <h3>Production tutor response</h3>
                 <div class="tutor-response">{{ tutor_response }}</div>
                 {% if attached_media %}
-                <div style="margin-top:0.75rem;padding:0.75rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;">
-                    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;font-weight:600;margin-bottom:0.5rem;">
+                <div style="margin-top:0.75rem;padding:0.75rem;background:var(--color-canvas);border:1px solid var(--color-surface-hover);border-radius:8px;">
+                    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--color-warm-500);font-weight:600;margin-bottom:0.5rem;">
                         Attached figure ({{ attached_media|length }}) — what the student saw
                     </div>
                     {% for m in attached_media %}
                     <div style="margin-bottom:0.75rem;">
                         {% if m.url %}
                         <img src="{{ m.url }}" alt="{{ m.alt|default:'' }}"
-                             style="max-width:100%;max-height:340px;border-radius:6px;display:block;background:#fff;"
+                             style="max-width:100%;max-height:340px;border-radius:6px;display:block;background:var(--color-surface);"
                              loading="lazy" decoding="async">
                         {% endif %}
-                        {% if m.caption %}<div style="font-size:0.78rem;color:#6b7280;margin-top:0.3rem;">{{ m.caption }}</div>{% endif %}
-                        {% if m.title %}<div style="font-size:0.75rem;color:#9ca3af;margin-top:0.2rem;font-family:ui-monospace,Menlo,monospace;">{{ m.title }}</div>{% endif %}
+                        {% if m.caption %}<div style="font-size:0.78rem;color:var(--color-warm-500);margin-top:0.3rem;">{{ m.caption }}</div>{% endif %}
+                        {% if m.title %}<div style="font-size:0.75rem;color:var(--color-warm-400);margin-top:0.2rem;font-family:ui-monospace,Menlo,monospace;">{{ m.title }}</div>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -258,7 +258,7 @@
                 <h3>Prompts used</h3>
                 <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
                     <thead>
-                        <tr style="background:#f9fafb;color:#6b7280;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+                        <tr style="background:var(--color-canvas);color:var(--color-warm-500);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
                             <th style="text-align:left;padding:0.3rem 0.5rem;">Role</th>
                             <th style="text-align:left;padding:0.3rem 0.5rem;">Hash</th>
                             <th style="text-align:right;padding:0.3rem 0.5rem;">Chars</th>
@@ -266,22 +266,22 @@
                     </thead>
                     <tbody>
                         {% if prompt_pack.tutor_system %}
-                        <tr style="border-top:1px solid #f3f4f6;">
-                            <td style="padding:0.3rem 0.5rem;font-weight:600;color:#111;">tutor_system</td>
-                            <td style="padding:0.3rem 0.5rem;font-family:ui-monospace,Menlo,monospace;color:#5b21b6;">{{ prompt_pack.tutor_system.hash|default:"—" }}</td>
-                            <td style="padding:0.3rem 0.5rem;text-align:right;font-variant-numeric:tabular-nums;color:#374151;">{{ prompt_pack.tutor_system.chars|default:"0" }}</td>
+                        <tr style="border-top:1px solid var(--color-surface-sunken);">
+                            <td style="padding:0.3rem 0.5rem;font-weight:600;color:var(--color-text);">tutor_system</td>
+                            <td style="padding:0.3rem 0.5rem;font-family:ui-monospace,Menlo,monospace;color:var(--color-primary-ink);">{{ prompt_pack.tutor_system.hash|default:"—" }}</td>
+                            <td style="padding:0.3rem 0.5rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--color-warm-700);">{{ prompt_pack.tutor_system.chars|default:"0" }}</td>
                         </tr>
                         {% endif %}
                         {% for jname, jmeta in prompt_pack.judges.items %}
-                        <tr style="border-top:1px solid #f3f4f6;">
-                            <td style="padding:0.3rem 0.5rem;color:#374151;">{{ jname }}</td>
-                            <td style="padding:0.3rem 0.5rem;font-family:ui-monospace,Menlo,monospace;color:#5b21b6;">{{ jmeta.hash|default:"—" }}</td>
-                            <td style="padding:0.3rem 0.5rem;text-align:right;font-variant-numeric:tabular-nums;color:#374151;">{{ jmeta.chars|default:"0" }}</td>
+                        <tr style="border-top:1px solid var(--color-surface-sunken);">
+                            <td style="padding:0.3rem 0.5rem;color:var(--color-warm-700);">{{ jname }}</td>
+                            <td style="padding:0.3rem 0.5rem;font-family:ui-monospace,Menlo,monospace;color:var(--color-primary-ink);">{{ jmeta.hash|default:"—" }}</td>
+                            <td style="padding:0.3rem 0.5rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--color-warm-700);">{{ jmeta.chars|default:"0" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                <div style="font-size:0.72rem;color:#9ca3af;margin-top:0.5rem;">
+                <div style="font-size:0.72rem;color:var(--color-warm-400);margin-top:0.5rem;">
                     Short sha1 fingerprint. Same hash = same prompt text. Comparable across items to attribute behaviour shifts to prompt revisions.
                 </div>
             </div>
@@ -290,34 +290,34 @@
             {% if regen_audit.cycles %}
             <div class="ann-card">
                 <h3>Regen audit — {{ regen_audit.cycles|length }} cycle{{ regen_audit.cycles|length|pluralize }}
-                    {% if regen_audit.clean %}<span style="color:#065f46;font-weight:600;">(picked clean)</span>{% else %}<span style="color:#b91c1c;font-weight:600;">(shipped dirty)</span>{% endif %}
+                    {% if regen_audit.clean %}<span style="color:var(--color-teal-ink);font-weight:600;">(picked clean)</span>{% else %}<span style="color:var(--color-rose-ink);font-weight:600;">(shipped dirty)</span>{% endif %}
                 </h3>
-                <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.6rem;">
+                <div style="font-size:0.78rem;color:var(--color-warm-500);margin-bottom:0.6rem;">
                     Picked: <code>{{ regen_audit.picked_model|default:"—" }}</code>
-                    {% if regen_audit.fallback_used %} • <strong style="color:#b91c1c;">stock fallback used</strong>{% endif %}
+                    {% if regen_audit.fallback_used %} • <strong style="color:var(--color-rose-ink);">stock fallback used</strong>{% endif %}
                 </div>
                 {% for cyc in regen_audit.cycles %}
-                <details {% if forloop.first %}open{% endif %} style="margin-bottom:0.6rem;border:1px solid #f3f4f6;border-radius:6px;padding:0.5rem 0.65rem;background:#fafafa;">
-                    <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:#374151;">
+                <details {% if forloop.first %}open{% endif %} style="margin-bottom:0.6rem;border:1px solid var(--color-surface-sunken);border-radius:6px;padding:0.5rem 0.65rem;background:var(--color-canvas);">
+                    <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:var(--color-warm-700);">
                         Cycle {{ cyc.cycle }} — temp={{ cyc.temperature|floatformat:2 }}
                         ({{ cyc.candidates|length }} candidate{{ cyc.candidates|length|pluralize }})
                     </summary>
                     {% for cand in cyc.candidates %}
-                    <div style="margin-top:0.55rem;padding:0.5rem 0.65rem;background:#fff;border:1px solid #f3f4f6;border-radius:6px;">
-                        <div style="font-size:0.75rem;color:#6b7280;margin-bottom:0.35rem;">
+                    <div style="margin-top:0.55rem;padding:0.5rem 0.65rem;background:var(--color-surface);border:1px solid var(--color-surface-sunken);border-radius:6px;">
+                        <div style="font-size:0.75rem;color:var(--color-warm-500);margin-bottom:0.35rem;">
                             <code>{{ cand.model }}</code> • score={{ cand.score|floatformat:2 }} •
-                            {% if cand.clean %}<span style="color:#065f46;font-weight:600;">clean</span>{% else %}<span style="color:#b91c1c;font-weight:600;">dirty</span>{% endif %}
-                            {% if cand.error %} • <span style="color:#b91c1c;">error: {{ cand.error }}</span>{% endif %}
+                            {% if cand.clean %}<span style="color:var(--color-teal-ink);font-weight:600;">clean</span>{% else %}<span style="color:var(--color-rose-ink);font-weight:600;">dirty</span>{% endif %}
+                            {% if cand.error %} • <span style="color:var(--color-rose-ink);">error: {{ cand.error }}</span>{% endif %}
                         </div>
                         {% if cand.text_preview %}
-                        <div style="font-size:0.82rem;line-height:1.5;white-space:pre-wrap;background:#fdf4ff;padding:0.45rem 0.6rem;border-radius:4px;border:1px solid #e9d5ff;color:#111;margin-bottom:0.4rem;">{{ cand.text_preview }}</div>
+                        <div style="font-size:0.82rem;line-height:1.5;white-space:pre-wrap;background:var(--color-accent-surface);padding:0.45rem 0.6rem;border-radius:4px;border:1px solid var(--color-accent-border);color:var(--color-text);margin-bottom:0.4rem;">{{ cand.text_preview }}</div>
                         {% endif %}
                         {% if cand.judge_outputs %}
                         {% for jname, jdata in cand.judge_outputs.items %}
                         {% if jdata and jname != 'skipped' and jname != 'skip_reason' and jname != 'sub_skipped' %}
-                        <div style="font-size:0.75rem;padding:0.2rem 0.4rem;color:#374151;">
-                            <strong style="color:#111;">{{ jname }}</strong>:
-                            <code style="font-size:0.72rem;color:#6b7280;">{{ jdata }}</code>
+                        <div style="font-size:0.75rem;padding:0.2rem 0.4rem;color:var(--color-warm-700);">
+                            <strong style="color:var(--color-text);">{{ jname }}</strong>:
+                            <code style="font-size:0.72rem;color:var(--color-warm-500);">{{ jdata }}</code>
                         </div>
                         {% endif %}
                         {% endfor %}
@@ -335,7 +335,7 @@
             <div class="ann-card">
                 <h3>Labels</h3>
                 {% if suggested_labels %}
-                <div style="font-size:0.78rem;color:#6b7280;margin-bottom:0.6rem;">
+                <div style="font-size:0.78rem;color:var(--color-warm-500);margin-bottom:0.6rem;">
                     Pipeline suggested:
                     {% for s in suggested_labels %}<span class="pill pill-suggested">{{ s }}</span> {% endfor %}
                 </div>
@@ -396,13 +396,13 @@
 
                 <div class="form-row">
                     <label class="field-label">Failure categories
-                        <span style="color:#9ca3af;font-weight:400;font-size:0.78rem;">
+                        <span style="color:var(--color-warm-400);font-weight:400;font-size:0.78rem;">
                             (multi-select — leave all unchecked for a pass)
                         </span>
                     </label>
                     <div class="failure-categories" style="display:flex;flex-wrap:wrap;gap:0.4rem 0.85rem;">
                         {% for opt in failure_category_options %}
-                        <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:#374151;">
+                        <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--color-warm-700);">
                             <input type="checkbox" name="failure_categories"
                                    value="{{ opt.key }}"
                                    {% if opt.checked %}checked{% endif %}>

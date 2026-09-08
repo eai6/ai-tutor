@@ -6,16 +6,16 @@
 {% block content %}
 <style>
     .runs-summary {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.9rem;
-        color:#374151;
+        color:var(--color-warm-700);
     }
     .runs-summary code {
-        font-size:0.78rem; background:#f3f4f6; padding:0.1rem 0.4rem;
+        font-size:0.78rem; background:var(--color-surface-sunken); padding:0.1rem 0.4rem;
         border-radius:4px;
     }
     .runs-table {
-        background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+        background:var(--color-surface); border:1px solid var(--color-surface-hover); border-radius:10px;
         overflow:hidden;
     }
     .runs-table table { width:100%; border-collapse:collapse; }
@@ -24,28 +24,28 @@
         vertical-align:top;
     }
     .runs-table thead th {
-        background:#f9fafb; color:#6b7280; font-weight:600;
+        background:var(--color-canvas); color:var(--color-warm-500); font-weight:600;
         font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;
-        border-bottom:1px solid #e5e7eb;
+        border-bottom:1px solid var(--color-surface-hover);
     }
-    .runs-table tbody tr { border-bottom:1px solid #f3f4f6; }
-    .runs-table tbody tr:hover { background:#fafafa; }
-    .runs-table td a { color:#5b21b6; text-decoration:none; font-weight:500; }
+    .runs-table tbody tr { border-bottom:1px solid var(--color-surface-sunken); }
+    .runs-table tbody tr:hover { background:var(--color-canvas); }
+    .runs-table td a { color:var(--color-primary-ink); text-decoration:none; font-weight:500; }
     .runs-table td a:hover { text-decoration:underline; }
 
     .pill {
         display:inline-block; padding:0.1rem 0.55rem; border-radius:999px;
         font-size:0.7rem; font-weight:600;
     }
-    .pill-variant { background:#eff6ff; color:#1e40af; }
-    .pill-role-human { background:#ecfdf5; color:#065f46; }
-    .pill-role-llm { background:#ede9fe; color:#5b21b6; }
-    .rate { font-weight:600; color:#111; font-variant-numeric: tabular-nums; }
-    .rate-bar { display:inline-block; width:80px; height:6px; background:#f3f4f6; border-radius:3px; vertical-align:middle; overflow:hidden; margin-left:0.4rem; }
-    .rate-bar-fill { height:100%; background:#8b5cf6; }
-    .empty { padding:3rem 1rem; text-align:center; color:#6b7280; }
-    .back-link { color:#6b7280; font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
-    .back-link:hover { color:#5b21b6; }
+    .pill-variant { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .pill-role-human { background:var(--color-teal-tint); color:var(--color-teal-ink); }
+    .pill-role-llm { background:var(--color-accent-surface); color:var(--color-primary-ink); }
+    .rate { font-weight:600; color:var(--color-text); font-variant-numeric: tabular-nums; }
+    .rate-bar { display:inline-block; width:80px; height:6px; background:var(--color-surface-sunken); border-radius:3px; vertical-align:middle; overflow:hidden; margin-left:0.4rem; }
+    .rate-bar-fill { height:100%; background:var(--color-brand-mid); }
+    .empty { padding:3rem 1rem; text-align:center; color:var(--color-warm-500); }
+    .back-link { color:var(--color-warm-500); font-size:0.85rem; text-decoration:none; margin-bottom:1rem; display:inline-block; }
+    .back-link:hover { color:var(--color-primary-ink); }
 </style>
 
 <a href="{% url 'dashboard:benchmark:list' %}" class="back-link">← Benchmark items</a>
@@ -54,9 +54,9 @@
 <div style="margin-bottom:1rem;">
     {% for m in messages %}
     <div style="padding:0.6rem 0.85rem;border-radius:8px;font-size:0.85rem;
-                background:{% if m.tags == 'error' %}#fef2f2{% else %}#ecfdf5{% endif %};
-                color:{% if m.tags == 'error' %}#991b1b{% else %}#065f46{% endif %};
-                border:1px solid {% if m.tags == 'error' %}#fecaca{% else %}#a7f3d0{% endif %};">
+                background:{% if m.tags == 'error' %}var(--color-rose-surface){% else %}var(--color-teal-tint){% endif %};
+                color:{% if m.tags == 'error' %}var(--color-rose-ink){% else %}var(--color-teal-ink){% endif %};
+                border:1px solid {% if m.tags == 'error' %}var(--color-rose-border){% else %}var(--color-teal-edge){% endif %};">
         {{ m }}
     </div>
     {% endfor %}
@@ -70,7 +70,7 @@
             Annotations on disk: <strong>{{ human_annotation_count }}</strong> human,
             <strong>{{ llm_annotation_count }}</strong> LLM-judge.
             <br>
-            <span style="color:#6b7280;font-size:0.8rem;">
+            <span style="color:var(--color-warm-500);font-size:0.8rem;">
                 Each run is a frozen snapshot — score after each pipeline change to track pass-rate over time.
             </span>
         </div>
@@ -79,11 +79,11 @@
             {% csrf_token %}
             <input type="text" name="notes" placeholder="Run notes (optional)"
                    maxlength="500"
-                   style="padding:0.5rem 0.7rem;border:1px solid #d1d5db;
+                   style="padding:0.5rem 0.7rem;border:1px solid var(--color-warm-300);
                           border-radius:6px;font-size:0.85rem;width:220px;">
             <button type="submit"
                     style="padding:0.5rem 1rem;border-radius:6px;border:none;
-                           background:#8b5cf6;color:#fff;font-weight:600;
+                           background:var(--color-brand-mid);color:var(--color-surface);font-weight:600;
                            font-size:0.85rem;cursor:pointer;"
                     {% if not human_annotation_count %}disabled
                     title="Annotate at least one item first"{% endif %}>
@@ -125,7 +125,7 @@
                     <span class="rate">{{ run.pass_rate|floatformat:3 }}</span>
                     <span class="rate-bar"><span class="rate-bar-fill" style="width:{% widthratio run.passed run.total_items 100 %}%;"></span></span>
                 </td>
-                <td style="max-width:280px;color:#6b7280;">{{ run.notes|default:"—" }}</td>
+                <td style="max-width:280px;color:var(--color-warm-500);">{{ run.notes|default:"—" }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -134,7 +134,7 @@
 {% else %}
 <div class="runs-table">
     <div class="empty flex flex-col items-center text-center gap-2 py-10 px-6 text-text-muted [&_.icon]:text-[2rem] [&_.icon]:text-text-faint [&_.icon]:mb-1">
-        <h3 style="color:#374151;margin-bottom:0.5rem;">No runs yet.</h3>
+        <h3 style="color:var(--color-warm-700);margin-bottom:0.5rem;">No runs yet.</h3>
         {% if human_annotation_count %}
         <p>{{ human_annotation_count }} annotation{{ human_annotation_count|pluralize }} ready — hit
            <strong>Score now</strong> above to compute the first run.</p>

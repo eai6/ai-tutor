@@ -38,13 +38,16 @@ def _sources():
         yield rel, p
 
 
-@pytest.mark.xfail(strict=True, reason="true once phase 4 deletes the last stylesheet")
 def test_no_literal_colour_outside_the_theme():
     """`css/dashboard/README.md`'s one rule, carried across to @theme.
 
     A hex in a template is a colour nobody can re-theme: the per-institution
     brand override in base.html works by redefining a custom property, and a
     literal never sees it.
+
+    True since the 1,060 literals the migration left behind were folded into
+    the theme as `var(--color-*)`. The ratchet is off — this is an assertion
+    now, and a new hex in a template fails the build rather than being counted.
     """
     offenders = sorted(
         rel for rel, p in _sources()

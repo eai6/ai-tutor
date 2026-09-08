@@ -82,21 +82,28 @@
   --color-warm-900: #1B1815;   /* body ink                       (16.4:1)   */
 
   /* ------------------------------------------------------------------------
-     Brand orange — THREE TOKENS, THREE JOBS.
+     Brand blue — THREE TOKENS, THREE JOBS.
      Getting this wrong is the single most common mistake in this codebase.
      --color-primary is overridden per-institution by base.html; the ramp
      around it is fixed so derived surfaces stay predictable.
+
+     The brand was orange (#E8590C) until it was named: Sesel AI's blue is
+     #003BA4, which is a far darker anchor than the orange it replaces. The
+     ramp keeps its shape — identity, fill, hover, two tints, ink — and every
+     step gains contrast rather than losing it, so nothing that passed before
+     can fail now. The one rule that changes is the warning below: a 9.7:1
+     fill will carry white text, where the orange one could not.
      --------------------------------------------------------------------- */
-  --color-primary:       #E8590C;  /* bars, focus ring, active edge, tint source.
-                                      3.6:1 — clears the 3:1 non-text bar and
-                                      NOTHING more. Never put text on it or
-                                      in it, in either direction. */
-  --color-primary-fill:  #C4460A;  /* a filled control carrying white text.
-                                      White on this is 5.0:1. */
-  --color-primary-dark:  #A83B00;  /* hover/active on a filled control (6.4:1) */
-  --color-primary-light: #FFF3EC;  /* tinted surface                           */
-  --color-primary-tint:  #FDE3D3;  /* tinted surface, one step stronger        */
-  --color-primary-ink:   #A83B00;  /* orange TEXT and standalone icons (6.4:1) */
+  --color-primary:       #1E5BD6;  /* bars, focus ring, active edge, tint source.
+                                      6.0:1 — well past the 3:1 non-text bar,
+                                      but still the lightest step: keep the
+                                      fill below for anything text sits on. */
+  --color-primary-fill:  #003BA4;  /* a filled control carrying white text.
+                                      White on this is 9.7:1. */
+  --color-primary-dark:  #002E80;  /* hover/active on a filled control (12.3:1) */
+  --color-primary-light: #EEF3FD;  /* tinted surface                            */
+  --color-primary-tint:  #D3E0F9;  /* tinted surface, one step stronger         */
+  --color-primary-ink:   #003BA4;  /* blue TEXT and standalone icons   (9.7:1) */
 
   /* ------------------------------------------------------------------------
      Status. Deliberately desaturated: a teacher scans this page dozens of
@@ -198,12 +205,27 @@
        --x-fill    >=4.5:1 with white on top. Filled buttons.
        --x-ink     >=4.5:1 on the ground. Text and standalone icons.
      --------------------------------------------------------------------- */
-  --color-coral:       #FF6B35;   /* identity, decoration only     (2.8:1) */
-  --color-coral-solid: #E85416;   /* bars, dots, icon fills        (3.7:1) */
-  --color-coral-fill:  #CE440B;   /* button fill, white text on it (4.7:1) */
-  --color-coral-ink:   #BC3D07;   /* text and standalone icons     (5.5:1) */
-  --color-coral-tint:  #FFF1EA;
-  --color-coral-edge:  #FFD9C7;
+  /* Named `coral` from when it was one. The hue is the brand blue now; the
+     token names stay because they are the role, not the colour, and renaming
+     them would touch every template on the student and public surfaces to say
+     the same thing. */
+  --color-coral:       #003BA4;   /* identity: the wordmark tile, large
+                                     decorative areas               (9.7:1) */
+  --color-coral-solid: #0B4FC7;   /* bars, dots, icon fills        (7.1:1) */
+  --color-coral-fill:  #003BA4;   /* button fill, white text on it (9.7:1) */
+  --color-coral-ink:   #002E80;   /* text, icons, and the hover a filled
+                                     control darkens to           (12.3:1) */
+  --color-coral-tint:  #EEF3FD;
+  --color-coral-edge:  #C7D8F7;
+
+  /* Two steps the ramp did not have until the product's own literals were
+     folded into it. The templates carried a mid-light and a mid decorative
+     blue that the jump from --coral-edge (1.4:1) to --color-primary (6.0:1)
+     could not express, so a chip or a ring had to land two stops away from
+     where it started. NEITHER carries text: 1.8:1 and 3.4:1 are a fill and a
+     graphical object respectively, and nothing more. */
+  --color-brand-soft:  #A8C2F2;   /* chips, rings, hover fills     (1.8:1) */
+  --color-brand-mid:   #5B8AEA;   /* dividers, markers, avatars    (3.4:1) */
 
   --color-teal:        #4ECDC4;
   --color-teal-solid:  #1E9B94;   /* (3.4:1) */
