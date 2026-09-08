@@ -22,6 +22,8 @@ HEADINGS_BY_LANGUAGE = {
             ('compliance-features-already-in-the-platform', 'Fonctions de conformité déjà présentes dans la plateforme'),
         ],
         'evidence': [
+            ('from-inputs-to-impact', "Des moyens à l'impact"),
+            ('science-of-learning-built-in', "La science de l'apprentissage, intégrée"),
             ('layer-1-the-runtime-judge', "Niveau 1 — L'évaluateur à l'exécution"),
             ('layer-2-turn-level-evaluation-against-a-rubric', 'Niveau 2 — Évaluation par tour selon une grille'),
             ('layer-3-session-level-pedagogical-evaluation', 'Niveau 3 — Évaluation pédagogique au niveau de la séance'),
@@ -74,6 +76,8 @@ HEADINGS_BY_LANGUAGE = {
             ('compliance-features-already-in-the-platform', 'Funcionalidades de conformidade já existentes na plataforma'),
         ],
         'evidence': [
+            ('from-inputs-to-impact', 'Dos recursos ao impacto'),
+            ('science-of-learning-built-in', 'Ciência da aprendizagem, incorporada'),
             ('layer-1-the-runtime-judge', 'Nível 1 — O avaliador em execução'),
             ('layer-2-turn-level-evaluation-against-a-rubric', 'Nível 2 — Avaliação por turno segundo uma rubrica'),
             ('layer-3-session-level-pedagogical-evaluation', 'Nível 3 — Avaliação pedagógica ao nível da sessão'),
@@ -126,6 +130,8 @@ HEADINGS_BY_LANGUAGE = {
             ('compliance-features-already-in-the-platform', 'Vipengele vya utiifu vilivyomo tayari katika jukwaa'),
         ],
         'evidence': [
+            ('from-inputs-to-impact', 'Kutoka pembejeo hadi athari'),
+            ('science-of-learning-built-in', 'Sayansi ya kujifunza, ndani yake'),
             ('layer-1-the-runtime-judge', 'Tabaka la 1 — Jaji wa wakati halisi'),
             ('layer-2-turn-level-evaluation-against-a-rubric', 'Tabaka la 2 — Tathmini ya kila zamu dhidi ya kigezo'),
             ('layer-3-session-level-pedagogical-evaluation', 'Tabaka la 3 — Tathmini ya kimafunzo ya kipindi kizima'),
