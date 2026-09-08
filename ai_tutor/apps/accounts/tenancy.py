@@ -28,7 +28,7 @@ every other school's content, so they are kept apart deliberately.
 from django.db.models import Q
 
 
-def visible_q(institution, field='institution', country_field=None):
+def visible_q(institution, field='institution', country_field=None, model=None):
     """The Q for what *institution* may see, for callers that build a filter.
 
     Most call sites pass this rule as one positional argument alongside other
@@ -47,6 +47,20 @@ def visible_q(institution, field='institution', country_field=None):
 
     ``institution=None`` yields an empty Q, which matches everything: the
     caller is aggregating.
+
+    *model* is what the Q will be filtered against, and it is only consulted to
+    answer one question: does this model carry a country at all? A
+    TeachingMaterialUpload does not. Its shared half would ask for
+    ``country__in`` on a table with no such column, which is a FieldError
+    rather than a leak — /dashboard/curriculum/ raised one for every teacher.
+    `in_country_q` has guarded this since it was written; this is the same
+    guard on the other half of the pair.
+
+    Without a country there is no way to say which country a row with no
+    institution belongs to, so it belongs to none of them: the shared half is
+    dropped, which is the answer `shared=False` gives for the same reason.
+    Callers that do not pass *model* keep the old behaviour, so a site that
+    works today cannot break by omission.
     """
     if institution is None:
         return Q()
@@ -54,6 +68,8 @@ def visible_q(institution, field='institution', country_field=None):
         country_field = field.rsplit('__', 1)[0] + '__country' if '__' in field else 'country'
 
     own, countries = _resolve(institution, field)
+    if model is not None and not _has_path(model, country_field):
+        return Q(**own)
     return Q(**own) | Q(**{f'{field}__isnull': True, f'{country_field}__in': countries})
 
 
@@ -186,7 +202,8 @@ def scope_q(institution, country, field='institution', model=None, shared=True):
     get the country without the shared half.
     """
     if institution is not None:
-        return visible_q(institution, field) if shared else Q(**{field: institution})
+        return (visible_q(institution, field, model=model) if shared
+                else Q(**{field: institution}))
     if country is None:
         return Q()
     if not shared:

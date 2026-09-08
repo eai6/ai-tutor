@@ -95,6 +95,52 @@ ALLOWED = {
 CONFIG_MARKER = 'platform configuration, not curriculum'
 
 
+@pytest.mark.django_db
+def test_a_model_with_no_country_gets_no_country_lookup(two_countries):
+    """/dashboard/curriculum/ raised FieldError for every teacher.
+
+    `visible_q`'s shared half asks for `country__in`, and a
+    TeachingMaterialUpload has no country column — the query could not be
+    built at all, so the page 500'd rather than leaking anything. `in_country_q`
+    had guarded this from the start; its other half had not.
+    """
+    from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
+    from ai_tutor.apps.accounts.tenancy import scope_q, visible_q
+
+    sc, _tz = two_countries
+    school = Institution.objects.create(name='S', slug='s', country=sc)
+
+    # Told what it is filtering, it drops the half the model cannot answer.
+    guarded = visible_q(school, model=TeachingMaterialUpload)
+    assert 'country' not in str(guarded)
+    assert TeachingMaterialUpload.objects.filter(guarded).count() == 0
+
+    # And the same through scope_q, which is what the views call.
+    assert TeachingMaterialUpload.objects.filter(
+        scope_q(school, sc, model=TeachingMaterialUpload)).count() == 0
+
+    # A model that does carry a country keeps its shared half.
+    assert 'country' in str(visible_q(school, model=Course))
+
+
+@pytest.mark.django_db
+def test_the_curriculum_page_opens_for_a_teacher(client, two_countries):
+    """The regression as a reader meets it, not as a Q object."""
+    from django.contrib.auth.models import User
+    from django.urls import reverse
+
+    from ai_tutor.apps.accounts.models import Membership
+
+    sc, _tz = two_countries
+    school = Institution.objects.create(name='S', slug='s', country=sc)
+    teacher = User.objects.create_user(username='t', password='Correct-Horse-Battery-92')
+    Membership.objects.create(user=teacher, institution=school,
+                              role=Membership.Role.STAFF)
+    client.force_login(teacher)
+
+    assert client.get(reverse('dashboard:curriculum_list')).status_code == 200
+
+
 def _offending_lines(text):
     """Lines that spell the rule out and do not claim the configuration
     exemption on the line itself or the one above it."""

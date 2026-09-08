@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 12:01+0000\n"
+"POT-Creation-Date: 2026-09-08 12:33+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1282,7 +1282,6 @@ msgstr "Tayari una akaunti?"
 #: ai_tutor/templates/accounts/country_self_register.html:146
 #: ai_tutor/templates/accounts/landing.html:211
 #: ai_tutor/templates/accounts/landing.html:221
-#: ai_tutor/templates/accounts/landing.html:231
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
@@ -1558,7 +1557,6 @@ msgstr ""
 
 #: ai_tutor/templates/accounts/landing.html:212
 #: ai_tutor/templates/accounts/landing.html:222
-#: ai_tutor/templates/accounts/landing.html:232
 msgid "Create account"
 msgstr "Fungua akaunti"
 
@@ -1587,6 +1585,10 @@ msgstr ""
 "Kwa wizara ya serikali au shirika linaloendesha jukwaa katika mfumo "
 "mzima wa shule. Ona kila shule, ongeza mpya, na fuatilia jinsi kundi "
 "zima linavyofanya."
+
+#: ai_tutor/templates/accounts/landing.html:241
+msgid "Contact us for onboarding"
+msgstr "Wasiliana nasi ili kuanza"
 
 #: ai_tutor/templates/accounts/login.html:14
 msgid "Welcome back!"

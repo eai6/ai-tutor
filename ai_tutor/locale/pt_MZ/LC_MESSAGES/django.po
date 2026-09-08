@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 12:01+0000\n"
+"POT-Creation-Date: 2026-09-08 12:33+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1283,7 +1283,6 @@ msgstr "Já tens uma conta?"
 #: ai_tutor/templates/accounts/country_self_register.html:146
 #: ai_tutor/templates/accounts/landing.html:211
 #: ai_tutor/templates/accounts/landing.html:221
-#: ai_tutor/templates/accounts/landing.html:231
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
@@ -1564,7 +1563,6 @@ msgstr ""
 
 #: ai_tutor/templates/accounts/landing.html:212
 #: ai_tutor/templates/accounts/landing.html:222
-#: ai_tutor/templates/accounts/landing.html:232
 msgid "Create account"
 msgstr "Criar conta"
 
@@ -1593,6 +1591,10 @@ msgstr ""
 "Para um ministério do governo ou organização que gere a plataforma em "
 "todo um sistema escolar. Veja cada escola, adicione novas e acompanhe o "
 "desempenho de toda a coorte."
+
+#: ai_tutor/templates/accounts/landing.html:241
+msgid "Contact us for onboarding"
+msgstr "Contacte-nos para a integração"
 
 #: ai_tutor/templates/accounts/login.html:14
 msgid "Welcome back!"

@@ -361,10 +361,16 @@ def test_a_country_account_lands_on_the_dashboard_not_the_catalogue(client, coun
 
 
 @pytest.mark.django_db
-def test_the_landing_page_offers_the_country_door(client, countries):
+def test_the_landing_page_sends_an_enterprise_reader_to_a_person(client, countries):
+    """The card offers no form. A country is claimed once and reaches every
+    school in it, so the first account is opened after a conversation — the
+    header keeps a sign-in door for the team that already holds one."""
     body = client.get(reverse('accounts:landing')).content.decode()
-    assert reverse('accounts:country_login') in body
-    assert reverse('accounts:country_self_register') in body
+
+    assert 'mailto:' in body
+    assert 'Contact us for onboarding' in body
+    assert reverse('accounts:country_self_register') not in body
+    assert reverse('accounts:country_login') in body, 'the sign-in door is the header one'
 
 
 @pytest.mark.django_db
