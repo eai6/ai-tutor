@@ -34,7 +34,7 @@ import logging
 from django.utils.translation import gettext as _
 
 from ai_tutor.apps.accounts.models import (
-    CountryMembership, Institution, Membership)
+    Country, CountryMembership, Institution, Membership)
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +66,26 @@ def get_staff_context(request):
 
 
 def _superadmin_context(request, selected):
-    """Platform-wide access."""
-    all_schools = list(Institution.objects.filter(is_active=True).order_by('name'))
+    """Platform-wide access, optionally narrowed to one country.
+
+    The country is a filter over the same platform-wide reach, not a smaller
+    entitlement: a super admin who picks Seychelles is asking a question about
+    Seychelles, and can pick another country in the next breath. Setting
+    `country` rather than filtering each view is what makes the aggregated
+    figures agree with the choice — `scope_q(None, country)` already scopes to
+    a country, and with `country` None it scopes to nothing, which is how a
+    super admin saw every country's numbers under "All schools".
+    """
+    country = _selected_country(request)
+    schools = Institution.objects.filter(is_active=True).exclude(country__is_hidden=True)
+    if country is not None:
+        schools = schools.filter(country=country)
+    all_schools = list(schools.order_by('name'))
 
     if selected and selected != 'all':
-        institution = Institution.objects.filter(id=selected, is_active=True).first()
+        # Resolved against the schools in reach, so a school left selected
+        # from before a country switch does not survive it.
+        institution = next((s for s in all_schools if str(s.pk) == str(selected)), None)
     else:
         institution = None  # aggregated mode
 
@@ -78,7 +93,7 @@ def _superadmin_context(request, selected):
     # (2026-05-07) — flagged dashboard is safety-only.
     return {
         'membership': None,
-        'country': None,
+        'country': country,
         'institution': institution,
         'role': 'superadmin',
         # What to print where a person's role is shown. Two templates used
@@ -106,7 +121,35 @@ def _superadmin_context(request, selected):
         # platform unable to open one — or to get back into a country whose
         # only account holder has gone.
         'can_manage_country_team': True,
+        # A super admin's country is a filter it can change, so an action that
+        # needs one asks; a country account's is its own and is never asked.
+        'country_is_fixed': False,
+        'all_countries': _countries_with_schools(),
+        'selected_country': country,
     }
+
+
+def _selected_country(request):
+    """The country the switcher is pointing at, or None for all of them."""
+    chosen = request.session.get('selected_country_id')
+    if not chosen or chosen == 'all':
+        return None
+    return Country.objects.filter(pk=chosen, is_hidden=False).first()
+
+
+def _countries_with_schools():
+    """Countries the switcher offers.
+
+    Every country with a school in it, plus any a country account holds — a
+    ministry that has signed up and added nothing yet is still a country the
+    platform knows about, and leaving it out of the list would make it
+    unreachable from the switcher.
+    """
+    with_schools = Institution.objects.filter(
+        is_active=True).values_list('country_id', flat=True)
+    held = CountryMembership.objects.values_list('country_id', flat=True)
+    return list(Country.objects.filter(is_hidden=False).filter(
+        pk__in=set(with_schools) | set(held)).order_by('name'))
 
 
 def _country_context(request, membership, selected):
@@ -146,6 +189,9 @@ def _country_context(request, membership, selected):
         # account per country, so whoever holds it adds the rest of the
         # ministry here or nobody else gets in.
         'can_manage_country_team': True,
+        'country_is_fixed': True,
+        'all_countries': [],
+        'selected_country': None,
     }
 
 
@@ -171,6 +217,9 @@ def _school_admin_context(request, membership):
         'can_manage_people': True,
         'can_edit_school_settings': True,
         'can_manage_country_team': False,
+        'country_is_fixed': True,
+        'all_countries': [],
+        'selected_country': None,
     }
 
 
@@ -223,6 +272,9 @@ def _staff_context(request, selected):
         'can_manage_people': False,
         'can_edit_school_settings': False,
         'can_manage_country_team': False,
+        'country_is_fixed': True,
+        'all_countries': [],
+        'selected_country': None,
     }
 
 

@@ -1,0 +1,96 @@
+{% extends 'dashboard/base.html' %}
+{% load i18n dashboard_ui %}
+
+{% block title %}{% trans "Country accounts" %}{% endblock %}
+{% block page_title %}{% trans "Country accounts" %}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom:1rem;">
+    <h1>{% trans "Country accounts" %}</h1>
+    <p class="muted text-text-muted">{% blocktrans %}An account here reaches every school in its country. A country is claimed once by sign-up; every account after the first is made on this page.{% endblocktrans %}</p>
+</div>
+
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Accounts" %} ({{ account_total }})</h3></div>
+    {% if groups %}
+    <table class="w-full [border-collapse:collapse] text-base">
+        <thead>
+            <tr style="background:var(--color-surface-sunken);">
+                <th style="padding:0.75rem 1rem;text-align:left;">{% trans "Country" %}</th>
+                <th style="padding:0.75rem 1rem;text-align:left;">{% trans "Name" %}</th>
+                <th style="padding:0.75rem 1rem;text-align:left;">{% trans "Email" %}</th>
+                <th style="padding:0.75rem 1rem;text-align:left;">{% trans "Status" %}</th>
+                <th style="padding:0.75rem 1rem;text-align:left;"><span class="sr-only">{% trans "Actions" %}</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in groups %}
+            {% for m in group.members %}
+            <tr style="border-top:1px solid var(--color-border);">
+                <td style="padding:0.75rem 1rem;">
+                    {% if forloop.first %}<span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--color-teal-tint);color:var(--color-teal-ink);">{{ group.country.name }}</span>{% endif %}
+                </td>
+                <td style="padding:0.75rem 1rem;font-weight:500;">{{ m.user.get_full_name|default:m.user.username }}</td>
+                <td style="padding:0.75rem 1rem;color:var(--color-text-muted);">{{ m.user.email|default:"—" }}</td>
+                <td style="padding:0.75rem 1rem;">
+                    {% if m.user.is_active and m.is_active %}
+                    <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary">{% trans "Active" %}</span>
+                    {% else %}
+                    <span class="badge inline-flex items-center gap-1 py-[1px] px-2 border border-transparent rounded-full text-2xs font-bold leading-[1.6] whitespace-nowrap bg-surface-sunken text-text-secondary" style="background:var(--color-warning-surface);color:var(--color-warning);">{% trans "Awaiting approval" %}</span>
+                    {% endif %}
+                </td>
+                <td style="padding:0.75rem 1rem;text-align:right;">
+                    <a href="{% url 'dashboard:staff_list' %}?find={{ m.user.email|urlencode }}" class="text-text-link font-bold">{% trans "Manage" %}</a>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="card-body p-5"><p class="text-text-muted">{% trans "No country accounts yet." %}</p></div>
+    {% endif %}
+</div>
+
+<div class="card bg-surface border border-border rounded-lg shadow-[var(--shadow-xs)] overflow-hidden print:[break-inside:avoid] print:shadow-none focus-visible:rounded-lg" style="margin-top:1.5rem;max-width:44rem;">
+    <div class="card-header flex items-center justify-between gap-3 flex-wrap py-4 px-5 border-b border-b-border"><h3 class="font-display text-md font-medium tracking-tight m-0">{% trans "Add a country account" %}</h3></div>
+    <div class="card-body p-5">
+        <p style="color:var(--color-warm-500);font-size:0.8125rem;margin-bottom:0.75rem;">
+            {% if country_is_fixed %}{% blocktrans with name=country.name %}Another account for {{ name }}, with the same reach as yours. They sign in with this email and password.{% endblocktrans %}
+            {% else %}{% trans "Open a country that has none yet, or add someone to one already running. They sign in with this email and password." %}{% endif %}
+        </p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_country_member">
+            {% if country_choices %}
+            <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                <label class="form-label block mb-1 text-xs font-bold text-text-secondary" for="member-country">{% trans "Country" %}</label>
+                <select class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary-fill focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical] focus-visible:shadow-[var(--shadow-halo)]" name="member_country" id="member-country" required>
+                    <option value="">{% trans "Select a country…" %}</option>
+                    {% for code, label in country_choices %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "First Name" %}</label>
+                    <input type="text" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary-fill focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical] focus-visible:shadow-[var(--shadow-halo)]" name="member_first_name" placeholder="{% trans 'First name' %}">
+                </div>
+                <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Last Name" %}</label>
+                    <input type="text" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary-fill focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical] focus-visible:shadow-[var(--shadow-halo)]" name="member_last_name" placeholder="{% trans 'Last name' %}">
+                </div>
+                <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Email" %}</label>
+                    <input type="email" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary-fill focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical] focus-visible:shadow-[var(--shadow-halo)]" name="member_email" placeholder="{% trans 'colleague@ministry.gov' %}" required>
+                </div>
+                <div class="form-group mb-4" style="margin-bottom:0.75rem;">
+                    <label class="form-label block mb-1 text-xs font-bold text-text-secondary">{% trans "Password" %}</label>
+                    <input type="password" class="form-control w-full min-h-[38px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-base text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] placeholder:text-text-muted hover:border-warm-400 focus-visible:outline-none focus-visible:border-primary-fill focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [&:is(select)]:[appearance:none] [&:is(select)]:pr-8 [&:is(select)]:[background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%236F6860'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [&:is(select)]:[background-repeat:no-repeat] [&:is(select)]:[background-position:right_calc(var(--spacing)*2)_center] [&:is(select)]:[background-size:1rem] [&:is(select)]:cursor-pointer [&:is(textarea)]:min-h-24 [&:is(textarea)]:[resize:vertical] focus-visible:shadow-[var(--shadow-halo)]" name="member_password" placeholder="{% trans 'Strong password' %}" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm inline-flex items-center justify-center gap-2 min-h-[30px] py-1 px-3 border border-primary-fill rounded-sm font-body text-xs font-bold leading-[1.2] no-underline cursor-pointer whitespace-nowrap [transition:background_var(--dur-fast)_var(--ease-out),_border-color_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none [&[aria-disabled='true']]:opacity-50 [&[aria-disabled='true']]:cursor-not-allowed [&[aria-disabled='true']]:pointer-events-none bg-primary-fill text-text-on-accent hover:bg-primary-dark hover:border-primary-dark hover:text-text-on-accent">{% trans "Add account" %}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

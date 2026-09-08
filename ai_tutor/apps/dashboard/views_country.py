@@ -77,7 +77,16 @@ def country_school_create(request):
     # The creator's country, never a form field: a country account may only
     # ever add schools to its own country, and a hidden input would be a
     # cross-tenant hole.
-    country = ctx.get('country') or Country.get_platform()
+    #
+    # A super admin has no country until the switcher is pointed at one, and
+    # falling back to the hidden Platform country made a school that no
+    # ministry could ever see and no page listed. Ask instead.
+    country = ctx.get('country')
+    if country is None:
+        messages.error(request, _(
+            "Choose a country in the top bar first — a school belongs to one, "
+            "and it cannot be moved afterwards."))
+        return redirect('dashboard:country_schools')
     Institution.objects.create(
         name=name, slug=slug, country=country,
         default_locale=country.default_locale,

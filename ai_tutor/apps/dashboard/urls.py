@@ -80,6 +80,7 @@ urlpatterns = [
     # Account deletion (memory)
     path('students/<int:student_id>/delete/', views.delete_student, name='delete_student'),
     path('staff/', views.staff_list, name='staff_list'),
+    path('country-accounts/', views.country_accounts, name='country_accounts'),
     path('staff/<int:user_id>/delete/', views.delete_staff, name='delete_staff'),
     path('staff/<int:user_id>/reset-password/show/', views.staff_reset_password_show, name='staff_reset_password_show'),
     path('staff/<int:user_id>/reset-password/email/', views.staff_reset_password_email, name='staff_reset_password_email'),

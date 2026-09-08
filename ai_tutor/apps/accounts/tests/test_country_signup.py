@@ -406,7 +406,7 @@ def test_the_holder_can_add_a_colleague(client, countries):
     _, tz = countries
     holder = _country_client(client, tz)
 
-    resp = holder.post(reverse('dashboard:staff_list'), {
+    resp = holder.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member',
         'member_email': 'colleague@moe.example',
         'member_first_name': 'Neema', 'member_last_name': 'Mushi',
@@ -429,7 +429,7 @@ def test_the_holder_can_add_a_colleague(client, countries):
 def test_the_colleague_is_scoped_to_the_same_country_and_no_further(client, countries):
     sc, tz = countries
     holder = _country_client(client, tz)
-    holder.post(reverse('dashboard:staff_list'), {
+    holder.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_email': 'c@moe.example',
         'member_first_name': 'Neema', 'member_password': PW,
     })
@@ -450,7 +450,7 @@ def test_a_school_admin_cannot_add_to_a_country_team(client, countries):
                               role=Membership.Role.SCHOOL_ADMIN)
     client.force_login(admin)
 
-    client.post(reverse('dashboard:staff_list'), {
+    client.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_email': 'x@moe.example',
         'member_first_name': 'X', 'member_password': PW,
     })
@@ -465,7 +465,7 @@ def test_the_team_is_listed_and_can_be_deactivated(client, countries):
     be seen is one that cannot be revoked."""
     _, tz = countries
     holder = _country_client(client, tz)
-    holder.post(reverse('dashboard:staff_list'), {
+    holder.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_email': 'c@moe.example',
         'member_first_name': 'Neema', 'member_password': PW,
     })
@@ -513,7 +513,7 @@ def test_a_platform_admin_can_open_a_country_nobody_holds(client, countries, sup
     run the platform could not open one at all."""
     client.force_login(superadmin)
 
-    resp = client.post(reverse('dashboard:staff_list'), {
+    resp = client.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_country': 'MZ',
         'member_email': 'moz@moe.example', 'member_first_name': 'Ana',
         'member_password': PW,
@@ -540,7 +540,7 @@ def test_a_platform_admin_lands_on_the_row_a_ministry_already_made(client, count
 
     admin_client = client.__class__()
     admin_client.force_login(superadmin)
-    admin_client.post(reverse('dashboard:staff_list'), {
+    admin_client.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_country': 'MZ',
         'member_email': 'second@moe.example', 'member_first_name': 'Ana',
         'member_password': PW,
@@ -554,7 +554,7 @@ def test_a_platform_admin_lands_on_the_row_a_ministry_already_made(client, count
 @pytest.mark.django_db
 def test_a_platform_admin_is_offered_every_country(client, countries, superadmin):
     client.force_login(superadmin)
-    offered = dict(client.get(reverse('dashboard:staff_list')).context['country_choices'])
+    offered = dict(client.get(reverse('dashboard:country_accounts')).context['country_choices'])
 
     assert len(offered) > 150
     assert 'MZ' in offered, 'a country with no row yet must still be openable'
@@ -567,9 +567,9 @@ def test_a_country_account_is_never_asked_which_country(client, countries):
     sc, tz = countries
     holder = _country_client(client, tz)
 
-    assert holder.get(reverse('dashboard:staff_list')).context['country_choices'] == []
+    assert holder.get(reverse('dashboard:country_accounts')).context['country_choices'] == []
 
-    holder.post(reverse('dashboard:staff_list'), {
+    holder.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_country': sc.iso_code,
         'member_email': 'sneaky@moe.example', 'member_first_name': 'X',
         'member_password': PW,
@@ -583,7 +583,7 @@ def test_a_country_account_is_never_asked_which_country(client, countries):
 def test_a_country_that_is_not_one_is_refused(client, countries, superadmin):
     client.force_login(superadmin)
 
-    client.post(reverse('dashboard:staff_list'), {
+    client.post(reverse('dashboard:country_accounts'), {
         'action': 'create_country_member', 'member_country': 'ZZ',
         'member_email': 'nowhere@moe.example', 'member_first_name': 'X',
         'member_password': PW,
@@ -607,3 +607,127 @@ def test_a_platform_admin_sees_every_country_account(client, countries, superadm
     assert listed['sc-team']['is_country'] is True
     assert listed['sc-team']['institutions'] == 'Seychelles'
     assert listed['tz-team']['institutions'] == 'Tanzania'
+
+
+# ---------------------------------------------------------------------------
+# The country accounts page, and the country the switcher points at
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+def test_a_platform_admin_sees_every_country_account_on_its_own_page(client, countries, superadmin):
+    """The staff list is a school's list. A country account holds no
+    Membership and belongs to no school, so on a page of teachers it is one
+    badge among hundreds of rows."""
+    sc, tz = countries
+    for name, country in (('sc-team', sc), ('tz-team', tz)):
+        u = User.objects.create_user(username=name, password=PW)
+        CountryMembership.objects.create(user=u, country=country)
+
+    client.force_login(superadmin)
+    ctx = client.get(reverse('dashboard:country_accounts')).context
+
+    listed = {m.user.username for g in ctx['groups'] for m in g['members']}
+    assert {'sc-team', 'tz-team'} <= listed
+    assert {g['country'].name for g in ctx['groups']} >= {'Seychelles', 'Tanzania'}
+    assert ctx['account_total'] == len(listed)
+
+
+@pytest.mark.django_db
+def test_a_country_account_sees_only_its_own_team_there(client, countries):
+    sc, tz = countries
+    other = User.objects.create_user(username='sc-team', password=PW)
+    CountryMembership.objects.create(user=other, country=sc)
+    holder = _country_client(client, tz)
+
+    ctx = holder.get(reverse('dashboard:country_accounts')).context
+
+    assert {g['country'].name for g in ctx['groups']} == {'Tanzania'}
+    assert ctx['country_choices'] == [], 'it has a country and is not asked for one'
+
+
+@pytest.mark.django_db
+def test_a_teacher_cannot_reach_the_page(client, countries):
+    sc, _ = countries
+    school = Institution.objects.create(name='A', slug='a', country=sc)
+    teacher = User.objects.create_user(username='t', password=PW)
+    Membership.objects.create(user=teacher, institution=school,
+                              role=Membership.Role.STAFF)
+    client.force_login(teacher)
+
+    assert client.get(reverse('dashboard:country_accounts')).status_code == 302
+
+
+@pytest.mark.django_db
+def test_the_switcher_narrows_a_platform_admin_to_one_country(client, countries, superadmin):
+    """The country is a filter over the same reach, not a smaller one — which
+    is why it is `staff_ctx['country']` and every scoped query follows it."""
+    sc, tz = countries
+    Institution.objects.create(name='SC school', slug='sc-school', country=sc)
+    Institution.objects.create(name='TZ school', slug='tz-school', country=tz)
+    client.force_login(superadmin)
+
+    client.post(reverse('dashboard:switch_school'),
+                {'country_id': str(sc.pk), 'school_id': 'all'})
+    ctx = client.get(reverse('dashboard:staff_list')).context
+
+    assert ctx['country'] == sc
+    assert {s.name for s in ctx['all_schools']} == {'SC school'}
+    assert sc in ctx['all_countries']
+
+
+@pytest.mark.django_db
+def test_changing_country_drops_a_school_from_the_one_left(client, countries, superadmin):
+    """Both selects post together, so the school select still holds the school
+    of the country being left. Carrying it would scope the dashboard to a
+    school that is not in the country on screen."""
+    sc, tz = countries
+    school = Institution.objects.create(name='SC school', slug='sc-school', country=sc)
+    client.force_login(superadmin)
+
+    # Pick the country, then the school within it — the order a person uses,
+    # because the school select only offers that country's schools.
+    client.post(reverse('dashboard:switch_school'),
+                {'country_id': str(sc.pk), 'school_id': 'all'})
+    client.post(reverse('dashboard:switch_school'),
+                {'country_id': str(sc.pk), 'school_id': str(school.pk)})
+    assert client.session['selected_school_id'] == str(school.pk)
+
+    # Now change country. The school select still posts the school just left.
+    client.post(reverse('dashboard:switch_school'),
+                {'country_id': str(tz.pk), 'school_id': str(school.pk)})
+    assert client.session['selected_school_id'] == 'all'
+
+
+@pytest.mark.django_db
+def test_a_platform_admin_still_says_which_country_a_new_account_is_for(client, countries, superadmin):
+    """Filtering the view to Seychelles is not the same as saying the next
+    account is Seychelles'. It still asks."""
+    sc, tz = countries
+    client.force_login(superadmin)
+    client.post(reverse('dashboard:switch_school'),
+                {'country_id': str(sc.pk), 'school_id': 'all'})
+
+    client.post(reverse('dashboard:country_accounts'), {
+        'action': 'create_country_member', 'member_country': tz.iso_code,
+        'member_email': 'tz@moe.example', 'member_first_name': 'A',
+        'member_password': PW,
+    })
+
+    member = User.objects.get(email='tz@moe.example')
+    assert CountryMembership.objects.get(user=member).country == tz
+
+
+@pytest.mark.django_db
+def test_a_school_is_never_created_into_nowhere(client, countries, superadmin):
+    """A super admin with no country selected used to create schools against
+    the hidden Platform country, where no ministry could ever see them."""
+    from ai_tutor.apps.accounts.models import Country
+
+    client.force_login(superadmin)
+    before = Institution.objects.count()
+
+    client.post(reverse('dashboard:country_school_create'), {'name': 'Nowhere High'})
+
+    assert Institution.objects.count() == before
+    assert not Institution.objects.filter(country=Country.get_platform(),
+                                          name='Nowhere High').exists()

@@ -164,6 +164,12 @@
                    {% if 'staff' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
                     {% icon "staff" %}{% trans "Staff" %}
                 </a>
+                {% if can_manage_country_team %}
+                <a href="{% url 'dashboard:country_accounts' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
+                   {% if 'country_accounts' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                    {% icon "globe" %}{% trans "Country accounts" %}
+                </a>
+                {% endif %}
                 {% if user.is_staff %}
                 <a href="{% url 'dashboard:feedback_list' %}" class="nav-link forced-colors:[&[aria-current='page']]:[forced-color-adjust:none] forced-colors:[&[aria-current='page']]:bg-[Highlight] forced-colors:[&[aria-current='page']]:text-[HighlightText] relative flex items-center gap-3 py-2 px-3 mb-[1px] rounded-sm text-text-secondary no-underline text-base font-medium [transition:background_var(--dur-fast)_var(--ease-out),_color_var(--dur-fast)_var(--ease-out)] [&_.icon]:text-[1.125rem] [&_.icon]:text-text-muted [&_.icon]:transition-colors [&_.icon]:duration-[var(--dur-fast)] [&_.icon]:ease-[var(--ease-out)] hover:bg-surface-hover hover:text-text [&:hover_.icon]:text-text-muted [&[aria-current='page']]:bg-primary-light [&[aria-current='page']]:text-primary-ink [&[aria-current='page']]:font-bold [&[aria-current='page']_.icon]:text-primary-ink [&[aria-current='page']::before]:content-[''] [&[aria-current='page']::before]:absolute [&[aria-current='page']::before]:left-0 [&[aria-current='page']::before]:top-[20%] [&[aria-current='page']::before]:bottom-[20%] [&[aria-current='page']::before]:w-[3px] [&[aria-current='page']::before]:rounded-tl-[0] [&[aria-current='page']::before]:rounded-tr-full [&[aria-current='page']::before]:rounded-br-full [&[aria-current='page']::before]:rounded-bl-[0] [&[aria-current='page']::before]:bg-primary"
                    {% if 'feedback' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
@@ -246,8 +252,24 @@
                 <form method="post" action="{% url 'dashboard:switch_school' %}" class="row flex items-center gap-2 flex-wrap">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.path }}">
+                    {% if all_countries %}
+                    {% comment %}
+                    The two selects are one control: a school only means something
+                    inside a country, so the country comes first and narrows what the
+                    second offers. Only an account whose reach spans more than one
+                    country is asked — a ministry has one and is never made to pick it.
+                    {% endcomment %}
+                    <label for="country-switch" class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% trans "Showing data for country" %}</label>
+                    <select name="country_id" id="country-switch" class="select w-auto max-w-[11rem] min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [appearance:none] pr-8 [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%237C7469'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*2)_center] [background-size:1rem] cursor-pointer pt-1 pb-1"
+                            onchange="this.form.submit()">
+                        <option value="all" {% if not selected_country %}selected{% endif %}>{% trans "All countries" %}</option>
+                        {% for c in all_countries %}
+                        <option value="{{ c.id }}" {% if selected_country.id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
                     <label for="school-switch" class="absolute w-[1px] h-[1px] p-0 m-[-1px] overflow-hidden [clip:rect(0,_0,_0,_0)] whitespace-nowrap border-0">{% trans "Showing data for school" %}</label>
-                    <select name="school_id" id="school-switch" class="select w-full min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [appearance:none] pr-8 [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%237C7469'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*2)_center] [background-size:1rem] cursor-pointer pt-1 pb-1" onchange="this.form.submit()">
+                    <select name="school_id" id="school-switch" class="select w-auto max-w-[11rem] min-h-[30px] py-2 px-3 bg-surface border border-border-field rounded-sm font-body text-sm text-text [transition:border-color_var(--dur-fast)_var(--ease-out),_box-shadow_var(--dur-fast)_var(--ease-out)] hover:border-warm-400 focus-visible:border-primary focus-visible:shadow-[0_0_0_3px_var(--color-primary-light)] [appearance:none] pr-8 [background-image:url('data:image/svg+xml,%3Csvg_xmlns='http://www.w3.org/2000/svg'_fill='none'_viewBox='0_0_24_24'_stroke='%237C7469'_stroke-width='2'_stroke-linecap='round'_stroke-linejoin='round'%3E%3Cpath_d='M6_9l6_6_6-6'/%3E%3C/svg%3E')] [background-repeat:no-repeat] [background-position:right_calc(var(--spacing)*2)_center] [background-size:1rem] cursor-pointer pt-1 pb-1" onchange="this.form.submit()">
                         {% if user.is_staff %}
                         <option value="all" {% if is_aggregated %}selected{% endif %}>{% trans "All schools" %}</option>
                         {% endif %}

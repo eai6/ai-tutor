@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 14:43+0000\n"
+"POT-Creation-Date: 2026-09-08 17:03+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -46,24 +46,25 @@ msgstr "alama"
 msgid "Your password must contain %(wanted)s."
 msgstr "Nenosiri lako lazima liwe na %(wanted)s."
 
-#: ai_tutor/apps/accounts/scope.py:93
+#: ai_tutor/apps/accounts/scope.py:108
 #: ai_tutor/templates/dashboard/staff_list.html:33
 #: ai_tutor/templates/dashboard/staff_list.html:145
 msgid "Super Admin"
 msgstr "Msimamizi Mkuu"
 
-#: ai_tutor/apps/accounts/scope.py:134
+#: ai_tutor/apps/accounts/scope.py:177
 #: ai_tutor/templates/accounts/country_self_register.html:86
+#: ai_tutor/templates/dashboard/country_accounts.html:19
+#: ai_tutor/templates/dashboard/country_accounts.html:67
 #: ai_tutor/templates/dashboard/staff_list.html:145
-#: ai_tutor/templates/dashboard/staff_list.html:293
 msgid "Country"
 msgstr "Nchi"
 
-#: ai_tutor/apps/accounts/scope.py:163
+#: ai_tutor/apps/accounts/scope.py:209
 msgid "School Admin"
 msgstr "Msimamizi wa Shule"
 
-#: ai_tutor/apps/accounts/scope.py:215
+#: ai_tutor/apps/accounts/scope.py:264
 msgid "Teacher"
 msgstr "Mwalimu"
 
@@ -205,26 +206,26 @@ msgstr "wanafunzi hawakuwa na kipindi muda huu"
 msgid "Out of %(total)s on the roster."
 msgstr "Kati ya %(total)s waliosajiliwa."
 
-#: ai_tutor/apps/dashboard/views.py:299
+#: ai_tutor/apps/dashboard/views.py:314
 msgid "weekly"
 msgstr "kila wiki"
 
-#: ai_tutor/apps/dashboard/views.py:1133 ai_tutor/apps/dashboard/views.py:2260
+#: ai_tutor/apps/dashboard/views.py:1148 ai_tutor/apps/dashboard/views.py:2275
 #, python-format
 msgid "Promote to %(grade)s"
 msgstr "Pandisha hadi %(grade)s"
 
-#: ai_tutor/apps/dashboard/views.py:1135 ai_tutor/apps/dashboard/views.py:2262
-#: ai_tutor/apps/dashboard/views.py:2263
+#: ai_tutor/apps/dashboard/views.py:1150 ai_tutor/apps/dashboard/views.py:2277
+#: ai_tutor/apps/dashboard/views.py:2278
 msgid "Graduate"
 msgstr "Hitimu"
 
-#: ai_tutor/apps/dashboard/views.py:1137 ai_tutor/apps/dashboard/views.py:2270
+#: ai_tutor/apps/dashboard/views.py:1152 ai_tutor/apps/dashboard/views.py:2285
 #, python-format
 msgid "Demote to %(grade)s"
 msgstr "Shusha hadi %(grade)s"
 
-#: ai_tutor/apps/dashboard/views.py:1140
+#: ai_tutor/apps/dashboard/views.py:1155
 msgid "Reactivate at S5"
 msgstr "Washa upya katika S5"
 
@@ -241,7 +242,15 @@ msgstr "Shule inahitaji jina."
 msgid "That short name is already taken."
 msgstr "Jina hilo fupi tayari limechukuliwa."
 
-#: ai_tutor/apps/dashboard/views_country.py:85
+#: ai_tutor/apps/dashboard/views_country.py:87
+msgid ""
+"Choose a country in the top bar first — a school belongs to one, and it "
+"cannot be moved afterwards."
+msgstr ""
+"Chagua nchi kwenye upau wa juu kwanza — shule ni ya nchi moja, na "
+"haiwezi kuhamishwa baadaye."
+
+#: ai_tutor/apps/dashboard/views_country.py:94
 #, fuzzy, python-format
 #| msgid "by %(name)s"
 msgid "%(name)s added."
@@ -946,8 +955,8 @@ msgstr "Weka jina lako la mtumiaji"
 #: ai_tutor/templates/accounts/staff_self_register.html:94
 #: ai_tutor/templates/accounts/student_login.html:42
 #: ai_tutor/templates/accounts/student_register.html:116
+#: ai_tutor/templates/dashboard/country_accounts.html:88
 #: ai_tutor/templates/dashboard/staff_list.html:272
-#: ai_tutor/templates/dashboard/staff_list.html:314
 #: ai_tutor/templates/desktop/server.html:125
 msgid "Password"
 msgstr "Nenosiri"
@@ -1013,9 +1022,9 @@ msgstr ""
 #: ai_tutor/templates/accounts/staff_register.html:65
 #: ai_tutor/templates/accounts/staff_self_register.html:32
 #: ai_tutor/templates/accounts/student_register.html:39
+#: ai_tutor/templates/dashboard/country_accounts.html:76
 #: ai_tutor/templates/dashboard/settings.html:197
 #: ai_tutor/templates/dashboard/staff_list.html:260
-#: ai_tutor/templates/dashboard/staff_list.html:302
 msgid "First Name"
 msgstr "Jina la Kwanza"
 
@@ -1030,9 +1039,9 @@ msgstr "Jina lako la kwanza"
 #: ai_tutor/templates/accounts/staff_register.html:79
 #: ai_tutor/templates/accounts/staff_self_register.html:46
 #: ai_tutor/templates/accounts/student_register.html:53
+#: ai_tutor/templates/dashboard/country_accounts.html:80
 #: ai_tutor/templates/dashboard/settings.html:201
 #: ai_tutor/templates/dashboard/staff_list.html:264
-#: ai_tutor/templates/dashboard/staff_list.html:306
 msgid "Last Name"
 msgstr "Jina la Ukoo"
 
@@ -1057,12 +1066,13 @@ msgstr "Chagua jina la mtumiaji"
 #: ai_tutor/templates/accounts/staff_register.html:49
 #: ai_tutor/templates/accounts/staff_self_register.html:71
 #: ai_tutor/templates/dashboard/classes/detail.html:146
+#: ai_tutor/templates/dashboard/country_accounts.html:21
+#: ai_tutor/templates/dashboard/country_accounts.html:84
 #: ai_tutor/templates/dashboard/settings.html:205
 #: ai_tutor/templates/dashboard/staff_list.html:133
 #: ai_tutor/templates/dashboard/staff_list.html:194
 #: ai_tutor/templates/dashboard/staff_list.html:241
 #: ai_tutor/templates/dashboard/staff_list.html:268
-#: ai_tutor/templates/dashboard/staff_list.html:310
 msgid "Email"
 msgstr "Barua pepe"
 
@@ -1494,7 +1504,7 @@ msgstr "Rudia nenosiri"
 
 #: ai_tutor/templates/accounts/settings.html:4
 #: ai_tutor/templates/accounts/settings.html:131
-#: ai_tutor/templates/dashboard/base.html:211
+#: ai_tutor/templates/dashboard/base.html:217
 #: ai_tutor/templates/dashboard/settings.html:4
 #: ai_tutor/templates/dashboard/settings.html:5
 msgid "Settings"
@@ -1509,7 +1519,7 @@ msgid "Manage your account."
 msgstr "Simamia akaunti yako."
 
 #: ai_tutor/templates/accounts/settings.html:144
-#: ai_tutor/templates/dashboard/base.html:208
+#: ai_tutor/templates/dashboard/base.html:214
 msgid "Account"
 msgstr "Akaunti"
 
@@ -1524,14 +1534,14 @@ msgid "Role"
 msgstr "Jukumu"
 
 #: ai_tutor/templates/accounts/settings.html:163
+#: ai_tutor/templates/dashboard/country_accounts.html:77
 #: ai_tutor/templates/dashboard/staff_list.html:261
-#: ai_tutor/templates/dashboard/staff_list.html:303
 msgid "First name"
 msgstr "Jina la kwanza"
 
 #: ai_tutor/templates/accounts/settings.html:167
+#: ai_tutor/templates/dashboard/country_accounts.html:81
 #: ai_tutor/templates/dashboard/staff_list.html:265
-#: ai_tutor/templates/dashboard/staff_list.html:307
 msgid "Last name"
 msgstr "Jina la ukoo"
 
@@ -1930,64 +1940,79 @@ msgid "Staff"
 msgstr "Wafanyakazi"
 
 #: ai_tutor/templates/dashboard/base.html:176
+#: ai_tutor/templates/dashboard/country_accounts.html:4
+#: ai_tutor/templates/dashboard/country_accounts.html:5
+#: ai_tutor/templates/dashboard/country_accounts.html:9
+msgid "Country accounts"
+msgstr "Akaunti za nchi"
+
+#: ai_tutor/templates/dashboard/base.html:182
 msgid "Feedback & bugs"
 msgstr "Maoni na hitilafu"
 
-#: ai_tutor/templates/dashboard/base.html:185
+#: ai_tutor/templates/dashboard/base.html:191
 msgid "Evaluation"
 msgstr "Tathmini"
 
-#: ai_tutor/templates/dashboard/base.html:188
+#: ai_tutor/templates/dashboard/base.html:194
 msgid "Tutoring evaluation"
 msgstr "Tathmini ya ufundishaji"
 
-#: ai_tutor/templates/dashboard/base.html:192
+#: ai_tutor/templates/dashboard/base.html:198
 msgid "Scores & export"
 msgstr "Alama na kuhamisha"
 
-#: ai_tutor/templates/dashboard/base.html:197
+#: ai_tutor/templates/dashboard/base.html:203
 #: ai_tutor/templates/dashboard/quality/content_edit_dashboard.html:5
 msgid "Content quality"
 msgstr "Ubora wa maudhui"
 
-#: ai_tutor/templates/dashboard/base.html:201
+#: ai_tutor/templates/dashboard/base.html:207
 #: ai_tutor/templates/dashboard/quality/content_edit_events_list.html:5
 msgid "Edit events"
 msgstr "Hariri matukio"
 
-#: ai_tutor/templates/dashboard/base.html:214
+#: ai_tutor/templates/dashboard/base.html:220
 msgid "Back to tutor"
 msgstr "Rudi kwa mkufunzi"
 
-#: ai_tutor/templates/dashboard/base.html:217
+#: ai_tutor/templates/dashboard/base.html:223
 msgid "Log out"
 msgstr "Ondoka"
 
-#: ai_tutor/templates/dashboard/base.html:231
+#: ai_tutor/templates/dashboard/base.html:237
 msgid "Open navigation"
 msgstr "Fungua urambazaji"
 
-#: ai_tutor/templates/dashboard/base.html:238
+#: ai_tutor/templates/dashboard/base.html:244
 msgid "Teacher dashboard"
 msgstr "Dashibodi ya mwalimu"
 
-#: ai_tutor/templates/dashboard/base.html:242
+#: ai_tutor/templates/dashboard/base.html:248
 #: ai_tutor/templates/dashboard/quality/content_edit_events_list.html:12
 #: ai_tutor/templates/tutoring/catalog.html:53
 #: ai_tutor/templates/tutoring/chat_tutor.html:19
 msgid "Dashboard"
 msgstr "Dashibodi"
 
-#: ai_tutor/templates/dashboard/base.html:257
+#: ai_tutor/templates/dashboard/base.html:271
+msgid "Showing data for country"
+msgstr "Inaonyesha data ya nchi"
+
+#: ai_tutor/templates/dashboard/base.html:274
+msgid "All countries"
+msgstr "Nchi zote"
+
+#: ai_tutor/templates/dashboard/base.html:280
 msgid "Showing data for school"
 msgstr "Inaonyesha data ya shule"
 
-#: ai_tutor/templates/dashboard/base.html:260
+#: ai_tutor/templates/dashboard/base.html:283
 #: ai_tutor/templates/dashboard/settings.html:219
 msgid "All schools"
 msgstr "Shule zote"
 
-#: ai_tutor/templates/dashboard/base.html:266
+#: ai_tutor/templates/dashboard/base.html:289
 msgid "Switch"
 msgstr "Badilisha"
 
@@ -2405,6 +2430,7 @@ msgstr "Ina ya mwisho"
 
 #: ai_tutor/templates/dashboard/competency/student.html:66
 #: ai_tutor/templates/dashboard/country/schools.html:24
+#: ai_tutor/templates/dashboard/country_accounts.html:22
 #: ai_tutor/templates/dashboard/curriculum/course_detail.html:485
 #: ai_tutor/templates/dashboard/curriculum/course_detail.html:902
 #: ai_tutor/templates/dashboard/curriculum/list.html:34
@@ -2465,6 +2491,7 @@ msgid "Short name"
 msgstr "Jina fupi"
 
 #: ai_tutor/templates/dashboard/country/schools.html:35
+#: ai_tutor/templates/dashboard/country_accounts.html:37
 #: ai_tutor/templates/dashboard/lesson_monitor.html:230
 #: ai_tutor/templates/dashboard/settings.html:456
 #: ai_tutor/templates/dashboard/settings.html:737
@@ -2501,6 +2528,7 @@ msgid "New schools join %(name)s. Its default language becomes theirs."
 msgstr "Shule mpya hujiunga na %(name)s. Lugha yake chaguo-msingi inakuwa yao."
 
 #: ai_tutor/templates/dashboard/country/schools.html:63
+#: ai_tutor/templates/dashboard/country_accounts.html:20
 #: ai_tutor/templates/dashboard/settings.html:446
 #: ai_tutor/templates/dashboard/settings.html:527
 #: ai_tutor/templates/dashboard/settings.html:719
@@ -2524,6 +2552,77 @@ msgstr "Hutumika katika viungo. Ikiachwa wazi, hutengenezwa kutoka jina."
 #: ai_tutor/templates/dashboard/country/schools.html:76
 msgid "Add school"
 msgstr "Ongeza shule"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:10
+msgid ""
+"An account here reaches every school in its country. A country is claimed "
+"once by sign-up; every account after the first is made on this page."
+msgstr ""
+"Akaunti hapa hufikia kila shule katika nchi yake. Nchi husajiliwa mara "
+"moja tu; akaunti zote zinazofuata hufunguliwa kwenye ukurasa huu."
+
+#: ai_tutor/templates/dashboard/country_accounts.html:14
+msgid "Accounts"
+msgstr "Akaunti"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:23
+#: ai_tutor/templates/dashboard/flagged_sessions.html:61
+#: ai_tutor/templates/dashboard/lesson_monitor.html:261
+#: ai_tutor/templates/dashboard/settings.html:722
+#: ai_tutor/templates/dashboard/students/list.html:37
+msgid "Actions"
+msgstr "Vitendo"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:39
+msgid "Awaiting approval"
+msgstr "Inasubiri idhini"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:43
+#: ai_tutor/templates/dashboard/curriculum/list.html:72
+msgid "Manage"
+msgstr "Simamia"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:51
+msgid "No country accounts yet."
+msgstr "Bado hakuna akaunti za nchi."
+
+#: ai_tutor/templates/dashboard/country_accounts.html:56
+msgid "Add a country account"
+msgstr "Ongeza akaunti ya nchi"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:59
+#, python-format
+msgid ""
+"Another account for %(name)s, with the same reach as yours. They sign in "
+"with this email and password."
+msgstr ""
+"Akaunti nyingine ya %(name)s, yenye ufikiaji sawa na wako. Wanaingia kwa"
+" barua pepe na nenosiri hili."
+
+#: ai_tutor/templates/dashboard/country_accounts.html:60
+msgid ""
+"Open a country that has none yet, or add someone to one already running. "
+"They sign in with this email and password."
+msgstr ""
+"Fungua nchi ambayo bado haina akaunti, au ongeza mtu kwenye nchi "
+"inayoendesha tayari. Wanaingia kwa barua pepe na nenosiri hili."
+
+#: ai_tutor/templates/dashboard/country_accounts.html:69
+msgid "Select a country…"
+msgstr "Chagua nchi…"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:85
+msgid "colleague@ministry.gov"
+msgstr ""
+
+#: ai_tutor/templates/dashboard/country_accounts.html:89
+#: ai_tutor/templates/dashboard/staff_list.html:273
+msgid "Strong password"
+msgstr "Nenosiri imara"
+
+#: ai_tutor/templates/dashboard/country_accounts.html:92
+msgid "Add account"
+msgstr "Ongeza akaunti"
 
 #: ai_tutor/templates/dashboard/curriculum/content_progress.html:4
 msgid "Content Generation Progress"
@@ -3478,10 +3577,6 @@ msgstr "Sehemu"
 msgid "Platform"
 msgstr "Jukwaa"
 
-#: ai_tutor/templates/dashboard/curriculum/list.html:72
-msgid "Manage"
-msgstr "Simamia"
-
 #: ai_tutor/templates/dashboard/curriculum/list.html:83
 #: ai_tutor/templates/dashboard/curriculum/upload.html:399
 #: ai_tutor/templates/dashboard/materials/process.html:128
@@ -4343,13 +4438,6 @@ msgstr "Kwa nini iliripotiwa"
 #: ai_tutor/templates/dashboard/flagged_sessions.html:59
 msgid "Flagged"
 msgstr "Imeripotiwa"
-
-#: ai_tutor/templates/dashboard/flagged_sessions.html:61
-#: ai_tutor/templates/dashboard/lesson_monitor.html:261
-#: ai_tutor/templates/dashboard/settings.html:722
-#: ai_tutor/templates/dashboard/students/list.html:37
-msgid "Actions"
-msgstr "Vitendo"
 
 #: ai_tutor/templates/dashboard/flagged_sessions.html:102
 msgid "Flagged chat pages"
@@ -5889,7 +5977,7 @@ msgstr "Mfanye Msimamizi Mkuu"
 
 #: ai_tutor/templates/dashboard/staff_list.html:66
 #: ai_tutor/templates/dashboard/staff_list.html:152
-#: ai_tutor/templates/dashboard/staff_list.html:329
+#: ai_tutor/templates/dashboard/staff_list.html:288
 msgid "Reset password"
 msgstr "Weka upya nenosiri"
 
@@ -6024,99 +6112,57 @@ msgstr ""
 msgid "admin@school.edu"
 msgstr "admin@school.edu"
 
-#: ai_tutor/templates/dashboard/staff_list.html:273
-#: ai_tutor/templates/dashboard/staff_list.html:315
-msgid "Strong password"
-msgstr "Nenosiri imara"
-
 #: ai_tutor/templates/dashboard/staff_list.html:276
 msgid "Create Admin"
 msgstr "Tengeneza Msimamizi"
 
-#: ai_tutor/templates/dashboard/staff_list.html:285
-msgid "Add to the country team"
-msgstr "Ongeza kwenye timu ya nchi"
-
-#: ai_tutor/templates/dashboard/staff_list.html:287
-#, python-format
-msgid ""
-"Another account for %(name)s, with the same reach as yours. A country "
-"registers once, so this is how the rest of the team gets in — they sign in "
-"with this email and password."
-msgstr ""
-"Akaunti nyingine ya %(name)s, yenye ufikiaji sawa na wako. Nchi "
-"husajiliwa mara moja tu, kwa hivyo hivi ndivyo wengine wa timu "
-"wanavyoingia — wanaingia kwa barua pepe na nenosiri hili."
-
-#: ai_tutor/templates/dashboard/staff_list.html:287
-msgid ""
-"A country account reaches every school in its country. Open a country that "
-"has none yet, or add someone to one already running — they sign in with this "
-"email and password."
-msgstr ""
-"Akaunti ya nchi hufikia kila shule katika nchi yake. Fungua nchi ambayo "
-"bado haina akaunti, au ongeza mtu kwenye nchi inayoendesha tayari — "
-"wanaingia kwa barua pepe na nenosiri hili."
-
-#: ai_tutor/templates/dashboard/staff_list.html:295
-msgid "Select a country…"
-msgstr "Chagua nchi…"
-
-#: ai_tutor/templates/dashboard/staff_list.html:311
-msgid "colleague@ministry.gov"
-msgstr ""
-
-#: ai_tutor/templates/dashboard/staff_list.html:318
-msgid "Add member"
-msgstr "Ongeza mwanachama"
-
-#: ai_tutor/templates/dashboard/staff_list.html:334
+#: ai_tutor/templates/dashboard/staff_list.html:293
 msgid "Pick how to deliver the new password:"
 msgstr "Chagua jinsi ya kufikisha nenosiri jipya:"
 
-#: ai_tutor/templates/dashboard/staff_list.html:336
+#: ai_tutor/templates/dashboard/staff_list.html:295
 msgid "Email a reset link"
 msgstr "Tuma kiungo cha kuweka upya"
 
-#: ai_tutor/templates/dashboard/staff_list.html:340
+#: ai_tutor/templates/dashboard/staff_list.html:299
 msgid "Show a temporary password"
 msgstr "Onyesha nenosiri la muda"
 
-#: ai_tutor/templates/dashboard/staff_list.html:341
+#: ai_tutor/templates/dashboard/staff_list.html:300
 msgid ""
 "Copy it and share with the user. They will be forced to change it on next "
 "login."
 msgstr ""
 "Nakili na umshirikishe mtumiaji. Atalazimika kulibadilisha atakapoingia tena."
 
-#: ai_tutor/templates/dashboard/staff_list.html:344
+#: ai_tutor/templates/dashboard/staff_list.html:303
 msgid "Working…"
 msgstr "Inafanya kazi…"
 
-#: ai_tutor/templates/dashboard/staff_list.html:346
+#: ai_tutor/templates/dashboard/staff_list.html:305
 msgid "Temporary password for"
 msgstr "Nenosiri la muda kwa"
 
-#: ai_tutor/templates/dashboard/staff_list.html:349
+#: ai_tutor/templates/dashboard/staff_list.html:308
 msgid "Copy"
 msgstr "Nakili"
 
-#: ai_tutor/templates/dashboard/staff_list.html:351
+#: ai_tutor/templates/dashboard/staff_list.html:310
 msgid ""
 "⚠️ Will not be shown again. The user will be required to change it on next "
 "login."
 msgstr ""
 "⚠️ Halitaonyeshwa tena. Mtumiaji atatakiwa kulibadilisha atakapoingia tena."
 
-#: ai_tutor/templates/dashboard/staff_list.html:354
+#: ai_tutor/templates/dashboard/staff_list.html:313
 msgid "✅ Reset link emailed to"
 msgstr "✅ Kiungo cha kuweka upya kimetumwa kwa"
 
-#: ai_tutor/templates/dashboard/staff_list.html:354
+#: ai_tutor/templates/dashboard/staff_list.html:313
 msgid "The link expires shortly."
 msgstr "Kiungo kitaisha muda hivi karibuni."
 
-#: ai_tutor/templates/dashboard/staff_list.html:359
+#: ai_tutor/templates/dashboard/staff_list.html:318
 #: ai_tutor/templates/tutoring/catalog.html:105
 #: ai_tutor/templates/tutoring/catalog.html:114
 #: ai_tutor/templates/tutoring/chat_tutor.html:221
@@ -7837,6 +7883,12 @@ msgstr "Kagua Somo"
 msgid "Continue Learning"
 msgstr "Endelea Kujifunza"
 
+#~ msgid "Add to the country team"
+#~ msgstr "Ongeza kwenye timu ya nchi"
+
+#~ msgid "Add member"
+#~ msgstr "Ongeza mwanachama"
+
 #~ msgid "Quality gates before a cohort"
 #~ msgstr "Vigezo vya ubora kabla ya kundi"
 
@@ -7994,9 +8046,6 @@ msgstr "Endelea Kujifunza"
 
 #~ msgid "Request received"
 #~ msgstr "Ombi limepokelewa"
-
-#~ msgid "Countries"
-#~ msgstr "Nchi"
 
 #~ msgid "Request access"
 #~ msgstr "Omba ufikiaji"

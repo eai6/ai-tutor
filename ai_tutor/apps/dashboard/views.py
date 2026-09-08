@@ -151,9 +151,24 @@ teacher_required = staff_required
 @login_required
 @require_POST
 def switch_school(request):
-    """Store selected school in session."""
-    school_id = request.POST.get('school_id', 'all')
-    request.session['selected_school_id'] = school_id
+    """Store the selected country and school in the session.
+
+    One form, two selects, because the second depends on the first: changing
+    the country changes which schools exist to choose from, so a school left
+    selected from the previous country has to go. `all` is the value for both,
+    and means the level above.
+    """
+    switched_country = False
+    if 'country_id' in request.POST:
+        chosen = request.POST.get('country_id', 'all')
+        switched_country = chosen != request.session.get('selected_country_id')
+        request.session['selected_country_id'] = chosen
+
+    # Both selects post together, so on a country change the school select
+    # still holds a school from the country just left. Taking it would carry
+    # the old school into the new country, where it does not exist.
+    request.session['selected_school_id'] = (
+        'all' if switched_country else request.POST.get('school_id', 'all'))
     # Redirect back to the page they came from, or dashboard home
     next_url = request.POST.get('next', request.META.get('HTTP_REFERER', ''))
     if next_url:
@@ -4770,6 +4785,129 @@ def delete_student(request, student_id):
 
 
 @staff_required
+def country_accounts(request):
+    """Every account that holds a country, and the form that makes one.
+
+    Its own page because the staff list is a school's list: a country account
+    holds no Membership, belongs to no school, and reaching every school in a
+    country is a different kind of access from teaching in one of them. Mixed
+    into a page of teachers it is one badge among hundreds of rows.
+
+    A super admin sees every country and is asked which one a new account is
+    for; a country account sees its own and is not asked. That is
+    `country_is_fixed`, and it is the same distinction the switcher makes.
+    """
+    from django.contrib.auth.models import User
+    from ai_tutor.apps.accounts.models import Country, CountryMembership
+    from ai_tutor.apps.safety import SafetyAuditLog
+
+    if not request.staff_ctx.get('can_manage_country_team'):
+        messages.error(request, "Admin access required.")
+        return redirect('dashboard:home')
+
+    country = request.staff_ctx['country']
+    fixed = request.staff_ctx.get('country_is_fixed')
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        if action == 'create_country_member':
+            # Self-registration claims a country once, so this is the only
+            # other door into one — see accounts/views.country_self_register.
+            # It hands out no more access than the actor already holds: a
+            # country account may only add to its own country, and a platform
+            # admin already reaches every one of them.
+            if not request.staff_ctx.get('can_manage_country_team'):
+                messages.error(request, "Admin access required.")
+                return redirect('dashboard:country_accounts')
+            # `fixed` and not `country`: a super admin with the switcher
+            # pointed at Seychelles is filtering a view, which is not the same
+            # as saying the new account is Seychelles'. It still says which.
+            target_country = country if fixed else None
+            if target_country is None:
+                # A platform admin has no country of its own, so it says which
+                # — including one the platform has never heard of, which is how
+                # a country gets opened at all now.
+                from ai_tutor.apps.accounts.countries import BY_CODE
+                code = request.POST.get('member_country', '').strip().upper()
+                if code not in BY_CODE:
+                    messages.error(request, "Please choose a country.")
+                    return redirect('dashboard:country_accounts')
+                target_country = Country.get_or_create_by_iso(code)
+            email = request.POST.get('member_email', '').strip()
+            first = request.POST.get('member_first_name', '').strip()
+            last = request.POST.get('member_last_name', '').strip()
+            password = request.POST.get('member_password', '').strip()
+            existing = User.objects.filter(
+                Q(email__iexact=email) | Q(username__iexact=email)).first() if email else None
+            if not email:
+                messages.error(request, "Email is required.")
+            elif existing:
+                from urllib.parse import quote
+                messages.warning(
+                    request,
+                    f"An account already exists for '{email}' "
+                    f"({existing.get_full_name() or existing.username}).")
+                return redirect(f"{reverse('dashboard:staff_list')}?find={quote(email)}")
+            elif not password:
+                messages.error(request, "Password is required.")
+            else:
+                from django.contrib.auth.password_validation import validate_password
+                from django.core.exceptions import ValidationError as PwValidationError
+                try:
+                    validate_password(password)
+                except PwValidationError as exc:
+                    messages.error(request, "Password too weak: " + " ".join(exc.messages))
+                else:
+                    member = User.objects.create_user(
+                        username=email, email=email, password=password,
+                        first_name=first, last_name=last, is_active=True,
+                    )
+                    CountryMembership.objects.create(
+                        user=member, country=target_country, is_active=True)
+                    SafetyAuditLog.log(
+                        'account_created', user=request.user,
+                        details={'mode': 'country_member_created',
+                                 'target_user_id': member.id,
+                                 'country_id': target_country.id},
+                        severity='warning', request=request,
+                    )
+                    messages.success(
+                        request,
+                        f"'{member.get_full_name() or email}' can now sign in for {target_country.name}.")
+            return redirect('dashboard:country_accounts')
+
+        messages.error(request, "Unknown action.")
+        return redirect('dashboard:country_accounts')
+
+    memberships = (CountryMembership.objects
+                   .select_related('user', 'country')
+                   .order_by('country__name', 'user__last_name', 'user__username'))
+    if fixed and country is not None:
+        memberships = memberships.filter(country=country)
+    elif country is not None:
+        # A super admin with the switcher pointed at one country asked about
+        # that country, here as everywhere else.
+        memberships = memberships.filter(country=country)
+
+    by_country = {}
+    for m in memberships:
+        by_country.setdefault(m.country, []).append(m)
+    groups = [{'country': c, 'members': ms} for c, ms in by_country.items()]
+
+    country_choices = []
+    if not fixed:
+        from ai_tutor.apps.accounts.countries import choices as country_options
+        country_choices = country_options()
+
+    return render(request, 'dashboard/country_accounts.html', {
+        **request.staff_ctx,
+        'groups': groups,
+        'account_total': sum(len(g['members']) for g in groups),
+        'country_choices': country_choices,
+    })
+
+
+@staff_required
 def staff_list(request):
     """Centralized staff management hub.
 
@@ -4956,69 +5094,6 @@ def staff_list(request):
                 return redirect(f"{reverse('dashboard:staff_list')}?find={quote(target.email)}")
             return redirect('dashboard:staff_list')
 
-        if action == 'create_country_member':
-            # Self-registration claims a country once, so this is the only
-            # other door into one — see accounts/views.country_self_register.
-            # It hands out no more access than the actor already holds: a
-            # country account may only add to its own country, and a platform
-            # admin already reaches every one of them.
-            if not request.staff_ctx.get('can_manage_country_team'):
-                messages.error(request, "Admin access required.")
-                return redirect('dashboard:staff_list')
-            target_country = country
-            if target_country is None:
-                # A platform admin has no country of its own, so it says which
-                # — including one the platform has never heard of, which is how
-                # a country gets opened at all now.
-                from ai_tutor.apps.accounts.countries import BY_CODE
-                code = request.POST.get('member_country', '').strip().upper()
-                if code not in BY_CODE:
-                    messages.error(request, "Please choose a country.")
-                    return redirect('dashboard:staff_list')
-                target_country = Country.get_or_create_by_iso(code)
-            email = request.POST.get('member_email', '').strip()
-            first = request.POST.get('member_first_name', '').strip()
-            last = request.POST.get('member_last_name', '').strip()
-            password = request.POST.get('member_password', '').strip()
-            existing = User.objects.filter(
-                Q(email__iexact=email) | Q(username__iexact=email)).first() if email else None
-            if not email:
-                messages.error(request, "Email is required.")
-            elif existing:
-                from urllib.parse import quote
-                messages.warning(
-                    request,
-                    f"An account already exists for '{email}' "
-                    f"({existing.get_full_name() or existing.username}).")
-                return redirect(f"{reverse('dashboard:staff_list')}?find={quote(email)}")
-            elif not password:
-                messages.error(request, "Password is required.")
-            else:
-                from django.contrib.auth.password_validation import validate_password
-                from django.core.exceptions import ValidationError as PwValidationError
-                try:
-                    validate_password(password)
-                except PwValidationError as exc:
-                    messages.error(request, "Password too weak: " + " ".join(exc.messages))
-                else:
-                    member = User.objects.create_user(
-                        username=email, email=email, password=password,
-                        first_name=first, last_name=last, is_active=True,
-                    )
-                    CountryMembership.objects.create(
-                        user=member, country=target_country, is_active=True)
-                    SafetyAuditLog.log(
-                        'account_created', user=request.user,
-                        details={'mode': 'country_member_created',
-                                 'target_user_id': member.id,
-                                 'country_id': target_country.id},
-                        severity='warning', request=request,
-                    )
-                    messages.success(
-                        request,
-                        f"'{member.get_full_name() or email}' can now sign in for {target_country.name}.")
-            return redirect('dashboard:staff_list')
-
         if action == 'invite_staff':
             email = request.POST.get('invite_email', '').strip()
             school_id = request.POST.get('invite_school_id', '')
@@ -5195,14 +5270,6 @@ def staff_list(request):
     active_schools = _managed(
         Institution.objects.filter(is_active=True), 'id').order_by('name')
 
-    # Only the account with no country of its own is asked which; every
-    # country is offered, because a ministry arrives before its country is on
-    # the platform. Same list the public sign-up form uses.
-    country_choices = []
-    if request.staff_ctx.get('can_manage_country_team') and country is None:
-        from ai_tutor.apps.accounts.countries import choices as country_options
-        country_choices = country_options()
-
     context = {
         **request.staff_ctx,
         'people': people,
@@ -5211,7 +5278,6 @@ def staff_list(request):
         'find_query': find_query,
         'found_users': found_users,
         'active_schools': active_schools,
-        'country_choices': country_choices,
     }
     return render(request, 'dashboard/staff_list.html', context)
 
