@@ -1,4 +1,4 @@
-"""Public documentation pages for the Country Adoption Playbook.
+"""Public documentation pages for the Enterprise Adoption Playbook.
 
 Public by design, and for the same reason /self-hosting/ is: a ministry
 evaluating the platform reads this before anyone has an account to log into,

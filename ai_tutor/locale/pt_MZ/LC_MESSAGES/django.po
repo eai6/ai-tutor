@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 10:54+0000\n"
+"POT-Creation-Date: 2026-09-08 12:01+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -798,8 +798,8 @@ msgstr "Ajuda e FAQ"
 #: ai_tutor/templates/_includes/_marketing_header.html:48
 #: ai_tutor/templates/docs/base.html:7 ai_tutor/templates/docs/index.html:25
 #: ai_tutor/templates/docs/section.html:20
-msgid "Enterprise Adaptation"
-msgstr "Adaptação empresarial"
+msgid "Enterprise Adoption"
+msgstr "Adoção empresarial"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:11
 #: ai_tutor/templates/accounts/terms.html:4 ai_tutor/templates/base.html:132

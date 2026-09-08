@@ -1,4 +1,4 @@
-"""The Country Adoption Playbook, as a navigable documentation site.
+"""The Enterprise Adoption Playbook, as a navigable documentation site.
 
 The prose lives in templates/docs/sections/, generated from the Word original
 by scripts/build_playbook_docs.py. What lives here is everything the .docx
