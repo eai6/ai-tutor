@@ -48,15 +48,6 @@ docker compose logs -f app</code></pre>
 <h3 id="starting-with-no-provider-account-at-all">Starting with no provider account at all</h3>
 <pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code>docker compose --profile local-llm up -d</code></pre>
 <p>That adds a local model container, pulls a ~2.6 GB model on first start and points the tutor at it automatically. Treat it as a way to get started without a commercial account, not as an equivalent: a small local model is measurably weaker at tutoring, needs roughly 4 GB of RAM beyond the application, and is slower on a server with no GPU. Add a provider key later and restart — the local configuration steps aside on its own.</p>
-<h3 id="what-you-get-on-first-start">What you get on first start</h3>
-<p>The image ships with a curriculum already loaded — courses, lessons, steps and exit tickets — imported the first time the container boots. Nothing is downloaded, so a first run works with no internet at all.</p>
-<p><strong>Figures and images are not included.</strong> They are roughly twenty times the size of the text. About three quarters of lesson steps reference a figure, so those steps read with a visible gap until you add media — by uploading your own through the teacher dashboard, or by importing a pack built with media:</p>
-<pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code># on a deployment that has the figures
-python manage.py build_curriculum_pack --institution &lt;id&gt; --out dist/
-
-# then, on this one
-docker compose exec app python manage.py import_curriculum_pack /path/pack.tar.gz --force</code></pre>
-<p>First start takes several minutes: migrations, reference data and the help index. It is ready when the log shows gunicorn listening and docker compose ps reports app healthy. If a required value is missing, Compose refuses to start and names it — a half-configured server is worse than one that did not start.</p>
 <h3 id="first-run">First run</h3>
 <ol class="doc-list">
 <li>Create the administrator account: docker compose exec app python manage.py createsuperuser</li>

@@ -48,15 +48,6 @@ docker compose logs -f app</code></pre>
 <h3 id="starting-with-no-provider-account-at-all">Começar sem qualquer conta de fornecedor</h3>
 <pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code>docker compose --profile local-llm up -d</code></pre>
 <p>Isso acrescenta um contentor com um modelo local, descarrega um modelo de cerca de 2,6 GB no primeiro arranque e aponta o tutor para ele automaticamente. Encare-o como uma forma de começar sem uma conta comercial, e não como um equivalente: um modelo local pequeno é mensuravelmente mais fraco a ensinar, precisa de cerca de 4 GB de RAM além da aplicação e é mais lento num servidor sem GPU. Acrescente mais tarde uma chave de fornecedor e reinicie — a configuração local afasta-se sozinha.</p>
-<h3 id="what-you-get-on-first-start">O que obtém no primeiro arranque</h3>
-<p>A imagem já traz um currículo carregado — cursos, lições, passos e fichas de saída — importado na primeira vez que o contentor arranca. Nada é descarregado, pelo que uma primeira execução funciona sem Internet nenhuma.</p>
-<p><strong>As figuras e imagens não estão incluídas.</strong> São cerca de vinte vezes maiores do que o texto. Aproximadamente três quartos dos passos de lição referem uma figura, pelo que esses passos ficam com um vazio visível até acrescentar media — carregando as suas próprias pelo painel do professor, ou importando um pacote construído com media:</p>
-<pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code># numa instalação que tenha as figuras
-python manage.py build_curriculum_pack --institution &lt;id&gt; --out dist/
-
-# depois, nesta
-docker compose exec app python manage.py import_curriculum_pack /path/pack.tar.gz --force</code></pre>
-<p>O primeiro arranque demora vários minutos: migrações, dados de referência e o índice de ajuda. Está pronto quando o registo mostrar o gunicorn à escuta e o docker compose ps indicar app healthy. Se faltar um valor obrigatório, o Compose recusa arrancar e indica qual — um servidor meio configurado é pior do que um que não arrancou.</p>
 <h3 id="first-run">Primeira execução</h3>
 <ol class="doc-list">
 <li>Crie a conta de administrador: docker compose exec app python manage.py createsuperuser</li>

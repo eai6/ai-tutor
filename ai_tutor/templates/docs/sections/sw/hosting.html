@@ -48,15 +48,6 @@ docker compose logs -f app</code></pre>
 <h3 id="starting-with-no-provider-account-at-all">Kuanza bila akaunti yoyote ya mtoa huduma</h3>
 <pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code>docker compose --profile local-llm up -d</code></pre>
 <p>Hiyo huongeza kontena la modeli ya ndani, huvuta modeli ya ~GB 2.6 wakati wa kuanza mara ya kwanza na humwelekeza mkufunzi kwayo kiotomatiki. Ichukulie kama njia ya kuanza bila akaunti ya kibiashara, si kama kitu sawa nayo: modeli ndogo ya ndani ni dhaifu kwa kipimo katika ufundishaji, inahitaji takriban GB 4 za RAM zaidi ya programu, na ni ya polepole kwenye seva isiyo na GPU. Ongeza ufunguo wa mtoa huduma baadaye kisha uanze upya — usanidi wa ndani hujiondoa wenyewe.</p>
-<h3 id="what-you-get-on-first-start">Unachopata unapoanza mara ya kwanza</h3>
-<p>Taswira huja na mtaala tayari umepakiwa — kozi, masomo, hatua na tiketi za kutoka — ulioingizwa mara ya kwanza kontena linapowashwa. Hakuna kinachopakuliwa, hivyo jaribio la kwanza hufanya kazi bila intaneti kabisa.</p>
-<p><strong>Michoro na picha havijajumuishwa.</strong> Ni takriban mara ishirini ya ukubwa wa maandishi. Takriban robo tatu ya hatua za somo hurejea mchoro, hivyo hatua hizo husomeka zikiwa na pengo linaloonekana hadi uongeze maudhui ya picha — kwa kupakia yako mwenyewe kupitia dashibodi ya mwalimu, au kwa kuingiza kifurushi kilichojengwa na maudhui ya picha:</p>
-<pre class="doc-code print:bg-surface-sunken print:text-text print:border print:border-border my-5 mx-0 py-4 px-5 bg-surface-inverse text-warm-100 rounded-md font-mono text-sm leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] [tab-size:4] [&_code]:[font:inherit] [&_code]:text-inherit [&_code]:bg-none [&_code]:p-0"><code># kwenye usakinishaji ulio na michoro
-python manage.py build_curriculum_pack --institution &lt;id&gt; --out dist/
-
-# kisha, kwenye huu
-docker compose exec app python manage.py import_curriculum_pack /path/pack.tar.gz --force</code></pre>
-<p>Kuanza mara ya kwanza huchukua dakika kadhaa: uhamishaji, data ya marejeo na faharasa ya msaada. Iko tayari pale kumbukumbu inapoonyesha gunicorn inasikiliza na docker compose ps inaripoti app healthy. Kama thamani inayohitajika haipo, Compose hukataa kuanza na huitaja — seva iliyosanidiwa nusu ni mbaya kuliko ile isiyoanza.</p>
 <h3 id="first-run">Jaribio la kwanza</h3>
 <ol class="doc-list">
 <li>Unda akaunti ya msimamizi: docker compose exec app python manage.py createsuperuser</li>

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 13:43+0000\n"
+"POT-Creation-Date: 2026-09-08 13:57+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -416,7 +416,7 @@ msgstr ""
 "Bidhaa kama mwanafunzi, mwalimu na wizara wanavyoikutana nayo — na kile "
 "isicho."
 
-#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:245
+#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:231
 msgid "The five layers of adaptation"
 msgstr "Tabaka tano za kubadilisha"
 
@@ -452,7 +452,7 @@ msgstr ""
 "Kinachobaki nchini, kinachoondoka na kwa nini hakuna mpangilio unaobadilisha "
 "hilo, na njia tatu za kuziba pengo."
 
-#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:229
+#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:215
 msgid "Evidence, evaluation and quality assurance"
 msgstr "Ushahidi, tathmini na uhakikisho wa ubora"
 
@@ -476,7 +476,7 @@ msgstr ""
 "Sehemu isiyoweza kununuliwa au kusambazwa: mabingwa, uandamani, kliniki na "
 "mistari mitatu ya msaada."
 
-#: ai_tutor/apps/docs/playbook.py:148 ai_tutor/apps/docs/playbook.py:253
+#: ai_tutor/apps/docs/playbook.py:148
 msgid "Risks and how they are managed"
 msgstr "Hatari na jinsi zinavyodhibitiwa"
 
@@ -511,59 +511,11 @@ msgstr ""
 "Njia tatu za seva na miundo miwili ya bila mtandao, pamoja na amri, dalili "
 "na kanuni za nakala rudufu."
 
-#: ai_tutor/apps/docs/playbook.py:158
-msgid "Quality gates before a cohort"
-msgstr "Vigezo vya ubora kabla ya kundi"
-
-#: ai_tutor/apps/docs/playbook.py:159
-msgid ""
-"Three harnesses at three units of analysis, and why judges are a filter "
-"rather than a gate."
-msgstr ""
-"Mifumo mitatu katika ngazi tatu za uchanganuzi, na kwa nini wahakiki ni "
-"kichujio badala ya lango."
-
-#: ai_tutor/apps/docs/playbook.py:161
-msgid "Operating the platform"
-msgstr "Kuendesha jukwaa"
-
-#: ai_tutor/apps/docs/playbook.py:162
-msgid ""
-"Backups, upgrades, secrets, monitoring, flagged sessions and the login "
-"lockout rule."
-msgstr ""
-"Nakala rudufu, maboresho, siri, ufuatiliaji, vipindi vilivyoripotiwa na "
-"kanuni ya kufunga kuingia."
-
-#: ai_tutor/apps/docs/playbook.py:164
-msgid "Integration surface"
-msgstr "Sehemu ya muunganisho"
-
-#: ai_tutor/apps/docs/playbook.py:165
-msgid ""
-"A versioned REST API, a published schema, and a realistic integration scope "
-"for a pilot."
-msgstr ""
-"REST API yenye matoleo, schema iliyochapishwa, na wigo halisi wa muunganisho "
-"kwa majaribio."
-
-#: ai_tutor/apps/docs/playbook.py:168
-msgid "Case study: what a second adaptation changed"
-msgstr "Uchunguzi: kilichobadilika katika ubadilishaji wa pili"
-
-#: ai_tutor/apps/docs/playbook.py:169
-msgid ""
-"The real change list from taking the platform to a second country. No schema "
-"redesign appears in it."
-msgstr ""
-"Orodha halisi ya mabadiliko ya kupeleka jukwaa katika nchi ya pili. Hakuna "
-"kubuni upya kwa schema ndani yake."
-
-#: ai_tutor/apps/docs/playbook.py:171 ai_tutor/apps/docs/playbook.py:213
+#: ai_tutor/apps/docs/playbook.py:159 ai_tutor/apps/docs/playbook.py:201
 msgid "Questions to answer before Phase 1"
 msgstr "Maswali ya kujibu kabla ya Awamu ya 1"
 
-#: ai_tutor/apps/docs/playbook.py:172
+#: ai_tutor/apps/docs/playbook.py:160
 msgid ""
 "Ten questions. A country that can answer them can start; one that cannot "
 "will stall on the unanswered one."
@@ -571,73 +523,56 @@ msgstr ""
 "Maswali kumi. Nchi inayoweza kuyajibu inaweza kuanza; isiyoweza itakwama "
 "kwenye lile ambalo halijajibiwa."
 
-#: ai_tutor/apps/docs/playbook.py:174
+#: ai_tutor/apps/docs/playbook.py:162
 msgid "Glossary"
 msgstr "Kamusi"
 
-#: ai_tutor/apps/docs/playbook.py:208
+#: ai_tutor/apps/docs/playbook.py:196
 msgid "Start here"
 msgstr "Anzia hapa"
 
-#: ai_tutor/apps/docs/playbook.py:209
+#: ai_tutor/apps/docs/playbook.py:197
 msgid "What the thing is, before deciding anything about it."
 msgstr "Kitu hiki ni nini, kabla ya kuamua chochote kukihusu."
 
-#: ai_tutor/apps/docs/playbook.py:216
+#: ai_tutor/apps/docs/playbook.py:204
 msgid "Decide the shape"
 msgstr "Amua muundo"
 
-#: ai_tutor/apps/docs/playbook.py:217
+#: ai_tutor/apps/docs/playbook.py:205
 msgid "Where it runs, where the data lives, and who owns each decision."
 msgstr "Inapoendeshwa, data inapokaa, na nani anamiliki kila uamuzi."
 
-#: ai_tutor/apps/docs/playbook.py:221
-msgid "What a second adaptation changed"
-msgstr "Kilichobadilika katika ubadilishaji wa pili"
-
-#: ai_tutor/apps/docs/playbook.py:224
+#: ai_tutor/apps/docs/playbook.py:210
 msgid "Prepare the people"
 msgstr "Andaa watu"
 
-#: ai_tutor/apps/docs/playbook.py:225
+#: ai_tutor/apps/docs/playbook.py:211
 msgid ""
 "The part that cannot be bought or deployed, and how you know it teaches well."
 msgstr ""
 "Sehemu isiyoweza kununuliwa wala kusakinishwa, na jinsi unavyojua "
 "inafundisha vizuri."
 
-#: ai_tutor/apps/docs/playbook.py:232
+#: ai_tutor/apps/docs/playbook.py:218
 msgid "Stand it up"
 msgstr "Isimamishe"
 
-#: ai_tutor/apps/docs/playbook.py:233
-msgid ""
-"Provision the deployment, then run it without anyone needing to be called."
-msgstr "Andaa usambazaji, kisha uiendeshe bila mtu yeyote kuhitaji kuitwa."
+#: ai_tutor/apps/docs/playbook.py:219
+msgid "Provision the deployment and run it."
+msgstr "Andaa usakinishaji na uuendeshe."
 
-#: ai_tutor/apps/docs/playbook.py:236
+#: ai_tutor/apps/docs/playbook.py:222
 msgid "Run it yourself — the short version"
 msgstr "Iendeshe mwenyewe — toleo fupi"
 
-#: ai_tutor/apps/docs/playbook.py:240
+#: ai_tutor/apps/docs/playbook.py:226
 msgid "Make it yours"
 msgstr "Ifanye yako"
 
-#: ai_tutor/apps/docs/playbook.py:241
+#: ai_tutor/apps/docs/playbook.py:227
 msgid "Configure the country: grade names, school register, competency bands."
 msgstr "Sanidi nchi: majina ya madarasa, daftari la shule, viwango vya umahiri."
-
-#: ai_tutor/apps/docs/playbook.py:248
-msgid "Prove it, then connect it"
-msgstr "Ithibitishe, kisha iunganishe"
-
-#: ai_tutor/apps/docs/playbook.py:249
-msgid ""
-"The gate to pass before students arrive, and the surface other systems talk "
-"to."
-msgstr ""
-"Kigezo cha kupita kabla wanafunzi hawajafika, na sehemu ambayo mifumo "
-"mingine huzungumza nayo."
 
 #: ai_tutor/apps/support/views.py:74
 msgid ""
@@ -7887,6 +7822,59 @@ msgstr "Kagua Somo"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Endelea Kujifunza"
+
+#~ msgid "Quality gates before a cohort"
+#~ msgstr "Vigezo vya ubora kabla ya kundi"
+
+#~ msgid ""
+#~ "Three harnesses at three units of analysis, and why judges are a filter "
+#~ "rather than a gate."
+#~ msgstr ""
+#~ "Mifumo mitatu katika ngazi tatu za uchanganuzi, na kwa nini wahakiki ni "
+#~ "kichujio badala ya lango."
+
+#~ msgid "Operating the platform"
+#~ msgstr "Kuendesha jukwaa"
+
+#~ msgid ""
+#~ "Backups, upgrades, secrets, monitoring, flagged sessions and the login "
+#~ "lockout rule."
+#~ msgstr ""
+#~ "Nakala rudufu, maboresho, siri, ufuatiliaji, vipindi vilivyoripotiwa na "
+#~ "kanuni ya kufunga kuingia."
+
+#~ msgid "Integration surface"
+#~ msgstr "Sehemu ya muunganisho"
+
+#~ msgid ""
+#~ "A versioned REST API, a published schema, and a realistic integration "
+#~ "scope for a pilot."
+#~ msgstr ""
+#~ "REST API yenye matoleo, schema iliyochapishwa, na wigo halisi wa "
+#~ "muunganisho kwa majaribio."
+
+#~ msgid "Case study: what a second adaptation changed"
+#~ msgstr "Uchunguzi: kilichobadilika katika ubadilishaji wa pili"
+
+#~ msgid ""
+#~ "The real change list from taking the platform to a second country. No "
+#~ "schema redesign appears in it."
+#~ msgstr ""
+#~ "Orodha halisi ya mabadiliko ya kupeleka jukwaa katika nchi ya pili. "
+#~ "Hakuna kubuni upya kwa schema ndani yake."
+
+#~ msgid "What a second adaptation changed"
+#~ msgstr "Kilichobadilika katika ubadilishaji wa pili"
+
+#~ msgid "Prove it, then connect it"
+#~ msgstr "Ithibitishe, kisha iunganishe"
+
+#~ msgid ""
+#~ "The gate to pass before students arrive, and the surface other systems "
+#~ "talk to."
+#~ msgstr ""
+#~ "Kigezo cha kupita kabla wanafunzi hawajafika, na sehemu ambayo mifumo "
+#~ "mingine huzungumza nayo."
 
 #~ msgid ""
 #~ "Observed pilot figures, given as planning inputs. They are not prices and "

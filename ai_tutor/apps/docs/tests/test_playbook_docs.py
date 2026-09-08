@@ -63,10 +63,15 @@ class TestSectionIndex:
 
     def test_every_card_link_resolves(self):
         """Card membership is written by slug string, so a rename here is a
-        KeyError at import — but the footer link is resolved lazily."""
+        KeyError at import — but the footer link is resolved lazily.
+
+        A card may carry no footer link at all: `more_slug` is optional, and
+        a card whose onward section was withdrawn keeps its own sections and
+        loses its footer rather than pointing at nothing.
+        """
         for card in playbook.CARDS:
             assert card.sections, f'{card.title} has no sections'
-            if not card.more_url_name:
+            if card.more_slug:
                 assert card.more_section is not None, (
                     f'{card.title} points at an unknown section')
 

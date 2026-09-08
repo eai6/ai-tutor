@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 13:43+0000\n"
+"POT-Creation-Date: 2026-09-08 13:57+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -412,7 +412,7 @@ msgstr ""
 "O produto tal como o encontram um aluno, um professor e um ministério — e o "
 "que ele não é."
 
-#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:245
+#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:231
 msgid "The five layers of adaptation"
 msgstr "As cinco camadas de adaptação"
 
@@ -448,7 +448,7 @@ msgstr ""
 "O que fica no país, o que sai e porque nenhuma configuração o altera, e as "
 "três formas de fechar essa lacuna."
 
-#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:229
+#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:215
 msgid "Evidence, evaluation and quality assurance"
 msgstr "Evidência, avaliação e garantia de qualidade"
 
@@ -472,7 +472,7 @@ msgstr ""
 "A parte que não se compra nem se instala: dinamizadores, acompanhamento, "
 "sessões de apoio e três linhas de suporte."
 
-#: ai_tutor/apps/docs/playbook.py:148 ai_tutor/apps/docs/playbook.py:253
+#: ai_tutor/apps/docs/playbook.py:148
 msgid "Risks and how they are managed"
 msgstr "Riscos e como são geridos"
 
@@ -506,59 +506,11 @@ msgstr ""
 "Três caminhos de servidor e dois formatos offline, com os comandos, os "
 "sintomas e as regras de cópia de segurança."
 
-#: ai_tutor/apps/docs/playbook.py:158
-msgid "Quality gates before a cohort"
-msgstr "Critérios de qualidade antes de uma turma"
-
-#: ai_tutor/apps/docs/playbook.py:159
-msgid ""
-"Three harnesses at three units of analysis, and why judges are a filter "
-"rather than a gate."
-msgstr ""
-"Três ferramentas em três unidades de análise e porque os avaliadores são um "
-"filtro e não um crivo."
-
-#: ai_tutor/apps/docs/playbook.py:161
-msgid "Operating the platform"
-msgstr "Operar a plataforma"
-
-#: ai_tutor/apps/docs/playbook.py:162
-msgid ""
-"Backups, upgrades, secrets, monitoring, flagged sessions and the login "
-"lockout rule."
-msgstr ""
-"Cópias de segurança, actualizações, segredos, monitorização, sessões "
-"sinalizadas e a regra de bloqueio de início de sessão."
-
-#: ai_tutor/apps/docs/playbook.py:164
-msgid "Integration surface"
-msgstr "Superfície de integração"
-
-#: ai_tutor/apps/docs/playbook.py:165
-msgid ""
-"A versioned REST API, a published schema, and a realistic integration scope "
-"for a pilot."
-msgstr ""
-"Uma API REST versionada, um esquema publicado e um âmbito de integração "
-"realista para um piloto."
-
-#: ai_tutor/apps/docs/playbook.py:168
-msgid "Case study: what a second adaptation changed"
-msgstr "Estudo de caso: o que mudou numa segunda adaptação"
-
-#: ai_tutor/apps/docs/playbook.py:169
-msgid ""
-"The real change list from taking the platform to a second country. No schema "
-"redesign appears in it."
-msgstr ""
-"A lista real de alterações ao levar a plataforma a um segundo país. Não "
-"inclui qualquer redesenho do esquema de dados."
-
-#: ai_tutor/apps/docs/playbook.py:171 ai_tutor/apps/docs/playbook.py:213
+#: ai_tutor/apps/docs/playbook.py:159 ai_tutor/apps/docs/playbook.py:201
 msgid "Questions to answer before Phase 1"
 msgstr "Perguntas a responder antes da Fase 1"
 
-#: ai_tutor/apps/docs/playbook.py:172
+#: ai_tutor/apps/docs/playbook.py:160
 msgid ""
 "Ten questions. A country that can answer them can start; one that cannot "
 "will stall on the unanswered one."
@@ -566,75 +518,56 @@ msgstr ""
 "Dez perguntas. Um país que saiba respondê-las pode começar; o que não souber "
 "ficará bloqueado naquela que ficou por responder."
 
-#: ai_tutor/apps/docs/playbook.py:174
+#: ai_tutor/apps/docs/playbook.py:162
 msgid "Glossary"
 msgstr "Glossário"
 
-#: ai_tutor/apps/docs/playbook.py:208
+#: ai_tutor/apps/docs/playbook.py:196
 msgid "Start here"
 msgstr "Comece aqui"
 
-#: ai_tutor/apps/docs/playbook.py:209
+#: ai_tutor/apps/docs/playbook.py:197
 msgid "What the thing is, before deciding anything about it."
 msgstr "O que isto é, antes de decidir seja o que for a seu respeito."
 
-#: ai_tutor/apps/docs/playbook.py:216
+#: ai_tutor/apps/docs/playbook.py:204
 msgid "Decide the shape"
 msgstr "Decida o formato"
 
-#: ai_tutor/apps/docs/playbook.py:217
+#: ai_tutor/apps/docs/playbook.py:205
 msgid "Where it runs, where the data lives, and who owns each decision."
 msgstr "Onde funciona, onde ficam os dados e a quem cabe cada decisão."
 
-#: ai_tutor/apps/docs/playbook.py:221
-msgid "What a second adaptation changed"
-msgstr "O que mudou numa segunda adaptação"
-
-#: ai_tutor/apps/docs/playbook.py:224
+#: ai_tutor/apps/docs/playbook.py:210
 msgid "Prepare the people"
 msgstr "Preparar as pessoas"
 
-#: ai_tutor/apps/docs/playbook.py:225
+#: ai_tutor/apps/docs/playbook.py:211
 msgid ""
 "The part that cannot be bought or deployed, and how you know it teaches well."
 msgstr "A parte que não se compra nem se implanta, e como sabe que ensina bem."
 
-#: ai_tutor/apps/docs/playbook.py:232
+#: ai_tutor/apps/docs/playbook.py:218
 msgid "Stand it up"
 msgstr "Ponha-o de pé"
 
-#: ai_tutor/apps/docs/playbook.py:233
-msgid ""
-"Provision the deployment, then run it without anyone needing to be called."
-msgstr ""
-"Provisione a instalação e depois opere-a sem que ninguém tenha de ser "
-"chamado."
+#: ai_tutor/apps/docs/playbook.py:219
+msgid "Provision the deployment and run it."
+msgstr "Aprovisione a implantação e ponha-a a funcionar."
 
-#: ai_tutor/apps/docs/playbook.py:236
+#: ai_tutor/apps/docs/playbook.py:222
 msgid "Run it yourself — the short version"
 msgstr "Instale por si próprio — a versão curta"
 
-#: ai_tutor/apps/docs/playbook.py:240
+#: ai_tutor/apps/docs/playbook.py:226
 msgid "Make it yours"
 msgstr "Torne-o seu"
 
-#: ai_tutor/apps/docs/playbook.py:241
+#: ai_tutor/apps/docs/playbook.py:227
 msgid "Configure the country: grade names, school register, competency bands."
 msgstr ""
 "Configure o país: nomes dos anos, registo de escolas, bandas de "
 "competência."
-
-#: ai_tutor/apps/docs/playbook.py:248
-msgid "Prove it, then connect it"
-msgstr "Comprove-o e depois ligue-o"
-
-#: ai_tutor/apps/docs/playbook.py:249
-msgid ""
-"The gate to pass before students arrive, and the surface other systems talk "
-"to."
-msgstr ""
-"O critério a cumprir antes de os alunos chegarem e a superfície com que "
-"outros sistemas comunicam."
 
 #: ai_tutor/apps/support/views.py:74
 msgid ""
@@ -7939,6 +7872,59 @@ msgstr "Rever Lição"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Continuar a aprender"
+
+#~ msgid "Quality gates before a cohort"
+#~ msgstr "Critérios de qualidade antes de uma turma"
+
+#~ msgid ""
+#~ "Three harnesses at three units of analysis, and why judges are a filter "
+#~ "rather than a gate."
+#~ msgstr ""
+#~ "Três ferramentas em três unidades de análise e porque os avaliadores são "
+#~ "um filtro e não um crivo."
+
+#~ msgid "Operating the platform"
+#~ msgstr "Operar a plataforma"
+
+#~ msgid ""
+#~ "Backups, upgrades, secrets, monitoring, flagged sessions and the login "
+#~ "lockout rule."
+#~ msgstr ""
+#~ "Cópias de segurança, actualizações, segredos, monitorização, sessões "
+#~ "sinalizadas e a regra de bloqueio de início de sessão."
+
+#~ msgid "Integration surface"
+#~ msgstr "Superfície de integração"
+
+#~ msgid ""
+#~ "A versioned REST API, a published schema, and a realistic integration "
+#~ "scope for a pilot."
+#~ msgstr ""
+#~ "Uma API REST versionada, um esquema publicado e um âmbito de integração "
+#~ "realista para um piloto."
+
+#~ msgid "Case study: what a second adaptation changed"
+#~ msgstr "Estudo de caso: o que mudou numa segunda adaptação"
+
+#~ msgid ""
+#~ "The real change list from taking the platform to a second country. No "
+#~ "schema redesign appears in it."
+#~ msgstr ""
+#~ "A lista real de alterações ao levar a plataforma a um segundo país. Não "
+#~ "inclui qualquer redesenho do esquema de dados."
+
+#~ msgid "What a second adaptation changed"
+#~ msgstr "O que mudou numa segunda adaptação"
+
+#~ msgid "Prove it, then connect it"
+#~ msgstr "Comprove-o e depois ligue-o"
+
+#~ msgid ""
+#~ "The gate to pass before students arrive, and the surface other systems "
+#~ "talk to."
+#~ msgstr ""
+#~ "O critério a cumprir antes de os alunos chegarem e a superfície com que "
+#~ "outros sistemas comunicam."
 
 #~ msgid ""
 #~ "Observed pilot figures, given as planning inputs. They are not prices and "

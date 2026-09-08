@@ -155,23 +155,11 @@ SECTIONS: list[Section] = [
     Section('hosting', 'B', _('Hosting the platform'),
             _('Three server paths and two offline shapes, with the commands, '
             'the symptoms and the backup rules.'), PART_TWO),
-    Section('quality-gates', 'C', _('Quality gates before a cohort'),
-            _('Three harnesses at three units of analysis, and why judges are '
-            'a filter rather than a gate.'), PART_TWO),
-    Section('operations', 'D', _('Operating the platform'),
-            _('Backups, upgrades, secrets, monitoring, flagged sessions and '
-            'the login lockout rule.'), PART_TWO),
-    Section('integration', 'E', _('Integration surface'),
-            _('A versioned REST API, a published schema, and a realistic '
-            'integration scope for a pilot.'), PART_TWO),
 
-    Section('case-study', 'A1', _('Case study: what a second adaptation changed'),
-            _('The real change list from taking the platform to a second '
-            'country. No schema redesign appears in it.'), APPENDICES),
-    Section('before-phase-1', 'A2', _('Questions to answer before Phase 1'),
+    Section('before-phase-1', 'A1', _('Questions to answer before Phase 1'),
             _('Ten questions. A country that can answer them can start; one '
             'that cannot will stall on the unanswered one.'), APPENDICES),
-    Section('glossary', 'A3', _('Glossary'),
+    Section('glossary', 'A2', _('Glossary'),
             'The eleven terms this document uses in a particular way.',
             APPENDICES),
 ]
@@ -217,22 +205,18 @@ CARDS: list[Card] = [
         lede=_('Where it runs, where the data lives, and who owns each decision.'),
         part=PART_ONE,
         slugs=['adoption-models', 'data-sovereignty', 'risks'],
-        more_slug='case-study',
-        more_label=_('What a second adaptation changed'),
     ),
     Card(
         title=_('Prepare the people'),
         lede=_('The part that cannot be bought or deployed, and how you know it teaches well.'),
         part=PART_ONE,
-        slugs=['teacher-training'],
-        more_slug='evidence',
-        more_label=_('Evidence, evaluation and quality assurance'),
+        slugs=['evidence', 'teacher-training'],
     ),
     Card(
         title=_('Stand it up'),
-        lede=_('Provision the deployment, then run it without anyone needing to be called.'),
+        lede=_('Provision the deployment and run it.'),
         part=PART_TWO,
-        slugs=['hosting', 'operations'],
+        slugs=['hosting'],
         more_label=_('Run it yourself — the short version'),
         more_url_name='self_hosting',
     ),
@@ -243,14 +227,6 @@ CARDS: list[Card] = [
         slugs=['national-structures'],
         more_slug='five-layers',
         more_label=_('The five layers of adaptation'),
-    ),
-    Card(
-        title=_('Prove it, then connect it'),
-        lede=_('The gate to pass before students arrive, and the surface other systems talk to.'),
-        part=PART_TWO,
-        slugs=['quality-gates', 'evidence', 'integration'],
-        more_slug='risks',
-        more_label=_('Risks and how they are managed'),
     ),
 ]
 
