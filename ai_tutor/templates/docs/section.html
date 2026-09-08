@@ -24,7 +24,16 @@ checklists and the glossary — get no rail and the full measure instead.
         <span class="text-text font-medium">{{ section.label }}. {{ section.title }}</span>
     </nav>
 
-    <article class="docs-article{% if section.headings %} docs-article--railed{% endif %}">
+        {% comment %}
+    The rail reads first in the DOM and sits first in the grid, so "on this
+    page" is to the LEFT of the prose and the prose is what scrolls under it.
+    `docs-article--railed` carried these columns until the Tailwind migration
+    deleted the sheet that defined it — the class survived as markup with no
+    rule behind it, which is why the rail had been stacking above the text.
+    Below the xl breakpoint there is no room for two columns and it stacks
+    again, deliberately.
+    {% endcomment %}
+    <article class="docs-article{% if section.headings %} docs-article--railed grid gap-10 items-start xl:grid-cols-[minmax(0,_14rem)_minmax(0,_1fr)]{% endif %}">
 
         {% if section.headings %}
         <nav class="docs-rail xl:sticky xl:top-[calc(var(--topbar-height)_+_calc(var(--spacing)*6))] print:hidden self-start [&_ul]:list-none [&_ul]:m-0 [&_ul]:pt-0 [&_ul]:pr-0 [&_ul]:pb-0 [&_ul]:pl-4 [&_ul]:border-l-[2px] [&_ul]:border-l-border [&_ul]:grid [&_ul]:gap-2 [&_a]:text-base [&_a]:leading-snug [&_a]:text-text-secondary [&_a]:no-underline [&_a:hover]:text-primary-ink [&_a:focus-visible]:outline-none [&_a:focus-visible]:shadow-[var(--shadow-focus)] [&_a:focus-visible]:rounded-xs" aria-label="{% trans 'On this page' %}">

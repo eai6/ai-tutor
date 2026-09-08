@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 12:33+0000\n"
+"POT-Creation-Date: 2026-09-08 13:43+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -356,35 +356,27 @@ msgstr ""
 "sekondari); ubadilishaji wa eneo la pili unaandaliwa; chanzo cha jukwaa na "
 "mifumo ya tathmini kufikia Agosti 2026."
 
-#: ai_tutor/apps/docs/playbook.py:39
-msgid ""
-"Observed pilot figures, given as planning inputs. They are not prices and "
-"must be re-derived for each country."
-msgstr ""
-"Takwimu zilizoonwa kwenye majaribio, zinatolewa kama pembejeo za mipango. Si "
-"bei na lazima zikokotolewe upya kwa kila nchi."
-
-#: ai_tutor/apps/docs/playbook.py:106
+#: ai_tutor/apps/docs/playbook.py:102
 msgid "The decision"
 msgstr "Uamuzi"
 
-#: ai_tutor/apps/docs/playbook.py:107
+#: ai_tutor/apps/docs/playbook.py:103
 msgid "The implementation"
 msgstr "Utekelezaji"
 
-#: ai_tutor/apps/docs/playbook.py:108
+#: ai_tutor/apps/docs/playbook.py:104
 msgid "Appendices"
 msgstr "Viambatisho"
 
-#: ai_tutor/apps/docs/playbook.py:114 ai_tutor/templates/docs/index.html:71
+#: ai_tutor/apps/docs/playbook.py:110 ai_tutor/templates/docs/index.html:71
 msgid "Part I"
 msgstr "Sehemu ya I"
 
-#: ai_tutor/apps/docs/playbook.py:115 ai_tutor/templates/docs/index.html:84
+#: ai_tutor/apps/docs/playbook.py:111 ai_tutor/templates/docs/index.html:84
 msgid "Part II"
 msgstr "Sehemu ya II"
 
-#: ai_tutor/apps/docs/playbook.py:121
+#: ai_tutor/apps/docs/playbook.py:117
 msgid ""
 "For ministry officials, programme leads and advisors. No technical knowledge "
 "assumed."
@@ -392,19 +384,19 @@ msgstr ""
 "Kwa maafisa wa wizara, viongozi wa programu na washauri. Hakuna ujuzi wa "
 "kiufundi unaohitajika."
 
-#: ai_tutor/apps/docs/playbook.py:123
+#: ai_tutor/apps/docs/playbook.py:119
 msgid "For the technical team that will stand up and run a national instance."
 msgstr "Kwa timu ya kiufundi itakayosimamisha na kuendesha mfumo wa kitaifa."
 
-#: ai_tutor/apps/docs/playbook.py:125
+#: ai_tutor/apps/docs/playbook.py:121
 msgid "Reference material for both audiences."
 msgstr "Nyenzo ya rejea kwa hadhira zote mbili."
 
-#: ai_tutor/apps/docs/playbook.py:131
+#: ai_tutor/apps/docs/playbook.py:127
 msgid "Executive summary"
 msgstr "Muhtasari wa uongozi"
 
-#: ai_tutor/apps/docs/playbook.py:132
+#: ai_tutor/apps/docs/playbook.py:128
 msgid ""
 "What adoption involves, what a country adapts, and how long a first cohort "
 "takes."
@@ -412,11 +404,11 @@ msgstr ""
 "Uzinduzi unahusisha nini, nchi inabadilisha nini, na kundi la kwanza "
 "huchukua muda gani."
 
-#: ai_tutor/apps/docs/playbook.py:134
+#: ai_tutor/apps/docs/playbook.py:130
 msgid "What is actually being adopted"
 msgstr "Nini hasa kinachozinduliwa"
 
-#: ai_tutor/apps/docs/playbook.py:135
+#: ai_tutor/apps/docs/playbook.py:131
 msgid ""
 "The product as a student, a teacher and a ministry each meet it — and what "
 "it is not."
@@ -424,11 +416,11 @@ msgstr ""
 "Bidhaa kama mwanafunzi, mwalimu na wizara wanavyoikutana nayo — na kile "
 "isicho."
 
-#: ai_tutor/apps/docs/playbook.py:137 ai_tutor/apps/docs/playbook.py:270
+#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:245
 msgid "The five layers of adaptation"
 msgstr "Tabaka tano za kubadilisha"
 
-#: ai_tutor/apps/docs/playbook.py:138
+#: ai_tutor/apps/docs/playbook.py:134
 msgid ""
 "Language, curriculum, local context, national structures and infrastructure "
 "— five projects, not one."
@@ -436,11 +428,11 @@ msgstr ""
 "Lugha, mtaala, mazingira ya ndani, miundo ya kitaifa na miundombinu — miradi "
 "mitano, si mmoja."
 
-#: ai_tutor/apps/docs/playbook.py:140
+#: ai_tutor/apps/docs/playbook.py:136
 msgid "Four models of adoption"
 msgstr "Modeli nne za uzinduzi"
 
-#: ai_tutor/apps/docs/playbook.py:141
+#: ai_tutor/apps/docs/playbook.py:137
 msgid ""
 "Managed, country cloud, single server and offline: who operates it and where "
 "the data lives."
@@ -448,11 +440,11 @@ msgstr ""
 "Inayosimamiwa, wingu la nchi, seva moja na bila mtandao: nani anaiendesha na "
 "data inapokaa."
 
-#: ai_tutor/apps/docs/playbook.py:143
+#: ai_tutor/apps/docs/playbook.py:139
 msgid "Data sovereignty: the honest account"
 msgstr "Umiliki wa data: maelezo ya kweli"
 
-#: ai_tutor/apps/docs/playbook.py:144
+#: ai_tutor/apps/docs/playbook.py:140
 msgid ""
 "What stays in country, what leaves and why no setting changes it, and the "
 "three ways to close the gap."
@@ -460,35 +452,11 @@ msgstr ""
 "Kinachobaki nchini, kinachoondoka na kwa nini hakuna mpangilio unaobadilisha "
 "hilo, na njia tatu za kuziba pengo."
 
-#: ai_tutor/apps/docs/playbook.py:146
-msgid "What it costs, and what drives the cost"
-msgstr "Gharama yake, na kinachoiendesha gharama"
-
-#: ai_tutor/apps/docs/playbook.py:147
-msgid ""
-"The fixed infrastructure line, the model spend that dominates it, and the "
-"levers worth pulling."
-msgstr ""
-"Mstari wa miundombinu usiobadilika, matumizi ya modeli yanayoutawala, na "
-"vidhibiti vinavyostahili kuvutwa."
-
-#: ai_tutor/apps/docs/playbook.py:149
-msgid "Cost sharing and sustainability"
-msgstr "Kugawana gharama na uendelevu"
-
-#: ai_tutor/apps/docs/playbook.py:150
-msgid ""
-"Who pays for which line, four funding models, and whether it is still funded "
-"in year three."
-msgstr ""
-"Nani hulipia mstari upi, modeli nne za ufadhili, na kama bado inafadhiliwa "
-"mwaka wa tatu."
-
-#: ai_tutor/apps/docs/playbook.py:152 ai_tutor/apps/docs/playbook.py:254
+#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:229
 msgid "Evidence, evaluation and quality assurance"
 msgstr "Ushahidi, tathmini na uhakikisho wa ubora"
 
-#: ai_tutor/apps/docs/playbook.py:153
+#: ai_tutor/apps/docs/playbook.py:143
 msgid ""
 "Three layers of answer to \"how do you know it teaches well\", and the gate "
 "to apply before a cohort."
@@ -496,22 +464,11 @@ msgstr ""
 "Tabaka tatu za jibu la \\\"unajuaje kwamba inafundisha vizuri\\\", na kigezo "
 "cha kutumia kabla ya kundi."
 
-#: ai_tutor/apps/docs/playbook.py:155
-msgid "A phased adoption roadmap"
-msgstr "Ramani ya uzinduzi wa awamu"
-
-#: ai_tutor/apps/docs/playbook.py:156
-msgid ""
-"Six phases from decision to scale, each with an owner and an exit criterion."
-msgstr ""
-"Awamu sita kutoka uamuzi hadi upanuzi, kila moja na mmiliki na kigezo cha "
-"kutoka."
-
-#: ai_tutor/apps/docs/playbook.py:158
+#: ai_tutor/apps/docs/playbook.py:145
 msgid "Teacher training and support"
 msgstr "Mafunzo na msaada kwa walimu"
 
-#: ai_tutor/apps/docs/playbook.py:159
+#: ai_tutor/apps/docs/playbook.py:146
 msgid ""
 "The part that cannot be bought or deployed: champions, accompaniment, "
 "clinics and three lines of support."
@@ -519,67 +476,22 @@ msgstr ""
 "Sehemu isiyoweza kununuliwa au kusambazwa: mabingwa, uandamani, kliniki na "
 "mistari mitatu ya msaada."
 
-#: ai_tutor/apps/docs/playbook.py:161
-msgid "Governance and what the country must provide"
-msgstr "Utawala na kile nchi inapaswa kutoa"
-
-#: ai_tutor/apps/docs/playbook.py:162
-msgid ""
-"The five roles that need a name against them, and what each side supplies."
-msgstr "Majukumu matano yanayohitaji jina, na kile kila upande unachotoa."
-
-#: ai_tutor/apps/docs/playbook.py:164 ai_tutor/apps/docs/playbook.py:278
+#: ai_tutor/apps/docs/playbook.py:148 ai_tutor/apps/docs/playbook.py:253
 msgid "Risks and how they are managed"
 msgstr "Hatari na jinsi zinavyodhibitiwa"
 
-#: ai_tutor/apps/docs/playbook.py:165
+#: ai_tutor/apps/docs/playbook.py:149
 msgid ""
 "Ten risks, why each one happens, and the control already in place for it."
 msgstr ""
 "Hatari kumi, kwa nini kila moja hutokea, na udhibiti uliopo tayari kwa ajili "
 "yake."
 
-#: ai_tutor/apps/docs/playbook.py:168
-msgid "Country onboarding checklist"
-msgstr "Orodha ya hatua za kuanzisha nchi"
-
-#: ai_tutor/apps/docs/playbook.py:169
-msgid ""
-"Nine steps in order, and where each one lives. Content is step five for a "
-"reason."
-msgstr ""
-"Hatua tisa kwa mpangilio, na kila moja inapokaa. Maudhui ni hatua ya tano "
-"kwa sababu."
-
-#: ai_tutor/apps/docs/playbook.py:171
-msgid "Language and locale adaptation"
-msgstr "Kubadilisha lugha na eneo"
-
-#: ai_tutor/apps/docs/playbook.py:172
-msgid ""
-"The five places a locale is registered, which language wins per request, and "
-"the register decisions to settle first."
-msgstr ""
-"Sehemu tano ambapo eneo husajiliwa, lugha ipi hushinda kwa kila ombi, na "
-"maamuzi ya usajili ya kutatua kwanza."
-
-#: ai_tutor/apps/docs/playbook.py:174
-msgid "Curriculum ingestion and the content pipeline"
-msgstr "Uingizaji wa mtaala na mkondo wa maudhui"
-
-#: ai_tutor/apps/docs/playbook.py:175
-msgid ""
-"Two routes in, the eight generation steps, and why review throughput is the "
-"schedule."
-msgstr ""
-"Njia mbili za kuingia, hatua nane za uzalishaji, na kwa nini kasi ya ukaguzi "
-"ndiyo ratiba."
-
-#: ai_tutor/apps/docs/playbook.py:177
+#: ai_tutor/apps/docs/playbook.py:152
 msgid "National structures"
 msgstr "Miundo ya kitaifa"
 
-#: ai_tutor/apps/docs/playbook.py:178
+#: ai_tutor/apps/docs/playbook.py:153
 msgid ""
 "Grades, schools, terminology and competency thresholds — all configuration, "
 "no migration."
@@ -587,11 +499,11 @@ msgstr ""
 "Madarasa, shule, istilahi na vigezo vya umahiri — yote ni usanidi, hakuna "
 "uhamishaji."
 
-#: ai_tutor/apps/docs/playbook.py:180
+#: ai_tutor/apps/docs/playbook.py:155
 msgid "Hosting the platform"
 msgstr "Kupangisha jukwaa"
 
-#: ai_tutor/apps/docs/playbook.py:181
+#: ai_tutor/apps/docs/playbook.py:156
 msgid ""
 "Three server paths and two offline shapes, with the commands, the symptoms "
 "and the backup rules."
@@ -599,11 +511,11 @@ msgstr ""
 "Njia tatu za seva na miundo miwili ya bila mtandao, pamoja na amri, dalili "
 "na kanuni za nakala rudufu."
 
-#: ai_tutor/apps/docs/playbook.py:183
+#: ai_tutor/apps/docs/playbook.py:158
 msgid "Quality gates before a cohort"
 msgstr "Vigezo vya ubora kabla ya kundi"
 
-#: ai_tutor/apps/docs/playbook.py:184
+#: ai_tutor/apps/docs/playbook.py:159
 msgid ""
 "Three harnesses at three units of analysis, and why judges are a filter "
 "rather than a gate."
@@ -611,11 +523,11 @@ msgstr ""
 "Mifumo mitatu katika ngazi tatu za uchanganuzi, na kwa nini wahakiki ni "
 "kichujio badala ya lango."
 
-#: ai_tutor/apps/docs/playbook.py:186
+#: ai_tutor/apps/docs/playbook.py:161
 msgid "Operating the platform"
 msgstr "Kuendesha jukwaa"
 
-#: ai_tutor/apps/docs/playbook.py:187
+#: ai_tutor/apps/docs/playbook.py:162
 msgid ""
 "Backups, upgrades, secrets, monitoring, flagged sessions and the login "
 "lockout rule."
@@ -623,11 +535,11 @@ msgstr ""
 "Nakala rudufu, maboresho, siri, ufuatiliaji, vipindi vilivyoripotiwa na "
 "kanuni ya kufunga kuingia."
 
-#: ai_tutor/apps/docs/playbook.py:189
+#: ai_tutor/apps/docs/playbook.py:164
 msgid "Integration surface"
 msgstr "Sehemu ya muunganisho"
 
-#: ai_tutor/apps/docs/playbook.py:190
+#: ai_tutor/apps/docs/playbook.py:165
 msgid ""
 "A versioned REST API, a published schema, and a realistic integration scope "
 "for a pilot."
@@ -635,11 +547,11 @@ msgstr ""
 "REST API yenye matoleo, schema iliyochapishwa, na wigo halisi wa muunganisho "
 "kwa majaribio."
 
-#: ai_tutor/apps/docs/playbook.py:193
+#: ai_tutor/apps/docs/playbook.py:168
 msgid "Case study: what a second adaptation changed"
 msgstr "Uchunguzi: kilichobadilika katika ubadilishaji wa pili"
 
-#: ai_tutor/apps/docs/playbook.py:194
+#: ai_tutor/apps/docs/playbook.py:169
 msgid ""
 "The real change list from taking the platform to a second country. No schema "
 "redesign appears in it."
@@ -647,11 +559,11 @@ msgstr ""
 "Orodha halisi ya mabadiliko ya kupeleka jukwaa katika nchi ya pili. Hakuna "
 "kubuni upya kwa schema ndani yake."
 
-#: ai_tutor/apps/docs/playbook.py:196 ai_tutor/apps/docs/playbook.py:238
+#: ai_tutor/apps/docs/playbook.py:171 ai_tutor/apps/docs/playbook.py:213
 msgid "Questions to answer before Phase 1"
 msgstr "Maswali ya kujibu kabla ya Awamu ya 1"
 
-#: ai_tutor/apps/docs/playbook.py:197
+#: ai_tutor/apps/docs/playbook.py:172
 msgid ""
 "Ten questions. A country that can answer them can start; one that cannot "
 "will stall on the unanswered one."
@@ -659,67 +571,67 @@ msgstr ""
 "Maswali kumi. Nchi inayoweza kuyajibu inaweza kuanza; isiyoweza itakwama "
 "kwenye lile ambalo halijajibiwa."
 
-#: ai_tutor/apps/docs/playbook.py:199
+#: ai_tutor/apps/docs/playbook.py:174
 msgid "Glossary"
 msgstr "Kamusi"
 
-#: ai_tutor/apps/docs/playbook.py:233
+#: ai_tutor/apps/docs/playbook.py:208
 msgid "Start here"
 msgstr "Anzia hapa"
 
-#: ai_tutor/apps/docs/playbook.py:234
+#: ai_tutor/apps/docs/playbook.py:209
 msgid "What the thing is, before deciding anything about it."
 msgstr "Kitu hiki ni nini, kabla ya kuamua chochote kukihusu."
 
-#: ai_tutor/apps/docs/playbook.py:241
+#: ai_tutor/apps/docs/playbook.py:216
 msgid "Decide the shape"
 msgstr "Amua muundo"
 
-#: ai_tutor/apps/docs/playbook.py:242
+#: ai_tutor/apps/docs/playbook.py:217
 msgid "Where it runs, where the data lives, and who owns each decision."
 msgstr "Inapoendeshwa, data inapokaa, na nani anamiliki kila uamuzi."
 
-#: ai_tutor/apps/docs/playbook.py:246
+#: ai_tutor/apps/docs/playbook.py:221
 msgid "What a second adaptation changed"
 msgstr "Kilichobadilika katika ubadilishaji wa pili"
 
-#: ai_tutor/apps/docs/playbook.py:249
-msgid "Plan and fund it"
-msgstr "Ipange na uigharamie"
+#: ai_tutor/apps/docs/playbook.py:224
+msgid "Prepare the people"
+msgstr "Andaa watu"
 
-#: ai_tutor/apps/docs/playbook.py:250
+#: ai_tutor/apps/docs/playbook.py:225
 msgid ""
-"What it costs, who carries which line, and how a first cohort is sequenced."
+"The part that cannot be bought or deployed, and how you know it teaches well."
 msgstr ""
-"Gharama yake, nani anabeba mstari upi, na jinsi kundi la kwanza "
-"linavyopangwa."
+"Sehemu isiyoweza kununuliwa wala kusakinishwa, na jinsi unavyojua "
+"inafundisha vizuri."
 
-#: ai_tutor/apps/docs/playbook.py:257
+#: ai_tutor/apps/docs/playbook.py:232
 msgid "Stand it up"
 msgstr "Isimamishe"
 
-#: ai_tutor/apps/docs/playbook.py:258
+#: ai_tutor/apps/docs/playbook.py:233
 msgid ""
 "Provision the deployment, then run it without anyone needing to be called."
 msgstr "Andaa usambazaji, kisha uiendeshe bila mtu yeyote kuhitaji kuitwa."
 
-#: ai_tutor/apps/docs/playbook.py:261
+#: ai_tutor/apps/docs/playbook.py:236
 msgid "Run it yourself — the short version"
 msgstr "Iendeshe mwenyewe — toleo fupi"
 
-#: ai_tutor/apps/docs/playbook.py:265
+#: ai_tutor/apps/docs/playbook.py:240
 msgid "Make it yours"
 msgstr "Ifanye yako"
 
-#: ai_tutor/apps/docs/playbook.py:266
-msgid "Register the locale, ingest the syllabus, configure the country."
-msgstr "Sajili eneo, ingiza muhtasari, sanidi nchi."
+#: ai_tutor/apps/docs/playbook.py:241
+msgid "Configure the country: grade names, school register, competency bands."
+msgstr "Sanidi nchi: majina ya madarasa, daftari la shule, viwango vya umahiri."
 
-#: ai_tutor/apps/docs/playbook.py:273
+#: ai_tutor/apps/docs/playbook.py:248
 msgid "Prove it, then connect it"
 msgstr "Ithibitishe, kisha iunganishe"
 
-#: ai_tutor/apps/docs/playbook.py:274
+#: ai_tutor/apps/docs/playbook.py:249
 msgid ""
 "The gate to pass before students arrive, and the surface other systems talk "
 "to."
@@ -806,7 +718,7 @@ msgid "Terms of use"
 msgstr "Masharti ya matumizi"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:12
-#: ai_tutor/templates/accounts/landing.html:192
+#: ai_tutor/templates/accounts/landing.html:191
 #: ai_tutor/templates/docs/index.html:60
 msgid "Run it yourself"
 msgstr "Iendeshe mwenyewe"
@@ -832,11 +744,7 @@ msgstr "Kuingia kwa mwalimu au msimamizi"
 msgid "Student sign in"
 msgstr "Kuingia kwa mwanafunzi"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:54
-msgid "Enterprise sign in"
-msgstr "Kuingia kwa taasisi"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:83
+#: ai_tutor/templates/_includes/_marketing_header.html:82
 #: ai_tutor/templates/accounts/settings.html:198
 #: ai_tutor/templates/dashboard/curriculum/course_detail.html:191
 #: ai_tutor/templates/dashboard/curriculum/upload.html:292
@@ -844,7 +752,7 @@ msgstr "Kuingia kwa taasisi"
 msgid "Language"
 msgstr "Lugha"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:93
+#: ai_tutor/templates/_includes/_marketing_header.html:92
 msgid "Go"
 msgstr "Nenda"
 
@@ -1280,8 +1188,8 @@ msgid "Already have an account?"
 msgstr "Tayari una akaunti?"
 
 #: ai_tutor/templates/accounts/country_self_register.html:146
-#: ai_tutor/templates/accounts/landing.html:211
-#: ai_tutor/templates/accounts/landing.html:221
+#: ai_tutor/templates/accounts/landing.html:210
+#: ai_tutor/templates/accounts/landing.html:220
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
@@ -1342,69 +1250,65 @@ msgstr "Mwanafunzi"
 msgid "Teacher/Admin"
 msgstr "Mwalimu au Msimamizi"
 
-#: ai_tutor/templates/accounts/landing.html:61
-msgid "Enterprise"
-msgstr "Taasisi"
-
-#: ai_tutor/templates/accounts/landing.html:65
+#: ai_tutor/templates/accounts/landing.html:64
 msgid "New here? You can create an account on any of these sign-in pages."
 msgstr ""
 "Ni mgeni hapa? Unaweza kufungua akaunti kwenye kurasa zozote hizi za "
 "kuingia."
 
-#: ai_tutor/templates/accounts/landing.html:76
+#: ai_tutor/templates/accounts/landing.html:75
 msgid "How one lesson goes"
 msgstr "Jinsi somo moja linavyokwenda"
 
-#: ai_tutor/templates/accounts/landing.html:81
+#: ai_tutor/templates/accounts/landing.html:80
 #: ai_tutor/templates/tutoring/catalog.html:158
 msgid "Engage"
 msgstr "Shirikisha"
 
-#: ai_tutor/templates/accounts/landing.html:82
+#: ai_tutor/templates/accounts/landing.html:81
 msgid "Opens with a question about something the student already knows."
 msgstr "Huanza na swali kuhusu kitu ambacho mwanafunzi tayari anakijua."
 
-#: ai_tutor/templates/accounts/landing.html:88
+#: ai_tutor/templates/accounts/landing.html:87
 #: ai_tutor/templates/tutoring/catalog.html:159
 msgid "Explore"
 msgstr "Chunguza"
 
-#: ai_tutor/templates/accounts/landing.html:89
+#: ai_tutor/templates/accounts/landing.html:88
 msgid "The student works the idea out loud; the tutor asks rather than tells."
 msgstr ""
 "Mwanafunzi hufanyia kazi wazo kwa sauti; mkufunzi huuliza badala ya kueleza."
 
-#: ai_tutor/templates/accounts/landing.html:95
+#: ai_tutor/templates/accounts/landing.html:94
 #: ai_tutor/templates/tutoring/catalog.html:160
 msgid "Explain"
 msgstr "Eleza"
 
-#: ai_tutor/templates/accounts/landing.html:96
+#: ai_tutor/templates/accounts/landing.html:95
 msgid "The idea gets named and tied to the curriculum's own wording."
 msgstr "Wazo hupewa jina na kuunganishwa na maneno ya mtaala wenyewe."
 
-#: ai_tutor/templates/accounts/landing.html:102
+#: ai_tutor/templates/accounts/landing.html:101
 msgid "Elaborate"
 msgstr "Fafanua"
 
-#: ai_tutor/templates/accounts/landing.html:103
+#: ai_tutor/templates/accounts/landing.html:102
 msgid "A harder case, to see whether it holds outside the first example."
 msgstr "Mfano mgumu zaidi, kuona kama unashikilia nje ya mfano wa kwanza."
 
-#: ai_tutor/templates/accounts/landing.html:109
+#: ai_tutor/templates/accounts/landing.html:108
 msgid "Exit ticket"
 msgstr "Tiketi ya kutoka"
 
-#: ai_tutor/templates/accounts/landing.html:110
+#: ai_tutor/templates/accounts/landing.html:109
 msgid "A short check. The score is what the teacher sees the next morning."
 msgstr "Ukaguzi mfupi. Alama ndiyo mwalimu anayoiona asubuhi inayofuata."
 
-#: ai_tutor/templates/accounts/landing.html:122
+#: ai_tutor/templates/accounts/landing.html:121
 msgid "It teaches the syllabus the school already uses"
 msgstr "Hufundisha muhtasari ambao shule tayari inautumia"
 
-#: ai_tutor/templates/accounts/landing.html:123
+#: ai_tutor/templates/accounts/landing.html:122
 msgid ""
 "A teacher uploads the curriculum — schemes of work, past papers, worksheets. "
 "The platform turns it into lessons and keeps every answer grounded in that "
@@ -1415,11 +1319,11 @@ msgstr ""
 "kazi. Jukwaa hulibadilisha kuwa masomo na hushikilia kila jibu kwenye nyenzo "
 "hiyo, ili mwanafunzi asifundishwe kozi tofauti na ile atakayofanyia mtihani."
 
-#: ai_tutor/templates/accounts/landing.html:129
+#: ai_tutor/templates/accounts/landing.html:128
 msgid "Talks, doesn't lecture"
 msgstr "Huzungumza, haitoi mhadhara"
 
-#: ai_tutor/templates/accounts/landing.html:130
+#: ai_tutor/templates/accounts/landing.html:129
 msgid ""
 "Every step is a question. A student who answers correctly moves on; a "
 "student who doesn't gets a smaller step, not the answer."
@@ -1427,11 +1331,11 @@ msgstr ""
 "Kila hatua ni swali. Mwanafunzi anayejibu kwa usahihi huendelea; asiyejibu "
 "hupewa hatua ndogo zaidi, si jibu."
 
-#: ai_tutor/templates/accounts/landing.html:135
+#: ai_tutor/templates/accounts/landing.html:134
 msgid "Measures what stuck"
 msgstr "Hupima kilichobaki"
 
-#: ai_tutor/templates/accounts/landing.html:136
+#: ai_tutor/templates/accounts/landing.html:135
 msgid ""
 "Each lesson ends with an exit ticket. Scores are per objective, so a teacher "
 "sees which idea a class missed, not just who scored low."
@@ -1439,11 +1343,11 @@ msgstr ""
 "Kila somo huisha na tiketi ya kutoka. Alama ni kwa kila lengo, hivyo mwalimu "
 "huona wazo gani darasa lilikosa, si tu nani alipata alama za chini."
 
-#: ai_tutor/templates/accounts/landing.html:141
+#: ai_tutor/templates/accounts/landing.html:140
 msgid "Watched, not unattended"
 msgstr "Inatazamwa, haijaachwa"
 
-#: ai_tutor/templates/accounts/landing.html:142
+#: ai_tutor/templates/accounts/landing.html:141
 msgid ""
 "Conversations are checked for harmful, inappropriate and manipulative "
 "content. Anything flagged goes to a named teacher to review."
@@ -1451,11 +1355,11 @@ msgstr ""
 "Mazungumzo hukaguliwa kuona maudhui yenye madhara, yasiyofaa na ya "
 "udanganyifu. Chochote kinachoripotiwa huenda kwa mwalimu aliyetajwa kukagua."
 
-#: ai_tutor/templates/accounts/landing.html:147
+#: ai_tutor/templates/accounts/landing.html:146
 msgid "One device, two students"
 msgstr "Kifaa kimoja, wanafunzi wawili"
 
-#: ai_tutor/templates/accounts/landing.html:148
+#: ai_tutor/templates/accounts/landing.html:147
 msgid ""
 "Where devices are shared, a teacher can pair students into groups and the "
 "tutor runs the lesson for the pair."
@@ -1463,11 +1367,11 @@ msgstr ""
 "Pale vifaa vinaposhirikiwa, mwalimu anaweza kuunganisha wanafunzi katika "
 "vikundi na mkufunzi huendesha somo kwa jozi."
 
-#: ai_tutor/templates/accounts/landing.html:153
+#: ai_tutor/templates/accounts/landing.html:152
 msgid "Reports for the teacher"
 msgstr "Ripoti kwa mwalimu"
 
-#: ai_tutor/templates/accounts/landing.html:154
+#: ai_tutor/templates/accounts/landing.html:153
 msgid ""
 "A dashboard shows who has been active, how the class scored, and which "
 "students went backwards on a retry."
@@ -1475,11 +1379,11 @@ msgstr ""
 "Dashibodi huonyesha nani amekuwa akitumia, darasa lilipata alama gani, na "
 "wanafunzi gani walirudi nyuma walipojaribu tena."
 
-#: ai_tutor/templates/accounts/landing.html:159
+#: ai_tutor/templates/accounts/landing.html:158
 msgid "In the classroom's language"
 msgstr "Kwa lugha ya darasani"
 
-#: ai_tutor/templates/accounts/landing.html:160
+#: ai_tutor/templates/accounts/landing.html:159
 msgid ""
 "The interface and the lessons follow the language the course is taught in, "
 "set per school."
@@ -1487,11 +1391,11 @@ msgstr ""
 "Kiolesura na masomo hufuata lugha ambayo kozi inafundishwa, iliyowekwa kwa "
 "kila shule."
 
-#: ai_tutor/templates/accounts/landing.html:176
+#: ai_tutor/templates/accounts/landing.html:175
 msgid "Run it on your own hardware"
 msgstr "Iendeshe kwenye vifaa vyako mwenyewe"
 
-#: ai_tutor/templates/accounts/landing.html:177
+#: ai_tutor/templates/accounts/landing.html:176
 msgid ""
 "Neither option needs a connection to us. Pick the one that matches who is "
 "running it — a teacher in one classroom, or a ministry across a district."
@@ -1499,11 +1403,11 @@ msgstr ""
 "Chaguo lolote halihitaji muunganisho nasi. Chagua linalolingana na "
 "anayeiendesha — mwalimu katika darasa moja, au wizara katika wilaya."
 
-#: ai_tutor/templates/accounts/landing.html:183
+#: ai_tutor/templates/accounts/landing.html:182
 msgid "No internet? It still teaches."
 msgstr "Hakuna intaneti? Bado hufundisha."
 
-#: ai_tutor/templates/accounts/landing.html:184
+#: ai_tutor/templates/accounts/landing.html:183
 msgid ""
 "The desktop build runs the whole platform — tutor, curriculum and marking — "
 "on one machine in the classroom, serving students over its own WiFi. Nothing "
@@ -1513,15 +1417,15 @@ msgstr ""
 "kwenye mashine moja darasani, likihudumia wanafunzi kupitia WiFi yake. "
 "Hakuna kinachotoka chumbani, na hakuna kinachohitaji muunganisho."
 
-#: ai_tutor/templates/accounts/landing.html:185
+#: ai_tutor/templates/accounts/landing.html:184
 msgid "Get the offline app"
 msgstr "Pata programu ya bila mtandao"
 
-#: ai_tutor/templates/accounts/landing.html:190
+#: ai_tutor/templates/accounts/landing.html:189
 msgid "Host it on your own servers"
 msgstr "Ipangishe kwenye seva zako mwenyewe"
 
-#: ai_tutor/templates/accounts/landing.html:191
+#: ai_tutor/templates/accounts/landing.html:190
 msgid ""
 "For a school group or a ministry that needs the data to stay on "
 "infrastructure it controls. The whole platform is deployable from source, "
@@ -1531,11 +1435,11 @@ msgstr ""
 "inayoidhibiti. Jukwaa zima linaweza kusambazwa kutoka chanzo, kwa modeli "
 "zako mwenyewe na hifadhi yako mwenyewe."
 
-#: ai_tutor/templates/accounts/landing.html:202
+#: ai_tutor/templates/accounts/landing.html:201
 msgid "Get started"
 msgstr "Anza"
 
-#: ai_tutor/templates/accounts/landing.html:208
+#: ai_tutor/templates/accounts/landing.html:207
 #: ai_tutor/templates/dashboard/base.html:136
 #: ai_tutor/templates/dashboard/classes/detail.html:67
 #: ai_tutor/templates/dashboard/classes/detail.html:106
@@ -1548,23 +1452,23 @@ msgstr "Anza"
 msgid "Students"
 msgstr "Wanafunzi"
 
-#: ai_tutor/templates/accounts/landing.html:209
+#: ai_tutor/templates/accounts/landing.html:208
 msgid ""
 "Pick a subject and carry on where you left off. Your teacher gives you your "
 "school and grade."
 msgstr ""
 "Chagua somo na uendelee ulipoishia. Mwalimu wako hukupa shule na darasa lako."
 
-#: ai_tutor/templates/accounts/landing.html:212
-#: ai_tutor/templates/accounts/landing.html:222
+#: ai_tutor/templates/accounts/landing.html:211
+#: ai_tutor/templates/accounts/landing.html:221
 msgid "Create account"
 msgstr "Fungua akaunti"
 
-#: ai_tutor/templates/accounts/landing.html:218
+#: ai_tutor/templates/accounts/landing.html:217
 msgid "Teachers & Admins"
 msgstr "Walimu na Wasimamizi"
 
-#: ai_tutor/templates/accounts/landing.html:219
+#: ai_tutor/templates/accounts/landing.html:218
 msgid ""
 "Upload your curriculum, watch how the class is doing, and review anything "
 "the safety check flagged."
@@ -1572,11 +1476,11 @@ msgstr ""
 "Pakia mtaala wako, tazama darasa linavyofanya, na ukague chochote ambacho "
 "ukaguzi wa usalama umeripoti."
 
-#: ai_tutor/templates/accounts/landing.html:228
+#: ai_tutor/templates/accounts/landing.html:227
 msgid "Enterprise Hosting"
 msgstr "Uenyeji wa Taasisi"
 
-#: ai_tutor/templates/accounts/landing.html:229
+#: ai_tutor/templates/accounts/landing.html:228
 msgid ""
 "For a government ministry or organisation running the platform across a "
 "whole school system. See every school in it, add new ones, and follow how "
@@ -1586,7 +1490,7 @@ msgstr ""
 "mzima wa shule. Ona kila shule, ongeza mpya, na fuatilia jinsi kundi "
 "zima linavyofanya."
 
-#: ai_tutor/templates/accounts/landing.html:241
+#: ai_tutor/templates/accounts/landing.html:240
 msgid "Contact us for onboarding"
 msgstr "Wasiliana nasi ili kuanza"
 
@@ -4396,7 +4300,7 @@ msgstr "Ukurasa %(current)s kati ya %(total)s"
 #: ai_tutor/templates/dashboard/feedback/list.html:102
 #: ai_tutor/templates/dashboard/flagged_sessions.html:113
 #: ai_tutor/templates/dashboard/students/list.html:106
-#: ai_tutor/templates/docs/section.html:80
+#: ai_tutor/templates/docs/section.html:90
 msgid "Next"
 msgstr "Ifuatayo"
 
@@ -4516,7 +4420,7 @@ msgstr "Kurasa za mazungumzo yaliyoripotiwa"
 
 #: ai_tutor/templates/dashboard/flagged_sessions.html:105
 #: ai_tutor/templates/dashboard/students/list.html:98
-#: ai_tutor/templates/docs/section.html:71
+#: ai_tutor/templates/docs/section.html:81
 msgid "Previous"
 msgstr "Iliyotangulia"
 
@@ -6827,11 +6731,11 @@ msgstr "Rudi kwenye usanidi"
 
 #: ai_tutor/templates/docs/base.html:8
 msgid ""
-"How a country adopts the AI Tutor: what it adapts, what it must decide, what "
-"it costs, and how to get a first cohort teaching."
+"How a country adopts the AI Tutor: what it adapts, what it must decide, and "
+"how to get a first cohort teaching."
 msgstr ""
-"Jinsi nchi inavyozindua AI Tutor: inabadilisha nini, inapaswa kuamua nini, "
-"gharama yake, na jinsi ya kuanzisha ufundishaji wa kundi la kwanza."
+"Jinsi nchi inavyoanzisha AI Tutor: inarekebisha nini, inapaswa kuamua "
+"nini, na jinsi ya kuanzisha kundi la kwanza la wanafunzi."
 
 #: ai_tutor/templates/docs/base.html:30
 msgid "Skip to the documentation"
@@ -6840,12 +6744,11 @@ msgstr "Rukia nyaraka"
 #: ai_tutor/templates/docs/index.html:27
 msgid ""
 "Adopting the AI Tutor in a national education system — what a country "
-"adapts, what it must decide, what it costs, and how to get a first cohort "
-"teaching."
+"adapts, what it must decide, and how to get a first cohort teaching."
 msgstr ""
-"Kuzindua AI Tutor katika mfumo wa elimu wa kitaifa — nchi inabadilisha nini, "
-"inapaswa kuamua nini, gharama yake, na jinsi ya kuanzisha ufundishaji wa "
-"kundi la kwanza."
+"Kuanzisha AI Tutor katika mfumo wa elimu wa kitaifa — nchi hurekebisha "
+"nini, inapaswa kuamua nini, na jinsi ya kuanzisha kundi la kwanza la "
+"wanafunzi."
 
 #: ai_tutor/templates/docs/index.html:35 ai_tutor/templates/docs/index.html:38
 msgid "Search the playbook"
@@ -6857,8 +6760,8 @@ msgid "Breadcrumb"
 msgstr "Njia"
 
 #: ai_tutor/templates/docs/index.html:53
-msgid "Country adoption playbook"
-msgstr "Mwongozo wa uzinduzi wa kitaifa"
+msgid "Enterprise adoption playbook"
+msgstr "Mwongozo wa uzinduzi wa taasisi"
 
 #: ai_tutor/templates/docs/index.html:58
 #, python-format
@@ -6881,20 +6784,16 @@ msgstr "Toleo"
 msgid "Evidence base"
 msgstr "Msingi wa ushahidi"
 
-#: ai_tutor/templates/docs/index.html:103
-msgid "Costs"
-msgstr "Gharama"
-
-#: ai_tutor/templates/docs/section.html:30
-#: ai_tutor/templates/docs/section.html:31
+#: ai_tutor/templates/docs/section.html:40
+#: ai_tutor/templates/docs/section.html:41
 msgid "On this page"
 msgstr "Kwenye ukurasa huu"
 
-#: ai_tutor/templates/docs/section.html:56
+#: ai_tutor/templates/docs/section.html:66
 msgid "This section has not been translated yet, and is shown in English."
 msgstr "Sehemu hii bado haijatafsiriwa, na inaonyeshwa kwa Kiingereza."
 
-#: ai_tutor/templates/docs/section.html:66
+#: ai_tutor/templates/docs/section.html:76
 msgid "Section navigation"
 msgstr "Urambazaji wa sehemu"
 
@@ -7988,6 +7887,102 @@ msgstr "Kagua Somo"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Endelea Kujifunza"
+
+#~ msgid ""
+#~ "Observed pilot figures, given as planning inputs. They are not prices and "
+#~ "must be re-derived for each country."
+#~ msgstr ""
+#~ "Takwimu zilizoonwa kwenye majaribio, zinatolewa kama pembejeo za mipango. "
+#~ "Si bei na lazima zikokotolewe upya kwa kila nchi."
+
+#~ msgid "What it costs, and what drives the cost"
+#~ msgstr "Gharama yake, na kinachoiendesha gharama"
+
+#~ msgid ""
+#~ "The fixed infrastructure line, the model spend that dominates it, and the "
+#~ "levers worth pulling."
+#~ msgstr ""
+#~ "Mstari wa miundombinu usiobadilika, matumizi ya modeli yanayoutawala, na "
+#~ "vidhibiti vinavyostahili kuvutwa."
+
+#~ msgid "Cost sharing and sustainability"
+#~ msgstr "Kugawana gharama na uendelevu"
+
+#~ msgid ""
+#~ "Who pays for which line, four funding models, and whether it is still "
+#~ "funded in year three."
+#~ msgstr ""
+#~ "Nani hulipia mstari upi, modeli nne za ufadhili, na kama bado "
+#~ "inafadhiliwa mwaka wa tatu."
+
+#~ msgid "A phased adoption roadmap"
+#~ msgstr "Ramani ya uzinduzi wa awamu"
+
+#~ msgid ""
+#~ "Six phases from decision to scale, each with an owner and an exit "
+#~ "criterion."
+#~ msgstr ""
+#~ "Awamu sita kutoka uamuzi hadi upanuzi, kila moja na mmiliki na kigezo cha "
+#~ "kutoka."
+
+#~ msgid "Governance and what the country must provide"
+#~ msgstr "Utawala na kile nchi inapaswa kutoa"
+
+#~ msgid ""
+#~ "The five roles that need a name against them, and what each side supplies."
+#~ msgstr "Majukumu matano yanayohitaji jina, na kile kila upande unachotoa."
+
+#~ msgid "Country onboarding checklist"
+#~ msgstr "Orodha ya hatua za kuanzisha nchi"
+
+#~ msgid ""
+#~ "Nine steps in order, and where each one lives. Content is step five for a "
+#~ "reason."
+#~ msgstr ""
+#~ "Hatua tisa kwa mpangilio, na kila moja inapokaa. Maudhui ni hatua ya tano "
+#~ "kwa sababu."
+
+#~ msgid "Language and locale adaptation"
+#~ msgstr "Kubadilisha lugha na eneo"
+
+#~ msgid ""
+#~ "The five places a locale is registered, which language wins per request, "
+#~ "and the register decisions to settle first."
+#~ msgstr ""
+#~ "Sehemu tano ambapo eneo husajiliwa, lugha ipi hushinda kwa kila ombi, na "
+#~ "maamuzi ya usajili ya kutatua kwanza."
+
+#~ msgid "Curriculum ingestion and the content pipeline"
+#~ msgstr "Uingizaji wa mtaala na mkondo wa maudhui"
+
+#~ msgid ""
+#~ "Two routes in, the eight generation steps, and why review throughput is "
+#~ "the schedule."
+#~ msgstr ""
+#~ "Njia mbili za kuingia, hatua nane za uzalishaji, na kwa nini kasi ya "
+#~ "ukaguzi ndiyo ratiba."
+
+#~ msgid "Plan and fund it"
+#~ msgstr "Ipange na uigharamie"
+
+#~ msgid ""
+#~ "What it costs, who carries which line, and how a first cohort is "
+#~ "sequenced."
+#~ msgstr ""
+#~ "Gharama yake, nani anabeba mstari upi, na jinsi kundi la kwanza "
+#~ "linavyopangwa."
+
+#~ msgid "Register the locale, ingest the syllabus, configure the country."
+#~ msgstr "Sajili eneo, ingiza muhtasari, sanidi nchi."
+
+#~ msgid "Enterprise sign in"
+#~ msgstr "Kuingia kwa taasisi"
+
+#~ msgid "Enterprise"
+#~ msgstr "Taasisi"
+
+#~ msgid "Costs"
+#~ msgstr "Gharama"
 
 #~ msgid "Country Adoption"
 #~ msgstr "Uzinduzi wa Kitaifa"

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ai-tutor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-08 12:33+0000\n"
+"POT-Creation-Date: 2026-09-08 13:43+0000\n"
 "Language: pt_MZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -351,35 +351,27 @@ msgstr ""
 "secundário); adaptação a uma segunda localidade em preparação; código da "
 "plataforma e ferramentas de avaliação em Agosto de 2026."
 
-#: ai_tutor/apps/docs/playbook.py:39
-msgid ""
-"Observed pilot figures, given as planning inputs. They are not prices and "
-"must be re-derived for each country."
-msgstr ""
-"Valores observados no piloto, apresentados como dados de planeamento. Não "
-"são preços e devem ser recalculados para cada país."
-
-#: ai_tutor/apps/docs/playbook.py:106
+#: ai_tutor/apps/docs/playbook.py:102
 msgid "The decision"
 msgstr "A decisão"
 
-#: ai_tutor/apps/docs/playbook.py:107
+#: ai_tutor/apps/docs/playbook.py:103
 msgid "The implementation"
 msgstr "A implementação"
 
-#: ai_tutor/apps/docs/playbook.py:108
+#: ai_tutor/apps/docs/playbook.py:104
 msgid "Appendices"
 msgstr "Anexos"
 
-#: ai_tutor/apps/docs/playbook.py:114 ai_tutor/templates/docs/index.html:71
+#: ai_tutor/apps/docs/playbook.py:110 ai_tutor/templates/docs/index.html:71
 msgid "Part I"
 msgstr "Parte I"
 
-#: ai_tutor/apps/docs/playbook.py:115 ai_tutor/templates/docs/index.html:84
+#: ai_tutor/apps/docs/playbook.py:111 ai_tutor/templates/docs/index.html:84
 msgid "Part II"
 msgstr "Parte II"
 
-#: ai_tutor/apps/docs/playbook.py:121
+#: ai_tutor/apps/docs/playbook.py:117
 msgid ""
 "For ministry officials, programme leads and advisors. No technical knowledge "
 "assumed."
@@ -387,20 +379,20 @@ msgstr ""
 "Para quadros do ministério, responsáveis de programa e assessores. Não "
 "pressupõe conhecimentos técnicos."
 
-#: ai_tutor/apps/docs/playbook.py:123
+#: ai_tutor/apps/docs/playbook.py:119
 msgid "For the technical team that will stand up and run a national instance."
 msgstr ""
 "Para a equipa técnica que vai instalar e operar uma instância nacional."
 
-#: ai_tutor/apps/docs/playbook.py:125
+#: ai_tutor/apps/docs/playbook.py:121
 msgid "Reference material for both audiences."
 msgstr "Material de referência para ambos os públicos."
 
-#: ai_tutor/apps/docs/playbook.py:131
+#: ai_tutor/apps/docs/playbook.py:127
 msgid "Executive summary"
 msgstr "Resumo executivo"
 
-#: ai_tutor/apps/docs/playbook.py:132
+#: ai_tutor/apps/docs/playbook.py:128
 msgid ""
 "What adoption involves, what a country adapts, and how long a first cohort "
 "takes."
@@ -408,11 +400,11 @@ msgstr ""
 "O que envolve a adopção, o que um país adapta e quanto tempo demora uma "
 "primeira turma."
 
-#: ai_tutor/apps/docs/playbook.py:134
+#: ai_tutor/apps/docs/playbook.py:130
 msgid "What is actually being adopted"
 msgstr "O que está realmente a ser adoptado"
 
-#: ai_tutor/apps/docs/playbook.py:135
+#: ai_tutor/apps/docs/playbook.py:131
 msgid ""
 "The product as a student, a teacher and a ministry each meet it — and what "
 "it is not."
@@ -420,11 +412,11 @@ msgstr ""
 "O produto tal como o encontram um aluno, um professor e um ministério — e o "
 "que ele não é."
 
-#: ai_tutor/apps/docs/playbook.py:137 ai_tutor/apps/docs/playbook.py:270
+#: ai_tutor/apps/docs/playbook.py:133 ai_tutor/apps/docs/playbook.py:245
 msgid "The five layers of adaptation"
 msgstr "As cinco camadas de adaptação"
 
-#: ai_tutor/apps/docs/playbook.py:138
+#: ai_tutor/apps/docs/playbook.py:134
 msgid ""
 "Language, curriculum, local context, national structures and infrastructure "
 "— five projects, not one."
@@ -432,11 +424,11 @@ msgstr ""
 "Língua, currículo, contexto local, estruturas nacionais e infra-estrutura — "
 "cinco projectos, não um."
 
-#: ai_tutor/apps/docs/playbook.py:140
+#: ai_tutor/apps/docs/playbook.py:136
 msgid "Four models of adoption"
 msgstr "Quatro modelos de adopção"
 
-#: ai_tutor/apps/docs/playbook.py:141
+#: ai_tutor/apps/docs/playbook.py:137
 msgid ""
 "Managed, country cloud, single server and offline: who operates it and where "
 "the data lives."
@@ -444,11 +436,11 @@ msgstr ""
 "Gerido, nuvem do país, servidor único e offline: quem o opera e onde ficam "
 "os dados."
 
-#: ai_tutor/apps/docs/playbook.py:143
+#: ai_tutor/apps/docs/playbook.py:139
 msgid "Data sovereignty: the honest account"
 msgstr "Soberania dos dados: o relato honesto"
 
-#: ai_tutor/apps/docs/playbook.py:144
+#: ai_tutor/apps/docs/playbook.py:140
 msgid ""
 "What stays in country, what leaves and why no setting changes it, and the "
 "three ways to close the gap."
@@ -456,35 +448,11 @@ msgstr ""
 "O que fica no país, o que sai e porque nenhuma configuração o altera, e as "
 "três formas de fechar essa lacuna."
 
-#: ai_tutor/apps/docs/playbook.py:146
-msgid "What it costs, and what drives the cost"
-msgstr "Quanto custa e o que determina o custo"
-
-#: ai_tutor/apps/docs/playbook.py:147
-msgid ""
-"The fixed infrastructure line, the model spend that dominates it, and the "
-"levers worth pulling."
-msgstr ""
-"A rubrica fixa de infra-estrutura, a despesa com modelos que a domina e as "
-"alavancas que vale a pena accionar."
-
-#: ai_tutor/apps/docs/playbook.py:149
-msgid "Cost sharing and sustainability"
-msgstr "Partilha de custos e sustentabilidade"
-
-#: ai_tutor/apps/docs/playbook.py:150
-msgid ""
-"Who pays for which line, four funding models, and whether it is still funded "
-"in year three."
-msgstr ""
-"Quem paga cada rubrica, quatro modelos de financiamento e se continua "
-"financiado no terceiro ano."
-
-#: ai_tutor/apps/docs/playbook.py:152 ai_tutor/apps/docs/playbook.py:254
+#: ai_tutor/apps/docs/playbook.py:142 ai_tutor/apps/docs/playbook.py:229
 msgid "Evidence, evaluation and quality assurance"
 msgstr "Evidência, avaliação e garantia de qualidade"
 
-#: ai_tutor/apps/docs/playbook.py:153
+#: ai_tutor/apps/docs/playbook.py:143
 msgid ""
 "Three layers of answer to \"how do you know it teaches well\", and the gate "
 "to apply before a cohort."
@@ -492,22 +460,11 @@ msgstr ""
 "Três níveis de resposta a «como sabe que ensina bem» e o critério a aplicar "
 "antes de uma turma."
 
-#: ai_tutor/apps/docs/playbook.py:155
-msgid "A phased adoption roadmap"
-msgstr "Um roteiro de adopção por fases"
-
-#: ai_tutor/apps/docs/playbook.py:156
-msgid ""
-"Six phases from decision to scale, each with an owner and an exit criterion."
-msgstr ""
-"Seis fases da decisão à escala, cada uma com um responsável e um critério de "
-"saída."
-
-#: ai_tutor/apps/docs/playbook.py:158
+#: ai_tutor/apps/docs/playbook.py:145
 msgid "Teacher training and support"
 msgstr "Formação e apoio aos professores"
 
-#: ai_tutor/apps/docs/playbook.py:159
+#: ai_tutor/apps/docs/playbook.py:146
 msgid ""
 "The part that cannot be bought or deployed: champions, accompaniment, "
 "clinics and three lines of support."
@@ -515,67 +472,21 @@ msgstr ""
 "A parte que não se compra nem se instala: dinamizadores, acompanhamento, "
 "sessões de apoio e três linhas de suporte."
 
-#: ai_tutor/apps/docs/playbook.py:161
-msgid "Governance and what the country must provide"
-msgstr "Governação e o que o país tem de fornecer"
-
-#: ai_tutor/apps/docs/playbook.py:162
-msgid ""
-"The five roles that need a name against them, and what each side supplies."
-msgstr ""
-"Os cinco papéis que precisam de um nome associado e o que cada parte fornece."
-
-#: ai_tutor/apps/docs/playbook.py:164 ai_tutor/apps/docs/playbook.py:278
+#: ai_tutor/apps/docs/playbook.py:148 ai_tutor/apps/docs/playbook.py:253
 msgid "Risks and how they are managed"
 msgstr "Riscos e como são geridos"
 
-#: ai_tutor/apps/docs/playbook.py:165
+#: ai_tutor/apps/docs/playbook.py:149
 msgid ""
 "Ten risks, why each one happens, and the control already in place for it."
 msgstr ""
 "Dez riscos, porque ocorre cada um e o controlo já existente para o mitigar."
 
-#: ai_tutor/apps/docs/playbook.py:168
-msgid "Country onboarding checklist"
-msgstr "Lista de verificação para integrar um país"
-
-#: ai_tutor/apps/docs/playbook.py:169
-msgid ""
-"Nine steps in order, and where each one lives. Content is step five for a "
-"reason."
-msgstr ""
-"Nove passos por ordem e onde cada um se realiza. O conteúdo é o quinto passo "
-"por uma razão."
-
-#: ai_tutor/apps/docs/playbook.py:171
-msgid "Language and locale adaptation"
-msgstr "Adaptação de língua e localidade"
-
-#: ai_tutor/apps/docs/playbook.py:172
-msgid ""
-"The five places a locale is registered, which language wins per request, and "
-"the register decisions to settle first."
-msgstr ""
-"Os cinco sítios onde uma localidade é registada, que língua prevalece em "
-"cada pedido e as decisões de registo a resolver primeiro."
-
-#: ai_tutor/apps/docs/playbook.py:174
-msgid "Curriculum ingestion and the content pipeline"
-msgstr "Ingestão do currículo e pipeline de conteúdos"
-
-#: ai_tutor/apps/docs/playbook.py:175
-msgid ""
-"Two routes in, the eight generation steps, and why review throughput is the "
-"schedule."
-msgstr ""
-"Duas vias de entrada, os oito passos de geração e porque é a capacidade de "
-"revisão que define o calendário."
-
-#: ai_tutor/apps/docs/playbook.py:177
+#: ai_tutor/apps/docs/playbook.py:152
 msgid "National structures"
 msgstr "Estruturas nacionais"
 
-#: ai_tutor/apps/docs/playbook.py:178
+#: ai_tutor/apps/docs/playbook.py:153
 msgid ""
 "Grades, schools, terminology and competency thresholds — all configuration, "
 "no migration."
@@ -583,11 +494,11 @@ msgstr ""
 "Anos, escolas, terminologia e limiares de competência — tudo configuração, "
 "sem migração."
 
-#: ai_tutor/apps/docs/playbook.py:180
+#: ai_tutor/apps/docs/playbook.py:155
 msgid "Hosting the platform"
 msgstr "Alojar a plataforma"
 
-#: ai_tutor/apps/docs/playbook.py:181
+#: ai_tutor/apps/docs/playbook.py:156
 msgid ""
 "Three server paths and two offline shapes, with the commands, the symptoms "
 "and the backup rules."
@@ -595,11 +506,11 @@ msgstr ""
 "Três caminhos de servidor e dois formatos offline, com os comandos, os "
 "sintomas e as regras de cópia de segurança."
 
-#: ai_tutor/apps/docs/playbook.py:183
+#: ai_tutor/apps/docs/playbook.py:158
 msgid "Quality gates before a cohort"
 msgstr "Critérios de qualidade antes de uma turma"
 
-#: ai_tutor/apps/docs/playbook.py:184
+#: ai_tutor/apps/docs/playbook.py:159
 msgid ""
 "Three harnesses at three units of analysis, and why judges are a filter "
 "rather than a gate."
@@ -607,11 +518,11 @@ msgstr ""
 "Três ferramentas em três unidades de análise e porque os avaliadores são um "
 "filtro e não um crivo."
 
-#: ai_tutor/apps/docs/playbook.py:186
+#: ai_tutor/apps/docs/playbook.py:161
 msgid "Operating the platform"
 msgstr "Operar a plataforma"
 
-#: ai_tutor/apps/docs/playbook.py:187
+#: ai_tutor/apps/docs/playbook.py:162
 msgid ""
 "Backups, upgrades, secrets, monitoring, flagged sessions and the login "
 "lockout rule."
@@ -619,11 +530,11 @@ msgstr ""
 "Cópias de segurança, actualizações, segredos, monitorização, sessões "
 "sinalizadas e a regra de bloqueio de início de sessão."
 
-#: ai_tutor/apps/docs/playbook.py:189
+#: ai_tutor/apps/docs/playbook.py:164
 msgid "Integration surface"
 msgstr "Superfície de integração"
 
-#: ai_tutor/apps/docs/playbook.py:190
+#: ai_tutor/apps/docs/playbook.py:165
 msgid ""
 "A versioned REST API, a published schema, and a realistic integration scope "
 "for a pilot."
@@ -631,11 +542,11 @@ msgstr ""
 "Uma API REST versionada, um esquema publicado e um âmbito de integração "
 "realista para um piloto."
 
-#: ai_tutor/apps/docs/playbook.py:193
+#: ai_tutor/apps/docs/playbook.py:168
 msgid "Case study: what a second adaptation changed"
 msgstr "Estudo de caso: o que mudou numa segunda adaptação"
 
-#: ai_tutor/apps/docs/playbook.py:194
+#: ai_tutor/apps/docs/playbook.py:169
 msgid ""
 "The real change list from taking the platform to a second country. No schema "
 "redesign appears in it."
@@ -643,11 +554,11 @@ msgstr ""
 "A lista real de alterações ao levar a plataforma a um segundo país. Não "
 "inclui qualquer redesenho do esquema de dados."
 
-#: ai_tutor/apps/docs/playbook.py:196 ai_tutor/apps/docs/playbook.py:238
+#: ai_tutor/apps/docs/playbook.py:171 ai_tutor/apps/docs/playbook.py:213
 msgid "Questions to answer before Phase 1"
 msgstr "Perguntas a responder antes da Fase 1"
 
-#: ai_tutor/apps/docs/playbook.py:197
+#: ai_tutor/apps/docs/playbook.py:172
 msgid ""
 "Ten questions. A country that can answer them can start; one that cannot "
 "will stall on the unanswered one."
@@ -655,69 +566,69 @@ msgstr ""
 "Dez perguntas. Um país que saiba respondê-las pode começar; o que não souber "
 "ficará bloqueado naquela que ficou por responder."
 
-#: ai_tutor/apps/docs/playbook.py:199
+#: ai_tutor/apps/docs/playbook.py:174
 msgid "Glossary"
 msgstr "Glossário"
 
-#: ai_tutor/apps/docs/playbook.py:233
+#: ai_tutor/apps/docs/playbook.py:208
 msgid "Start here"
 msgstr "Comece aqui"
 
-#: ai_tutor/apps/docs/playbook.py:234
+#: ai_tutor/apps/docs/playbook.py:209
 msgid "What the thing is, before deciding anything about it."
 msgstr "O que isto é, antes de decidir seja o que for a seu respeito."
 
-#: ai_tutor/apps/docs/playbook.py:241
+#: ai_tutor/apps/docs/playbook.py:216
 msgid "Decide the shape"
 msgstr "Decida o formato"
 
-#: ai_tutor/apps/docs/playbook.py:242
+#: ai_tutor/apps/docs/playbook.py:217
 msgid "Where it runs, where the data lives, and who owns each decision."
 msgstr "Onde funciona, onde ficam os dados e a quem cabe cada decisão."
 
-#: ai_tutor/apps/docs/playbook.py:246
+#: ai_tutor/apps/docs/playbook.py:221
 msgid "What a second adaptation changed"
 msgstr "O que mudou numa segunda adaptação"
 
-#: ai_tutor/apps/docs/playbook.py:249
-msgid "Plan and fund it"
-msgstr "Planeie e financie"
+#: ai_tutor/apps/docs/playbook.py:224
+msgid "Prepare the people"
+msgstr "Preparar as pessoas"
 
-#: ai_tutor/apps/docs/playbook.py:250
+#: ai_tutor/apps/docs/playbook.py:225
 msgid ""
-"What it costs, who carries which line, and how a first cohort is sequenced."
-msgstr ""
-"Quanto custa, quem suporta cada rubrica e como se sequencia uma primeira "
-"turma."
+"The part that cannot be bought or deployed, and how you know it teaches well."
+msgstr "A parte que não se compra nem se implanta, e como sabe que ensina bem."
 
-#: ai_tutor/apps/docs/playbook.py:257
+#: ai_tutor/apps/docs/playbook.py:232
 msgid "Stand it up"
 msgstr "Ponha-o de pé"
 
-#: ai_tutor/apps/docs/playbook.py:258
+#: ai_tutor/apps/docs/playbook.py:233
 msgid ""
 "Provision the deployment, then run it without anyone needing to be called."
 msgstr ""
 "Provisione a instalação e depois opere-a sem que ninguém tenha de ser "
 "chamado."
 
-#: ai_tutor/apps/docs/playbook.py:261
+#: ai_tutor/apps/docs/playbook.py:236
 msgid "Run it yourself — the short version"
 msgstr "Instale por si próprio — a versão curta"
 
-#: ai_tutor/apps/docs/playbook.py:265
+#: ai_tutor/apps/docs/playbook.py:240
 msgid "Make it yours"
 msgstr "Torne-o seu"
 
-#: ai_tutor/apps/docs/playbook.py:266
-msgid "Register the locale, ingest the syllabus, configure the country."
-msgstr "Registe a localidade, ingira o programa, configure o país."
+#: ai_tutor/apps/docs/playbook.py:241
+msgid "Configure the country: grade names, school register, competency bands."
+msgstr ""
+"Configure o país: nomes dos anos, registo de escolas, bandas de "
+"competência."
 
-#: ai_tutor/apps/docs/playbook.py:273
+#: ai_tutor/apps/docs/playbook.py:248
 msgid "Prove it, then connect it"
 msgstr "Comprove-o e depois ligue-o"
 
-#: ai_tutor/apps/docs/playbook.py:274
+#: ai_tutor/apps/docs/playbook.py:249
 msgid ""
 "The gate to pass before students arrive, and the surface other systems talk "
 "to."
@@ -807,7 +718,7 @@ msgid "Terms of use"
 msgstr "Termos de utilização"
 
 #: ai_tutor/templates/_includes/_marketing_footer.html:12
-#: ai_tutor/templates/accounts/landing.html:192
+#: ai_tutor/templates/accounts/landing.html:191
 #: ai_tutor/templates/docs/index.html:60
 msgid "Run it yourself"
 msgstr "Instale por si próprio"
@@ -833,11 +744,7 @@ msgstr "Entrada de professor/administrador"
 msgid "Student sign in"
 msgstr "Entrada de aluno"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:54
-msgid "Enterprise sign in"
-msgstr "Entrada empresarial"
-
-#: ai_tutor/templates/_includes/_marketing_header.html:83
+#: ai_tutor/templates/_includes/_marketing_header.html:82
 #: ai_tutor/templates/accounts/settings.html:198
 #: ai_tutor/templates/dashboard/curriculum/course_detail.html:191
 #: ai_tutor/templates/dashboard/curriculum/upload.html:292
@@ -845,7 +752,7 @@ msgstr "Entrada empresarial"
 msgid "Language"
 msgstr "Idioma"
 
-#: ai_tutor/templates/_includes/_marketing_header.html:93
+#: ai_tutor/templates/_includes/_marketing_header.html:92
 msgid "Go"
 msgstr "Ir"
 
@@ -1281,8 +1188,8 @@ msgid "Already have an account?"
 msgstr "Já tens uma conta?"
 
 #: ai_tutor/templates/accounts/country_self_register.html:146
-#: ai_tutor/templates/accounts/landing.html:211
-#: ai_tutor/templates/accounts/landing.html:221
+#: ai_tutor/templates/accounts/landing.html:210
+#: ai_tutor/templates/accounts/landing.html:220
 #: ai_tutor/templates/accounts/register.html:122
 #: ai_tutor/templates/accounts/staff_self_register.html:137
 #: ai_tutor/templates/accounts/student_register.html:159
@@ -1342,70 +1249,66 @@ msgstr "Aluno"
 msgid "Teacher/Admin"
 msgstr "Professor/Administrador"
 
-#: ai_tutor/templates/accounts/landing.html:61
-msgid "Enterprise"
-msgstr "Empresa"
-
-#: ai_tutor/templates/accounts/landing.html:65
+#: ai_tutor/templates/accounts/landing.html:64
 msgid "New here? You can create an account on any of these sign-in pages."
 msgstr ""
 "É a primeira vez? Pode criar uma conta em qualquer uma destas páginas de"
 " entrada."
 
-#: ai_tutor/templates/accounts/landing.html:76
+#: ai_tutor/templates/accounts/landing.html:75
 msgid "How one lesson goes"
 msgstr "Como decorre uma lição"
 
-#: ai_tutor/templates/accounts/landing.html:81
+#: ai_tutor/templates/accounts/landing.html:80
 #: ai_tutor/templates/tutoring/catalog.html:158
 msgid "Engage"
 msgstr "Engajar"
 
-#: ai_tutor/templates/accounts/landing.html:82
+#: ai_tutor/templates/accounts/landing.html:81
 msgid "Opens with a question about something the student already knows."
 msgstr "Começa com uma pergunta sobre algo que o aluno já sabe."
 
-#: ai_tutor/templates/accounts/landing.html:88
+#: ai_tutor/templates/accounts/landing.html:87
 #: ai_tutor/templates/tutoring/catalog.html:159
 msgid "Explore"
 msgstr "Explorar"
 
-#: ai_tutor/templates/accounts/landing.html:89
+#: ai_tutor/templates/accounts/landing.html:88
 msgid "The student works the idea out loud; the tutor asks rather than tells."
 msgstr ""
 "O aluno trabalha a ideia em voz alta; o tutor pergunta em vez de dizer."
 
-#: ai_tutor/templates/accounts/landing.html:95
+#: ai_tutor/templates/accounts/landing.html:94
 #: ai_tutor/templates/tutoring/catalog.html:160
 msgid "Explain"
 msgstr "Explicar"
 
-#: ai_tutor/templates/accounts/landing.html:96
+#: ai_tutor/templates/accounts/landing.html:95
 msgid "The idea gets named and tied to the curriculum's own wording."
 msgstr "A ideia é nomeada e ligada às próprias palavras do currículo."
 
-#: ai_tutor/templates/accounts/landing.html:102
+#: ai_tutor/templates/accounts/landing.html:101
 msgid "Elaborate"
 msgstr "Aprofundar"
 
-#: ai_tutor/templates/accounts/landing.html:103
+#: ai_tutor/templates/accounts/landing.html:102
 msgid "A harder case, to see whether it holds outside the first example."
 msgstr "Um caso mais difícil, para ver se se mantém fora do primeiro exemplo."
 
-#: ai_tutor/templates/accounts/landing.html:109
+#: ai_tutor/templates/accounts/landing.html:108
 msgid "Exit ticket"
 msgstr "Ficha de saída"
 
-#: ai_tutor/templates/accounts/landing.html:110
+#: ai_tutor/templates/accounts/landing.html:109
 msgid "A short check. The score is what the teacher sees the next morning."
 msgstr ""
 "Uma verificação curta. A nota é o que o professor vê na manhã seguinte."
 
-#: ai_tutor/templates/accounts/landing.html:122
+#: ai_tutor/templates/accounts/landing.html:121
 msgid "It teaches the syllabus the school already uses"
 msgstr "Ensina o programa que a escola já usa"
 
-#: ai_tutor/templates/accounts/landing.html:123
+#: ai_tutor/templates/accounts/landing.html:122
 msgid ""
 "A teacher uploads the curriculum — schemes of work, past papers, worksheets. "
 "The platform turns it into lessons and keeps every answer grounded in that "
@@ -1417,11 +1320,11 @@ msgstr ""
 "assentes nesse material, para que o aluno não aprenda um curso diferente "
 "daquele em que faz exame."
 
-#: ai_tutor/templates/accounts/landing.html:129
+#: ai_tutor/templates/accounts/landing.html:128
 msgid "Talks, doesn't lecture"
 msgstr "Conversa, não faz palestras"
 
-#: ai_tutor/templates/accounts/landing.html:130
+#: ai_tutor/templates/accounts/landing.html:129
 msgid ""
 "Every step is a question. A student who answers correctly moves on; a "
 "student who doesn't gets a smaller step, not the answer."
@@ -1429,11 +1332,11 @@ msgstr ""
 "Cada passo é uma pergunta. O aluno que responde correctamente avança; o que "
 "não responde recebe um passo mais pequeno, não a resposta."
 
-#: ai_tutor/templates/accounts/landing.html:135
+#: ai_tutor/templates/accounts/landing.html:134
 msgid "Measures what stuck"
 msgstr "Mede o que ficou"
 
-#: ai_tutor/templates/accounts/landing.html:136
+#: ai_tutor/templates/accounts/landing.html:135
 msgid ""
 "Each lesson ends with an exit ticket. Scores are per objective, so a teacher "
 "sees which idea a class missed, not just who scored low."
@@ -1442,11 +1345,11 @@ msgstr ""
 "que o professor veja que ideia a turma falhou, e não apenas quem teve nota "
 "baixa."
 
-#: ai_tutor/templates/accounts/landing.html:141
+#: ai_tutor/templates/accounts/landing.html:140
 msgid "Watched, not unattended"
 msgstr "Vigiado, não deixado ao acaso"
 
-#: ai_tutor/templates/accounts/landing.html:142
+#: ai_tutor/templates/accounts/landing.html:141
 msgid ""
 "Conversations are checked for harmful, inappropriate and manipulative "
 "content. Anything flagged goes to a named teacher to review."
@@ -1455,11 +1358,11 @@ msgstr ""
 "manipulador. Tudo o que for sinalizado segue para um professor designado "
 "rever."
 
-#: ai_tutor/templates/accounts/landing.html:147
+#: ai_tutor/templates/accounts/landing.html:146
 msgid "One device, two students"
 msgstr "Um dispositivo, dois alunos"
 
-#: ai_tutor/templates/accounts/landing.html:148
+#: ai_tutor/templates/accounts/landing.html:147
 msgid ""
 "Where devices are shared, a teacher can pair students into groups and the "
 "tutor runs the lesson for the pair."
@@ -1467,11 +1370,11 @@ msgstr ""
 "Onde os dispositivos são partilhados, o professor pode juntar alunos em "
 "grupos e o tutor dá a lição ao par."
 
-#: ai_tutor/templates/accounts/landing.html:153
+#: ai_tutor/templates/accounts/landing.html:152
 msgid "Reports for the teacher"
 msgstr "Relatórios para o professor"
 
-#: ai_tutor/templates/accounts/landing.html:154
+#: ai_tutor/templates/accounts/landing.html:153
 msgid ""
 "A dashboard shows who has been active, how the class scored, and which "
 "students went backwards on a retry."
@@ -1479,11 +1382,11 @@ msgstr ""
 "Um painel mostra quem esteve activo, como a turma se saiu e que alunos "
 "pioraram na repetição."
 
-#: ai_tutor/templates/accounts/landing.html:159
+#: ai_tutor/templates/accounts/landing.html:158
 msgid "In the classroom's language"
 msgstr "Na língua da sala de aula"
 
-#: ai_tutor/templates/accounts/landing.html:160
+#: ai_tutor/templates/accounts/landing.html:159
 msgid ""
 "The interface and the lessons follow the language the course is taught in, "
 "set per school."
@@ -1491,11 +1394,11 @@ msgstr ""
 "A interface e as lições seguem a língua em que o curso é leccionado, "
 "definida por escola."
 
-#: ai_tutor/templates/accounts/landing.html:176
+#: ai_tutor/templates/accounts/landing.html:175
 msgid "Run it on your own hardware"
 msgstr "Execute no seu próprio equipamento"
 
-#: ai_tutor/templates/accounts/landing.html:177
+#: ai_tutor/templates/accounts/landing.html:176
 msgid ""
 "Neither option needs a connection to us. Pick the one that matches who is "
 "running it — a teacher in one classroom, or a ministry across a district."
@@ -1504,11 +1407,11 @@ msgstr ""
 "quem a vai usar — um professor numa sala de aula ou um ministério em todo um "
 "distrito."
 
-#: ai_tutor/templates/accounts/landing.html:183
+#: ai_tutor/templates/accounts/landing.html:182
 msgid "No internet? It still teaches."
 msgstr "Sem Internet? Continua a ensinar."
 
-#: ai_tutor/templates/accounts/landing.html:184
+#: ai_tutor/templates/accounts/landing.html:183
 msgid ""
 "The desktop build runs the whole platform — tutor, curriculum and marking — "
 "on one machine in the classroom, serving students over its own WiFi. Nothing "
@@ -1518,15 +1421,15 @@ msgstr ""
 "correcção — numa única máquina na sala de aula, servindo os alunos pela sua "
 "própria rede WiFi. Nada sai da sala e nada precisa de ligação."
 
-#: ai_tutor/templates/accounts/landing.html:185
+#: ai_tutor/templates/accounts/landing.html:184
 msgid "Get the offline app"
 msgstr "Obter a aplicação offline"
 
-#: ai_tutor/templates/accounts/landing.html:190
+#: ai_tutor/templates/accounts/landing.html:189
 msgid "Host it on your own servers"
 msgstr "Alojar nos seus próprios servidores"
 
-#: ai_tutor/templates/accounts/landing.html:191
+#: ai_tutor/templates/accounts/landing.html:190
 msgid ""
 "For a school group or a ministry that needs the data to stay on "
 "infrastructure it controls. The whole platform is deployable from source, "
@@ -1536,11 +1439,11 @@ msgstr ""
 "infra-estrutura própria. Toda a plataforma pode ser instalada a partir do "
 "código, com os seus próprios modelos e o seu próprio armazenamento."
 
-#: ai_tutor/templates/accounts/landing.html:202
+#: ai_tutor/templates/accounts/landing.html:201
 msgid "Get started"
 msgstr "Começar"
 
-#: ai_tutor/templates/accounts/landing.html:208
+#: ai_tutor/templates/accounts/landing.html:207
 #: ai_tutor/templates/dashboard/base.html:136
 #: ai_tutor/templates/dashboard/classes/detail.html:67
 #: ai_tutor/templates/dashboard/classes/detail.html:106
@@ -1553,7 +1456,7 @@ msgstr "Começar"
 msgid "Students"
 msgstr "Alunos"
 
-#: ai_tutor/templates/accounts/landing.html:209
+#: ai_tutor/templates/accounts/landing.html:208
 msgid ""
 "Pick a subject and carry on where you left off. Your teacher gives you your "
 "school and grade."
@@ -1561,16 +1464,16 @@ msgstr ""
 "Escolha uma disciplina e continue de onde parou. O seu professor indica-lhe "
 "a escola e o ano."
 
-#: ai_tutor/templates/accounts/landing.html:212
-#: ai_tutor/templates/accounts/landing.html:222
+#: ai_tutor/templates/accounts/landing.html:211
+#: ai_tutor/templates/accounts/landing.html:221
 msgid "Create account"
 msgstr "Criar conta"
 
-#: ai_tutor/templates/accounts/landing.html:218
+#: ai_tutor/templates/accounts/landing.html:217
 msgid "Teachers & Admins"
 msgstr "Professores e administradores"
 
-#: ai_tutor/templates/accounts/landing.html:219
+#: ai_tutor/templates/accounts/landing.html:218
 msgid ""
 "Upload your curriculum, watch how the class is doing, and review anything "
 "the safety check flagged."
@@ -1578,11 +1481,11 @@ msgstr ""
 "Carregue o seu currículo, acompanhe o desempenho da turma e reveja tudo o "
 "que a verificação de segurança sinalizou."
 
-#: ai_tutor/templates/accounts/landing.html:228
+#: ai_tutor/templates/accounts/landing.html:227
 msgid "Enterprise Hosting"
 msgstr "Alojamento empresarial"
 
-#: ai_tutor/templates/accounts/landing.html:229
+#: ai_tutor/templates/accounts/landing.html:228
 msgid ""
 "For a government ministry or organisation running the platform across a "
 "whole school system. See every school in it, add new ones, and follow how "
@@ -1592,7 +1495,7 @@ msgstr ""
 "todo um sistema escolar. Veja cada escola, adicione novas e acompanhe o "
 "desempenho de toda a coorte."
 
-#: ai_tutor/templates/accounts/landing.html:241
+#: ai_tutor/templates/accounts/landing.html:240
 msgid "Contact us for onboarding"
 msgstr "Contacte-nos para a integração"
 
@@ -4428,7 +4331,7 @@ msgstr "Página %(current)s de %(total)s"
 #: ai_tutor/templates/dashboard/feedback/list.html:102
 #: ai_tutor/templates/dashboard/flagged_sessions.html:113
 #: ai_tutor/templates/dashboard/students/list.html:106
-#: ai_tutor/templates/docs/section.html:80
+#: ai_tutor/templates/docs/section.html:90
 msgid "Next"
 msgstr "Seguinte"
 
@@ -4548,7 +4451,7 @@ msgstr "Páginas de conversas sinalizadas"
 
 #: ai_tutor/templates/dashboard/flagged_sessions.html:105
 #: ai_tutor/templates/dashboard/students/list.html:98
-#: ai_tutor/templates/docs/section.html:71
+#: ai_tutor/templates/docs/section.html:81
 msgid "Previous"
 msgstr "Anterior"
 
@@ -6872,11 +6775,11 @@ msgstr "Voltar à configuração"
 
 #: ai_tutor/templates/docs/base.html:8
 msgid ""
-"How a country adopts the AI Tutor: what it adapts, what it must decide, what "
-"it costs, and how to get a first cohort teaching."
+"How a country adopts the AI Tutor: what it adapts, what it must decide, and "
+"how to get a first cohort teaching."
 msgstr ""
-"Como um país adopta o AI Tutor: o que adapta, o que tem de decidir, quanto "
-"custa e como pôr uma primeira turma a aprender."
+"Como um país adopta o AI Tutor: o que adapta, o que tem de decidir, e "
+"como pôr uma primeira coorte a aprender."
 
 #: ai_tutor/templates/docs/base.html:30
 msgid "Skip to the documentation"
@@ -6885,11 +6788,10 @@ msgstr "Ir para a documentação"
 #: ai_tutor/templates/docs/index.html:27
 msgid ""
 "Adopting the AI Tutor in a national education system — what a country "
-"adapts, what it must decide, what it costs, and how to get a first cohort "
-"teaching."
+"adapts, what it must decide, and how to get a first cohort teaching."
 msgstr ""
-"Adoptar o AI Tutor num sistema nacional de educação — o que se adapta, o que "
-"é preciso decidir, quanto custa e como pôr uma primeira turma a aprender."
+"Adoptar o AI Tutor num sistema educativo nacional — o que um país "
+"adapta, o que tem de decidir, e como pôr uma primeira coorte a aprender."
 
 #: ai_tutor/templates/docs/index.html:35 ai_tutor/templates/docs/index.html:38
 msgid "Search the playbook"
@@ -6901,8 +6803,8 @@ msgid "Breadcrumb"
 msgstr "Trilho de navegação"
 
 #: ai_tutor/templates/docs/index.html:53
-msgid "Country adoption playbook"
-msgstr "Manual de adopção por país"
+msgid "Enterprise adoption playbook"
+msgstr "Manual de adopção empresarial"
 
 #: ai_tutor/templates/docs/index.html:58
 #, python-format
@@ -6925,20 +6827,16 @@ msgstr "Versão"
 msgid "Evidence base"
 msgstr "Base de evidência"
 
-#: ai_tutor/templates/docs/index.html:103
-msgid "Costs"
-msgstr "Custos"
-
-#: ai_tutor/templates/docs/section.html:30
-#: ai_tutor/templates/docs/section.html:31
+#: ai_tutor/templates/docs/section.html:40
+#: ai_tutor/templates/docs/section.html:41
 msgid "On this page"
 msgstr "Nesta página"
 
-#: ai_tutor/templates/docs/section.html:56
+#: ai_tutor/templates/docs/section.html:66
 msgid "This section has not been translated yet, and is shown in English."
 msgstr "Esta secção ainda não foi traduzida e é apresentada em inglês."
 
-#: ai_tutor/templates/docs/section.html:66
+#: ai_tutor/templates/docs/section.html:76
 msgid "Section navigation"
 msgstr "Navegação da secção"
 
@@ -8041,6 +7939,104 @@ msgstr "Rever Lição"
 #: ai_tutor/templates/tutoring/chat_tutor.html:248
 msgid "Continue Learning"
 msgstr "Continuar a aprender"
+
+#~ msgid ""
+#~ "Observed pilot figures, given as planning inputs. They are not prices and "
+#~ "must be re-derived for each country."
+#~ msgstr ""
+#~ "Valores observados no piloto, apresentados como dados de planeamento. Não "
+#~ "são preços e devem ser recalculados para cada país."
+
+#~ msgid "What it costs, and what drives the cost"
+#~ msgstr "Quanto custa e o que determina o custo"
+
+#~ msgid ""
+#~ "The fixed infrastructure line, the model spend that dominates it, and the "
+#~ "levers worth pulling."
+#~ msgstr ""
+#~ "A rubrica fixa de infra-estrutura, a despesa com modelos que a domina e "
+#~ "as alavancas que vale a pena accionar."
+
+#~ msgid "Cost sharing and sustainability"
+#~ msgstr "Partilha de custos e sustentabilidade"
+
+#~ msgid ""
+#~ "Who pays for which line, four funding models, and whether it is still "
+#~ "funded in year three."
+#~ msgstr ""
+#~ "Quem paga cada rubrica, quatro modelos de financiamento e se continua "
+#~ "financiado no terceiro ano."
+
+#~ msgid "A phased adoption roadmap"
+#~ msgstr "Um roteiro de adopção por fases"
+
+#~ msgid ""
+#~ "Six phases from decision to scale, each with an owner and an exit "
+#~ "criterion."
+#~ msgstr ""
+#~ "Seis fases da decisão à escala, cada uma com um responsável e um critério "
+#~ "de saída."
+
+#~ msgid "Governance and what the country must provide"
+#~ msgstr "Governação e o que o país tem de fornecer"
+
+#~ msgid ""
+#~ "The five roles that need a name against them, and what each side supplies."
+#~ msgstr ""
+#~ "Os cinco papéis que precisam de um nome associado e o que cada parte "
+#~ "fornece."
+
+#~ msgid "Country onboarding checklist"
+#~ msgstr "Lista de verificação para integrar um país"
+
+#~ msgid ""
+#~ "Nine steps in order, and where each one lives. Content is step five for a "
+#~ "reason."
+#~ msgstr ""
+#~ "Nove passos por ordem e onde cada um se realiza. O conteúdo é o quinto "
+#~ "passo por uma razão."
+
+#~ msgid "Language and locale adaptation"
+#~ msgstr "Adaptação de língua e localidade"
+
+#~ msgid ""
+#~ "The five places a locale is registered, which language wins per request, "
+#~ "and the register decisions to settle first."
+#~ msgstr ""
+#~ "Os cinco sítios onde uma localidade é registada, que língua prevalece em "
+#~ "cada pedido e as decisões de registo a resolver primeiro."
+
+#~ msgid "Curriculum ingestion and the content pipeline"
+#~ msgstr "Ingestão do currículo e pipeline de conteúdos"
+
+#~ msgid ""
+#~ "Two routes in, the eight generation steps, and why review throughput is "
+#~ "the schedule."
+#~ msgstr ""
+#~ "Duas vias de entrada, os oito passos de geração e porque é a capacidade "
+#~ "de revisão que define o calendário."
+
+#~ msgid "Plan and fund it"
+#~ msgstr "Planeie e financie"
+
+#~ msgid ""
+#~ "What it costs, who carries which line, and how a first cohort is "
+#~ "sequenced."
+#~ msgstr ""
+#~ "Quanto custa, quem suporta cada rubrica e como se sequencia uma primeira "
+#~ "turma."
+
+#~ msgid "Register the locale, ingest the syllabus, configure the country."
+#~ msgstr "Registe a localidade, ingira o programa, configure o país."
+
+#~ msgid "Enterprise sign in"
+#~ msgstr "Entrada empresarial"
+
+#~ msgid "Enterprise"
+#~ msgstr "Empresa"
+
+#~ msgid "Costs"
+#~ msgstr "Custos"
 
 #~ msgid "Country Adoption"
 #~ msgstr "Adopção por País"

@@ -85,7 +85,6 @@ def index(request):
         'part_two_label': playbook.PART_LABELS[playbook.PART_TWO],
         'status': playbook.STATUS,
         'evidence_base': playbook.EVIDENCE_BASE,
-        'costs_note': playbook.COSTS_NOTE,
     })
 
 

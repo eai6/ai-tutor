@@ -15,25 +15,6 @@ HEADINGS_BY_LANGUAGE = {
             ('the-offline-options-in-more-detail', 'Les options hors ligne en détail'),
             ('choosing-between-them', 'Choisir entre elles'),
         ],
-        'cost-sharing': [
-            ('the-cost-lines-behave-differently-so-share-them-differently', 'Les postes de coût se comportent différemment : partagez-les différemment'),
-            ('four-funding-models', 'Quatre modèles de financement'),
-            ('making-the-recurring-line-small', 'Réduire le poste récurrent'),
-            ('a-cost-per-student-figure-you-can-defend', 'Un coût par élève que vous pouvez défendre'),
-            ('sustainability-is-not-only-financial', "La pérennité n'est pas seulement financière"),
-            ('what-to-write-into-the-funding-agreement', "Ce qu'il faut inscrire dans l'accord de financement"),
-        ],
-        'costs': [
-            ('fixed-infrastructure-a-country-owned-cloud-instance', 'Infrastructure fixe — une instance de nuage détenue par le pays'),
-            ('variable-cost-the-model-and-it-dominates', "Coût variable — le modèle, et c'est lui qui domine"),
-            ('levers-in-the-order-worth-pulling-them', "Les leviers, dans l'ordre où il vaut la peine de les actionner"),
-            ('modelling-it-for-your-country', 'Le modéliser pour votre pays'),
-        ],
-        'curriculum-pipeline': [
-            ('two-routes-in', "Deux voies d'entrée"),
-            ('the-generation-pipeline', 'La chaîne de génération'),
-            ('practical-notes', 'Remarques pratiques'),
-        ],
         'data-sovereignty': [
             ('what-stays-where-you-put-it', 'Ce qui reste là où vous le placez'),
             ('what-leaves-and-why-no-setting-changes-it', "Ce qui sort, et pourquoi aucun réglage n'y change rien"),
@@ -49,8 +30,6 @@ HEADINGS_BY_LANGUAGE = {
         'executive-summary': [
             ('the-five-things-a-country-adapts', "Les cinq choses qu'un pays adapte"),
             ('the-one-decision-that-changes-everything-else', 'La décision qui conditionne toutes les autres'),
-            ('cost-shape', 'Profil de coûts'),
-            ('time-to-a-first-cohort', "Délai jusqu'à une première cohorte"),
         ],
         'five-layers': [
             ('layer-1-language-and-register', 'Couche 1 — Langue et registre'),
@@ -59,30 +38,17 @@ HEADINGS_BY_LANGUAGE = {
             ('layer-4-national-structures', 'Couche 4 — Structures nationales'),
             ('layer-5-infrastructure-and-data-residency', 'Couche 5 — Infrastructure et résidence des données'),
         ],
-        'governance': [
-            ('roles-that-need-a-name-against-them', 'Les rôles auxquels il faut associer un nom'),
-            ('what-the-country-supplies', 'Ce que le pays fournit'),
-            ('what-the-platform-supplies', 'Ce que la plateforme fournit'),
-        ],
         'hosting': [
             ('choosing-a-path', 'Choisir un parcours'),
             ('path-a-one-server', 'Parcours A — un serveur'),
             ('path-b-your-own-aws-account', 'Parcours B — votre propre compte AWS'),
-            ('path-c-pip-install-no-docker', 'Parcours C — installation par pip, sans Docker'),
             ('the-two-offline-shapes', 'Les deux formats hors ligne'),
             ('when-something-is-wrong', 'Quand quelque chose ne va pas'),
             ('backup-and-restore', 'Sauvegarde et restauration'),
             ('logs', 'Journaux'),
         ],
-        'language-locale': [
-            ('locale-codes', 'Codes de localité'),
-            ('the-five-places-a-locale-is-registered', 'Les cinq endroits où une localité est enregistrée'),
-            ('which-language-wins-per-request', "Quelle langue l'emporte, à chaque requête"),
-            ('register-decisions-to-settle-with-a-native-speaking-educator', 'Décisions de registre à trancher avec un enseignant locuteur natif'),
-        ],
         'teacher-training': [
             ('what-a-teacher-has-to-be-able-to-do-and-when', "Ce qu'un enseignant doit savoir faire, et quand"),
-            ('a-three-tier-training-model', 'Un modèle de formation à trois niveaux'),
             ('who-trains-whom', 'Qui forme qui'),
             ('three-lines-of-support', 'Trois niveaux de soutien'),
             ('what-to-measure', "Ce qu'il faut mesurer"),
@@ -101,25 +67,6 @@ HEADINGS_BY_LANGUAGE = {
             ('the-offline-options-in-more-detail', 'As opções offline em mais detalhe'),
             ('choosing-between-them', 'Escolher entre eles'),
         ],
-        'cost-sharing': [
-            ('the-cost-lines-behave-differently-so-share-them-differently', 'As rubricas de custo comportam-se de forma diferente, por isso partilhe-as de forma diferente'),
-            ('four-funding-models', 'Quatro modelos de financiamento'),
-            ('making-the-recurring-line-small', 'Tornar pequena a rubrica recorrente'),
-            ('a-cost-per-student-figure-you-can-defend', 'Um custo por aluno que consegue defender'),
-            ('sustainability-is-not-only-financial', 'A sustentabilidade não é apenas financeira'),
-            ('what-to-write-into-the-funding-agreement', 'O que escrever no acordo de financiamento'),
-        ],
-        'costs': [
-            ('fixed-infrastructure-a-country-owned-cloud-instance', 'Infra-estrutura fixa — uma instância de nuvem pertencente ao país'),
-            ('variable-cost-the-model-and-it-dominates', 'Custo variável — o modelo, e é ele que domina'),
-            ('levers-in-the-order-worth-pulling-them', 'Alavancas, pela ordem por que vale a pena accioná-las'),
-            ('modelling-it-for-your-country', 'Modelar isto para o seu país'),
-        ],
-        'curriculum-pipeline': [
-            ('two-routes-in', 'Duas vias de entrada'),
-            ('the-generation-pipeline', 'O pipeline de geração'),
-            ('practical-notes', 'Notas práticas'),
-        ],
         'data-sovereignty': [
             ('what-stays-where-you-put-it', 'O que fica onde o colocar'),
             ('what-leaves-and-why-no-setting-changes-it', 'O que sai, e porque nenhuma configuração o altera'),
@@ -135,8 +82,6 @@ HEADINGS_BY_LANGUAGE = {
         'executive-summary': [
             ('the-five-things-a-country-adapts', 'As cinco coisas que um país adapta'),
             ('the-one-decision-that-changes-everything-else', 'A decisão que altera todas as outras'),
-            ('cost-shape', 'Perfil de custos'),
-            ('time-to-a-first-cohort', 'Tempo até uma primeira turma'),
         ],
         'five-layers': [
             ('layer-1-language-and-register', 'Camada 1 — Língua e registo'),
@@ -145,30 +90,17 @@ HEADINGS_BY_LANGUAGE = {
             ('layer-4-national-structures', 'Camada 4 — Estruturas nacionais'),
             ('layer-5-infrastructure-and-data-residency', 'Camada 5 — Infra-estrutura e residência dos dados'),
         ],
-        'governance': [
-            ('roles-that-need-a-name-against-them', 'Papéis que precisam de um nome associado'),
-            ('what-the-country-supplies', 'O que o país fornece'),
-            ('what-the-platform-supplies', 'O que a plataforma fornece'),
-        ],
         'hosting': [
             ('choosing-a-path', 'Escolher um caminho'),
             ('path-a-one-server', 'Caminho A — um servidor'),
             ('path-b-your-own-aws-account', 'Caminho B — a sua própria conta AWS'),
-            ('path-c-pip-install-no-docker', 'Caminho C — instalação com pip, sem Docker'),
             ('the-two-offline-shapes', 'Os dois formatos offline'),
             ('when-something-is-wrong', 'Quando algo corre mal'),
             ('backup-and-restore', 'Cópias de segurança e restauro'),
             ('logs', 'Registos'),
         ],
-        'language-locale': [
-            ('locale-codes', 'Códigos de localidade'),
-            ('the-five-places-a-locale-is-registered', 'Os cinco sítios onde uma localidade é registada'),
-            ('which-language-wins-per-request', 'Que língua prevalece, em cada pedido'),
-            ('register-decisions-to-settle-with-a-native-speaking-educator', 'Decisões de registo a fechar com um educador falante nativo'),
-        ],
         'teacher-training': [
             ('what-a-teacher-has-to-be-able-to-do-and-when', 'O que um professor tem de saber fazer, e quando'),
-            ('a-three-tier-training-model', 'Um modelo de formação em três níveis'),
             ('who-trains-whom', 'Quem forma quem'),
             ('three-lines-of-support', 'Três linhas de apoio'),
             ('what-to-measure', 'O que medir'),
@@ -187,25 +119,6 @@ HEADINGS_BY_LANGUAGE = {
             ('the-offline-options-in-more-detail', 'Chaguo za nje ya mtandao kwa undani zaidi'),
             ('choosing-between-them', 'Kuchagua kati yao'),
         ],
-        'cost-sharing': [
-            ('the-cost-lines-behave-differently-so-share-them-differently', 'Mistari ya gharama hutenda tofauti, hivyo igawe tofauti'),
-            ('four-funding-models', 'Miundo minne ya ufadhili'),
-            ('making-the-recurring-line-small', 'Kufanya mstari wa kujirudia kuwa mdogo'),
-            ('a-cost-per-student-figure-you-can-defend', 'Takwimu ya gharama kwa kila mwanafunzi unayoweza kuitetea'),
-            ('sustainability-is-not-only-financial', 'Uendelevu si wa kifedha pekee'),
-            ('what-to-write-into-the-funding-agreement', 'Cha kuandika ndani ya mkataba wa ufadhili'),
-        ],
-        'costs': [
-            ('fixed-infrastructure-a-country-owned-cloud-instance', 'Miundombinu ya kudumu — mfano wa wingu unaomilikiwa na nchi'),
-            ('variable-cost-the-model-and-it-dominates', 'Gharama inayobadilika — modeli, nayo hutawala'),
-            ('levers-in-the-order-worth-pulling-them', 'Vishikizo, kwa mpangilio unaostahili kuvivuta'),
-            ('modelling-it-for-your-country', 'Kuikadiria kwa nchi yako'),
-        ],
-        'curriculum-pipeline': [
-            ('two-routes-in', 'Njia mbili za kuingia'),
-            ('the-generation-pipeline', 'Mfumo wa utungaji'),
-            ('practical-notes', 'Maelezo ya kivitendo'),
-        ],
         'data-sovereignty': [
             ('what-stays-where-you-put-it', 'Kinachobaki pale unapokiweka'),
             ('what-leaves-and-why-no-setting-changes-it', 'Kinachotoka, na kwa nini hakuna mpangilio unaokibadilisha'),
@@ -221,8 +134,6 @@ HEADINGS_BY_LANGUAGE = {
         'executive-summary': [
             ('the-five-things-a-country-adapts', 'Mambo matano ambayo nchi huyaasili'),
             ('the-one-decision-that-changes-everything-else', 'Uamuzi mmoja unaobadilisha kila kitu kingine'),
-            ('cost-shape', 'Sura ya gharama'),
-            ('time-to-a-first-cohort', 'Muda hadi kundi la kwanza'),
         ],
         'five-layers': [
             ('layer-1-language-and-register', 'Tabaka la 1 — Lugha na mtindo'),
@@ -231,30 +142,17 @@ HEADINGS_BY_LANGUAGE = {
             ('layer-4-national-structures', 'Tabaka la 4 — Miundo ya kitaifa'),
             ('layer-5-infrastructure-and-data-residency', 'Tabaka la 5 — Miundombinu na mahali data inapokaa'),
         ],
-        'governance': [
-            ('roles-that-need-a-name-against-them', 'Majukumu yanayohitaji jina mahususi'),
-            ('what-the-country-supplies', 'Kile nchi inachotoa'),
-            ('what-the-platform-supplies', 'Kile jukwaa linachotoa'),
-        ],
         'hosting': [
             ('choosing-a-path', 'Kuchagua njia'),
             ('path-a-one-server', 'Njia A — seva moja'),
             ('path-b-your-own-aws-account', 'Njia B — akaunti yako mwenyewe ya AWS'),
-            ('path-c-pip-install-no-docker', 'Njia C — kusakinisha kwa pip, bila Docker'),
             ('the-two-offline-shapes', 'Miundo miwili ya nje ya mtandao'),
             ('when-something-is-wrong', 'Kunapokuwa na tatizo'),
             ('backup-and-restore', 'Nakala rudufu na kurejesha'),
             ('logs', 'Kumbukumbu'),
         ],
-        'language-locale': [
-            ('locale-codes', 'Misimbo ya eneo-lugha'),
-            ('the-five-places-a-locale-is-registered', 'Sehemu tano ambazo eneo-lugha husajiliwa'),
-            ('which-language-wins-per-request', 'Lugha ipi hushinda, kwa kila ombi'),
-            ('register-decisions-to-settle-with-a-native-speaking-educator', 'Maamuzi ya mtindo ya kuamuliwa na mwalimu anayeizungumza lugha kwa asili'),
-        ],
         'teacher-training': [
             ('what-a-teacher-has-to-be-able-to-do-and-when', 'Mwalimu anapaswa kuweza kufanya nini, na lini'),
-            ('a-three-tier-training-model', 'Muundo wa mafunzo wa ngazi tatu'),
             ('who-trains-whom', 'Nani anamfundisha nani'),
             ('three-lines-of-support', 'Mistari mitatu ya msaada'),
             ('what-to-measure', 'Cha kupima'),

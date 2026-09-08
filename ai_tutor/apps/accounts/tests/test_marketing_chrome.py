@@ -22,13 +22,15 @@ def _split_at_footer(body):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize('page', PUBLIC_PAGES)
-def test_the_header_carries_all_three_sign_in_doors(client, page):
+def test_the_header_carries_the_two_self_service_doors(client, page):
+    """Student and staff sign themselves in. Enterprise does not: that account
+    is opened by the platform team after a conversation, so the header offers
+    no door for it — see the Get started card."""
     head, _ = _split_at_footer(client.get(reverse(page)).content.decode())
 
-    for door in ('accounts:student_login', 'accounts:staff_login',
-                 'accounts:country_login'):
+    for door in ('accounts:student_login', 'accounts:staff_login'):
         assert reverse(door) in head, f'{door} missing from the header of {page}'
-    assert 'Enterprise sign in' in head
+    assert 'Enterprise sign in' not in head
 
 
 @pytest.mark.django_db
@@ -58,12 +60,14 @@ def test_the_picker_still_works_without_javascript(client, page):
 
 
 @pytest.mark.django_db
-def test_the_hero_carries_the_enterprise_door_too(client):
-    """Above the fold as well as in the header — the enterprise reader is the
-    one least likely to scroll to the cards to find out this is for them."""
+def test_the_hero_offers_only_the_doors_a_reader_can_open(client):
+    """Student and staff sign themselves in, so the hero shows those two.
+    Enterprise is not a door anyone can walk through unaided — that account is
+    opened by the platform team — so the hero does not pretend otherwise."""
     body = client.get(reverse('accounts:landing')).content.decode()
     hero = body[body.index('id="start"'):]
     hero = hero[:hero.index('</section>')]
 
-    assert reverse('accounts:country_login') in hero
-    assert 'Enterprise' in hero
+    assert reverse('accounts:student_login') in hero
+    assert reverse('accounts:staff_login') in hero
+    assert reverse('accounts:country_login') not in hero

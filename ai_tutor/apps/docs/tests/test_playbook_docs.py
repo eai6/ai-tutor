@@ -109,7 +109,7 @@ class TestPages:
         """Link previewers and uptime checks probe with HEAD; require_GET
         answers those with 405."""
         assert client.head(reverse('docs:index')).status_code == 200
-        assert client.head(reverse('docs:section', args=['costs'])).status_code == 200
+        assert client.head(reverse('docs:section', args=['hosting'])).status_code == 200
 
     def test_search_index_covers_every_section(self, client):
         response = client.get(reverse('docs:search_index'))
@@ -131,7 +131,7 @@ class TestPages:
 
 
 
-def _read_in(client, lang, slug='costs'):
+def _read_in(client, lang, slug='hosting'):
     """Fetch a section as a reader who has picked `lang`.
 
     The language cookie, not translation.override: the request goes through
@@ -152,7 +152,8 @@ class TestSectionLanguage:
     def test_every_offered_language_has_every_section(self, client):
         """Nothing a reader can pick leaves them on an English page.
 
-        The picker offers three languages and the playbook has 23 sections;
+        The picker offers three languages and the playbook has sixteen
+        sections;
         this is the whole grid. It fails the day someone adds a section
         without translating it, or offers a fourth language — which is the
         moment to catch it, not after a ministry has opened the gap.
@@ -173,12 +174,12 @@ class TestSectionLanguage:
         with override_settings(LANGUAGES=settings.LANGUAGES + [('de', 'Deutsch')]):
             body = _read_in(client, 'de')
         assert 'docs-untranslated' in body
-        assert 'What it costs' in body
+        assert 'Path A' in body
 
     def test_english_gets_no_untranslated_notice(self, client):
         body = _read_in(client, 'en-us')
         assert 'docs-untranslated' not in body
-        assert 'What it costs' in body
+        assert 'Path A' in body
 
     def test_a_translated_body_is_preferred_over_english(self, tmp_path, settings):
         """The mechanism itself: drop a French partial in and it wins."""
@@ -186,7 +187,7 @@ class TestSectionLanguage:
         marker = 'MARQUEUR-DE-TRADUCTION'
         d = tmp_path / 'docs' / 'sections' / 'fr'
         d.mkdir(parents=True)
-        (d / 'costs.html').write_text(f'<p>{marker}</p>')
+        (d / 'hosting.html').write_text(f'<p>{marker}</p>')
 
         dirs = list(settings.TEMPLATES[0]['DIRS'])
         settings.TEMPLATES = [{**settings.TEMPLATES[0],
@@ -195,8 +196,8 @@ class TestSectionLanguage:
         try:
             from ai_tutor.apps.docs import views as docs_views
             with translation.override('fr'):
-                template, translated = docs_views._body_template('costs')
-            assert template == 'docs/sections/fr/costs.html'
+                template, translated = docs_views._body_template('hosting')
+            assert template == 'docs/sections/fr/hosting.html'
             assert translated is True
         finally:
             engines._engines = {}

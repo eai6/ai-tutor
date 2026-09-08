@@ -24,7 +24,7 @@ stacked blocks, and the cards are sized to their lists.
         <div class="flex-[1_1_26rem] min-w-0">
             <h1>{% trans "Enterprise Adoption" %}</h1>
             <p class="mt-2 mx-0 mb-0 max-w-[46rem] text-base leading-normal text-text-secondary">
-                {% blocktrans %}Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, what it costs, and how to get a first cohort teaching.{% endblocktrans %}
+                {% blocktrans %}Adopting the AI Tutor in a national education system — what a country adapts, what it must decide, and how to get a first cohort teaching.{% endblocktrans %}
             </p>
         </div>
 
@@ -50,7 +50,7 @@ stacked blocks, and the cards are sized to their lists.
         <nav class="docs-crumbs flex items-baseline flex-wrap gap-2 mt-4 pb-4 border-b border-b-border text-base [&_a]:text-text-link [&_a]:no-underline [&_a:hover]:underline" aria-label="{% trans 'Breadcrumb' %}">
             <a href="{% url 'accounts:landing' %}">{{ theme_institution_name|default:"Sesel AI" }}</a>
             <span class="text-text-faint" aria-hidden="true">&#9656;</span>
-            <span class="text-text font-medium">{% trans "Country adoption playbook" %}</span>
+            <span class="text-text font-medium">{% trans "Enterprise adoption playbook" %}</span>
             <span class="docs-crumbs__date max-[48rem]:ml-0 max-[48rem]:basis-full ml-auto font-mono text-xs text-text-muted">{{ version_date|date:"j F Y" }}</span>
         </nav>
 
@@ -100,7 +100,6 @@ stacked blocks, and the cards are sized to their lists.
                 <dt>{% trans "Version" %}</dt><dd>{{ version }} — {{ version_date|date:"j F Y" }}</dd>
                 <dt>{% trans "Status" %}</dt><dd>{{ status }}</dd>
                 <dt>{% trans "Evidence base" %}</dt><dd>{{ evidence_base }}</dd>
-                <dt>{% trans "Costs" %}</dt><dd>{{ costs_note }}</dd>
             </dl>
         </details>
     </div>

@@ -35,10 +35,6 @@ EVIDENCE_BASE = _(
     'a second-locale adaptation in preparation; platform source and '
     'evaluation harnesses as at August 2026.'
 )
-COSTS_NOTE = _(
-    'Observed pilot figures, given as planning inputs. They are not prices '
-    'and must be re-derived for each country.'
-)
 
 
 @dataclass(frozen=True)
@@ -143,50 +139,29 @@ SECTIONS: list[Section] = [
     Section('data-sovereignty', '5', _('Data sovereignty: the honest account'),
             _('What stays in country, what leaves and why no setting changes '
             'it, and the three ways to close the gap.'), PART_ONE),
-    Section('costs', '6', _('What it costs, and what drives the cost'),
-            _('The fixed infrastructure line, the model spend that dominates '
-            'it, and the levers worth pulling.'), PART_ONE),
-    Section('cost-sharing', '7', _('Cost sharing and sustainability'),
-            _('Who pays for which line, four funding models, and whether it is '
-            'still funded in year three.'), PART_ONE),
-    Section('evidence', '8', _('Evidence, evaluation and quality assurance'),
+    Section('evidence', '6', _('Evidence, evaluation and quality assurance'),
             _('Three layers of answer to "how do you know it teaches well", '
             'and the gate to apply before a cohort.'), PART_ONE),
-    Section('roadmap', '9', _('A phased adoption roadmap'),
-            _('Six phases from decision to scale, each with an owner and an '
-            'exit criterion.'), PART_ONE),
-    Section('teacher-training', '10', _('Teacher training and support'),
+    Section('teacher-training', '7', _('Teacher training and support'),
             _('The part that cannot be bought or deployed: champions, '
             'accompaniment, clinics and three lines of support.'), PART_ONE),
-    Section('governance', '11', _('Governance and what the country must provide'),
-            _('The five roles that need a name against them, and what each '
-            'side supplies.'), PART_ONE),
-    Section('risks', '12', _('Risks and how they are managed'),
+    Section('risks', '8', _('Risks and how they are managed'),
             _('Ten risks, why each one happens, and the control already in '
             'place for it.'), PART_ONE),
 
-    Section('onboarding-checklist', 'A', _('Country onboarding checklist'),
-            _('Nine steps in order, and where each one lives. Content is step '
-            'five for a reason.'), PART_TWO),
-    Section('language-locale', 'B', _('Language and locale adaptation'),
-            _('The five places a locale is registered, which language wins per '
-            'request, and the register decisions to settle first.'), PART_TWO),
-    Section('curriculum-pipeline', 'C', _('Curriculum ingestion and the content pipeline'),
-            _('Two routes in, the eight generation steps, and why review '
-            'throughput is the schedule.'), PART_TWO),
-    Section('national-structures', 'D', _('National structures'),
+    Section('national-structures', 'A', _('National structures'),
             _('Grades, schools, terminology and competency thresholds — all '
             'configuration, no migration.'), PART_TWO),
-    Section('hosting', 'E', _('Hosting the platform'),
+    Section('hosting', 'B', _('Hosting the platform'),
             _('Three server paths and two offline shapes, with the commands, '
             'the symptoms and the backup rules.'), PART_TWO),
-    Section('quality-gates', 'F', _('Quality gates before a cohort'),
+    Section('quality-gates', 'C', _('Quality gates before a cohort'),
             _('Three harnesses at three units of analysis, and why judges are '
             'a filter rather than a gate.'), PART_TWO),
-    Section('operations', 'G', _('Operating the platform'),
+    Section('operations', 'D', _('Operating the platform'),
             _('Backups, upgrades, secrets, monitoring, flagged sessions and '
             'the login lockout rule.'), PART_TWO),
-    Section('integration', 'H', _('Integration surface'),
+    Section('integration', 'E', _('Integration surface'),
             _('A versioned REST API, a published schema, and a realistic '
             'integration scope for a pilot.'), PART_TWO),
 
@@ -241,15 +216,15 @@ CARDS: list[Card] = [
         title=_('Decide the shape'),
         lede=_('Where it runs, where the data lives, and who owns each decision.'),
         part=PART_ONE,
-        slugs=['adoption-models', 'data-sovereignty', 'governance', 'risks'],
+        slugs=['adoption-models', 'data-sovereignty', 'risks'],
         more_slug='case-study',
         more_label=_('What a second adaptation changed'),
     ),
     Card(
-        title=_('Plan and fund it'),
-        lede=_('What it costs, who carries which line, and how a first cohort is sequenced.'),
+        title=_('Prepare the people'),
+        lede=_('The part that cannot be bought or deployed, and how you know it teaches well.'),
         part=PART_ONE,
-        slugs=['costs', 'cost-sharing', 'roadmap', 'teacher-training'],
+        slugs=['teacher-training'],
         more_slug='evidence',
         more_label=_('Evidence, evaluation and quality assurance'),
     ),
@@ -257,15 +232,15 @@ CARDS: list[Card] = [
         title=_('Stand it up'),
         lede=_('Provision the deployment, then run it without anyone needing to be called.'),
         part=PART_TWO,
-        slugs=['onboarding-checklist', 'hosting', 'operations'],
+        slugs=['hosting', 'operations'],
         more_label=_('Run it yourself — the short version'),
         more_url_name='self_hosting',
     ),
     Card(
         title=_('Make it yours'),
-        lede=_('Register the locale, ingest the syllabus, configure the country.'),
+        lede=_('Configure the country: grade names, school register, competency bands.'),
         part=PART_TWO,
-        slugs=['language-locale', 'curriculum-pipeline', 'national-structures'],
+        slugs=['national-structures'],
         more_slug='five-layers',
         more_label=_('The five layers of adaptation'),
     ),
