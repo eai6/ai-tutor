@@ -89,7 +89,7 @@ _PRIVATE_CONTENT_TYPES = ('text/html', 'application/json')
 # Unauthenticated pages that must still not be left in a shared-device cache
 # (2026-08 assessment, QA-06 / QAS-05 / F-04). Each embeds a CSRF token and, on
 # a failed submit, redisplays whatever the visitor just typed — name, username,
-# student id. The public marketing pages (/, /terms/, /download/, /self-hosting/)
+# student id. The public marketing pages (/, /terms/, /download/)
 # are deliberately NOT here: they carry no personal data and benefit from caching.
 _SENSITIVE_PATH_PREFIXES = (
     '/student/login',

@@ -194,6 +194,12 @@ Working from source also lets you build the image yourself, which is how an ARM
 server gets one — the published image is x86_64.
 </details>
 
+**`env.example` ships placeholder values, not blanks.** It arrives with
+`SITE_DOMAIN=tutor.education.gov.xx` and `ACME_EMAIL=ict@education.gov.xx`.
+Those look filled in and are not — `.xx` is not a real TLD. Replace both, or
+Caddy will spend thirty days failing to get a certificate for a domain that
+does not exist.
+
 Open `.env` and fill in everything marked REQUIRED. Each entry says what it is
 and what breaks without it. Generate the two secrets rather than inventing
 them:
@@ -243,6 +249,13 @@ The image ships with a **curriculum already loaded** — courses, lessons, steps
 and exit tickets — imported automatically the first time the container boots.
 No internet is needed for it: the content is inside the image, not downloaded.
 
+**First start does need internet for one thing**, even with a local model: the
+app downloads its embedding model (`all-MiniLM-L6-v2`, about 90 MB) from
+HuggingFace on first boot. Embeddings are computed locally from then on, inside
+the app container, so your curriculum is never sent anywhere to be indexed. For
+an air-gapped install, warm that cache on a connected machine first and copy
+the volume across.
+
 **Figures and images are not included.** They are roughly twenty times the size
 of the text and would make every clone of this repository carry them forever.
 About three quarters of lesson steps reference a figure, so those steps read
@@ -274,6 +287,11 @@ deliberate — a half-configured server is worse than one that did not start.
    docker compose exec app python manage.py createsuperuser
    ```
 
+   Only after the app reports healthy, and **type a username** — leaving it
+   blank accepts the container's OS user, which gives you an account called
+   `root`. Easy to do by accident and confusing later; fix it afterwards with
+   `docker compose exec app python manage.py changepassword <name>`.
+
 2. Sign in at `https://<your-domain>/admin/` and set which model serves which
    purpose under **LLM → Model configs**. Nothing works until at least
    `tutoring` points at a provider whose key you supplied.
@@ -299,6 +317,12 @@ Symptoms first, because that is how they present.
 | **Caddy returns 502**, but `docker compose ps` says the app is healthy. | The app is listening on loopback inside its container, so nothing else can reach it. A healthcheck that only tests 127.0.0.1 passes anyway. | Check `docker compose logs app` for `Listening at:` — it must say `0.0.0.0:8000`, not `127.0.0.1:8000`. |
 | **Build fails: "Multi-platform build is not supported for the docker driver".** | A platform pin put BuildKit into multi-platform mode. | The shipped compose file has no pin — build natively. Only the AWS path needs `--platform linux/amd64`. |
 | **Docker fails with `input/output error`** during a rebuild. | The Docker VM's disk filled. Its size limit is separate from your host's free space, and images plus layer cache add up fast. | `docker builder prune -af`, then Docker Desktop → Troubleshoot → Clean/Purge data if it persists. |
+| **`.env` edits appear to do nothing.** | `docker compose restart` does **not** re-read `.env`, and neither port nor volume changes take effect. | Always `docker compose up -d`, which recreates the affected containers. |
+| **`relation "auth_user" does not exist`** at `createsuperuser`. | You ran it before migrations finished — most likely by pasting it together with `up -d`. | Nothing is broken. Wait for the app to report healthy and run it again. |
+| **`ERR_SSL_PROTOCOL_ERROR`**, or "sent an invalid response". | Caddy is redirecting to HTTPS but has no certificate for the hostname you asked for: either it was never issued (see the next row), or you are browsing to `localhost` while the only site block is for `{$SITE_DOMAIN}`. No site matches, so the handshake aborts before any HTTP happens. | Switch to the `:80` block. |
+| **`invalidContact` — "domain does not end with a valid public suffix".** | `ACME_EMAIL` is still the `.xx` placeholder, so Let's Encrypt refuses the account and Caddy falls back to ZeroSSL, which refuses too. Caddy then retries with backoff **for 30 days**. | Set a real address, or remove the ACME block if you are not on a public domain. Issuance also needs the domain to already resolve here with 80/443 reachable — a laptop behind NAT cannot satisfy that. Clear the failed account state with `docker compose down && docker volume rm ai-tutor_caddy_data`. |
+| **Browser still redirects to HTTPS** after the Caddyfile is fixed. | The old redirect was a **308 Permanent**, which browsers cache aggressively — you are sent to `https://` without Caddy ever being asked. | A private window, or clear site data for that host. Confirm from the shell, which does not cache: `curl -sI http://localhost/admin/` — want 302 to `/admin/login/`, not 308. |
+| **Kali: apt has no repository for Docker.** | Docker's apt repository has no `kali-rolling` suite. | Use Kali's own package and install the Compose plugin binary directly, rather than falling back to the v1 `docker-compose` script: `sudo apt install docker.io`, then drop `docker-compose-linux-x86_64` into `~/.docker/cli-plugins/docker-compose` and `chmod +x` it. Note that joining the `docker` group is effectively passwordless root — on a workstation, consider `sudo docker` instead. |
 
 ### Upgrading
 
@@ -581,6 +605,9 @@ Stated plainly, because each is something Path A does for you:
 | **Everything works as root, nothing works as the service user.** | `/var/lib/ai-tutor` is owned by root. | `chown -R` it to the user in the unit's `User=` line. |
 | **Upgrade appears to do nothing.** | The service is still running the old code. | `systemctl restart ai-tutor` after every upgrade; unlike Compose, pip does not restart anything. |
 | **Login returns 403, no error anywhere.** | Session and CSRF cookies are marked `Secure` and the browser will not send them over plain HTTP. | Finish the TLS setup, or set `HTTPS_EDGE=false` — only on an isolated network. |
+| **The service crash-loops with `PermissionError` on `ai-tutor.env`.** | `ai-tutor init` runs as root and writes the file `0600 root:root`; `ai-tutor systemd` generates a unit that runs as an unprivileged user. Nothing reconciles the two. | `chown root:<user>` and `chmod 640` the env file, `chown -R` the data directory, then `systemctl reset-failed` before restarting. |
+| **Every page returns 500, "Missing staticfiles manifest entry".** | `collectstatic` was never run. Django's manifest storage raises rather than degrading to unstyled output, so even the login form fails. | Run `collectstatic`. Note that `curl -I /admin/` still returns a healthy `302`, because a redirect renders no template — this one is only visible in a browser. |
+| **It started, but is it using the right database?** | If `DATABASE_URL` is unset, Django falls back to SQLite and everything appears to work — with no pgvector behind retrieval. | `ls -la /var/lib/ai-tutor/`: a `db.sqlite3` there means the fallback happened. |
 
 ### Upgrading
 

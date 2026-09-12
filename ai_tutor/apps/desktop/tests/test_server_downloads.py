@@ -13,6 +13,11 @@ from ai_tutor.apps.desktop.public_views import server_artefacts
 
 BUCKET = dict(AWS_DOWNLOADS_BUCKET='dl.example', AWS_MEDIA_REGION='us-east-1')
 
+# Where the self-hosting manual lives now that the application no longer
+# renders it. Asserted verbatim: a typo here is a footer link to a 404, and
+# nothing else in the suite would notice.
+MANUAL_URL = 'https://github.com/eai6/ai-tutor/blob/main/docs/self-hosting.md'
+
 
 class TestArtefactNames:
 
@@ -73,89 +78,9 @@ class TestRedirect:
 class TestPage:
 
     @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
-    def test_offers_both_server_routes(self):
-        body = Client().get('/self-hosting/').content.decode()
-        assert 'Docker' in body
-        assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
-
-    @override_settings(SERVER_WHEEL_VERSION='', **BUCKET)
-    def test_never_offers_a_link_it_cannot_serve(self):
-        """Before a release the page must not show a pip command pointing at a
-        wheel that does not exist."""
-        body = Client().get('/self-hosting/').content.decode()
-        assert 'py3-none-any.whl' not in body
-        assert 'No wheel has been published yet' in body
-
-    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
     def test_still_offers_the_desktop_installers(self):
         body = Client().get('/download/').content.decode()
         assert 'macOS' in body and 'Windows' in body
-
-
-@pytest.mark.django_db
-class TestSelfHostingPage:
-    """The one page that tells you how to deploy.
-
-    There is no separate manual page: rendering all 683 lines of
-    docs/self-hosting.md here buried the commands under AWS cost tables and a
-    Pulumi walkthrough. This page carries what a person types, and the few
-    operational facts they cannot safely leave without.
-    """
-
-    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
-    def test_carries_the_actual_commands(self, client):
-        body = client.get('/self-hosting/').content.decode()
-        for cmd in ('docker compose up -d', 'ai-tutor init', 'ai-tutor migrate',
-                    'createsuperuser', 'systemctl enable --now ai-tutor'):
-            assert cmd in body, f'missing: {cmd}'
-
-    def test_says_what_must_be_filled_in(self, client):
-        """The two 'now edit this file' moments are where a deploy stalls."""
-        body = client.get('/self-hosting/').content.decode()
-        for name in ('SECRET_KEY', 'ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS'):
-            assert name in body
-
-    def test_covers_backups_and_upgrades(self, client):
-        """A ministry that deploys and never backs up loses a term of work."""
-        body = client.get('/self-hosting/').content.decode()
-        assert 'pg_dump' in body and 'backup.sh' in body
-        assert 'systemctl restart ai-tutor' in body
-
-    def test_warns_about_the_silent_failure(self, client):
-        """Login 403 with no error anywhere is the commonest way this is
-        misconfigured, and nothing in the logs says so."""
-        body = client.get('/self-hosting/').content.decode()
-        assert 'HTTPS_EDGE' in body
-
-    def test_says_what_leaves_the_network(self, client):
-        """A ministry cannot evaluate this deployment without knowing it."""
-        body = client.get('/self-hosting/').content.decode()
-        assert 'Anthropic' in body and 'leaving your network' in body
-
-    def test_there_is_no_separate_manual_page(self, client):
-        assert client.get('/self-hosting/manual/').status_code == 404
-
-    def test_renders_without_a_published_wheel(self, client):
-        with override_settings(AWS_DOWNLOADS_BUCKET='', SERVER_WHEEL_VERSION=''):
-            body = client.get('/self-hosting/').content.decode()
-        assert 'docker compose up -d' in body
-        assert 'py3-none-any.whl' not in body
-
-    @override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET)
-    def test_offers_the_wheel_when_one_is_published(self, client):
-        body = client.get('/self-hosting/').content.decode()
-        assert 'ai_tutor-1.2.0-py3-none-any.whl' in body
-
-    def test_the_two_pages_link_to_each_other(self, client):
-        """Separate audiences, but someone always lands on the wrong one."""
-        assert '/self-hosting/' in client.get('/download/').content.decode()
-        assert '/download/' in client.get('/self-hosting/').content.decode()
-
-    def test_the_desktop_page_no_longer_carries_server_instructions(self, client):
-        with override_settings(SERVER_WHEEL_VERSION='1.2.0', **BUCKET):
-            body = client.get('/download/').content.decode()
-        assert 'python3.12 -m venv' not in body
-        assert 'macOS' in body
 
 
 @pytest.mark.django_db
@@ -164,9 +89,10 @@ class TestLandingPage:
     def test_offers_self_hosting(self, client):
         """A ministry evaluating the platform arrives at the root, not at
         /download/. Without a link here they have no way to discover that
-        running it themselves is even possible."""
+        running it themselves is even possible. The manual is no longer served
+        by the application — it lives with the source it describes."""
         body = client.get('/').content.decode()
-        assert '/self-hosting/' in body
+        assert MANUAL_URL in body
 
     def test_it_is_in_the_footer_not_the_main_choice(self, client):
         """Students and teachers land here to sign in. The two big cards stay
@@ -174,4 +100,10 @@ class TestLandingPage:
         import re
         body = client.get('/').content.decode()
         footer = re.search(r'<footer.*?</footer>', body, re.S)
-        assert footer and '/self-hosting/' in footer.group(0)
+        assert footer and MANUAL_URL in footer.group(0)
+
+    def test_the_application_no_longer_serves_the_manual(self, client):
+        """Deleted rather than redirected: it duplicated docs/self-hosting.md
+        and drifted from it."""
+        assert client.get('/self-hosting/').status_code == 404
+        assert client.get('/download/self-hosting/').status_code == 404

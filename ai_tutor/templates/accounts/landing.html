@@ -268,24 +268,9 @@
             </div>
         </div>
 
-        {# Not a third role card: downloading the app is not a role, and giving #}
-        {# it equal weight would push the two sign-in paths off a phone screen. #}
-        {# It sits below because the people who need it are told to look for it. #}
-        <div style="max-width:32rem;margin:2.5rem auto 0;padding:1rem 1.25rem;
-                    border:1px solid var(--gray-200,#e5e7eb);border-radius:12px;
-                    display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
-                    justify-content:center;text-align:center;">
-            <div style="font-size:1.5rem;line-height:1;">💻</div>
-            <div style="flex:1;min-width:12rem;text-align:left;">
-                <div style="font-weight:600;">{% trans "No internet in the classroom?" %}</div>
-                <div style="font-size:0.85rem;color:var(--gray-500,#6b7280);">
-                    {% trans "Install the desktop app — it teaches offline, with no connection needed." %}
-                </div>
-            </div>
-            <a href="{% url 'downloads:page' %}" class="btn btn-secondary">
-                {% trans "Download" %}
-            </a>
-        </div>
+        {# Hosting is not a role, so it gets no card here. Whoever deploys this #}
+        {# arrives looking for it; the footer's "Run it yourself" is enough, #}
+        {# and the two sign-in paths keep the page to themselves. #}
     </main>
 
     <footer class="footer">
@@ -294,8 +279,11 @@
             &nbsp;·&nbsp;
             {# For a ministry or school evaluating whether to run this on their #}
             {# own servers. Deliberately in the footer: students and teachers #}
-            {# arriving here want to sign in, not to deploy. #}
-            <a href="{% url 'self_hosting' %}">{% trans "Run it yourself" %}</a>
+            {# arriving here want to sign in, not to deploy. The manual lives #}
+            {# in the repository rather than being served here — it is written #}
+            {# for whoever has the source, and it changes with the code. #}
+            <a href="https://github.com/eai6/ai-tutor/blob/main/docs/self-hosting.md"
+               target="_blank" rel="noopener">{% trans "Run it yourself" %}</a>
             &nbsp;·&nbsp;
             <span style="display:inline-flex;gap:0.4rem;align-items:center;">
                 {% get_current_language as CURRENT_LANG %}

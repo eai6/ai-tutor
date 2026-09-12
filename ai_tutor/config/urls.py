@@ -40,16 +40,11 @@ def service_worker(_request):
     return response
 
 
-from ai_tutor.apps.desktop import public_views as desktop_public_views
-
 urlpatterns = [
     path('health/', health_check),
     # Public installer download page. No auth: someone who has never logged
     # in has to be able to install the app.
     path('download/', include('ai_tutor.apps.desktop.download_urls')),
-    # The self-hosting manual, served by the application. A public page
-    # cannot route its instructions through a private repository.
-    path('self-hosting/', desktop_public_views.self_hosting, name='self_hosting'),
     # Default 'admin/'; ADMIN_URL moves it. See the note in settings.py — the
     # control that matters is the CIDR restriction at the load balancer, this
     # only takes the console off the path every scanner probes by default.
