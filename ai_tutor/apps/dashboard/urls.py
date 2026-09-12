@@ -136,6 +136,12 @@ urlpatterns = [
     
     # Settings
     path('settings/', views.settings_page, name='settings'),
+    # Platform backup (superadmin only). Separate routes rather than another
+    # POST action on the settings view: the download is a GET that redirects
+    # off-site, and the status endpoint is polled.
+    path('settings/backup/create/', views.backup_create, name='backup_create'),
+    path('settings/backup/status/', views.backup_status, name='backup_status'),
+    path('settings/backup/<int:job_id>/download/', views.backup_download, name='backup_download'),
 
     # Safety / Flagged sessions
     path('flagged/', views.flagged_sessions, name='flagged_sessions'),

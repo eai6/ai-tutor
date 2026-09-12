@@ -13,11 +13,13 @@ import logging
 import os
 import zoneinfo
 from datetime import date as _date, timedelta
+from pathlib import Path
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, Http404, FileResponse
+from django.db import IntegrityError
 from django.db.models import Count, Avg, Q, F, Max
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -28,6 +30,7 @@ from django.views.decorators.http import require_POST
 from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile, PlatformConfig
 from ai_tutor.apps.curriculum.models import Course, Unit, Lesson
 from ai_tutor.apps.tutoring.models import TutorSession, StudentLessonProgress
+from ai_tutor.apps.dashboard.models import BackupJob
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash, logout
 
@@ -220,6 +223,26 @@ def staff_required(view_func):
 
 # Alias for backwards compatibility
 teacher_required = staff_required
+
+
+def superadmin_required(view_func):
+    """Platform superadmin only — not a school admin, not a teacher.
+
+    Spelled out as a decorator rather than an `if request.user.is_staff` inside
+    each view because the three backup endpoints hand out every student record
+    in the platform in one file. A guard that has to be remembered per view is
+    a guard that eventually is not.
+    """
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise Http404
+        ctx = get_staff_context(request)
+        if not ctx:
+            raise Http404
+        request.staff_ctx = ctx
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 
 @login_required
@@ -3981,6 +4004,24 @@ def settings_page(request):
         'img_provider_defaults_json': img_provider_defaults_json,
         'personalities': personalities,
     }
+
+    # Platform backup. The inventory is two counting queries and a bucket
+    # listing, so it is built only for the account that can see the card.
+    if is_superadmin:
+        from ai_tutor.apps.dashboard import backup as backup_service
+        context['backup_jobs'] = BackupJob.objects.select_related('created_by')[:10]
+        context['backup_inventory'] = backup_service.inventory()
+        context['backup_destination'] = (
+            f's3://{backup_service.backup_bucket()}/{backup_service.OPS_PREFIX}/'
+            if backup_service.backup_bucket() else str(backup_service.backup_root())
+        )
+        # On a container, local disk dies with the task. A backup written there
+        # is gone at the next deploy, and nothing else would say so — the job
+        # row would read "done" either way.
+        context['backup_is_ephemeral'] = (
+            bool(getattr(django_settings, 'USE_S3_MEDIA', False))
+            and not backup_service.backup_bucket()
+        )
 
     return render(request, 'dashboard/settings.html', context)
 
@@ -9854,3 +9895,110 @@ def aggregate_export_csv(request):
         ])
 
     return response
+
+
+# ============================================================================
+# Platform backup — database + media, for whoever has to answer "where is your
+# backup?". Superadmin only; see apps/dashboard/backup.py for what goes in.
+# ============================================================================
+
+def _log_backup_event(request, job, action: str, **extra):
+    """Every create and every download, on the record.
+
+    A backup feature whose own use is not logged is worth less than no feature:
+    the point of the archive is custody of student data, and custody means
+    knowing who took a copy and when.
+    """
+    from ai_tutor.apps.safety.models import SafetyAuditLog
+    SafetyAuditLog.objects.create(
+        event_type=SafetyAuditLog.EventType.DATA_EXPORT,
+        user_id=request.user.id,
+        severity='warning',
+        details={
+            'action': action,
+            'job_id': job.pk,
+            'scope': 'platform',
+            'size_bytes': job.size_bytes,
+            'storage_key': job.storage_key,
+            **extra,
+        },
+        ip_address=request.META.get('REMOTE_ADDR'),
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+    )
+
+
+@superadmin_required
+@require_POST
+def backup_create(request):
+    """Start a backup. Returns immediately; the work runs on a thread."""
+    from ai_tutor.apps.dashboard import backup as backup_service
+
+    # The uniqueness is the database's job (see BackupJob.Meta.constraints);
+    # this is the friendly half of it. Two concurrent pg_dumps against one RDS
+    # instance make the tutor slow for every student, to produce two copies of
+    # the same data.
+    try:
+        job = BackupJob.objects.create(created_by=request.user)
+    except IntegrityError:
+        messages.info(request, "A backup is already running.")
+        return redirect('dashboard:settings')
+    _log_backup_event(request, job, 'create')
+    backup_service.start(job)
+    messages.success(
+        request,
+        "Backup started. It keeps running if you leave this page.",
+    )
+    return redirect('dashboard:settings')
+
+
+@superadmin_required
+def backup_status(request):
+    """Poll target for the card: the recent jobs and how the live one is doing."""
+    jobs = BackupJob.objects.select_related('created_by')[:10]
+    return JsonResponse({
+        'jobs': [
+            {
+                'id': j.pk,
+                'status': j.status,
+                'stage': j.stage,
+                'progress': j.progress,
+                'size_bytes': j.size_bytes,
+                'created_at': j.created_at.isoformat(),
+                'created_by': getattr(j.created_by, 'username', ''),
+                'error': j.error,
+                'duration_seconds': j.duration_seconds,
+            }
+            for j in jobs
+        ],
+    })
+
+
+@superadmin_required
+def backup_download(request, job_id: int):
+    """Hand over one archive.
+
+    On S3 this is a redirect to a presigned URL that expires in 15 minutes —
+    the file never passes through gunicorn, which is the only way a multi-GB
+    download survives a 120-second worker timeout. Off S3 (dev, Docker without
+    a bucket) it is served from disk.
+    """
+    from ai_tutor.apps.dashboard import backup as backup_service
+
+    job = get_object_or_404(BackupJob, pk=job_id, status=BackupJob.Status.DONE)
+    if not job.storage_key:
+        raise Http404
+
+    _log_backup_event(request, job, 'download')
+
+    url = backup_service.download_url(job)
+    if url:
+        return redirect(url)
+
+    path = Path(job.storage_key)
+    # The key is written by build(), never by a request — but this view is the
+    # one place a path from the database becomes a filesystem read, so it is
+    # also the right place to refuse anything outside the backup directory.
+    root = backup_service.backup_root().resolve()
+    if not path.is_file() or root not in path.resolve().parents:
+        raise Http404
+    return FileResponse(path.open('rb'), as_attachment=True, filename=path.name)

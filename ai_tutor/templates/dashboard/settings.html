@@ -619,6 +619,110 @@
 
         <button type="submit" class="btn btn-primary">{% trans "Save AI Prompts" %}</button>
     </form>
+
+    {# ── Platform backup (superadmin only) ──────────────────────────────── #}
+    {# Not the anonymised export on the Overview page: that one exists to be #}
+    {# shared, this one is every student record in a single file. Different  #}
+    {# audiences, different pages, no way to reach for one meaning the other.#}
+    <div class="card" style="margin-top:2rem;margin-bottom:1.5rem;">
+        <div class="card-header">
+            <h3 class="card-title">{% trans "Data backup" %}</h3>
+        </div>
+        <div class="card-body">
+            <p style="color:var(--gray-500);font-size:0.875rem;margin-bottom:1rem;">
+                {% blocktrans trimmed %}
+                    A restorable copy of the whole platform — the database and every
+                    uploaded file, archived together so a restore cannot mix one with
+                    the other. Contains student names and tutoring transcripts: treat
+                    a downloaded archive the way you would treat the server itself.
+                {% endblocktrans %}
+            </p>
+
+            <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:1.25rem;
+                        font-size:0.875rem;">
+                <div>
+                    <div style="color:var(--gray-500);">{% trans "Database" %}</div>
+                    <strong>{{ backup_inventory.database.bytes|filesizeformat }}</strong>
+                    <span style="color:var(--gray-500);">({{ backup_inventory.database.engine }})</span>
+                </div>
+                <div>
+                    <div style="color:var(--gray-500);">{% trans "Media" %}</div>
+                    <strong>{{ backup_inventory.media.files }}</strong>
+                    {% trans "files" %} ·
+                    <strong>{{ backup_inventory.media.bytes|filesizeformat }}</strong>
+                </div>
+                <div>
+                    <div style="color:var(--gray-500);">{% trans "Archives kept in" %}</div>
+                    <code style="font-size:0.8rem;">{{ backup_destination }}</code>
+                </div>
+            </div>
+
+            {% if backup_is_ephemeral %}
+            <p style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;
+                      border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;
+                      margin-bottom:1rem;">
+                {% blocktrans trimmed %}
+                    No archive bucket is configured, so backups are written to this
+                    container's own disk — which is erased on the next deploy or
+                    restart. Download an archive as soon as it finishes, or set
+                    AWS_BACKUP_BUCKET so they are kept outside the server.
+                {% endblocktrans %}
+            </p>
+            {% endif %}
+
+            <form method="post" action="{% url 'dashboard:backup_create' %}" style="margin-bottom:1.25rem;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">{% trans "Create backup now" %}</button>
+                <span id="backup-live" style="margin-left:0.75rem;color:var(--gray-500);font-size:0.875rem;"></span>
+            </form>
+
+            <table class="table" style="width:100%;font-size:0.875rem;" id="backup-table">
+                <thead>
+                    <tr>
+                        <th>{% trans "Taken" %}</th>
+                        <th>{% trans "By" %}</th>
+                        <th>{% trans "Size" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for job in backup_jobs %}
+                    <tr>
+                        <td>{{ job.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ job.created_by.username|default:"—" }}</td>
+                        <td>{% if job.size_bytes %}{{ job.size_bytes|filesizeformat }}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if job.status == 'done' %}
+                                <span style="color:var(--success,#15803d);">{% trans "Complete" %}</span>
+                            {% elif job.status == 'failed' %}
+                                <span style="color:var(--danger,#b91c1c);" title="{{ job.error }}">{% trans "Failed" %}</span>
+                            {% else %}
+                                {{ job.stage|default:job.status }} {{ job.progress }}%
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.status == 'done' %}
+                                <a class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.8rem;"
+                                   href="{% url 'dashboard:backup_download' job.pk %}">{% trans "Download" %}</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" style="color:var(--gray-500);">
+                        {% trans "No backups yet." %}
+                    </td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p style="color:var(--gray-500);font-size:0.8rem;margin-top:0.75rem;">
+                {% blocktrans trimmed %}
+                    Download links expire after 15 minutes, and archives are deleted
+                    after 90 days. Copy one somewhere durable if you are keeping it.
+                {% endblocktrans %}
+            </p>
+        </div>
+    </div>
     {% endif %}
 
 </div>
@@ -690,6 +794,60 @@
     }
 
     renderTable('grades');
+})();
+</script>
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+    // Backup progress. Polls only while something is running, and stops as
+    // soon as nothing is: a settings page left open in a tab should not sit
+    // there querying the database every three seconds until the browser closes.
+    var live = document.getElementById('backup-live');
+    var table = document.getElementById('backup-table');
+    if (!live || !table) { return; }
+
+    var STATUS_URL = '{% url "dashboard:backup_status" %}';
+    var timer = null;
+
+    function render(jobs) {
+        var running = null;
+        for (var i = 0; i < jobs.length; i++) {
+            if (jobs[i].status === 'running' || jobs[i].status === 'pending') {
+                running = jobs[i];
+                break;
+            }
+        }
+        if (running) {
+            live.textContent = (running.stage || running.status) + ' — ' + running.progress + '%';
+            return true;
+        }
+        if (timer) {
+            // Finished while we were watching. The row markup is rendered
+            // server-side, so a reload is both the simplest way to show the
+            // new row and the one that cannot drift from it.
+            window.location.reload();
+        }
+        live.textContent = '';
+        return false;
+    }
+
+    function poll() {
+        fetch(STATUS_URL, { credentials: 'same-origin' })
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(data) {
+                if (!data) { return; }
+                if (!render(data.jobs) && timer) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .catch(function() { /* transient: the next tick tries again */ });
+    }
+
+    // Start polling only if the server already rendered a live job.
+    if (table.textContent.indexOf('%') !== -1) {
+        timer = setInterval(poll, 3000);
+        poll();
+    }
 })();
 </script>
 {% endif %}

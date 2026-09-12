@@ -470,3 +470,86 @@ class WeeklyAssignment(models.Model):
             course_filter,
             week_start=cls.current_week_start(),
         ).select_related('course').prefetch_related('lessons')
+
+
+class BackupJob(models.Model):
+    """One archive of the whole platform: database, media, manifest.
+
+    A row rather than a cache entry because this is the evidence half of the
+    feature. "Show me your backups" is answered by this table — who took one,
+    when, how big, and whether it finished — and an entry that a cache eviction
+    can delete cannot answer it.
+
+    The archive itself never lives here. It goes to the ops bucket, which has a
+    7-day expiry rule, so `storage_key` points at something that will be gone
+    before long. That is deliberate: a bucket accumulating copies of every
+    student record is a larger risk than a backup someone has to re-take.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        RUNNING = 'running', 'Running'
+        DONE = 'done', 'Done'
+        FAILED = 'failed', 'Failed'
+
+    status = models.CharField(max_length=10, choices=Status.choices,
+                              default=Status.PENDING, db_index=True)
+    # Whoever pressed the button. Kept even if the account is later deleted:
+    # SET_NULL rather than CASCADE, because losing the audit trail is worse
+    # than a row with an empty author.
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='backup_jobs',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    # Where the archive landed: an S3 key when a bucket is configured, an
+    # absolute path when one is not (dev, Docker without S3).
+    storage_key = models.CharField(max_length=500, blank=True)
+    size_bytes = models.BigIntegerField(default=0)
+
+    # Free text for the UI while it runs — "dumping database", "media 412/3204".
+    stage = models.CharField(max_length=120, blank=True)
+    progress = models.PositiveSmallIntegerField(default=0)
+
+    # What went in, for the manifest and for the list view: row counts per
+    # table, media file count and bytes, database engine, app version.
+    summary = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True)
+
+    # Always True; it exists only to give the partial unique index below
+    # something to collide on. See the constraint.
+    active_marker = models.BooleanField(default=True, editable=False)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['-created_at', 'status'])]
+        constraints = [
+            # At most one unfinished backup, enforced by the database rather
+            # than by a check in the view. Two requests that both read "nothing
+            # is running" before either writes would otherwise start two
+            # pg_dumps against the same RDS instance — a double-click is enough,
+            # since gunicorn runs several threads per worker. Once a job reaches
+            # done or failed it leaves the condition, so finished rows
+            # accumulate freely.
+            models.UniqueConstraint(
+                fields=['active_marker'],
+                condition=models.Q(status__in=['pending', 'running']),
+                name='dashboard_one_active_backup',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Backup {self.pk} ({self.status})"
+
+    @property
+    def is_finished(self) -> bool:
+        return self.status in (self.Status.DONE, self.Status.FAILED)
+
+    @property
+    def duration_seconds(self) -> int | None:
+        if not (self.started_at and self.finished_at):
+            return None
+        return int((self.finished_at - self.started_at).total_seconds())

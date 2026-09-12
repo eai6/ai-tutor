@@ -497,6 +497,14 @@ SERVER_WHEEL_VERSION = os.getenv('SERVER_WHEEL_VERSION', '')
 
 AWS_MEDIA_BUCKET = os.getenv('AWS_MEDIA_BUCKET', '')
 AWS_MEDIA_REGION = os.getenv('AWS_MEDIA_REGION', 'us-east-1')
+
+# Where platform backups go: a bucket of their own, versioned, closed to the
+# public, with a 90-day lifecycle (infra/aws/components/storage.py). Not the
+# ops bucket — that one expires everything after 7 days, which is right for a
+# restore payload and wrong for the copy a ministry keeps. Unset (dev, Docker
+# without S3) means backups are written to BACKUP_ROOT on disk instead.
+AWS_BACKUP_BUCKET = os.getenv('AWS_BACKUP_BUCKET', '')
+BACKUP_ROOT = os.getenv('BACKUP_ROOT', '') or (BASE_DIR / 'backups')
 USE_S3_MEDIA = bool(AWS_MEDIA_BUCKET)
 
 if USE_S3_MEDIA:

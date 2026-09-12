@@ -123,3 +123,7 @@ tests/*Security_Assessment*.docx
 # committed; the log is the console spew that produced it, up to 27 MB for a
 # single arm, and no .log under multi_turn_results has ever been tracked.
 offline_eval/multi_turn_results/**/*.log
+
+# Platform backup archives. Every one contains the whole database —
+# student names, transcripts, uploaded media. Never in git.
+/backups/
