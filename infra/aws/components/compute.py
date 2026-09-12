@@ -61,6 +61,7 @@ def create_compute(
     log_group,
     media_bucket,
     ops_bucket_arn,
+    backups_bucket_arn,
     secret_arns: dict,
     task_environment: dict,
     private_subnet_ids,
@@ -128,7 +129,8 @@ def create_compute(
         f"{prefix}-task-policy",
         role=task_role.id,
         policy=pulumi.Output.all(
-            media_bucket.arn, task_role.arn, execution_role.arn, ops_bucket_arn
+            media_bucket.arn, task_role.arn, execution_role.arn, ops_bucket_arn,
+            backups_bucket_arn,
         ).apply(
             lambda a: json.dumps(
                 {
@@ -153,6 +155,18 @@ def create_compute(
                             "Effect": "Allow",
                             "Action": ["s3:GetObject", "s3:ListBucket"],
                             "Resource": [a[3], f"{a[3]}/*"],
+                        },
+                        {
+                            # Write, and read back for the presigned download
+                            # link. No DeleteObject: expiry is the lifecycle
+                            # rule's job, and an application that cannot delete
+                            # a backup is one bug away from a smaller disaster.
+                            "Sid": "BackupsBucketReadWrite",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:GetObject", "s3:PutObject", "s3:ListBucket",
+                            ],
+                            "Resource": [a[4], f"{a[4]}/*"],
                         },
                         {
                             "Sid": "TransactionalEmail",

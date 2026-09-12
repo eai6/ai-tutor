@@ -20,6 +20,7 @@ class Storage:
     media_bucket: aws.s3.BucketV2
     ecr_repo: aws.ecr.Repository
     ops_bucket: aws.s3.BucketV2
+    backups_bucket: aws.s3.BucketV2
     downloads_bucket: aws.s3.BucketV2
 
 
@@ -124,6 +125,91 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
                 filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
                 expiration=aws.s3.BucketLifecycleConfigurationV2RuleExpirationArgs(days=7),
             ),
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="abort-incomplete-multipart",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                abort_incomplete_multipart_upload=aws.s3.BucketLifecycleConfigurationV2RuleAbortIncompleteMultipartUploadArgs(
+                    days_after_initiation=1
+                ),
+            ),
+        ],
+    )
+
+    # ── Platform backups ───────────────────────────────────────────────────
+    #
+    # Its own bucket rather than a prefix in the ops one, for two reasons that
+    # both bite later. The ops bucket expires everything after 7 days, which is
+    # right for a restore payload someone forgot to delete and wrong for the
+    # copy a ministry is told to keep. And the task role is deliberately
+    # read-only on ops; backups need write, and widening that grant would give
+    # the application write access to operational payloads too.
+    #
+    # What lands here is every student record in the platform in one file, so:
+    # versioned (an overwrite or a delete is recoverable), encrypted, and
+    # completely closed to the public.
+    backups_bucket = aws.s3.BucketV2(
+        f"{prefix}-backups",
+        bucket=f"{prefix}-backups-{account_id}",
+        tags={**tags, "Name": f"{prefix}-backups", "Contains": "student-data"},
+    )
+
+    aws.s3.BucketPublicAccessBlock(
+        f"{prefix}-backups-pab",
+        bucket=backups_bucket.id,
+        block_public_acls=True,
+        block_public_policy=True,
+        ignore_public_acls=True,
+        restrict_public_buckets=True,
+    )
+
+    aws.s3.BucketServerSideEncryptionConfigurationV2(
+        f"{prefix}-backups-sse",
+        bucket=backups_bucket.id,
+        rules=[
+            aws.s3.BucketServerSideEncryptionConfigurationV2RuleArgs(
+                apply_server_side_encryption_by_default=aws.s3.BucketServerSideEncryptionConfigurationV2RuleApplyServerSideEncryptionByDefaultArgs(
+                    sse_algorithm="AES256"
+                ),
+                bucket_key_enabled=True,
+            )
+        ],
+    )
+
+    # Versioning is the point of difference from every other bucket here. A
+    # backup that can be silently replaced by a later, broken one is not a
+    # backup; with versions, the good copy is still there under it.
+    aws.s3.BucketVersioningV2(
+        f"{prefix}-backups-versioning",
+        bucket=backups_bucket.id,
+        versioning_configuration=aws.s3.BucketVersioningV2VersioningConfigurationArgs(
+            status="Enabled",
+        ),
+    )
+
+    aws.s3.BucketLifecycleConfigurationV2(
+        f"{prefix}-backups-lifecycle",
+        bucket=backups_bucket.id,
+        rules=[
+            # 90 days of daily archives, then gone. Long enough to cover a
+            # corruption nobody noticed for a term; short enough that this is
+            # not an ever-growing pile of student records. Raise it here if the
+            # DICT retention requirement turns out to be longer.
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="expire-backups",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                expiration=aws.s3.BucketLifecycleConfigurationV2RuleExpirationArgs(
+                    days=90
+                ),
+                # Superseded versions are the safety net, not the archive: a
+                # month is enough to notice and roll back to one.
+                noncurrent_version_expiration=aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs(
+                    noncurrent_days=30
+                ),
+            ),
+            # These archives are gigabytes; an upload that dies halfway leaves
+            # parts that are billed and invisible in the console.
             aws.s3.BucketLifecycleConfigurationV2RuleArgs(
                 id="abort-incomplete-multipart",
                 status="Enabled",
@@ -267,5 +353,6 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
         media_bucket=bucket,
         ecr_repo=repo,
         ops_bucket=ops_bucket,
+        backups_bucket=backups_bucket,
         downloads_bucket=downloads_bucket,
     )

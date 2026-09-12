@@ -91,8 +91,27 @@ def create_data(
         backup_window="03:00-04:00",
         maintenance_window="Mon:04:00-Mon:05:00",
         auto_minor_version_upgrade=True,
-        deletion_protection=False,
-        skip_final_snapshot=True,
+        # Two settings that only matter on the worst day, which is why they are
+        # worth getting right on an ordinary one.
+        #
+        # deletion_protection: AWS refuses to delete the instance at all. A
+        # `pulumi destroy` aimed at the wrong stack, a resource replacement
+        # triggered by an innocuous-looking property change, an API call with
+        # the wrong identifier — all of them stop here instead of taking every
+        # student record with them. Deleting deliberately now takes two steps:
+        # set this False, `pulumi up`, then destroy.
+        deletion_protection=True,
+        # skip_final_snapshot: even if the instance does go, a snapshot is
+        # taken first. The 14-day automated backups below do NOT survive the
+        # instance — they are deleted with it — so without this, deletion is
+        # unrecoverable no matter what the retention period says. That is the
+        # gap that makes "we have 14 days of backups" misleading.
+        skip_final_snapshot=False,
+        # Required whenever skip_final_snapshot is False, and must not already
+        # exist in the account: a delete that collides with an old snapshot of
+        # the same name fails, which is the safe direction to fail in.
+        final_snapshot_identifier=f"{prefix}-db-final",
+        copy_tags_to_snapshot=True,
         apply_immediately=True,
         # NOT set: monitoring_interval / monitoring_role_arn. Enhanced
         # monitoring needs iam:PassRole, which is currently denied.

@@ -139,12 +139,17 @@ task_environment = (
         network.tasks_sg.id,
         cluster.name,
         edge.alb.dns_name,
+        # Appended, never inserted: every index below is positional.
+        storage.backups_bucket.bucket,
     ).apply(
         lambda a: {
             "DEBUG": "False",
             "AWS_REGION": region,
             "AWS_MEDIA_BUCKET": a[0],
             "AWS_DOWNLOADS_BUCKET": a[1],
+            # Platform backups (Settings → Data backup). Without this the
+            # archive is written to the task's own disk and dies with it.
+            "AWS_BACKUP_BUCKET": a[6],
             "AWS_MEDIA_REGION": region,
             "AWS_SES_REGION": region,
             # Set once an SES identity is verified; absent means console email.
@@ -204,6 +209,7 @@ if enable_ecs:
         log_group=log_group,
         media_bucket=storage.media_bucket,
         ops_bucket_arn=storage.ops_bucket.arn,
+        backups_bucket_arn=storage.backups_bucket.arn,
         secret_arns={
             "database-url": data.database_url_secret.arn,
             **{k: v.arn for k, v in data.app_secrets.items()},
