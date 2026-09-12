@@ -141,6 +141,77 @@ class TestArchiveContents:
 
 
 @pytest.mark.django_db(transaction=True)
+class TestDatabaseOnly:
+    """Media is nearly all the bytes, so a database-only archive is the one
+    someone takes often. The risk is that it looks identical to a full one."""
+
+    def test_it_leaves_the_media_out(self, local_backup, student_with_transcript):
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+
+        assert job.status == BackupJob.Status.DONE, job.error
+        with tarfile.open(job.storage_key) as tar:
+            names = tar.getnames()
+        assert not any(n.startswith('media/') for n in names)
+        assert 'db.sqlite3' in names and 'manifest.json' in names
+
+    def test_the_database_is_still_whole(self, local_backup,
+                                         student_with_transcript, tmp_path):
+        """Skipping media must not mean skipping anything else."""
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+
+        out = tmp_path / 'restored-db-only'
+        with tarfile.open(job.storage_key) as tar:
+            tar.extract(tar.getmember('db.sqlite3'), path=out, filter='data')
+        import sqlite3
+        con = sqlite3.connect(out / 'db.sqlite3')
+        names = [r[0] for r in con.execute('SELECT first_name FROM auth_user')]
+        assert 'Amara' in names
+        con.close()
+
+    def test_the_archive_says_so_in_its_name_and_its_manifest(
+            self, local_backup, student_with_transcript):
+        """The file outlives this page. Someone holding it later must be able
+        to tell which kind it is without guessing."""
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+
+        assert job.storage_key.endswith('-db.tar.gz')
+        with tarfile.open(job.storage_key) as tar:
+            manifest = json.loads(tar.extractfile('manifest.json').read())
+        assert manifest['media']['included'] is False
+        assert manifest['media']['files_archived'] == 0
+        assert 'NO MEDIA' in manifest['restore']
+
+    def test_a_full_archive_is_named_and_marked_differently(
+            self, local_backup, student_with_transcript):
+        job = BackupJob.objects.create(include_media=True)
+        backup_service.build(job)
+        job.refresh_from_db()
+
+        assert job.storage_key.endswith('-full.tar.gz')
+        with tarfile.open(job.storage_key) as tar:
+            manifest = json.loads(tar.extractfile('manifest.json').read())
+        assert manifest['media']['included'] is True
+        assert 'NO MEDIA' not in manifest['restore']
+
+    def test_the_button_default_is_the_complete_archive(self, client, superadmin,
+                                                        local_backup, monkeypatch):
+        """A backup that quietly left out most of the data because a parameter
+        was missing is the wrong way round to fail."""
+        # Don't let a real thread outlive the test: it would be torn down
+        # mid-build and die inside its own error handler.
+        monkeypatch.setattr(backup_service, 'start', lambda job: None)
+        client.force_login(superadmin)
+        client.post(reverse('dashboard:backup_create'))      # no include_media
+        assert BackupJob.objects.latest('id').include_media is True
+
+
+@pytest.mark.django_db(transaction=True)
 class TestFailureIsVisible:
 
     def test_a_failed_dump_records_why_on_the_row(self, local_backup, monkeypatch):
@@ -202,6 +273,43 @@ class TestOneAtATime:
 
         assert len(started) == 1, f'{len(started)} backups started concurrently'
         assert errors == ['rejected']
+
+
+class TestAStuckJobDoesNotBlockForever:
+    """The one-active-backup constraint is what makes a dead job dangerous: a
+    row left in RUNNING by a process that was replaced mid-backup would hold
+    the door shut for good."""
+
+    def test_an_abandoned_job_is_reaped(self, db):
+        from django.utils import timezone as tz
+        job = BackupJob.objects.create(status=BackupJob.Status.RUNNING)
+        BackupJob.objects.filter(pk=job.pk).update(
+            created_at=tz.now() - backup_service.STALE_AFTER * 2)
+
+        assert backup_service.reap_stale() == 1
+        job.refresh_from_db()
+        assert job.status == BackupJob.Status.FAILED
+        assert 'take another' in job.error
+        BackupJob.objects.create()          # the door is open again
+
+    def test_a_backup_still_running_is_left_alone(self, db):
+        BackupJob.objects.create(status=BackupJob.Status.RUNNING)
+        assert backup_service.reap_stale() == 0
+
+    def test_the_view_clears_a_stuck_job_and_starts(self, client, superadmin,
+                                                    local_backup, monkeypatch):
+        from django.utils import timezone as tz
+        monkeypatch.setattr(backup_service, 'start', lambda job: None)
+        stuck = BackupJob.objects.create(status=BackupJob.Status.RUNNING)
+        BackupJob.objects.filter(pk=stuck.pk).update(
+            created_at=tz.now() - backup_service.STALE_AFTER * 2)
+
+        client.force_login(superadmin)
+        client.post(reverse('dashboard:backup_create'))
+
+        stuck.refresh_from_db()
+        assert stuck.status == BackupJob.Status.FAILED
+        assert BackupJob.objects.filter(status=BackupJob.Status.PENDING).count() == 1
 
 
 class TestWhoCanReachIt:

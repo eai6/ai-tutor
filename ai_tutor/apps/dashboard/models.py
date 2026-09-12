@@ -523,6 +523,13 @@ class BackupJob(models.Model):
     # something to collide on. See the constraint.
     active_marker = models.BooleanField(default=True, editable=False)
 
+    # Whether the uploaded files travelled with the database. Media is almost
+    # all of the bytes, so a database-only archive is minutes rather than an
+    # hour and small enough to take often — but restoring one on its own
+    # leaves every lesson figure broken, so which kind this is has to be
+    # recorded, shown in the list, and said inside the archive itself.
+    include_media = models.BooleanField(default=True)
+
     class Meta:
         ordering = ['-created_at']
         indexes = [models.Index(fields=['-created_at', 'status'])]

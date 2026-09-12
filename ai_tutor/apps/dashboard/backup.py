@@ -27,6 +27,7 @@ import subprocess
 import tarfile
 import tempfile
 import threading
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -276,7 +277,11 @@ def build(job) -> None:
     job.save(update_fields=['status', 'started_at', 'stage'])
 
     stamp = timezone.now().strftime('%Y%m%d-%H%M%S')
-    name = f'aitutor-backup-{stamp}.tar.gz'
+    # The kind is in the filename because the file outlives this page. Someone
+    # holding aitutor-backup-...-db.tar.gz a year from now should not have to
+    # open it to find out the figures are missing.
+    kind = 'full' if job.include_media else 'db'
+    name = f'aitutor-backup-{stamp}-{kind}.tar.gz'
 
     try:
         counts = inventory()
@@ -297,13 +302,19 @@ def build(job) -> None:
                              'dump_file': dump_path.name},
                 'media': counts['media'],
                 'app_version': _app_version(),
-                'restore': _restore_instructions(dump_format, dump_path.name),
+                'restore': _restore_instructions(dump_format, dump_path.name,
+                                                 job.include_media),
             }
 
             archive_path = scratch_path / name
             with tarfile.open(archive_path, 'w:gz') as tar:
                 tar.add(dump_path, arcname=dump_path.name)
-                media_written = _add_media(tar, job, counts['media'])
+                if job.include_media:
+                    media_written = _add_media(tar, job, counts['media'])
+                else:
+                    _touch(job, stage='skipping media', progress=85)
+                    media_written = 0
+                manifest['media']['included'] = job.include_media
                 manifest['media']['files_archived'] = media_written
 
                 manifest_path = scratch_path / 'manifest.json'
@@ -326,11 +337,48 @@ def build(job) -> None:
 
     except Exception as exc:                           # noqa: BLE001 - recorded on the row
         logger.exception('backup %s failed', job.pk)
-        job.status = job.Status.FAILED
-        job.error = str(exc)[:2000]
-        job.stage = 'failed'
-        job.finished_at = timezone.now()
-        job.save(update_fields=['status', 'error', 'stage', 'finished_at'])
+        try:
+            job.status = job.Status.FAILED
+            job.error = str(exc)[:2000]
+            job.stage = 'failed'
+            job.finished_at = timezone.now()
+            job.save(update_fields=['status', 'error', 'stage', 'finished_at'])
+        except Exception:                              # noqa: BLE001
+            # The failure handler failing is the case that matters most: if the
+            # database is what went away, this save goes with it, the thread
+            # dies, and the row stays RUNNING — where the one-active-backup
+            # constraint then blocks every future backup for good. Swallow it
+            # here and let reap_stale() clear the row instead.
+            logger.exception('backup %s: could not record its own failure', job.pk)
+
+
+# How long a backup may sit in RUNNING before it is presumed dead. Generous:
+# a full archive of a large media store is legitimately slow. The point is
+# only that it is finite — see reap_stale().
+STALE_AFTER = timedelta(hours=6)
+
+
+def reap_stale() -> int:
+    """Mark long-abandoned jobs failed, and return how many.
+
+    A job whose thread died without recording anything — the task was replaced
+    mid-backup, the database went away — holds the one-active-backup constraint
+    shut forever. Nothing else would ever clear it, and the symptom is a button
+    that says "a backup is already running" for the rest of time.
+    """
+    cutoff = timezone.now() - STALE_AFTER
+    from ai_tutor.apps.dashboard.models import BackupJob
+    stale = BackupJob.objects.filter(
+        status__in=(BackupJob.Status.PENDING, BackupJob.Status.RUNNING),
+        created_at__lt=cutoff,
+    )
+    return stale.update(
+        status=BackupJob.Status.FAILED,
+        stage='abandoned',
+        error=(f'No progress for over {STALE_AFTER}. The process was probably '
+               f'replaced mid-backup. Nothing was kept; take another.'),
+        finished_at=timezone.now(),
+    )
 
 
 def start(job) -> None:
@@ -340,7 +388,8 @@ def start(job) -> None:
     thread.start()
 
 
-def _restore_instructions(dump_format: str, dump_file: str) -> str:
+def _restore_instructions(dump_format: str, dump_file: str,
+                          include_media: bool = True) -> str:
     """How to put this archive back, written for whoever opens it cold.
 
     Carried inside the archive rather than left in a runbook: the person doing
@@ -348,17 +397,26 @@ def _restore_instructions(dump_format: str, dump_file: str) -> str:
     access to this repository and no idea which engine produced it.
     """
     if dump_format == 'pg_dump-custom':
+        database = f'pg_restore --clean --no-owner --dbname=<target> {dump_file}'
+    else:
+        database = (f'Put {dump_file} where DATABASE_URL/settings point '
+                    f'(SQLite file)')
+
+    if include_media:
         return (
-            f'pg_restore --clean --no-owner --dbname=<target> {dump_file}, then '
-            'copy media/ back into the media store (S3 bucket or MEDIA_ROOT). '
-            'Restore both halves from the same archive: the database holds the '
-            'reference to every uploaded file and the store holds the file.'
+            f'{database}, then copy media/ back into the media store (S3 bucket '
+            'or MEDIA_ROOT). Restore both halves from the same archive: the '
+            'database holds the reference to every uploaded file and the store '
+            'holds the file.'
         )
+    # Said plainly, because this is the archive someone reaches for in a hurry
+    # and the failure is silent — lessons render with gaps and nothing errors.
     return (
-        f'Put {dump_file} where DATABASE_URL/settings point (SQLite file), then '
-        'copy media/ back into MEDIA_ROOT. Restore both halves from the same '
-        'archive: the database holds the reference to every uploaded file and '
-        'the store holds the file.'
+        f'{database}. THIS ARCHIVE CONTAINS NO MEDIA: the database still holds '
+        'a reference to every uploaded figure, so restoring it against an empty '
+        'or older media store leaves lessons with broken images and reports no '
+        'error. Pair it with a full archive, or with the media store as it '
+        'stands now if that is intact.'
     )
 
 

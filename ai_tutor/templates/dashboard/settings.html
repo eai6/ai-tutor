@@ -672,8 +672,21 @@
 
             <form method="post" action="{% url 'dashboard:backup_create' %}" style="margin-bottom:1.25rem;">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-primary">{% trans "Create backup now" %}</button>
+                <button type="submit" name="include_media" value="1" class="btn btn-primary">
+                    {% trans "Create full backup" %}
+                </button>
+                <button type="submit" name="include_media" value="0" class="btn btn-secondary"
+                        style="margin-left:0.5rem;">
+                    {% trans "Database only" %}
+                </button>
                 <span id="backup-live" style="margin-left:0.75rem;color:var(--gray-500);font-size:0.875rem;"></span>
+                <div style="color:var(--gray-500);font-size:0.8rem;margin-top:0.5rem;">
+                    {% blocktrans trimmed with media=backup_inventory.media.bytes|filesizeformat %}
+                        Full includes the {{ media }} of uploaded files. Database only is
+                        far quicker, but restoring from it leaves lesson figures broken
+                        unless the media store is still intact.
+                    {% endblocktrans %}
+                </div>
             </form>
 
             <table class="table" style="width:100%;font-size:0.875rem;" id="backup-table">
@@ -681,6 +694,7 @@
                     <tr>
                         <th>{% trans "Taken" %}</th>
                         <th>{% trans "By" %}</th>
+                        <th>{% trans "Contents" %}</th>
                         <th>{% trans "Size" %}</th>
                         <th>{% trans "Status" %}</th>
                         <th></th>
@@ -691,6 +705,13 @@
                     <tr>
                         <td>{{ job.created_at|date:"Y-m-d H:i" }}</td>
                         <td>{{ job.created_by.username|default:"—" }}</td>
+                        <td>
+                            {% if job.include_media %}
+                                {% trans "Database + media" %}
+                            {% else %}
+                                <span title="{% trans 'No uploaded files in this archive' %}">{% trans "Database only" %}</span>
+                            {% endif %}
+                        </td>
                         <td>{% if job.size_bytes %}{{ job.size_bytes|filesizeformat }}{% else %}—{% endif %}</td>
                         <td>
                             {% if job.status == 'done' %}
@@ -709,7 +730,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="5" style="color:var(--gray-500);">
+                    <tr><td colspan="6" style="color:var(--gray-500);">
                         {% trans "No backups yet." %}
                     </td></tr>
                 {% endfor %}

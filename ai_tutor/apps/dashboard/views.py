@@ -9933,12 +9933,20 @@ def backup_create(request):
     """Start a backup. Returns immediately; the work runs on a thread."""
     from ai_tutor.apps.dashboard import backup as backup_service
 
+    # Clear anything abandoned first, or a job whose process died holds the
+    # constraint shut and the button says "already running" forever.
+    backup_service.reap_stale()
+
     # The uniqueness is the database's job (see BackupJob.Meta.constraints);
     # this is the friendly half of it. Two concurrent pg_dumps against one RDS
     # instance make the tutor slow for every student, to produce two copies of
     # the same data.
+    # Default to the complete archive. A backup that quietly left out most of
+    # the data because of an unchecked box is the wrong way round to fail.
+    include_media = request.POST.get('include_media', '1') != '0'
     try:
-        job = BackupJob.objects.create(created_by=request.user)
+        job = BackupJob.objects.create(created_by=request.user,
+                                       include_media=include_media)
     except IntegrityError:
         messages.info(request, "A backup is already running.")
         return redirect('dashboard:settings')
@@ -9964,6 +9972,7 @@ def backup_status(request):
                 'progress': j.progress,
                 'size_bytes': j.size_bytes,
                 'created_at': j.created_at.isoformat(),
+                'include_media': j.include_media,
                 'created_by': getattr(j.created_by, 'username', ''),
                 'error': j.error,
                 'duration_seconds': j.duration_seconds,

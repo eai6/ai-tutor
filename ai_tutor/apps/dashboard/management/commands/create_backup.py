@@ -22,18 +22,24 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--no-media', action='store_true',
+            help='Database only — faster and far smaller, but a restore from it '
+                 'leaves every lesson figure broken unless the media store is intact',
+        )
+        parser.add_argument(
             '--wait', action='store_true',
             help='Run in the foreground and exit non-zero if it fails',
         )
 
     def handle(self, *args, **options):
+        backup_service.reap_stale()
         running = BackupJob.objects.filter(
             status__in=(BackupJob.Status.PENDING, BackupJob.Status.RUNNING)
         ).first()
         if running:
             raise CommandError(f'backup {running.pk} is already running')
 
-        job = BackupJob.objects.create()
+        job = BackupJob.objects.create(include_media=not options['no_media'])
         if not options['wait']:
             backup_service.start(job)
             self.stdout.write(f'backup {job.pk} started')
