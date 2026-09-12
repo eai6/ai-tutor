@@ -4011,10 +4011,6 @@ def settings_page(request):
         from ai_tutor.apps.dashboard import backup as backup_service
         context['backup_jobs'] = BackupJob.objects.select_related('created_by')[:10]
         context['backup_inventory'] = backup_service.inventory()
-        context['backup_destination'] = (
-            f's3://{backup_service.backup_bucket()}/{backup_service.OPS_PREFIX}/'
-            if backup_service.backup_bucket() else str(backup_service.backup_root())
-        )
         # On a container, local disk dies with the task. A backup written there
         # is gone at the next deploy, and nothing else would say so — the job
         # row would read "done" either way.

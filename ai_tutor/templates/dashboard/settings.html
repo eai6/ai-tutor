@@ -651,10 +651,6 @@
                     {% trans "files" %} ·
                     <strong>{{ backup_inventory.media.bytes|filesizeformat }}</strong>
                 </div>
-                <div>
-                    <div style="color:var(--gray-500);">{% trans "Archives kept in" %}</div>
-                    <code style="font-size:0.8rem;">{{ backup_destination }}</code>
-                </div>
             </div>
 
             {% if backup_is_ephemeral %}
