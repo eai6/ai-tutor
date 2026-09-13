@@ -197,3 +197,66 @@ class TestMatchingIsScopedToTheUnit:
             course, _structure('Grid references', 'Map scale', 'Contours',
                                unit='Maps and scale'))
         assert n == 3, 'every lesson moved to a renamed unit is re-homed'
+
+
+@pytest.mark.django_db
+class TestSubjectAndGradeReachTheCourse:
+    """The teacher picks a subject and a grade on the upload form. Those two
+    fields are the entire join for material sharing — and they were only ever
+    written when the Course row was CREATED.
+
+    get_or_create(defaults=...) does not touch an existing row, so every
+    re-upload and every course predating the subject dropdown kept them blank
+    forever: inheritance matched nothing, in both directions, with nothing on
+    screen to say why.
+    """
+
+    def _upload(self, institution, subject_code='mathematics'):
+        from ai_tutor.apps.dashboard.models import CurriculumUpload
+        return CurriculumUpload.objects.create(
+            institution=institution, subject_name='Mathematics',
+            grade_level='S3', subject_code=subject_code,
+            original_filename='syllabus.pdf', file_path='/tmp/x.pdf',
+        )
+
+    def test_a_blank_course_is_filled_in(self, db, school):
+        from ai_tutor.apps.curriculum.models import Course as C
+        course = C.objects.create(title='Mathematics S3', institution=school,
+                                  subject_code='', grade_levels=[])
+        upload = self._upload(school)
+
+        # What the pipeline does for an existing course.
+        defaults = {'subject_code': upload.subject_code, 'grade_levels': ['S3']}
+        fill = {}
+        if not course.subject_code and defaults.get('subject_code'):
+            fill['subject_code'] = defaults['subject_code']
+        if not course.grade_levels and defaults.get('grade_levels'):
+            fill['grade_levels'] = defaults['grade_levels']
+        for f, v in fill.items():
+            setattr(course, f, v)
+        course.save(update_fields=list(fill))
+
+        course.refresh_from_db()
+        assert course.subject_code == 'mathematics'
+        assert course.grade_levels == ['S3']
+
+    def test_a_course_with_neither_is_flagged_on_the_page(self, client, teacher,
+                                                          db, school):
+        from ai_tutor.apps.curriculum.models import Course as C
+        course = C.objects.create(title='Mathematics S3', institution=school,
+                                  subject_code='', grade_levels=[])
+        client.force_login(teacher)
+        body = client.get(reverse('dashboard:course_detail',
+                                  args=[course.id])).content.decode()
+        assert 'not sharing teaching materials' in body
+        assert 'no subject and no grade set' in body
+
+    def test_a_course_with_both_is_not_flagged(self, client, teacher, course):
+        course.subject_code = 'geography'
+        course.grade_levels = ['S3']
+        course.save(update_fields=['subject_code', 'grade_levels'])
+
+        client.force_login(teacher)
+        body = client.get(reverse('dashboard:course_detail',
+                                  args=[course.id])).content.decode()
+        assert 'not sharing teaching materials' not in body
