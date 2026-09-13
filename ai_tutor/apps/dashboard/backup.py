@@ -367,14 +367,25 @@ def _store(job, archive: Path, manifest: dict, *, prefix: str = OPS_PREFIX) -> s
                           ServerSideEncryption='AES256')
         return key
 
-    destination = backup_root() / name
+    # The prefix is a subdirectory off S3, so a pre-restore copy is as easy to
+    # pick out of a directory listing as it is out of a bucket. backup_root() is
+    # already the equivalent of OPS_PREFIX, so only the part BEYOND it becomes a
+    # directory — otherwise ordinary backups land in backups/backups/.
+    below = prefix[len(OPS_PREFIX):].strip('/') if prefix.startswith(OPS_PREFIX) else prefix
+    destination = backup_root() / below / name
+    destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(archive), destination)
     destination.with_name(destination.name + '.manifest.json').write_bytes(blob)
     return str(destination)
 
 
-def build(job) -> None:
-    """Take the backup. Runs in a thread; never raises into the caller."""
+def build(job, *, prefix: str = OPS_PREFIX) -> None:
+    """Take the backup. Runs in a thread; never raises into the caller.
+
+    `prefix` is for the restore's pre-restore safety copy, which lands under
+    backups/pre-restore/<id>/ so it is not one undated row among the ordinary
+    backups at the moment somebody badly needs to find it.
+    """
     job.status = job.Status.RUNNING
     job.started_at = timezone.now()
     job.stage = 'starting'
@@ -385,7 +396,15 @@ def build(job) -> None:
     # holding aitutor-backup-...-db.tar.gz a year from now should not have to
     # open it to find out the figures are missing.
     kind = 'full' if job.include_media else 'db'
-    name = f'aitutor-backup-{stamp}-{kind}.tar.gz'
+    # The job id is in the name because the timestamp is only per-second, and
+    # two backups CAN land in the same second — the restore flow guarantees it,
+    # since it takes a safety copy moments before reading another archive.
+    # Without this they share a filename: on disk the second silently overwrites
+    # the first (which, during a restore, means the safety copy destroying the
+    # archive being restored), and on S3 both rows point at one key so the older
+    # row now describes the newer bytes. The kind stays last so the name still
+    # says what is in it at a glance.
+    name = f'aitutor-backup-{stamp}-j{job.pk}-{kind}.tar.gz'
 
     try:
         # fresh=True: these numbers go into the manifest and are what a restore
@@ -449,7 +468,7 @@ def build(job) -> None:
             # the archive is open; this catches it one layer earlier.
             archive_sha256 = _sha256(archive_path)
             manifest['archive_sha256'] = archive_sha256
-            key = _store(job, archive_path, manifest)
+            key = _store(job, archive_path, manifest, prefix=prefix)
 
         job.status = job.Status.DONE
         job.storage_key = key

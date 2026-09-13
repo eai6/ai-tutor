@@ -669,3 +669,383 @@ class TestDispatch:
                     'ECS_MIGRATE_TASK_DEFINITION'):
             monkeypatch.delenv(var, raising=False)
         assert restore._ecs_settings() is None
+
+
+# ---------------------------------------------------------------------------
+# The destructive command
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db(transaction=True)
+class TestTheRoundTripActuallyWorks:
+    """The claim the whole feature rests on: what went in comes back out.
+
+    Everything else here tests a safeguard. This tests that the thing works —
+    that an archive taken before a change, restored after it, removes the
+    change and brings back what was there.
+    """
+
+    def _archive(self, tmp_path, settings):
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        job = BackupJob.objects.create(include_media=False)
+        from ai_tutor.apps.dashboard import backup as backup_service
+        backup_service.build(job)
+        job.refresh_from_db()
+        assert job.status == BackupJob.Status.DONE, job.error
+        return job
+
+    def test_a_change_made_after_the_backup_is_gone_after_the_restore(
+            self, db, tmp_path, settings, monkeypatch, django_user_model):
+        from django.core.management import call_command
+
+        marker = 'gone-by-restore'
+        assert not django_user_model.objects.filter(username=marker).exists()
+        backup = self._archive(tmp_path, settings)
+
+        # The world moves on.
+        django_user_model.objects.create_user(marker, 'x@y.z', 'pw')
+        assert django_user_model.objects.filter(username=marker).exists()
+
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        # No ECS here: no service to scale, no cluster to wait for.
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        assert not django_user_model.objects.filter(username=marker).exists(), \
+            'the restore did not undo the change'
+
+    def test_a_row_that_existed_before_the_backup_survives(
+            self, db, tmp_path, settings, monkeypatch, django_user_model):
+        """The other half. A restore that merely emptied the database would
+        pass the test above."""
+        from django.core.management import call_command
+
+        keeper = 'present-before-the-backup'
+        django_user_model.objects.create_user(keeper, 'k@y.z', 'pw')
+        backup = self._archive(tmp_path, settings)
+
+        django_user_model.objects.create_user('later', 'l@y.z', 'pw')
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        assert django_user_model.objects.filter(username=keeper).exists()
+        assert not django_user_model.objects.filter(username='later').exists()
+
+    def test_the_restore_records_itself_in_the_database_it_restored(
+            self, db, tmp_path, settings, monkeypatch):
+        """The row that started it was dropped with everything else. Without a
+        re-insert, a successful restore leaves no trace it happened."""
+        from django.core.management import call_command
+
+        backup = self._archive(tmp_path, settings)
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        done = RestoreJob.objects.filter(status=RestoreJob.Status.DONE)
+        assert done.exists(), 'no record of the restore survived it'
+        assert done.first().safety_backup_key, 'the safety copy was not recorded'
+
+    def test_the_safety_copy_is_downloadable_afterwards(
+            self, db, tmp_path, settings, monkeypatch):
+        """An S3 key nobody can reach from the UI is not a safety net."""
+        from django.core.management import call_command
+
+        backup = self._archive(tmp_path, settings)
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        safety = BackupJob.objects.filter(stage='pre-restore safety copy').first()
+        assert safety is not None, 'the safety copy is not in the backup list'
+        assert safety.status == BackupJob.Status.DONE
+        assert Path(safety.storage_key).is_file()
+
+    def test_interrupted_rows_the_archive_brought_back_are_cleared(
+            self, db, tmp_path, settings, monkeypatch):
+        """build() marks a BackupJob RUNNING before it dumps, so every archive
+        contains its own unfinished row. Restored as-is it holds the
+        one-active-backup constraint shut and parks the settings page on 'a
+        backup is already running' for six hours."""
+        from django.core.management import call_command
+
+        backup = self._archive(tmp_path, settings)
+        # The archive contains this very job, and build() saved it as RUNNING
+        # before dumping — so the dump holds a running row.
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        unfinished = BackupJob.objects.filter(
+            status__in=(BackupJob.Status.PENDING, BackupJob.Status.RUNNING))
+        assert not unfinished.exists(), \
+            'a resurrected running backup would block the next one for 6 hours'
+        # And a new backup can therefore be started.
+        BackupJob.objects.create()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestItRefusesRatherThanRiskIt:
+
+    def _backup(self, tmp_path, settings):
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        from ai_tutor.apps.dashboard import backup as backup_service
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+        return job
+
+    def test_a_failed_safety_backup_stops_everything(
+            self, db, tmp_path, settings, monkeypatch, django_user_model):
+        """build() never raises — it records failure and returns — so the status
+        has to be read back. Without that check this is the step that turns
+        'we restored the wrong archive' from recoverable into permanent."""
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        from ai_tutor.apps.dashboard import backup as backup_service
+
+        backup = self._backup(tmp_path, settings)
+        canary = django_user_model.objects.create_user('canary', 'c@y.z', 'pw')
+
+        def fail_the_safety_backup(safety_job, **kwargs):
+            safety_job.status = BackupJob.Status.FAILED
+            safety_job.error = 'pg_dump: connection refused'
+            safety_job.save()
+
+        monkeypatch.setattr(backup_service, 'build', fail_the_safety_backup)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        with pytest.raises(CommandError, match='NOTHING HAS BEEN CHANGED'):
+            call_command('restore_backup', job=job.pk)
+
+        # The live database is untouched.
+        assert django_user_model.objects.filter(pk=canary.pk).exists()
+
+    def test_a_corrupted_archive_is_caught_before_the_database_is_dropped(
+            self, db, tmp_path, settings, monkeypatch, django_user_model):
+        """The entire reason checksums were added in the first place."""
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        backup = self._backup(tmp_path, settings)
+        canary = django_user_model.objects.create_user('canary2', 'c2@y.z', 'pw')
+
+        # Corrupt the recorded checksum so the archive no longer matches it.
+        backup.summary['database']['dump_sha256'] = 'f' * 64
+        backup.save(update_fields=['summary'])
+
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        with pytest.raises(CommandError, match='NOTHING HAS BEEN CHANGED'):
+            call_command('restore_backup', job=job.pk)
+
+        assert django_user_model.objects.filter(pk=canary.pk).exists()
+
+    def test_it_will_not_run_while_another_restore_holds_the_lock(
+            self, db, tmp_path, settings, monkeypatch):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        backup = self._backup(tmp_path, settings)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+
+        blocker = RestoreJob.objects.create(status=RestoreJob.Status.DONE)
+        job = RestoreJob.objects.create(source_backup=backup,
+                                        source_key=backup.storage_key)
+        with restore_lock.exclusive(blocker):
+            with pytest.raises(CommandError):
+                call_command('restore_backup', job=job.pk)
+
+        job.refresh_from_db()
+        assert job.status == RestoreJob.Status.FAILED
+        assert 'Refused' in job.error
+
+
+# ---------------------------------------------------------------------------
+# The views — who may reach this, and what stops a mis-click
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def superuser(db):
+    return User.objects.create_superuser('root2', 'root2@example.com', 'pw')
+
+
+@pytest.fixture
+def staff_only(db):
+    """is_staff but NOT is_superuser — the account a superadmin can create from
+    the staff list with one toggle."""
+    return User.objects.create_user('staffer', 's@example.com', 'pw', is_staff=True)
+
+
+@pytest.mark.django_db
+class TestWhoCanReachRestore:
+
+    @pytest.mark.parametrize('route', [
+        'restore_preflight', 'restore_start', 'restore_upload'])
+    def test_an_anonymous_visitor_is_not_told_it_exists(self, client, route):
+        from django.urls import reverse
+        response = client.post(reverse(f'dashboard:{route}'))
+        assert response.status_code in (302, 404)
+        assert 'Restore' not in response.content.decode(errors='ignore')
+
+    @pytest.mark.parametrize('route', [
+        'restore_preflight', 'restore_start', 'restore_upload'])
+    def test_staff_without_superuser_gets_nothing(self, client, staff_only, route):
+        """is_staff is one toggle away for any account, and gates taking a copy.
+        Destroying everything is a different privilege."""
+        from django.urls import reverse
+        client.force_login(staff_only)
+        assert client.post(reverse(f'dashboard:{route}')).status_code == 404
+
+    def test_a_superuser_reaches_the_confirmation_page(self, client, superuser,
+                                                       lock_dir):
+        from django.urls import reverse
+        backup = BackupJob.objects.create(status=BackupJob.Status.DONE,
+                                          summary=_manifest(),
+                                          storage_key='backups/x.tar.gz')
+        client.force_login(superuser)
+        response = client.post(reverse('dashboard:restore_preflight'),
+                               {'backup_id': backup.pk})
+        assert response.status_code == 200
+        body = response.content.decode()
+        assert 'replaces the whole platform' in body
+        assert 'to confirm' in body
+
+
+@pytest.mark.django_db
+class TestTheConfirmationActuallyGuards:
+
+    def _confirm_page(self, client, superuser, lock_dir):
+        from django.urls import reverse
+        backup = BackupJob.objects.create(status=BackupJob.Status.DONE,
+                                          summary=_manifest(),
+                                          storage_key='backups/x.tar.gz')
+        client.force_login(superuser)
+        response = client.post(reverse('dashboard:restore_preflight'),
+                               {'backup_id': backup.pk})
+        return response.context['token'], backup
+
+    def test_the_wrong_platform_name_starts_nothing(self, client, superuser,
+                                                    lock_dir):
+        from django.urls import reverse
+        token, _ = self._confirm_page(client, superuser, lock_dir)
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': 'something else'})
+        assert not RestoreJob.objects.exists()
+
+    def test_a_token_cannot_be_used_twice(self, client, superuser, lock_dir,
+                                          monkeypatch):
+        """Spent server-side, so a re-POST of the confirmation page — a refresh,
+        a back button, a forged repeat — cannot start a second restore."""
+        from django.urls import reverse
+        from ai_tutor.apps.dashboard import restore as restore_service
+        monkeypatch.setattr(restore_service, 'dispatch', lambda job: 'pid:0')
+
+        token, _ = self._confirm_page(client, superuser, lock_dir)
+        name = 'AI Tutor'
+        from ai_tutor.apps.accounts.models import PlatformConfig
+        name = PlatformConfig.load().platform_name or name
+
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name})
+        assert RestoreJob.objects.count() == 1
+
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': token, 'confirm_name': name})
+        assert RestoreJob.objects.count() == 1, 'the token was accepted twice'
+
+    def test_a_token_that_was_never_issued_is_refused(self, client, superuser,
+                                                      lock_dir):
+        from django.urls import reverse
+        client.force_login(superuser)
+        client.post(reverse('dashboard:restore_start'),
+                    {'token': 'deadbeef' * 4, 'confirm_name': 'AI Tutor'})
+        assert not RestoreJob.objects.exists()
+
+    def test_an_unrestorable_archive_offers_no_confirmation_at_all(
+            self, client, superuser, lock_dir):
+        """Not merely warned about — there must be no form to submit."""
+        from django.urls import reverse
+        backup = BackupJob.objects.create(
+            status=BackupJob.Status.DONE, storage_key='backups/x.tar.gz',
+            summary=_manifest(database={'dump_format': 'pg_dump-custom'}))
+        client.force_login(superuser)
+        response = client.post(reverse('dashboard:restore_preflight'),
+                               {'backup_id': backup.pk})
+        body = response.content.decode()
+        assert 'cannot be restored' in body
+        assert 'restore/start' not in body
+
+    def test_it_is_all_on_the_record(self, client, superuser, lock_dir):
+        from django.urls import reverse
+        from ai_tutor.apps.safety.models import SafetyAuditLog
+        token, _ = self._confirm_page(client, superuser, lock_dir)
+        actions = list(SafetyAuditLog.objects
+                       .values_list('details__action', flat=True))
+        assert 'restore_preflight' in actions
+        entry = SafetyAuditLog.objects.first()
+        assert entry.severity == 'critical', 'a restore is not a warning'
+
+
+@pytest.mark.django_db
+class TestAFailedRestoreCanBeDiagnosed:
+    """A restore that half-works must leave an explanation somewhere.
+
+    The row that would record the failure is in the database the restore was
+    busy replacing, so off ECS — where there is no CloudWatch collecting the
+    task's stdout — the log file is the only account there is. This was learned
+    by sending it to DEVNULL and then having to reconstruct what happened.
+    """
+
+    def test_the_subprocess_backend_keeps_its_output(self, lock_dir, monkeypatch):
+        from ai_tutor.apps.dashboard import restore as restore_service
+
+        started = {}
+
+        class FakePopen:
+            def __init__(self, argv, stdout=None, stderr=None, **kw):
+                started['stdout'] = stdout
+                started['stderr'] = stderr
+                self.pid = 4242
+
+        monkeypatch.setattr(restore_service.subprocess, 'Popen', FakePopen)
+        job = RestoreJob.objects.create()
+        restore_service._dispatch_via_subprocess(job)
+
+        assert started['stdout'] is not None, 'restore output was discarded'
+        assert started['stdout'] != restore_service.subprocess.DEVNULL
+        # And it is a real file on disk, not a pipe nobody is reading.
+        assert hasattr(started['stdout'], 'name')
+        assert f'restore-{job.pk}.log' in str(started['stdout'].name)
+        assert started['stderr'] == restore_service.subprocess.STDOUT
+
+    def test_the_log_lands_beside_the_archives(self, lock_dir, monkeypatch):
+        from ai_tutor.apps.dashboard import restore as restore_service
+        from ai_tutor.apps.dashboard import backup as backup_service
+
+        class FakePopen:
+            def __init__(self, *a, **kw):
+                self.pid = 1
+
+        monkeypatch.setattr(restore_service.subprocess, 'Popen', FakePopen)
+        job = RestoreJob.objects.create()
+        restore_service._dispatch_via_subprocess(job)
+        assert (backup_service.backup_root() / f'restore-{job.pk}.log').is_file()

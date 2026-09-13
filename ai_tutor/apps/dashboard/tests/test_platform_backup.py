@@ -526,3 +526,49 @@ class TestCountingIsNotDoneOnEveryPageView:
         counts = backup_service.inventory(fresh=True)
         assert 'stale' not in counts['database']
         assert counts['database']['engine'] in ('sqlite', 'postgresql')
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTwoBackupsInTheSameSecond:
+    """The restore flow guarantees this: it takes a safety copy moments before
+    reading another archive. Sharing a filename means the safety copy can
+    overwrite the very archive being restored."""
+
+    def test_they_do_not_share_a_filename(self, local_backup):
+        first = BackupJob.objects.create(include_media=False)
+        backup_service.build(first)
+        second = BackupJob.objects.create(include_media=False)
+        backup_service.build(second)
+        first.refresh_from_db()
+        second.refresh_from_db()
+
+        assert first.status == BackupJob.Status.DONE, first.error
+        assert second.status == BackupJob.Status.DONE, second.error
+        assert first.storage_key != second.storage_key
+        assert Path(first.storage_key).is_file(), 'the first archive was overwritten'
+        assert Path(second.storage_key).is_file()
+
+    def test_each_still_says_what_it_holds_in_its_name(self, local_backup):
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+        # The kind stays last: someone holding the file a year from now should
+        # not have to open it to find out the figures are missing.
+        assert job.storage_key.endswith('-db.tar.gz')
+        assert f'-j{job.pk}-' in job.storage_key
+
+    def test_a_prefixed_copy_lands_apart_from_ordinary_backups(self, local_backup):
+        """The pre-restore safety copy, which must be findable at the moment
+        somebody badly needs it."""
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job, prefix=f'{backup_service.OPS_PREFIX}/pre-restore/7')
+        job.refresh_from_db()
+        assert job.status == BackupJob.Status.DONE, job.error
+        assert Path(job.storage_key).parent.name == '7'
+        assert 'pre-restore' in job.storage_key
+
+    def test_an_ordinary_backup_is_not_nested_under_a_stray_directory(self, local_backup):
+        job = BackupJob.objects.create(include_media=False)
+        backup_service.build(job)
+        job.refresh_from_db()
+        assert Path(job.storage_key).parent == backup_service.backup_root()

@@ -545,16 +545,32 @@ def _dispatch_via_ecs(job, cluster, task_definition, subnets,
 
 
 def _dispatch_via_subprocess(job) -> str:
-    """Dev. Detached, because the restore must not share a process with the web
-    server whose database connection it is about to drop."""
+    """Dev, and Path A on one server. Detached, because the restore must not
+    share a process with the web server whose database connection it is about
+    to drop.
+
+    Output goes to a log file, NOT to DEVNULL. On ECS the task's stdout reaches
+    CloudWatch and a failed restore can be read back; off ECS there is no such
+    collector, and discarding it means a restore that half-worked leaves no
+    explanation anywhere — the row that would have recorded the failure is in
+    the database the restore was busy replacing. Learned by doing exactly that.
+    """
     manage = Path(settings.BASE_DIR) / 'manage.py'
     if not manage.is_file():                           # installed as a package
         manage = Path(__file__).resolve().parents[3] / 'manage.py'
-    process = subprocess.Popen(
-        [sys.executable, str(manage), 'restore_backup', '--job', str(job.pk)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
+
+    log_path = backup_service.backup_root() / f'restore-{job.pk}.log'
+    log = log_path.open('ab')
+    try:
+        process = subprocess.Popen(
+            [sys.executable, str(manage), 'restore_backup', '--job', str(job.pk)],
+            stdout=log, stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    finally:
+        # The child holds its own duplicate of the descriptor.
+        log.close()
+    logger.info('restore %s logging to %s', job.pk, log_path)
     return f'pid:{process.pid}'
 
 
