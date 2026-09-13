@@ -78,3 +78,61 @@ class SubjectTypeTest(TestCase):
                 course.is_math,
                 msg=f'{title!r} should be detected as math via title heuristic',
             )
+
+
+class IsMathReadsSubjectCodeFirstTest(TestCase):
+    """subject_code is the canonical subject — the value the upload form
+    collects and the key material sharing joins on. Reading it last meant a
+    course explicitly marked `mathematics` could still have is_math decided by
+    a keyword scan of its title.
+
+    Step 1 of memory/subject_grade_unification_plan.md.
+    """
+
+    def setUp(self):
+        self.institution = Institution.objects.create(name='T2', slug='t2')
+
+    def test_a_maths_course_survives_a_rename(self):
+        """The production case. "Layer S Demo — Math S3" carries
+        subject_code='mathematics' and no subject_type, so is_math was True
+        only because the title contains "Math"."""
+        course = Course.objects.create(
+            institution=self.institution,
+            title='Angles around a point',      # no math keyword
+            subject_code='mathematics',
+        )
+        self.assertTrue(course.is_math)
+
+    def test_a_geography_course_named_after_a_keyword_is_not_math(self):
+        """"Statistics" is a MATH_KEYWORD, and a geography lesson can be
+        called that."""
+        course = Course.objects.create(
+            institution=self.institution,
+            title='Population Statistics',
+            subject_code='geography',
+        )
+        self.assertFalse(course.is_math)
+
+    def test_the_code_wins_over_the_type(self):
+        course = Course.objects.create(
+            institution=self.institution,
+            title='Anything',
+            subject_code='geography',
+            subject_type='math',
+        )
+        self.assertFalse(course.is_math)
+
+    def test_the_type_still_answers_when_there_is_no_code(self):
+        """Half the catalogue is classified this way — Mathematics S3 carries
+        subject_type='math' with subject_code empty."""
+        course = Course.objects.create(
+            institution=self.institution,
+            title='Anything',
+            subject_type='math',
+        )
+        self.assertTrue(course.is_math)
+
+    def test_the_title_still_answers_when_there_is_neither(self):
+        course = Course.objects.create(
+            institution=self.institution, title='Grade 8 Mathematics')
+        self.assertTrue(course.is_math)

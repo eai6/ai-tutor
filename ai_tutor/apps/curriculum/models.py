@@ -203,9 +203,29 @@ class Course(models.Model):
 
     @property
     def is_math(self):
+        """Whether the math tutoring rules apply to this course.
+
+        subject_code first. It is the canonical subject — the value the upload
+        form collects and the one material sharing joins on — and reading it
+        last meant a course explicitly marked `mathematics` could still be
+        decided by a keyword scan of its title. "Layer S Demo — Math S3" was
+        exactly that: subject_code='mathematics', subject_type='', and is_math
+        True only because the title happens to contain "Math". Rename it and
+        the math rules switch off silently.
+
+        subject_type stays as the second reading because half the catalogue is
+        classified through it and nothing through both — Mathematics S3 carries
+        subject_type='math' with no code at all.
+
+        The MATH_KEYWORDS scan is last and is the anti-pattern CLAUDE.md names.
+        It stays until both fields are populated everywhere; the thing that
+        makes it unreachable is `backfill_course_subjects`, not a deletion here.
+        """
+        if self.subject_code:
+            return self.subject_code == self.SubjectCode.MATHEMATICS
         if self.subject_type:
             return self.subject_type == self.SubjectType.MATH
-        # Legacy fallback for unclassified courses.
+        # Legacy fallback for courses classified by neither field.
         return any(kw in (self.title or '').lower() for kw in self.MATH_KEYWORDS)
 
     def __str__(self):
