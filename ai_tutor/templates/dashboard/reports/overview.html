@@ -87,34 +87,6 @@
     </div>
 </div>
 
-<!-- Competency Reports -->
-<div class="card" style="margin-top: 1.5rem;">
-    <div class="card-header">
-        <h3 class="card-title">{% trans "Competency Reports" %}</h3>
-    </div>
-    <div class="card-body">
-        {% if courses_with_eo %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
-            {% for item in courses_with_eo %}
-            <div style="border: 1px solid var(--gray-200); border-radius: 0.75rem; padding: 1rem;">
-                <div style="font-weight: 700; margin-bottom: 0.25rem;">{{ item.course.title }}</div>
-                <div style="font-size: 0.8125rem; color: var(--gray-500); margin-bottom: 0.75rem;">
-                    {% blocktrans with eo=item.eo_count s=item.session_count %}{{ eo }} enabling objectives · {{ s }} sessions{% endblocktrans %}
-                </div>
-                <a href="{% url 'dashboard:class_competency' item.course.id %}" class="btn btn-sm btn-primary" style="font-size: 0.8125rem;">
-                    {% trans "Class Competency & Readiness" %}
-                </a>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <p>{% trans "No courses with competency data yet. Upload a curriculum and generate content to see competency reports." %}</p>
-        </div>
-        {% endif %}
-    </div>
-</div>
-
 <!-- Recent Lesson Sessions -->
 {% if recent_lessons %}
 <div class="card" style="margin-top: 1.5rem;">
