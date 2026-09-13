@@ -206,10 +206,34 @@
         <h2>{{ lesson.title }}</h2>
         <div class="monitor-meta">{{ course.name }} &mdash; {% trans "Live Session Monitor" %}</div>
     </div>
-    <div>
-        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn-view" style="background:#6366f1;">{% trans "Session Report" %}</a>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        {% comment %}
+        Which class this page is about. A monitor with no class shows everyone
+        in the school who worked the lesson — useful for a super-admin, but it
+        cannot say who has NOT started, because there is no roster to compare
+        against.
+        {% endcomment %}
+        {% if class_choices %}
+        <form method="get" style="display:flex; align-items:center; gap:0.4rem;">
+            <label for="class-picker" style="font-size:0.8125rem; color:#71717a;">{% trans "Class" %}</label>
+            <select name="class" id="class-picker" onchange="this.form.submit()"
+                    style="padding:0.35rem 0.6rem; border:1px solid #e4e4e7; border-radius:6px; font-family:inherit; font-size:0.8125rem;">
+                <option value="">{% trans "Everyone in this school" %}</option>
+                {% for g in class_choices %}
+                <option value="{{ g }}"{% if g == grade %} selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+        <a href="{% url 'dashboard:lesson_session_report' lesson.id %}{% if grade %}?class={{ grade|urlencode }}{% endif %}" class="btn-view" style="background:#6366f1;">{% trans "Session Report" %}</a>
     </div>
 </div>
+
+{% if grade %}
+<p style="color:#71717a; font-size:0.875rem; margin:-0.25rem 0 1rem;">
+    {% blocktrans count n=roster_size with g=grade %}{{ g }} — {{ n }} student on the roster right now.{% plural %}{{ g }} — {{ n }} students on the roster right now.{% endblocktrans %}
+</p>
+{% endif %}
 
 <div class="summary-cards">
     <div class="summary-card">
@@ -233,6 +257,19 @@
         <div class="label">{% trans "Total" %}</div>
     </div>
 </div>
+
+{% if not_started %}
+<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:0.9rem 1.1rem; margin-bottom:1.25rem;">
+    <div style="font-size:0.875rem; font-weight:600; color:#92400e; margin-bottom:0.5rem;">
+        {% blocktrans count n=not_started|length %}{{ n }} student has not opened this lesson{% plural %}{{ n }} students have not opened this lesson{% endblocktrans %}
+    </div>
+    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+        {% for s in not_started %}
+        <a href="{% url 'dashboard:student_detail' s.id %}" style="padding:0.25rem 0.55rem; background:#fff; border:1px solid #fcd34d; border-radius:999px; font-size:0.8125rem; color:#92400e; text-decoration:none;">{{ s.first_name }} {{ s.last_name }}</a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 {% if sessions %}
 <table class="session-table">
@@ -299,6 +336,30 @@ recent-guidance UI was leaking platform internals to teachers; the
 underlying cognitive_load tracking still runs in the engine but
 isn't surfaced.
 {% endcomment %}
+
+{% if former_sessions %}
+{% comment %}
+Students who worked this lesson and have since left the class. Their work
+happened and is not deleted — but they are not what a teacher is deciding
+about today, so they sit below the roster and out of the counts.
+{% endcomment %}
+<details style="margin-top:1.5rem; border:1px solid #e4e4e7; border-radius:12px; padding:0.85rem 1.1rem;">
+    <summary style="cursor:pointer; font-size:0.875rem; color:#52525b;">
+        {% blocktrans count n=former_sessions|length with g=grade %}{{ n }} student no longer in {{ g }}{% plural %}{{ n }} students no longer in {{ g }}{% endblocktrans %}
+    </summary>
+    <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:0.4rem;">
+        {% for s in former_sessions %}
+        <div style="display:flex; align-items:center; gap:0.75rem; font-size:0.875rem;">
+            <span style="flex:1; min-width:0;">{{ s.student_name }}</span>
+            {% if s.exit_score is not None %}
+            <span style="font-weight:600;{% if s.exit_passed %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">{{ s.exit_score }}/{{ s.exit_total }}</span>
+            {% endif %}
+            <a href="{% url 'dashboard:session_chat_history' s.session.id %}" class="btn-view">{% trans "View Chat" %}</a>
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
 
 <div class="refresh-note">{% trans "Auto-refreshes every 10 seconds for active sessions." %}</div>
 {% endblock %}

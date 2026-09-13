@@ -196,6 +196,49 @@ def filter_by_institution(queryset, institution, field='institution'):
     return queryset
 
 
+def class_roster_ids(institution, grade):
+    """The user ids on a class roster RIGHT NOW.
+
+    A class is its current members, which is the whole point of scoping the
+    monitor and the report to one: a student promoted out of S3 last term is
+    not part of how S3 is doing today, and a student who joined this term is.
+    Reading it live off Membership + StudentProfile.grade_level means the
+    answer follows the roster without anything being recomputed.
+
+    Third caller of this filter (class_detail, the monitor, the report), which
+    is where the Rule of Three says to extract it.
+    """
+    qs = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution,
+    ).select_related('user', 'user__student_profile')
+    wanted = (grade or '').strip()
+    return [
+        m.user_id for m in qs
+        if ((getattr(getattr(m.user, 'student_profile', None),
+                     'grade_level', '') or '').strip() == wanted)
+    ]
+
+
+def class_choices(institution):
+    """Every grade that currently has a student in it, for the class picker.
+
+    Built from the roster rather than a fixed S1-S5 list because grade levels
+    are country-specific and config-driven (Mozambique runs "8ª Classe"), and
+    because offering a class with nobody in it is offering an empty page.
+    """
+    qs = filter_by_institution(
+        Membership.objects.filter(role='student', is_active=True),
+        institution,
+    ).select_related('user__student_profile')
+    grades = {
+        (getattr(getattr(m.user, 'student_profile', None),
+                 'grade_level', '') or '').strip()
+        for m in qs
+    }
+    return sorted(g for g in grades if g)
+
+
 def get_scoped_object_or_404(model, institution, **kwargs):
     """get_object_or_404 with optional institution scoping.
 
@@ -2498,16 +2541,11 @@ def class_detail(request, grade):
 
     institution = request.staff_ctx['institution']
 
-    # Roster — institution-scoped students whose grade_level matches.
-    student_qs = filter_by_institution(
-        Membership.objects.filter(role='student', is_active=True),
-        institution,
-    ).select_related('user', 'user__student_profile')
-    students = []
-    for m in student_qs:
-        profile = getattr(m.user, 'student_profile', None)
-        if profile and (profile.grade_level or '').strip() == grade:
-            students.append(m.user)
+    # Roster — institution-scoped students whose grade_level matches. Shared
+    # with the lesson monitor and the session report so all three pages mean
+    # the same thing by "this class".
+    student_ids = class_roster_ids(institution, grade)
+    students = list(User.objects.filter(id__in=student_ids))
     students.sort(key=lambda u: ((u.first_name or '').lower(), (u.last_name or '').lower(), u.username))
     student_ids = [s.id for s in students]
 
@@ -2969,12 +3007,38 @@ def lesson_session_report(request, lesson_id):
     course = lesson.unit.course
     mastery_threshold = config.threshold_me_min / 100.0  # Default 0.8
 
-    # ── Students who had tutor sessions for this lesson ──
-    sessions = TutorSession.objects.filter(lesson=lesson).select_related('student')
-    student_ids = list(sessions.values_list('student_id', flat=True).distinct())
+    # ── Who this report is about ──
+    #
+    # The school filter closes a leak: this was a bare filter(lesson=lesson),
+    # so on a platform-wide course the report mixed in every other school's
+    # students. The class filter is the point of the change — a report keyed
+    # to whoever once sat the lesson describes a group that no longer exists
+    # the moment anyone is promoted.
+    #
+    # Students who have moved on are kept, below the roster, rather than
+    # dropped: their work happened, and a teacher comparing this term with
+    # last one should still be able to see it.
+    grade = (request.GET.get('class') or '').strip()
+    roster_ids = set(class_roster_ids(institution, grade)) if grade else set()
+
+    sessions = filter_by_institution(
+        TutorSession.objects.filter(lesson=lesson), institution,
+    ).select_related('student')
+    worked_ids = list(sessions.values_list('student_id', flat=True).distinct())
+
+    if grade:
+        student_ids = [i for i in worked_ids if i in roster_ids]
+        former_ids = [i for i in worked_ids if i not in roster_ids]
+        # On the roster and never opened it. The count a teacher needs before
+        # deciding to move on, and one a sessions-only query cannot produce.
+        not_started_ids = sorted(roster_ids - set(worked_ids))
+    else:
+        student_ids, former_ids, not_started_ids = worked_ids, [], []
+
     total_students = len(student_ids)
 
-    completed_sessions = sessions.filter(status='completed').values_list('student_id', flat=True).distinct()
+    completed_sessions = (sessions.filter(status='completed', student_id__in=student_ids)
+                          .values_list('student_id', flat=True).distinct())
     completed_count = len(set(completed_sessions))
 
     # ── Enabling Objectives: canonical source of truth ──
@@ -3353,6 +3417,17 @@ def lesson_session_report(request, lesson_id):
         'recommendation_action': recommendation_action,
         'next_lesson': next_lesson,
         'group_sessions': group_sessions,
+        'grade': grade,
+        'class_choices': class_choices(institution),
+        'roster_size': len(roster_ids) if grade else None,
+        # Named, not counted: three students who never opened the lesson is a
+        # list of three people to go and ask, and a percentage is not.
+        'not_started_students': list(
+            User.objects.filter(id__in=not_started_ids)
+            .order_by('first_name', 'last_name', 'username')),
+        'former_students': list(
+            User.objects.filter(id__in=former_ids)
+            .order_by('first_name', 'last_name', 'username')),
     }
 
     return render(request, 'dashboard/lesson_session_report.html', context)
@@ -8566,9 +8641,23 @@ def lesson_live_monitor(request, lesson_id):
     # Also dedupe by student: keep only the most recent session per
     # student (handles edge cases where a student has multiple
     # active or completed rows for the same lesson).
+    #
+    # Scoped to the school, and optionally to one class.
+    #
+    # The school filter is not a refinement, it is a fix: this query was a bare
+    # filter(lesson=lesson), so on a platform-wide course a teacher at one
+    # school watched every other school's students work the same lesson.
+    #
+    # The class filter is what makes the page answer "how is MY class doing".
+    # A class roster changes — students are promoted out, new ones arrive — and
+    # a report keyed to whoever once sat the lesson drifts further from the
+    # class it is supposed to describe every term.
+    grade = (request.GET.get('class') or '').strip()
+    roster_ids = set(class_roster_ids(institution, grade)) if grade else set()
+
     raw_sessions = (
-        TutorSession.objects
-        .filter(lesson=lesson)
+        filter_by_institution(
+            TutorSession.objects.filter(lesson=lesson), institution)
         .exclude(status='abandoned')
         .select_related('student')
         .prefetch_related('turns')
@@ -8685,6 +8774,30 @@ def lesson_live_monitor(request, lesson_id):
             'participant_names': participant_names,
         })
 
+    # Roster first, everyone else below.
+    #
+    # A student who worked this lesson and has since moved on is not deleted
+    # from the record — their work happened — but they are not what a teacher
+    # is deciding about today, so they do not sit in the counts or the main
+    # table. Without a class filter every row is "on roster" and the second
+    # list is empty, which is the old behaviour plus the school fix.
+    if grade:
+        on_roster = [d for d in session_data if d['session'].student_id in roster_ids]
+        off_roster = [d for d in session_data if d['session'].student_id not in roster_ids]
+    else:
+        on_roster, off_roster = session_data, []
+
+    # Students on the roster who have not opened the lesson at all. They are
+    # the reason the class filter exists: "nobody started" is invisible when
+    # the page can only list sessions that happened.
+    worked_ids = {d['session'].student_id for d in on_roster}
+    not_started = []
+    if grade:
+        not_started = list(
+            User.objects.filter(id__in=roster_ids - worked_ids)
+            .order_by('first_name', 'last_name', 'username')
+        )
+
     # Monitor AI: auto-issue guidance to tutors for struggling students,
     # debounced to once per 5 min per lesson so page refreshes don't spam.
     _maybe_run_monitor_ai(lesson, session_data)
@@ -8711,12 +8824,17 @@ def lesson_live_monitor(request, lesson_id):
         **request.staff_ctx,
         'lesson': lesson,
         'course': lesson.unit.course,
-        'sessions': session_data,
-        'active_count': sum(1 for s in session_data if s['status'] == 'active' and not s['is_idle'] and not s['is_completed']),
-        'idle_count': sum(1 for s in session_data if s['is_idle'] and not s['is_completed']),
-        'completed_count': sum(1 for s in session_data if s['is_completed']),
+        'sessions': on_roster,
+        'former_sessions': off_roster,
+        'not_started': not_started,
+        'grade': grade,
+        'class_choices': class_choices(institution),
+        'roster_size': len(roster_ids) if grade else None,
+        'active_count': sum(1 for s in on_roster if s['status'] == 'active' and not s['is_idle'] and not s['is_completed']),
+        'idle_count': sum(1 for s in on_roster if s['is_idle'] and not s['is_completed']),
+        'completed_count': sum(1 for s in on_roster if s['is_completed']),
         'struggling_count': sum(
-            1 for s in session_data
+            1 for s in on_roster
             if s['status'] == 'active' and not s['is_idle'] and s['cognitive_load'] > 0.7
         ),
         'recent_ai_guidances': recent_ai_guidances,

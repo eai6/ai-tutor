@@ -79,8 +79,14 @@
                         <td>{{ r.session_count }}</td>
                         <td style="color:var(--gray-500);">{% blocktrans with when=r.most_recent|timesince %}{{ when }} ago{% endblocktrans %}</td>
                         <td style="white-space:nowrap;">
-                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Monitor" %}</a>
-                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Report" %}</a>
+                            {% comment %}
+                            Both carry ?class= so the page they open is about
+                            THIS class — its current roster, including who has
+                            not started — rather than everyone who ever sat the
+                            lesson. See views.class_roster_ids.
+                            {% endcomment %}
+                            <a href="{% url 'dashboard:lesson_monitor' r.lesson.id %}?class={{ grade|urlencode }}" class="btn btn-secondary btn-sm">{% trans "Monitor" %}</a>
+                            <a href="{% url 'dashboard:lesson_session_report' r.lesson.id %}?class={{ grade|urlencode }}" class="btn btn-secondary btn-sm">{% trans "Report" %}</a>
                         </td>
                     </tr>
                 {% endfor %}

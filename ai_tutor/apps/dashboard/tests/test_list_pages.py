@@ -260,16 +260,39 @@ class TestTheWeekIsACalendarWeek:
 
 
 @pytest.mark.django_db
-class TestEveryLessonRowIsActionable:
-    """Review, Monitor and Report on the row itself — a teacher who spots a
-    lesson in the table should not have to open it to watch or read it."""
+class TestTheCourseTableIsAboutContent:
+    """Monitor and Report used to sit on these rows. They moved.
 
-    def test_the_row_offers_monitor_and_report(self, client, teacher, school,
-                                               course):
-        from django.urls import reverse
+    Both pages are class-scoped now — a roster, who has not started, who has
+    since moved on — and a course does not name a class: "Geography S1-S5"
+    spans five of them. They live on the class page, which knows which one.
+    Review stays: reviewing a lesson is a thing you do to the content.
+    """
+
+    def test_the_row_offers_review_only(self, client, teacher, school, course):
         lesson = course.units.first().lessons.first()
         client.force_login(teacher)
         response = client.get(reverse('dashboard:course_detail', args=[course.id]))
         body = response.content.decode()
-        assert reverse('dashboard:lesson_monitor', args=[lesson.id]) in body
-        assert reverse('dashboard:lesson_session_report', args=[lesson.id]) in body
+
+        assert reverse('dashboard:lesson_detail', args=[lesson.id]) in body
+        assert reverse('dashboard:lesson_monitor', args=[lesson.id]) not in body
+        assert reverse('dashboard:lesson_session_report', args=[lesson.id]) not in body
+
+    def test_the_class_page_carries_them_with_a_class(self, client, teacher,
+                                                      school, course):
+        """And carries the class with them — a link that lost the ?class= would
+        land on the school-wide page and quietly answer a different question."""
+        amara = _student(school, 'amara')
+        lesson = course.units.first().lessons.first()
+        TutorSession.objects.create(student=amara, lesson=lesson,
+                                    institution=school)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:class_detail', args=['S3']))
+        body = response.content.decode()
+
+        monitor = reverse('dashboard:lesson_monitor', args=[lesson.id])
+        report = reverse('dashboard:lesson_session_report', args=[lesson.id])
+        assert f'{monitor}?class=S3' in body
+        assert f'{report}?class=S3' in body

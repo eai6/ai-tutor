@@ -1017,9 +1017,14 @@ lessons even when curriculum editing is locked down.
                             </form>
                         {% endif %}
                     {% endwith %}
+                    {% comment %}
+                    Monitor and Report used to sit here. They are class-scoped
+                    now — a roster, who has not started, who has moved on — and
+                    a course does not name a class: "Geography S1-S5" spans
+                    five of them. They live on the class page, which knows.
+                    This table is about the content.
+                    {% endcomment %}
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Review" %}</a>
-                    <a href="{% url 'dashboard:lesson_monitor' lesson.id %}" class="btn btn-sm" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Watch students working on this lesson now' %}">{% trans "Monitor" %}</a>
-                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
                 </div>
             </div>
             {% endfor %}
