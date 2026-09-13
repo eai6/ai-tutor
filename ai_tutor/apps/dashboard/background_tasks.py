@@ -123,9 +123,11 @@ def generate_all_content_async(course_id: int, upload_id: int = None, generate_m
                 upload.add_log(message)
 
     try:
-        # Get all lessons
+        # Get all live lessons. Parked ones (Lesson.retired_at) are skipped:
+        # a replace retires what the new document dropped, and generating for
+        # them is spend on work no student can reach.
         lessons = Lesson.objects.filter(
-            unit__course=course
+            unit__course=course, retired_at__isnull=True,
         ).order_by('unit__order_index', 'order_index')
 
         total = lessons.count()
@@ -274,7 +276,9 @@ def generate_media_for_lessons(course_id: int, upload=None) -> dict:
     course = Course.objects.get(id=course_id)
     institution = course.institution
     
-    lessons = Lesson.objects.filter(unit__course_id=course_id)
+    # Live lessons only — parked ones cost real image spend for nothing.
+    lessons = Lesson.objects.filter(
+        unit__course_id=course_id, retired_at__isnull=True)
     generated = 0
     failed = 0
     skipped = 0
@@ -352,7 +356,9 @@ def generate_exit_tickets_for_lessons(course_id: int, upload=None) -> dict:
 
     client = get_llm_client(config)
 
-    lessons = Lesson.objects.filter(unit__course_id=course_id)
+    # Live lessons only, same reason as the media sweep.
+    lessons = Lesson.objects.filter(
+        unit__course_id=course_id, retired_at__isnull=True)
     generated = 0
     failed = 0
     skipped = 0
@@ -648,7 +654,11 @@ def generate_media_async(
             upload.save()
     
     try:
-        lessons = Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+        # Live lessons only. Parked ones (Lesson.retired_at) are unreachable
+        # by any student, so generating their images is pure spend.
+        lessons = (Lesson.objects
+                   .filter(unit__course=course, retired_at__isnull=True)
+                   .order_by('unit__order_index', 'order_index'))
         total_lessons = lessons.count()
 
         log(f"📊 Found {total_lessons} lessons to process")
@@ -1310,7 +1320,9 @@ def generate_complete_course(
                 logger.info(msg)
 
     lessons = list(
-        Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+        Lesson.objects
+        .filter(unit__course=course, retired_at__isnull=True)
+        .order_by('unit__order_index', 'order_index')
     )
     scope_label = "steps + exit tickets + summative" if do_steps else "exit tickets + summative (steps preserved)"
     log(f"🚀 Starting course regen for '{course.title}' — {len(lessons)} lesson(s), scope: {scope_label}, {max_workers} parallel workers")
@@ -1621,7 +1633,7 @@ def review_unreviewed_content_async(
     try:
         lessons = (
             Lesson.objects
-            .filter(unit__course=course)
+            .filter(unit__course=course, retired_at__isnull=True)
             .order_by('unit__order_index', 'order_index')
         )
         total_lessons = lessons.count()
