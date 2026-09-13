@@ -2,7 +2,7 @@ config:
   aws:region: us-east-1
   aitutor-aws:enable-ecs: "true"
   aitutor-aws:waf-block-mode: "true"
-  aitutor-aws:image-tag: 4b21fc15836540ffc23559b71680e67395dec049
+  aitutor-aws:image-tag: 5de65e505d28e2ae60be75e223f615ecda952b1e
   aitutor-aws:domain-name: aitutor.edwardamoah.com
   aitutor-aws:hosted-zone-id: Z00581302MRKJMLLLUCQ7
   aitutor-aws:django-secret-key:
