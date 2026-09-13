@@ -1470,8 +1470,26 @@ class CurriculumKnowledgeBase:
         # Try the canonical match first
         if course is not None:
             upload_ids = self._global_upload_ids_matching_course(course)
-            if upload_ids:
+            if upload_ids and self._global_chunks_exist_for(upload_ids):
                 return {"upload_id": {"$in": list(upload_ids)}}
+            if upload_ids:
+                # The match is right and the filter would still return
+                # nothing, because no indexed chunk carries these upload_ids.
+                # Chunks indexed before upload_id was threaded through
+                # index_teaching_material have it NULL, and this filter is an
+                # early return — so the BETTER the subject+grade match got,
+                # the LESS the tutor retrieved. A course matching platform
+                # materials retrieved nothing while a course matching none
+                # fell through to the subject filter and retrieved something.
+                # Fall through rather than hand back a filter that is known
+                # to be empty. The durable fix is re-indexing those materials.
+                logger.warning(
+                    "[KB] %s platform upload(s) match this course but no "
+                    "indexed chunk carries their upload_id — falling back to "
+                    "the subject filter. Re-index those materials to restore "
+                    "the precise match.",
+                    len(upload_ids),
+                )
 
         # Legacy fallback: extract subject filter from the supplied filter
         if where_filter and isinstance(where_filter, dict):
@@ -1482,6 +1500,24 @@ class CurriculumKnowledgeBase:
                     if isinstance(clause, dict) and "subject" in clause:
                         return clause
         return None
+
+    @staticmethod
+    def _global_chunks_exist_for(upload_ids) -> bool:
+        """Is any indexed chunk actually tagged with one of these uploads?
+
+        Cheap existence check, not a count — it only has to answer whether the
+        upload_id filter can return anything at all.
+        """
+        if not upload_ids:
+            return False
+        try:
+            from ai_tutor.apps.curriculum.models import CurriculumChunk
+            return CurriculumChunk.objects.filter(
+                upload_id__in=list(upload_ids)).exists()
+        except Exception:                                    # noqa: BLE001
+            # Never let a diagnostic break retrieval; assume the filter is
+            # usable and let the query decide.
+            return True
 
     @staticmethod
     def _global_upload_ids_matching_course(course) -> set:
@@ -1501,9 +1537,7 @@ class CurriculumKnowledgeBase:
             course_grades = PlatformConfig.normalize_grades(
                 getattr(course, 'grade_levels', None), vocab)
             if not subject_code:
-                # No rule match is possible, but a hand-attached material
-                # still counts — this is the likeliest course to have one.
-                return CurriculumKnowledgeBase._hand_attached_upload_ids(course)
+                return set()
         except Exception:
             return set()
 
@@ -1526,32 +1560,12 @@ class CurriculumKnowledgeBase:
                 matching_course_ids.append(gc.id)
 
         if not matching_course_ids:
-            return CurriculumKnowledgeBase._hand_attached_upload_ids(course)
+            return set()
 
         upload_ids = set(TeachingMaterialUpload.objects.filter(
             course_id__in=matching_course_ids,
         ).values_list('id', flat=True))
-        upload_ids |= CurriculumKnowledgeBase._hand_attached_upload_ids(course)
         return upload_ids
-
-    @staticmethod
-    def _hand_attached_upload_ids(course) -> set:
-        """Materials a teacher attached to this course directly.
-
-        A union with the subject+grade match, never a replacement: attaching
-        by hand can only ever add. Kept as its own method, and called from
-        both the matched and unmatched paths above, because the early returns
-        in the matching logic would otherwise skip it — a course with no
-        subject_code has no rule match at all, and that is exactly the course
-        somebody is most likely to have attached materials to by hand.
-        """
-        try:
-            return set(course.shared_materials.values_list('id', flat=True))
-        except Exception:                                    # noqa: BLE001
-            # A course object that is not a real model instance (tests, a
-            # deferred .only() row without the m2m). Never break retrieval
-            # over an optional extra.
-            return set()
 
     def _convert_fallback_to_query_results(self, merged: List[Dict]) -> Dict:
         """Convert query_with_global_fallback() output to ChromaDB query() format

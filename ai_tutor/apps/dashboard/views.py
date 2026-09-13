@@ -169,41 +169,6 @@ def _safety_flag_count(institution) -> int:
     return qs.count()
 
 
-def _attachable_materials_qs(course):
-    """Teaching materials this course is allowed to attach by hand.
-
-    ONE definition, used by both the picker and the endpoint that saves it —
-    if they disagreed, the page would offer materials the save then silently
-    dropped.
-
-    Three ways in, and the third is the one that matters day to day:
-
-      institution IS NULL              uploaded platform-wide
-      on a platform-wide course        already shared to every school by the
-                                       subject+grade rule, whatever institution
-                                       is stamped on the material itself
-      institution == this course's     the school's OWN material, on its OWN
-                                       course — no tenancy boundary crossed
-
-    The third was missing, which made a school's materials unattachable to
-    that school's own courses: the common case, refused for a leak that
-    cannot happen.
-
-    `course__isnull=False` is load-bearing on the second clause. Without it
-    `course__institution__isnull=True` also matches a material with NO course,
-    which would offer one school's private material to another.
-    """
-    from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
-
-    rule = (
-        Q(institution__isnull=True)
-        | Q(course__isnull=False, course__institution__isnull=True)
-    )
-    if getattr(course, 'institution_id', None):
-        rule |= Q(institution_id=course.institution_id)
-    return TeachingMaterialUpload.objects.filter(rule).distinct()
-
-
 def _inherited_materials_summary(course):
     """For a school course, summarise platform-wide materials it inherits.
 
@@ -223,21 +188,7 @@ def _inherited_materials_summary(course):
     # Hand-attached materials are counted on every path, including the ones
     # where the subject+grade rule matches nothing — that is the course most
     # likely to have them.
-    # `course.pk` guard: the upload-form preview passes an UNSAVED Course to
-    # reuse this exact rule, and an m2m read on an unsaved instance raises.
-    # Nothing is hand-attached to a course that does not exist yet.
-    hand_attached = (
-        list(course.shared_materials.select_related('course').all())
-        if getattr(course, 'pk', None) else []
-    )
     if not getattr(course, 'subject_code', ''):
-        if hand_attached:
-            return {
-                'status': 'hand_attached_only',
-                'platform_courses': [],
-                'material_count': 0,
-                'hand_attached': hand_attached,
-            }
         return None
     # Both sides normalised to configured grade CODES before intersecting.
     # A platform-wide course created from a syllabus carries whatever label
@@ -266,18 +217,10 @@ def _inherited_materials_summary(course):
         material_count = TeachingMaterialUpload.objects.filter(
             course_id__in=[c.id for c in matching],
         ).count()
-        if material_count or hand_attached:
-            return {
-                'status': 'matched',
-                'platform_courses': matching,
-                'material_count': material_count,
-                'hand_attached': hand_attached,
-            }
         return {
-            'status': 'matched_but_empty',
+            'status': 'matched' if material_count else 'matched_but_empty',
             'platform_courses': matching,
-            'material_count': 0,
-            'hand_attached': [],
+            'material_count': material_count,
         }
 
     # Nothing matched, and the course itself is set up correctly — which until
@@ -302,7 +245,6 @@ def _inherited_materials_summary(course):
             'status': 'platform_courses_unclassified',
             'platform_courses': [],
             'material_count': 0,
-            'hand_attached': hand_attached,
             'unclassified_courses': unclassified_with_materials,
         }
 
@@ -312,7 +254,6 @@ def _inherited_materials_summary(course):
             'status': 'grade_mismatch',
             'platform_courses': [],
             'material_count': 0,
-            'hand_attached': hand_attached,
             'subject_courses': platform_courses,
         }
 
@@ -320,7 +261,6 @@ def _inherited_materials_summary(course):
         'status': 'no_platform_course',
         'platform_courses': [],
         'material_count': 0,
-        'hand_attached': hand_attached,
     }
 
 
@@ -1971,25 +1911,6 @@ def course_detail(request, course_id):
         # `course__institution__isnull=True` also matches a material with NO
         # course at all, which would offer one school's private material to
         # another. Tested.
-        'attachable_materials': (
-            [] if is_platform_wide else list(
-                _attachable_materials_qs(course)
-                .select_related('course', 'institution')
-                .order_by('subject_name', 'title')[:200]
-            )
-        ),
-        # What exists but cannot be attached, so an empty picker can say why
-        # rather than just being empty.
-        'unattachable_material_count': (
-            0 if is_platform_wide else (
-                TeachingMaterialUpload.objects.count()
-                - _attachable_materials_qs(course).count()
-            )
-        ),
-        'attached_material_ids': (
-            set() if is_platform_wide
-            else set(course.shared_materials.values_list('id', flat=True))
-        ),
         'is_platform_wide': is_platform_wide,
         'course_read_only': course_read_only,
         'course_tier_label': course_tier_label,
@@ -8169,8 +8090,6 @@ def material_inheritance_preview(request):
         title='', institution=None,
         subject_code=subject_code, grade_level=','.join(grades),
     )
-    # Unsaved instance: shared_materials would raise, and there is nothing
-    # hand-attached to a course that does not exist yet.
     summary = _inherited_materials_summary(probe) or {}
     return JsonResponse({
         'ok': True,
@@ -8188,56 +8107,6 @@ def material_inheritance_preview(request):
             for c in summary.get('subject_courses', [])
         ],
     })
-
-
-@teacher_required
-@require_POST
-def course_shared_materials(request, course_id):
-    """Attach / detach platform-wide materials to one course by hand.
-
-    Its own endpoint rather than part of `course_edit`, deliberately. That view
-    is also the target of the re-parse form, which posts a small subset of
-    fields — so a checkbox list living there would arrive EMPTY on every
-    re-parse and silently detach everything. The same absent-field trap that
-    made `defaults` skip subject and grade on an existing course.
-
-    What this writes is a union with the automatic subject+grade match, never
-    a replacement: attaching by hand can only add. Only platform-wide
-    materials are attachable — a school's own material reaching another school
-    would be a cross-tenant leak, so the queryset is filtered rather than
-    trusting the posted ids.
-    """
-    from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
-
-    institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(Course, id=course_id, institution=institution)
-    else:
-        course = get_object_or_404(Course, id=course_id)
-
-    posted_ids = {int(i) for i in request.POST.getlist('material_ids') if i.isdigit()}
-    # Platform-wide only, and re-read from the DB rather than trusting the
-    # post: an id for another school's material simply will not be found.
-    allowed = _attachable_materials_qs(course).filter(id__in=posted_ids)
-    course.shared_materials.set(allowed)
-
-    n = allowed.count()
-    dropped = len(posted_ids) - n
-    if dropped:
-        messages.warning(
-            request,
-            f"{dropped} material(s) could not be attached — only platform-wide "
-            f"materials can be shared into a course.",
-        )
-    messages.success(
-        request,
-        f"{n} platform-wide material(s) attached to \"{course.title}\" by hand. "
-        f"They are in addition to anything matched automatically by subject and grade."
-        if n else
-        f"No hand-attached materials on \"{course.title}\". It still inherits "
-        f"whatever matches its subject and grade.",
-    )
-    return redirect('dashboard:course_detail', course_id=course.id)
 
 
 @teacher_required

@@ -120,27 +120,6 @@ class Course(models.Model):
         ),
     )
 
-    # Platform-wide materials attached to this course BY HAND, in addition to
-    # whatever the subject+grade rule already matches.
-    #
-    # Two sources reaching one course is a shape worth being careful about —
-    # it is what memory/subject_grade_unification_plan.md spent five steps
-    # removing elsewhere. The difference is that these two are not two
-    # spellings of one fact that can disagree: the rule says "every S3 maths
-    # course sees these", and this says "and this course also sees that one".
-    # A union, not an override. Nothing here can make the rule match less, and
-    # the course page labels which materials came from which, so a teacher can
-    # always tell why a material is present.
-    shared_materials = models.ManyToManyField(
-        'dashboard.TeachingMaterialUpload',
-        blank=True,
-        related_name='attached_courses',
-        help_text=(
-            "Platform-wide materials attached to this course by hand, on top "
-            "of those matched automatically by subject + grade."
-        ),
-    )
-
     # subject_code → the coarse bucket. Total over SubjectCode: every code has
     # exactly one type, which is why the type never needed storing separately.
     SUBJECT_CODE_TO_TYPE = {
