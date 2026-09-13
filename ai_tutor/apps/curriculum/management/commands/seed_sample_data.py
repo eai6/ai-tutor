@@ -107,7 +107,14 @@ Use simple language appropriate for young learners.''',
             title='Grade 3 Math: Addition',
             defaults={
                 'description': 'Learn addition with carrying for two-digit numbers',
-                'grade_level': 'Grade 3',
+                # A configured grade code and an explicit subject, so the seed
+                # produces a course the platform can actually match. 'Grade 3'
+                # is in none of the configured grade sets, and with no
+                # subject_code is_math fell back to scanning the title — the
+                # seed was manufacturing the exact unclassified row that
+                # memory/subject_grade_unification_plan.md exists to remove.
+                'grade_level': 'S1',
+                'subject_code': Course.SubjectCode.MATHEMATICS,
                 'is_published': True,
             }
         )

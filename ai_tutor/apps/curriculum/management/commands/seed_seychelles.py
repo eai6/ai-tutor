@@ -221,7 +221,12 @@ class Command(BaseCommand):
             defaults={
                 'description': 'Seychelles Secondary Geography Curriculum (Cycle 4: S1-S3). '
                               'Covers physical and human geography with emphasis on Seychelles context.',
-                'grade_level': 'S1-S3',
+                # Comma-separated, not the 'S1-S3' range it used to carry.
+                # grade_levels splits on commas, so a range parsed to the
+                # single token ['S1-S3'] and matched no student and no
+                # platform-wide course. The units below already use this form.
+                'grade_level': 'S1,S2,S3',
+                'subject_code': Course.SubjectCode.GEOGRAPHY,
                 'is_published': True,
             }
         )
@@ -346,7 +351,8 @@ class Command(BaseCommand):
             defaults={
                 'description': 'Seychelles Secondary Mathematics Curriculum. '
                               'Five strands: Number, Algebra, Shape & Space, Measures, Handling Data.',
-                'grade_level': 'S1-S5',
+                'grade_level': 'S1,S2,S3,S4,S5',
+                'subject_code': Course.SubjectCode.MATHEMATICS,
                 'is_published': True,
             }
         )

@@ -1,6 +1,7 @@
 # Subject and grade — one stored field each (2026-09-13)
 
-**Status: IN PROGRESS.** Steps 1-4 are done. Step 5 is still scope only.
+**Status: Steps 1-5 done.** One thing is deliberately NOT done and is
+blocked on an action outside this repo — see step 5.
 
 Written after a teacher set subject and grade on the upload form and the
 platform-wide materials still did not reach the course. That bug is fixed
@@ -271,6 +272,72 @@ read back. Porting them to `subject_code` fixed that incidentally.
 `Edit Course` form keeps them editable. `backfill_course_subjects` is deleted —
 there is nothing left to backfill.
 
+**Done 2026-09-13, except the deletion.** The step was written as tidying-up.
+It was not: auditing every writer found that the headline bug was still live
+on the route most uploads take.
+
+**There are TWO `complete_curriculum_upload` functions**, and they were not
+equivalent:
+
+| route | used by | set `subject_code`? |
+|---|---|---|
+| `pipeline.complete_curriculum_upload` | `course_reupload` (replace / refresh) | yes, since `63c3483` |
+| `curriculum_parser.complete_curriculum_upload` | **`curriculum_approve`** — the button a teacher presses after reviewing a parse | **no** |
+
+The second hands off to the archive's `create_curriculum_from_structure`,
+which predates `subject_code` and never set it. So `63c3483` fixed the reported
+bug on the secondary route and left it standing on the primary one: a teacher
+picked Mathematics on the upload form, approved the parse, and got a course
+with no subject at all. Reproduced with a test before fixing.
+
+The fix stamps it after the row exists, beside the `locale` patch two lines
+up that is there for exactly the same reason — the archive ignores that field
+too. Fills a blank only, because this route can target an existing course on a
+re-upload.
+
+**The upload form now requires a subject on the server.** The template marked
+it `required`, but that is client-side; the view accepted a blank because the
+free-text "Display name" satisfied the "please select a subject" check on its
+own. Same free-text-twin shape as the grade box removed the same day: a
+secondary field standing in for the canonical one. Verified the new test fails
+without the change.
+
+**Three seed-created courses were the anti-pattern in miniature** —
+`seed_sample_data`'s `'Grade 3'` and `seed_seychelles`'s `'S1-S3'` / `'S1-S5'`,
+all three with no `subject_code`. `grade_levels` splits on commas, so a
+hyphen range read back as the single token `['S1-S3']` and matched nothing.
+Seeds are where a developer's idea of a normal row comes from, so these are
+worth more than their runtime weight. A test now asserts every seeded course
+has a subject and a grade the platform can match.
+
+### `backfill_course_subjects` is NOT deleted — and the gate is not in this repo
+
+The plan says to delete it because there is nothing left to backfill. That is
+true of local data (it proposes 0 of 8 changes) and of every course created
+from now on. It is NOT known to be true of **prod**, where
+`backfill_course_subjects --apply` **has never been run**.
+
+Two things are waiting on that single command:
+
+1. **The command itself.** It is the only way to classify a prod course that
+   predates the subject dropdown.
+2. **The `MATH_KEYWORDS` fallback in `is_math`** (CLAUDE.md names it as an
+   anti-pattern to remove). Deleting it while an unclassified prod course
+   exists silently switches the math tutoring rules off for that course —
+   worse than the heuristic it removes.
+
+So the remaining work is one operational step, then two deletions:
+
+```bash
+python manage.py backfill_course_subjects --dry-run   # read the unmapped list
+python manage.py backfill_course_subjects --apply
+```
+
+The dry-run prints every course it cannot classify from its title. Those need
+a subject picked by hand in Edit Course — guessing is what this plan removed.
+Once the survey shows no course without a `subject_code`, delete the command
+and the keyword fallback together.
+
 ---
 
 # Part 4 — Deliberately out of scope
@@ -310,9 +377,28 @@ there is nothing left to backfill.
 # Part 6 — What this does not fix
 
 The teacher still sets a subject and a grade in two places — the upload form
-and Edit Course — and a course created by other means has neither. The
-warning shipped in `63c3483` makes that visible. Making it impossible would
-mean requiring both at course creation, which is a product decision, not a
-refactor.
+and Edit Course. That is by design: the upload form is where a course is born
+and Edit Course is where it is corrected. Both now write the same two stored
+fields, and both require a subject, so the two places cannot disagree about
+what a course *is* — only about what it should be, which is what editing means.
+
+What remains genuinely unfixed:
+
+- **A course created by neither** has neither field. The three seed commands
+  were the only such path in the repo and are fixed; a shell or a future code
+  path could still make one. `Course.subject_code` is `blank=True` at the model
+  level, so nothing structural prevents it. Making it `NOT NULL` would need
+  every existing prod row classified first — the same gate as everything else
+  in step 5.
+- **`Unit.grade_level` is free text and unvalidated**, and the parser writes
+  whatever label it detected. That is what puts an off-list grade on a course
+  in the first place. The Edit Course warning now surfaces it; normalising it
+  at parse time is separate work.
+- **The grade written at upload does not override the grade the parser
+  detected.** Both creation routes use the detected per-grade label, which is
+  correct for a multi-grade syllabus (one upload, N courses, one grade each)
+  and wrong for a single-grade one where the parser reads "Secondary 3" and
+  the teacher picked "S3". Resolving that needs a rule that distinguishes the
+  two cases; the warning makes the mismatch visible meanwhile.
 
 Refs: memory/curriculum_material_sharing_plan.md

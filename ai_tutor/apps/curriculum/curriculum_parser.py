@@ -1584,11 +1584,27 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
         total_units += result.get('units_created', 0)
         total_lessons += result.get('lessons_created', 0)
 
-        # Stamp the detected locale on the Course so content
-        # generation runs in the correct register. The archive's
-        # create_curriculum_from_structure ignores locale.
+        # Stamp the fields the archive's create_curriculum_from_structure
+        # predates onto the Course after the row exists.
+        #
+        # locale, so content generation runs in the correct register — and
+        # subject_code, which is what the teacher picked on the upload form
+        # and the key material sharing joins on. Without it the course is
+        # unclassified: it inherits no platform-wide materials, and is_math
+        # falls back to scanning the title, so a maths syllabus whose subject
+        # name has no keyword in it silently loses the math tutoring rules.
+        #
+        # This is the same fill 63c3483 added to pipeline.py. That fixed the
+        # re-upload route; this is the route `curriculum_approve` takes, which
+        # is the one most uploads go through.
         if cid:
             _Course.objects.filter(id=cid).update(locale=detected_locale)
+            # Fill a BLANK only. This route can target an existing course on a
+            # re-upload, and a subject a teacher chose is not ours to replace.
+            if getattr(upload, 'subject_code', ''):
+                _Course.objects.filter(id=cid, subject_code='').update(
+                    subject_code=upload.subject_code,
+                )
 
         upload.add_log(
             f"   ✓ {grade or '(no grade)'}: Course #{cid} "

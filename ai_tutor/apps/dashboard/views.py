@@ -1927,23 +1927,29 @@ def curriculum_upload(request):
             return redirect('dashboard:curriculum_upload')
 
         # Validate subject_code against the SubjectCode enum.
+        #
+        # Required on the server, not just via the form's `required` attribute.
+        # The dropdown is the ONLY thing that classifies the course this upload
+        # creates — the display name below is free text and reaches nothing
+        # that matches. Accepting a blank code here let an upload satisfy
+        # "please select a subject" with the display name alone and create an
+        # unclassified course: no inherited materials, and is_math left to a
+        # scan of the title. See memory/subject_grade_unification_plan.md.
         valid_subjects = {c[0] for c in Course.SubjectCode.choices}
-        subject_label = ''
-        if subject_code:
-            if subject_code not in valid_subjects:
-                messages.error(request, f"Invalid subject: {subject_code!r}.")
-                return redirect('dashboard:curriculum_upload')
-            subject_label = dict(Course.SubjectCode.choices).get(subject_code, '')
-
-        # subject_name (display) — auto-derive from the dropdown label when
-        # the optional override is blank. Either path satisfies the
-        # downstream "must have a subject_name" requirement.
-        if not subject_name:
-            subject_name = subject_label
-
-        if not subject_name:
+        if not subject_code:
             messages.error(request, "Please select a subject.")
             return redirect('dashboard:curriculum_upload')
+        if subject_code not in valid_subjects:
+            messages.error(request, f"Invalid subject: {subject_code!r}.")
+            return redirect('dashboard:curriculum_upload')
+        subject_label = dict(Course.SubjectCode.choices).get(subject_code, '')
+
+        # subject_name (display) — auto-derive from the dropdown label when
+        # the optional override is blank. The dropdown is validated above, so
+        # the label is always non-empty and there is no second "no subject"
+        # path left to check for.
+        if not subject_name:
+            subject_name = subject_label
 
         if not grade_level:
             messages.error(request, "Please select at least one grade level.")
