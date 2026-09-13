@@ -48,13 +48,15 @@ def _build_session(*, lesson, when=None) -> TutorSession:
     return session
 
 
-def _make_lesson(title: str, subject: str = 'mathematics') -> Lesson:
+def _make_lesson(title: str, subject: str = 'mathematics',
+                 code: str = '') -> Lesson:
     inst, _ = Institution.objects.get_or_create(
         slug=f'i-{title.lower()}',
         defaults={'name': title},
     )
     course = Course.objects.create(
         institution=inst, title=title, subject_type=subject,
+        subject_code=code,
     )
     unit = Unit.objects.create(course=course, title='U1', order_index=1)
     return Lesson.objects.create(
@@ -113,34 +115,48 @@ class TimeWindowFilterTest(TestCase):
 
 
 class SubjectFilterTest(TestCase):
-    """Pin the subject mapping. The earlier `subject='math'` filter
-    included an empty-string subject_type catchall that turned the
-    filter into a no-op for any course missing an explicit
-    classification. Now the math filter requires either
-    subject_type='math' OR a title-keyword match on uncategorised
-    courses; geography requires humanities OR a title match."""
+    """The subject filter reads subject_code, and only subject_code.
 
-    def test_math_subject_filter_excludes_unrelated_uncategorised(self):
-        # Two uncategorised courses: one has 'math' in the title, one
-        # is a pure geography course with empty subject_type.
-        math_l = _make_lesson('Algebra Basics', subject='')
-        geog_l = _make_lesson('Maps of Africa', subject='')
-        _build_session(lesson=math_l)
-        _build_session(lesson=geog_l)
-        eligible = candidate_tutor_turns()
-        self.assertEqual(eligible.count(), 2)
-        # Math filter pulls the algebra course (title-keyword fallback)
-        # but NOT the maps course.
-        n = candidate_tutor_turns(subject='math').count()
-        self.assertEqual(n, 1)
+    It used to read subject_type plus a title LIKE, which was wrong twice:
+    subject_type is too coarse to separate geography from history (both are
+    'humanities'), and matching the title in SQL is the MATH_KEYWORDS
+    anti-pattern moved into the database.
 
-    def test_geography_subject_filter_matches_humanities_or_title(self):
-        humanities_l = _make_lesson('Intro to Civics', subject='humanities')
-        geography_l = _make_lesson('Geography of East Africa', subject='')
-        unrelated_l = _make_lesson('Algebra', subject='math')
-        _build_session(lesson=humanities_l)
-        _build_session(lesson=geography_l)
-        _build_session(lesson=unrelated_l)
+    Step 2 of memory/subject_grade_unification_plan.md."""
+
+    def test_the_title_no_longer_decides_the_subject(self):
+        """The filter used to match title LIKE '%math%' in SQL — the
+        MATH_KEYWORDS anti-pattern, in the database. A course called "Algebra
+        Basics" with no subject_code is unclassified, not maths; the remedy is
+        `backfill_course_subjects`, not a regex."""
+        untitled_math = _make_lesson('Algebra Basics', subject='', code='')
+        real_math = _make_lesson('Angles around a point', subject='',
+                                 code='mathematics')
+        _build_session(lesson=untitled_math)
+        _build_session(lesson=real_math)
+
+        self.assertEqual(candidate_tutor_turns().count(), 2)
+        self.assertEqual(candidate_tutor_turns(subject='math').count(), 1)
+
+    def test_geography_does_not_sweep_in_the_rest_of_humanities(self):
+        """subject_type cannot answer this: geography and history both
+        collapse to 'humanities', which is why SubjectCode exists. Sampling
+        geography used to return civics sessions."""
+        civics = _make_lesson('Intro to Civics', subject='humanities',
+                              code='history')
+        geography = _make_lesson('Geography of East Africa', subject='',
+                                 code='geography')
+        maths = _make_lesson('Algebra', subject='math', code='mathematics')
+        for lesson in (civics, geography, maths):
+            _build_session(lesson=lesson)
+
         n = candidate_tutor_turns(subject='geography').count()
-        # humanities (canonical) + title-match (fallback) = 2
-        self.assertEqual(n, 2)
+        self.assertEqual(n, 1, 'civics is not geography')
+
+    def test_a_course_classified_by_neither_field_matches_nothing(self):
+        """Not a gap — the documented remedy is the backfill command, and
+        silently guessing is what this change removes."""
+        unclassified = _make_lesson('Mystery Course', subject='', code='')
+        _build_session(lesson=unclassified)
+        for subject in ('math', 'geography', 'science'):
+            self.assertEqual(candidate_tutor_turns(subject=subject).count(), 0)

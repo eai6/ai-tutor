@@ -1,6 +1,7 @@
 # Subject and grade — one stored field each (2026-09-13)
 
-**Status: SCOPE FOR REVIEW. Nothing changed.**
+**Status: IN PROGRESS.** Steps 1 and 2 are done (`847ac5f`, and this
+commit). Steps 3-5 are still scope only.
 
 Written after a teacher set subject and grade on the upload form and the
 platform-wide materials still did not reach the course. That bug is fixed
@@ -125,6 +126,9 @@ Each step ships and is verifiable on its own.
 
 ### 1. `is_math` reads `subject_code` — smallest, highest value
 
+**Done 2026-09-13 (`847ac5f`).** Courses whose `is_math` came from a title
+keyword scan: 6 of 8 → 0.
+
 ```python
 @property
 def is_math(self):
@@ -146,6 +150,22 @@ title. The keyword fallback stays until step 4 proves it unreachable.
 
 **Verify:** each filter returns the same lesson set before and after, on a DB
 where the backfill has run.
+
+**Done 2026-09-13.** Both filters read `subject_code` only. Migration 0036
+gave the math-only courses their code first — `math` is the one `subject_type`
+value that maps without ambiguity, so the rest still need
+`backfill_course_subjects`.
+
+Two things the rewrite found, beyond the plan:
+
+* The benchmark sampler matched `title__icontains='math'` **in SQL** — the
+  MATH_KEYWORDS anti-pattern in the database — and `subject='geography'`
+  matched `subject_type='humanities'`, so sampling geography returned civics
+  and history sessions. Both tests asserted that behaviour and were rewritten.
+* `sampling.map_subject(course.subject_type, course.title)` still labels
+  benchmark items from `subject_type` with a title fallback. It is a Python
+  read, not a DB filter, so it does not block step 4 — but it is the same
+  defect and should move to `subject_code` when step 4 lands.
 
 ### 3. `grade_levels` becomes a property
 

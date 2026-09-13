@@ -268,33 +268,26 @@ def candidate_tutor_turns(*, subject: Optional[str] = None,
         qs = qs.filter(session__is_synthetic=False)
 
     if subject:
-        # Map benchmark subject → Course.subject_type. Canonical values
-        # in the SubjectType enum are: math, science, humanities,
-        # language, other (geography is part of humanities — there's no
-        # separate enum value for it). For math + geography we ALSO
-        # include courses whose subject_type is blank but whose title
-        # carries the relevant keyword — this matches Course.is_math's
-        # title-fallback behavior at apps/curriculum/models.py:96 and
-        # rescues legacy / un-classified courses.
-        from django.db.models import Q as _Q
-        if subject == 'math':
-            qs = qs.filter(
-                _Q(session__lesson__unit__course__subject_type='math')
-                | (_Q(session__lesson__unit__course__subject_type='')
-                   & (
-                       _Q(session__lesson__unit__course__title__icontains='math')
-                       | _Q(session__lesson__unit__course__title__icontains='algebra')
-                       | _Q(session__lesson__unit__course__title__icontains='geometry')
-                       | _Q(session__lesson__unit__course__title__icontains='calculus')
-                   ))
-            )
-        elif subject == 'geography':
-            qs = qs.filter(
-                _Q(session__lesson__unit__course__subject_type='humanities')
-                | _Q(session__lesson__unit__course__title__icontains='geography')
-            )
-        elif subject == 'science':
-            qs = qs.filter(session__lesson__unit__course__subject_type='science')
+        # Maps benchmark subject → Course.subject_code, the canonical subject.
+        #
+        # This read subject_type plus a title LIKE, which was wrong twice.
+        # subject_type is too coarse to answer the question being asked:
+        # geography and history both collapse to 'humanities', so sampling
+        # `geography` returned history sessions as well — the Course model says
+        # so in as many words where SubjectCode is defined. And the title
+        # matching put the MATH_KEYWORDS anti-pattern into SQL, where a
+        # geography course called "Population Statistics" is a maths course.
+        #
+        # A course carrying neither field matches nothing, which is the
+        # documented remedy rather than a gap: run
+        # `python manage.py backfill_course_subjects`.
+        codes = {
+            'math': ['mathematics'],
+            'geography': ['geography'],
+            'science': ['physics', 'chemistry', 'biology'],
+        }.get(subject)
+        if codes:
+            qs = qs.filter(session__lesson__unit__course__subject_code__in=codes)
 
     if lesson_id is not None:
         qs = qs.filter(session__lesson_id=lesson_id)

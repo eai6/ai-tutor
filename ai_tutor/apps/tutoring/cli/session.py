@@ -66,28 +66,25 @@ def list_lessons(limit: int = 40) -> list[tuple[int, str, str]]:
 def subject_filter(subject: str):
     """Q filter selecting lessons belonging to ``subject``.
 
-    Matches subject_code OR subject_type because courses in this database are
-    classified through different fields: Mathematics S3 carries
-    subject_type='math' with subject_code empty, while Mount Fleuri Geography S3
-    carries subject_code='geography' with subject_type empty. Checking only one
-    field silently returns nothing for half the catalogue.
+    subject_code only. This used to match subject_code OR subject_type, because
+    courses were classified through whichever field the code path that created
+    them happened to write — Mathematics S3 carried subject_type='math' with no
+    code at all, so checking one field returned nothing for half the catalogue.
 
-    Not a title heuristic — CLAUDE.md rules those out (the Course.is_math
-    MATH_KEYWORDS fallback is the anti-pattern). If a course matches neither
-    field it needs `python manage.py backfill_course_subjects`, not a regex here.
+    Migration 0036 gave those courses their code (math is the one subject_type
+    value that maps without ambiguity), and subject_code is on its way to being
+    the single stored subject — see memory/subject_grade_unification_plan.md.
+
+    Still not a title heuristic; CLAUDE.md rules those out. A course matching
+    nothing needs `python manage.py backfill_course_subjects`, not a regex.
     """
     from django.db.models import Q
 
     filters = {
-        'math': (
-            Q(unit__course__subject_code='mathematics')
-            | Q(unit__course__subject_type='math')
-        ),
+        'math': Q(unit__course__subject_code='mathematics'),
         'geography': Q(unit__course__subject_code='geography'),
-        'science': (
-            Q(unit__course__subject_code__in=('physics', 'chemistry', 'biology'))
-            | Q(unit__course__subject_type='science')
-        ),
+        'science': Q(
+            unit__course__subject_code__in=('physics', 'chemistry', 'biology')),
     }
     try:
         return filters[subject]
