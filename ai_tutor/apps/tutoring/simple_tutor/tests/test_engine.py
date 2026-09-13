@@ -388,3 +388,142 @@ class FiguresEnabledTest(DjangoTestCase):
         # Bare session-shaped object without unit/course
         bare = SimpleNamespace(lesson=None)
         self.assertTrue(_figures_enabled(bare))
+
+
+@patch('ai_tutor.apps.tutoring.simple_tutor.engine._retrieve_kb', return_value=[])
+class AutoFigureTest(DjangoTestCase):
+    """The server sends the step's figure with the question.
+
+    The tutor used to have to ask, with request_figure. Measured across 11,067
+    production turns it asked 25 times — 0.23% — while 63% of steps carry a
+    figure. A student on lesson 1425 worked the first question of a step whose
+    figure was sitting on it the whole time, and saw it only after typing
+    "show me a figure".
+    """
+
+    def _slot(self, session):
+        from ai_tutor.apps.tutoring.models import InFlightQuestion
+        return InFlightQuestion.objects.create(
+            session=session, question_text='Which is larger scale?',
+            question_type='mcq', reference_answer='A',
+            options=['1:25,000', '1:5,000,000'])
+
+    def _step(self, session):
+        from ai_tutor.apps.curriculum.models import LessonStep
+        return LessonStep.objects.filter(
+            lesson=session.lesson, order_index=0).first()
+
+    def test_a_live_question_pulls_the_step_figure(self, _kb):
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=True)
+        self._slot(session)
+
+        media = auto_figure_for_turn(session, self._step(session))
+
+        self.assertEqual(len(media), 1)
+        self.assertEqual(media[0]['url'], '/m/a.png')
+        self.assertEqual(media[0]['type'], 'image')
+        self.assertEqual(media[0]['alt'], 'A figure')
+
+    def test_no_question_means_no_figure(self, _kb):
+        """The figure goes WITH the question. A teaching turn with nothing to
+        answer is not the moment."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=True)
+        self.assertEqual(auto_figure_for_turn(session, self._step(session)), [])
+
+    def test_it_is_sent_once_per_step(self, _kb):
+        """A step can carry several questions. Re-sending the same image under
+        each is clutter — it is still in the transcript, and on desktop still
+        in the artifact panel."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=True)
+        self._slot(session)
+        step = self._step(session)
+
+        self.assertEqual(len(auto_figure_for_turn(session, step)), 1)
+        self.assertEqual(auto_figure_for_turn(session, step), [])
+
+    def test_a_step_with_no_figure_sends_nothing(self, _kb):
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=False)
+        self._slot(session)
+        self.assertEqual(auto_figure_for_turn(session, self._step(session)), [])
+
+    def test_a_figure_with_no_file_is_not_sent(self, _kb):
+        """Two thirds of authored figures are intents image generation never
+        fulfilled. Sending one puts a broken image in front of a student."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=True)
+        step = self._step(session)
+        step.media = {'images': [{'alt': 'never generated', 'caption': 'c'}]}
+        step.save(update_fields=['media'])
+        self._slot(session)
+        self.assertEqual(auto_figure_for_turn(session, step), [])
+
+    def test_disabled_on_the_course_sends_nothing(self, _kb):
+        from ai_tutor.apps.tutoring.simple_tutor.engine import auto_figure_for_turn
+        session, _ = _make_session(with_step_media=True, figures_enabled=False)
+        self._slot(session)
+        self.assertEqual(auto_figure_for_turn(session, self._step(session)), [])
+
+    def test_the_prompt_only_describes_a_figure_already_on_screen(self, _kb):
+        """The invariant that matters. If the prompt describes a figure the
+        student cannot see, the tutor writes "look at the diagram" about
+        nothing — which is what judges/figure_ref.py exists to catch."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import (
+            _figures_shown, _step_figure, auto_figure_for_turn,
+        )
+        session, _ = _make_session(with_step_media=True)
+        step = self._step(session)
+        self._slot(session)
+
+        self.assertNotIn(step.order_index, _figures_shown(session))
+        auto_figure_for_turn(session, step)
+        session.refresh_from_db()
+        self.assertIn(step.order_index, _figures_shown(session))
+        self.assertIsNotNone(_step_figure(step))
+
+    def test_the_engine_attaches_it_on_a_real_turn(self, _kb):
+        from ai_tutor.apps.tutoring.simple_tutor.engine import respond_for_view
+        session, _ = _make_session(with_step_media=True)
+        with patch(
+            'ai_tutor.apps.tutoring.simple_tutor.engine._call_llm',
+            return_value=_llm_response(
+                text='Here is the first one.',
+                tool_uses=[{'name': 'pose_question',
+                            'input': {'question_index': 1}}],
+            ),
+        ):
+            payload = respond_for_view(session, 'ready')
+
+        self.assertEqual(len(payload['media']), 1)
+        self.assertEqual(payload['media'][0]['url'], '/m/a.png')
+        self.assertEqual(payload['media'][0]['type'], 'image')
+
+    def test_the_figure_survives_a_reload(self, _kb):
+        """Caught in the browser, not by a test: the live turn showed the map
+        and the reload showed nothing. views._build_session_history redraws a
+        turn from metadata['attached_media'], so a payload-only attachment is
+        lost the moment the student comes back — which is exactly when they
+        would want another look at it."""
+        from ai_tutor.apps.tutoring.models import SessionTurn
+        from ai_tutor.apps.tutoring.simple_tutor.engine import respond_for_view
+
+        session, _ = _make_session(with_step_media=True)
+        with patch(
+            'ai_tutor.apps.tutoring.simple_tutor.engine._call_llm',
+            return_value=_llm_response(
+                text='Here is the first one.',
+                tool_uses=[{'name': 'pose_question',
+                            'input': {'question_index': 1}}],
+            ),
+        ):
+            payload = respond_for_view(session, 'ready')
+
+        turn = SessionTurn.objects.filter(session=session, role='tutor').last()
+        persisted = (turn.metadata or {}).get('attached_media') or []
+        self.assertEqual([m['url'] for m in persisted], ['/m/a.png'])
+        self.assertEqual([m['url'] for m in payload['media']],
+                         [m['url'] for m in persisted],
+                         'the live payload and the transcript must agree')

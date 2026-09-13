@@ -467,7 +467,28 @@ def respond(
     step = _load_current_step(session)
     question_pool = build_question_pool(session)
     kb_chunks = _retrieve_kb(session, user_input)
-    figure_catalog = _build_figure_catalog(step)
+    # What the prompt is told about figures is what is ALREADY on the screen,
+    # not what the step owns.
+    #
+    # Same invariant as the answer picker: if the prompt describes a figure the
+    # student cannot see, the tutor writes "look at the diagram" about nothing
+    # — which is the exact failure judges/figure_ref.py was built to catch. A
+    # figure attached at the end of turn N is on screen from turn N+1, and that
+    # is when the tutor is told about it.
+    _shown = _figures_shown(session)
+    _on_screen = (_step_figure(step)
+                  if getattr(step, 'order_index', None) in _shown else None)
+    figure_catalog = [_on_screen] if _on_screen else []
+
+    # The dispatch keeps the FULL step catalog, deliberately.
+    #
+    # request_figure is no longer a tool the model is offered, but the text
+    # parser still honours the call when a local model emits it as prose
+    # (_ALLOWED_TOOLS). Validating that against the on-screen list would reject
+    # it whenever the figure had not been sent yet — turning a working
+    # fail-soft path into a silent refusal. The prompt gets what is on screen;
+    # the handler gets what exists.
+    dispatch_figure_catalog = _build_figure_catalog(step)
     figures_enabled = _figures_enabled(session)
     recent_window = build_recent_window(session)
     step_summaries = step_summary_log(session)
@@ -680,7 +701,7 @@ def respond(
         question_pool=question_pool,
         session=session,
         response=response,
-        figure_catalog=figure_catalog,
+        figure_catalog=dispatch_figure_catalog,
     )
 
     # ─── 5b. Which forced tool did Call 1 skip? ───────────────────
@@ -770,7 +791,7 @@ def respond(
         response=response,
         text_reply_1=text_reply_1,
         tool_results=tool_results,
-        figure_catalog=figure_catalog,
+        figure_catalog=dispatch_figure_catalog,
         missing_tool=missing_tool,
         user_input=user_input,
         # Same config as call 1 — see the comment at the turn_config assignment.
@@ -927,7 +948,24 @@ def respond(
         if autograded is not None:
             tool_results.append(autograded)
 
-    _persist_tutor_turn(session, text_reply, step, tool_results)
+    # Resolve the turn's figure HERE, not in respond_for_view.
+    #
+    # It has to be decided before the turn row is written, or the figure is
+    # sent live and lost on reload: views._build_session_history redraws a turn
+    # from metadata['attached_media'], and a payload-only attachment leaves
+    # that key empty. Caught in the browser — the live turn showed the map, the
+    # reload showed nothing.
+    turn_media = _figure_media(tool_results)
+    if turn_media:
+        # The tutor produced one itself (a local model can still emit
+        # request_figure as text and the parser honours it). Record it so the
+        # server does not send the same image again next turn.
+        _mark_figure_shown(session, getattr(step, 'order_index', None))
+    else:
+        turn_media = auto_figure_for_turn(session, step)
+
+    _persist_tutor_turn(session, text_reply, step, tool_results,
+                        attached_media=turn_media)
 
     # ─── 9. Server auto-advance (safety net) ──────────────────────
     advanced = maybe_advance_step(session)
@@ -980,6 +1018,7 @@ def respond(
         'tool_calls': tool_results,
         'fallback': False,
         'step_advanced': advanced,
+        'media': turn_media,
     }
 
 
@@ -2073,6 +2112,93 @@ def _figure_media(tool_results) -> list[dict]:
             'caption': result.get('caption') or '',
         })
     return out
+
+
+def _step_figure(step) -> dict | None:
+    """The figure that belongs to this step, if it has one with a real file.
+
+    Exactly one, because that is what the data is: 2,144 figure entries across
+    2,144 steps that have any. There has never been a choice to make here,
+    which is why the tutor selecting one by id was ceremony around a decision
+    with a single option.
+
+    Entries with no ``url`` are figure INTENTS the generator wrote and image
+    generation never fulfilled — two thirds of them. Offering one would put a
+    broken image in front of a student.
+    """
+    for fig in _build_figure_catalog(step):
+        if (fig.get('url') or '').strip():
+            return fig
+    return None
+
+
+def _figures_shown(session) -> list:
+    state = getattr(session, 'engine_state', None) or {}
+    shown = state.get('figures_shown')
+    return list(shown) if isinstance(shown, list) else []
+
+
+def _mark_figure_shown(session, step_index) -> None:
+    """Record that this step's figure is already on screen.
+
+    Once per step, not once per question. A step can carry several questions
+    and re-sending the same image under each one is clutter, not contiguity —
+    the figure is still in the transcript above, and on desktop it is still in
+    the artifact panel beside the chat.
+    """
+    try:
+        state = session.engine_state or {}
+        shown = _figures_shown(session)
+        if step_index in shown:
+            return
+        shown.append(step_index)
+        state['figures_shown'] = shown
+        session.engine_state = state
+        session.save(update_fields=['engine_state'])
+    except Exception:                              # noqa: BLE001
+        logger.warning("could not record shown figure", exc_info=True)
+
+
+def auto_figure_for_turn(session, step) -> list[dict]:
+    """The figure to send with this turn, chosen by the server.
+
+    The rule: a question is in flight on a step that has a figure, and the
+    figure has not been shown yet in this session — so it goes out WITH the
+    question, which is the moment the student needs it.
+
+    Before this the tutor had to ask for it with a tool, and measured across
+    11,067 production turns it asked 25 times. A student on lesson 1425 worked
+    through the first question of a step whose figure was sitting on it the
+    whole time, and saw it only after typing "show me a figure".
+
+    Returns [] when there is no live question, no figure, no file, or the
+    figure is already on screen.
+    """
+    try:
+        from ai_tutor.apps.tutoring.models import InFlightQuestion
+
+        if step is None or not _figures_enabled(session):
+            return []
+        step_index = getattr(step, 'order_index', None)
+        if step_index is None or step_index in _figures_shown(session):
+            return []
+        if not InFlightQuestion.objects.filter(session=session).exists():
+            return []
+        fig = _step_figure(step)
+        if fig is None:
+            return []
+
+        _mark_figure_shown(session, step_index)
+        return [{
+            'type': 'image',
+            'url': fig['url'],
+            'alt': fig.get('alt_text') or fig.get('description') or '',
+            'caption': fig.get('caption') or '',
+        }]
+    except Exception:                              # noqa: BLE001
+        # A missing figure costs the student a picture, never the turn.
+        logger.warning("auto figure attach failed", exc_info=True)
+        return []
 
 
 def _build_figure_catalog(step) -> list[dict]:
@@ -3260,7 +3386,9 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
                 is_correct = True
             elif verdict == 'incorrect':
                 is_correct = False
-    turn_media = _figure_media(out.get('tool_calls'))
+    # Decided in respond(), before the turn row was written, so the live
+    # payload and the persisted transcript carry the same figure.
+    turn_media = out.get('media') or []
 
     # Exit ticket transition: when all lesson steps are done, hand the
     # student off to the exit ticket instead of marking is_complete.
@@ -4148,7 +4276,8 @@ def _project_start_payload(session, message: str) -> dict:
     }
 
 
-def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
+def _persist_tutor_turn(session, text_reply: str, step, tool_results: list,
+                        *, attached_media: list | None = None):
     """Create the tutor's SessionTurn row. If any tool call recorded
     a grader verdict (record_answer or auto_grade_fallback), embed it
     in ``judge_outputs['grader']`` so the dashboard + analytics +
@@ -4173,7 +4302,8 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
     # gone the moment the student reloaded or came back to the lesson — which
     # is exactly when they would want to look at it again. Written only when
     # there is one, so a text turn's metadata keeps the shape it has today.
-    attached_media = _figure_media(tool_results)
+    if attached_media is None:
+        attached_media = _figure_media(tool_results)
     if attached_media:
         metadata['attached_media'] = attached_media
 

@@ -141,12 +141,13 @@ class ToolSchemasTest(TestCase):
         See memory/tool_surface_reduction_plan.md.
         """
         names = {t['name'] for t in TOOL_SCHEMAS}
-        self.assertEqual(
-            names,
-            {'pose_question', 'record_answer', 'request_figure'},
-        )
+        self.assertEqual(names, {'pose_question', 'record_answer'})
         self.assertNotIn('redirect_off_topic', names)
         self.assertNotIn('advance_step', names)
+        # request_figure went 2026-09-13. The server attaches the step's
+        # figure with the question, so there is nothing for the tutor to ask
+        # for — and across 11,067 production turns it asked 25 times anyway.
+        self.assertNotIn('request_figure', names)
 
 
     def test_every_tool_has_description_and_input_schema(self):
@@ -194,9 +195,12 @@ class ToolSchemasTest(TestCase):
         # Description should reference the in-flight question
         self.assertIn('in-flight', t['description'].lower())
 
-    def test_request_figure_description_rejects_invented_ids(self):
-        t = next(t for t in TOOL_SCHEMAS if t['name'] == 'request_figure')
-        self.assertIn('invented', t['description'].lower())
+    def test_no_tool_offers_a_figure(self):
+        """Choosing a figure is not the tutor's job any more. The step has
+        one, the server sends it with the question, and the prompt describes
+        what is on screen."""
+        for t in TOOL_SCHEMAS:
+            self.assertNotIn('figure', t['name'])
 
 
 # ============================================================================
@@ -364,18 +368,29 @@ class QuestionPoolTest(TestCase):
 
 class FigureCatalogTest(TestCase):
 
-    def test_renders_figures(self):
-        catalog = [
-            {'id': 5, 'description': 'Map of Seychelles'},
-            {'id': 7, 'description': 'Hydrological cycle diagram'},
-        ]
-        s = _render_figure_catalog(catalog)
-        self.assertIn('<figure id="5">Map of Seychelles</figure>', s)
-        self.assertIn('<figure id="7">Hydrological cycle diagram</figure>', s)
+    def test_it_describes_what_is_on_screen(self):
+        s = _render_figure_catalog([{'description': 'Map of Seychelles'}])
+        self.assertIn('<figure_on_screen>', s)
+        self.assertIn('Map of Seychelles', s)
+        # No id. There is nothing to select by — the figure is already there.
+        self.assertNotIn('id=', s)
 
-    def test_empty_renders_self_closing(self):
-        s = _render_figure_catalog([])
-        self.assertEqual(s, '<figure_catalog/>')
+    def test_a_caption_that_repeats_the_description_is_not_doubled(self):
+        s = _render_figure_catalog([
+            {'description': 'Map of Seychelles', 'caption': 'Map of Seychelles'}])
+        self.assertEqual(s.count('Map of Seychelles'), 1)
+
+    def test_a_distinct_caption_is_kept(self):
+        s = _render_figure_catalog([
+            {'description': 'Two maps side by side',
+             'caption': 'Large-scale maps show small areas in detail.'}])
+        self.assertIn('<caption>Large-scale maps show small areas in detail.</caption>', s)
+
+    def test_nothing_on_screen_renders_nothing(self):
+        """Not a self-closing tag. An explicit <figure_on_screen/> is a
+        prohibition the model has to hold in mind; absence says the same thing
+        and costs no tokens."""
+        self.assertEqual(_render_figure_catalog([]), '')
 
 
 # ============================================================================
@@ -836,8 +851,9 @@ class EndToEndShapeTest(TestCase):
             step_summaries=['Step 1 (Engage) — mastered after 1 attempt'],
         )
         self.assertEqual(len(blocks), 3)
-        # pose_question, record_answer, request_figure.
-        self.assertEqual(len(tools), 3)
+        # pose_question, record_answer. request_figure went when the server
+        # took over attaching the step's figure with the question.
+        self.assertEqual(len(tools), 2)
 
         # Block 0 — static
         b0 = blocks[0]['text']
@@ -895,24 +911,17 @@ class FiguresDisabledTest(TestCase):
     returned tools list (no affordance).
     """
 
-    def test_request_figure_tool_omitted_when_disabled(self):
-        _, tools = build_system_prompt(
-            session=_session(), step=_step(),
-            figures_enabled=False,
-        )
-        names = {t['name'] for t in tools}
-        self.assertNotIn('request_figure', names)
-        # Other tools still present
-        self.assertIn('record_answer', names)
-        self.assertIn('pose_question', names)
-
-    def test_request_figure_tool_present_when_enabled(self):
-        _, tools = build_system_prompt(
-            session=_session(), step=_step(),
-            figures_enabled=True,
-        )
-        names = {t['name'] for t in tools}
-        self.assertIn('request_figure', names)
+    def test_no_figure_tool_either_way(self):
+        """The flag governs the figure block and its rule now — there is no
+        tool to withhold."""
+        for enabled in (True, False):
+            _, tools = build_system_prompt(
+                session=_session(), step=_step(), figures_enabled=enabled,
+            )
+            names = {t['name'] for t in tools}
+            self.assertNotIn('request_figure', names)
+            self.assertIn('record_answer', names)
+            self.assertIn('pose_question', names)
 
     def test_rule_text_swapped_when_disabled(self):
         blocks, _ = build_system_prompt(
@@ -920,10 +929,19 @@ class FiguresDisabledTest(TestCase):
             figures_enabled=False,
         )
         block0 = blocks[0]['text']
-        # No "request_figure" mentioned in the rules
-        self.assertNotIn('request_figure(figure_id)', block0)
-        # Instead: IMAGES DISABLED instruction
-        self.assertIn('IMAGES DISABLED', block0)
+        self.assertNotIn('figure_on_screen', block0)
+        self.assertIn('images disabled', block0.lower())
+
+    def test_the_rule_points_at_the_screen_when_enabled(self):
+        """Positive framing: a fact about what the student can see, not an
+        affordance the tutor has to decide to use. The old rule offered
+        request_figure and never said when — so it fired on 0.23% of turns."""
+        blocks, _ = build_system_prompt(
+            session=_session(), step=_step(), figures_enabled=True,
+        )
+        block0 = blocks[0]['text']
+        self.assertIn('<figure_on_screen>', block0)
+        self.assertNotIn('request_figure', block0)
 
     def test_figure_catalog_suppressed_when_disabled(self):
         blocks, tools = build_system_prompt(
@@ -934,7 +952,6 @@ class FiguresDisabledTest(TestCase):
         # Step block (1) should not include the figure descriptions
         step_block = blocks[1]['text']
         self.assertNotIn('should not show', step_block)
-        # The self-closing tag is fine since figure_catalog→None
-        self.assertIn('<figure_catalog/>', step_block)
-        # Double-check request_figure is also dropped from tools
+        # Nothing at all, not a self-closing tag.
+        self.assertNotIn('figure_on_screen', step_block)
         self.assertNotIn('request_figure', {t['name'] for t in tools})

@@ -120,29 +120,6 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "required": ["extracted_answer"],
         },
     },
-    {
-        "name": "request_figure",
-        "description": (
-            "Display one of the pre-generated figures listed in "
-            "<figure_catalog>. Pass the figure_id verbatim from the "
-            "catalog. The platform inserts the image inline beside your "
-            "text — do not describe the figure separately in prose. Only "
-            "ids that appear in <figure_catalog> are valid; invented ids "
-            "are rejected by the platform."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "figure_id": {
-                    "type": "integer",
-                    "description": (
-                        "The figure id from <figure_catalog>."
-                    ),
-                },
-            },
-            "required": ["figure_id"],
-        },
-    },
 ]
 
 # advance_step was REMOVED 2026-08-05. The model called it once in 1,443
@@ -565,7 +542,8 @@ def build_system_prompt(
             figures_enabled=False.
         figures_enabled: per-course flag (Course.tutoring_images_enabled).
             When False: figure_catalog is suppressed, the figure-related
-            rules in <rules> are omitted, AND request_figure is removed
+            rules in <rules> are omitted (the figure block is not
+            rendered and the tutor is told to teach in prose)
             from the returned tools list.
         recent_window: last N SessionTurns of this step, oldest → newest.
         step_summaries: one-line summary per completed step.
@@ -583,16 +561,22 @@ def build_system_prompt(
 
     # ── Block 0 — static per conversation ──────────────────────────
     if figures_enabled:
+        # Positive framing, and a fact rather than a capability.
+        #
+        # The old rule offered request_figure and forbade inventing ids. It
+        # never said WHEN to show a figure, so across 11,067 production turns
+        # the tool fired 25 times. The platform now attaches the step's figure
+        # with the question; all the tutor has to do is talk about the picture
+        # the student is already looking at.
         figure_rule = (
-            "- Reference pre-generated figures only via request_figure(figure_id) "
-            "using ids from <figure_catalog>. Do not invent figure ids or describe "
-            "figures that aren't in the catalog."
+            "- When <figure_on_screen> is present the student is looking at "
+            "that image. Point at what is in it by name. With no "
+            "<figure_on_screen>, teach in prose and describe no visuals."
         )
     else:
         figure_rule = (
-            "- This lesson has IMAGES DISABLED. Do not mention figures, diagrams, "
-            "images, or visuals. Describe concepts in prose. The request_figure "
-            "tool is unavailable on this lesson."
+            "- This lesson has images disabled. Teach in prose and describe no "
+            "figures, diagrams, images or visuals."
         )
     locale_rule = _build_locale_rule(locale)
     # Family-specific Block 0 (eval): the selected model's family picks its own
@@ -708,15 +692,11 @@ def build_system_prompt(
             # it would just register writes (1.25× cost) for no hits.
         })
 
-    # When figures are disabled for this lesson, remove the
-    # request_figure tool from the available set. The LLM doesn't see
-    # the affordance, so it can't call it.
-    if figures_enabled:
-        tools_for_llm = list(TOOL_SCHEMAS)
-    else:
-        tools_for_llm = [
-            t for t in TOOL_SCHEMAS if t['name'] != 'request_figure'
-        ]
+    # request_figure is no longer offered at all — the server attaches the
+    # step's figure with the question. TOOL_SCHEMAS no longer carries it, so
+    # both branches are the same list; the flag now only governs whether the
+    # figure block and its rule are rendered.
+    tools_for_llm = list(TOOL_SCHEMAS)
 
     # The TUTORING_QUESTION_TYPES allowlist used to be enforced by narrowing
     # pose_question's question_type enum. Since the tutor selects a pool index
@@ -952,20 +932,35 @@ def _render_question_pool(pool) -> str:
 
 
 def _render_figure_catalog(figure_catalog: list[dict] | None) -> str:
-    """Render the <figure_catalog> with id + description for each
-    pre-generated figure on the current step.
+    """Render ``<figure_on_screen>`` — what the student can currently see.
+
+    This used to be ``<figure_catalog>``: a menu of ids the tutor could
+    request. Nothing told it when to request one, so it almost never did, and
+    a student on a step whose figure was sitting right there had to type "show
+    me a figure" to get it.
+
+    The platform now attaches that figure with the question, so the tutor's
+    job is not to choose a picture — it is to talk about the one on screen.
+    Stating the fact rather than offering the capability also removes the
+    failure the figure_ref judge exists to catch: the tutor cannot reference a
+    diagram that is not there, because the block is absent when there is none.
+
+    Empty renders nothing at all. An explicit ``<figure_on_screen/>`` would be
+    a prohibition the model has to hold in mind; absence is the same
+    instruction at no cost.
     """
     if not figure_catalog:
-        return "<figure_catalog/>"
-    parts = ["<figure_catalog>"]
-    for fig in figure_catalog:
-        fid = fig.get('id') or fig.get('figure_id') or '?'
-        desc = (fig.get('description') or fig.get('alt_text')
-                or fig.get('caption') or '')
-        parts.append(
-            f'  <figure id="{fid}">{_escape_xml(desc.strip())}</figure>'
-        )
-    parts.append("</figure_catalog>")
+        return ""
+    fig = figure_catalog[0]
+    desc = (fig.get('description') or fig.get('alt_text')
+            or fig.get('caption') or '').strip()
+    parts = ["<figure_on_screen>"]
+    if desc:
+        parts.append(f"  {_escape_xml(desc)}")
+    caption = (fig.get('caption') or '').strip()
+    if caption and caption != desc:
+        parts.append(f"  <caption>{_escape_xml(caption)}</caption>")
+    parts.append("</figure_on_screen>")
     return "\n".join(parts)
 
 
