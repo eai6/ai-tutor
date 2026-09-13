@@ -3424,8 +3424,30 @@ def lesson_session_report(request, lesson_id):
             'students': group_students,
             'count': len(group_students),
             'common_weak': common_weak,
+            # The constant per-band sentence. Kept as the fallback — see below.
             'instruction': instruction,
         })
+
+    # The instruction a teacher actually reads, written from the numbers above.
+    #
+    # The bands and the weak objectives stay deterministic: they come from
+    # exit-ticket concept_tag matching and nothing here can change them. What
+    # the model adds is the sentence — the constant f-strings said the same
+    # words for every AE group on every lesson, and their only real payload was
+    # the objective names spliced in.
+    #
+    # One call for the whole report, cached on the inputs, and silent on
+    # failure: an empty dict leaves every band with the template it had.
+    try:
+        from ai_tutor.apps.dashboard import report_instructions
+        written = report_instructions.generate(lesson, category_groups)
+        for group in category_groups:
+            text = written.get(group['code'])
+            if text:
+                group['instruction'] = text
+                group['instruction_source'] = 'generated'
+    except Exception:                                   # noqa: BLE001
+        logger.warning("report instruction generation failed", exc_info=True)
 
     # Group session breakdown (G6): for every session that had >1 active
     # participant, list the participants so teachers can see which lessons
