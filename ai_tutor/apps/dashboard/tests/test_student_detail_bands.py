@@ -192,3 +192,86 @@ class TestWeakConceptsKeepTheirNumbers:
         client.force_login(teacher)
         response = client.get(reverse('dashboard:student_detail', args=[student.id]))
         assert response.context['stuck_lessons'][0].weak_concept_rows == []
+
+
+@pytest.mark.django_db
+class TestTheDictAnswersFormatDoesNotCrashThePage:
+    """The 500 on /dashboard/students/<id>/, held at the page rather than the
+    helper.
+
+    ``ExitTicketAttempt.answers`` comes in two shapes: the retired
+    conversational_tutor wrote a list of per-question dicts, and simple_tutor
+    has written ``{'per_question': [...], 'eo_competency': {...}}`` since
+    2026-05-26. Iterating the dict yields its string KEYS, so
+    ``per_concept_breakdown``'s ``a.get("concept_tag")`` raised
+    ``AttributeError: 'str' object has no attribute 'get'`` and took the whole
+    page down for any student whose latest attempt was written by the live
+    engine — which, by now, is most of them.
+
+    ``competency.answer_rows`` normalises both. This test exists because the
+    fix was made once on ``main`` (ec24e9d) and never reached this branch, so
+    the deployment kept crashing on a bug that was already solved.
+    """
+
+    def _attempt(self, student, lesson, school, answers):
+        from ai_tutor.apps.tutoring.models import ExitTicket, ExitTicketAttempt
+        from django.utils import timezone
+        ticket = ExitTicket.objects.create(lesson=lesson, passing_score=8,
+                                           questions_per_attempt=10)
+        return ExitTicketAttempt.objects.create(
+            student=student, exit_ticket=ticket, answers=answers,
+            score=2, passed=False, completed_at=timezone.now())
+
+    SIMPLE_TUTOR_DICT = {
+        'per_question': [
+            {'concept_tag': 'Scale and ratio', 'correct': False},
+            {'concept_tag': 'Scale and ratio', 'correct': False},
+            {'concept_tag': 'Map symbols', 'correct': True},
+        ],
+        'eo_competency': {'EO1': {'correct': 1, 'total': 3}},
+    }
+
+    def test_a_simple_tutor_attempt_renders(self, client, teacher, student,
+                                            course, school):
+        lesson = course.units.first().lessons.first()
+        _progress(student, lesson, school, mastery_level='in_progress',
+                  best_score=0.2)
+        self._attempt(student, lesson, school, self.SIMPLE_TUTOR_DICT)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail',
+                                      args=[student.id]))
+
+        assert response.status_code == 200
+        rows = response.context['stuck_lessons'][0].weak_concept_rows
+        assert [r['concept'] for r in rows] == ['Scale and ratio']
+        assert rows[0]['pct'] == 0
+
+    def test_a_legacy_list_attempt_still_renders(self, client, teacher, student,
+                                                 course, school):
+        lesson = course.units.first().lessons.first()
+        _progress(student, lesson, school, mastery_level='in_progress',
+                  best_score=0.2)
+        self._attempt(student, lesson, school,
+                      self.SIMPLE_TUTOR_DICT['per_question'])
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail',
+                                      args=[student.id]))
+        assert response.status_code == 200
+        rows = response.context['stuck_lessons'][0].weak_concept_rows
+        assert [r['concept'] for r in rows] == ['Scale and ratio']
+
+    def test_a_malformed_attempt_is_survivable(self, client, teacher, student,
+                                               course, school):
+        """Whatever else lands in that column, the page is not the place to
+        find out about it."""
+        lesson = course.units.first().lessons.first()
+        _progress(student, lesson, school, mastery_level='in_progress')
+        self._attempt(student, lesson, school, {'per_question': 'not a list'})
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail',
+                                      args=[student.id]))
+        assert response.status_code == 200
+        assert response.context['stuck_lessons'][0].weak_concept_rows == []
