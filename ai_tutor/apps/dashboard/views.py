@@ -1696,9 +1696,24 @@ def course_detail(request, course_id):
     )
     current_lesson_duration = _mode if _mode in _SUPPORTED_DURATIONS else None
 
+    # The class a lesson row's Monitor / Report should open on.
+    #
+    # Units carry their own grade on a multi-grade syllabus — Geography S1-S5
+    # has S1 through S5 units — and that is the precise answer, so the template
+    # prefers unit.grade_level and falls back here. Single-grade courses leave
+    # the unit blank and this covers them.
+    #
+    # Empty when the course names several grades and the unit names none: there
+    # is no honest answer, so the links go unscoped and the picker on the other
+    # side asks.
+    course_grades = [g.strip() for g in (course.grade_level or '').split(',')
+                     if g.strip()]
+    course_grade = course_grades[0] if len(course_grades) == 1 else ''
+
     context = {
         **request.staff_ctx,
         'course': course,
+        'course_grade': course_grade,
         'units': units,
         'lesson_stats': lesson_stats,
         'total_lessons': total_lessons,

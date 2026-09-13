@@ -260,37 +260,72 @@ class TestTheWeekIsACalendarWeek:
 
 
 @pytest.mark.django_db
-class TestTheCourseTableIsAboutContent:
-    """Monitor and Report used to sit on these rows. They moved.
+class TestEveryLessonRowNamesItsClass:
+    """Monitor and Report on the course row, each carrying a class.
 
-    Both pages are class-scoped now — a roster, who has not started, who has
-    since moved on — and a course does not name a class: "Geography S1-S5"
-    spans five of them. They live on the class page, which knows which one.
-    Review stays: reviewing a lesson is a thing you do to the content.
+    Both pages are about a roster now — who has not started, who has since
+    moved on — so a link that arrives without one lands on the school-wide
+    view and quietly answers a different question. The row names the class it
+    means: the unit when a multi-grade syllabus says so, the course otherwise.
     """
 
-    def test_the_row_offers_review_only(self, client, teacher, school, course):
+    def test_the_row_offers_all_three(self, client, teacher, school, course):
         lesson = course.units.first().lessons.first()
         client.force_login(teacher)
         response = client.get(reverse('dashboard:course_detail', args=[course.id]))
         body = response.content.decode()
 
         assert reverse('dashboard:lesson_detail', args=[lesson.id]) in body
-        assert reverse('dashboard:lesson_monitor', args=[lesson.id]) not in body
-        assert reverse('dashboard:lesson_session_report', args=[lesson.id]) not in body
+        monitor = reverse('dashboard:lesson_monitor', args=[lesson.id])
+        report = reverse('dashboard:lesson_session_report', args=[lesson.id])
+        assert f'{monitor}?class=S3' in body
+        assert f'{report}?class=S3' in body
 
-    def test_the_class_page_carries_them_with_a_class(self, client, teacher,
-                                                      school, course):
-        """And carries the class with them — a link that lost the ?class= would
-        land on the school-wide page and quietly answer a different question."""
+    def test_a_unit_grade_beats_the_course_grade(self, client, teacher, school):
+        """A syllabus covering several grades carries the answer on the unit —
+        Geography S1-S5 has an S1 unit and an S5 one, and a row in the S5 unit
+        is about S5 whatever the course label says."""
+        wide = Course.objects.create(title='Geography S1-S5', institution=school,
+                                     grade_level='S1,S2,S3,S4,S5')
+        unit = Unit.objects.create(course=wide, title='Rivers', order_index=1,
+                                   grade_level='S5')
+        lesson = Lesson.objects.create(unit=unit, title='Drainage', objective='o',
+                                       order_index=0, is_published=True)
+
+        client.force_login(teacher)
+        body = client.get(reverse('dashboard:course_detail',
+                                  args=[wide.id])).content.decode()
+        monitor = reverse('dashboard:lesson_monitor', args=[lesson.id])
+        assert f'{monitor}?class=S5' in body
+
+    def test_when_nothing_names_a_class_the_link_stays_unscoped(
+            self, client, teacher, school):
+        """Several grades on the course, none on the unit: there is no honest
+        answer, so the page does not invent one — the picker on the other side
+        asks instead."""
+        wide = Course.objects.create(title='Geography S1-S5', institution=school,
+                                     grade_level='S1,S2,S3')
+        unit = Unit.objects.create(course=wide, title='Maps', order_index=1)
+        lesson = Lesson.objects.create(unit=unit, title='Scale', objective='o',
+                                       order_index=0, is_published=True)
+
+        client.force_login(teacher)
+        body = client.get(reverse('dashboard:course_detail',
+                                  args=[wide.id])).content.decode()
+        monitor = reverse('dashboard:lesson_monitor', args=[lesson.id])
+        assert monitor in body
+        assert f'{monitor}?class=' not in body
+
+    def test_the_class_page_carries_them_too(self, client, teacher, school,
+                                             course):
         amara = _student(school, 'amara')
         lesson = course.units.first().lessons.first()
         TutorSession.objects.create(student=amara, lesson=lesson,
                                     institution=school)
 
         client.force_login(teacher)
-        response = client.get(reverse('dashboard:class_detail', args=['S3']))
-        body = response.content.decode()
+        body = client.get(reverse('dashboard:class_detail',
+                                  args=['S3'])).content.decode()
 
         monitor = reverse('dashboard:lesson_monitor', args=[lesson.id])
         report = reverse('dashboard:lesson_session_report', args=[lesson.id])

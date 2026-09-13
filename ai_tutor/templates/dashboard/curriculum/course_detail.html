@@ -1018,13 +1018,18 @@ lessons even when curriculum editing is locked down.
                         {% endif %}
                     {% endwith %}
                     {% comment %}
-                    Monitor and Report used to sit here. They are class-scoped
-                    now — a roster, who has not started, who has moved on — and
-                    a course does not name a class: "Geography S1-S5" spans
-                    five of them. They live on the class page, which knows.
-                    This table is about the content.
+                    Monitor and Report carry a class, because both pages are
+                    about a roster now — who has not started, who has since
+                    moved on. The unit names the grade on a multi-grade
+                    syllabus (Geography S1-S5 has an S1 unit and an S5 one);
+                    otherwise the course does. When neither can say, the links
+                    go unscoped and the picker on the other side asks rather
+                    than this page guessing.
                     {% endcomment %}
+                    {% firstof unit.grade_level course_grade '' as row_grade %}
                     <a href="{% url 'dashboard:lesson_detail' lesson.id %}" class="btn btn-secondary btn-sm">{% trans "Review" %}</a>
+                    <a href="{% url 'dashboard:lesson_monitor' lesson.id %}{% if row_grade %}?class={{ row_grade|urlencode }}{% endif %}" class="btn btn-sm" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Watch students working on this lesson now' %}">{% trans "Monitor" %}</a>
+                    <a href="{% url 'dashboard:lesson_session_report' lesson.id %}{% if row_grade %}?class={{ row_grade|urlencode }}{% endif %}" class="btn btn-sm" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:0.6875rem;font-weight:600;text-decoration:none;" title="{% trans 'Competency report for this lesson' %}">{% trans "Report" %}</a>
                 </div>
             </div>
             {% endfor %}
