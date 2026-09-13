@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #F9FAFB; color: #111827; }
+    a { color: #003da5; text-decoration: none; } a:hover { color: #002d7a; text-decoration: underline; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; }
+    .band-head { padding: 0.75rem 1.5rem; font-size: 0.8125rem; font-weight: 600;
+                 letter-spacing: 0.04em; text-transform: uppercase; }
+    .row { border-bottom: 1px solid #E5E7EB; padding: 1rem 1.5rem; }
+    .row:last-child { border-bottom: none; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: 500; }
+  </style>
+</helmet>
+
+<div style="padding: 28px 32px 40px; width: 1120px; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: 0.875rem; color: #6B7280;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    <a href="#" style="color: #6B7280;">All students</a>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
+    <div style="width: 44px; height: 44px; border-radius: 50%; background: #003da5; color: #fff;
+                display: flex; align-items: center; justify-content: center; font-size: 0.9375rem;
+                font-weight: 600;">MT</div>
+    <div style="flex-grow: 1;">
+      <div style="font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em;">Mobile Tester</div>
+      <div style="font-size: 0.8125rem; color: #6B7280;">S5 &middot; Belonie Secondary &middot; last worked 140 days ago</div>
+    </div>
+    <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                   padding: 0.5rem 0.75rem; font-size: 0.875rem; cursor: pointer;
+                   display: inline-flex; align-items: center; gap: 6px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"
+           stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      Account
+    </button>
+  </div>
+
+  <!-- Band 1: what to act on -->
+  <div class="card" style="margin-bottom: 18px; border-color: #FCD34D;">
+    <div class="band-head" style="background: #FFFBEB; color: #92400E; border-bottom: 1px solid #FDE68A;">
+      Stuck &mdash; 3 lessons open, none finished
+    </div>
+
+    <div class="row" style="display: flex; align-items: flex-start; gap: 16px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <a href="#" style="font-size: 0.9375rem; font-weight: 500;">Understanding Maps</a>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Geography S1&ndash;S5 &middot; opened 26 Apr, never completed
+        </div>
+        <!-- per_concept_breakdown() already computes these percentages and the page throws them away -->
+        <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;">
+          <span class="chip" style="background: #FEF2F2; color: #991B1B;">Scale &amp; ratio 34%</span>
+          <span class="chip" style="background: #FEF2F2; color: #991B1B;">Grid references 41%</span>
+          <span class="chip" style="background: #FFFBEB; color: #92400E;">Contour lines 58%</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+        <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Open transcript
+        </button>
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Reset lesson
+        </button>
+      </div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: flex-start; gap: 16px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <a href="#" style="font-size: 0.9375rem; font-weight: 500;">Three Branches of Geography</a>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Geography S1&ndash;S5 &middot; opened 26 Apr, never completed
+        </div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 10px;">
+          Left during the first teaching step &mdash; no concepts assessed yet.
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+        <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Open transcript
+        </button>
+      </div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: flex-start; gap: 16px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <a href="#" style="font-size: 0.9375rem; font-weight: 500;">What is Geography?</a>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Geography S1&ndash;S5 &middot; opened 26 Apr, never completed
+        </div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 10px;">
+          Left during the first teaching step &mdash; no concepts assessed yet.
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+        <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Open transcript
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Band 2: nothing to do -->
+  <div class="card" style="margin-bottom: 18px;">
+    <div class="band-head" style="background: #F9FAFB; color: #374151; border-bottom: 1px solid #E5E7EB;">
+      Mastered &mdash; 0 lessons
+    </div>
+    <div style="padding: 1.25rem 1.5rem; font-size: 0.875rem; color: #6B7280;">
+      Nothing passed yet. A lesson lands here once its exit ticket is passed.
+    </div>
+  </div>
+
+  <!-- Band 3: the 0/101 noise, folded away -->
+  <div class="card">
+    <div class="band-head" style="background: #F9FAFB; color: #374151; border-bottom: 1px solid #E5E7EB;
+                                  display: flex; justify-content: space-between; align-items: center;">
+      <span>Not started</span>
+      <a href="#" style="font-size: 0.8125rem; font-weight: 500; text-transform: none; letter-spacing: 0;">Show 7 courses</a>
+    </div>
+    <div style="padding: 1.25rem 1.5rem; font-size: 0.875rem; color: #6B7280;">
+      7 courses are available to S5 and untouched. Counting their lessons as
+      &ldquo;0 of 101&rdquo; says more about the catalogue than about this student.
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

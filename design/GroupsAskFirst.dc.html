@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #F9FAFB; color: #111827; }
+    a { color: #003da5; text-decoration: none; } a:hover { color: #002d7a; text-decoration: underline; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; }
+    .label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+             color: #6B7280; }
+  </style>
+</helmet>
+
+<div style="padding: 28px 32px 40px; width: 1120px; box-sizing: border-box;">
+
+  <div class="label" style="margin-bottom: 10px;">Blocked state &mdash; picker set to All Schools</div>
+
+  <!-- Was: three cards of prose, a red warning, and a silently empty box -->
+  <div class="card" style="margin-bottom: 34px;">
+    <div style="padding: 56px 32px; display: flex; flex-direction: column; align-items: center;
+                text-align: center; gap: 16px;">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5"/>
+      </svg>
+      <div style="font-size: 1.125rem; font-weight: 600;">Choose a school to set up groups</div>
+      <div style="font-size: 0.9375rem; color: #6B7280; max-width: 46ch; line-height: 1.55;">
+        Groups pair students who share a device, so they belong to one school.
+      </div>
+      <select style="margin-top: 4px; padding: 0.625rem 0.875rem; border: 1px solid #D1D5DB;
+                     border-radius: 8px; font-size: 0.875rem; min-width: 260px; background: #fff;
+                     color: #111827;">
+        <option>Select a school&hellip;</option>
+        <option>Belonie Secondary</option>
+        <option>Pointe Larue Secondary</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="label" style="margin-bottom: 10px;">Once a school is chosen</div>
+
+  <!-- Mode: a two-option choice is a segmented control, not a select plus a Save button -->
+  <div class="card" style="margin-bottom: 18px;">
+    <div style="padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 24px;">
+      <div style="flex-grow: 1;">
+        <div style="font-size: 0.9375rem; font-weight: 600;">How students take lessons</div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Shared device lets a pair work together on one screen.
+        </div>
+      </div>
+      <div style="display: flex; background: #F3F4F6; border-radius: 8px; padding: 3px; gap: 3px;">
+        <div style="padding: 0.4375rem 0.875rem; border-radius: 6px; font-size: 0.8125rem;
+                    font-weight: 500; background: #fff; color: #111827; box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
+          Shared device
+        </div>
+        <div style="padding: 0.4375rem 0.875rem; border-radius: 6px; font-size: 0.8125rem;
+                    font-weight: 500; color: #6B7280;">
+          Individual
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #E5E7EB; display: flex;
+                justify-content: space-between; align-items: center;">
+      <div style="font-size: 1rem; font-weight: 600;">Groups at Belonie Secondary</div>
+      <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                     padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;
+                     display: inline-flex; align-items: center; gap: 6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
+             stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        New group
+      </button>
+    </div>
+
+    <!-- Empty state that says what to do, not "use the form above" when there is no form -->
+    <div style="padding: 48px 32px; text-align: center;">
+      <div style="font-size: 0.9375rem; color: #374151;">No groups yet at this school.</div>
+      <div style="font-size: 0.875rem; color: #6B7280; margin-top: 6px; line-height: 1.55;">
+        A group is two or more students who will share a device.<br>
+        Creating one opens a student picker &mdash; the roster is not on this page until you need it.
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 10px; font-size: 0.8125rem; color: #6B7280; padding-left: 2px;">
+    Today the roster renders once per group plus once for the create form &mdash;
+    30 groups &times; 200 students is 6,200 checkboxes in the page.
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

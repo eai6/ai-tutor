@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #F9FAFB; color: #111827; }
+    a { color: #003da5; text-decoration: none; } a:hover { color: #002d7a; text-decoration: underline; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; }
+    .row { padding: 1.125rem 1.5rem; border-bottom: 1px solid #E5E7EB; }
+    .row:last-child { border-bottom: none; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px;
+            background: #F3F4F6; border-radius: 999px; font-size: 0.8125rem; color: #374151; }
+    .init { width: 22px; height: 22px; border-radius: 50%; background: #003da5; color: #fff;
+            display: inline-flex; align-items: center; justify-content: center; font-size: 0.625rem;
+            font-weight: 600; }
+  </style>
+</helmet>
+
+<div style="padding: 28px 32px 40px; width: 1120px; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+              margin-bottom: 8px;">
+    <div>
+      <div style="font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em;">Groups</div>
+      <div style="font-size: 0.9375rem; color: #6B7280; margin-top: 4px;">
+        Belonie Secondary &middot; shared-device mode
+        <a href="#" style="margin-left: 6px; font-size: 0.875rem;">Change</a>
+      </div>
+    </div>
+    <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                   padding: 0.625rem 1rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+                   display: inline-flex; align-items: center; gap: 7px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"
+           stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New group
+    </button>
+  </div>
+
+  <div style="font-size: 0.875rem; color: #6B7280; margin-bottom: 22px;">
+    3 active &middot; 1 archived &middot; 2 students not in any group
+  </div>
+
+  <div class="card">
+
+    <div class="row" style="display: flex; align-items: center; gap: 20px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 0.9375rem; font-weight: 600;">Pair A</span>
+          <span style="font-size: 0.75rem; color: #6B7280;">made by E. Amoah, 12 Sep</span>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          <span class="pill"><span class="init">AR</span>Amara Rose</span>
+          <span class="pill"><span class="init">JP</span>Jean-Luc Pillay</span>
+        </div>
+      </div>
+      <!-- What the page has never shown: whether the pair actually works together -->
+      <div style="text-align: right; flex-shrink: 0; width: 160px;">
+        <div style="font-size: 0.875rem; color: #111827;">4 shared sessions</div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 2px;">last Tuesday</div>
+      </div>
+      <div style="display: flex; gap: 6px; flex-shrink: 0;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Edit</button>
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Archive</button>
+      </div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: center; gap: 20px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 0.9375rem; font-weight: 600;">Pair B</span>
+          <span style="font-size: 0.75rem; color: #6B7280;">made by E. Amoah, 12 Sep</span>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          <span class="pill"><span class="init">ML</span>Marie Louise</span>
+          <span class="pill"><span class="init">TF</span>Terence Fred</span>
+        </div>
+      </div>
+      <div style="text-align: right; flex-shrink: 0; width: 160px;">
+        <div style="font-size: 0.875rem; color: #B45309;">Never worked together</div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 2px;">made 1 day ago</div>
+      </div>
+      <div style="display: flex; gap: 6px; flex-shrink: 0;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Edit</button>
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Archive</button>
+      </div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: center; gap: 20px; background: #F9FAFB;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 0.9375rem; font-weight: 600; color: #6B7280;">Term 1 pilot pair</span>
+          <span style="padding: 2px 8px; border-radius: 999px; background: #E5E7EB; color: #6B7280;
+                       font-size: 0.6875rem; font-weight: 500;">Archived</span>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          <span class="pill" style="opacity: 0.6;"><span class="init">AR</span>Amara Rose</span>
+          <span class="pill" style="opacity: 0.6;"><span class="init">SD</span>Sylvie Dubois</span>
+        </div>
+      </div>
+      <div style="text-align: right; flex-shrink: 0; width: 160px;">
+        <div style="font-size: 0.875rem; color: #6B7280;">11 shared sessions</div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 2px;">ended 3 Aug</div>
+      </div>
+      <div style="display: flex; gap: 6px; flex-shrink: 0;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Restore</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Ungrouped students belong here, not as a checkbox grid at the top of the page -->
+  <div class="card" style="margin-top: 18px;">
+    <div style="padding: 1rem 1.5rem; display: flex; align-items: center; gap: 16px;">
+      <div style="flex-grow: 1;">
+        <div style="font-size: 0.9375rem; font-weight: 600;">2 students are not in a group</div>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          In shared-device mode they cannot start a paired session.
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="pill"><span class="init">KM</span>Kevin Monthy</span>
+        <span class="pill"><span class="init">RA</span>Rita Antoine</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

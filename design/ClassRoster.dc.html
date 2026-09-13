@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #F9FAFB; color: #111827; }
+    a { color: #003da5; text-decoration: none; } a:hover { color: #002d7a; text-decoration: underline; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; }
+    th { background: #F9FAFB; font-weight: 600; font-size: 0.8125rem; color: #374151;
+         padding: 0.625rem 1rem; text-align: left; border-bottom: 1px solid #E5E7EB; }
+    td { padding: 0.875rem 1rem; border-bottom: 1px solid #E5E7EB; font-size: 0.875rem; }
+    tr:last-child td { border-bottom: none; }
+  </style>
+</helmet>
+
+<div style="padding: 28px 32px 40px; width: 1120px; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: 0.875rem; color: #6B7280;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    <a href="#" style="color: #6B7280;">All classes</a>
+  </div>
+
+  <!-- The headline the view already computes and the page currently throws away -->
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+              margin-bottom: 24px; flex-wrap: wrap;">
+    <div>
+      <div style="font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em;">S3</div>
+      <div style="font-size: 0.9375rem; color: #6B7280; margin-top: 4px;">
+        2 students &middot; Belonie Secondary
+      </div>
+    </div>
+    <div style="display: flex; gap: 28px;">
+      <div>
+        <div style="font-size: 0.75rem; color: #6B7280; text-transform: uppercase; letter-spacing: 0.04em;">Class mastery</div>
+        <div style="font-size: 1.75rem; font-weight: 600; color: #003da5; line-height: 1.2;">12%</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #6B7280; text-transform: uppercase; letter-spacing: 0.04em;">Active this week</div>
+        <div style="font-size: 1.75rem; font-weight: 600; line-height: 1.2;">1<span style="font-size: 1rem; color: #6B7280; font-weight: 400;">/2</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The roster is the class. It leads. -->
+  <div class="card" style="margin-bottom: 20px;">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #E5E7EB; display: flex;
+                justify-content: space-between; align-items: center;">
+      <div style="font-size: 1rem; font-weight: 600;">Students</div>
+      <div style="display: flex; gap: 8px;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Demote to S2
+        </button>
+        <button style="background: #003da5; color: #fff; border: none; border-radius: 8px;
+                       padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">
+          Promote to S4
+        </button>
+      </div>
+    </div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Last worked</th>
+          <th style="text-align: right;">Lessons mastered</th>
+          <th style="width: 180px;">Mastery</th>
+          <th style="width: 40px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <a href="#" style="font-weight: 500;">Amara Rose</a>
+            <div style="font-size: 0.8125rem; color: #6B7280;">amara@belonie.sc</div>
+          </td>
+          <td style="color: #374151;">2 days ago</td>
+          <td style="text-align: right; color: #374151;">9</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="flex-grow: 1; height: 6px; background: #E5E7EB; border-radius: 999px; overflow: hidden;">
+                <div style="width: 24%; height: 100%; background: #003da5;"></div>
+              </div>
+              <span style="font-size: 0.8125rem; color: #374151; width: 32px; text-align: right;">24%</span>
+            </div>
+          </td>
+          <td><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></td>
+        </tr>
+        <tr>
+          <td>
+            <a href="#" style="font-weight: 500;">Jean-Luc Pillay</a>
+            <div style="font-size: 0.8125rem; color: #6B7280;">jeanluc@belonie.sc</div>
+          </td>
+          <td style="color: #B45309;">31 days ago</td>
+          <td style="text-align: right; color: #374151;">0</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="flex-grow: 1; height: 6px; background: #E5E7EB; border-radius: 999px; overflow: hidden;">
+                <div style="width: 0%; height: 100%; background: #003da5;"></div>
+              </div>
+              <span style="font-size: 0.8125rem; color: #6B7280; width: 32px; text-align: right;">0%</span>
+            </div>
+          </td>
+          <td><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 8 course cards with 16 buttons become one line of chips -->
+  <div class="card">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #E5E7EB; display: flex;
+                justify-content: space-between; align-items: center;">
+      <div style="font-size: 1rem; font-weight: 600;">Courses for S3</div>
+      <div style="font-size: 0.8125rem; color: #6B7280;">3 at this school</div>
+    </div>
+    <div style="padding: 1.25rem 1.5rem; display: flex; gap: 10px; flex-wrap: wrap;">
+      <a href="#" style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0.5rem 0.875rem;
+                         border: 1px solid #E5E7EB; border-radius: 8px; background: #fff; color: #111827;">
+        <span style="font-size: 0.875rem; font-weight: 500;">Belonie Geography S3</span>
+        <span style="font-size: 0.75rem; color: #6B7280;">38 lessons &middot; 24% mastered</span>
+      </a>
+      <a href="#" style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0.5rem 0.875rem;
+                         border: 1px solid #E5E7EB; border-radius: 8px; background: #fff; color: #111827;">
+        <span style="font-size: 0.875rem; font-weight: 500;">Geography S1&ndash;S5</span>
+        <span style="font-size: 0.75rem; color: #6B7280;">101 lessons &middot; 6% mastered</span>
+      </a>
+      <a href="#" style="display: inline-flex; align-items: baseline; gap: 8px; padding: 0.5rem 0.875rem;
+                         border: 1px solid #E5E7EB; border-radius: 8px; background: #fff; color: #111827;">
+        <span style="font-size: 0.875rem; font-weight: 500;">Mathematics S3</span>
+        <span style="font-size: 0.75rem; color: #6B7280;">56 lessons &middot; not started</span>
+      </a>
+    </div>
+    <div style="padding: 0.875rem 1.5rem; background: #F9FAFB; border-top: 1px solid #E5E7EB;
+                font-size: 0.8125rem; color: #6B7280;">
+      Only this school&rsquo;s courses. The other 5 S3 courses belong to other schools and were
+      being listed here because the picker was set to <em>All Schools</em>.
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

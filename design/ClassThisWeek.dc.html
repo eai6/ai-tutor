@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+           background: #F9FAFB; color: #111827; }
+    a { color: #003da5; text-decoration: none; } a:hover { color: #002d7a; text-decoration: underline; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; }
+    .tab { padding: 0.625rem 0; font-size: 0.9375rem; font-weight: 500; color: #6B7280;
+           border-bottom: 2px solid transparent; cursor: pointer; }
+    .tab-on { color: #111827; border-bottom-color: #003da5; }
+    .row { padding: 1rem 1.5rem; border-bottom: 1px solid #E5E7EB; }
+    .row:last-child { border-bottom: none; }
+  </style>
+</helmet>
+
+<div style="padding: 28px 32px 40px; width: 1120px; box-sizing: border-box;">
+
+  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: 0.875rem; color: #6B7280;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    <a href="#" style="color: #6B7280;">All classes</a>
+  </div>
+
+  <div style="font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em;">S3</div>
+  <div style="font-size: 0.9375rem; color: #6B7280; margin-top: 4px;">2 students &middot; Belonie Secondary</div>
+
+  <!-- Tabs, because these are three separate jobs, not three sections of one -->
+  <div style="display: flex; gap: 24px; margin-top: 22px; border-bottom: 1px solid #E5E7EB;">
+    <div class="tab tab-on">This week</div>
+    <div class="tab">Students</div>
+    <div class="tab">Courses</div>
+  </div>
+
+  <!-- One thing to do, said plainly, at the top -->
+  <div style="margin-top: 22px; margin-bottom: 18px; background: #FFFBEB; border: 1px solid #FDE68A;
+              border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 12px;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+      <path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>
+    </svg>
+    <div style="flex-grow: 1; font-size: 0.9375rem; color: #92400E;">
+      <strong style="font-weight: 600;">Jean-Luc Pillay</strong> has not worked for 31 days.
+    </div>
+    <a href="#" style="font-size: 0.875rem; font-weight: 500; color: #92400E;">Open student</a>
+  </div>
+
+  <div class="card">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #E5E7EB; display: flex;
+                justify-content: space-between; align-items: center;">
+      <div style="font-size: 1rem; font-weight: 600;">Lessons worked on, last 7 days</div>
+      <div style="font-size: 0.8125rem; color: #6B7280;">1 of 2 students active</div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: center; gap: 16px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <a href="#" style="font-size: 0.9375rem; font-weight: 500;">Reading contour lines</a>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Belonie Geography S3 &middot; 1 student &middot; 3 sessions &middot; 1 completed
+        </div>
+      </div>
+      <div style="font-size: 0.8125rem; color: #6B7280; width: 80px; text-align: right;">2 days ago</div>
+      <div style="display: flex; gap: 6px; flex-shrink: 0;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Monitor</button>
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Report</button>
+      </div>
+    </div>
+
+    <div class="row" style="display: flex; align-items: center; gap: 16px;">
+      <div style="flex-grow: 1; min-width: 0;">
+        <a href="#" style="font-size: 0.9375rem; font-weight: 500;">Scale and distance on a map</a>
+        <div style="font-size: 0.8125rem; color: #6B7280; margin-top: 3px;">
+          Belonie Geography S3 &middot; 1 student &middot; 2 sessions
+        </div>
+      </div>
+      <div style="font-size: 0.8125rem; color: #6B7280; width: 80px; text-align: right;">4 days ago</div>
+      <div style="display: flex; gap: 6px; flex-shrink: 0;">
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Monitor</button>
+        <button style="background: #F3F4F6; color: #374151; border: none; border-radius: 8px;
+                       padding: 0.4375rem 0.75rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;">Report</button>
+      </div>
+    </div>
+
+    <!-- The current page drops this card entirely when empty, which reads as a rendering fault -->
+    <div style="padding: 0.875rem 1.5rem; background: #F9FAFB; border-top: 1px solid #E5E7EB;
+                font-size: 0.8125rem; color: #6B7280;">
+      A quiet week shows this same panel saying &ldquo;nothing yet this week&rdquo; &mdash;
+      the card should not disappear.
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,126 @@
+{
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Student detail"
+    },
+    {
+      "id": "page-2",
+      "name": "Class detail"
+    },
+    {
+      "id": "page-3",
+      "name": "Student groups"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 1120,
+      "h": 610,
+      "title": "A \u2014 One answer, then the evidence"
+    },
+    {
+      "file": "StudentTriage.dc.html",
+      "page": "page-1",
+      "x": 1240,
+      "y": 0,
+      "w": 1120,
+      "h": 780,
+      "title": "B \u2014 Triage by what needs doing"
+    },
+    {
+      "file": "ClassRoster.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 1120,
+      "h": 625,
+      "title": "A \u2014 The class, not the catalogue"
+    },
+    {
+      "file": "ClassThisWeek.dc.html",
+      "page": "page-2",
+      "x": 1240,
+      "y": 0,
+      "w": 1120,
+      "h": 580,
+      "title": "B \u2014 This week first"
+    },
+    {
+      "file": "GroupsAskFirst.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 0,
+      "w": 1120,
+      "h": 850,
+      "title": "A \u2014 Ask for the school, then get out of the way"
+    },
+    {
+      "file": "GroupsAtAGlance.dc.html",
+      "page": "page-3",
+      "x": 1240,
+      "y": 0,
+      "w": 1120,
+      "h": 565,
+      "title": "B \u2014 Pairs at a glance"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "diag-student",
+      "page": "page-1",
+      "x": 0,
+      "y": -190,
+      "w": 560,
+      "text": "Diagnosis\n\nThree stat tiles and two panels all describe the same three unfinished lessons. Course Progress and Recent Sessions are the same data twice.\n\n0/101 counts every authored lesson in the course, published and draft, with no student scoping \u2014 so it measures the catalogue, not the student.\n\nEvery lesson and session name is inert text. Nothing opens a transcript."
+    },
+    {
+      "id": "diag-student-b",
+      "page": "page-1",
+      "x": 1240,
+      "y": -190,
+      "w": 560,
+      "text": "B surfaces data the page already computes and discards: per_concept_breakdown() works out a percentage per concept and only three concept names survive to the template.\n\nTradeoff: more opinionated. Wrong thresholds put a fine student in the Stuck band."
+    },
+    {
+      "id": "diag-class",
+      "page": "page-2",
+      "x": 0,
+      "y": -210,
+      "w": 560,
+      "text": "Diagnosis\n\nTwo pages in one: a course catalogue for the grade, and a roster. The catalogue is identical for every S3 class and pushes the 2 students below the fold.\n\nThe view computes avg_mastery_pct \u2014 the number its own docstring calls the point of the page \u2014 and the template never renders it.\n\nThe 8 course cards come from 5 different schools because the picker is on All Schools."
+    },
+    {
+      "id": "diag-class-b",
+      "page": "page-2",
+      "x": 1240,
+      "y": -210,
+      "w": 560,
+      "text": "B leads with the week and demotes roster and courses to tabs.\n\nTradeoff: promotion is the page's only bulk action and a tab hides it.\n\nSeparate bug worth fixing either way: Competency map goes to a view scoped by the school picker, not the grade \u2014 from /classes/S3/ you land on a map covering every grade in the school."
+    },
+    {
+      "id": "diag-groups",
+      "page": "page-3",
+      "x": 0,
+      "y": -210,
+      "w": 560,
+      "text": "Diagnosis\n\nUnder All Schools the page renders three cards it cannot act on: a red warning, then a heading and a paragraph above a silently empty box where the form should be, then \"No groups yet \u2014 use the form above\" when there is no form above.\n\nThe roster renders once per group plus once for the create form.\n\nEditing and archiving still work while gated, across schools, with no school column."
+    },
+    {
+      "id": "diag-groups-b",
+      "page": "page-3",
+      "x": 1240,
+      "y": -210,
+      "w": 560,
+      "text": "B answers the question the page has never answered: has this pair actually worked together?\n\nStudentGroup already records created_by and created_at and shows neither.\n\nTradeoff: shared-session counts are not currently queried anywhere, so this direction needs a new query before it can be built."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-1"
+  }
+}
