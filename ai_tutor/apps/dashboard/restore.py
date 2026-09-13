@@ -126,7 +126,11 @@ def manifest_for(*, backup=None, key: str = '') -> tuple[dict, str]:
     "read from the row that claims to describe it" are different degrees of
     evidence and the confirmation page should not blur them.
     """
-    if backup is not None and backup.summary:
+    # A summary is only a manifest if it actually describes a dump. Rows can
+    # carry a stub — a note about where an archive came from, say — and taking
+    # that as the manifest produces "unrecognised dump format None" instead of
+    # falling through to the sidecar that would have answered properly.
+    if backup is not None and (backup.summary or {}).get('database'):
         return backup.summary, 'backup record'
 
     key = key or (backup.storage_key if backup else '')

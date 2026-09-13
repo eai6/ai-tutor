@@ -729,10 +729,28 @@
                                 {{ job.stage|default:job.status }} {{ job.progress }}%
                             {% endif %}
                         </td>
-                        <td>
+                        <td style="white-space:nowrap;">
                             {% if job.status == 'done' %}
                                 <a class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.8rem;"
                                    href="{% url 'dashboard:backup_download' job.pk %}">{% trans "Download" %}</a>
+                                {# Restore sits beside Download rather than in a  #}
+                                {# list of its own: it is the same archive and    #}
+                                {# two lists of it drift. Gated separately, on    #}
+                                {# is_superuser — taking a copy and destroying    #}
+                                {# everything are not the same privilege.         #}
+                                {% if request.user.is_superuser %}
+                                <form method="post" action="{% url 'dashboard:restore_preflight' %}"
+                                      style="display:inline;margin-left:0.35rem;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="backup_id" value="{{ job.pk }}">
+                                    <button type="submit" class="btn"
+                                            style="padding:0.25rem 0.6rem;font-size:0.8rem;
+                                                   background:#fee2e2;color:#991b1b;
+                                                   border:1px solid #fca5a5;cursor:pointer;">
+                                        {% trans "Restore…" %}
+                                    </button>
+                                </form>
+                                {% endif %}
                             {% endif %}
                         </td>
                     </tr>
@@ -786,44 +804,12 @@
             </p>
             {% endif %}
 
-            {% if restorable_backups %}
-            <table class="table" style="width:100%;font-size:0.875rem;">
-                <thead>
-                    <tr>
-                        <th>{% trans "Taken" %}</th>
-                        <th>{% trans "Contents" %}</th>
-                        <th>{% trans "Size" %}</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for job in restorable_backups %}
-                    <tr>
-                        <td>{{ job.created_at|date:"Y-m-d H:i" }}</td>
-                        <td>{% if job.include_media %}{% trans "Database + media" %}
-                            {% else %}{% trans "Database only" %}{% endif %}</td>
-                        <td>{% if job.size_bytes %}{{ job.size_bytes|filesizeformat }}{% else %}—{% endif %}</td>
-                        <td>
-                            <form method="post" action="{% url 'dashboard:restore_preflight' %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="backup_id" value="{{ job.pk }}">
-                                <button type="submit" class="btn btn-secondary"
-                                        style="padding:0.25rem 0.6rem;font-size:0.8rem;
-                                               background:#fee2e2;color:#991b1b;
-                                               border:1px solid #fca5a5;">
-                                    {% trans "Restore…" %}
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
             <p style="color:var(--gray-500);font-size:0.875rem;">
-                {% trans "No archives available to restore from." %}
+                {% blocktrans trimmed %}
+                    Use the Restore button beside any finished archive in the
+                    list above.
+                {% endblocktrans %}
             </p>
-            {% endif %}
 
             <div style="border-top:1px solid var(--gray-200);margin-top:1.25rem;
                         padding-top:1.25rem;">

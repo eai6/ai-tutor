@@ -459,6 +459,26 @@ class Command(BaseCommand):
         # ago contains its own unfinished row — which then holds the
         # one-active-backup constraint shut and parks the settings page on "a
         # backup is already running" for six hours.
+        # One of those rows is special: the archive's own. A dump taken by
+        # build() always contains the very row describing the backup that was
+        # running when it was taken — and that backup demonstrably finished,
+        # because we just restored from what it produced. Marking it "failed"
+        # alongside the others would put a red Failed row in the list for the
+        # exact archive the admin successfully restored from, which reads as
+        # though the restore went wrong. It is identified by primary key: the
+        # dump carries the row under the same pk the source BackupJob has here.
+        if job.source_backup_id:
+            recovered = BackupJob.objects.filter(
+                pk=job.source_backup_id,
+                status__in=(BackupJob.Status.PENDING, BackupJob.Status.RUNNING),
+            ).update(
+                status=BackupJob.Status.DONE, stage='done', progress=100,
+                storage_key=job.source_key,
+                size_bytes=getattr(self, '_source_bytes', 0),
+                summary=manifest, finished_at=timezone.now())
+            if recovered:
+                self.say('restored the source archive\'s own record')
+
         for model in (BackupJob, RestoreJob):
             stuck = model.objects.filter(
                 status__in=(model.Status.PENDING, model.Status.RUNNING))
@@ -484,18 +504,26 @@ class Command(BaseCommand):
         # the settings page instead of being an S3 key somebody has to presign
         # by hand on the worst day of their week.
         if safety_key:
-            try:
-                safety_bytes = Path(safety_key).stat().st_size
-            except OSError:
-                safety_bytes = 0          # an S3 key, not a path
+            safety_bytes = getattr(self, '_safety_bytes', 0)
+            if not safety_bytes:
+                try:
+                    safety_bytes = Path(safety_key).stat().st_size
+                except OSError:
+                    safety_bytes = 0      # an S3 key, not a path
+            # Its REAL manifest, not a stub. The safety copy is the archive
+            # somebody reaches for when a restore turned out to be the wrong
+            # one, and a row without a manifest cannot be preflighted — which
+            # would make it the one archive they cannot put back.
+            summary = dict(getattr(self, '_safety_summary', None) or
+                           {'scope': 'platform'})
+            summary['note'] = (f'Taken automatically before restore '
+                               f'{restored.pk}.')
             BackupJob.objects.create(
                 status=BackupJob.Status.DONE, storage_key=safety_key,
                 size_bytes=safety_bytes,
                 include_media=False, stage='pre-restore safety copy',
                 progress=100, finished_at=timezone.now(),
-                summary={'scope': 'platform',
-                         'note': f'Taken automatically before restore '
-                                 f'{restored.pk}.'})
+                summary=summary)
 
         SafetyAuditLog.objects.create(
             event_type=SafetyAuditLog.EventType.DATA_EXPORT,
@@ -586,6 +614,11 @@ class Command(BaseCommand):
                 scratch = Path(scratch_dir)
                 self.step(job, 'fetching the archive', 35)
                 archive = self.fetch_archive(job.source_key, scratch)
+                # Kept for the row re-inserted afterwards: the dump contains
+                # this archive's own BackupJob record as it was mid-backup,
+                # before build() wrote the size onto it, so without this it
+                # comes back showing "—" in the list.
+                self._source_bytes = archive.stat().st_size
 
                 self.step(job, 'verifying the dump', 45)
                 dump_path = self.extract_dump(archive, manifest, scratch)
@@ -699,6 +732,12 @@ class Command(BaseCommand):
         restore_service.write_status(job, state='running',
                                      stage='safety copy taken', progress=15,
                                      safety_backup_key=safety.storage_key)
+        # Its manifest and size are kept so the row re-inserted after the
+        # restore is a real backup record rather than a stub. A stub cannot be
+        # preflighted, which would make the one archive somebody reaches for in
+        # a hurry the one they cannot restore.
+        self._safety_summary = safety.summary
+        self._safety_bytes = safety.size_bytes
         return safety.storage_key
 
     def _fail(self, job, message: str, *, destructive: bool) -> None:

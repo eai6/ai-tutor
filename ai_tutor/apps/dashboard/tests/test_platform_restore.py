@@ -1129,3 +1129,123 @@ class TestAPartlyConfiguredEcsRefuses:
                     'ECS_RESTORE_TASK_DEFINITION', 'ECS_MIGRATE_TASK_DEFINITION'):
             monkeypatch.delenv(var, raising=False)
         assert restore_service.required_settings_missing() == []
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTheSourceArchiveIsNotReportedAsFailed:
+    """Every dump contains the row describing the backup that was running when
+    it was taken — build() saves RUNNING before it dumps. That backup plainly
+    finished, because the archive it produced is what we just restored from.
+    Sweeping it to 'failed' with the rest puts a red Failed row in the list for
+    the exact archive the admin succeeded with."""
+
+    def test_the_archive_own_record_comes_back_as_done(
+            self, db, tmp_path, settings, monkeypatch):
+        from django.core.management import call_command
+        from ai_tutor.apps.dashboard import backup as backup_service
+
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        source = BackupJob.objects.create(include_media=False)
+        backup_service.build(source)
+        source.refresh_from_db()
+        assert source.status == BackupJob.Status.DONE, source.error
+
+        job = RestoreJob.objects.create(source_backup=source,
+                                        source_key=source.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        source.refresh_from_db()
+        assert source.status == BackupJob.Status.DONE, \
+            'the archive we restored from is listed as failed'
+        assert source.storage_key, 'its key was lost, so it cannot be downloaded'
+        # The dump holds this row as it was MID-backup, before build() wrote
+        # the size and manifest onto it — so both have to be put back, or the
+        # archive shows "—" in the list and cannot be preflighted again.
+        assert source.size_bytes > 0, 'shows "—" in the list'
+        assert (source.summary or {}).get('database'), 'cannot be restored again'
+
+    def test_other_unfinished_rows_are_still_swept(
+            self, db, tmp_path, settings, monkeypatch):
+        """The sweep still has to happen — a resurrected running row holds the
+        one-active-backup constraint shut for six hours."""
+        from django.core.management import call_command
+        from ai_tutor.apps.dashboard import backup as backup_service
+
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        source = BackupJob.objects.create(include_media=False)
+        backup_service.build(source)
+        source.refresh_from_db()
+
+        job = RestoreJob.objects.create(source_backup=source,
+                                        source_key=source.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        assert not BackupJob.objects.filter(
+            status__in=(BackupJob.Status.PENDING,
+                        BackupJob.Status.RUNNING)).exists()
+        # And a new backup can start, which is the point of the sweep.
+        BackupJob.objects.create()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTheSafetyCopyCanItselfBeRestored:
+    """It is the archive somebody reaches for when a restore turned out to be
+    the wrong one. A record without a manifest cannot be preflighted, which
+    would make it the one archive they cannot put back."""
+
+    def test_it_carries_a_real_manifest_not_a_stub(
+            self, db, tmp_path, settings, monkeypatch):
+        from django.core.management import call_command
+        from ai_tutor.apps.dashboard import backup as backup_service
+        from ai_tutor.apps.dashboard import restore as restore_service
+
+        settings.BACKUP_ROOT = tmp_path / 'backups'
+        settings.AWS_BACKUP_BUCKET = ''
+        source = BackupJob.objects.create(include_media=False)
+        backup_service.build(source)
+        source.refresh_from_db()
+
+        job = RestoreJob.objects.create(source_backup=source,
+                                        source_key=source.storage_key)
+        for var in ('ECS_CLUSTER', 'ECS_SERVICE'):
+            monkeypatch.delenv(var, raising=False)
+        call_command('restore_backup', job=job.pk)
+
+        safety = BackupJob.objects.filter(stage='pre-restore safety copy').first()
+        assert safety is not None
+        assert safety.size_bytes > 0, 'shows "—" in the list'
+        # The thing that matters: it can be checked and restored in turn.
+        report = restore_service.preflight(backup=safety)
+        assert report['ok'], report['blocking']
+        assert report['manifest_source'] == 'backup record'
+
+
+@pytest.mark.django_db
+class TestAStubSummaryIsNotMistakenForAManifest:
+
+    def test_it_falls_through_to_the_sidecar(self, lock_dir):
+        """A row can carry a note rather than a manifest. Taking that as the
+        manifest yields 'unrecognised dump format None' instead of the answer
+        the sidecar beside the archive would have given."""
+        from ai_tutor.apps.dashboard import restore as restore_service
+
+        root = Path(lock_dir) / 'backups'
+        root.mkdir(parents=True, exist_ok=True)
+        archive = root / 'stubbed.tar.gz'
+        archive.write_bytes(b'not read by preflight')
+        archive.with_name(archive.name + '.manifest.json').write_text(
+            json.dumps(_manifest()))
+
+        backup = BackupJob.objects.create(
+            status=BackupJob.Status.DONE, storage_key=str(archive),
+            summary={'scope': 'platform', 'note': 'where this came from'})
+
+        report = restore_service.preflight(backup=backup)
+        assert report['manifest_source'] == 'sidecar manifest'
+        assert report['ok'], report['blocking']

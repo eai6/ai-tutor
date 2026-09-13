@@ -4027,8 +4027,8 @@ def settings_page(request):
         if request.user.is_superuser:
             from ai_tutor.apps.dashboard import restore as restore_service
             restore_service.reap_stale()
-            context['restorable_backups'] = BackupJob.objects.filter(
-                status=BackupJob.Status.DONE).exclude(storage_key='')[:10]
+            # No separate list of archives: the Restore button lives on the
+            # backup table's own rows. Two lists of the same archives drift.
             context['restore_running'] = RestoreJob.objects.filter(
                 status__in=(RestoreJob.Status.PENDING,
                             RestoreJob.Status.RUNNING)).exists()
