@@ -40,7 +40,7 @@ def _build_session_with_mcq_bank_question():
     institution = Institution.objects.create(name="T", slug="mcq-eq-test")
     student = User.objects.create_user(username="mcq-eq-stu", password="x")
     course = Course.objects.create(
-        institution=institution, title="Math", subject_type='math',
+        institution=institution, title="Math", subject_code='mathematics',
         is_published=True,
     )
     unit = Unit.objects.create(course=course, title="U", order_index=0)

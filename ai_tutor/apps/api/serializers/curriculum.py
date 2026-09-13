@@ -8,6 +8,10 @@ from ai_tutor.apps.curriculum.models import Course, Unit, Lesson, LessonStep
 class CourseSerializer(serializers.ModelSerializer):
     institution_id = serializers.IntegerField(read_only=True, allow_null=True)
     is_math = serializers.BooleanField(read_only=True)
+    # Both of these are properties on Course now, not columns. Declared rather
+    # than left to ModelSerializer's inference so the read-only-ness is visible
+    # here if this ever stops being a ListAPIView.
+    subject_type = serializers.CharField(read_only=True)
 
     class Meta:
         model = Course

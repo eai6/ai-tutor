@@ -245,11 +245,11 @@ class FigureFactsBlockTest(TestCase):
         cls.student = User.objects.create_user(username="ffstu", password="pw")
         cls.math_course = Course.objects.create(
             institution=cls.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.geo_course = Course.objects.create(
             institution=cls.institution, title="Geo S3",
-            grade_level="S3", is_published=True, subject_type='humanities',
+            grade_level="S3", is_published=True, subject_code='geography',
         )
         cls.unit = Unit.objects.create(course=cls.math_course, title="U", order_index=0)
         cls.geo_unit = Unit.objects.create(course=cls.geo_course, title="G", order_index=0)

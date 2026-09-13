@@ -54,7 +54,7 @@ class CombinedJudgeSkipGatesTest(TestCase):
         cls.institution = Institution.objects.create(name="T", slug="t")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="U", order_index=0,
@@ -103,7 +103,7 @@ class ValidatorConsumesCombinedResultTest(TestCase):
         cls.institution = Institution.objects.create(name="T", slug="t")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="U", order_index=0,

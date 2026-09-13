@@ -35,7 +35,7 @@ def _make_session(*, is_synthetic: bool, sim_persona: str = '',
         username=f"user-{ts}", password='x',
     )
     course = Course.objects.create(
-        institution=inst, title='Angles', subject_type='mathematics',
+        institution=inst, title='Angles', subject_code='mathematics',
     )
     unit = Unit.objects.create(course=course, title='U1', order_index=1)
     lesson = Lesson.objects.create(

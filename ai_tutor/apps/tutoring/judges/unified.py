@@ -498,7 +498,11 @@ def _build_user_prompt(
     unit = getattr(lesson, 'unit', None)
     if unit and getattr(unit, 'course', None):
         course = unit.course
-        subj = getattr(course, 'subject_type', '') or getattr(course, 'subject_code', '')
+        # subject_code, not subject_type: the type maps FROM the code now, so
+        # the `or` that used to sit here could never fire, and the code is the
+        # more precise of the two — "geography" tells the judge more than
+        # "humanities", which history shares.
+        subj = getattr(course, 'subject_code', '') or ''
         lesson_parts.append(f"Subject: {subj} | Grade: {getattr(course, 'grade_level', '?')}")
     lesson_context = "\n".join(lesson_parts)
 

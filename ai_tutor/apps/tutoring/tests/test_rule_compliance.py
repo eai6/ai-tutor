@@ -220,11 +220,11 @@ class ValidatorIntegrationTest(TestCase):
         cls.institution = Institution.objects.create(name="V", slug="v")
         cls.math_course = Course.objects.create(
             institution=cls.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.non_math_course = Course.objects.create(
             institution=cls.institution, title="Geo S3",
-            grade_level="S3", is_published=True, subject_type='humanities',
+            grade_level="S3", is_published=True, subject_code='geography',
         )
         cls.unit = Unit.objects.create(course=cls.math_course, title="U", order_index=0)
         cls.geo_unit = Unit.objects.create(course=cls.non_math_course, title="G", order_index=0)
@@ -488,7 +488,7 @@ class FakeScaffoldingIntegrationTest(TestCase):
         cls.institution = Institution.objects.create(name="V2", slug="v2")
         cls.math_course = Course.objects.create(
             institution=cls.institution, title="Math S3 Sum",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.math_course, title="Angles", order_index=0,

@@ -38,7 +38,7 @@ class RestartLessonTest(TestCase):
         )
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math S2",
-            grade_level="S2", is_published=True, subject_type='math',
+            grade_level="S2", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(course=cls.course, title="U", order_index=0)
         cls.lesson = Lesson.objects.create(

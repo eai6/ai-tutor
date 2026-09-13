@@ -33,7 +33,7 @@ def _setup():
     institution = Institution.objects.create(name="T", slug="t-phase")
     student = User.objects.create_user(username="stu-phase", password="x")
     course = Course.objects.create(
-        institution=institution, title='Math', subject_type='math',
+        institution=institution, title='Math', subject_code='mathematics',
         is_published=True,
     )
     unit = Unit.objects.create(course=course, title='U', order_index=0)

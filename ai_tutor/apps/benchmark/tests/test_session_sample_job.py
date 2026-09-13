@@ -45,7 +45,7 @@ def school(db):
 @pytest.fixture
 def lesson(school):
     course = Course.objects.create(title='Geo', institution=school,
-                                   subject_type='geography')
+                                   subject_code='geography')
     unit = Unit.objects.create(course=course, title='Maps', order_index=1)
     return Lesson.objects.create(unit=unit, title='Maps', objective='o',
                                  order_index=1, is_published=True)
@@ -523,12 +523,12 @@ class TestSelectionIsARandomDraw:
         from ai_tutor.apps.curriculum.models import Course, Lesson, Unit
 
         maths = Course.objects.create(title='Maths', institution=school,
-                                      subject_type='math')
+                                      subject_code='mathematics')
         m_unit = Unit.objects.create(course=maths, title='U', order_index=1)
         rare_lesson = Lesson.objects.create(unit=m_unit, title='Rare',
                                             objective='o', order_index=1)
         geo = Course.objects.create(title='Geo', institution=school,
-                                    subject_type='geography')
+                                    subject_code='geography')
         g_unit = Unit.objects.create(course=geo, title='U', order_index=1)
         common_lesson = Lesson.objects.create(unit=g_unit, title='Common',
                                               objective='o', order_index=1)
@@ -657,7 +657,7 @@ class TestFilters:
         from ai_tutor.apps.curriculum.models import Course, Lesson, Unit
 
         other = Course.objects.create(title='Other', institution=school,
-                                      subject_type='math')
+                                      subject_code='mathematics')
         unit = Unit.objects.create(course=other, title='U', order_index=1)
         other_lesson = Lesson.objects.create(unit=unit, title='L',
                                              objective='o', order_index=1)
@@ -672,7 +672,7 @@ class TestFilters:
         from ai_tutor.apps.curriculum.models import Course, Lesson, Unit
 
         other = Course.objects.create(title='Other', institution=school,
-                                      subject_type='math')
+                                      subject_code='mathematics')
         unit = Unit.objects.create(course=other, title='U', order_index=1)
         other_lesson = Lesson.objects.create(unit=unit, title='L',
                                              objective='o', order_index=1)

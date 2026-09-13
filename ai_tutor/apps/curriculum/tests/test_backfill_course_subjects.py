@@ -1,10 +1,10 @@
 """Tests for backfill_course_subjects management command.
 
-Audit v3 R4: the backfill must populate BOTH subject_code AND
-subject_type, otherwise is_math reads an empty subject_type and falls
-through to the legacy MATH_KEYWORDS heuristic — silently bypassing the
-math protection layer on courses whose titles don't include the
-keywords.
+The command writes one field now: subject_code. subject_type follows from it
+(a property, step 4 of memory/subject_grade_unification_plan.md), so the
+assertions below check the derived value as well — filling the code is what
+makes is_math stop falling through to the legacy MATH_KEYWORDS heuristic on a
+course whose title doesn't contain a keyword.
 """
 
 from io import StringIO
@@ -60,24 +60,25 @@ class BackfillCourseSubjectsTest(TestCase):
                 self.assertEqual(c.subject_code, code)
                 self.assertEqual(c.subject_type, 'science')
 
-    def test_does_not_overwrite_existing_subject_type(self):
-        """Without --overwrite, an explicitly-set subject_type stays put."""
+    def test_does_not_overwrite_an_existing_subject_code(self):
+        """Without --overwrite, a subject a teacher chose stays put — even when
+        the title keywords say something else."""
         course = Course.objects.create(
             institution=self.institution,
             title='Math 101',
-            subject_type='language',  # deliberately wrong, simulating teacher input
+            subject_code='french',  # deliberately wrong, simulating teacher input
         )
         self._backfill()
         course.refresh_from_db()
-        # subject_code still gets backfilled (was empty), but subject_type stays
-        self.assertEqual(course.subject_code, 'mathematics')
+        self.assertEqual(course.subject_code, 'french')
         self.assertEqual(course.subject_type, 'language')
+        self.assertFalse(course.is_math)
 
-    def test_overwrite_flag_replaces_subject_type(self):
+    def test_overwrite_flag_replaces_the_subject_code(self):
         course = Course.objects.create(
             institution=self.institution,
             title='Math 101',
-            subject_type='language',
+            subject_code='french',
         )
         out = StringIO()
         call_command(
@@ -85,4 +86,6 @@ class BackfillCourseSubjectsTest(TestCase):
             stdout=out, stderr=StringIO(),
         )
         course.refresh_from_db()
+        self.assertEqual(course.subject_code, 'mathematics')
+        # The type follows the code with no second write.
         self.assertEqual(course.subject_type, 'math')

@@ -65,10 +65,9 @@ class Course(models.Model):
         ),
     )
 
-    # Subject classification (M8 / memory/math_tutor_fix_plan.md). Replaces
-    # the fragile MATH_KEYWORDS title heuristic. is_math now prefers this
-    # field when set, falling back to the keyword check for legacy rows
-    # that haven't been classified yet.
+    # The coarse subject bucket. No longer stored — see the `subject_type`
+    # property, which maps it from subject_code. The vocabulary stays because
+    # tutor rules, the benchmark sampler and the image service all speak it.
     class SubjectType(models.TextChoices):
         MATH = 'math', 'Math'
         SCIENCE = 'science', 'Science'
@@ -76,15 +75,18 @@ class Course(models.Model):
         LANGUAGE = 'language', 'Language'
         OTHER = 'other', 'Other'
 
-    subject_type = models.CharField(
+    # Superseded by the `subject_type` PROPERTY below, which maps it from
+    # subject_code. Nothing reads or writes this column any more; it is kept
+    # for one release so a rollback still has the data, and dropped after
+    # that. Do not add references.
+    subject_type_stored = models.CharField(
+        db_column='subject_type',
         max_length=20,
         choices=SubjectType.choices,
         blank=True,
         default='',
         help_text=(
-            "Canonical subject classification. Drives is_math and "
-            "subject-specific tutor rules. Empty falls back to the legacy "
-            "MATH_KEYWORDS title heuristic."
+            "Deprecated — read Course.subject_type, which maps subject_code."
         ),
     )
 
@@ -117,6 +119,21 @@ class Course(models.Model):
             "`python manage.py backfill_course_subjects`."
         ),
     )
+
+    # subject_code → the coarse bucket. Total over SubjectCode: every code has
+    # exactly one type, which is why the type never needed storing separately.
+    SUBJECT_CODE_TO_TYPE = {
+        SubjectCode.MATHEMATICS:      SubjectType.MATH,
+        SubjectCode.PHYSICS:          SubjectType.SCIENCE,
+        SubjectCode.CHEMISTRY:        SubjectType.SCIENCE,
+        SubjectCode.BIOLOGY:          SubjectType.SCIENCE,
+        SubjectCode.GEOGRAPHY:        SubjectType.HUMANITIES,
+        SubjectCode.HISTORY:          SubjectType.HUMANITIES,
+        SubjectCode.ENGLISH:          SubjectType.LANGUAGE,
+        SubjectCode.FRENCH:           SubjectType.LANGUAGE,
+        SubjectCode.COMPUTER_SCIENCE: SubjectType.OTHER,
+        SubjectCode.OTHER:            SubjectType.OTHER,
+    }
 
     # Normalised grade list — multi-grade allowed. Drives the global-KB
     # merge: a school's S3 course inherits chunks from any platform-wide
@@ -222,30 +239,53 @@ class Course(models.Model):
         return [g.strip() for g in (self.grade_level or '').split(',') if g.strip()]
 
     @property
+    def subject_type(self):
+        """The coarse subject bucket, mapped from subject_code.
+
+        This was a stored field, set by its own dropdown on the course page,
+        independently of subject_code. The two never disagreed — they were
+        never both set. Measured across the 8 local courses: 2 agreed and 6
+        had an EMPTY stored type against a code that determines it, so the
+        mapping only ever added information. Nothing was classified as one
+        subject by its code and another by its type, because two different
+        code paths each wrote one field and neither wrote the other.
+
+        Every SubjectCode maps to exactly one SubjectType, so there was never
+        anything for the stored column to say that the code did not already
+        determine. Blank code gives blank type, which keeps `if
+        course.subject_type` falsy for an unclassified course exactly as
+        before.
+        """
+        if not self.subject_code:
+            return ''
+        # str() so callers get the same plain value the column held, not a
+        # TextChoices member whose repr leaks into logs and serialisers.
+        return str(self.SUBJECT_CODE_TO_TYPE.get(
+            self.subject_code, self.SubjectType.OTHER))
+
+    @property
     def is_math(self):
         """Whether the math tutoring rules apply to this course.
 
-        subject_code first. It is the canonical subject — the value the upload
-        form collects and the one material sharing joins on — and reading it
-        last meant a course explicitly marked `mathematics` could still be
-        decided by a keyword scan of its title. "Layer S Demo — Math S3" was
-        exactly that: subject_code='mathematics', subject_type='', and is_math
-        True only because the title happens to contain "Math". Rename it and
-        the math rules switch off silently.
+        subject_code is the canonical subject — the value the upload form
+        collects and the one material sharing joins on. Reading it last used to
+        mean a course explicitly marked `mathematics` could still be decided by
+        a keyword scan of its title. "Layer S Demo — Math S3" was exactly that:
+        is_math True only because the title happens to contain "Math". Rename
+        it and the math rules switch off silently.
 
-        subject_type stays as the second reading because half the catalogue is
-        classified through it and nothing through both — Mathematics S3 carries
-        subject_type='math' with no code at all.
+        The subject_type reading that sat here is gone: subject_type now maps
+        FROM subject_code, so asking it second could only repeat the first
+        answer.
 
         The MATH_KEYWORDS scan is last and is the anti-pattern CLAUDE.md names.
-        It stays until both fields are populated everywhere; the thing that
-        makes it unreachable is `backfill_course_subjects`, not a deletion here.
+        It stays until `backfill_course_subjects --apply` has run on prod —
+        until then a prod course with no subject_code would silently stop being
+        a maths course, which is a worse failure than the heuristic.
         """
         if self.subject_code:
             return self.subject_code == self.SubjectCode.MATHEMATICS
-        if self.subject_type:
-            return self.subject_type == self.SubjectType.MATH
-        # Legacy fallback for courses classified by neither field.
+        # Legacy fallback for courses with no subject_code at all.
         return any(kw in (self.title or '').lower() for kw in self.MATH_KEYWORDS)
 
     def __str__(self):

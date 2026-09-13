@@ -1,11 +1,12 @@
-"""Backfill Course.subject_code and Course.subject_type from the title.
+"""Backfill Course.subject_code from the title.
 
-Maps `Course.title` → SubjectCode by keyword, then `subject_code` →
-`subject_type`, for courses created before the upload form collected either.
+Maps `Course.title` → SubjectCode by keyword, for courses created before the
+upload form collected a subject.
 
-Grade is no longer part of this. `Course.grade_levels` is a property over
-`Course.grade_level`, so there is nothing to keep in step — see step 3 of
-`memory/subject_grade_unification_plan.md`. Grade tokens are still parsed,
+One field, because the others are derived now — `Course.subject_type` maps
+from `subject_code` and `Course.grade_levels` parses `grade_level`, so there
+is nothing left to keep in step (steps 3 and 4 of
+`memory/subject_grade_unification_plan.md`). Grade tokens are still parsed,
 but only to decide whether a course with no inferable subject is worth
 reporting as unmapped.
 
@@ -42,44 +43,25 @@ KEYWORD_RULES = [
 ]
 
 
-# Map subject_type → fallback subject_code for rows where title doesn't
-# yield a match but the existing subject_type is informative.
-SUBJECT_TYPE_FALLBACK = {
-    'math': 'mathematics',
-}
-
-
-# Map inferred subject_code → coarse subject_type, so the same backfill
-# pass populates BOTH fields. is_math consults subject_type, so leaving
-# it empty after backfill forces the legacy MATH_KEYWORDS fallback for
-# every read — re-introducing the silent-gap problem v3 audit H3 calls
-# out for courses whose titles don't match the keyword list.
-SUBJECT_CODE_TO_TYPE = {
-    'mathematics':      'math',
-    'physics':          'science',
-    'chemistry':        'science',
-    'biology':          'science',
-    'geography':        'humanities',
-    'history':          'humanities',
-    'english':          'language',
-    'french':           'language',
-    'computer_science': 'other',
-}
-
-
 # Recognised grade tokens. Match case-insensitively, normalise to upper.
 GRADE_PATTERN = re.compile(r'\bs([1-6])\b', re.IGNORECASE)
 
 
-def infer_subject_code(title: str, subject_type: str = '') -> Optional[str]:
-    """Return SubjectCode value or None if no rule matched."""
+def infer_subject_code(title: str) -> Optional[str]:
+    """Return SubjectCode value or None if no rule matched.
+
+    The subject_type fallback that used to sit here ('math' → 'mathematics',
+    for a title the keywords missed) is gone: subject_type maps FROM
+    subject_code now, so it is empty exactly when subject_code is, and
+    consulting it to fill subject_code was asking the answer to supply itself.
+    """
     if not title:
-        return SUBJECT_TYPE_FALLBACK.get(subject_type)
+        return None
     lower = title.lower()
     for pattern, code in KEYWORD_RULES:
         if re.search(pattern, lower):
             return code
-    return SUBJECT_TYPE_FALLBACK.get(subject_type)
+    return None
 
 
 def parse_grade_levels(grade_level: str) -> List[str]:
@@ -91,7 +73,7 @@ def parse_grade_levels(grade_level: str) -> List[str]:
 
 
 class Command(BaseCommand):
-    help = "Backfill Course.subject_code + Course.subject_type from the title."
+    help = "Backfill Course.subject_code from the title."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -104,7 +86,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--overwrite', action='store_true', default=False,
-            help="Overwrite existing subject_code/subject_type if already set. "
+            help="Overwrite an existing subject_code if already set. "
                  "Default: only fill empty fields.",
         )
 
@@ -134,11 +116,8 @@ class Command(BaseCommand):
         def _do_backfill():
             nonlocal will_update
             for c in courses:
-                proposed_code = infer_subject_code(c.title, c.subject_type or '')
+                proposed_code = infer_subject_code(c.title)
                 proposed_grades = parse_grade_levels(c.grade_level or '')
-                proposed_type = (
-                    SUBJECT_CODE_TO_TYPE.get(proposed_code) if proposed_code else None
-                )
 
                 # Skip when nothing usable — log and move on
                 if not proposed_code and not proposed_grades:
@@ -152,11 +131,9 @@ class Command(BaseCommand):
                         if apply_changes:
                             c.subject_code = proposed_code
 
-                if proposed_type and (overwrite or not c.subject_type):
-                    if c.subject_type != proposed_type:
-                        changes.append(f"subject_type: {c.subject_type!r} → {proposed_type!r}")
-                        if apply_changes:
-                            c.subject_type = proposed_type
+                # No subject_type branch. It maps from subject_code now, so
+                # writing the code above is the whole job — and the column it
+                # used to write is not a field any more.
 
                 # No grade branch any more. grade_levels is derived from
                 # grade_level, and proposed_grades came from parsing that same
@@ -171,7 +148,7 @@ class Command(BaseCommand):
                         + "\n".join(f"        {ch}" for ch in changes) + "\n"
                     )
                     if apply_changes:
-                        c.save(update_fields=['subject_code', 'subject_type'])
+                        c.save(update_fields=['subject_code'])
                 elif not c.subject_code and not c.grade_levels:
                     # Nothing to write but also nothing was set — log
                     inst = c.institution.name if c.institution else 'PLATFORM-WIDE'

@@ -5813,35 +5813,6 @@ def staff_reset_password_email(request, user_id):
 
 @teacher_required
 @require_POST
-def course_subject_type(request, course_id):
-    """Update Course.subject_type. Drives is_math + subject-specific tutor
-    rules. See memory/math_tutor_fix_plan.md M8.
-    """
-    from ai_tutor.apps.curriculum.models import Course
-
-    institution = request.staff_ctx['institution']
-    if institution is not None:
-        course = get_object_or_404(
-            Course,
-            Q(institution=institution) | Q(institution__isnull=True),
-            id=course_id,
-        )
-    else:
-        course = get_object_or_404(Course, id=course_id)
-
-    new_value = request.POST.get('subject_type', '').strip()
-    valid = {choice[0] for choice in Course.SubjectType.choices}
-    if new_value and new_value not in valid:
-        messages.error(request, "Invalid subject type.")
-    else:
-        course.subject_type = new_value
-        course.save(update_fields=['subject_type'])
-        messages.success(request, f"Subject type set to '{new_value or 'auto-detect'}'.")
-    return redirect('dashboard:course_detail', course_id=course.id)
-
-
-@teacher_required
-@require_POST
 def exit_question_regenerate(request, question_id):
     """POST → prompt-mode rewrite of an MCQ exit-ticket question.
     Returns the candidate fields as JSON. Does NOT persist.

@@ -48,15 +48,13 @@ def _build_session(*, lesson, when=None) -> TutorSession:
     return session
 
 
-def _make_lesson(title: str, subject: str = 'mathematics',
-                 code: str = '') -> Lesson:
+def _make_lesson(title: str, code: str = 'mathematics') -> Lesson:
     inst, _ = Institution.objects.get_or_create(
         slug=f'i-{title.lower()}',
         defaults={'name': title},
     )
     course = Course.objects.create(
-        institution=inst, title=title, subject_type=subject,
-        subject_code=code,
+        institution=inst, title=title, subject_code=code,
     )
     unit = Unit.objects.create(course=course, title='U1', order_index=1)
     return Lesson.objects.create(
@@ -122,6 +120,9 @@ class SubjectFilterTest(TestCase):
     'humanities'), and matching the title in SQL is the MATH_KEYWORDS
     anti-pattern moved into the database.
 
+    subject_type is no longer stored at all — it maps from subject_code (step
+    4), so there is not a second field left to disagree.
+
     Step 2 of memory/subject_grade_unification_plan.md."""
 
     def test_the_title_no_longer_decides_the_subject(self):
@@ -129,9 +130,8 @@ class SubjectFilterTest(TestCase):
         MATH_KEYWORDS anti-pattern, in the database. A course called "Algebra
         Basics" with no subject_code is unclassified, not maths; the remedy is
         `backfill_course_subjects`, not a regex."""
-        untitled_math = _make_lesson('Algebra Basics', subject='', code='')
-        real_math = _make_lesson('Angles around a point', subject='',
-                                 code='mathematics')
+        untitled_math = _make_lesson('Algebra Basics', code='')
+        real_math = _make_lesson('Angles around a point', code='mathematics')
         _build_session(lesson=untitled_math)
         _build_session(lesson=real_math)
 
@@ -142,11 +142,9 @@ class SubjectFilterTest(TestCase):
         """subject_type cannot answer this: geography and history both
         collapse to 'humanities', which is why SubjectCode exists. Sampling
         geography used to return civics sessions."""
-        civics = _make_lesson('Intro to Civics', subject='humanities',
-                              code='history')
-        geography = _make_lesson('Geography of East Africa', subject='',
-                                 code='geography')
-        maths = _make_lesson('Algebra', subject='math', code='mathematics')
+        civics = _make_lesson('Intro to Civics', code='history')
+        geography = _make_lesson('Geography of East Africa', code='geography')
+        maths = _make_lesson('Algebra', code='mathematics')
         for lesson in (civics, geography, maths):
             _build_session(lesson=lesson)
 
@@ -156,7 +154,7 @@ class SubjectFilterTest(TestCase):
     def test_a_course_classified_by_neither_field_matches_nothing(self):
         """Not a gap — the documented remedy is the backfill command, and
         silently guessing is what this change removes."""
-        unclassified = _make_lesson('Mystery Course', subject='', code='')
+        unclassified = _make_lesson('Mystery Course', code='')
         _build_session(lesson=unclassified)
         for subject in ('math', 'geography', 'science'):
             self.assertEqual(candidate_tutor_turns(subject=subject).count(), 0)

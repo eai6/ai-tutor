@@ -20,7 +20,7 @@ from ai_tutor.apps.tutoring.models import SessionTurn, TutorSession
 
 
 def _build_session_with_turns(*, n_turns: int, judge_outputs_on,
-                              history_key_on, subject_type='mathematics',
+                              history_key_on, subject_code='mathematics',
                               user=None, institution=None) -> TutorSession:
     """Construct a TutorSession with N tutor turns, each carrying or
     omitting the post-2.2.5 instrumentation per the flags."""
@@ -32,7 +32,7 @@ def _build_session_with_turns(*, n_turns: int, judge_outputs_on,
         username=f'stud-{timezone.now().timestamp()}', password='x',
     )
     course = Course.objects.create(
-        institution=institution, title='Angles', subject_type=subject_type,
+        institution=institution, title='Angles', subject_code=subject_code,
     )
     unit = Unit.objects.create(course=course, title='U1', order_index=1)
     lesson = Lesson.objects.create(

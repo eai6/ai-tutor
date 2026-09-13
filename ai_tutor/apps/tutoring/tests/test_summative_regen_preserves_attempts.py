@@ -41,7 +41,7 @@ class SummativeRegenPreservesAttemptsTest(TransactionTestCase):
         self.student = User.objects.create_user(username="srstu", password="pw")
         self.course = Course.objects.create(
             institution=self.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         self.unit = Unit.objects.create(
             course=self.course, title="Geo", order_index=0,

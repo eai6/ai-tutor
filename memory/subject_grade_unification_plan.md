@@ -1,7 +1,6 @@
 # Subject and grade — one stored field each (2026-09-13)
 
-**Status: IN PROGRESS.** Steps 1, 2 and 3 are done. Steps 4-5 are still
-scope only.
+**Status: IN PROGRESS.** Steps 1-4 are done. Step 5 is still scope only.
 
 Written after a teacher set subject and grade on the upload form and the
 platform-wide materials still did not reach the course. That bug is fixed
@@ -215,6 +214,56 @@ Three things beyond the plan:
 Mapping from `subject_code`; column dropped a release later.
 
 **Verify:** the benchmark sampler and CLI filter still select the same rows.
+
+**Done 2026-09-13.** Measured stored column against the code-derived value
+across all 8 courses: **2 identical, 6 differing — and every difference is a
+stored EMPTY against a code that determines the answer.** Not one course was
+classified as one subject by its code and another by its type. That is Part 1's
+"no course has both subject fields" stated as a safety result: the mapping only
+ever adds information, so there was nothing to reconcile and no data decision to
+get wrong.
+
+Migration 0038, same `SeparateDatabaseAndState` shape and same reason as 0037.
+The column stays on disk; a later release drops it.
+
+`SUBJECT_CODE_TO_TYPE` now lives on the model (the property needs it) rather
+than in the backfill command. It is total over `SubjectCode` — including
+`OTHER`, which is why no expressiveness is lost by deriving.
+
+Five things beyond the plan:
+
+* **The teacher-facing subject_type dropdown is gone**, along with the
+  `course_subject_type` view and URL. It let a teacher set the coarse type
+  independently of `subject_code` — exactly the second control that can
+  disagree with the first. The course page now prints the derived subject and
+  keeps the "math rules on" badge; Edit Course's Subject dropdown
+  (`subject_code`) is the one place it is set.
+* **`is_math` lost its subject_type branch.** With the type mapped from the
+  code, asking it second could only repeat the first answer.
+* **MATH_KEYWORDS stays, deliberately.** Step 1 said step 4 would prove it
+  unreachable. It has not: `backfill_course_subjects --apply` has NOT been run
+  on prod, so a prod course with no `subject_code` still exists, and deleting
+  the fallback would silently switch the math tutoring rules off for it. That
+  is worse than the anti-pattern. **Removing it is gated on the prod backfill,
+  not on step 5.**
+* **`sampling.map_subject` moved to `subject_code` and lost its title scan** —
+  the last of the three defects step 2 found. It mapped `'humanities'` →
+  `'geography'`, so a history course's turns were labelled GEOGRAPHY and a
+  geography benchmark slice quietly included them; and it labelled any course
+  whose title contained "map" or "region" as geography. New item ids for a
+  history course change prefix (GEOGRAPHY_ → OTHER_); existing rows keep theirs,
+  and the id is not a join key anywhere.
+* **The backfill command's `SUBJECT_TYPE_FALLBACK` was circular** and is
+  deleted. It filled a blank `subject_code` from `subject_type` — which is now
+  empty exactly when `subject_code` is, so it was asking the answer to supply
+  itself. The command writes one field now, and locally proposes 0 of 8
+  changes, down from 6 of 8, because the six writes it used to make were all
+  `subject_type`.
+
+Fixture note: several tests set `subject_type='geography'` / `'mathematics'` —
+values that were never in `SubjectType.choices` at all. Django does not
+validate choices on `save()`, so they had been storing junk that happened to
+read back. Porting them to `subject_code` fixed that incidentally.
 
 ### 5. The upload form is the only place either is set
 

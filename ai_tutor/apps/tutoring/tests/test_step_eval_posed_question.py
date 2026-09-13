@@ -29,7 +29,7 @@ def _build_session(*, step_type='worked_example',
     institution = Institution.objects.create(name="T", slug="t-pq")
     student = User.objects.create_user(username="stu-pq", password="x")
     course = Course.objects.create(
-        institution=institution, title='Math', subject_type='math',
+        institution=institution, title='Math', subject_code='mathematics',
         is_published=True,
     )
     unit = Unit.objects.create(course=course, title='U', order_index=0)

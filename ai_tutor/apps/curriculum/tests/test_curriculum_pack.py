@@ -35,7 +35,7 @@ def school(db):
 @pytest.fixture
 def content(school):
     course = Course.objects.create(title='Geography', institution=school,
-                                   subject_type='geography')
+                                   subject_code='geography')
     unit = Unit.objects.create(course=course, title='Maps', order_index=1)
     Lesson.objects.create(unit=unit, title='Reading Maps', objective='Read a map',
                           order_index=1, is_published=True)

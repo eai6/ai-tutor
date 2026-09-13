@@ -14,33 +14,42 @@ from ai_tutor.apps.benchmark.autopopulate import derive_suggested_labels
 from ai_tutor.apps.tutoring.models import SessionTurn
 
 
-# Map of Course.subject_type → BenchmarkItem.Subject.value
-_SUBJECT_TYPE_MAP = {
+# Course.subject_code → BenchmarkItem.Subject.value. The benchmark enum is
+# deliberately coarser than SubjectCode (four buckets, not ten), so several
+# codes share a bucket and anything unlisted is 'other'.
+_SUBJECT_CODE_MAP = {
     'mathematics': 'math',
-    'math': 'math',
-    'humanities': 'geography',
-    'geography': 'geography',
-    'science': 'science',
+    'geography':   'geography',
+    'physics':     'science',
+    'chemistry':   'science',
+    'biology':     'science',
 }
 
 
-def map_subject(course_subject_type: str, course_title: str = '') -> str:
-    """Resolve a course's subject_type field to the benchmark subject enum.
+def map_subject(course_subject_code: str, course_title: str = '') -> str:
+    """Resolve a course's subject_code to the benchmark subject enum.
 
-    Falls back to 'other' when the subject doesn't match a known mapping.
-    Heuristic on title for empty subject_type (legacy rows).
+    subject_code, not subject_type, and no title heuristic. Both of the things
+    this replaces were wrong in the same way the sampler's own subject filter
+    was (step 2 of memory/subject_grade_unification_plan.md):
+
+    * subject_type is too coarse. It mapped 'humanities' → 'geography', so a
+      history course's turns were labelled GEOGRAPHY and a geography-only
+      benchmark slice quietly included them.
+    * the title scan is the MATH_KEYWORDS anti-pattern CLAUDE.md rules out. It
+      labelled any course whose title contained "map" or "region" as
+      geography, and renaming a course silently relabelled its items.
+
+    A course classified by neither is 'other'. That is honest — the remedy is
+    `python manage.py backfill_course_subjects`, not a guess.
+
+    ``course_title`` is kept in the signature, unused, because it is part of
+    the item-id contract below and dropping it would silently shift every
+    caller's positional arguments.
     """
-    if course_subject_type:
-        mapped = _SUBJECT_TYPE_MAP.get(course_subject_type.lower())
-        if mapped:
-            return mapped
-    # Fallback heuristic for empty subject_type rows
-    title_lower = (course_title or '').lower()
-    if any(k in title_lower for k in ('math', 'algebra', 'angles', 'geometry', 'arithmetic')):
-        return 'math'
-    if any(k in title_lower for k in ('geography', 'map', 'climate', 'region')):
-        return 'geography'
-    return 'other'
+    if not course_subject_code:
+        return 'other'
+    return _SUBJECT_CODE_MAP.get(course_subject_code.lower(), 'other')
 
 
 # Minimal anonymizer — replaces obvious names/identifiers in free text.
@@ -163,10 +172,10 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
         step_id = tutor_turn.step_id
 
     item = {
-        'item_id': make_item_id(course.subject_type, course.title, session.id, tutor_turn.id),
+        'item_id': make_item_id(course.subject_code, course.title, session.id, tutor_turn.id),
         'session_id': session.id,
         'turn_id': tutor_turn.id,
-        'subject': map_subject(course.subject_type or '', course.title or ''),
+        'subject': map_subject(course.subject_code or '', course.title or ''),
         'lesson_id': lesson.id,
         'lesson_title': lesson.title or '',
         'lesson_objective': lesson.objective or '',
@@ -195,10 +204,14 @@ def build_item_snapshot(tutor_turn: SessionTurn) -> Dict:
     return {'item': item, 'production': production}
 
 
-def make_item_id(course_subject_type: str, course_title: str,
+def make_item_id(course_subject_code: str, course_title: str,
                  session_id: int, turn_id: int) -> str:
-    """Stable, human-readable item ID: e.g. 'MATH_S18_T458'."""
-    subj = map_subject(course_subject_type, course_title).upper()
+    """Stable, human-readable item ID: e.g. 'MATH_S18_T458'.
+
+    Stable per (session, turn) — the subject prefix can change if a course is
+    reclassified, which is why the id is not the join key anywhere.
+    """
+    subj = map_subject(course_subject_code, course_title).upper()
     return f"{subj}_S{session_id}_T{turn_id}"
 
 

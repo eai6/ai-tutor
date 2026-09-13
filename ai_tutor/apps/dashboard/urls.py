@@ -70,7 +70,6 @@ urlpatterns = [
          views.exit_ticket_figure_regenerate, name='exit_ticket_figure_regenerate'),
     path('exit-tickets/questions/<int:question_id>/figure/delete/',
          views.exit_ticket_figure_delete, name='exit_ticket_figure_delete'),
-    path('curriculum/course/<int:course_id>/subject-type/', views.course_subject_type, name='course_subject_type'),
 
     # Account deletion (memory)
     path('students/<int:student_id>/delete/', views.delete_student, name='delete_student'),

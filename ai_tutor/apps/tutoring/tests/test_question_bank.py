@@ -253,12 +253,12 @@ class QuestionBankWiringTest(TestCase):
         cls.math_course = Course.objects.create(
             institution=cls.institution, title="Math S3",
             grade_level="S3", is_published=True,
-            subject_type='math',
+            subject_code='mathematics',
         )
         cls.non_math_course = Course.objects.create(
             institution=cls.institution, title="Geo S3",
             grade_level="S3", is_published=True,
-            subject_type='humanities',
+            subject_code='geography',
         )
         cls.unit = Unit.objects.create(
             course=cls.math_course, title="U", order_index=0,
@@ -431,7 +431,7 @@ class FailingTranscriptRegressionTest(TestCase):
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math S3",
             grade_level="S3", is_published=True,
-            subject_type='math',
+            subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="U", order_index=0,
@@ -577,7 +577,7 @@ class CoverageGapTest(TestCase):
         institution = Institution.objects.create(name="C", slug="c")
         course = Course.objects.create(
             institution=institution, title="M", grade_level="S3",
-            is_published=True, subject_type='math',
+            is_published=True, subject_code='mathematics',
         )
         unit = Unit.objects.create(course=course, title="U", order_index=0)
         lesson = Lesson.objects.create(
@@ -604,7 +604,7 @@ class CoverageGapTest(TestCase):
         institution = Institution.objects.create(name="C2", slug="c2")
         course = Course.objects.create(
             institution=institution, title="M", grade_level="S3",
-            is_published=True, subject_type='math',
+            is_published=True, subject_code='mathematics',
         )
         unit = Unit.objects.create(course=course, title="U", order_index=0)
         lesson = Lesson.objects.create(

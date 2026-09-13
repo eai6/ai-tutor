@@ -62,7 +62,7 @@ class PoseQuestionToolDefinitionTest(TestCase):
         cls.student = User.objects.create_user(username="stu", password="pw")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="Geometry", order_index=0,
@@ -138,7 +138,7 @@ class PoseQuestionMessageHandlerTest(TestCase):
         cls.student = User.objects.create_user(username="stu", password="pw")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="Geometry", order_index=0,
@@ -278,7 +278,7 @@ class JudgeClientRoutingTest(TestCase):
         cls.student = User.objects.create_user(username="stu", password="pw")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="U", order_index=0,
@@ -347,7 +347,7 @@ class BankScopeStrictTest(TestCase):
         cls.student = User.objects.create_user(username="stu", password="pw")
         cls.course = Course.objects.create(
             institution=cls.institution, title="Math S3",
-            grade_level="S3", is_published=True, subject_type='math',
+            grade_level="S3", is_published=True, subject_code='mathematics',
         )
         cls.unit = Unit.objects.create(
             course=cls.course, title="U", order_index=0,
