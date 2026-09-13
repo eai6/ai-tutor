@@ -20,7 +20,8 @@
                     <th>{% trans "Student" %}</th>
                     <th>{% trans "Grade" %}</th>
                     <th>{% trans "School" %}</th>
-                    <th>{% trans "Progress" %}</th>
+                    <th>{% trans "Mastered" %}</th>
+                    <th>{% trans "Open" %}</th>
                     <th>{% trans "Last Active" %}</th>
                     <th></th>
                 </tr>
@@ -48,26 +49,32 @@
                     </td>
                     <td>
                         {% if s.profile %}
-                            {{ s.profile.get_school_display_name }}
+                            {{ s.school_name }}
                         {% else %}
                             <span style="color: var(--gray-400);">—</span>
                         {% endif %}
                     </td>
-                    <td style="width: 200px;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <div class="progress-bar" style="flex: 1;">
-                                <div class="progress-fill {% if s.mastery_pct >= 70 %}success{% endif %}" style="width: {{ s.mastery_pct }}%;"></div>
-                            </div>
-                            <span style="font-size: 0.875rem; color: var(--gray-500); min-width: 60px;">
-                                {{ s.lessons_mastered }}/{{ s.lessons_total }}
-                            </span>
-                        </div>
-                    </td>
-                    <td>
-                        {% if s.last_active %}
-                            <span style="font-size: 0.875rem;">{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}</span>
+                    <td style="white-space:nowrap;">
+                        {% if s.lessons_mastered %}
+                        <span style="color:var(--success); font-weight:600;">{{ s.lessons_mastered }}</span>
+                        <span style="color:var(--gray-500); font-size:0.85rem;">{% trans "mastered" %}</span>
                         {% else %}
-                            <span style="color: var(--gray-400);">{% trans "Never" %}</span>
+                        <span style="color:var(--gray-400);">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if s.lessons_open %}
+                        <span style="color:#92400e; font-weight:600;">{{ s.lessons_open }}</span>
+                        <span style="color:var(--gray-500); font-size:0.85rem;">{% trans "open" %}</span>
+                        {% else %}
+                        <span style="color:var(--gray-400);">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if s.last_active %}
+                            <span style="font-size:0.875rem; {% if s.is_quiet %}color:#92400e;{% endif %}">{% blocktrans with ts=s.last_active|timesince %}{{ ts }} ago{% endblocktrans %}</span>
+                        {% else %}
+                            <span style="color:#92400e; font-size:0.875rem;">{% trans "Never" %}</span>
                         {% endif %}
                     </td>
                     <td>

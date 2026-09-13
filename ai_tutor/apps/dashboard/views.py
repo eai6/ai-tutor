@@ -995,40 +995,67 @@ def student_list(request):
     students = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
         institution
-    ).select_related('user').order_by('user__last_name', 'user__first_name')
+        # student_profile too: the row shows grade and school, and without it
+        # that is one more query per student on top of the counts.
+    ).select_related('user', 'user__student_profile').order_by(
+        'user__last_name', 'user__first_name')
 
-    # Total available published lessons (denominator for all students)
-    total_available = filter_by_institution(
-        Lesson.objects.filter(is_published=True), institution, field='unit__course__institution'
-    ).count()
+    # Counts per student in three queries rather than two per student, and
+    # WITHOUT a shared denominator. "0/129" counted every published lesson in
+    # the school: an S1 student is not working toward the S5 lessons, so the
+    # ratio measured the catalogue and read as zero progress for everyone.
+    # Mastered and open are facts about the student; they need no denominator.
+    from django.db.models import Count, Max
+    from ai_tutor.apps.tutoring.models import SessionParticipant
 
-    # Enrich with progress data
+    student_ids = [m.user_id for m in students]
+    by_level = {}
+    if student_ids:
+        rows = filter_by_institution(
+            StudentLessonProgress.objects.filter(student_id__in=student_ids),
+            institution,
+        ).values('student_id', 'mastery_level').annotate(n=Count('id'))
+        for r in rows:
+            by_level.setdefault(r['student_id'], {})[r['mastery_level']] = r['n']
+
+    # Last activity, owned sessions and joined ones separately: a session's
+    # student_id is its OWNER, so a student who only ever works alongside a
+    # groupmate would read as "Never".
+    last_active = {}
+    if student_ids:
+        for r in (filter_by_institution(
+                    TutorSession.objects.filter(student_id__in=student_ids),
+                    institution)
+                  .values('student_id').annotate(last=Max('started_at'))):
+            last_active[r['student_id']] = r['last']
+        for r in (SessionParticipant.objects
+                  .filter(student_id__in=student_ids, is_active=True)
+                  .values('student_id').annotate(last=Max('session__started_at'))):
+            current = last_active.get(r['student_id'])
+            if r['last'] and (current is None or r['last'] > current):
+                last_active[r['student_id']] = r['last']
+
+    # School names resolved once. StudentProfile.get_school_display_name() calls
+    # PlatformConfig.get_school_choices(), which runs two queries every time —
+    # so rendering it per row was two more queries per student.
+    from ai_tutor.apps.accounts.models import PlatformConfig
+    school_names = dict(PlatformConfig.get_school_choices())
+
+    quiet_cutoff = timezone.now() - timedelta(days=QUIET_AFTER_DAYS)
     student_data = []
     for membership in students:
         user = membership.user
-
-        # Get progress stats
-        mastered_count = filter_by_institution(
-            StudentLessonProgress.objects.filter(student=user, mastery_level='mastered'),
-            institution
-        ).count()
-
-        # Get recent session
-        last_session = filter_by_institution(
-            TutorSession.objects.filter(student=user),
-            institution
-        ).order_by('-started_at').first()
-
-        # Get profile
+        levels = by_level.get(user.id, {})
+        seen = last_active.get(user.id)
         profile = getattr(user, 'student_profile', None)
-
         student_data.append({
             'user': user,
             'profile': profile,
-            'lessons_mastered': mastered_count,
-            'lessons_total': total_available,
-            'last_active': last_session.started_at if last_session else None,
-            'mastery_pct': round((mastered_count / total_available) * 100) if total_available else 0,
+            'school_name': school_names.get(profile.school, profile.school) if profile else '',
+            'lessons_mastered': levels.get('mastered', 0),
+            'lessons_open': levels.get('in_progress', 0),
+            'last_active': seen,
+            'is_quiet': seen is None or seen < quiet_cutoff,
         })
     
     # Pagination
@@ -1150,11 +1177,21 @@ def student_detail(request, student_id):
             if attempt:
                 rows = per_concept_breakdown(attempt)
                 p.weak_concepts = [r['concept'] for r in rows if r['pct'] < 0.7][:3]
+                # Keep the percentage, not just the name. per_concept_breakdown
+                # works this out and the page used to throw it away, which left
+                # a teacher reading "Scale & ratio" with no idea whether that
+                # meant 68% or 12% — a different conversation with the student.
+                p.weak_concept_rows = [
+                    {'concept': r['concept'], 'pct': round(r['pct'] * 100)}
+                    for r in rows if r['pct'] < 0.7
+                ][:3]
             else:
                 p.weak_concepts = []
+                p.weak_concept_rows = []
         else:
             p.best_score_pct = None
             p.weak_concepts = []
+            p.weak_concept_rows = []
         courses_progress[course.id]['lessons'].append(p)
         if p.mastery_level == 'mastered':
             courses_progress[course.id]['mastered'] += 1
@@ -1168,7 +1205,51 @@ def student_detail(request, student_id):
                 'mastered': 0,
                 'total': info['count'],
             }
-    
+
+    # ── Bands: what needs doing, what is done, what is untouched ──
+    #
+    # The page used to show Course Progress and Recent Sessions side by side,
+    # which is the same lessons twice in two shapes, above three stat tiles
+    # that counted the same rows again. One ordering, by what a teacher would
+    # act on, replaces all of it.
+    #
+    # `untouched_courses` is the honest version of the old "0/101 lessons"
+    # bars: that denominator counted every authored lesson in the course,
+    # published and draft, with no student scoping — it described the
+    # catalogue, not the student.
+    # Most recent session per lesson, so an unfinished lesson can still open
+    # its transcript. last_completion_session is only set when a lesson is
+    # COMPLETED, which is precisely the case a stuck student is not in — and
+    # the stuck ones are the transcripts a teacher actually wants to read.
+    session_by_lesson = {}
+    for s in sessions:                       # already ordered -started_at
+        session_by_lesson.setdefault(s.lesson_id, s.id)
+
+    stuck_lessons, mastered_lessons_list = [], []
+    untouched_courses = []
+    for cp in courses_progress.values():
+        if not cp['lessons']:
+            untouched_courses.append(cp['course'])
+            continue
+        for p in cp['lessons']:
+            p.course_title = cp['course'].title
+            # The session that last worked this lesson, so the row can open
+            # the transcript. Every lesson name on this page used to be inert
+            # text; the FK to get there already existed on the model.
+            p.transcript_session_id = (p.last_completion_session_id
+                                       or session_by_lesson.get(p.lesson_id))
+            if p.mastery_level == 'mastered':
+                mastered_lessons_list.append(p)
+            else:
+                stuck_lessons.append(p)
+
+    # Most recently touched first — a lesson left last week matters more than
+    # one abandoned in April.
+    stuck_lessons.sort(key=lambda p: p.last_attempt_at or p.updated_at, reverse=True)
+    mastered_lessons_list.sort(key=lambda p: p.last_attempt_at or p.updated_at,
+                               reverse=True)
+
+
     # ── Competency breakdown per course ──
     from ai_tutor.apps.tutoring.skills_models import Skill, StudentSkillMastery
     from ai_tutor.apps.accounts.models import PlatformConfig
@@ -1205,20 +1286,6 @@ def student_detail(request, student_id):
     # S5" makes sense.
     profile = getattr(student, 'student_profile', None)
     current_grade = (profile.grade_level if profile else '') or ''
-    GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
-    promote_label = ''
-    demote_label = ''
-    if current_grade in GRADE_ORDER:
-        idx = GRADE_ORDER.index(current_grade)
-        if idx < len(GRADE_ORDER) - 1:
-            promote_label = _('Promote to %(grade)s') % {'grade': GRADE_ORDER[idx + 1]}
-        else:
-            promote_label = _('Graduate')
-        if idx > 0:
-            demote_label = _('Demote to %(grade)s') % {'grade': GRADE_ORDER[idx - 1]}
-    elif current_grade == '':
-        # Graduated — can be reactivated to S5.
-        demote_label = _('Reactivate at S5')
 
     context = {
         **request.staff_ctx,
@@ -1229,8 +1296,11 @@ def student_detail(request, student_id):
         'courses_progress': courses_progress.values(),
         'competency_data': competency_data,
         'current_grade': current_grade,
-        'promote_label': promote_label,
-        'demote_label': demote_label,
+        # Banded view — see the block that builds these.
+        'stuck_lessons': stuck_lessons,
+        'mastered_lessons_list': mastered_lessons_list,
+        'untouched_courses': untouched_courses,
+        'last_worked_at': sessions[0].started_at if sessions else None,
     }
 
     return render(request, 'dashboard/students/detail.html', context)
@@ -2217,6 +2287,85 @@ def curriculum_process_api(request, upload_id):
 # Class Management
 # ============================================================================
 
+QUIET_AFTER_DAYS = 14
+
+
+def school_week_start(institution, now=None):
+    """Midnight on the Sunday of the current week, in the school's timezone.
+
+    A teacher's "this week" is a calendar week, not the last 168 hours: on a
+    Monday morning a rolling window still reports most of the previous week's
+    work as current, which makes "active this week" read high exactly when a
+    teacher is checking whether the week has started.
+
+    In the INSTITUTION's timezone, because the boundary is a local midnight.
+    Seychelles is UTC+4, so a UTC Sunday-midnight cut would move the boundary
+    to 4am Sunday local and put Saturday evening's work in the wrong week.
+    """
+    now = now or timezone.now()
+    name = getattr(institution, 'timezone', None) if institution else None
+    try:
+        tz = zoneinfo.ZoneInfo(name) if name else timezone.get_current_timezone()
+    except Exception:                                  # noqa: BLE001 - bad tz string
+        tz = timezone.get_current_timezone()
+
+    local = timezone.localtime(now, tz)
+    # weekday(): Mon=0 .. Sun=6. Days back to Sunday: Sun->0, Mon->1, Sat->6.
+    days_since_sunday = (local.weekday() + 1) % 7
+    start_local = (local - timedelta(days=days_since_sunday)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    return start_local
+
+
+def class_signals(student_ids, institution):
+    """Who worked this week, and who has gone quiet, for one class.
+
+    Shared by the classes list and a class's own page so the two cannot
+    disagree — a list card and a detail page reporting different numbers for
+    the same class is worse than the card not existing.
+
+    Deliberately NOT a mastery figure. A class studies several subjects, and
+    one percentage spanning Geography and Mathematics averages things that do
+    not share a scale — it reads as a grade while meaning nothing a teacher
+    could act on. Per-subject progress belongs on a subject's own page.
+    """
+    from django.db.models import Max
+    from ai_tutor.apps.tutoring.models import SessionParticipant
+
+    if not student_ids:
+        return {'active_this_week': 0, 'quiet_count': 0, 'last_seen': {},
+                'week_start': school_week_start(institution)}
+
+    # Last activity per student. Owned sessions and joined ones separately: a
+    # session's student_id is its OWNER, so a student who only ever works in a
+    # pair would read as "never worked".
+    last_seen = {}
+    for r in (TutorSession.objects.filter(student_id__in=student_ids)
+              .values('student_id').annotate(last=Max('started_at'))):
+        last_seen[r['student_id']] = r['last']
+    for r in (SessionParticipant.objects
+              .filter(student_id__in=student_ids, is_active=True)
+              .values('student_id').annotate(last=Max('session__started_at'))):
+        current = last_seen.get(r['student_id'])
+        if r['last'] and (current is None or r['last'] > current):
+            last_seen[r['student_id']] = r['last']
+
+    now = timezone.now()
+    week_start = school_week_start(institution, now)
+    quiet_cutoff = now - timedelta(days=QUIET_AFTER_DAYS)
+    active = sum(1 for sid in student_ids
+                 if last_seen.get(sid) and last_seen[sid] >= week_start)
+    quiet = sum(1 for sid in student_ids
+                if not last_seen.get(sid) or last_seen[sid] < quiet_cutoff)
+
+    return {
+        'active_this_week': active,
+        'quiet_count': quiet,
+        'week_start': week_start,
+        'last_seen': last_seen,
+    }
+
+
 @teacher_required
 def class_list(request):
     """All classes overview — one summary card per grade. The student
@@ -2225,6 +2374,7 @@ def class_list(request):
     institution = request.staff_ctx['institution']
 
     counts = {}
+    ids_by_grade = {}
     memberships = filter_by_institution(
         Membership.objects.filter(role='student', is_active=True),
         institution,
@@ -2233,6 +2383,7 @@ def class_list(request):
         profile = getattr(m.user, 'student_profile', None)
         grade = (profile.grade_level if profile else '') or 'Unassigned'
         counts[grade] = counts.get(grade, 0) + 1
+        ids_by_grade.setdefault(grade, []).append(m.user_id)
 
     # Canonical S1..S5 order, with Unassigned at the end. Skip grades
     # that have zero students so the grid doesn't show empty cards.
@@ -2241,20 +2392,29 @@ def class_list(request):
     for g in canonical:
         if counts.get(g):
             classes.append({'grade': g, 'count': counts[g], 'is_grade': True})
-    if counts.get('Unassigned'):
-        classes.append({
-            'grade': 'Unassigned', 'count': counts['Unassigned'], 'is_grade': False,
-        })
+    # Students with no grade are NOT appended as a class. They are not one —
+    # they are students who cannot be taught at a grade level, which the page
+    # says plainly above the grid instead (unassigned_count).
     # Anything custom (e.g. legacy "Form 4") that isn't in the canonical list
     for g, n in counts.items():
         if g in canonical or g == 'Unassigned':
             continue
         classes.append({'grade': g, 'count': n, 'is_grade': True})
 
+    # The same signals the class page shows, rolled up — so "which class needs
+    # me" is answerable from the list instead of by opening each in turn. A
+    # count alone cannot answer it.
+    for c in classes:
+        if c['is_grade']:
+            c.update(class_signals(ids_by_grade.get(c['grade'], []),
+                                   institution))
+
     context = {
         **request.staff_ctx,
         'classes': classes,
         'total_students': sum(counts.values()),
+        'quiet_after_days': QUIET_AFTER_DAYS,
+        'unassigned_count': counts.get('Unassigned', 0),
     }
     return render(request, 'dashboard/classes/list.html', context)
 
@@ -2340,24 +2500,6 @@ def class_detail(request, grade):
             'mastered_cells': mastered,
         })
 
-    GRADE_ORDER = ['S1', 'S2', 'S3', 'S4', 'S5']
-    if grade in GRADE_ORDER and GRADE_ORDER.index(grade) < len(GRADE_ORDER) - 1:
-        next_grade = GRADE_ORDER[GRADE_ORDER.index(grade) + 1]
-        next_action = _('Promote to %(grade)s') % {'grade': next_grade}
-    elif grade == 'S5':
-        next_grade = _('Graduate')
-        next_action = _('Graduate')
-    else:
-        next_grade = ''
-        next_action = ''
-
-    if grade in GRADE_ORDER and GRADE_ORDER.index(grade) > 0:
-        prev_grade = GRADE_ORDER[GRADE_ORDER.index(grade) - 1]
-        prev_action = _('Demote to %(grade)s') % {'grade': prev_grade}
-    else:
-        prev_grade = ''
-        prev_action = ''
-
     # Recent activity — top 5 lessons across all courses for this
     # grade where students have actually started a session this
     # week. Gives teachers a one-glance "what's the class working on"
@@ -2367,13 +2509,24 @@ def class_detail(request, grade):
     from datetime import timedelta
     recent_activity = []
     if student_ids:
-        week_ago = timezone.now() - timedelta(days=7)
+        # Calendar week (Sunday -> Saturday) in the school's timezone, matching
+        # the 'active this week' count beside it. A rolling 168-hour window
+        # disagreed with it every Monday.
+        week_ago = school_week_start(institution)
         # Pull recent non-abandoned sessions for these students,
         # group by lesson, take the top 5 by most-recent activity.
+        # Group sessions count. A student who joined a groupmate's session was
+        # invisible here, because the session belongs to the other student —
+        # so a class doing paired work looked idle. student_detail has always
+        # handled this; this page did not.
+        in_class = (Q(student_id__in=student_ids)
+                    | Q(participants__student_id__in=student_ids,
+                        participants__is_active=True))
         recent_sessions = (
             TutorSession.objects
-            .filter(student_id__in=student_ids, started_at__gte=week_ago)
+            .filter(in_class, started_at__gte=week_ago)
             .exclude(status='abandoned')
+            .distinct()
             .select_related('lesson', 'lesson__unit', 'lesson__unit__course')
             .order_by('-started_at')
         )
@@ -2401,17 +2554,36 @@ def class_detail(request, grade):
         for e in recent_activity:
             e['unique_students'] = len(e['unique_students'])
 
+    # ── Per-student last activity, and who has gone quiet ──
+    #
+    # The roster listed names with no signal at all, so "who has stopped
+    # working" — the question a teacher opens a class page to answer — could
+    # only be got by clicking into each student in turn.
+    #
+    # Via class_signals so this page and the classes list cannot disagree.
+    signals = class_signals(student_ids, institution)
+    last_seen = signals.get('last_seen', {})
+
+    now = timezone.now()
+    quiet_cutoff = now - timedelta(days=QUIET_AFTER_DAYS)
+    inactive_students = []
+    for s in students:
+        s.last_worked_at = last_seen.get(s.id)
+        if s.last_worked_at is None or s.last_worked_at < quiet_cutoff:
+            inactive_students.append(s)
+
     context = {
         **request.staff_ctx,
         'grade': grade,
         'students': students,
         'student_count': len(students),
         'course_stats': course_stats,
-        'next_grade': next_grade,
-        'next_action': next_action,
-        'prev_grade': prev_grade,
-        'prev_action': prev_action,
         'recent_activity': recent_activity,
+        'inactive_students': inactive_students,
+        'quiet_after_days': QUIET_AFTER_DAYS,
+        # From the shared helper, so this page and the classes list show the
+        # same numbers for the same class.
+        'active_this_week': signals['active_this_week'],
     }
     return render(request, 'dashboard/classes/detail.html', context)
 
@@ -2554,26 +2726,6 @@ def reports_overview(request):
         completions=Count('sessions', filter=Q(sessions__mastery_achieved=True))
     ).order_by('-attempts')[:20]
     
-    # Courses with competency data (for readiness report links)
-    from ai_tutor.apps.curriculum.models import Course
-    from ai_tutor.apps.tutoring.skills_models import Skill
-    courses_with_eo = []
-    course_qs = filter_by_institution(
-        Course.objects.filter(is_published=True),
-        institution,
-    ).order_by('title')
-    for course in course_qs:
-        eo_count = Skill.objects.filter(course=course, is_enabling_objective=True).count()
-        session_count = filter_by_institution(
-            TutorSession.objects.filter(lesson__unit__course=course),
-            institution,
-        ).count()
-        courses_with_eo.append({
-            'course': course,
-            'eo_count': eo_count,
-            'session_count': session_count,
-        })
-
     # Lessons with session report data (recent lessons with sessions)
     recent_lessons = filter_by_institution(
         Lesson.objects.filter(
@@ -2592,7 +2744,6 @@ def reports_overview(request):
         'sessions_by_day': list(sessions_by_day),
         'top_students': top_students,
         'lessons': lessons,
-        'courses_with_eo': courses_with_eo,
         'recent_lessons': recent_lessons,
     }
 

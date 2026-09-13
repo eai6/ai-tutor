@@ -30,168 +30,112 @@
                 </div>
                 {% endif %}
             </div>
-            <div style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:flex-start;">
-                {% if promote_label %}
-                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{% blocktrans with label=promote_label first=student.first_name last=student.last_name %}{{ label }} for {{ first }} {{ last }}?{% endblocktrans %}');">
-                    {% csrf_token %}
-                    <input type="hidden" name="student_ids" value="{{ student.id }}">
-                    <input type="hidden" name="from_grade" value="{{ current_grade }}">
-                    <input type="hidden" name="direction" value="up">
-                    <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
-                    <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">{{ promote_label }}</button>
-                </form>
-                {% endif %}
-                {% if demote_label %}
-                <form method="post" action="{% url 'dashboard:promote_students' %}" onsubmit="return confirm('{% blocktrans with label=demote_label first=student.first_name last=student.last_name %}{{ label }} for {{ first }} {{ last }}?{% endblocktrans %}');">
-                    {% csrf_token %}
-                    <input type="hidden" name="student_ids" value="{{ student.id }}">
-                    <input type="hidden" name="from_grade" value="{{ current_grade }}">
-                    <input type="hidden" name="direction" value="down">
-                    <input type="hidden" name="redirect_to" value="{% url 'dashboard:student_detail' student.id %}">
-                    <button type="submit" class="btn btn-secondary btn-sm" style="white-space:nowrap;">{{ demote_label }}</button>
-                </form>
-                {% endif %}
-                <form method="post" action="{% url 'dashboard:delete_student' student.id %}" onsubmit="return confirm('{% blocktrans with name=student.username %}Permanently delete student account &quot;{{ name }}&quot;? This removes their tutoring history and exit ticket attempts and cannot be undone.{% endblocktrans %}');">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:6px;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.8rem;">{% trans "Delete student" %}</button>
-                </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- One ordering, by what a teacher would act on. Replaces the three stat
+     tiles (which counted the same rows three ways) and the Course Progress /
+     Recent Sessions pair (which listed the same lessons twice). -->
+
+{% if last_worked_at %}
+<p style="color: var(--gray-500); margin: -0.5rem 0 1.5rem;">
+    {% blocktrans with when=last_worked_at|timesince %}Last worked {{ when }} ago.{% endblocktrans %}
+</p>
+{% endif %}
+
+<!-- Needs attention -->
+<div class="card" style="margin-bottom: 1.25rem; {% if stuck_lessons %}border-color:#fcd34d;{% endif %}">
+    <div class="card-header" {% if stuck_lessons %}style="background:#fffbeb;border-bottom-color:#fde68a;"{% endif %}>
+        <h3 class="card-title" {% if stuck_lessons %}style="color:#92400e;"{% endif %}>
+            {% blocktrans count n=stuck_lessons|length %}Open — {{ n }} lesson started, not finished{% plural %}Open — {{ n }} lessons started, not finished{% endblocktrans %}
+        </h3>
+    </div>
+    {% for p in stuck_lessons %}
+    <div style="padding:1rem 1.5rem;{% if not forloop.last %}border-bottom:1px solid var(--gray-200);{% endif %}display:flex;gap:1rem;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:500;">{{ p.lesson.title }}</div>
+            <div style="font-size:0.8125rem;color:var(--gray-500);margin-top:0.15rem;">
+                {{ p.course_title }}
+                {% if p.last_attempt_at %} · {% blocktrans with when=p.last_attempt_at|timesince %}worked {{ when }} ago{% endblocktrans %}{% endif %}
+                {% if p.attempts_count %} · {% blocktrans count n=p.attempts_count %}{{ n }} attempt{% plural %}{{ n }} attempts{% endblocktrans %}{% endif %}
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- Stats — "Completed sessions" was removed because it tracks
-     TutorSession.status='completed' (chat-session state) while
-     "Lessons Mastered" tracks StudentLessonProgress (exit-ticket
-     pass). A student can master a lesson without their session
-     being marked completed (abandonment, timeout) so the two
-     diverge legitimately. The mastered + in-progress pair tells
-     the meaningful story without the misleading divergence. -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Total Sessions" %}</div>
-        <div class="stat-value">{{ stats.total_sessions }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">{% trans "Lessons Mastered" %}</div>
-        <div class="stat-value" style="color: var(--success);">{{ stats.mastered_lessons }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">{% trans "In Progress" %}</div>
-        <div class="stat-value" style="color: var(--warning);">{{ stats.in_progress_lessons }}</div>
-    </div>
-</div>
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-    <!-- Course Progress -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">{% trans "Course Progress" %}</h3>
-        </div>
-        <div class="card-body">
-            {% if courses_progress %}
-                {% for cp in courses_progress %}
-                <div style="margin-bottom: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span style="font-weight: 600;">{{ cp.course.title }}</span>
-                        <span style="color: var(--gray-500);">{% blocktrans with mastered=cp.mastered total=cp.total %}{{ mastered }}/{{ total }} lessons{% endblocktrans %}</span>
-                    </div>
-                    <div class="progress-bar" style="margin-bottom: 0.75rem;">
-                        {% widthratio cp.mastered cp.total 100 as pct %}
-                        <div class="progress-fill {% if pct >= 70 %}success{% endif %}" style="width: {{ pct|default:0 }}%;"></div>
-                    </div>
-                    
-                    <!-- Lesson list (C4 rich display) -->
-                    <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                        {% for lesson in cp.lessons %}
-                        <div style="padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; border: 1px solid;
-                            {% if lesson.mastery_level == 'mastered' %}
-                                background: #ecfdf5; color: #065F46; border-color: #a7f3d0;
-                            {% elif lesson.mastery_level == 'in_progress' %}
-                                background: #fffbeb; color: #92400E; border-color: #fde68a;
-                            {% else %}
-                                background: var(--gray-50); color: var(--gray-500); border-color: var(--gray-200);
-                            {% endif %}
-                        ">
-                            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                                <span style="font-weight:600;">
-                                    {% if lesson.mastery_level == 'mastered' %}✓{% elif lesson.mastery_level == 'in_progress' %}◐{% else %}○{% endif %}
-                                    {{ lesson.lesson.title }}
-                                    {% if lesson.last_completion_was_group %}<span title="Completed as part of a group" style="margin-left:0.25rem;">👥</span>{% endif %}
-                                </span>
-                                {% if lesson.best_score_pct is not None %}
-                                <span style="font-size:0.78rem;color:var(--gray-500);">
-                                    {% trans "Best" %} <strong>{{ lesson.best_score_pct }}%</strong>
-                                    · {% blocktrans count count=lesson.attempts_count|default:0 %}{{ count }} attempt{% plural %}{{ count }} attempts{% endblocktrans %}
-                                </span>
-                                {% endif %}
-                            </div>
-                            {% if lesson.weak_concepts %}
-                            <div style="margin-top:0.3rem;font-size:0.75rem;color:#b45309;">
-                                {% trans "Weak:" %} {% for c in lesson.weak_concepts %}<span style="background:#fef3c7;padding:0.05rem 0.4rem;border-radius:3px;margin-right:0.2rem;">{{ c }}</span>{% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
+            {% if p.weak_concept_rows %}
+            <div style="display:flex;gap:0.375rem;margin-top:0.625rem;flex-wrap:wrap;">
+                {% for w in p.weak_concept_rows %}
+                <span style="padding:0.1875rem 0.5rem;border-radius:999px;font-size:0.75rem;font-weight:500;{% if w.pct < 50 %}background:#fef2f2;color:#991b1b;{% else %}background:#fffbeb;color:#92400e;{% endif %}">{{ w.concept }} {{ w.pct }}%</span>
                 {% endfor %}
+            </div>
+            {% elif p.best_score_pct is not None %}
+            <div style="font-size:0.8125rem;color:var(--gray-500);margin-top:0.5rem;">
+                {% blocktrans with pct=p.best_score_pct %}Best {{ pct }}% — no concept scored below 70%.{% endblocktrans %}
+            </div>
             {% else %}
-                <div class="empty-state">
-                    <p>{% trans "No course progress yet" %}</p>
-                </div>
+            <div style="font-size:0.8125rem;color:var(--gray-500);margin-top:0.5rem;">
+                {% trans "No exit ticket attempted yet." %}
+            </div>
             {% endif %}
         </div>
+        {% if p.transcript_session_id %}
+        <a class="btn btn-secondary btn-sm" style="white-space:nowrap;"
+           href="{% url 'dashboard:session_chat_history' p.transcript_session_id %}">{% trans "Transcript" %}</a>
+        {% endif %}
     </div>
-    
-    {% comment %}
-      Competency Breakdown widget removed (Edward, 2026-05-07).
-      The widget displayed per-course / per-EO objective ratios that
-      were largely all-zero or stale — same family as the "Competency
-      by Objective" table dropped from the session report. The Course
-      Progress card above already conveys the meaningful per-lesson
-      mastery picture.
-    {% endcomment %}
+    {% empty %}
+    <div style="padding:1.25rem 1.5rem;color:var(--gray-500);font-size:0.875rem;">
+        {% trans "Nothing open — every lesson this student started has been finished." %}
+    </div>
+    {% endfor %}
+</div>
 
-    <!-- Recent Sessions -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">{% trans "Recent Sessions" %}</h3>
+<!-- Mastered -->
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            {% blocktrans count n=mastered_lessons_list|length %}Mastered — {{ n }} lesson{% plural %}Mastered — {{ n }} lessons{% endblocktrans %}
+        </h3>
+    </div>
+    {% for p in mastered_lessons_list %}
+    <div style="padding:0.875rem 1.5rem;{% if not forloop.last %}border-bottom:1px solid var(--gray-200);{% endif %}display:flex;gap:1rem;align-items:center;">
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:500;">{{ p.lesson.title }}</div>
+            <div style="font-size:0.8125rem;color:var(--gray-500);margin-top:0.15rem;">{{ p.course_title }}</div>
         </div>
-        <div class="card-body" style="padding: 0;">
-            {% if sessions %}
-                {% for session in sessions %}
-                <div style="padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--gray-100);">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 500;">
-                                {{ session.lesson.title }}
-                                {% if session.is_group_for_student %}<span class="badge" title="{% trans 'Joined as a group participant' %}" style="background:#ede9fe;color:#5b21b6;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 joined" %}</span>{% elif session.is_group %}<span class="badge" style="background:var(--accent);color:white;font-size:0.65rem;margin-left:0.3rem;">{% trans "👥 group" %}</span>{% endif %}
-                            </div>
-                            <div style="font-size: 0.8125rem; color: var(--gray-500);">
-                                {{ session.started_at|date:"M d, Y H:i" }}
-                            </div>
-                        </div>
-                        <div>
-                            {% if session.mastery_achieved %}
-                                <span class="badge badge-success">{% trans "Mastered" %}</span>
-                            {% elif session.status == 'completed' %}
-                                <span class="badge badge-warning">{% trans "Completed" %}</span>
-                            {% elif session.status == 'active' %}
-                                <span class="badge badge-info">{% trans "In Progress" %}</span>
-                            {% else %}
-                                <span class="badge">{{ session.status }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>{% trans "No sessions yet" %}</p>
-                </div>
-            {% endif %}
+        {% if p.best_score_pct is not None %}
+        <span style="color:var(--success);font-size:0.875rem;font-weight:500;">{{ p.best_score_pct }}%</span>
+        {% endif %}
+        {% if p.transcript_session_id %}
+        <a class="btn btn-secondary btn-sm" style="white-space:nowrap;"
+           href="{% url 'dashboard:session_chat_history' p.transcript_session_id %}">{% trans "Transcript" %}</a>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div style="padding:1.25rem 1.5rem;color:var(--gray-500);font-size:0.875rem;">
+        {% trans "Nothing passed yet. A lesson lands here once its exit ticket is passed." %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Not started. Was: a 0/N progress bar per course, where N counted every
+     authored lesson including drafts — a fact about the catalogue, not this
+     student. -->
+{% if untouched_courses %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">{% trans "Not started" %}</h3>
+    </div>
+    <div style="padding:1.25rem 1.5rem;">
+        <p style="color:var(--gray-500);font-size:0.875rem;margin:0 0 0.75rem;">
+            {% blocktrans count n=untouched_courses|length %}{{ n }} course is available to this student and untouched.{% plural %}{{ n }} courses are available to this student and untouched.{% endblocktrans %}
+        </p>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            {% for c in untouched_courses %}
+            <span style="padding:0.3125rem 0.625rem;border:1px solid var(--gray-200);border-radius:8px;font-size:0.8125rem;color:var(--gray-700);">{{ c.title }}</span>
+            {% endfor %}
         </div>
     </div>
 </div>
+{% endif %}
+
 {% endblock %}
