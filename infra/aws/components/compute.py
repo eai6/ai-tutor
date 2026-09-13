@@ -169,6 +169,20 @@ def create_compute(
                             "Resource": [a[4], f"{a[4]}/*"],
                         },
                         {
+                            # The ONE place a delete is allowed, and only under
+                            # restores/. An archive somebody uploaded to restore
+                            # from is a copy of student records that should not
+                            # outlive the restore it was uploaded for; the
+                            # lifecycle rule expires it in days, and this lets
+                            # the application clean up sooner. Still no delete on
+                            # the backups themselves — expiry is the lifecycle
+                            # rule's job there.
+                            "Sid": "CleanUpUploadedRestorePayloads",
+                            "Effect": "Allow",
+                            "Action": ["s3:DeleteObject"],
+                            "Resource": f"{a[4]}/restores/*",
+                        },
+                        {
                             "Sid": "TransactionalEmail",
                             "Effect": "Allow",
                             "Action": ["ses:SendEmail", "ses:SendRawEmail"],
@@ -179,6 +193,87 @@ def create_compute(
                             "Effect": "Allow",
                             "Action": ["ecs:RunTask", "ecs:DescribeTasks"],
                             "Resource": f"arn:aws:ecs:{region}:{account_id}:task-definition/{prefix}-material:*",
+                        },
+                        {
+                            # The restore reuses the migrate definition (see
+                            # __main__.py for why it is not a family of its own).
+                            "Sid": "DispatchPlatformRestore",
+                            "Effect": "Allow",
+                            "Action": ["ecs:RunTask", "ecs:DescribeTasks"],
+                            "Resource": f"arn:aws:ecs:{region}:{account_id}:task-definition/{prefix}-migrate:*",
+                        },
+                        {
+                            # A database cannot be dropped while the connection
+                            # pool holds it open, so the restore stops the
+                            # service and starts it again afterwards.
+                            #
+                            # This lands on the SHARED task role, so the web
+                            # container gets it too. Accepted deliberately and
+                            # narrowly: scoped to this one service, and the
+                            # worst a compromised web container can do with it
+                            # is take the site down — which is a denial of
+                            # service, not a breach, and that actor already has
+                            # media-bucket write and RunTask above. The
+                            # alternative, a separate role on a separate task
+                            # family, buys less than it looks: ecs:RunTask plus
+                            # iam:PassRole lets the holder supply
+                            # containerOverrides and there is no IAM condition
+                            # key for those, so it could simply start the
+                            # restore task and inherit the same power.
+                            "Sid": "StopAndStartTheServiceForARestore",
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecs:UpdateService", "ecs:DescribeServices",
+                            ],
+                            "Resource": f"arn:aws:ecs:{region}:{account_id}:service/{prefix}-cluster/{prefix}-service",
+                        },
+                        {
+                            # Listing is how the restore knows the cluster has
+                            # gone quiet, and how it refuses to start when
+                            # another restore is already running. ListTasks
+                            # takes the CLUSTER as its resource, not a task.
+                            "Sid": "SeeWhatElseIsRunningInTheCluster",
+                            "Effect": "Allow",
+                            "Action": ["ecs:ListTasks"],
+                            "Resource": "*",
+                            "Condition": {
+                                "ArnEquals": {
+                                    "ecs:cluster": f"arn:aws:ecs:{region}:{account_id}:cluster/{prefix}-cluster"
+                                }
+                            },
+                        },
+                        {
+                            # Application Auto Scaling treats min_capacity as a
+                            # floor and restores it on the next scaling
+                            # activity — and zero running tasks is itself a
+                            # state that produces one. Without suspending it,
+                            # a web task can boot into a half-restored database.
+                            # RegisterScalableTarget does not accept a resource
+                            # ARN, hence "*".
+                            "Sid": "SuspendAutoscalingDuringARestore",
+                            "Effect": "Allow",
+                            "Action": [
+                                "application-autoscaling:RegisterScalableTarget",
+                                "application-autoscaling:DescribeScalableTargets",
+                            ],
+                            "Resource": "*",
+                        },
+                        {
+                            # The safety net that cannot half-succeed: atomic,
+                            # minutes rather than the half-hour a dump of this
+                            # size takes, and it does not depend on the
+                            # application being healthy. No delete — a snapshot
+                            # the application can remove is not a safety net.
+                            "Sid": "SnapshotBeforeDestroying",
+                            "Effect": "Allow",
+                            "Action": [
+                                "rds:CreateDBSnapshot", "rds:DescribeDBSnapshots",
+                                "rds:AddTagsToResource",
+                            ],
+                            "Resource": [
+                                f"arn:aws:rds:{region}:{account_id}:db:{prefix}-db",
+                                f"arn:aws:rds:{region}:{account_id}:snapshot:{prefix}-db-pre-restore-*",
+                            ],
                         },
                         {
                             # The web container starts the material task, so it
@@ -212,7 +307,7 @@ def create_compute(
     ]
     ordered_secret_arns = [secret_arns[key] for _, key in secret_env]
 
-    def _container(name, command, cpu, memory):
+    def _container(name, command, cpu, memory, stop_timeout=None):
         # `image` is an Output (derived from the ECR repo URL) and so are the
         # secret ARNs — every one has to go through Output.all before json.dumps
         # can see it, or serialization fails with "Object of type Output is not
@@ -227,6 +322,8 @@ def create_compute(
                         "image": a[0],
                         "essential": True,
                         "command": command,
+                        # Omitted entirely when unset: ECS rejects a null.
+                        **({"stopTimeout": stop_timeout} if stop_timeout else {}),
                         "portMappings": (
                             [{"containerPort": APP_PORT, "protocol": "tcp"}]
                             if name == "web" else []
@@ -251,7 +348,8 @@ def create_compute(
             )
         )
 
-    def _task_def(suffix, container_name, command, cpu, memory):
+    def _task_def(suffix, container_name, command, cpu, memory,
+                  disk_gib=None, stop_timeout=None):
         return aws.ecs.TaskDefinition(
             f"{prefix}-{suffix}",
             family=f"{prefix}-{suffix}",
@@ -264,7 +362,14 @@ def create_compute(
             runtime_platform=aws.ecs.TaskDefinitionRuntimePlatformArgs(
                 cpu_architecture="X86_64", operating_system_family="LINUX"
             ),
-            container_definitions=_container(container_name, command, cpu, memory),
+            # Unset means Fargate's 20 GiB default, which is fine for everything
+            # except a restore holding a multi-gigabyte archive on disk.
+            ephemeral_storage=(
+                aws.ecs.TaskDefinitionEphemeralStorageArgs(size_in_gib=disk_gib)
+                if disk_gib else None
+            ),
+            container_definitions=_container(container_name, command, cpu, memory,
+                                             stop_timeout=stop_timeout),
             tags=tags,
         )
 
@@ -280,7 +385,20 @@ def create_compute(
         WEB_CPU, WEB_MEMORY,
     )
     migrate_td = _task_def(
-        "migrate", "migrate", ["sh", "ops/migrate_and_seed.sh"], JOB_CPU, JOB_MEMORY
+        "migrate", "migrate", ["sh", "ops/migrate_and_seed.sh"], JOB_CPU, JOB_MEMORY,
+        # This family also runs the platform restore, started with a command
+        # override by apps/dashboard/restore.py. Both settings are for that:
+        #
+        # disk_gib: a restore downloads the whole archive — 9.3 GB today and
+        # growing every term — and extracts the dump beside it. The 20 GiB
+        # default has no headroom for that, and the failure is a mid-restore
+        # ENOSPC after the database has already been dropped. Billed per
+        # GB-hour of task runtime, so pennies for the hour it is used.
+        #
+        # stop_timeout: ECS sends SIGTERM then SIGKILL, and the default 30s is
+        # not enough for pg_restore -j 4 to notice and tidy up. 120 is the
+        # maximum Fargate allows.
+        disk_gib=100, stop_timeout=120,
     )
     material_td = _task_def(
         "material", "material-processor",

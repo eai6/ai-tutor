@@ -55,6 +55,21 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
         ],
     )
 
+    # Versioned since restores began writing here. A restore overwrites media
+    # objects by key, and the pre-restore safety copy is database-only — so
+    # without versions, restoring the wrong archive silently replaces a figure
+    # with an older one and nothing anywhere can get it back. The same argument
+    # the backups bucket makes below ("a backup a later broken one can silently
+    # replace is not a backup") applies to the files the database points at.
+    # It also protects the application's ordinary writes, which is a bonus.
+    aws.s3.BucketVersioningV2(
+        f"{prefix}-media-versioning",
+        bucket=bucket.id,
+        versioning_configuration=aws.s3.BucketVersioningV2VersioningConfigurationArgs(
+            status="Enabled",
+        ),
+    )
+
     aws.s3.BucketLifecycleConfigurationV2(
         f"{prefix}-media-lifecycle",
         bucket=bucket.id,
@@ -66,7 +81,18 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
                 abort_incomplete_multipart_upload=aws.s3.BucketLifecycleConfigurationV2RuleAbortIncompleteMultipartUploadArgs(
                     days_after_initiation=7
                 ),
-            )
+            ),
+            # Versions are a safety net for a bad overwrite, not an archive.
+            # Without this the bucket grows without limit now that every restore
+            # writes a new version of ~10,000 objects.
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="expire-superseded-media",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                noncurrent_version_expiration=aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs(
+                    noncurrent_days=30
+                ),
+            ),
         ],
     )
 
@@ -198,7 +224,9 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
             aws.s3.BucketLifecycleConfigurationV2RuleArgs(
                 id="expire-backups",
                 status="Enabled",
-                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(prefix=""),
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(
+                    prefix="backups/"
+                ),
                 expiration=aws.s3.BucketLifecycleConfigurationV2RuleExpirationArgs(
                     days=90
                 ),
@@ -206,6 +234,24 @@ def create_storage(prefix: str, account_id: str, tags: dict) -> Storage:
                 # month is enough to notice and roll back to one.
                 noncurrent_version_expiration=aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs(
                     noncurrent_days=30
+                ),
+            ),
+            # restores/ is not an archive. It holds payloads somebody uploaded
+            # to restore FROM, and the small status objects a running restore
+            # reports through. Both are transient, and the uploaded ones are a
+            # copy of student records that should not sit here for a quarter
+            # because a restore was abandoned halfway. Seven days, not ninety.
+            aws.s3.BucketLifecycleConfigurationV2RuleArgs(
+                id="expire-restore-payloads",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationV2RuleFilterArgs(
+                    prefix="restores/"
+                ),
+                expiration=aws.s3.BucketLifecycleConfigurationV2RuleExpirationArgs(
+                    days=7
+                ),
+                noncurrent_version_expiration=aws.s3.BucketLifecycleConfigurationV2RuleNoncurrentVersionExpirationArgs(
+                    noncurrent_days=1
                 ),
             ),
             # These archives are gigabytes; an upload that dies halfway leaves

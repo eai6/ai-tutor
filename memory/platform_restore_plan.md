@@ -274,7 +274,7 @@ aborts the restore. (`pg_restore` on an untrusted dump can run arbitrary SQL —
 not an escalation, since a superadmin already has that power, but it is why this
 is superadmin-only and audited.)
 
-## Step 4 — `manage.py restore_backup --job <id>`
+## Step 4 — `manage.py restore_backup --job <id>` — **DONE 2026-09-13**
 
 A port of `ops/restore_inner.py`, keeping its comments. Order matters:
 
@@ -411,7 +411,7 @@ ignorable noise. `restore_inner.py:37` uses `check=True`, which would abort a
 restore that actually worked — after the database was dropped. Capture stderr,
 parse the ignored-error count, and decide on that plus the row-count floors.
 
-## Step 5 — Views, URLs, template
+## Step 5 — Views, URLs, template — **DONE 2026-09-13**
 
 `views.py`, after the backup block (~9890-10010), all `@superadmin_required`:
 
@@ -505,7 +505,7 @@ single-use**: stash the archive key plus a nonce in the session at preflight and
 require it back on the POST, so the destructive request cannot be forged from the
 confirmation page's visible contents.
 
-## Step 6 — Infrastructure (`infra/aws/`) — confirm before changing
+## Step 6 — Infrastructure (`infra/aws/`) — **WRITTEN 2026-09-13, NOT APPLIED** (needs `pulumi up`)
 
 Per CLAUDE.md, `infra/__main__.py` and friends are load-bearing; this is the
 proposed shape, to be agreed before editing.

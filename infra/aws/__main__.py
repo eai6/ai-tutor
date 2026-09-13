@@ -157,6 +157,20 @@ task_environment = (
             "ECS_CLUSTER": a[4],
             "ECS_MATERIAL_TASK_DEFINITION": f"{prefix}-material",
             "ECS_MATERIAL_CONTAINER_NAME": "material-processor",
+            # Platform restore (Settings → Restore from backup). The restore
+            # reuses the MIGRATE task definition rather than a family of its
+            # own: .github/workflows/deploy-aws.yml re-registers only web and
+            # migrate, so a Pulumi-created family would stay pinned to whatever
+            # image the last hand-run `pulumi up` set. That matters here more
+            # than anywhere, because this task runs migrations — a stale image
+            # would migrate the database to a stale head and the web tasks
+            # would then come up against a schema missing columns they query.
+            "ECS_MIGRATE_TASK_DEFINITION": f"{prefix}-migrate",
+            "ECS_RESTORE_CONTAINER_NAME": "migrate",
+            # The service the restore scales to zero and back, and the instance
+            # it snapshots first. Without these it refuses rather than guesses.
+            "ECS_SERVICE": f"{prefix}-service",
+            "RDS_INSTANCE_IDENTIFIER": f"{prefix}-db",
             "ECS_SUBNETS": ",".join(a[2]),
             "ECS_SECURITY_GROUPS": a[3],
             # Secure cookies require TLS. With a domain the edge terminates
