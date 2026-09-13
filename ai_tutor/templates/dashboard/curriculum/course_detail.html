@@ -236,11 +236,31 @@
                         </div>
                         <small style="color:var(--gray-500);font-size:0.7rem;">Tick all years this course covers. Used to match platform-wide courses for material inheritance.</small>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Grade (free text)</label>
-                        <input type="text" name="grade_level" class="form-control" value="{{ course.grade_level }}" placeholder="only if no year is ticked">
-                        <small style="color:var(--gray-500);font-size:0.7rem;">Used only when no year is ticked above — for a course whose grade isn't in this platform's list. Ticking a year overwrites this.</small>
+{% comment %}
+                    No free-text grade box. The tick-boxes above ARE the
+                    platform's grade set, and the view validates against the
+                    same list — so anything typed outside it could never match
+                    anything: material inheritance intersects parsed grade
+                    lists, and students carry configured codes. A grade missing
+                    from the list is a platform-config fix, not a per-course
+                    one.
+
+                    The exception is a value already stored that the boxes
+                    cannot express. It is shown and carried through the save
+                    rather than silently wiped; ticking a year replaces it.
+                    {% endcomment %}
+                    {% if course_grade_off_list %}
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <input type="hidden" name="grade_level" value="{{ course.grade_level }}">
+                        <p style="margin:0;font-size:0.75rem;color:var(--warning,#92400e);background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:0.5rem 0.75rem;">
+                            This course is stored as <strong>{{ course.grade_level }}</strong>, and
+                            {% if course_grade_off_list|length == 1 %}<strong>{{ course_grade_off_list|join:", " }}</strong> is not{% else %}<strong>{{ course_grade_off_list|join:", " }}</strong> are not{% endif %}
+                            in this platform's grade list, so
+                            {% if course_grade_off_list|length == 1 %}it matches{% else %}they match{% endif %}
+                            no students and no shared materials. Tick the years above to replace it.
+                        </p>
                     </div>
+                    {% endif %}
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Description</label>
                         <textarea name="description" class="form-control" rows="2">{{ course.description }}</textarea>

@@ -1825,6 +1825,17 @@ def course_detail(request, course_id):
         # student's configured grade.
         'subject_code_choices': Course.SubjectCode.choices,
         'secondary_year_choices': PlatformConfig.get_grade_choices(),
+        # Any part of this course's grade that the tick-boxes cannot express.
+        # The boxes ARE the configured grade set, so this is empty for every
+        # course a teacher has set a grade on through the form; it catches a
+        # legacy row, or one the curriculum parser wrote a free-hand label
+        # onto ('Secondary 3', 'Grade 8'). The edit form shows it and carries
+        # it through a save, so editing the title does not silently drop a
+        # grade nobody can re-tick.
+        'course_grade_off_list': [
+            g for g in course.grade_levels
+            if g not in {c[0].strip() for c in PlatformConfig.get_grade_choices()}
+        ],
         # R2.3 — inherited materials from platform-wide courses matching
         # this course's subject_code + grade_levels. Surfaced as a badge
         # so teachers see they're not orphaned when they didn't upload
@@ -8028,9 +8039,12 @@ def course_edit(request, course_id):
     valid_years = {c[0].strip() for c in PlatformConfig.get_grade_choices()}
     grade_levels = sorted({g.strip() for g in grade_levels_raw if g.strip() in valid_years})
 
-    # The ticked years ARE the grade. grade_levels is derived from this text
-    # now, so the checkboxes write it and the free-text box is only a manual
-    # override for a course whose grades are not in the configured set.
+    # The ticked years ARE the grade — there is no free-text box to disagree
+    # with them. `grade_level` still arrives in the POST from two hidden
+    # fields: the reparse form round-trips the current value so refreshing
+    # lessons does not drop the grade, and the edit form carries it only when
+    # the stored value holds something the tick-boxes cannot express (a legacy
+    # or parser-written label). Ticking a year replaces it either way.
     if grade_levels:
         grade_level = ",".join(grade_levels)
 
