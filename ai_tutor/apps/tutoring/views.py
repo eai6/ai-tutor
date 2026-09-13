@@ -253,17 +253,27 @@ def lesson_catalog(request):
     student_grade = ''
     if hasattr(request.user, 'student_profile'):
         student_grade = (request.user.student_profile.grade_level or '').strip()
-    # Match whitespace/case-insensitively: a student's grade may carry a
-    # trailing space from the configured grade code (e.g. '8ª Classe '),
-    # while parse_grade_level_string strips the course side — an exact
-    # `in` check then silently hides every course from that student.
-    student_grade_cf = student_grade.casefold()
+    # Match through the platform's grade vocabulary, so the two sides can be
+    # written differently and still be the same grade. The parser writes
+    # whatever label a syllabus used ('Secondary 3'); a student profile
+    # carries the configured code ('S3'). Comparing the raw strings hid a
+    # course from exactly the students it was written for — the same clash
+    # that stopped material inheritance matching, and worse here because a
+    # student simply cannot see their course.
+    #
+    # Whitespace/case are handled inside normalize_grades; a grade the
+    # platform does not define is preserved, so an unrecognised value still
+    # matches its own spelling exactly as before.
+    from ai_tutor.apps.accounts.models import PlatformConfig
 
     if student_grade and not is_staff:
+        vocab = PlatformConfig.grade_vocabulary()
+        student_grades = PlatformConfig.normalize_grades([student_grade], vocab)
         filtered = []
         for course in courses:
-            course_grades = {g.casefold() for g in parse_grade_level_string(course.grade_level)}
-            if not course_grades or student_grade_cf in course_grades:
+            course_grades = PlatformConfig.normalize_grades(
+                parse_grade_level_string(course.grade_level), vocab)
+            if not course_grades or (student_grades & course_grades):
                 filtered.append(course)
         courses = filtered
 
