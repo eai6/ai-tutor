@@ -235,7 +235,7 @@ happened — the table comes back as it was before the restore began.
 for the safety archive is dropped too. The S3 object survives; the key is how the
 admin finds it, and the card surfaces it prominently after any restore.
 
-## Step 3 — `apps/dashboard/restore.py` (service, mirrors `backup.py`)
+## Step 3 — `apps/dashboard/restore.py` — **DONE 2026-09-13**
 
 - `preflight(source) -> dict` — non-destructive, runs in the request. Streams
   the archive header only. Checks: gzip/tar readable; `manifest.json` parses;
