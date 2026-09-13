@@ -304,19 +304,13 @@
 
 {% if not_started_students %}
 {% comment %}
-Named rather than counted: three students who never opened the lesson is a
-list of three people to go and ask. This is the number the report could not
-produce before it knew a roster — a sessions-only query cannot see an absence.
+The count, which is the thing this report could not produce before it knew a
+roster — a sessions-only query cannot see an absence. Not the names: this page
+is a decision about the class ("re-teach or move on"), and a register in the
+middle of it is noise. The names are on the class page.
 {% endcomment %}
-<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:0.9rem 1.1rem; margin-bottom:1.25rem;">
-    <div style="font-size:0.875rem; font-weight:600; color:#92400e; margin-bottom:0.5rem;">
-        {% blocktrans count n=not_started_students|length %}{{ n }} student never opened this lesson{% plural %}{{ n }} students never opened this lesson{% endblocktrans %}
-    </div>
-    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-        {% for s in not_started_students %}
-        <a href="{% url 'dashboard:student_detail' s.id %}" style="padding:0.25rem 0.55rem; background:#fff; border:1px solid #fcd34d; border-radius:999px; font-size:0.8125rem; color:#92400e; text-decoration:none;">{{ s.first_name }} {{ s.last_name }}</a>
-        {% endfor %}
-    </div>
+<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:0.75rem 1.1rem; margin-bottom:1.25rem; font-size:0.875rem; font-weight:600; color:#92400e;">
+    {% blocktrans count n=not_started_students|length %}{{ n }} student never opened this lesson{% plural %}{{ n }} students never opened this lesson{% endblocktrans %}
 </div>
 {% endif %}
 

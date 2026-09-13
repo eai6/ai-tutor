@@ -8789,10 +8789,24 @@ def lesson_live_monitor(request, lesson_id):
         else:
             participant_names = []
 
+        # One status for the row and the summary cards to share.
+        #
+        # session.status stays 'active' for a session nobody has touched in ten
+        # hours, while the ACTIVE card counts it as idle — so the badge and the
+        # card contradicted each other on the same screen. The cards were
+        # right; the badge was reading the raw field.
+        if is_completed:
+            display_status = 'completed'
+        elif is_idle:
+            display_status = 'idle'
+        else:
+            display_status = session.status
+
         session_data.append({
             'session': session,
             'student_name': session.student.get_full_name() or session.student.username,
             'status': session.status,
+            'display_status': display_status,
             'is_idle': is_idle,
             'idle_minutes': idle_minutes,
             'cognitive_load': state.get('cognitive_load', 0.5),
@@ -8986,7 +9000,7 @@ def send_guidance(request, lesson_id):
 @staff_required
 def session_chat_history(request, session_id):
     """View the full chat history of a tutoring session."""
-    from ai_tutor.apps.tutoring.models import SessionTurn
+    from ai_tutor.apps.tutoring.models import ExitTicketAttempt, SessionTurn
 
     institution = request.staff_ctx['institution']
     qs = TutorSession.objects.all()
@@ -9033,6 +9047,14 @@ def session_chat_history(request, session_id):
         'exit_total': state.get('exit_ticket_total'),
         'covered_eos': state.get('covered_enabling_objectives', []),
         'failed_eos': state.get('exit_ticket_failed_eos', []),
+        # Whether session_exit_review has anything to show. That view redirects
+        # to the monitor with a flash when there is no attempt, so linking
+        # unconditionally would bounce a teacher out of the transcript they are
+        # reading. Read from ExitTicketAttempt, not engine_state: the engine
+        # only writes exit_ticket_score when the student PASSES, so a failed
+        # attempt — the one most worth reviewing — leaves the state key unset.
+        'has_exit_review': ExitTicketAttempt.objects.filter(
+            session=session, completed_at__isnull=False).exists(),
     }
     return render(request, 'dashboard/session_chat_history.html', context)
 

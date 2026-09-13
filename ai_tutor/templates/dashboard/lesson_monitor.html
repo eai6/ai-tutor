@@ -259,15 +259,13 @@
 </div>
 
 {% if not_started %}
-<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:0.9rem 1.1rem; margin-bottom:1.25rem;">
-    <div style="font-size:0.875rem; font-weight:600; color:#92400e; margin-bottom:0.5rem;">
-        {% blocktrans count n=not_started|length %}{{ n }} student has not opened this lesson{% plural %}{{ n }} students have not opened this lesson{% endblocktrans %}
-    </div>
-    <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-        {% for s in not_started %}
-        <a href="{% url 'dashboard:student_detail' s.id %}" style="padding:0.25rem 0.55rem; background:#fff; border:1px solid #fcd34d; border-radius:999px; font-size:0.8125rem; color:#92400e; text-decoration:none;">{{ s.first_name }} {{ s.last_name }}</a>
-        {% endfor %}
-    </div>
+{% comment %}
+The number, not the register. A teacher watching a live lesson is deciding
+whether to wait or move on, and that is a count; the names are on the class
+page, which is where you go to chase someone.
+{% endcomment %}
+<div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:0.75rem 1.1rem; margin-bottom:1.25rem; font-size:0.875rem; font-weight:600; color:#92400e;">
+    {% blocktrans count n=not_started|length %}{{ n }} student has not opened this lesson{% plural %}{{ n }} students have not opened this lesson{% endblocktrans %}
 </div>
 {% endif %}
 
@@ -297,8 +295,15 @@
             </td>
             <td data-label="{% trans 'Status' %}">
                 <span>
-                    <span class="badge badge-{{ s.status }}">{{ s.status }}</span>
-                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="{% blocktrans with mins=s.idle_minutes %}No activity for {{ mins }} min{% endblocktrans %}">{% blocktrans with mins=s.idle_minutes %}Idle {{ mins }}m{% endblocktrans %}</span>{% endif %}
+                    {% comment %}
+                    display_status, not session.status. The raw field says
+                    "active" for a session nobody has touched in ten hours,
+                    while the ACTIVE card above counts it as idle — so the row
+                    and the card contradicted each other on the same screen.
+                    One field now feeds both.
+                    {% endcomment %}
+                    <span class="badge badge-{{ s.display_status }}">{{ s.display_status }}</span>
+                    {% if s.is_idle %}<span class="badge badge-idle" style="margin-left:4px;" title="{% blocktrans with mins=s.idle_minutes %}No activity for {{ mins }} min{% endblocktrans %}">{% blocktrans with mins=s.idle_minutes %}{{ mins }}m{% endblocktrans %}</span>{% endif %}
                     {% if s.is_remediation %}<span class="badge badge-remediation" style="margin-left:4px;">{% trans "Remediation" %}</span>{% endif %}
                 </span>
             </td>

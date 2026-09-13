@@ -164,8 +164,11 @@ class TestTheRosterLeadsAndPastStudentsFollow:
 class TestAnAbsenceBecomesVisible:
     """The number the page could not produce before it knew a roster."""
 
-    def test_students_who_never_opened_it_are_named(self, client, teacher,
-                                                    school, lesson):
+    def test_the_report_knows_exactly_who_did_not_start(self, client, teacher,
+                                                        school, lesson):
+        """It resolves them individually — the page only renders the count
+        (TestTheAbsenceIsACountNotARegister), but the set is what makes the
+        count trustworthy, and what a future export would need."""
         _worked(_student(school, 'amara'), lesson, school)
         kelly = _student(school, 'kelly')
         nadia = _student(school, 'nadia')
@@ -174,11 +177,9 @@ class TestAnAbsenceBecomesVisible:
         report = _report(client, lesson, 'S3')
 
         assert {s.id for s in report.context['not_started_students']} == {kelly.id, nadia.id}
-        body = report.content.decode()
-        assert 'never opened this lesson' in body
-        assert 'Kelly' in body and 'Nadia' in body
+        assert 'never opened this lesson' in report.content.decode()
 
-    def test_the_monitor_names_them_too(self, client, teacher, school, lesson):
+    def test_the_monitor_knows_too(self, client, teacher, school, lesson):
         _worked(_student(school, 'amara'), lesson, school)
         kelly = _student(school, 'kelly')
 
@@ -233,3 +234,142 @@ class TestThePicker:
         assert response.status_code == 200
         assert response.context['total_students'] == 0
         assert response.context['roster_size'] == 0
+
+
+@pytest.mark.django_db
+class TestTheRowAgreesWithTheCards:
+    """A session nobody has touched in ten hours kept a green ACTIVE badge
+    while the ACTIVE card above it counted 0 — the row and the summary
+    contradicting each other on the same screen. The cards were right."""
+
+    def _stale(self, student, lesson, school, minutes):
+        from django.utils import timezone
+        from datetime import timedelta
+        from ai_tutor.apps.tutoring.models import SessionTurn
+        session = TutorSession.objects.create(student=student, lesson=lesson,
+                                              institution=school, status='active')
+        turn = SessionTurn.objects.create(session=session, role='student',
+                                          content='hello')
+        SessionTurn.objects.filter(pk=turn.pk).update(
+            created_at=timezone.now() - timedelta(minutes=minutes))
+        return session
+
+    def test_a_stale_active_session_reads_idle(self, client, teacher, school,
+                                               lesson):
+        self._stale(_student(school, 'amara'), lesson, school, minutes=600)
+
+        client.force_login(teacher)
+        row = _monitor(client, lesson, 'S3').context['sessions'][0]
+
+        assert row['is_idle'] is True
+        assert row['display_status'] == 'idle'
+        assert row['status'] == 'active', 'the raw field is untouched'
+
+    def test_the_badge_and_the_card_cannot_disagree(self, client, teacher,
+                                                    school, lesson):
+        self._stale(_student(school, 'amara'), lesson, school, minutes=600)
+
+        client.force_login(teacher)
+        response = _monitor(client, lesson, 'S3')
+
+        counted_active = response.context['active_count']
+        badged_active = sum(1 for s in response.context['sessions']
+                            if s['display_status'] == 'active')
+        assert counted_active == badged_active == 0
+        assert response.context['idle_count'] == 1
+
+    def test_a_fresh_session_still_reads_active(self, client, teacher, school,
+                                                lesson):
+        self._stale(_student(school, 'amara'), lesson, school, minutes=1)
+
+        client.force_login(teacher)
+        row = _monitor(client, lesson, 'S3').context['sessions'][0]
+        assert row['display_status'] == 'active'
+        assert _monitor(client, lesson, 'S3').context['active_count'] == 1
+
+    def test_a_completed_session_reads_completed(self, client, teacher, school,
+                                                 lesson):
+        _worked(_student(school, 'amara'), lesson, school, status='completed')
+        client.force_login(teacher)
+        row = _monitor(client, lesson, 'S3').context['sessions'][0]
+        assert row['display_status'] == 'completed'
+
+
+@pytest.mark.django_db
+class TestTheAbsenceIsACountNotARegister:
+    """The monitor and the report say how many never opened the lesson, not
+    who. Both pages are a decision about the class — wait or move on, re-teach
+    or advance — and a register in the middle of one is noise. The names live
+    on the class page, which is where you go to chase someone."""
+
+    def test_the_monitor_gives_a_number_only(self, client, teacher, school,
+                                             lesson):
+        _worked(_student(school, 'amara'), lesson, school)
+        _student(school, 'kelly')
+
+        client.force_login(teacher)
+        response = _monitor(client, lesson, 'S3')
+        body = response.content.decode()
+
+        assert len(response.context['not_started']) == 1
+        assert 'has not opened this lesson' in body
+        assert 'Kelly' not in body
+
+    def test_the_report_gives_a_number_only(self, client, teacher, school,
+                                            lesson):
+        _worked(_student(school, 'amara'), lesson, school)
+        _student(school, 'kelly')
+
+        client.force_login(teacher)
+        response = _report(client, lesson, 'S3')
+        body = response.content.decode()
+
+        assert len(response.context['not_started_students']) == 1
+        assert 'never opened this lesson' in body
+        assert 'Kelly' not in body
+
+
+@pytest.mark.django_db
+class TestTheTranscriptOffersTheExitReview:
+
+    def _attempt(self, session, lesson, score=1, passed=False):
+        from django.utils import timezone
+        from ai_tutor.apps.tutoring.models import ExitTicket, ExitTicketAttempt
+        ticket, _ = ExitTicket.objects.get_or_create(
+            lesson=lesson, defaults={'passing_score': 8,
+                                     'questions_per_attempt': 10})
+        return ExitTicketAttempt.objects.create(
+            session=session, student=session.student, exit_ticket=ticket,
+            answers=[], score=score, passed=passed,
+            completed_at=timezone.now())
+
+    def test_a_failed_attempt_still_offers_the_link(self, client, teacher,
+                                                    school, lesson):
+        """The engine writes engine_state's exit_ticket_score only on a PASS,
+        so the score block never renders for a failed attempt — which is the
+        one a teacher most wants to read."""
+        session = _worked(_student(school, 'amara'), lesson, school)
+        self._attempt(session, lesson, score=1, passed=False)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:session_chat_history',
+                                      args=[session.id]))
+
+        assert response.context['has_exit_review'] is True
+        assert response.context['exit_score'] is None
+        assert reverse('dashboard:session_exit_review',
+                       args=[session.id]) in response.content.decode()
+
+    def test_no_attempt_means_no_link(self, client, teacher, school, lesson):
+        """session_exit_review redirects out to the monitor when there is no
+        attempt — a link that bounces a teacher out of the transcript they are
+        reading is worse than no link."""
+        session = _worked(_student(school, 'amara'), lesson, school)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:session_chat_history',
+                                      args=[session.id]))
+
+        assert response.context['has_exit_review'] is False
+        assert reverse('dashboard:session_exit_review',
+                       args=[session.id]) not in response.content.decode()
