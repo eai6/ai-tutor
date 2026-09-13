@@ -1008,8 +1008,30 @@ lessons even when curriculum editing is locked down.
                 </p>
             </div>
         </div>
-        {% if can_edit_content %}<a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation();">+ Add Lesson</a>{% endif %}
+        {% if can_edit_content %}
+        <div style="display:flex;gap:0.375rem;align-items:center;" onclick="event.stopPropagation();">
+            <a href="{% url 'dashboard:lesson_create' unit.id %}" class="btn btn-secondary btn-sm">+ Add Lesson</a>
+            <button type="button" class="btn btn-secondary btn-sm" data-rename-unit="{{ unit.id }}"
+                    title="{% trans 'Rename this unit' %}">{% trans "Rename" %}</button>
+            <form method="post" action="{% url 'dashboard:unit_delete' unit.id %}" style="display:inline;"
+                  onsubmit="return confirm('{% trans "Park this unit and its lessons? Nothing is deleted — student transcripts and mastery records stay intact, and the unit stops appearing here." %}');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm" style="background:#FEF2F2;color:#991B1B;border:1px solid #FECACA;border-radius:6px;padding:0.25rem 0.6rem;font-weight:600;"
+                        title="{% trans 'Park this unit — it is hidden, never deleted' %}">{% trans "Remove" %}</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
+    {% if can_edit_content %}
+    <form method="post" action="{% url 'dashboard:unit_edit' unit.id %}" id="rename-unit-{{ unit.id }}"
+          style="display:none;padding:0.75rem 1.25rem;background:#F8FAFC;border-top:1px solid var(--gray-200);gap:0.5rem;align-items:center;">
+        {% csrf_token %}
+        <input type="text" name="title" value="{{ unit.title }}" class="form-control" required
+               style="flex:1;font-size:0.875rem;">
+        <button type="submit" class="btn btn-secondary btn-sm">{% trans "Save" %}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-cancel-rename="{{ unit.id }}">{% trans "Cancel" %}</button>
+    </form>
+    {% endif %}
     <div class="collapsible-body" style="max-height: 2000px;">
         <div class="card-body" style="padding: 0;">
             {% if unit.lessons.all %}
@@ -1175,9 +1197,57 @@ lessons even when curriculum editing is locked down.
     Add Unit
 </a>
 {% endif %}
+
+{% comment %}
+Parked units. A replace retires the lessons a new document drops, and now the
+units those emptied too — otherwise the page keeps a "0 lessons" heading from
+every syllabus version it has ever seen, with no way to clear them. Listed
+rather than hidden, because parked is not deleted and a teacher should be able
+to see what went and put it back.
+{% endcomment %}
+{% if retired_units %}
+<details style="margin-top:1.25rem;">
+    <summary style="cursor:pointer;font-size:0.875rem;color:var(--gray-500);">
+        {% blocktrans count n=retired_units|length %}{{ n }} parked unit{% plural %}{{ n }} parked units{% endblocktrans %}
+        — {% trans "removed by a replace or by hand. Nothing was deleted." %}
+    </summary>
+    <div style="margin-top:0.5rem;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
+        {% for unit in retired_units %}
+        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.9rem;border-bottom:1px solid var(--gray-100);font-size:0.8125rem;">
+            <span style="flex:1;color:var(--gray-600);">{{ unit.title }}</span>
+            <span style="color:var(--gray-400);">{% blocktrans count n=unit.lessons.count %}{{ n }} lesson{% plural %}{{ n }} lessons{% endblocktrans %}</span>
+            {% if can_edit_content %}
+            <form method="post" action="{% url 'dashboard:unit_edit' unit.id %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="title" value="{{ unit.title }}">
+                <input type="hidden" name="restore" value="1">
+                <button type="submit" class="btn btn-secondary btn-sm">{% trans "Restore" %}</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
 </div><!-- /#course-live-region -->
 
 <script nonce="{{ request.csp_nonce }}">
+// Unit rename — toggle the inline form. Delegated and nonce'd rather than an
+// inline onclick, so it survives CSP_STRICT_SCRIPTS.
+document.addEventListener('click', function (e) {
+    const open = e.target.closest('[data-rename-unit]');
+    if (open) {
+        const f = document.getElementById('rename-unit-' + open.dataset.renameUnit);
+        if (f) { f.style.display = 'flex'; f.querySelector('input[name=title]').focus(); }
+        return;
+    }
+    const cancel = e.target.closest('[data-cancel-rename]');
+    if (cancel) {
+        const f = document.getElementById('rename-unit-' + cancel.dataset.cancelRename);
+        if (f) { f.style.display = 'none'; }
+    }
+});
+
 // Which curriculum document to re-read. Both forms are rendered server-side
 // and one is hidden; if this script never runs, both show, which is exactly
 // how the page behaved before they were merged.

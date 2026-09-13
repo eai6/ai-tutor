@@ -304,6 +304,16 @@ class Unit(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     order_index = models.PositiveIntegerField(default=0)
+
+    # Parked, not deleted — mirrors Lesson.retired_at. A replace that empties
+    # a unit of every lesson leaves the unit itself behind, and a course page
+    # full of "0 lessons" headings from syllabus versions ago is noise the
+    # teacher cannot clear. Retiring it hides it without breaking the FK from
+    # any lesson still parked underneath.
+    retired_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When this unit was parked. Null = live.",
+    )
     grade_level = models.CharField(
         max_length=50,
         blank=True,

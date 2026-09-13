@@ -367,6 +367,47 @@ def retire_lessons_not_in(course, structure, *, actor=None) -> int:
         lesson.is_published = False
         lesson.save(update_fields=['retired_at', 'is_published'])
         retired += 1
+
+    retire_emptied_units(course, structure)
+    return retired
+
+
+def retire_emptied_units(course, structure) -> int:
+    """Park units the replace left with nothing in them.
+
+    Retiring lessons alone leaves their unit behind as a "0 lessons" heading.
+    After months of additive re-parses a course accumulates those from every
+    syllabus version, and a teacher has no way to clear them — which is what
+    a replace was supposed to do.
+
+    A unit is parked only when BOTH hold: it has no live lesson left, and the
+    new document does not list it. The second is what stops a unit the
+    teacher just created, or one the document still names and will fill,
+    being swept away for being momentarily empty.
+
+    Parked, not deleted: lessons retired underneath it keep their unit FK, so
+    every transcript and mastery row still resolves.
+    """
+    from django.utils import timezone
+
+    def _norm(t):
+        return ' '.join(str(t or '').split()).strip().lower()
+
+    listed = {
+        _norm((u or {}).get('title'))
+        for u in ((structure or {}).get('units') or [])
+    }
+    listed.discard('')
+
+    retired = 0
+    for unit in course.units.filter(retired_at__isnull=True):
+        if _norm(unit.title) in listed:
+            continue
+        if unit.lessons.filter(retired_at__isnull=True).exists():
+            continue
+        unit.retired_at = timezone.now()
+        unit.save(update_fields=['retired_at'])
+        retired += 1
     return retired
 
 
@@ -1638,6 +1679,7 @@ def course_detail(request, course_id):
     from django.db.models import Prefetch
     units = (
         course.units
+        .filter(retired_at__isnull=True)
         .prefetch_related(
             Prefetch('lessons',
                      queryset=Lesson.objects.filter(retired_at__isnull=True)),
@@ -1647,6 +1689,8 @@ def course_detail(request, course_id):
     )
     retired_count = Lesson.objects.filter(
         unit__course=course, retired_at__isnull=False).count()
+    retired_units = list(course.units.filter(retired_at__isnull=False)
+                         .order_by('order_index'))
     
     # Get progress stats and content stats per lesson
     from ai_tutor.apps.tutoring.models import ExitTicket
@@ -1854,6 +1898,7 @@ def course_detail(request, course_id):
         'course_grade': course_grade,
         'units': units,
         'retired_count': retired_count,
+        'retired_units': retired_units,
         'lesson_stats': lesson_stats,
         'total_lessons': total_lessons,
         'lessons_with_content': lessons_with_content,
@@ -7872,6 +7917,103 @@ def course_unpublish_all(request, course_id):
 
     messages.success(request, f"Unpublished {unpublished} lessons and the course.")
     return redirect('dashboard:course_detail', course_id=course.id)
+
+
+@teacher_required
+@require_POST
+def unit_edit(request, unit_id):
+    """Rename a unit, or restore a parked one.
+
+    The title is not cosmetic: `retire_lessons_not_in` keys on
+    (unit title, lesson title), so renaming a unit changes what a future
+    replace considers the same lesson. Worth knowing, not worth blocking —
+    a teacher fixing a parser's mangled heading is the common case.
+    """
+    from ai_tutor.apps.curriculum.models import Unit
+
+    institution = request.staff_ctx['institution']
+    # Scoped through the course, the way course_edit scopes a course: strict
+    # institution match, so a teacher cannot edit another school's unit or a
+    # platform-wide one.
+    if institution is not None:
+        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    else:
+        unit = get_object_or_404(Unit, id=unit_id)
+    course_id = unit.course_id
+
+    title = request.POST.get('title', '').strip()
+    if not title:
+        messages.error(request, "A unit needs a title.")
+        return redirect('dashboard:course_detail', course_id=course_id)
+
+    fields = ['title']
+    unit.title = title
+    restored_lessons = 0
+    if request.POST.get('restore'):
+        # Undo exactly what parked it. Lessons parked in the SAME moment came
+        # from the same action, so they come back together; anything parked
+        # earlier — by a previous replace, for its own reasons — stays parked.
+        # Without this, restoring returns an empty unit, which is not what
+        # "restore" means.
+        if unit.retired_at:
+            restored_lessons = unit.lessons.filter(
+                retired_at=unit.retired_at).update(retired_at=None)
+        unit.retired_at = None
+        fields.append('retired_at')
+    unit.save(update_fields=fields)
+
+    if restored_lessons:
+        messages.success(
+            request,
+            f'Restored "{title}" and {restored_lessons} lesson(s). They are '
+            f'unpublished — publish them when you are ready.',
+        )
+    elif 'retired_at' in fields:
+        messages.success(request, f'Restored "{title}".')
+    else:
+        messages.success(request, f'Unit renamed to "{title}".')
+    return redirect('dashboard:course_detail', course_id=course_id)
+
+
+@teacher_required
+@require_POST
+def unit_delete(request, unit_id):
+    """Park a unit and everything still live in it.
+
+    Parked, never deleted. Unit and Lesson both CASCADE into TutorSession,
+    StudentLessonProgress and ExitTicket, so a real delete would take the
+    transcripts, the mastery rows and the exit-ticket attempts with it — the
+    failure that cost a pilot its competency history and the reason
+    retire_lessons_not_in exists. Everything here stays resolvable; it just
+    stops appearing and no student can start it.
+    """
+    from django.utils import timezone
+    from ai_tutor.apps.curriculum.models import Unit
+
+    institution = request.staff_ctx['institution']
+    # Scoped through the course, the way course_edit scopes a course: strict
+    # institution match, so a teacher cannot edit another school's unit or a
+    # platform-wide one.
+    if institution is not None:
+        unit = get_object_or_404(Unit, id=unit_id, course__institution=institution)
+    else:
+        unit = get_object_or_404(Unit, id=unit_id)
+    course_id = unit.course_id
+
+    now = timezone.now()
+    lessons = unit.lessons.filter(retired_at__isnull=True)
+    n = lessons.count()
+    lessons.update(retired_at=now, is_published=False)
+    unit.retired_at = now
+    unit.save(update_fields=['retired_at'])
+
+    messages.success(
+        request,
+        f'Parked "{unit.title}"'
+        + (f' and its {n} lesson(s)' if n else '')
+        + '. Nothing was deleted — student work on those lessons is intact.',
+    )
+    return redirect('dashboard:course_detail', course_id=course_id)
 
 
 @teacher_required
