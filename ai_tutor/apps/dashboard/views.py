@@ -48,11 +48,36 @@ def get_staff_context(request):
     selected = request.session.get('selected_school_id')
 
     if request.user.is_staff:
-        # Superadmin — platform-wide access
-        all_schools = list(Institution.objects.filter(is_active=True).order_by('name'))
+        # Superadmin — platform-wide access.
+        #
+        # "Global (All Schools)" is excluded. It is a container row
+        # (Institution.get_global(), slug 'global') that exists so uploads made
+        # in All-Schools mode have a non-null FK to hang media and skills off —
+        # it is not a school, has no members, and listing it put a second
+        # "All Schools" halfway down an alphabetical list of real ones.
+        #
+        # It matters most on the two other pickers fed by this list. The
+        # settings table would show it as a school to administer, and the
+        # move-a-course picker would offer it BESIDE its own "All Schools
+        # (platform-wide)" option — which is not the same thing: that one means
+        # institution=None. Confusing the two is the exact production failure
+        # the KB normalisation shim was written for (knowledge_base.py:107).
+        all_schools = list(
+            Institution.objects.filter(is_active=True)
+            .exclude(slug=Institution.GLOBAL_SLUG)
+            .order_by('name')
+        )
 
         if selected and selected != 'all':
-            institution = Institution.objects.filter(id=selected, is_active=True).first()
+            # Excluded here too, so a session that already selected the global
+            # row falls back to aggregated mode rather than wedging on an
+            # option the picker no longer offers.
+            institution = (
+                Institution.objects
+                .filter(id=selected, is_active=True)
+                .exclude(slug=Institution.GLOBAL_SLUG)
+                .first()
+            )
         else:
             institution = None  # aggregated mode
 
