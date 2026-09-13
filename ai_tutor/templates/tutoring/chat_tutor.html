@@ -77,6 +77,12 @@
                 <button type="button" role="menuitem" onclick="closeHeaderMenu(); restartLesson();">
                     <span class="hm-emoji" aria-hidden="true">🔄</span> {% trans "Restart lesson" %}
                 </button>
+                {% if not easy_mode_locked %}
+                <button type="button" role="menuitem" id="answer-mode-menu-item"
+                        onclick="closeHeaderMenu(); toggleEasyMode();">
+                    <span class="hm-emoji" aria-hidden="true">🅰️</span> <span id="answer-mode-menu-label">{% if easy_mode_on %}{% trans "Switch to typing" %}{% else %}{% trans "Easy mode: tap answers" %}{% endif %}</span>
+                </button>
+                {% endif %}
                 <button type="button" role="menuitem" class="fb-trigger" onclick="closeHeaderMenu();">
                     <span class="hm-emoji" aria-hidden="true">💬</span> {% trans "Help / report an issue" %}
                 </button>
@@ -140,16 +146,38 @@
                 </div>
                 {% endif %}
                 {% comment %}
-                Answer picker — offline (local model) MCQ only. Populated by
-                renderAnswerChoices() from the turn payload's answer_choices,
-                which swaps this in and the typing box out. Hidden by default
-                and whenever there is no live MCQ.
+                Answer picker. Shows for a live MCQ when the student turned
+                easy mode on, or when the session's model needs the buttons to
+                grade at all. Populated by renderAnswerChoices() from the turn
+                payload's answer_choices, which swaps this in and the typing
+                box out. Hidden by default and whenever there is no live MCQ.
 
                 This is a comment tag and not a hash-brace comment because
                 Django only treats the latter as a comment on a SINGLE line —
                 a multi-line one renders as literal text to the student.
                 Caught here by the screenshot check.
                 {% endcomment %}
+                {% if not easy_mode_locked %}
+                {% comment %}
+                Easy mode / normal mode. Easy mode swaps the typing box for the
+                A-D buttons on every multiple-choice question; normal mode
+                types. Hidden entirely when easy_mode_locked, i.e. when the
+                session's tutor cannot grade prose and the buttons are not
+                optional — see engine.easy_mode_is_forced.
+                {% endcomment %}
+                <div class="answer-mode-row">
+                    <button type="button"
+                            id="answer-mode-btn"
+                            class="answer-mode-btn"
+                            aria-pressed="{% if easy_mode_on %}true{% else %}false{% endif %}"
+                            onclick="toggleEasyMode()">
+                        <span aria-hidden="true">🅰️</span>
+                        <span id="answer-mode-label">{% if easy_mode_on %}{% trans "Easy mode: on" %}{% else %}{% trans "Easy mode: tap answers" %}{% endif %}</span>
+                    </button>
+                    <span class="answer-mode-note" id="answer-mode-note"
+                          {% if not easy_mode_on %}hidden{% endif %}>{% trans "Buttons appear when the tutor asks a multiple-choice question." %}</span>
+                </div>
+                {% endif %}
                 <div id="answer-choices" class="answer-choices" style="display:none;"></div>
                 <div class="input-wrapper" id="input-wrapper">
                     <textarea
@@ -944,6 +972,49 @@ body {
     color: #374151;
     overflow-wrap: anywhere;
 }
+/* Easy-mode switch. Sits above whichever input surface is showing, so the
+   student can get back to typing from inside easy mode — the picker hides the
+   textarea, and a control that lived beside the textarea would go with it. */
+.answer-mode-row {
+    max-width: 768px;
+    margin: 0 auto 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.answer-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    background: #fff;
+    border: 1.5px solid #e4e4e7;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #52525b;
+    transition: border-color .12s, background .12s, color .12s;
+}
+.answer-mode-btn:hover:not(:disabled) { border-color: #f97316; color: #c2410c; }
+.answer-mode-btn:focus-visible {
+    outline: none;
+    border-color: #a1a1aa;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
+.answer-mode-btn[aria-pressed="true"] {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #c2410c;
+}
+.answer-mode-btn:disabled { opacity: .55; cursor: progress; }
+.answer-mode-note {
+    font-size: 0.75rem;
+    color: #71717a;
+}
+
 .chat-input-area {
     flex-shrink: 0;
     padding: 0.75rem 1rem 1rem;
@@ -2702,6 +2773,81 @@ function applyTutorResponse(data) {
 // prevent. On a turn where typing was already the input, it stays. Every path
 // that ends a turn WITHOUT a payload — the catch block, the offline queue —
 // must call this plainly, or the student is left with no way to reply at all.
+// ── Easy mode ─────────────────────────────────────────────────────────────
+// Easy mode = tap A-D. Normal mode = type. The preference lives on the
+// student's profile, not in this page, because the tutor's system prompt has
+// to agree with what is on screen: engine._uses_answer_picker reads the same
+// row that decides whether the <answer_surface> block goes into the prompt.
+// A localStorage flag would show buttons the tutor did not know about, which
+// is device session 30 all over again.
+//
+// Hidden entirely (no #answer-mode-btn in the DOM) where the tutor cannot
+// grade prose — there easy mode is not optional, so there is no switch.
+let easyMode = {% if easy_mode_on %}true{% else %}false{% endif %};
+let easyModeBusy = false;
+
+function updateEasyModeLabels() {
+    const btn = document.getElementById('answer-mode-btn');
+    if (btn) {
+        btn.setAttribute('aria-pressed', easyMode ? 'true' : 'false');
+        const label = document.getElementById('answer-mode-label');
+        if (label) {
+            label.textContent = easyMode
+                ? gettext('Easy mode: on') : gettext('Easy mode: tap answers');
+        }
+    }
+    const menuLabel = document.getElementById('answer-mode-menu-label');
+    if (menuLabel) {
+        menuLabel.textContent = easyMode
+            ? gettext('Switch to typing') : gettext('Easy mode: tap answers');
+    }
+    // The note explains a gap the student would otherwise read as a broken
+    // button: easy mode is on, but this turn is a teaching turn or a
+    // short-answer question, so there is nothing to tap yet.
+    const note = document.getElementById('answer-mode-note');
+    const box = document.getElementById('answer-choices');
+    if (note) {
+        const showing = box && box.style.display !== 'none';
+        note.hidden = !easyMode || !!showing;
+    }
+}
+
+async function toggleEasyMode() {
+    const btn = document.getElementById('answer-mode-btn');
+    if (easyModeBusy) return;
+    // The endpoint is session-scoped so the response can carry the buttons for
+    // the question already on screen. Before the session exists there is no
+    // question to re-render, and chat start is a fraction of a second away.
+    if (!sessionId) return;
+
+    easyModeBusy = true;
+    if (btn) btn.disabled = true;
+    const wanted = easyMode ? 'normal' : 'easy';
+    try {
+        const res = await fetch(`/tutor/api/chat/${sessionId}/answer-surface/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.csrfToken(),
+            },
+            body: JSON.stringify({mode: wanted}),
+        });
+        if (!res.ok) throw new Error('answer-surface ' + res.status);
+        const data = await res.json();
+        easyMode = data.mode === 'easy';
+        // Land the switch on the question already on screen rather than at the
+        // start of the next turn — otherwise the student taps the control,
+        // nothing changes, and taps it again.
+        renderAnswerChoices(data.answer_choices);
+    } catch (err) {
+        console.error('Could not switch answer mode', err);
+    } finally {
+        easyModeBusy = false;
+        if (btn) btn.disabled = false;
+        updateEasyModeLabels();
+    }
+}
+
 function renderAnswerChoices(choices, opts) {
     const box = document.getElementById('answer-choices');
     if (!box) return;
@@ -2711,6 +2857,7 @@ function renderAnswerChoices(choices, opts) {
     if (!letters.length) {
         box.style.display = 'none';
         if (typing && !(opts && opts.preserveInput)) typing.style.display = '';
+        updateEasyModeLabels();
         return;
     }
     if (typing) typing.style.display = 'none';
@@ -2743,6 +2890,7 @@ function renderAnswerChoices(choices, opts) {
         box.appendChild(btn);
     });
     box.style.display = 'flex';
+    updateEasyModeLabels();
 }
 
 async function sendMessage() {

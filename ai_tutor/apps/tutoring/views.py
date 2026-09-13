@@ -707,10 +707,22 @@ def chat_tutor_interface(request, lesson_id):
     if has_session:
         allow_duration_picker = False
 
+    # Easy mode = tap A-D instead of typing. Normal mode is the default.
+    #
+    # easy_mode_locked is the deployment asking not to be offered a switch:
+    # where the tutor cannot grade prose the buttons are the only surface that
+    # works, so a control that claimed to turn them off would be lying. False
+    # on the hosted platform, where the choice is genuinely the student's.
+    from ai_tutor.apps.tutoring.simple_tutor.engine import easy_mode_is_forced
+    student_profile = getattr(request.user, 'student_profile', None)
+
     return render(request, 'tutoring/chat_tutor.html', {
         "lesson": lesson,
         "is_math_lesson": is_math_lesson,
         "allow_duration_picker": allow_duration_picker,
+        "easy_mode_on": bool(
+            getattr(student_profile, 'prefers_answer_picker', False)),
+        "easy_mode_locked": easy_mode_is_forced(request.user),
     })
 
 
@@ -2099,6 +2111,57 @@ def speak_text(request):
         return JsonResponse({"error": "TTS unavailable"}, status=503)
 
     return HttpResponse(audio_bytes, content_type=content_type)
+
+
+# =============================================================================
+# ANSWER SURFACE — easy mode (tap A-D) vs normal mode (type)
+# =============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def set_answer_surface(request, session_id):
+    """Switch this student between easy mode and normal mode.
+
+    Easy mode swaps the typing box for the A-D buttons whenever the tutor asks
+    a multiple-choice question. Normal mode is the default and types.
+
+    The preference is stored on the student, not the session: a student who
+    wants the buttons wants them in every lesson, and asking again at the top
+    of each one is the same question with the same answer.
+
+    The response carries the CURRENT question's buttons so the switch lands on
+    the question already on screen rather than at the start of the next turn.
+    ``answer_choices`` is None whenever there is nothing to tap — the live
+    question is not multiple choice, or there is no live question at all — and
+    the page keeps the typing box, which is the only honest thing to show.
+
+    NOT csrf_exempt. The neighbouring chat endpoints are, for reasons that
+    predate window.csrfToken(); a new endpoint that writes a profile row has no
+    reason to inherit that.
+    """
+    session = get_object_or_404(
+        TutorSession, id=session_id, student=request.user)
+
+    try:
+        mode = (json.loads(request.body or '{}').get('mode') or '').strip()
+    except (ValueError, TypeError):
+        mode = ''
+    if mode not in ('easy', 'normal'):
+        return JsonResponse({'error': 'mode must be "easy" or "normal"'},
+                            status=400)
+
+    from ai_tutor.apps.accounts.models import StudentProfile
+    profile, _ = StudentProfile.objects.get_or_create(user=request.user)
+    profile.prefers_answer_picker = (mode == 'easy')
+    profile.save(update_fields=['prefers_answer_picker'])
+
+    from ai_tutor.apps.tutoring.simple_tutor.engine import (
+        _answer_choices_payload,
+    )
+    return JsonResponse({
+        'mode': mode,
+        'answer_choices': _answer_choices_payload(session),
+    })
 
 
 # =============================================================================

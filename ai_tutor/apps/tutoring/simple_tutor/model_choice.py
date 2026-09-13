@@ -149,8 +149,19 @@ def resolve_for_session(session):
     Never raises: a failure here must not take down a tutoring turn, so the
     caller falls back to the normal resolution path.
     """
+    return resolve_for_student(
+        getattr(getattr(session, 'student', None), 'student_profile', None))
+
+
+def resolve_for_student(profile):
+    """The same resolution, for a student who has no session yet.
+
+    The chat page has to know which tutor a student will get BEFORE the session
+    exists — it decides whether the easy/normal switch is a real choice or a
+    control that does nothing, and that is settled by the model. Splitting it
+    out keeps one copy of the rules.
+    """
     try:
-        profile = getattr(getattr(session, 'student', None), 'student_profile', None)
         mode = getattr(profile, 'tutor_mode', None)
         if not mode:
             return None

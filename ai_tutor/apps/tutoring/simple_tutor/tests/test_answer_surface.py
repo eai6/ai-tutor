@@ -915,3 +915,102 @@ class LocalProfilesDeclareTheirSurfaceTest(DjangoTestCase):
             'removes the buttons.'
         ))
 
+
+
+class EasyModeOptInTest(UsesAnswerPickerTest):
+    """Easy mode — the student asking for the buttons on a cloud tutor.
+
+    Typing is the default and stays the default. But "type your answer" is not
+    a neutral cost for every student: on a shared phone, or in a second
+    language, writing the sentence is the work rather than the geography. Easy
+    mode lets them tap instead, and normal mode gives the text box back.
+
+    The two rules that make it safe are asserted here rather than described:
+    the preference can only ADD buttons (a model that cannot grade prose keeps
+    them whatever the student says), and the prompt and the buttons still agree
+    in every combination — the invariant the whole predicate exists for.
+    """
+
+    def _opt_in(self, session, on=True):
+        from ai_tutor.apps.accounts.models import StudentProfile
+        StudentProfile.objects.update_or_create(
+            user=session.student,
+            defaults={'prefers_answer_picker': on},
+        )
+        session.refresh_from_db()
+        return session
+
+    def test_a_cloud_student_who_opts_in_gets_buttons(self):
+        s = self._opt_in(self._setup(provider='anthropic'))
+        slot = self._live_mcq(s)
+        self.assertTrue(_uses_answer_picker(s, slot))
+        self.assertIsNotNone(_answer_choices_payload(s))
+
+    def test_normal_mode_is_the_default(self):
+        """No profile row, or a row that never asked: the text box stays."""
+        s = self._setup(provider='anthropic')
+        slot = self._live_mcq(s)
+        self.assertFalse(_uses_answer_picker(s, slot))
+        self._opt_in(s, on=False)
+        self.assertFalse(_uses_answer_picker(s, slot))
+
+    def test_opting_out_cannot_take_the_buttons_off_a_local_model(self):
+        """The floor. The local 4B cannot read "northing" as option B — device
+        session 29 — so on that model the buttons are not a convenience, they
+        are the only surface that grades. The chat page hides the switch there
+        rather than offering one that does nothing."""
+        s = self._opt_in(self._setup(provider='local_ollama'), on=False)
+        slot = self._live_mcq(s)
+        self.assertTrue(_uses_answer_picker(s, slot))
+
+    def test_easy_mode_still_needs_something_to_tap(self):
+        """A short-answer question has no options, so easy mode shows the text
+        box — which is the only honest thing to show."""
+        s = self._opt_in(self._setup(provider='anthropic'))
+        self.assertFalse(
+            _uses_answer_picker(s, self._live_mcq(s, qtype='short_answer')))
+        InFlightQuestion.objects.filter(session=s).delete()
+        self.assertFalse(
+            _uses_answer_picker(s, self._live_mcq(s, options=['only one'])))
+        InFlightQuestion.objects.filter(session=s).delete()
+        self.assertFalse(_uses_answer_picker(s, None))
+
+    def test_prompt_and_buttons_still_agree_with_easy_mode_on(self):
+        for provider in ('local_ollama', 'anthropic'):
+            for qtype in ('mcq', 'short_answer'):
+                for options in (['a', 'b', 'c', 'd'], ['a'], []):
+                    s = self._opt_in(self._setup(provider=provider))
+                    slot = self._live_mcq(s, qtype=qtype, options=options)
+                    self.assertEqual(
+                        _uses_answer_picker(s, slot),
+                        _answer_choices_payload(s) is not None,
+                        f'easy mode {provider}/{qtype}/{len(options)}: the '
+                        f'tutor and the student disagree about the surface',
+                    )
+
+    def test_the_switch_is_offered_online_and_not_offline(self):
+        """``easy_mode_is_forced`` is what the chat page asks before a session
+        exists. It must be False wherever the choice is real."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import (
+            easy_mode_is_forced,
+        )
+        from ai_tutor.apps.accounts.models import StudentProfile
+
+        cloud = self._setup(provider='anthropic')
+        StudentProfile.objects.create(user=cloud.student, tutor_mode='auto')
+        self.assertFalse(easy_mode_is_forced(cloud.student))
+
+        local = self._setup(provider='local_ollama')
+        StudentProfile.objects.create(user=local.student, tutor_mode='offline')
+        self.assertTrue(easy_mode_is_forced(local.student))
+
+    def test_a_student_with_no_profile_does_not_break_the_turn(self):
+        """Staff previewing a lesson, and imports that never made a profile
+        row. Losing the turn to an AttributeError would be a bad trade for a
+        preference they never set."""
+        from ai_tutor.apps.tutoring.simple_tutor.engine import (
+            _student_prefers_picker, easy_mode_is_forced,
+        )
+        s = self._setup(provider='anthropic')
+        self.assertFalse(_student_prefers_picker(s))
+        self.assertFalse(easy_mode_is_forced(s.student))

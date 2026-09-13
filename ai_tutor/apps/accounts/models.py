@@ -319,6 +319,28 @@ class StudentProfile(models.Model):
         ),
     )
 
+    # Answer surface — whether this student wants the A-D buttons instead of
+    # the typing box on multiple-choice questions.
+    #
+    # A student preference and not a session one: a student who reaches for the
+    # buttons because typing on a shared phone is slow, or because writing in
+    # English is the hard part rather than the geography, wants them in every
+    # lesson. Asking again at the top of each one would be the same question
+    # with the same answer.
+    #
+    # It can only ADD the picker, never remove it. Some local models cannot
+    # read "northing" as option B and the buttons are the only surface that
+    # grades correctly there; engine._uses_answer_picker keeps that floor and
+    # the chat page hides the toggle on those deployments rather than offering
+    # a switch that does nothing.
+    prefers_answer_picker = models.BooleanField(
+        default=False,
+        help_text=(
+            "Show tappable A-D answer buttons instead of the typing box "
+            "whenever the tutor asks a multiple-choice question."
+        ),
+    )
+
     # WHICH offline tutor, when more than one is installed. Distinct from
     # tutor_mode, which chooses online-vs-offline: this only says which local
     # model the offline path uses.

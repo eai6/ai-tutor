@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/chat/<int:session_id>/review/', views.chat_start_review, name='chat_start_review'),
     path('api/chat/<int:session_id>/difficulty-signal/', views.chat_difficulty_signal, name='chat_difficulty_signal'),
     path('api/chat/<int:session_id>/answer-bank-question/', views.chat_answer_bank_question, name='chat_answer_bank_question'),
+    path('api/chat/<int:session_id>/answer-surface/', views.set_answer_surface, name='set_answer_surface'),
 
     # Group lessons — participant management
     path('api/chat/<int:session_id>/participants/', views.session_participants, name='session_participants'),

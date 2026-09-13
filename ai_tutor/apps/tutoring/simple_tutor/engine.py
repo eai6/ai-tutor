@@ -2041,6 +2041,40 @@ def _retrieve_kb(session, query_text: str) -> list[dict]:
         return []
 
 
+def _figure_media(tool_results) -> list[dict]:
+    """The figures a turn displayed, in the shape the chat page renders.
+
+    ``type`` is not decoration. ``addMessage()`` in chat_tutor.html loops the
+    media list and draws nothing for an entry whose ``type`` is not one of
+    image / diagram / chart / illustration, silently — so the payload that
+    used to go out here, ``[{'url': media_url}]``, produced an empty
+    ``<div class="message-media">`` and no picture, no artifact panel and no
+    console error. The legacy engine set the key (conversational_tutor.py:3727)
+    and figures stopped appearing when simple_tutor took over the turn path.
+
+    ``alt`` and ``caption`` were being dropped the same way. Both are already
+    on the tool result — the frontend reads ``m.alt``, so the tool's
+    ``alt_text`` is renamed here rather than at the call site.
+    """
+    out: list[dict] = []
+    for entry in tool_results or []:
+        if entry.get('tool') != 'request_figure':
+            continue
+        result = entry.get('result') or {}
+        if not result.get('displayed'):
+            continue
+        url = (result.get('url') or '').strip()
+        if not url:
+            continue
+        out.append({
+            'type': 'image',
+            'url': url,
+            'alt': result.get('alt_text') or '',
+            'caption': result.get('caption') or '',
+        })
+    return out
+
+
 def _build_figure_catalog(step) -> list[dict]:
     """Synthesise stable per-turn figure ids from LessonStep.media.images.
 
@@ -2065,12 +2099,18 @@ def _build_figure_catalog(step) -> list[dict]:
         url = (img.get('url') or '').strip()
         if not url:
             continue
+        # The documented shape says 'alt' (curriculum/models.py:475) and every
+        # row the generator has written says 'alt_text' — 400 of 400 sampled.
+        # Read both: the description is what the tutor chooses a figure by, and
+        # reading only 'alt' quietly made it the caption on every real lesson.
+        alt = (img.get('alt') or img.get('alt_text') or '').strip()
+        caption = (img.get('caption') or '').strip()
         catalog.append({
             'id': i + 1,
-            'description': (img.get('alt') or img.get('caption') or '').strip(),
+            'description': (img.get('description') or alt or caption).strip(),
             'url': url,
-            'alt_text': (img.get('alt') or '').strip(),
-            'caption': (img.get('caption') or '').strip(),
+            'alt_text': alt,
+            'caption': caption,
         })
     return catalog
 
@@ -3211,7 +3251,6 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
 
     # Extract is_correct from any record_answer verdict.
     is_correct = None
-    media_url = None
     for entry in out.get('tool_calls') or []:
         tool = entry.get('tool')
         result = entry.get('result') or {}
@@ -3221,8 +3260,7 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
                 is_correct = True
             elif verdict == 'incorrect':
                 is_correct = False
-        elif tool == 'request_figure' and result.get('displayed'):
-            media_url = result.get('url')
+    turn_media = _figure_media(out.get('tool_calls'))
 
     # Exit ticket transition: when all lesson steps are done, hand the
     # student off to the exit ticket instead of marking is_complete.
@@ -3354,7 +3392,7 @@ def respond_for_view(session, user_input: str, *, on_delta=None) -> dict:
     return {
         'message': out.get('content', ''),
         'phase': phase,
-        'media': [{'url': media_url}] if media_url else [],
+        'media': turn_media,
         'show_exit_ticket': show_exit_ticket,
         'exit_ticket': exit_ticket_payload,
         'is_complete': is_complete,
@@ -3839,8 +3877,90 @@ def _is_offline_session(session, cfg=None) -> bool:
         return False
 
 
+def _model_requires_picker(cfg) -> bool:
+    """Does this tutor NEED the buttons, whatever the student would prefer?
+
+    Per-model override beats the provider heuristic. The heuristic reads
+    "local_ollama" as "small model that cannot parse prose options", which was
+    true while every local arm was a 2B-8B. A local 27B does not need the
+    buttons, and forcing them on it measures a UI the deployment would not
+    ship. ModelProfile carries the other per-model knobs (num_ctx,
+    ollama_think); this belongs beside them.
+
+    ``cfg`` of None means nothing is configured, which is not a reason to take
+    the student's typing box away.
+    """
+    from ai_tutor.apps.tutoring.simple_tutor.model_choice import LOCAL_PROVIDER
+
+    if cfg is None:
+        from ai_tutor.apps.llm.models import ModelConfig
+        cfg = ModelConfig.get_for('tutoring')
+    if cfg is None:
+        return False
+
+    from ai_tutor.apps.llm.model_profiles import get_model_profile
+    profile = get_model_profile(
+        f"{getattr(cfg, 'provider', '')}/{getattr(cfg, 'model_name', '')}")
+    surface = getattr(profile, 'answer_surface', None) if profile else None
+    if surface:
+        return surface == 'picker'
+
+    return str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
+
+
+def easy_mode_is_forced(user) -> bool:
+    """True when this student's tutor needs the buttons regardless.
+
+    The chat page asks this BEFORE a session exists, to decide whether to offer
+    the easy/normal switch at all. On a deployment whose tutor cannot grade
+    prose the switch is not a choice — turning it "off" would leave the buttons
+    up — so the page shows no control rather than one that lies.
+
+    On the hosted platform this is False: there is no local model, so easy mode
+    is the student's to turn on and off.
+    """
+    try:
+        from ai_tutor.apps.tutoring.simple_tutor.model_choice import (
+            resolve_for_student,
+        )
+        profile = getattr(user, 'student_profile', None)
+        return _model_requires_picker(resolve_for_student(profile))
+    except Exception:                              # noqa: BLE001
+        logger.warning("easy-mode lock check failed", exc_info=True)
+        return False
+
+
+def _student_prefers_picker(session) -> bool:
+    """Has the student asked for the A-D buttons in their own settings?
+
+    Read off the session OWNER's profile. A paired session has one screen, so
+    there is one answer surface on it, and the owner is who the platform can
+    name; a joiner who wants the buttons sets the preference and gets them in
+    their own sessions.
+
+    Fail-soft to False — a student with no StudentProfile row (staff accounts
+    previewing a lesson, an import that never created one) keeps the typing box
+    they have today rather than losing the turn to an AttributeError.
+    """
+    try:
+        profile = getattr(getattr(session, 'student', None),
+                          'student_profile', None)
+        return bool(getattr(profile, 'prefers_answer_picker', False))
+    except Exception:                              # noqa: BLE001
+        logger.warning("answer picker preference read failed", exc_info=True)
+        return False
+
+
 def _uses_answer_picker(session, slot, cfg=None) -> bool:
     """True when the A-D buttons are the student's ONLY way to answer ``slot``.
+
+    Two ways to get here. The student asked for them
+    (``StudentProfile.prefers_answer_picker``, set from the chat page), or the
+    model needs them — some local models cannot read "northing" as option B, so
+    there the buttons are not a convenience but the only surface that grades.
+    The second is a FLOOR: a student on such a model who switches the
+    preference off still gets buttons, which is why the chat page hides the
+    toggle there instead of offering a switch that does nothing.
 
     Two callers, and they must never disagree: ``_answer_choices_payload``
     decides whether the buttons render, and the system prompt's
@@ -3856,35 +3976,26 @@ def _uses_answer_picker(session, slot, cfg=None) -> bool:
     """
     try:
         from ai_tutor.apps.tutoring.simple_tutor.model_choice import (
-            LOCAL_PROVIDER, resolve_for_session,
+            resolve_for_session,
         )
 
         if slot is None or (slot.question_type or '').strip().lower() != 'mcq':
             return False
         if len([o for o in (slot.options or []) if str(o).strip()]) < 2:
             return False
+
+        # The student's own choice, checked before the model is resolved: it
+        # needs no model lookup, and on the hosted platform resolve_for_session
+        # is the expensive half of this function.
+        #
+        # It can only turn the picker ON. Switching it off is a request to type,
+        # which the checks below may still refuse — see the model floor there.
+        if _student_prefers_picker(session):
+            return True
+
         if cfg is None:
             cfg = resolve_for_session(session)
-        if cfg is None:
-            from ai_tutor.apps.llm.models import ModelConfig
-            cfg = ModelConfig.get_for('tutoring')
-        if cfg is None:
-            return False
-
-        # Per-model override beats the provider heuristic. The heuristic reads
-        # "local_ollama" as "small model that cannot parse prose options", which
-        # was true while every local arm was a 2B-8B. A local 27B does not need
-        # the buttons, and forcing them on it measures a UI the deployment would
-        # not ship. ModelProfile carries the other per-model knobs (num_ctx,
-        # ollama_think); this belongs beside them.
-        from ai_tutor.apps.llm.model_profiles import get_model_profile
-        profile = get_model_profile(
-            f"{getattr(cfg, 'provider', '')}/{getattr(cfg, 'model_name', '')}")
-        surface = getattr(profile, 'answer_surface', None) if profile else None
-        if surface:
-            return surface == 'picker'
-
-        return str(getattr(cfg, 'provider', '')) == LOCAL_PROVIDER
+        return _model_requires_picker(cfg)
     except Exception:                              # noqa: BLE001
         # Free text is the safe default on both sides: the student keeps a
         # way to reply, and the tutor keeps the ladder it has always had.
@@ -3895,11 +4006,15 @@ def _uses_answer_picker(session, slot, cfg=None) -> bool:
 def _answer_choices_payload(session) -> dict | None:
     """The live MCQ's options, when the student should CLICK rather than type.
 
-    Returned only for a session running a LOCAL model. Typing is fine online:
-    a cloud tutor reads "northing" as option B without difficulty. The local 4B
+    Returned when the student asked for the buttons, or when the session's
+    model needs them. Typing works fine online for a student who can type: a
+    cloud tutor reads "northing" as option B without difficulty. The local 4B
     does not, and the failure is expensive — device session 29, the student
     typed "northing" against "B) The northing or vertical distance", nothing
-    graded it, and the question was simply asked again.
+    graded it, and the question was simply asked again. The opt-in exists for
+    the other half of that: a student on a shared phone, or one whose English
+    is the hard part rather than the geography, for whom typing the answer is
+    the cost even when the model could read it.
 
     Offline is already MCQ-only (TUTORING_QUESTION_TYPES defaults to 'mcq'), so
     a letter picker covers every question the offline tutor can ask. Clicking a
@@ -3907,8 +4022,9 @@ def _answer_choices_payload(session) -> dict | None:
     no model call and no parsing — the whole class of "student phrased it
     differently" failures stops existing rather than being handled.
 
-    None when: no live question, not an MCQ, or the session is on a cloud
-    model. The frontend renders nothing in that case and typing is unchanged.
+    None when: no live question, not an MCQ, or neither the student nor the
+    model asked for buttons. The frontend renders nothing in that case and
+    typing is unchanged.
     """
     try:
         from ai_tutor.apps.tutoring.models import InFlightQuestion
@@ -4049,6 +4165,17 @@ def _persist_tutor_turn(session, text_reply: str, step, tool_results: list):
         for entry in tool_results
     ]
     metadata: dict = {'tool_calls': persistable}
+
+    # Figures the turn showed, in the same shape the live payload uses.
+    #
+    # views._build_session_history reads metadata['attached_media'] to redraw a
+    # turn on resume. Nothing here wrote it, so a figure appeared once and was
+    # gone the moment the student reloaded or came back to the lesson — which
+    # is exactly when they would want to look at it again. Written only when
+    # there is one, so a text turn's metadata keeps the shape it has today.
+    attached_media = _figure_media(tool_results)
+    if attached_media:
+        metadata['attached_media'] = attached_media
 
     # Surface the most recent grader verdict on the tutor turn's
     # judge_outputs['grader']. With the M11.3 tear-down the LLM provides
