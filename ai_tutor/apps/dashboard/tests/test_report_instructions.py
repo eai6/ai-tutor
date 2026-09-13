@@ -47,6 +47,27 @@ class TestItFailsSoft:
         monkeypatch.setattr(ModelConfig, 'get_for', staticmethod(lambda p: None))
         assert ri.generate(LESSON, GROUPS) == {}
 
+    def test_it_asks_for_the_tutoring_model(self, db, monkeypatch):
+        """Not a dedicated purpose. get_for falls back to
+        filter(is_active=True).first() when a purpose has no row — any active
+        config at all, which could be the image-generation model or a judge —
+        so an unseeded dedicated purpose picks a model by accident. Asking for
+        tutoring is explicit and needs no deploy step."""
+        from ai_tutor.apps.llm.models import ModelConfig
+        asked = []
+        monkeypatch.setattr(ModelConfig, 'get_for',
+                            staticmethod(lambda p: asked.append(p) or None))
+        ri.generate(LESSON, GROUPS)
+        assert asked == [ModelConfig.Purpose.TUTORING]
+
+    def test_no_temperature_is_sent(self):
+        """Opus 4.7 rejects the parameter outright, and since this follows
+        whatever the platform tutors with, the models it must satisfy are not
+        a fixed set."""
+        import inspect
+        src = inspect.getsource(ri._call_model)
+        assert 'temperature=' not in src
+
     def test_a_raising_client_returns_nothing(self, monkeypatch):
         def boom(*a, **kw):
             raise RuntimeError('provider down')

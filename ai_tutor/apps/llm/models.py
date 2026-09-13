@@ -125,13 +125,6 @@ class ModelConfig(models.Model):
         SKILL_EXTRACTION = 'skill_extraction', 'Skill Extraction'
         IMAGE_GENERATION = 'image_generation', 'Image Generation'
         HELP_ASSISTANT = 'help_assistant', 'In-app Help Assistant'
-        # Writes the per-band teacher instruction on the lesson session
-        # report from the deterministic band + weak-objective data. Short
-        # teacher-facing prose, once per distinct report state and cached,
-        # so a small fast model is the right choice. Absent config means
-        # the report renders its constant templates — see
-        # apps/dashboard/report_instructions.py.
-        TEACHER_REPORT = 'teacher_report', 'Teacher Report Instructions'
         # Post-response sanity checker (combined_judge: arithmetic +
         # factual + rule_compliance). Lower-cost / faster model than
         # tutoring on purpose — judge calls run after every tutor turn,

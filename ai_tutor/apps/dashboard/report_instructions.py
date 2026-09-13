@@ -25,6 +25,9 @@ Design notes, because the failure modes here are specific:
   timeout, a malformed response — the report renders the constant text it has
   always rendered. A teacher report that 500s because a model was slow would be
   a bad trade for better prose.
+* **It uses the tutoring model.** No dedicated purpose, no seed step. The job
+  is two sentences from numbers the platform has already worked out, and the
+  model that teaches these students is a reasonable one to describe them.
 * **Cached on the inputs, not the page.** The key is a hash of the bands, the
   counts and the objective lists, so the call happens once per distinct state
   of the report rather than once per page view.
@@ -262,9 +265,21 @@ def generate(lesson, groups, *, timeout: float = 12.0) -> dict[str, str]:
 def _call_model(lesson, groups, *, timeout: float) -> dict[str, str]:
     from ai_tutor.apps.llm.models import ModelConfig
 
-    config = ModelConfig.get_for(ModelConfig.Purpose.TEACHER_REPORT)
+    # Whatever the platform is already tutoring with.
+    #
+    # A dedicated purpose meant a seed command on every deploy, and without
+    # that row get_for falls back to `filter(is_active=True).first()` — any
+    # active config at all, which could be the image-generation model or a
+    # judge. Pinning to tutoring removes the setup step and makes the choice
+    # explicit rather than incidental.
+    #
+    # It also follows the deployment: the offline build tutors with a local
+    # model and writes these with the same one, which is correct there — a
+    # report that needs the cloud on a device that has no internet is not a
+    # report.
+    config = ModelConfig.get_for(ModelConfig.Purpose.TUTORING)
     if config is None:
-        logger.info("[ReportInstructions] no model configured — using templates")
+        logger.info("[ReportInstructions] no tutoring model — using templates")
         return {}
 
     from ai_tutor.apps.curriculum.content_judges._providers import (
@@ -284,7 +299,11 @@ def _call_model(lesson, groups, *, timeout: float) -> dict[str, str]:
         model=config.model_name,
         response_model=ReportInstructions,
         max_tokens=900,
-        temperature=0.2,
+        # No temperature. Opus 4.7 rejects the parameter outright — "
+        # `temperature` is deprecated for this model" — and since this now
+        # follows whatever the platform tutors with, the set of models it has
+        # to satisfy is not fixed. The provider default is right for two
+        # sentences of description anyway.
         timeout=timeout,
         messages=[
             {'role': 'system', 'content': system},
