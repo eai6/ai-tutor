@@ -292,6 +292,31 @@ class Lesson(models.Model):
     )
     order_index = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=False)
+
+    # Parked, not deleted.
+    #
+    # Replacing a course's lessons from a corrected syllabus cannot delete the
+    # old ones: TutorSession.lesson, StudentLessonProgress.lesson and
+    # ExitTicket.lesson all CASCADE, so a delete takes the transcripts, the
+    # mastery rows and the exit-ticket attempts with it. That is not
+    # hypothetical — the re-parse path used to call units.delete() and wiped a
+    # pilot's competency history.
+    #
+    # So a replaced lesson is retired instead: unpublished so no student can
+    # start it, filed away on the course page, and left whole so every record
+    # that points at it still resolves. Un-retiring is clearing this field.
+    #
+    # Deliberately NOT a manager-level filter. Student pages and transcripts
+    # must still find these rows; only the places that offer a lesson to work
+    # on exclude them.
+    retired_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text=(
+            "Set when a curriculum re-upload replaced this lesson. The row and "
+            "all student records are kept; the lesson is unpublished and "
+            "hidden from the course's lesson list."
+        ),
+    )
     content_status = models.CharField(
         max_length=20,
         choices=ContentStatus.choices,

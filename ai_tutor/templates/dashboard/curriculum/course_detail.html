@@ -314,12 +314,30 @@
 
             <p style="font-size: 0.8125rem; color: var(--gray-500); margin: 0.75rem 0 1rem;">
                 {% blocktrans trimmed %}
-                    Re-reads a syllabus and refreshes this course's units and lessons.
-                    Existing lessons are matched by title and updated in place — generated
-                    content, student mastery and transcripts are never overwritten or
-                    deleted.
+                    Re-reads a syllabus and updates this course's units and lessons,
+                    matching by title. Nothing is ever deleted — student mastery,
+                    transcripts and exit-ticket results survive either choice.
                 {% endblocktrans %}
             </p>
+
+            {% comment %}
+            Add vs replace. Replace parks — never deletes — any lesson the new
+            document no longer lists: TutorSession, StudentLessonProgress and
+            ExitTicket all CASCADE off Lesson, so deleting one would take the
+            student's transcripts and mastery with it.
+            {% endcomment %}
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; padding-bottom:0.85rem; border-bottom:1px solid var(--gray-200);">
+                <label style="display:flex; align-items:flex-start; gap:0.5rem; font-size:0.8125rem;">
+                    <input type="radio" name="reparse_mode_choice" value="add" checked style="margin-top:0.15rem;">
+                    <span><strong>{% trans "Add what is new" %}</strong><br>
+                    <span style="color:var(--gray-500);">{% trans "Lessons already here are kept and matched by title; the document only adds." %}</span></span>
+                </label>
+                <label style="display:flex; align-items:flex-start; gap:0.5rem; font-size:0.8125rem;">
+                    <input type="radio" name="reparse_mode_choice" value="replace" style="margin-top:0.15rem;">
+                    <span><strong>{% trans "Replace — this document is the lesson list" %}</strong><br>
+                    <span style="color:var(--gray-500);">{% trans "Lessons it no longer lists are parked: unpublished and filed away. Transcripts, mastery and exit-ticket results are kept." %}</span></span>
+                </label>
+            </div>
 
             <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">
                 <label style="display:flex; align-items:flex-start; gap:0.5rem; font-size:0.8125rem; {% if not course.curriculum_upload_id %}color:var(--gray-400);{% endif %}">
@@ -341,9 +359,10 @@
 
             <form method="post" action="{% url 'dashboard:course_edit' course.id %}" id="reparse-linked-form"
                   {% if not course.curriculum_upload_id %}hidden{% endif %}
-                  onsubmit="return confirm('{% trans "Re-read the linked curriculum document and refresh this course\'s lessons? Nothing existing is overwritten or deleted." %}');">
+                  onsubmit="return confirm('{% trans "Re-read the linked curriculum document and update this course\'s lessons? Nothing is deleted — in Replace mode, lessons the document drops are parked with their transcripts intact." %}');">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="reparse">
+                <input type="hidden" name="reparse_mode" value="add">
                 <input type="hidden" name="title" value="{{ course.title }}">
                 <input type="hidden" name="description" value="{{ course.description }}">
                 <input type="hidden" name="grade_level" value="{{ course.grade_level }}">
@@ -354,8 +373,9 @@
 
             <form method="post" action="{% url 'dashboard:course_reupload' course.id %}" id="reparse-upload-form"
                   enctype="multipart/form-data" {% if course.curriculum_upload_id %}hidden{% endif %}
-                  onsubmit="return confirm('{% trans "Read this document and add any new units and lessons to the course? Nothing existing is overwritten or deleted." %}');">
+                  onsubmit="return confirm('{% trans "Read this document and update the course's lessons? Nothing is deleted — in Replace mode, lessons the document drops are parked with their transcripts intact." %}');">
                 {% csrf_token %}
+                <input type="hidden" name="reparse_mode" value="add">
                 <div style="margin-bottom: 0.75rem;">
                     <input type="file" name="curriculum_file" accept=".pdf,.docx,.doc,.txt" required
                            class="form-control" style="font-size: 0.8125rem;">
@@ -378,6 +398,18 @@
                 </button>
             </form>
         </details>
+        <script nonce="{{ request.csp_nonce }}">
+        // One choice, two forms. The HTML `form=` attribute can only point at
+        // a single form, and both the linked-document and the upload path need
+        // to know whether this is an add or a replace.
+        document.querySelectorAll('input[name="reparse_mode_choice"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                document.querySelectorAll('input[type="hidden"][name="reparse_mode"]')
+                    .forEach(function (h) { h.value = radio.value; });
+            });
+        });
+        </script>
+
         {% endif %}
     </div>
 </div>

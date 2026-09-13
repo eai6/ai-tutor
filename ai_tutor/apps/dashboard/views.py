@@ -264,6 +264,46 @@ def class_choices(institution):
     return sorted(g for g in grades if g)
 
 
+def retire_lessons_not_in(course, structure, *, actor=None) -> int:
+    """Park every lesson of *course* the new curriculum document does not list.
+
+    Replace, without deleting. TutorSession.lesson, StudentLessonProgress.lesson
+    and ExitTicket.lesson all CASCADE, so removing a lesson removes the
+    transcripts, the mastery rows and the exit-ticket attempts with it — which
+    is what the re-parse path used to do before it was made additive, and it
+    cost a pilot its competency history.
+
+    A retired lesson is unpublished (no student can start it) and filed away on
+    the course page, and every record that points at it still resolves. The
+    student's page still shows the work they did on it.
+
+    Matching is by title, the same key the merge itself uses, so a lesson the
+    document still lists is left alone whatever else changed about it.
+    """
+    from django.utils import timezone
+
+    titles = set()
+    for unit in (structure or {}).get('units') or []:
+        for lesson in (unit or {}).get('lessons') or []:
+            title = (lesson or {}).get('title')
+            if title:
+                titles.add(' '.join(str(title).split()).strip().lower())
+    if not titles:
+        # An empty parse retires nothing. A document that yielded no lessons is
+        # a failed parse, not an instruction to empty the course.
+        return 0
+
+    retired = 0
+    for lesson in Lesson.objects.filter(unit__course=course, retired_at__isnull=True):
+        if ' '.join((lesson.title or '').split()).strip().lower() in titles:
+            continue
+        lesson.retired_at = timezone.now()
+        lesson.is_published = False
+        lesson.save(update_fields=['retired_at', 'is_published'])
+        retired += 1
+    return retired
+
+
 def get_scoped_object_or_404(model, institution, **kwargs):
     """get_object_or_404 with optional institution scoping.
 
@@ -1526,7 +1566,21 @@ def course_detail(request, course_id):
     is_platform_wide = course.institution is None
     course_read_only = is_platform_wide and not is_superadmin
     
-    units = course.units.prefetch_related('lessons', 'lessons__steps').order_by('grade_level', 'order_index')
+    # Retired lessons are parked, not deleted — kept out of the lesson table
+    # and counted separately below. Their rows stay whole so every transcript
+    # and mastery record still resolves; see Lesson.retired_at.
+    from django.db.models import Prefetch
+    units = (
+        course.units
+        .prefetch_related(
+            Prefetch('lessons',
+                     queryset=Lesson.objects.filter(retired_at__isnull=True)),
+            'lessons__steps',
+        )
+        .order_by('grade_level', 'order_index')
+    )
+    retired_count = Lesson.objects.filter(
+        unit__course=course, retired_at__isnull=False).count()
     
     # Get progress stats and content stats per lesson
     from ai_tutor.apps.tutoring.models import ExitTicket
@@ -1683,8 +1737,13 @@ def course_detail(request, course_id):
         }
         for ws in week_starts
     ]
+    # Parked lessons are excluded: this list is the weekly-assignment picker,
+    # and a lesson a replaced syllabus dropped is not one a teacher should be
+    # able to set as this week's work. It also feeds the default-duration mode
+    # below, which should describe the live course.
     course_lessons = list(
-        Lesson.objects.filter(unit__course=course).order_by('unit__order_index', 'order_index')
+        Lesson.objects.filter(unit__course=course, retired_at__isnull=True)
+        .order_by('unit__order_index', 'order_index')
     )
 
     # Pre-select the duration dropdown with the course's currently-dominant
@@ -1728,6 +1787,7 @@ def course_detail(request, course_id):
         'course': course,
         'course_grade': course_grade,
         'units': units,
+        'retired_count': retired_count,
         'lesson_stats': lesson_stats,
         'total_lessons': total_lessons,
         'lessons_with_content': lessons_with_content,
@@ -8064,7 +8124,11 @@ def course_edit(request, course_id):
         # Auto-completes after replan: the user already explicitly chose to
         # re-parse, so we don't ask them to "approve" the result on a separate
         # page. They'd just see an empty course in between and think it failed.
-        def _replan(upload_id, course_id):
+        # "Replace" means the document is the definitive lesson list: anything
+        # it no longer names gets parked. Default stays additive.
+        replace_mode = request.POST.get('reparse_mode') == 'replace'
+
+        def _replan(upload_id, course_id, replace=False):
             import django.db
             django.db.connections.close_all()
             try:
@@ -8109,6 +8173,20 @@ def course_edit(request, course_id):
                 up.add_log("🛠️ Re-creating units & lessons from new structure...")
                 up.save()
                 complete_curriculum_upload(up.id)
+
+                if replace:
+                    from ai_tutor.apps.curriculum.models import Course as _Course
+                    _course = _Course.objects.filter(id=course_id).first()
+                    if _course is not None:
+                        n = retire_lessons_not_in(_course, structure)
+                        up.add_log(
+                            f"🗄️ Parked {n} lesson(s) the new document no longer "
+                            f"lists. Their transcripts and mastery records are kept."
+                        )
+                        up.save()
+                        print(f"[Reparse] retired {n} lessons not in the new document",
+                              flush=True)
+
                 print(f"[Reparse] Done: {units_count} units, {lessons_count} lessons (auto-completed)", flush=True)
 
             except Exception as e:
@@ -8123,12 +8201,15 @@ def course_edit(request, course_id):
                 except Exception:
                     pass
 
-        run_async(_replan, upload.id, course.id)
+        run_async(_replan, upload.id, course.id, replace=replace_mode)
         messages.success(
             request,
-            "Re-parsing the curriculum document. Existing lessons upsert "
-            "by title (mastery + transcripts preserved). Refresh in ~1 "
-            "minute to see the result.",
+            "Re-parsing the curriculum document. "
+            + ("Lessons the new document no longer lists will be parked — "
+               "their transcripts and mastery records are kept. "
+               if replace_mode else
+               "Existing lessons upsert by title. ")
+            + "Refresh in ~1 minute to see the result.",
         )
         return redirect('dashboard:course_detail', course_id=course.id)
 
@@ -8221,13 +8302,33 @@ def course_reupload(request, course_id):
         course.curriculum_upload = upload
         course.save(update_fields=['curriculum_upload', 'updated_at'])
 
-    def _reupload_job(upload_id):
+    # Same choice as the linked-document path: replace means the document is
+    # the definitive lesson list, and anything it drops is parked rather than
+    # deleted.
+    replace_mode = request.POST.get('reparse_mode') == 'replace'
+
+    def _reupload_job(upload_id, course_id, replace=False):
         import django.db
         django.db.connections.close_all()
         try:
             from ai_tutor.apps.curriculum.curriculum_parser import process_curriculum_upload
             # skip_review=True → parse + auto-complete via the additive writer.
             process_curriculum_upload(upload_id, skip_review=True)
+
+            if replace:
+                from ai_tutor.apps.dashboard.models import CurriculumUpload as _CU
+                from ai_tutor.apps.curriculum.models import Course as _Course
+                up = _CU.objects.get(id=upload_id)
+                _course = _Course.objects.filter(id=course_id).first()
+                if _course is not None:
+                    n = retire_lessons_not_in(_course, up.parsed_data)
+                    up.add_log(
+                        f"🗄️ Parked {n} lesson(s) the new document no longer "
+                        f"lists. Their transcripts and mastery records are kept."
+                    )
+                    up.save()
+                    print(f"[Reupload] retired {n} lessons", flush=True)
+
             print(f"[Reupload] Done for upload {upload_id}", flush=True)
         except Exception as e:
             print(f"[Reupload] FAILED: {e}", flush=True)
@@ -8242,7 +8343,7 @@ def course_reupload(request, course_id):
             except Exception:
                 pass
 
-    run_async(_reupload_job, upload.id)
+    run_async(_reupload_job, upload.id, course.id, replace=replace_mode)
     range_msg = ""
     if first_page or last_page:
         range_msg = f" (pages {first_page or 'start'}–{last_page or 'end'})"
