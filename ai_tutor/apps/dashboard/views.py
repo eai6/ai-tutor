@@ -204,7 +204,14 @@ def _inherited_materials_summary(course):
                 'hand_attached': hand_attached,
             }
         return None
-    course_grades = set(course.grade_levels or [])
+    # Both sides normalised to configured grade CODES before intersecting.
+    # A platform-wide course created from a syllabus carries whatever label
+    # the parser read ('Secondary 3'); the tick-boxes write the code ('S3').
+    # Comparing the raw strings meant ticking a grade made the shared
+    # materials vanish — the two spellings never intersect. Built once here
+    # rather than per course: get_grade_choices() is a query.
+    vocab = PlatformConfig.grade_vocabulary()
+    course_grades = PlatformConfig.normalize_grades(course.grade_levels, vocab)
 
     from ai_tutor.apps.curriculum.models import Course as CourseModel
     from ai_tutor.apps.dashboard.models import TeachingMaterialUpload
@@ -216,7 +223,7 @@ def _inherited_materials_summary(course):
 
     matching = []
     for pc in platform_courses:
-        pc_grades = set(pc.grade_levels or [])
+        pc_grades = PlatformConfig.normalize_grades(pc.grade_levels, vocab)
         if not course_grades or not pc_grades or (course_grades & pc_grades):
             matching.append(pc)
 
@@ -1901,21 +1908,43 @@ def course_detail(request, course_id):
         # it through a save, so editing the title does not silently drop a
         # grade nobody can re-tick.
         'course_grade_off_list': [
+            # Compared through the vocabulary, not against the codes alone:
+            # 'Secondary 3' IS S3 written as its label, it matches shared
+            # materials fine, and flagging it as unmatchable would be a lie.
+            # Only a token the platform cannot resolve at all is off-list.
             g for g in course.grade_levels
-            if g not in {c[0].strip() for c in PlatformConfig.get_grade_choices()}
+            if PlatformConfig.normalize_grades([g])
+            - {c[0].strip() for c in PlatformConfig.get_grade_choices()}
         ],
         # R2.3 — inherited materials from platform-wide courses matching
         # this course's subject_code + grade_levels. Surfaced as a badge
         # so teachers see they're not orphaned when they didn't upload
         # textbooks themselves. Computed only when not platform-wide.
         'inherited_materials': _inherited_materials_summary(course) if not is_platform_wide else None,
-        # Everything attachable by hand, plus what is already attached, for
-        # the picker. Platform-wide only — see course_shared_materials.
+        # Everything attachable by hand, for the picker.
+        #
+        # "Platform-wide" has to mean the same thing here as it does to the
+        # inheritance rule, or the picker offers a different set from the one
+        # being shared. The rule joins ONLY on course_id, so a material sitting
+        # on a platform-wide course is already shared to every school
+        # regardless of the institution stamped on the material itself. Two
+        # ways in, then:
+        #   institution IS NULL            → uploaded as platform-wide
+        #   on a course with no institution → already shared by the rule
+        #
+        # `course__isnull=False` is load-bearing on the second: without it,
+        # `course__institution__isnull=True` also matches a material with NO
+        # course at all, which would offer one school's private material to
+        # another. Tested.
         'attachable_materials': (
             [] if is_platform_wide else list(
                 TeachingMaterialUpload.objects
-                .filter(institution__isnull=True)
+                .filter(
+                    Q(institution__isnull=True)
+                    | Q(course__isnull=False, course__institution__isnull=True)
+                )
                 .select_related('course')
+                .distinct()
                 .order_by('subject_name', 'title')[:200]
             )
         ),
@@ -8143,8 +8172,10 @@ def course_shared_materials(request, course_id):
     # Platform-wide only, and re-read from the DB rather than trusting the
     # post: an id for another school's material simply will not be found.
     allowed = TeachingMaterialUpload.objects.filter(
-        institution__isnull=True, id__in=posted_ids,
-    )
+        Q(institution__isnull=True)
+        | Q(course__isnull=False, course__institution__isnull=True),
+        id__in=posted_ids,
+    ).distinct()
     course.shared_materials.set(allowed)
 
     n = allowed.count()

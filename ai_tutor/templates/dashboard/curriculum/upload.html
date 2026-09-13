@@ -335,8 +335,10 @@
                     until the course existed and somebody noticed the badge
                     was missing.
                     {% endcomment %}
-                    <div id="inheritance-preview" hidden
-                         style="margin-top:0.625rem;font-size:0.8125rem;border-radius:6px;padding:0.6rem 0.8rem;line-height:1.45;"></div>
+                    <div id="inheritance-preview"
+                         style="margin-top:0.625rem;font-size:0.8125rem;border-radius:6px;padding:0.6rem 0.8rem;line-height:1.45;background:#F8FAFC;border:1px solid var(--gray-200);color:var(--gray-600);">
+                        {% trans "Pick a subject above to see which platform-wide materials this course will inherit." %}
+                    </div>
                 </div>
 
                 <!-- Page range — scope a single grade out of a multi-grade PDF -->
@@ -568,11 +570,21 @@
                       'for this subject, so this course starts with only what you upload to it.';
             }
             box.innerHTML = msg;
-            box.hidden = false;
+        }
+
+        function neutral(text) {
+            box.style.background = '#F8FAFC';
+            box.style.border = '1px solid var(--gray-200)';
+            box.style.color = 'var(--gray-600)';
+            box.textContent = text;
         }
 
         function refresh() {
-            if (!subject.value) { box.hidden = true; return; }
+            if (!subject.value) {
+                neutral('Pick a subject above to see which platform-wide ' +
+                        'materials this course will inherit.');
+                return;
+            }
             const params = new URLSearchParams();
             params.set('subject_code', subject.value);
             document.querySelectorAll('input[name="grade_level"]:checked')
@@ -580,8 +592,19 @@
             const mine = ++seq;
             fetch(url + '?' + params.toString(), {headers: {'Accept': 'application/json'}})
                 .then(r => r.ok ? r.json() : null)
-                .then(d => { if (d && d.ok && mine === seq) render(d); })
-                .catch(() => { /* preview is optional — never block the upload */ });
+                .then(d => {
+                    if (mine !== seq) return;          // a later change won
+                    if (d && d.ok) { render(d); }
+                    else { neutral('Could not check the shared library just now.'); }
+                })
+                .catch(() => {
+                    // Never block the upload over a preview — but never go
+                    // silent either. Silence is what this feature exists to
+                    // remove, and it reads as "the feature is not deployed".
+                    if (mine === seq) {
+                        neutral('Could not check the shared library just now.');
+                    }
+                });
         }
 
         subject.addEventListener('change', refresh);

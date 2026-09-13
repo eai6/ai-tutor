@@ -571,7 +571,7 @@ endpoint — NOT part of the Edit Course form, which the re-parse button also
 submits with a subset of fields; a checkbox list there would arrive empty on
 every re-parse and silently detach everything.
 {% endcomment %}
-{% if can_edit_content and attachable_materials %}
+{% if can_edit_content %}
 <details class="card" style="margin-bottom:1.5rem;">
     <summary style="cursor:pointer;padding:1rem 1.25rem;font-weight:600;display:flex;align-items:center;gap:0.5rem;">
         📎 {% trans "Attach platform-wide materials by hand" %}
@@ -581,6 +581,17 @@ every re-parse and silently detach everything.
         <p style="font-size:0.8125rem;color:var(--gray-500);margin-top:0;">
             {% trans "These are added on top of whatever this course already inherits automatically by subject and grade — attaching by hand can only add, never remove." %}
         </p>
+        {% if not attachable_materials %}
+        {% comment %}
+        Say it rather than hiding the panel. An empty picker rendered as an
+        absent section, which is the same silent-failure this whole feature
+        exists to remove — "I am not seeing it" is then indistinguishable from
+        a broken deploy.
+        {% endcomment %}
+        <p style="font-size:0.8125rem;color:var(--gray-600);background:#F8FAFC;border:1px solid var(--gray-200);border-radius:6px;padding:0.75rem 0.9rem;">
+            {% trans "There are no platform-wide materials to attach yet. A material is attachable when it was uploaded platform-wide, or when it sits on a platform-wide course — upload one as a super-admin and it appears here." %}
+        </p>
+        {% else %}
         <form method="post" action="{% url 'dashboard:course_shared_materials' course.id %}">
             {% csrf_token %}
             <div style="max-height:22rem;overflow-y:auto;border:1px solid var(--gray-200);border-radius:6px;padding:0.5rem;">
@@ -601,6 +612,7 @@ every re-parse and silently detach everything.
                 {% trans "Save attached materials" %}
             </button>
         </form>
+        {% endif %}
     </div>
 </details>
 {% endif %}

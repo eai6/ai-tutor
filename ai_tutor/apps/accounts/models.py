@@ -476,6 +476,52 @@ class PlatformConfig(models.Model):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
+    @classmethod
+    def grade_vocabulary(cls) -> dict:
+        """Every way of writing a grade → its canonical CODE.
+
+        'S3' and 'Secondary 3' are one grade written two ways — the code and
+        its label, both defined right here in `grades`. Which one gets stored
+        depends on who wrote it: the upload form posts codes, the curriculum
+        parser writes whatever label the document used. So the two sides of a
+        material-sharing match could be spelled differently and never
+        intersect, and a teacher ticking a grade would watch the shared
+        materials disappear.
+
+        Returns a lookup, not a guess. This is an exact match against the
+        platform's own vocabulary — the opposite of the title-keyword
+        heuristics CLAUDE.md rules out.
+
+        One query. Callers matching in a loop should call this ONCE and pass
+        the result to `normalize_grades`, because `load()` is a get_or_create.
+        """
+        vocab = {}
+        for code, label in cls.get_grade_choices():
+            code = (code or '').strip()
+            if not code:
+                continue
+            vocab[code.casefold()] = code
+            if label:
+                vocab[str(label).strip().casefold()] = code
+        return vocab
+
+    @classmethod
+    def normalize_grades(cls, tokens, vocab=None) -> set:
+        """Map grade tokens onto configured codes, keeping unknown ones as-is.
+
+        An unrecognised token is preserved rather than dropped: it still has
+        to match its own spelling on the other side, which is the pre-existing
+        behaviour for a grade the platform does not define.
+        """
+        if vocab is None:
+            vocab = cls.grade_vocabulary()
+        out = set()
+        for t in (tokens or []):
+            t = (t or '').strip()
+            if t:
+                out.add(vocab.get(t.casefold(), t))
+        return out
+
     def categorize_student(self, pct_achieved: float, exit_time_minutes: float = None) -> dict:
         """Categorize a student based on % of enabling objectives achieved.
 

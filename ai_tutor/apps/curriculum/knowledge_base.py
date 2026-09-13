@@ -1490,9 +1490,16 @@ class CurriculumKnowledgeBase:
         with the supplied course. Empty set when course has no
         subject_code, or no matching platform-wide course exists.
         """
+        from ai_tutor.apps.accounts.models import PlatformConfig
+
         try:
             subject_code = getattr(course, 'subject_code', '') or ''
-            course_grades = set(getattr(course, 'grade_levels', None) or [])
+            # Normalised to configured codes on both sides — see
+            # PlatformConfig.grade_vocabulary. 'Secondary 3' and 'S3' are one
+            # grade, and comparing the raw strings silently shared nothing.
+            vocab = PlatformConfig.grade_vocabulary()
+            course_grades = PlatformConfig.normalize_grades(
+                getattr(course, 'grade_levels', None), vocab)
             if not subject_code:
                 # No rule match is possible, but a hand-attached material
                 # still counts — this is the likeliest course to have one.
@@ -1514,7 +1521,7 @@ class CurriculumKnowledgeBase:
         # same subject_code (don't over-constrain).
         matching_course_ids = []
         for gc in global_courses:
-            gc_grades = set(gc.grade_levels or [])
+            gc_grades = PlatformConfig.normalize_grades(gc.grade_levels, vocab)
             if not course_grades or not gc_grades or (course_grades & gc_grades):
                 matching_course_ids.append(gc.id)
 
