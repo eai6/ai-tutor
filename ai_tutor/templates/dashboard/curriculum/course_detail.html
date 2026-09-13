@@ -716,9 +716,9 @@
             {% if not current_lesson_duration %}
             <option value="" disabled selected>— pick a duration —</option>
             {% endif %}
-            <option value="15" {% if current_lesson_duration == 15 %}selected{% endif %}>15 min · 3 steps</option>
-            <option value="20" {% if current_lesson_duration == 20 %}selected{% endif %}>20 min · 4 steps</option>
-            <option value="25" {% if current_lesson_duration == 25 %}selected{% endif %}>25 min · 5 steps</option>
+            <option value="15" {% if current_lesson_duration == 15 %}selected{% endif %}>15 min</option>
+            <option value="20" {% if current_lesson_duration == 20 %}selected{% endif %}>20 min</option>
+            <option value="25" {% if current_lesson_duration == 25 %}selected{% endif %}>25 min</option>
         </select>
         <label style="font-size:0.78rem; color:#065f46; display:flex; align-items:center; gap:0.3rem; cursor:pointer;" title="When unchecked, the chat-page picker is hidden and every session uses the default duration.">
             <input type="checkbox" name="allow_student_override" value="1" {% if course.allow_student_duration_override %}checked{% endif %} style="accent-color:#059669;">
