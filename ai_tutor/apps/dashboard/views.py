@@ -2580,6 +2580,11 @@ def class_detail(request, grade):
         'course_stats': course_stats,
         'recent_activity': recent_activity,
         'inactive_students': inactive_students,
+        # The count is what "This week" shows. Naming 357 students there is
+        # not a prompt to act, it is a wall — and it buries the lessons, which
+        # is what the week is actually about. The names stay one tab away,
+        # beside the date that explains them.
+        'quiet_count': len(inactive_students),
         'quiet_after_days': QUIET_AFTER_DAYS,
         # From the shared helper, so this page and the classes list show the
         # same numbers for the same class.

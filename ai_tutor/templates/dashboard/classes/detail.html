@@ -22,6 +22,18 @@
             <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% trans "Active this week" %}</div>
             <div style="font-size:1.6rem; font-weight:600; line-height:1.2;">{{ active_this_week }}<span style="font-size:0.95rem; color:var(--gray-500); font-weight:400;">/{{ student_count }}</span></div>
         </div>
+        {% comment %}
+        A number, not a list. This used to name every quiet student as a chip
+        in the week panel — 357 of them on a real school — which pushed the
+        lessons off the screen and asked the teacher to read a phone book.
+        The names are in the Students tab, next to the date that explains them;
+        this is the count, and it takes you there.
+        {% endcomment %}
+        <div>
+            <div style="font-size:0.75rem; color:var(--gray-500); text-transform:uppercase; letter-spacing:0.04em;">{% blocktrans with days=quiet_after_days %}Quiet {{ days }}+ days{% endblocktrans %}</div>
+            <button type="button" class="class-tab-link" data-panel="panel-students"
+                    style="background:none; border:none; padding:0; font-family:inherit; font-size:1.6rem; font-weight:600; line-height:1.2; cursor:pointer; color:{% if quiet_count %}#b45309{% else %}var(--gray-900){% endif %};">{{ quiet_count }}</button>
+        </div>
     </div>
     {% endif %}
 </div>
@@ -39,21 +51,6 @@
 </div>
 
 <div id="panel-week" class="class-panel">
-    {% if inactive_students %}
-    <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
-        <div style="font-size:0.9rem; color:#92400e; font-weight:500; margin-bottom:0.5rem;">
-            {% blocktrans count n=inactive_students|length with days=quiet_after_days %}{{ n }} student has not worked in {{ days }} days{% plural %}{{ n }} students have not worked in {{ days }} days{% endblocktrans %}
-        </div>
-        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            {% for s in inactive_students %}
-            <a href="{% url 'dashboard:student_detail' s.id %}" style="padding:0.3rem 0.6rem; background:#fff; border:1px solid #fcd34d; border-radius:999px; font-size:0.82rem; color:#92400e; text-decoration:none;">
-                {{ s.first_name }} {{ s.last_name }}{% if s.last_worked_at %} &middot; {{ s.last_worked_at|timesince }}{% else %} &middot; {% trans "never" %}{% endif %}
-            </a>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
     {# Rendered even when empty. The card used to vanish entirely on a quiet #}
     {# week, which reads as a page that failed to load.                      #}
     <div class="card">
@@ -119,6 +116,7 @@
             <thead>
                 <tr>
                     <th>{% trans "Student" %}</th>
+                    <th>{% trans "Last worked" %}</th>
                     <th>{% trans "Email" %}</th>
                     <th></th>
                 </tr>
@@ -133,6 +131,13 @@
                             </div>
                             <span style="font-weight:500;">{{ student.first_name }} {{ student.last_name }}</span>
                         </div>
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if student.last_worked_at %}
+                            <span style="color:var(--gray-500);">{% blocktrans with when=student.last_worked_at|timesince %}{{ when }} ago{% endblocktrans %}</span>
+                        {% else %}
+                            <span style="color:#b45309;">{% trans "Never" %}</span>
+                        {% endif %}
                     </td>
                     <td style="color:var(--gray-500);">{{ student.email }}</td>
                     <td>
@@ -188,17 +193,30 @@
 <script nonce="{{ request.csp_nonce }}">
 // Tabs. Every panel is rendered server-side and toggled here, so switching
 // costs no request and nothing is lost when a tab is hidden.
+function showClassPanel(id) {
+    document.querySelectorAll('.class-tab').forEach(function (t) {
+        var on = t.dataset.panel === id;
+        t.classList.toggle('class-tab-on', on);
+        t.style.borderBottomColor = on ? 'var(--primary)' : 'transparent';
+        t.style.color = on ? 'var(--gray-900)' : 'var(--gray-500)';
+    });
+    document.querySelectorAll('.class-panel').forEach(function (panel) {
+        panel.hidden = panel.id !== id;
+    });
+}
+
 document.querySelectorAll('.class-tab').forEach(function (tab) {
     tab.addEventListener('click', function () {
-        document.querySelectorAll('.class-tab').forEach(function (t) {
-            var on = t === tab;
-            t.classList.toggle('class-tab-on', on);
-            t.style.borderBottomColor = on ? 'var(--primary)' : 'transparent';
-            t.style.color = on ? 'var(--gray-900)' : 'var(--gray-500)';
-        });
-        document.querySelectorAll('.class-panel').forEach(function (panel) {
-            panel.hidden = panel.id !== tab.dataset.panel;
-        });
+        showClassPanel(tab.dataset.panel);
+    });
+});
+
+// The quiet count in the header is a way into the roster, not just a figure:
+// a teacher who reads "12" wants the twelve names, and they are one tab away.
+document.querySelectorAll('.class-tab-link').forEach(function (link) {
+    link.addEventListener('click', function () {
+        showClassPanel(link.dataset.panel);
+        window.scrollTo({top: 0, behavior: 'smooth'});
     });
 });
 

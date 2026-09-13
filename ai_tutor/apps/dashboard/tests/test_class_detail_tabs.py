@@ -167,3 +167,61 @@ class TestPromotionIsNoLongerOffered:
         body = response.content.decode()
         assert reverse('dashboard:promote_students') not in body
         assert reverse('dashboard:delete_student', args=[amara.id]) not in body
+
+
+@pytest.mark.django_db
+class TestTheWeekIsAboutLessons:
+    """"This week" used to open with every quiet student as a named chip.
+
+    On a real school that is 357 names — a wall that pushed the lessons, which
+    are what the week is actually about, off the bottom of the screen, and
+    asked a teacher to read a phone book before seeing anything actionable.
+
+    The count stays in the header, where it is a number you can act on. The
+    names move to the Students tab, beside the date that explains them.
+    """
+
+    def test_the_week_panel_names_nobody(self, client, teacher, school, course):
+        for name in ('amara', 'jeanluc', 'kelly'):
+            _student(school, name)
+
+        response = _get(client, teacher)
+        body = response.content.decode()
+
+        assert response.context['quiet_count'] == 3
+        assert 'Amara' not in body.split('id="panel-students"')[0]
+        assert 'has not worked in' not in body
+        assert 'students have not worked in' not in body
+
+    def test_the_count_is_still_there_to_act_on(self, client, teacher, school,
+                                                 course):
+        _student(school, 'amara')
+        response = _get(client, teacher)
+        body = response.content.decode()
+        assert response.context['quiet_count'] == 1
+        assert 'Quiet 14+ days' in body
+        # It is the way into the roster, not just a figure.
+        assert 'class-tab-link' in body
+
+    def test_it_agrees_with_the_roster_it_points_at(self, client, teacher,
+                                                    school, course):
+        _student(school, 'amara')
+        _student(school, 'jeanluc')
+        response = _get(client, teacher)
+        assert response.context['quiet_count'] == len(
+            response.context['inactive_students'])
+
+    def test_the_roster_carries_the_date_that_explains_the_count(
+            self, client, teacher, school, course):
+        """A name with no date is not an answer — the Students tab is where a
+        teacher finds out whether "quiet" means a fortnight or since April."""
+        amara = _student(school, 'amara')
+        TutorSession.objects.create(student=amara, institution=school,
+                                    lesson=course.units.first().lessons.first())
+        _student(school, 'jeanluc')
+
+        response = _get(client, teacher)
+        body = response.content.decode()
+        students_panel = body.split('id="panel-students"')[1]
+        assert 'Last worked' in students_panel
+        assert 'Never' in students_panel
