@@ -496,8 +496,13 @@ no badge and no explanation. Say it where the badge would have been.
 </div>
 {% endif %}
 
+{% comment %}
+Inherited platform-wide materials. This used to render only on a match, so a
+correctly-configured course with nothing to inherit looked exactly like a
+broken one — no badge, no explanation. Every outcome now says which it is.
+{% endcomment %}
 {% if inherited_materials %}
-<!-- R2.3: inherited platform-wide materials badge -->
+{% if inherited_materials.status == 'matched' %}
 <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;color:#065F46;">
     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -511,6 +516,32 @@ no badge and no explanation. Say it where the badge would have been.
         {% endif %}
     </div>
 </div>
+{% else %}
+<div style="background:#F8FAFC;border:1px solid var(--gray-200);border-radius:8px;padding:0.85rem 1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:0.75rem;color:var(--gray-600);">
+    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:0.1rem;">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div style="font-size:0.875rem;line-height:1.45;">
+        <strong>{% trans "No platform-wide materials reach this course yet." %}</strong><br>
+        {% if inherited_materials.status == 'platform_courses_unclassified' %}
+            {% blocktrans count n=inherited_materials.unclassified_courses|length %}{{ n }} platform-wide course has teaching materials but no subject set, so nothing can match it.{% plural %}{{ n }} platform-wide courses have teaching materials but no subject set, so nothing can match them.{% endblocktrans %}
+            <span style="color:var(--gray-500);">—
+                {% for pc in inherited_materials.unclassified_courses %}<em>{{ pc.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}.
+                {% trans "Open each and pick a subject, and they will reach every school course for that subject and grade." %}</span>
+        {% elif inherited_materials.status == 'grade_mismatch' %}
+            {% trans "Platform-wide courses exist for this subject, but none covers this course's grade" %}
+            <span style="color:var(--gray-500);">—
+                {% for pc in inherited_materials.subject_courses %}<em>{{ pc.title }}</em> ({{ pc.grade_level|default:"no grade" }}){% if not forloop.last %}, {% endif %}{% endfor %}.</span>
+        {% elif inherited_materials.status == 'matched_but_empty' %}
+            {% trans "A platform-wide course matches this subject and grade, but no teaching materials have been uploaded to it" %}
+            <span style="color:var(--gray-500);">—
+                {% for pc in inherited_materials.platform_courses %}<em>{{ pc.title }}</em>{% if not forloop.last %}, {% endif %}{% endfor %}.</span>
+        {% else %}
+            {% trans "There is no platform-wide course for this subject. Create one as a super-admin and upload the shared textbooks there, and every school course for this subject and grade picks them up automatically." %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endif %}
 
 <!-- Teaching Materials -->

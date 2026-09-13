@@ -1605,6 +1605,17 @@ def complete_curriculum_upload(upload_id: int, feedback: str = "") -> dict:
                 _Course.objects.filter(id=cid, subject_code='').update(
                     subject_code=upload.subject_code,
                 )
+            # Same treatment for the grade, and for the same reason. The
+            # archive puts grade_level in get_or_create's `defaults`, which
+            # fire only on CREATE — so a re-parse onto an existing course left
+            # a blank grade blank, and a course with no grade inherits from
+            # every platform-wide course of its subject rather than the right
+            # one. Filling only a blank keeps the archive's "a re-parse must
+            # not rewrite a teacher's meta" contract.
+            if grade:
+                _Course.objects.filter(id=cid, grade_level='').update(
+                    grade_level=grade,
+                )
 
         upload.add_log(
             f"   ✓ {grade or '(no grade)'}: Course #{cid} "

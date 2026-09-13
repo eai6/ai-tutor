@@ -201,16 +201,54 @@ def _inherited_materials_summary(course):
         if not course_grades or not pc_grades or (course_grades & pc_grades):
             matching.append(pc)
 
-    if not matching:
-        return None
+    if matching:
+        material_count = TeachingMaterialUpload.objects.filter(
+            course_id__in=[c.id for c in matching],
+        ).count()
+        return {
+            'status': 'matched' if material_count else 'matched_but_empty',
+            'platform_courses': matching,
+            'material_count': material_count,
+        }
 
-    material_count = TeachingMaterialUpload.objects.filter(
-        course_id__in=[c.id for c in matching],
-    ).count()
+    # Nothing matched, and the course itself is set up correctly — which until
+    # now rendered as an absent badge, i.e. exactly the same as a working
+    # course with nothing to show. "Why am I not seeing the platform-wide
+    # widget" has three different answers and the page gave none of them.
+    #
+    # The one worth naming loudest is the third: a platform-wide course that
+    # HAS materials but no subject_code of its own cannot be found by this
+    # query, so the materials exist and are invisible. That is a fixable
+    # state (set its subject, or run backfill_course_subjects), not an empty
+    # library, and the two look identical from here.
+    unclassified = list(CourseModel.objects.filter(
+        institution__isnull=True, subject_code='',
+    ).only('id', 'title', 'grade_level'))
+    unclassified_with_materials = [
+        c for c in unclassified
+        if TeachingMaterialUpload.objects.filter(course_id=c.id).exists()
+    ]
+    if unclassified_with_materials:
+        return {
+            'status': 'platform_courses_unclassified',
+            'platform_courses': [],
+            'material_count': 0,
+            'unclassified_courses': unclassified_with_materials,
+        }
+
+    if platform_courses:
+        # Right subject, no overlapping grade.
+        return {
+            'status': 'grade_mismatch',
+            'platform_courses': [],
+            'material_count': 0,
+            'subject_courses': platform_courses,
+        }
 
     return {
-        'platform_courses': matching,
-        'material_count': material_count,
+        'status': 'no_platform_course',
+        'platform_courses': [],
+        'material_count': 0,
     }
 
 
