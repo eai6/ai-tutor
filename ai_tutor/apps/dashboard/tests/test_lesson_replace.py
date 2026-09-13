@@ -45,8 +45,8 @@ def course(db, school):
     return course
 
 
-def _structure(*titles):
-    return {'units': [{'title': 'Maps',
+def _structure(*titles, unit='Maps'):
+    return {'units': [{'title': unit,
                        'lessons': [{'title': t} for t in titles]}]}
 
 
@@ -145,3 +145,55 @@ class TestTheFormOffersBothModes:
         body = client.get(reverse('dashboard:course_detail',
                                   args=[course.id])).content.decode()
         assert body.count('type="hidden" name="reparse_mode" value="add"') == 2
+
+
+@pytest.mark.django_db
+class TestMatchingIsScopedToTheUnit:
+    """Re-parsing additively for months leaves the same lesson title in
+    several units — Mathematics S3 in production has "Expand and simplify
+    number expressions" in three of them.
+
+    A course-wide title match keeps every copy, because the document still
+    lists the title somewhere, so a replace on that course was a no-op. The
+    merge writes on (unit title, lesson title); the retire has to read the
+    same key.
+    """
+
+    def test_a_duplicate_in_an_unlisted_unit_is_parked(self, course):
+        stale = Unit.objects.create(course=course, title='Old algebra unit',
+                                    order_index=9)
+        dupe = Lesson.objects.create(unit=stale, title='Map scale',
+                                     objective='o', order_index=0,
+                                     is_published=True)
+
+        retire_lessons_not_in(course, _structure('Map scale'))
+
+        dupe.refresh_from_db()
+        assert dupe.retired_at is not None, (
+            'a copy in a unit the document does not list must be parked, '
+            'even though its title appears elsewhere in the document'
+        )
+        assert Lesson.objects.get(title='Map scale',
+                                  unit__title='Maps').retired_at is None
+
+    def test_a_whole_unit_the_document_dropped_is_parked(self, course):
+        stale = Unit.objects.create(course=course, title='Removed topic',
+                                    order_index=9)
+        for i, t in enumerate(['Old one', 'Old two']):
+            Lesson.objects.create(unit=stale, title=t, objective='o',
+                                  order_index=i, is_published=True)
+
+        n = retire_lessons_not_in(
+            course, _structure('Grid references', 'Map scale', 'Contours'))
+
+        assert n == 2
+        assert Lesson.objects.filter(unit=stale,
+                                     retired_at__isnull=False).count() == 2
+
+    def test_a_renamed_unit_parks_its_old_copy(self, course):
+        """The document reorganising its units is the ordinary case for a
+        corrected syllabus, and the whole reason to offer replace."""
+        n = retire_lessons_not_in(
+            course, _structure('Grid references', 'Map scale', 'Contours',
+                               unit='Maps and scale'))
+        assert n == 3, 'every lesson moved to a renamed unit is re-homed'

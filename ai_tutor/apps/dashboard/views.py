@@ -277,25 +277,41 @@ def retire_lessons_not_in(course, structure, *, actor=None) -> int:
     the course page, and every record that points at it still resolves. The
     student's page still shows the work they did on it.
 
-    Matching is by title, the same key the merge itself uses, so a lesson the
-    document still lists is left alone whatever else changed about it.
+    Matched on (unit title, lesson title) — the same key the additive merge
+    writes with, so the two halves agree by construction.
+
+    Not on lesson title alone. Re-parsing additively for months leaves a course
+    with the same lesson title sitting in several units — Mathematics S3 in
+    production has "Expand and simplify number expressions" in three — and a
+    course-wide title match keeps every copy, because the document still lists
+    the title *somewhere*. Scoping to the unit is what lets a replace clear the
+    duplicate units those earlier merges built up.
     """
     from django.utils import timezone
 
-    titles = set()
+    def _key(unit_title, lesson_title):
+        return (
+            ' '.join(str(unit_title or '').split()).strip().lower(),
+            ' '.join(str(lesson_title or '').split()).strip().lower(),
+        )
+
+    keys = set()
     for unit in (structure or {}).get('units') or []:
+        unit_title = (unit or {}).get('title')
         for lesson in (unit or {}).get('lessons') or []:
             title = (lesson or {}).get('title')
             if title:
-                titles.add(' '.join(str(title).split()).strip().lower())
-    if not titles:
+                keys.add(_key(unit_title, title))
+    if not keys:
         # An empty parse retires nothing. A document that yielded no lessons is
         # a failed parse, not an instruction to empty the course.
         return 0
 
     retired = 0
-    for lesson in Lesson.objects.filter(unit__course=course, retired_at__isnull=True):
-        if ' '.join((lesson.title or '').split()).strip().lower() in titles:
+    for lesson in (Lesson.objects
+                   .filter(unit__course=course, retired_at__isnull=True)
+                   .select_related('unit')):
+        if _key(lesson.unit.title, lesson.title) in keys:
             continue
         lesson.retired_at = timezone.now()
         lesson.is_published = False
