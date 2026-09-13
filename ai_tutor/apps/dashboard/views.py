@@ -1249,6 +1249,67 @@ def student_detail(request, student_id):
     mastered_lessons_list.sort(key=lambda p: p.last_attempt_at or p.updated_at,
                                reverse=True)
 
+    # ── One tab per course ──
+    #
+    # "Mastered — 10 lessons" is a number with no denominator, and on a real
+    # student all ten belonged to one course out of five. Ten of twenty-five in
+    # Perseverence Geography is a different fact, and it is the one a teacher
+    # is actually asking for.
+    #
+    # The denominator is PUBLISHED lessons only. Counting drafts too (the
+    # 2026-05-07 behaviour, to "show the full course structure") makes the
+    # fraction describe the catalogue's authoring backlog rather than the
+    # student: locally one course carries 174 authored lessons and 0 published,
+    # so every student in it would read 0/174 forever. A student cannot work a
+    # draft, so a draft cannot be part of what they have left.
+    published_per_course = dict(
+        Lesson.objects
+        .filter(is_published=True)
+        .values_list('unit__course_id')
+        .annotate(n=Count('id'))
+        .values_list('unit__course_id', 'n')
+    )
+
+    course_tabs = []
+    for cp in courses_progress.values():
+        course = cp['course']
+        total = published_per_course.get(course.id, 0)
+        # A course with nothing published is not available to this student —
+        # there is no lesson they could open — so a 0/0 tab would be a row of
+        # noise between the courses they are actually in.
+        if not total:
+            continue
+        mastered = [p for p in cp['lessons'] if p.mastery_level == 'mastered']
+        open_rows = [p for p in cp['lessons'] if p.mastery_level != 'mastered']
+        mastered.sort(key=lambda p: p.last_attempt_at or p.updated_at, reverse=True)
+        open_rows.sort(key=lambda p: p.last_attempt_at or p.updated_at, reverse=True)
+        touched = [p.last_attempt_at or p.updated_at for p in cp['lessons']]
+        # Clamp: progress rows can outnumber published lessons when a lesson is
+        # unpublished after a student passed it. A bar past 100% reads as a bug.
+        counted = min(len(mastered) + len(open_rows), total)
+        course_tabs.append({
+            'course': course,
+            'slug': f'course-{course.id}',
+            'total': total,
+            'mastered': mastered,
+            'open': open_rows,
+            'mastered_count': len(mastered),
+            'open_count': len(open_rows),
+            'not_started': max(total - counted, 0),
+            'last_worked_at': max(touched) if touched else None,
+            'mastered_pct': round(min(len(mastered), total) / total * 100),
+            'open_pct': round(min(len(open_rows), total - min(len(mastered), total)) / total * 100),
+        })
+
+    # Courses the student is actually in come first, most recent first; the
+    # untouched ones keep a stable alphabetical tail rather than an arbitrary
+    # one, so the tab bar does not reshuffle between page loads.
+    course_tabs.sort(key=lambda t: (
+        t['last_worked_at'] is None,
+        -(t['last_worked_at'].timestamp() if t['last_worked_at'] else 0),
+        t['course'].title.lower(),
+    ))
+
 
     # ── Competency breakdown per course ──
     from ai_tutor.apps.tutoring.skills_models import Skill, StudentSkillMastery
@@ -1300,6 +1361,7 @@ def student_detail(request, student_id):
         'stuck_lessons': stuck_lessons,
         'mastered_lessons_list': mastered_lessons_list,
         'untouched_courses': untouched_courses,
+        'course_tabs': course_tabs,
         'last_worked_at': sessions[0].started_at if sessions else None,
     }
 

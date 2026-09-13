@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "DirectionA.dc.html", "title": "A — Course accordion", "x": 0, "y": 0, "w": 1180, "h": 1000 },
+    { "file": "DirectionB.dc.html", "title": "B — Summary strip + one table", "x": 1300, "y": 0, "w": 1180, "h": 1000 },
+    { "file": "Main.dc.html", "title": "C — One course at a time", "x": 2600, "y": 0, "w": 1180, "h": 1120 }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -210, "w": 460, "text": "Student page — mastery in the context of each course.\n\nToday the page says \"Mastered — 10 lessons\", which hides that those 10 are all one course and that the course has 25. Real numbers from the local DB: Perseverence 25 published lessons, Belonie 38, Mount Fleuri 36, Pointe Larue 25." },
+    { "id": "note-a", "x": 0, "y": 1040, "w": 1180, "text": "A — Course accordion. Every course is a row carrying its own fraction; the one with live work is open, the rest collapse to a line. Scales to any number of courses and puts the denominator where it belongs.\nTradeoff: a lesson is always one click away, and a student working across three courses has three things to expand." },
+    { "id": "note-b", "x": 1300, "y": 1040, "w": 1180, "text": "B — Summary strip + one table. The fractions are cards at the top; clicking one filters the single lesson table below. Nothing is hidden behind a disclosure, and the cards read at a glance.\nTradeoff: two regions to keep in sync, and the card strip wraps to a second row once a student has more than four courses." },
+    { "id": "note-c", "x": 2600, "y": 1160, "w": 1180, "text": "C — One course at a time. The tab bar becomes the course list, each tab carrying its fraction, and the panel below is that course banded Open / Mastered / Not started — the shape the page already has, scoped to one course.\nTradeoff: you cannot see two courses at once, and the tab bar gets crowded past five courses." },
+    { "id": "note-edge", "x": 2600, "y": 1420, "w": 1180, "text": "Edge case all three must handle: two of this student's courses (Geography S3, Mathematics S3) have 0 published lessons, so the honest fraction is 0/0. Worth deciding whether those courses appear at all." }
+  ],
+  "launch": { "view": "canvas" }
+}

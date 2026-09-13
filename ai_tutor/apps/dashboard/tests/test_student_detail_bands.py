@@ -12,6 +12,8 @@ import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 
+from datetime import timedelta
+
 from ai_tutor.apps.accounts.models import Institution, Membership, StudentProfile
 from ai_tutor.apps.curriculum.models import Course, Lesson, Unit
 from ai_tutor.apps.tutoring.models import StudentLessonProgress, TutorSession
@@ -74,18 +76,53 @@ class TestTheBands:
         assert stuck == [lessons[0].id]
         assert mastered == [lessons[1].id]
 
-    def test_a_course_with_no_progress_is_named_not_counted(
+    def test_an_untouched_course_shows_its_denominator(
             self, client, teacher, student, course, school):
-        """The old page drew a 0/N bar per untouched course, where N counted
-        every authored lesson including drafts — a fact about the catalogue,
-        not about this student."""
+        """The denominator is the point of the course tabs — "0/4" says this
+        student has four lessons waiting. What the old page got wrong was not
+        showing a fraction, it was counting DRAFTS in it (next test)."""
         client.force_login(teacher)
         response = client.get(reverse('dashboard:student_detail', args=[student.id]))
 
-        untouched = [c.title for c in response.context['untouched_courses']]
-        assert untouched == ['Geography S3']
-        body = response.content.decode()
-        assert '0/4' not in body and '0 / 4' not in body
+        tab = next(t for t in response.context['course_tabs']
+                   if t['course'].id == course.id)
+        assert (tab['mastered_count'], tab['total']) == (0, 4)
+        assert tab['not_started'] == 4
+        assert tab['last_worked_at'] is None
+        assert '0/4' in response.content.decode()
+
+    def test_drafts_are_not_in_the_denominator(
+            self, client, teacher, student, course, school):
+        """A student cannot open a draft, so a draft cannot be part of what
+        they have left. Counting them made the fraction describe the authoring
+        backlog — one local course carries 174 authored lessons and 0
+        published, which would have read 0/174 for every student in it."""
+        unit = course.units.first()
+        for i in range(6):
+            Lesson.objects.create(unit=unit, title=f'Draft {i}', objective='o',
+                                  order_index=10 + i, is_published=False)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        tab = next(t for t in response.context['course_tabs']
+                   if t['course'].id == course.id)
+        assert tab['total'] == 4, 'the six drafts must not be counted'
+
+    def test_a_course_with_nothing_published_gets_no_tab(
+            self, client, teacher, student, school):
+        """0/0 is not a fraction a teacher can act on, and a course with no
+        published lesson is one the student cannot enter at all."""
+        empty = Course.objects.create(title='Unpublished S3', institution=school)
+        unit = Unit.objects.create(course=empty, title='U', order_index=0)
+        Lesson.objects.create(unit=unit, title='Draft', objective='o',
+                              order_index=0, is_published=False)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        titles = [t['course'].title for t in response.context['course_tabs']]
+        assert 'Unpublished S3' not in titles
 
     def test_the_same_lesson_is_not_listed_twice(
             self, client, teacher, student, course, school):
@@ -275,3 +312,135 @@ class TestTheDictAnswersFormatDoesNotCrashThePage:
                                       args=[student.id]))
         assert response.status_code == 200
         assert response.context['stuck_lessons'][0].weak_concept_rows == []
+
+
+@pytest.mark.django_db
+class TestMasteryIsScopedToACourse:
+    """"Mastered — 10 lessons" is a number with no denominator.
+
+    On the student that prompted this, all ten belonged to one course out of
+    five, and that course has twenty-five published lessons. Ten of twenty-five
+    in Perseverence Geography is a different fact from "ten lessons", and it is
+    the one a teacher is actually asking for — so the page is one tab per
+    course, each carrying its own fraction.
+    """
+
+    def _second_course(self, school):
+        course = Course.objects.create(title='Maths S3', institution=school)
+        unit = Unit.objects.create(course=course, title='Numbers', order_index=1)
+        for i in range(10):
+            Lesson.objects.create(unit=unit, title=f'Maths {i}', objective='o',
+                                  order_index=i, is_published=True)
+        return course
+
+    def test_each_course_counts_only_its_own_lessons(
+            self, client, teacher, student, course, school):
+        maths = self._second_course(school)
+        geo_lessons = list(course.units.first().lessons.all())
+        for lesson in geo_lessons[:3]:
+            _progress(student, lesson, school, mastery_level='mastered',
+                      best_score=0.9)
+        _progress(student, maths.units.first().lessons.first(), school,
+                  mastery_level='mastered', best_score=0.8)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        tabs = {t['course'].title: t for t in response.context['course_tabs']}
+        assert (tabs['Geography S3']['mastered_count'],
+                tabs['Geography S3']['total']) == (3, 4)
+        assert (tabs['Maths S3']['mastered_count'],
+                tabs['Maths S3']['total']) == (1, 10)
+
+    def test_the_three_numbers_add_up_to_the_course(
+            self, client, teacher, student, course, school):
+        lessons = list(course.units.first().lessons.all())
+        _progress(student, lessons[0], school, mastery_level='mastered',
+                  best_score=0.9)
+        _progress(student, lessons[1], school, mastery_level='in_progress')
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        t = next(t for t in response.context['course_tabs']
+                 if t['course'].id == course.id)
+        assert t['mastered_count'] + t['open_count'] + t['not_started'] == t['total']
+
+    def test_an_unpublished_lesson_the_student_passed_does_not_overflow(
+            self, client, teacher, student, course, school):
+        """Unpublishing a lesson after a student passed it leaves more progress
+        rows than published lessons. A bar past 100%, or "5 of 4 passed", reads
+        as a bug in the page rather than a fact about the course."""
+        lessons = list(course.units.first().lessons.all())
+        for lesson in lessons:
+            _progress(student, lesson, school, mastery_level='mastered',
+                      best_score=0.9)
+        Lesson.objects.filter(pk=lessons[0].pk).update(is_published=False)
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        t = next(t for t in response.context['course_tabs']
+                 if t['course'].id == course.id)
+        assert t['total'] == 3
+        assert t['not_started'] == 0
+        assert t['mastered_pct'] <= 100
+        assert t['mastered_pct'] + t['open_pct'] <= 100
+
+    def test_the_course_being_worked_on_comes_first(
+            self, client, teacher, student, course, school):
+        """The tab bar opens on whichever course the student last touched, not
+        on whichever course sorts first alphabetically."""
+        from django.utils import timezone
+        maths = self._second_course(school)
+        old = _progress(student, course.units.first().lessons.first(), school,
+                        mastery_level='mastered', best_score=0.9)
+        new = _progress(student, maths.units.first().lessons.first(), school,
+                        mastery_level='in_progress')
+        StudentLessonProgress.objects.filter(pk=old.pk).update(
+            last_attempt_at=timezone.now() - timedelta(days=60))
+        StudentLessonProgress.objects.filter(pk=new.pk).update(
+            last_attempt_at=timezone.now())
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+        assert response.context['course_tabs'][0]['course'].title == 'Maths S3'
+
+    def test_untouched_courses_sort_after_the_worked_ones(
+            self, client, teacher, student, course, school):
+        self._second_course(school)
+        _progress(student, course.units.first().lessons.first(), school,
+                  mastery_level='in_progress')
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+        titles = [t['course'].title for t in response.context['course_tabs']]
+        assert titles == ['Geography S3', 'Maths S3']
+
+    def test_a_lesson_belongs_to_exactly_one_band_within_its_course(
+            self, client, teacher, student, course, school):
+        lessons = list(course.units.first().lessons.all())
+        _progress(student, lessons[0], school, mastery_level='mastered',
+                  best_score=0.9)
+        _progress(student, lessons[1], school, mastery_level='in_progress')
+
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[student.id]))
+
+        t = next(t for t in response.context['course_tabs']
+                 if t['course'].id == course.id)
+        mastered = {p.lesson_id for p in t['mastered']}
+        open_rows = {p.lesson_id for p in t['open']}
+        assert not (mastered & open_rows)
+
+    def test_a_student_with_no_available_course_gets_a_sentence_not_a_blank(
+            self, client, teacher, school):
+        user = User.objects.create_user('solo', 's@example.com', 'pw',
+                                        first_name='Solo')
+        Membership.objects.create(user=user, institution=school,
+                                  role=Membership.Role.STUDENT)
+        client.force_login(teacher)
+        response = client.get(reverse('dashboard:student_detail', args=[user.id]))
+
+        assert response.context['course_tabs'] == []
+        assert 'No course with published lessons' in response.content.decode()
